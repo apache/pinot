@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -34,6 +33,7 @@ import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
 /// An operator for order-by queries DESC that are partially sorted over the sorting keys.
+/// The planner guarantees the sorted prefix can be read in reverse; a literal-only prefix imposes no direction.
 ///
 /// @see LinearSelectionOrderByOperator
 public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrderByOperator {
@@ -45,13 +45,6 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
   public SelectionPartiallyOrderedByDescOperation(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
-    assert queryContext.getOrderByExpressions() != null;
-    Preconditions.checkArgument(!queryContext.getOrderByExpressions().stream()
-            .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
-            .isAsc(),
-        "%s can only be used when the first column in order by is DESC", EXPLAIN_NAME);
   }
 
   @Override

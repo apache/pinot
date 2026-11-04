@@ -96,6 +96,14 @@
         "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ GROUP BY {tbl1}.name"
       },
       {
+        "description": "Aggregate on partition column without group by with hint",
+        "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
+      },
+      {
+        "description": "Aggregate on partition column without group by with partition parallelism and hint",
+        "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */"
+      },
+      {
         "description": "Skip leaf stage aggregation with GROUP BY hint",
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), MIN({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} WHERE {tbl1}.num >= 0 GROUP BY {tbl1}.name"
       },
@@ -126,6 +134,63 @@
       {
         "description": "Colocated JOIN with partition column and group by non-partitioned column with stage parallelism",
         "sql": "SET stageParallelism=2; SELECT {tbl1}.name, SUM({tbl2}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Both sides distributed at random drops rows that share a key but land on different workers",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'random', right_distribution_type = 'random') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*must be distributed the same way on the join keys.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "One side hashed and the other at random drops rows that share a key",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'hash', right_distribution_type = 'random') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*must be distributed the same way on the join keys.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Broadcasting both sides repeats the join result once per worker",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'broadcast', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*Cannot give every worker the whole of both sides of the join.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "Join without equi keys and no broadcast side cannot bring matching rows together",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num > {tbl2}.num",
+        "expectedException": ".*requires one side to be broadcast.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "LEFT join broadcasting the left side emits left rows as unmatched on workers holding part of the right side",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'broadcast', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} LEFT JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*LEFT join requires every right row on each worker.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "RIGHT join broadcasting the right side emits right rows as unmatched on workers holding part of the left side",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} RIGHT JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+        "expectedException": ".*RIGHT join requires every left row on each worker.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "RIGHT join without equi keys broadcasting the right side emits right rows as unmatched",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'random', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} RIGHT JOIN {tbl2} ON {tbl1}.num > {tbl2}.num",
+        "expectedException": ".*RIGHT join requires every left row on each worker.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "SEMI join broadcasting the left side emits a left row once per worker holding a match",
+        "sql": "SELECT /*+ joinOptions(join_strategy = 'hash', left_distribution_type = 'broadcast', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name FROM {tbl1} WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2})",
+        "expectedException": ".*SEMI join requires every right row on each worker.*",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "SEMI join broadcasting the left side and hashing the right side on the join keys: only the worker a key hashes to holds its right rows",
+        "sql": "SELECT /*+ joinOptions(join_strategy = 'hash', left_distribution_type = 'broadcast', right_distribution_type = 'hash') */ {tbl1}.num, {tbl1}.name FROM {tbl1} WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2})",
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "LEFT join broadcasting the right side is the workable direction",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} LEFT JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
       },
       {
         "description": "Broadcast JOIN",
@@ -720,6 +785,30 @@
     {
       "description": "Local replicated JOIN with partition hint and parallelism",
       "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local JOIN without equi keys against a replicated table: every worker holds the whole right table",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num > {tbl2}.num"
+    },
+    {
+      "description": "Local LEFT JOIN without equi keys against a replicated table",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} LEFT JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num > {tbl2}.num"
+    },
+    {
+      "description": "Hash on the left and local on a replicated right table",
+      "sql": "SELECT /*+ joinOptions(right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local JOIN between two replicated tables repeats the join result once per worker",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(is_replicated='true') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num > {tbl2}.num",
+      "expectedException": ".*Cannot give every worker the whole of both sides of the join.*",
+      "ignoreV2Optimizer": true
+    },
+    {
+      "description": "Local scan of a replicated left table and a broadcast right side repeats the join result once per worker",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(is_replicated='true') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num",
+      "expectedException": ".*Cannot give every worker the whole of both sides of the join.*",
+      "ignoreV2Optimizer": true
     },
     {
       "description": "Window PARTITION BY the table's partition column with is_partitioned_by_window_keys hint forces a pre-partitioned (direct) exchange; tbl1 is partitioned by num so results stay correct",

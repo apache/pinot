@@ -41,6 +41,9 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// TODO: add test for other logical types
@@ -172,6 +175,76 @@ public class ParquetReaderLogicalTypesTest {
       GenericRow row = recordReader.next();
       assertEquals((Object[]) row.getValue("uint32_list"), new Object[]{largeUnsigned, 7L});
       assertEquals(((Map<?, ?>) row.getValue("uint32_struct")).get("value"), largeUnsigned);
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
+    }
+  }
+
+  @Test
+  public void testReadersPreserveUnsignedInt64Bits()
+      throws IOException {
+    MessageType schema = MessageTypeParser.parseMessageType(
+        "message m { required int64 value (INTEGER(64, false)); }");
+    File dataFile = new File(FileUtils.getTempDirectory(), "unsigned-int64-" + System.nanoTime() + ".parquet");
+    try {
+      try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+          .withType(schema).build()) {
+        SimpleGroupFactory groups = new SimpleGroupFactory(schema);
+        for (long value : new long[]{-1L, 7L, Long.MIN_VALUE}) {
+          writer.write(groups.newGroup().append("value", value));
+        }
+      }
+      for (RecordReader reader : List.of(new ParquetNativeRecordReader(), new ParquetAvroRecordReader())) {
+        try (reader) {
+          reader.init(dataFile, null, null);
+          for (long value : new long[]{-1L, 7L, Long.MIN_VALUE}) {
+            assertTrue(reader.hasNext());
+            assertEquals(reader.next(new GenericRow()).getValue("value"), value);
+          }
+          assertFalse(reader.hasNext());
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
+    }
+  }
+
+  @Test
+  public void testReadersAdvancePastRejectedInt96()
+      throws IOException {
+    MessageType schema = MessageTypeParser.parseMessageType("message m { required int96 value; }");
+    File dataFile = new File(FileUtils.getTempDirectory(), "rejected-int96-" + System.nanoTime() + ".parquet");
+    try {
+      try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+          .withType(schema).build()) {
+        SimpleGroupFactory groups = new SimpleGroupFactory(schema);
+        // Year 1600 cannot fit signed Long epoch nanos; the valid middle row is followed by another rejection.
+        writer.write(groups.newGroup().append("value", new NanoTime(2305448, 0L)));
+        writer.write(groups.newGroup().append("value", new NanoTime(2440588, 7L)));
+        writer.write(groups.newGroup().append("value", new NanoTime(2305448, 0L)));
+      }
+      for (boolean useAvro : new boolean[]{false, true}) {
+        ParquetRecordReaderConfig config = new ParquetRecordReaderConfig();
+        config.setUseParquetAvroRecordReader(useAvro);
+        config.setUseParquetNativeRecordReader(!useAvro);
+        config.setExtractRawTimeValues(true);
+        try (ParquetRecordReader reader = new ParquetRecordReader()) {
+          reader.init(dataFile, null, config);
+          assertEquals(reader.useAvroParquetRecordReader(), useAvro);
+          for (int iteration = 0; iteration < 2; iteration++) {
+            if (iteration > 0) {
+              reader.rewind();
+            }
+            assertTrue(reader.hasNext());
+            expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
+            assertTrue(reader.hasNext());
+            assertEquals(reader.next(new GenericRow()).getValue("value"), 7L);
+            assertTrue(reader.hasNext());
+            expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
+            assertFalse(reader.hasNext(), "Extraction failures must not retry the rejected record");
+          }
+        }
+      }
     } finally {
       FileUtils.deleteQuietly(dataFile);
     }

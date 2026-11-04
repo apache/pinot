@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.Literal;
@@ -27,6 +28,7 @@ import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.SerializedULL;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -88,6 +90,19 @@ public class DistinctCountULLAggregationFunctionTest {
 
   private static Map<ExpressionContext, BlockValSet> mvBlock() {
     return Map.of(COLUMN, SyntheticBlockValSets.LongMV.create(null, MV_ROWS));
+  }
+
+  @Test
+  public void testMergeRawFinalResults() {
+    DistinctCountRawULLAggregationFunction function =
+        new DistinctCountRawULLAggregationFunction(List.of(ExpressionContext.forIdentifier("col")), false);
+    UltraLogLog ull1 = UltraLogLog.create(12).add(0x0123456789ABCDEFL).add(0x1111111111111111L);
+    UltraLogLog ull2 = UltraLogLog.create(12).add(0x7777777777777777L);
+    UltraLogLog expected =
+        UltraLogLog.create(12).add(0x0123456789ABCDEFL).add(0x1111111111111111L).add(0x7777777777777777L);
+
+    String merged = function.mergeFinalResult(new SerializedULL(ull1).toString(), new SerializedULL(ull2).toString());
+    assertEquals(merged, new SerializedULL(expected).toString());
   }
 
   /// Aggregating a multi-value column gives exactly what aggregating its flattened values as a single-value column

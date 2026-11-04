@@ -1328,6 +1328,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
       when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
           this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
         }});
+      when(segmentMetadata.getColumnMetadataFor(COMPARISON_COLUMNS.get(0))).thenReturn(columnMetadata);
 
       ImmutableSegmentImpl segment =
           mockImmutableSegmentWithSegmentMetadata(1, new ThreadSafeMutableRoaringBitmap(), null, null, segmentMetadata,

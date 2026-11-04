@@ -536,7 +536,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
-      if (!_queryQuotaManager.acquireLogicalTable(tableName)) {
+      if (isLogicalTableQpsQuotaBreachEnforced(tableName)) {
         String errorMessage =
             String.format("Request %d: %s exceeds query quota for table: %s.", requestId,
                 _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), tableName);
@@ -595,13 +595,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
-      if (!_queryQuotaManager.acquire(tableName)) {
+      if (isTableQpsQuotaBreachEnforced(tableName)) {
         String errorMessage =
             String.format("Request %d: %s exceeds query quota for table: %s", requestId,
                 _queryLogger.redactQuery(query, requestContext.getQueryFingerprint()), tableName);
         LOGGER.info(errorMessage);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
 
@@ -1649,6 +1648,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (_enableAutoRewriteAggregationType != null) {
         sqlNodeAndOptions.getOptions()
             .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
+      }
+
+      if (_inferAnyValueTypeProvider.isEnabled()) {
+        sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.INFER_ANY_VALUE_TYPE, "true");
       }
 
       if (_regexDictSizeThreshold != null) {

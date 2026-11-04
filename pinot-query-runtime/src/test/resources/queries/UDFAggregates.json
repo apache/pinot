@@ -23,9 +23,36 @@
           [150, 150, 1.5, 1.5, "c", false, "1E+317", "2020-02-03 03:32:12", "DEADBE01", "00000000-0000-0000-0000-000000000006"],
           [175, 175, 1.75, 1.75, "c", true, "1E+328", "2020-01-02 03:32:12", "DEADBE02", "00000000-0000-0000-0000-000000000007"]
         ]
+      },
+      "partitioned_tbl": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "name", "type": "STRING"},
+          {"name": "flag", "type": "BOOLEAN"},
+          {"name": "event_ts", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          [1, "a", true, "2020-01-01 00:00:00"],
+          [3, "c", false, "2020-01-02 00:00:00"],
+          [3, "yyy", true, "2020-01-03 00:00:00"],
+          [4, "e", true, "2020-01-04 00:00:00"],
+          [4, "e", false, "2020-01-04 00:00:00"],
+          [4, "f", false, "2020-01-05 00:00:00"],
+          [7, "f", true, "2020-01-07 00:00:00"],
+          [7, "d", true, "2020-01-06 00:00:00"]
+        ],
+        "partitionColumns": ["num"]
       }
     },
     "queries": [
+      {"sql": "SELECT FIRSTWITHTIME(x, c) FROM (SELECT int_col x, 5 c FROM {tbl} WHERE int_col = 2 UNION ALL SELECT int_col, 5 FROM {tbl} WHERE int_col = 2)", "outputs": [[2]]},
+      {"sql": "SELECT COVARPOP(x, c), MODE(s) FROM (SELECT int_col x, 50 c, string_col s FROM {tbl} UNION ALL SELECT int_col, 50, string_col FROM {tbl})", "outputs": [[0, "c"]]},
+      {"sql": "SELECT CARDINALITY(ARRAY_AGG(x)), DISTINCTCOUNT(x), COVARPOP(x, y) FROM (SELECT int_col x, 1.0 y FROM {tbl} UNION ALL SELECT int_col, CAST(long_col AS DOUBLE) FROM {tbl})", "outputs": [[14, 6, 2339.918367346939]]},
+      {"sql": "SET enableNullHandling=false; SELECT MODE(CASE WHEN int_col > 3 THEN string_col END) FROM {tbl}", "outputs": [["c"]]},
+      {"sql": "SET enableNullHandling=false; SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ bool_col, MODE(CASE WHEN int_col > 3 THEN string_col END) FROM {tbl} GROUP BY bool_col", "outputs": [[true, "c"], [false, "c"]]},
+      {"sql": "SET inferAnyValueType=true; SELECT src, ANY_VALUE(x) FROM (SELECT 'a' src, 1 x FROM {tbl} UNION ALL SELECT 'b', 2 FROM {tbl}) GROUP BY src", "outputs": [["a", 1], ["b", 2]]},
+      {"sql": "SELECT LASTWITHTIME(x, t) FROM (SELECT int_col x, CAST('2019-01-01 00:00:00' AS TIMESTAMP) t FROM {tbl} UNION ALL SELECT int_col, timestamp_col FROM {tbl})", "outputs": [[101]]},
+      {"sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ src, k, MODE(s) FROM (SELECT 'a' src, int_col k, string_col s FROM {tbl} UNION ALL SELECT 'b', int_col, string_col FROM {tbl}) WHERE k = 2 GROUP BY src, k", "outputs": [["a", 2, "a"], ["b", 2, "a"]]},
       {
         "sql": "SELECT FIRSTWITHTIME(int_col, timestamp_col, 'INT'), FIRSTWITHTIME(string_col, timestamp_col, 'STRING'), first_with_time(bool_col, CAST(long_col AS TIMESTAMP), 'BOOLEAN') FROM {tbl}",
         "outputs": [[2, "a", true]]
@@ -35,7 +62,7 @@
         "outputs": [[false, 100, 100, 3], [true, 300, 300, 2]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, FIRSTWITHTIME(float_col, timestamp_col, 'FLOAT'), FIRSTWITHTIME(double_col, timestamp_col, 'DOUBLE'), first_with_time(long_col, CAST(long_col AS TIMESTAMP), 'LONG') FROM {tbl} GROUP BY string_col",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, FIRSTWITHTIME(float_col, timestamp_col, 'FLOAT'), FIRSTWITHTIME(double_col, timestamp_col, 'DOUBLE'), first_with_time(long_col, CAST(long_col AS TIMESTAMP), 'LONG') FROM {tbl} GROUP BY string_col",
         "outputs": [["a", 300, 300, 2], ["b", 100, 100, 3], ["c", 1.75, 1.75, 101]]
       },
       {
@@ -47,7 +74,7 @@
         "outputs": [[false, 1.01, 1.01, 150], [true, 1.75, 1.75, 175]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, LASTWITHTIME(float_col, timestamp_col, 'FLOAT'), LASTWITHTIME(double_col, timestamp_col, 'DOUBLE'), last_with_time(long_col, CAST(long_col AS TIMESTAMP), 'LONG') FROM {tbl} GROUP BY string_col",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, LASTWITHTIME(float_col, timestamp_col, 'FLOAT'), LASTWITHTIME(double_col, timestamp_col, 'DOUBLE'), last_with_time(long_col, CAST(long_col AS TIMESTAMP), 'LONG') FROM {tbl} GROUP BY string_col",
         "outputs": [["a", 400, 400, 2], ["b", 1, 1, 100], ["c", 1.01, 1.01, 175]]
       },
       {
@@ -60,7 +87,7 @@
         "outputs": [[false, 100, 100, 3], [true, 300, 300, 2]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, FIRSTWITHTIME(float_col, timestamp_col), FIRSTWITHTIME(double_col, timestamp_col), first_with_time(long_col, CAST(long_col AS TIMESTAMP)) FROM {tbl} GROUP BY string_col",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, FIRSTWITHTIME(float_col, timestamp_col), FIRSTWITHTIME(double_col, timestamp_col), first_with_time(long_col, CAST(long_col AS TIMESTAMP)) FROM {tbl} GROUP BY string_col",
         "outputs": [["a", 300, 300, 2], ["b", 100, 100, 3], ["c", 1.75, 1.75, 101]]
       },
       {
@@ -72,7 +99,7 @@
         "outputs": [[false, 1.01, 1.01, 150], [true, 1.75, 1.75, 175]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, LASTWITHTIME(float_col, timestamp_col), LASTWITHTIME(double_col, timestamp_col), last_with_time(long_col, CAST(long_col AS TIMESTAMP)) FROM {tbl} GROUP BY string_col",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, LASTWITHTIME(float_col, timestamp_col), LASTWITHTIME(double_col, timestamp_col), last_with_time(long_col, CAST(long_col AS TIMESTAMP)) FROM {tbl} GROUP BY string_col",
         "outputs": [["a", 400, 400, 2], ["b", 1, 1, 100], ["c", 1.01, 1.01, 175]]
       },
       {
@@ -105,8 +132,55 @@
         "outputs": [["a", "1E-307", "1E+307", "deadbeef", "fdeadbee"], ["b", "1E-308", "1E+308", "efdeadbe", "beefdead"], ["c", "1E+328", "1E-317", "deadbe02", "adbeefde"]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, FIRST_WITH_TIME(decimal_col, timestamp_col), LAST_WITH_TIME(decimal_col, timestamp_col), FIRST_WITH_TIME(bytes_col, timestamp_col), LAST_WITH_TIME(bytes_col, timestamp_col) FROM {tbl} GROUP BY string_col",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, FIRST_WITH_TIME(decimal_col, timestamp_col), LAST_WITH_TIME(decimal_col, timestamp_col), FIRST_WITH_TIME(bytes_col, timestamp_col), LAST_WITH_TIME(bytes_col, timestamp_col) FROM {tbl} GROUP BY string_col",
         "outputs": [["a", "1E-307", "1E+307", "deadbeef", "fdeadbee"], ["b", "1E-308", "1E+308", "efdeadbe", "beefdead"], ["c", "1E+328", "1E-317", "deadbe02", "adbeefde"]]
+      },
+      {
+        "comment": "MODE returns the type of a non-numeric argument, with ties broken by the smallest value",
+        "sql": "SELECT MODE(string_col), MODE(UPPER(string_col)), MODE(bool_col), MODE(timestamp_col), MODE(int_col) FROM {tbl}",
+        "outputs": [["c", "C", false, "2020-01-01 03:10:12.0", 2]]
+      },
+      {
+        "sql": "SELECT bool_col, MODE(string_col), MODE(timestamp_col) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[false, "b", "2020-01-01 08:32:12.0"], [true, "a", "2020-01-01 03:10:12.0"]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ int_col, MODE(string_col), MODE(bool_col), MODE(timestamp_col) FROM {tbl} GROUP BY int_col",
+        "outputs": [[2, "a", true, "2020-01-01 03:10:12.0"], [3, "b", false, "2020-01-01 08:32:12.0"], [100, "b", false, "2020-02-06 03:32:12.0"], [101, "c", false, "2020-05-01 03:32:12.0"], [150, "c", false, "2020-02-03 03:32:12.0"], [175, "c", true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SELECT MODE(string_col) FROM {tbl} WHERE int_col < 0",
+        "outputs": [[null]]
+      },
+      {
+        "comment": "The leaf returns the final MODE, which keeps the input type",
+        "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ {partitioned_tbl}.num, MODE({partitioned_tbl}.name), MODE({partitioned_tbl}.flag), MODE({partitioned_tbl}.event_ts) FROM {partitioned_tbl} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ GROUP BY {partitioned_tbl}.num",
+        "outputs": [[1, "a", true, "2020-01-01 00:00:00.0"], [3, "c", false, "2020-01-02 00:00:00.0"], [4, "e", false, "2020-01-04 00:00:00.0"], [7, "d", true, "2020-01-06 00:00:00.0"]]
+      },
+      {
+        "comment": "The data type argument of ANY_VALUE is inferred when omitted and inferAnyValueType is true",
+        "sql": "SET inferAnyValueType=true; SELECT ANY_VALUE(int_col), ANY_VALUE(long_col), ANY_VALUE(float_col), ANY_VALUE(double_col), ANY_VALUE(string_col), ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col = 175",
+        "outputs": [[175, 175, 1.75, 1.75, "c", true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT int_col, ANY_VALUE(string_col), ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col IN (3, 175) GROUP BY int_col",
+        "outputs": [[3, "b", false, "2020-01-01 08:32:12.0"], [175, "c", true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ int_col, ANY_VALUE(string_col), ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col IN (3, 175) GROUP BY int_col",
+        "outputs": [[3, "b", false, "2020-01-01 08:32:12.0"], [175, "c", true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SELECT ANY_VALUE(int_col, 'INT'), ANY_VALUE(bool_col, 'BOOLEAN'), ANY_VALUE(timestamp_col, 'TIMESTAMP') FROM {tbl} WHERE int_col = 175",
+        "outputs": [[175, true, "2020-01-02 03:32:12.0"]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col < 0",
+        "outputs": [[null, null]]
+      },
+      {
+        "sql": "SELECT int_col, ANY_VALUE(bool_col), ANY_VALUE(timestamp_col) FROM {tbl} WHERE int_col = 175 GROUP BY int_col",
+        "outputs": [[175, true, "2020-01-02 03:32:12.0"]]
       },
       {
         "sql": "SELECT SUMPRECISION(decimal_col) FROM {tbl}",
@@ -155,6 +229,47 @@
       {
         "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, distinct_avg(int_col), distinctAvg(long_col), DISTINCT_AVG(float_col), DISTINCTAVG(double_col) FROM {tbl} GROUP BY string_col",
         "outputs": [["a", 2.0, 2.0, 350.0, 350.0], ["b", 51.5, 51.5, 50.5, 50.5], ["c", 142.0, 142.0, 1.42, 1.42]]
+      }
+    ]
+  },
+  "pinot_any_value_tests": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "decimal_col", "type": "BIG_DECIMAL"},
+          {"name": "bytes_col", "type": "BYTES"},
+          {"name": "uuid_col", "type": "UUID"}
+        ],
+        "inputs": [
+          [1, "1.5", "DEADBEEF", "123e4567-e89b-12d3-a456-426614174000"],
+          [1, "1.5", "DEADBEEF", "123e4567-e89b-12d3-a456-426614174000"],
+          [2, "2.5", "CAFE", "123e4567-e89b-12d3-a456-426614174001"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "comment": "ANY_VALUE over the types that only ANY_VALUE infers a data type for",
+        "sql": "SET inferAnyValueType=true; SELECT ANY_VALUE(decimal_col), ANY_VALUE(bytes_col), ANY_VALUE(uuid_col), ANY_VALUE(int_col * 1.5) FROM {tbl} WHERE int_col = 1",
+        "outputs": [["1.5", "deadbeef", "123e4567-e89b-12d3-a456-426614174000", 1.5]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT int_col, ANY_VALUE(decimal_col), ANY_VALUE(bytes_col), ANY_VALUE(uuid_col), ANY_VALUE(int_col * 1.5) FROM {tbl} GROUP BY int_col",
+        "outputs": [[1, "1.5", "deadbeef", "123e4567-e89b-12d3-a456-426614174000", 1.5], [2, "2.5", "cafe", "123e4567-e89b-12d3-a456-426614174001", 3.0]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ int_col, ANY_VALUE(decimal_col), ANY_VALUE(bytes_col), ANY_VALUE(uuid_col), ANY_VALUE(int_col * 1.5) FROM {tbl} GROUP BY int_col",
+        "outputs": [[1, "1.5", "deadbeef", "123e4567-e89b-12d3-a456-426614174000", 1.5], [2, "2.5", "cafe", "123e4567-e89b-12d3-a456-426614174001", 3.0]]
+      },
+      {
+        "comment": "The infinite value of int_col = 1 is in the same block as the returned group",
+        "sql": "SET inferAnyValueType=true; SELECT int_col, ANY_VALUE(int_col / (int_col - 1.0)) FROM {tbl} GROUP BY int_col HAVING COUNT(*) = 1",
+        "outputs": [[2, 2.0]]
+      },
+      {
+        "sql": "SET inferAnyValueType=true; SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ int_col, ANY_VALUE(int_col / (int_col - 1.0)) FROM {tbl} GROUP BY int_col HAVING COUNT(*) = 1",
+        "outputs": [[2, 2.0]]
       }
     ]
   },
@@ -283,6 +398,83 @@
       {
         "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, distinct_count_theta_sketch(int_col), distinctCountThetaSketch(long_col), DISTINCT_COUNT_THETA_SKETCH(float_col), DISTINCTCOUNTTHETASKETCH(double_col) FROM {tbl} GROUP BY string_col",
         "outputs": [["a", 1, 1, 2, 2], ["b", 2, 2, 2, 2], ["c", 3, 3, 3, 3]]
+      }
+    ]
+  },
+  "pinot_array_agg_tests": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "long_col", "type": "LONG"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "decimal_col", "type": "BIG_DECIMAL"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "json_col", "type": "JSON"},
+          {"name": "int_mv_col", "type": "INT", "isSingleValue": false},
+          {"name": "string_mv_col", "type": "STRING", "isSingleValue": false}
+        ],
+        "inputs": [
+          [1, 10, 1.5, "1.5", "a", "{\"k\":1}", [1, 2], ["x", "y"]],
+          [2, 20, 2.5, "2.5", "a", "{\"k\":2}", [2, 3], ["y"]],
+          [2, 20, 2.5, "2.5", "b", "{\"k\":2}", [3], ["z", "x"]],
+          [3, 30, 3.5, "3.5", "b", "{\"k\":3}", [4, 5], ["z"]]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "comment": "The data type argument of ARRAY_AGG is inferred when omitted",
+        "sql": "SELECT arraySortInt(ARRAY_AGG(int_col)), arraySortInt(ARRAY_AGG(int_col, true)), arraySortString(ARRAY_AGG(string_col, true)), arraySortString(ARRAY_AGG(json_col)), CARDINALITY(ARRAY_AGG(long_col, true)), CARDINALITY(ARRAY_AGG(double_col)), CARDINALITY(ARRAY_AGG(decimal_col, true)) FROM {tbl}",
+        "outputs": [[[1, 2, 2, 3], [1, 2, 3], ["a", "b"], ["{\"k\":1}", "{\"k\":2}", "{\"k\":2}", "{\"k\":3}"], 3, 4, 3]]
+      },
+      {
+        "sql": "SELECT string_col, arraySortInt(ARRAY_AGG(int_col + 1, true)), arraySortInt(ARRAY_AGG(int_mv_col, true)), arraySortString(ARRAY_AGG(string_mv_col)) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", [2, 3], [1, 2, 3], ["x", "y", "y"]], ["b", [3, 4], [3, 4, 5], ["x", "z", "z"]]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, arraySortInt(ARRAY_AGG(int_col + 1, true)), CARDINALITY(ARRAY_AGG(long_col)) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", [2, 3], 2], ["b", [3, 4], 2]]
+      },
+      {
+        "sql": "SELECT arraySortInt(ARRAY_AGG(CAST(int_col AS DECIMAL(10, 0)))), CARDINALITY(ARRAY_AGG(CAST(long_col AS DECIMAL(20, 0)), true)) FROM {tbl}",
+        "outputs": [[[1, 2, 2, 3], 3]]
+      },
+      {
+        "sql": "SELECT arraySortInt(ARRAY_AGG(DISTINCT int_col)), CARDINALITY(ARRAY_AGG(DISTINCT string_col)), CARDINALITY(ARRAY_AGG(DISTINCT int_col, false)), CARDINALITY(ARRAY_AGG(DISTINCT int_col, 'INT')) FROM {tbl}",
+        "outputs": [[[1, 2, 3], 2, 3, 3]]
+      },
+      {
+        "sql": "SELECT string_col, arraySortString(ARRAY_AGG(DISTINCT string_mv_col)) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", ["x", "y"]], ["b", ["x", "z"]]]
+      },
+      {
+        "sql": "SELECT CARDINALITY(ARRAY_AGG(DISTINCT x, 'INT', true)), CARDINALITY(ARRAY_AGG(DISTINCT x, 'INT')) FROM (SELECT int_col x FROM {tbl} UNION ALL SELECT int_col FROM {tbl})",
+        "outputs": [[3, 3]]
+      },
+      {
+        "sql": "SELECT CARDINALITY(ARRAY_AGG(x)), FIRSTWITHTIME(x, CAST(t AS TIMESTAMP)) FROM (SELECT int_col x, long_col t FROM {tbl} UNION ALL SELECT int_col, long_col FROM {tbl} UNION ALL SELECT int_col, long_col FROM {tbl})",
+        "outputs": [[12, 1]]
+      },
+      {
+        "sql": "SELECT CARDINALITY(ARRAY_AGG(x)), FIRSTWITHTIME(x, CAST(t AS TIMESTAMP)) FROM (SELECT int_col x, long_col t FROM {tbl} INTERSECT ALL SELECT int_col, long_col FROM {tbl})",
+        "outputs": [[4, 1]]
+      },
+      {
+        "sql": "SELECT CARDINALITY(ARRAY_AGG(x)) FROM (SELECT int_col x FROM {tbl} EXCEPT ALL SELECT int_col FROM {tbl} WHERE int_col > 2)",
+        "outputs": [[3]]
+      },
+      {
+        "sql": "SELECT CARDINALITY(ARRAY_AGG(long_col / ((int_col - 2) * 1.0))) FROM {tbl}",
+        "outputs": [[4]]
+      },
+      {
+        "sql": "SELECT CARDINALITY(ARRAY_AGG(CASE WHEN int_col > 1 THEN int_col END)), CARDINALITY(ARRAY_AGG(CASE WHEN int_col > 1 THEN int_col END, 'INT')) FROM {tbl}",
+        "outputs": [[3, 3]]
+      },
+      {
+        "sql": "SELECT arraySortInt(ARRAY_AGG(int_col, 'INT')), arraySortInt(ARRAY_AGG(int_col, 'INT', true)) FROM {tbl}",
+        "outputs": [[[1, 2, 2, 3], [1, 2, 3]]]
       }
     ]
   }

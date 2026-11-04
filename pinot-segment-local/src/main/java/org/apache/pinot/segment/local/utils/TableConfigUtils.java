@@ -2404,8 +2404,9 @@ public final class TableConfigUtils {
             tableConfig.getTableName());
       } else {
         if (quotaConfig.getStorage() == null) {
-          // set a default storage quota and keep the RPS value
-          tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
+          // set a default storage quota and keep the RPS value and the enforcement modes
+          tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond(),
+              quotaConfig.getStorageQuotaEnforcementMode(), quotaConfig.getQueryQuotaEnforcementMode()));
           LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
               tableConfig.getTableName());
         } else {

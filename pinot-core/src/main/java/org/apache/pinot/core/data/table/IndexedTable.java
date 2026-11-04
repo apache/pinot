@@ -118,13 +118,10 @@ public abstract class IndexedTable extends BaseTable {
   /// Upserts an already-extracted result into a table with exactly one aggregation function.
   /// The table may retain the key and result; callers must not modify them after this call.
   /// A null result follows the aggregation function's existing merge semantics.
-  /// Final inputs must be Comparable, as required by the aggregation function's final-result merge.
   /// Returns true even when new groups are rejected; existing groups can still accept updates.
   public boolean upsertSingleAggregationResult(Key key, @Nullable Object result) {
     Preconditions.checkState(_aggregationFunctions.length == 1,
         "upsertSingleAggregationResult requires exactly one aggregation function");
-    Preconditions.checkArgument(!_hasFinalInput || result == null || result instanceof Comparable,
-        "Final aggregation inputs must be Comparable");
     if (_hasOrderBy) {
       return upsert(key, createSingleAggregationRecord(key, result));
     }
@@ -210,8 +207,7 @@ public abstract class IndexedTable extends BaseTable {
   private Object mergeValue(int functionIndex, @Nullable Object existing, @Nullable Object input,
       boolean hasFinalInput) {
     return hasFinalInput
-        ? AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[functionIndex], (Comparable) existing,
-            (Comparable) input)
+        ? AggregationFunctionUtils.mergeFinalResult(_aggregationFunctions[functionIndex], existing, input)
         : AggregationFunctionUtils.merge(_aggregationFunctions[functionIndex], existing, input);
   }
 

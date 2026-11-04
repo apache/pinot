@@ -24,18 +24,18 @@ import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /// The type matrix is inherited from [AvroRecordExtractor], with two overrides:
 /// - INT96 timestamp (which parquet-avro surfaces as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) →
-///   `Timestamp` (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via
-///   [ParquetUtils#convertInt96ToEpochNanos].
+///   `Timestamp` (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via [ParquetUtils].
 /// - Top-level unsigned 32-bit integer fields (`INTEGER(32, false)` / legacy `UINT_32`), which parquet-avro surfaces
 ///   as a signed Avro `int` → `Long` via [Integer#toUnsignedLong]. The field names come from the Parquet file schema
 ///   (see [ParquetUtils#getUnsignedInt32FieldNames]) since the Avro schema carries no signedness. Unsigned values
 ///   nested in a struct, list or map are still read as signed ints by this reader; [ParquetNativeRecordReader]
 ///   widens them at every level.
+///
+/// Unsigned 64-bit fields preserve their signed `Long` bit pattern, matching [ParquetNativeRecordReader].
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
   private static final int INT96_BYTE_SIZE = 12;
   private static final String INT96_DOC = "INT96 represented as byte[12]";
@@ -66,8 +66,10 @@ public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
   protected Object convertSingleValue(Schema schema, Object value) {
     if (schema.getType() == Schema.Type.FIXED && schema.getFixedSize() == INT96_BYTE_SIZE
         && INT96_DOC.equals(schema.getDoc())) {
-      long nanos = ParquetUtils.convertInt96ToEpochNanos(((GenericFixed) value).bytes());
-      return _extractRawTimeValues ? nanos : TimestampUtils.fromNanosSinceEpoch(nanos);
+      byte[] bytes = ((GenericFixed) value).bytes();
+      return _extractRawTimeValues
+          ? ParquetUtils.convertInt96ToEpochNanos(bytes)
+          : ParquetUtils.convertInt96ToTimestamp(bytes);
     }
     return super.convertSingleValue(schema, value);
   }

@@ -1048,9 +1048,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     LOGGER.info("Retrying unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
 
+    // Not an enabled server of the routing manager, for example a disabled server or a server of a remote cluster.
+    // Leave it to the other retriers.
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return FailureDetector.ServerState.UNHEALTHY;
+      return FailureDetector.ServerState.UNKNOWN;
     }
 
     // Could occur if the cluster is only serving multi-stage queries

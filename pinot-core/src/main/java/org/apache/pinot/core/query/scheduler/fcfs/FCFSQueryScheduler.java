@@ -27,6 +27,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -42,13 +43,13 @@ public class FCFSQueryScheduler extends QueryScheduler {
   }
 
   @Override
-  public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+  public ListenableFuture<DataBuffer> submitResponse(ServerQueryRequest queryRequest) {
     if (!_isRunning) {
-      return shuttingDown(queryRequest);
+      return shuttingDownResponse(queryRequest);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, null);
-    ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, executorService);
+    ListenableFutureTask<DataBuffer> queryTask = createResponseFutureTask(queryRequest, executorService);
     _resourceManager.getQueryRunners().submit(queryTask);
     return queryTask;
   }

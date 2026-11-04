@@ -356,7 +356,7 @@ public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassChec
             new IndexWriterConfig(analyzer).setOpenMode(IndexWriterConfig.OpenMode.CREATE))) {
       Document document = new Document();
       document.add(new TextField("text", "partial", Field.Store.NO));
-      document.add(new StoredField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME, 0));
+      document.add(new StoredField(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME, 0));
       writer.addDocument(document);
     }
   }

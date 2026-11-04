@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -225,8 +224,7 @@ public class ValueAggregationNullHandlingTest {
     AggregationResultHolder holder = function.createAggregationResultHolder();
     function.aggregate(3, holder, block(SyntheticBlockValSets.LongMV.create(ROW1_NULL, rows)));
 
-    assertEquals(function.extractFinalResult(function.extractAggregationResult(holder)),
-        new LongArrayList(new long[]{11L, 22L}));
+    assertEquals(function.extractFinalResult(function.extractAggregationResult(holder)), new long[]{11L, 22L});
   }
 
   @Test
@@ -237,8 +235,7 @@ public class ValueAggregationNullHandlingTest {
     AggregationResultHolder holder = function.createAggregationResultHolder();
     function.aggregate(3, holder, block(SyntheticBlockValSets.DoubleMV.create(ROW1_NULL, rows)));
 
-    assertEquals(function.extractFinalResult(function.extractAggregationResult(holder)),
-        new DoubleArrayList(new double[]{11.5d, 22.5d}));
+    assertEquals(function.extractFinalResult(function.extractAggregationResult(holder)), new double[]{11.5d, 22.5d});
   }
 
   /// Unlike the others here, the sum of no arrays is NULL in both modes, which is why neither needs a mode-aware
@@ -286,8 +283,7 @@ public class ValueAggregationNullHandlingTest {
         ExpressionContext.forLiteral(Literal.intValue(2))), nullHandlingEnabled);
   }
 
-  private static DoubleArrayList histogramOf(HistogramAggregationFunction function, BlockValSet blockValSet,
-      int length) {
+  private static double[] histogramOf(HistogramAggregationFunction function, BlockValSet blockValSet, int length) {
     AggregationResultHolder holder = function.createAggregationResultHolder();
     function.aggregate(length, holder, block(blockValSet));
     return function.extractFinalResult(function.extractAggregationResult(holder));
@@ -299,7 +295,7 @@ public class ValueAggregationNullHandlingTest {
     double[] values = {1.0d, 7.0d, 6.0d};
 
     assertEquals(histogramOf(histogram(true), SyntheticBlockValSets.Double.create(ROW1_NULL, values), 3),
-        new DoubleArrayList(new double[]{1.0d, 1.0d}));
+        new double[]{1.0d, 1.0d});
   }
 
   /// With the option enabled the histogram of nothing is NULL; with it disabled it is the all-zero histogram.
@@ -309,7 +305,7 @@ public class ValueAggregationNullHandlingTest {
 
     assertNull(histogramOf(histogram(true), SyntheticBlockValSets.Double.create(allNull(3), values), 3));
     assertEquals(histogramOf(histogram(false), SyntheticBlockValSets.Double.create(allNull(3), values), 0),
-        new DoubleArrayList(new double[]{0.0d, 0.0d}));
+        new double[]{0.0d, 0.0d});
   }
 
   /// Every value of a multi-value row is counted, which is a path this function did not support before.
@@ -318,7 +314,7 @@ public class ValueAggregationNullHandlingTest {
     double[][] rows = {{1.0d, 2.0d}, {7.0d}, {6.0d, 9.0d}};
 
     assertEquals(histogramOf(histogram(true), SyntheticBlockValSets.DoubleMV.create(ROW1_NULL, rows), 3),
-        new DoubleArrayList(new double[]{2.0d, 2.0d}));
+        new double[]{2.0d, 2.0d});
   }
 
   /// BIG_DECIMAL is numeric and now lands in the same bins as the other numeric types, single- and multi-value.
@@ -326,11 +322,11 @@ public class ValueAggregationNullHandlingTest {
   public void testHistogramBigDecimalColumn() {
     BigDecimal[] sv = {new BigDecimal("1.5"), new BigDecimal("99"), new BigDecimal("6.5")};
     assertEquals(histogramOf(histogram(true), SyntheticBlockValSets.BigDec.create(ROW1_NULL, sv), 3),
-        new DoubleArrayList(new double[]{1.0d, 1.0d}));
+        new double[]{1.0d, 1.0d});
 
     BigDecimal[][] mv = {{new BigDecimal("1.5"), new BigDecimal("2.5")}, {new BigDecimal("99")}};
     assertEquals(histogramOf(histogram(true), SyntheticBlockValSets.BigDecMV.create(ROW1_NULL, mv), 2),
-        new DoubleArrayList(new double[]{2.0d, 0.0d}));
+        new double[]{2.0d, 0.0d});
   }
 
   /// A row's values land in that row's group, and a group whose only row is null is never created.

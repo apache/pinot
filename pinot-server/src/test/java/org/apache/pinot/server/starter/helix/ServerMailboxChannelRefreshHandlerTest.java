@@ -18,24 +18,31 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import java.util.Arrays;
 import java.util.List;
+import org.apache.helix.AccessOption;
+import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.zookeeper.data.Stat;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +53,8 @@ public class ServerMailboxChannelRefreshHandlerTest {
   private static final String OTHER_SERVER_ID = "Server_otherhost_8000";
   private static final String OTHER_SERVER_HOST = "otherhost";
   private static final int OTHER_SERVER_MAILBOX_PORT = 9000;
+  private static final String INSTANCE_CONFIGS_PATH =
+      new PropertyKey.Builder(CLUSTER_NAME).instanceConfigs().getPath();
 
   private AutoCloseable _mocks;
 
@@ -56,6 +65,12 @@ public class ServerMailboxChannelRefreshHandlerTest {
   private HelixAdmin _helixAdmin;
 
   @Mock
+  private HelixDataAccessor _helixDataAccessor;
+
+  @Mock
+  private BaseDataAccessor<ZNRecord> _baseDataAccessor;
+
+  @Mock
   private MailboxService _mailboxService;
 
   private ServerMailboxChannelRefreshHandler _handler;
@@ -63,6 +78,9 @@ public class ServerMailboxChannelRefreshHandlerTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    when(_helixManager.getHelixDataAccessor()).thenReturn(_helixDataAccessor);
+    when(_helixDataAccessor.keyBuilder()).thenReturn(new PropertyKey.Builder(CLUSTER_NAME));
+    when(_helixDataAccessor.getBaseDataAccessor()).thenReturn(_baseDataAccessor);
     _handler = new ServerMailboxChannelRefreshHandler(_helixAdmin, CLUSTER_NAME, SELF_INSTANCE_ID, _mailboxService);
   }
 
@@ -190,8 +208,7 @@ public class ServerMailboxChannelRefreshHandlerTest {
 
   @Test
   public void testInitCallbackDoesFullScanAndTracksState() {
-    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
-        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID));
 
     // INIT callback: server is shutting down, triggers full cluster scan
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
@@ -206,12 +223,163 @@ public class ServerMailboxChannelRefreshHandlerTest {
     verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
 
+  @Test
+  public void testMinionMembershipChangesDoNotReadServerConfigs() {
+    String minionId = "Minion_minionhost_8000";
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), 10, 1);
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+
+    stubParticipantSnapshot(List.of(minionId, OTHER_SERVER_ID, SELF_INSTANCE_ID), 11, 1);
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), 12, 1);
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    verify(_helixAdmin, times(1)).getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID);
+    verify(_mailboxService, never()).refreshChannel(any(), anyInt());
+
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
+  @Test
+  public void testServerMembershipChangesStillScanConfigs() {
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID), 10, 1);
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), 11, 1);
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    verify(_helixAdmin).getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID);
+
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+    verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
+  @DataProvider(name = "ambiguousMembershipChanges")
+  public static Object[][] ambiguousMembershipChanges() {
+    return new Object[][]{
+        // A server delete/recreate and a minion join are coalesced into one callback.
+        {10, 13, 1L, 1L, true},
+        // A recreated parent has an unrelated cversion, even if its delta matches the minion join.
+        {10, 11, 1L, 2L, true},
+        // Integer wrap must not look like an unambiguous single child change.
+        {Integer.MAX_VALUE, Integer.MIN_VALUE, 1L, 1L, true},
+        // The parent changed while its child names were being read.
+        {10, 11, 1L, 1L, false}
+    };
+  }
+
+  @Test(dataProvider = "ambiguousMembershipChanges")
+  public void testAmbiguousMinionMembershipChangeStillTracksServerStartup(int previousCversion, int cversion,
+      long previousCzxid, long czxid, boolean stableSnapshot) {
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), previousCversion, previousCzxid);
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID, "Minion_minionhost_8000"), cversion, czxid);
+    if (!stableSnapshot) {
+      when(_baseDataAccessor.getStat(INSTANCE_CONFIGS_PATH, AccessOption.PERSISTENT))
+          .thenReturn(participantStat(previousCversion, czxid, 2), participantStat(cversion, czxid, 3));
+    }
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    verify(_mailboxService, never()).refreshChannel(any(), anyInt());
+
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
+  @DataProvider(name = "retryScanFailure")
+  public static Object[][] retryScanFailure() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "retryScanFailure")
+  public void testFailedReadRetriesOnMinionMembershipChange(boolean failRetryScan) {
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), 10, 1);
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID)).thenThrow(new RuntimeException("ZK hiccup"));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    verify(_mailboxService, never()).refreshChannel(any(), anyInt());
+
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID, "Minion_minionhost_8000"), 11, 1);
+    if (failRetryScan) {
+      _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+      stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID,
+          "Minion_minionhost_8000", "Minion_anotherhost_8000"), 12, 1);
+    }
+    doReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false))
+        .when(_helixAdmin).getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID);
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
+  @Test
+  public void testFailedInitReadRetriesOnMinionMembershipChange() {
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), 10, 1);
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID)).thenThrow(new RuntimeException("ZK hiccup"));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID, "Minion_minionhost_8000"), 11, 1);
+    doReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true))
+        .when(_helixAdmin).getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID);
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    verify(_mailboxService, never()).refreshChannel(any(), anyInt());
+
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
+  @DataProvider(name = "metadataReadFailure")
+  public static Object[][] metadataReadFailure() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "metadataReadFailure")
+  public void testMembershipMetadataReadFailureStillTracksServerStartup(boolean throwOnStatRead) {
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), 10, 1);
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createInitContext());
+
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID, "Minion_minionhost_8000"), 11, 1);
+    // Missing metadata cannot prove that the minion join was the only change.
+    if (throwOnStatRead) {
+      when(_baseDataAccessor.getStat(INSTANCE_CONFIGS_PATH, AccessOption.PERSISTENT))
+          .thenThrow(new RuntimeException("ZK hiccup"));
+    } else {
+      when(_baseDataAccessor.getStat(INSTANCE_CONFIGS_PATH, AccessOption.PERSISTENT)).thenReturn(null);
+    }
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, true));
+    _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
+    verify(_mailboxService, never()).refreshChannel(any(), anyInt());
+
+    when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
+        .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
+    _handler.onInstanceConfigChange(List.of(), createCallbackContextForInstance(OTHER_SERVER_ID));
+    verify(_mailboxService).refreshChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
   /// A server that comes back on another mailbox port (the default when ports are not pinned) leaves a channel to its
   /// old address that nothing will use again.
   @Test
   public void testRetiresChannelToOldAddressWhenServerMoves() {
-    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
-        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID));
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
     _handler.onInstanceConfigChange(List.of(), createInitContext());
@@ -229,13 +397,12 @@ public class ServerMailboxChannelRefreshHandlerTest {
 
   @Test
   public void testRetiresChannelOfServerThatLeftTheCluster() {
-    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
-        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID), 10, 1);
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
     _handler.onInstanceConfigChange(List.of(), createInitContext());
 
-    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME)).thenReturn(List.of(SELF_INSTANCE_ID));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID), 11, 1);
     _handler.onInstanceConfigChange(List.of(), createChildChangeContext());
     verify(_mailboxService).retireChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
   }
@@ -243,8 +410,7 @@ public class ServerMailboxChannelRefreshHandlerTest {
   /// A config that cannot be read now does not mean that the server left: its channel stays.
   @Test
   public void testDoesNotRetireChannelWhenInstanceConfigReadFails() {
-    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
-        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID));
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
     _handler.onInstanceConfigChange(List.of(), createInitContext());
@@ -258,8 +424,7 @@ public class ServerMailboxChannelRefreshHandlerTest {
   @Test
   public void testKeepsChannelToAddressTakenOverByAnotherServer() {
     String thirdServerId = "Server_thirdhost_8000";
-    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
-        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID, thirdServerId));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID, thirdServerId));
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, thirdServerId))
@@ -283,8 +448,7 @@ public class ServerMailboxChannelRefreshHandlerTest {
   @Test
   public void testFullScanKeepsChannelToAddressTakenOverInTheSameScan() {
     String thirdServerId = "Server_thirdhost_8000";
-    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME))
-        .thenReturn(Arrays.asList(SELF_INSTANCE_ID, OTHER_SERVER_ID, thirdServerId));
+    stubParticipantSnapshot(List.of(SELF_INSTANCE_ID, OTHER_SERVER_ID, thirdServerId));
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, OTHER_SERVER_ID))
         .thenReturn(createServerConfig(OTHER_SERVER_ID, OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT, false));
     when(_helixAdmin.getInstanceConfig(CLUSTER_NAME, thirdServerId))
@@ -300,6 +464,27 @@ public class ServerMailboxChannelRefreshHandlerTest {
 
     verify(_mailboxService).retireChannel("thirdhost", OTHER_SERVER_MAILBOX_PORT);
     verify(_mailboxService, never()).retireChannel(OTHER_SERVER_HOST, OTHER_SERVER_MAILBOX_PORT);
+  }
+
+  private void stubParticipantSnapshot(List<String> instances) {
+    stubParticipantSnapshot(instances, 0, 1);
+  }
+
+  private void stubParticipantSnapshot(List<String> instances, int cversion, long czxid) {
+    // The Admin name list is the fallback when the versioned membership read throws.
+    when(_helixAdmin.getInstancesInCluster(CLUSTER_NAME)).thenReturn(instances);
+    when(_baseDataAccessor.getChildNames(INSTANCE_CONFIGS_PATH, AccessOption.PERSISTENT)).thenReturn(instances);
+    when(_baseDataAccessor.getStat(INSTANCE_CONFIGS_PATH, AccessOption.PERSISTENT))
+        .thenReturn(participantStat(cversion, czxid, instances.size()));
+  }
+
+  private static Stat participantStat(int cversion, long czxid, int numChildren) {
+    Stat stat = new Stat();
+    stat.setCversion(cversion);
+    stat.setCzxid(czxid);
+    stat.setPzxid(100L + Integer.toUnsignedLong(cversion));
+    stat.setNumChildren(numChildren);
+    return stat;
   }
 
   private InstanceConfig createServerConfig(String instanceId, String hostname, int mailboxPort,
@@ -332,6 +517,8 @@ public class ServerMailboxChannelRefreshHandlerTest {
 
     verify(_mailboxService, never()).refreshChannel(any(), anyInt());
     verify(_helixAdmin, never()).getInstancesInCluster(any());
+    verify(_baseDataAccessor, never()).getStat(any(), anyInt());
+    verify(_baseDataAccessor, never()).getChildNames(any(), anyInt());
   }
 
   private NotificationContext createFinalizeContextWithNullPath() {

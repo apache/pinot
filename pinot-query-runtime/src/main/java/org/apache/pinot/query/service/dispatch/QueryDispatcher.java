@@ -124,8 +124,13 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
-  /// Last known dispatch address of each server, by instance id, kept by [#onServerEnabled] to retire the dispatch
-  /// client of an address a server has left.
+  /// Last known dispatch address of each instance, by instance id. [#onServerEnabled] sets it for the servers of the
+  /// routing manager, and uses it to retire the dispatch client of an address a server has left. Each dispatch sets it
+  /// too, so that [#checkConnectivityToInstance(String)] can check instances that no routing manager knows.
+  ///
+  /// Entries are never removed. There is one for each instance id that a query was dispatched to, or that
+  /// [#onServerEnabled] saw, so the number of instances bounds the size as long as instance ids are stable, as Helix
+  /// instance ids are. [#onServerEnabled] scans the values, but it runs only when a server is enabled.
   private final Map<String, String> _dispatchAddressByInstanceId = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
@@ -411,6 +416,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
           expectedForServer += workerIds.size();
         }
       }
+      recordDispatchAddress(server);
       DispatchClient client = getOrCreateDispatchClient(server);
       try {
         client.submitWithStream(request, server, deadline, session, expectedForServer,
@@ -634,24 +640,42 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     }
   }
 
+  /// Checks the dispatch channel to a server, at its current address in a routing manager.
   public FailureDetector.ServerState checkConnectivityToInstance(ServerInstance serverInstance) {
-    String hostname = serverInstance.getHostname();
-    int port = serverInstance.getQueryServicePort();
+    return checkConnectivity(serverInstance.getInstanceId(),
+        toHostnamePortKey(serverInstance.getHostname(), serverInstance.getQueryServicePort()));
+  }
 
-    DispatchClient client = _dispatchClientMap.get(toHostnamePortKey(hostname, port));
+  /// Checks the dispatch channel to an instance, at the address where a query was last dispatched to it, or where
+  /// [#onServerEnabled] last found it. The failure detector uses this for instances that no routing manager knows, for
+  /// example workers that a custom worker manager picks. Returns [FailureDetector.ServerState#UNKNOWN] if there is no
+  /// dispatch channel to that address, for example because no query was dispatched to the instance.
+  ///
+  /// Use [#checkConnectivityToInstance(ServerInstance)] when the current address of the instance is known. This address
+  /// goes stale when the instance moves to another port, until the next dispatch or [#onServerEnabled] call for it.
+  public FailureDetector.ServerState checkConnectivityToInstance(String instanceId) {
+    String hostnamePortKey = _dispatchAddressByInstanceId.get(instanceId);
+    if (hostnamePortKey == null) {
+      LOGGER.debug("No dispatch address found for instance: {}", instanceId);
+      return FailureDetector.ServerState.UNKNOWN;
+    }
+    return checkConnectivity(instanceId, hostnamePortKey);
+  }
+
+  private FailureDetector.ServerState checkConnectivity(String instanceId, String hostnamePortKey) {
+    DispatchClient client = _dispatchClientMap.get(hostnamePortKey);
     // Could occur if the cluster is only serving single-stage queries
     if (client == null) {
-      LOGGER.debug("No DispatchClient found for server with instanceId: {}", serverInstance.getInstanceId());
+      LOGGER.debug("No DispatchClient found for server with instanceId: {}", instanceId);
       return FailureDetector.ServerState.UNKNOWN;
     }
 
     ConnectivityState connectivityState = client.getChannel().getState(true);
     if (connectivityState == ConnectivityState.READY) {
-      LOGGER.info("Successfully connected to server: {}", serverInstance.getInstanceId());
+      LOGGER.info("Successfully connected to server: {}", instanceId);
       return FailureDetector.ServerState.HEALTHY;
     } else {
-      LOGGER.info("Still can't connect to server: {}, current state: {}", serverInstance.getInstanceId(),
-          connectivityState);
+      LOGGER.info("Still can't connect to server: {}, current state: {}", instanceId, connectivityState);
       return FailureDetector.ServerState.UNHEALTHY;
     }
   }
@@ -694,6 +718,7 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
         }
       };
       R request = requestBuilder.apply(serverInstance);
+      recordDispatchAddress(serverInstance);
       DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
 
       try {
@@ -897,6 +922,20 @@ public class QueryDispatcher implements PinotClusterConfigChangeListener {
     return _dispatchClientMap.computeIfAbsent(toHostnamePortKey(hostname, port),
         k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext, _keepAliveConfig,
             _dispatchMaxInboundMessageSizeBytes));
+  }
+
+  /// Records the address of an instance that a query is dispatched to, as its last known address, see
+  /// [#checkConnectivityToInstance(String)]. Only dispatches record it: a cancel can still go to an address that the
+  /// instance has left.
+  @VisibleForTesting
+  void recordDispatchAddress(QueryServerInstance queryServerInstance) {
+    String instanceId = queryServerInstance.getInstanceId();
+    String hostnamePortKey =
+        toHostnamePortKey(queryServerInstance.getHostname(), queryServerInstance.getQueryServicePort());
+    // Read first, so that a dispatch to an instance that did not move does not write the map
+    if (!hostnamePortKey.equals(_dispatchAddressByInstanceId.get(instanceId))) {
+      _dispatchAddressByInstanceId.put(instanceId, hostnamePortKey);
+    }
   }
 
   /// Called when a server becomes routable, which it does when it starts and when it is enabled again after it was

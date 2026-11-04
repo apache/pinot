@@ -515,6 +515,52 @@ public class RetentionManagerTest {
     verify(mockPinotHelixResourceManager, times(1)).deleteSegments(eq(realtimeTableName), anyList());
   }
 
+  @Test
+  public void testHybridTableRetentionOverrideTakesPrecedenceOverConfig() {
+    TableConfig realtimeTableConfig = createRealtimeTableConfig1(1);
+    TableConfig offlineTableConfig = createOfflineTableConfig();
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getOfflineTableConfig(TEST_TABLE_NAME)).thenReturn(offlineTableConfig);
+    ControllerConf conf = new ControllerConf();
+    conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, false);
+    RetentionManager retentionManager =
+        createRetentionManagerWithHybridRetentionOverride(realtimeTableConfig, resourceManager, conf);
+
+    retentionManager.processTable(REALTIME_TABLE_NAME);
+
+    verify(retentionManager).shouldEnableHybridTableRetentionStrategy(realtimeTableConfig, offlineTableConfig);
+    verify(retentionManager).manageRetentionForHybridTable(realtimeTableConfig, offlineTableConfig);
+    verify(retentionManager, never()).manageRetentionForRealtimeTable(anyString(), any(), anyInt(), any());
+  }
+
+  @Test
+  public void testHybridTableRetentionOverrideNotCalledWithoutOfflineTable() {
+    TableConfig realtimeTableConfig = createRealtimeTableConfig1(1);
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getOfflineTableConfig(TEST_TABLE_NAME)).thenReturn(null);
+    RetentionManager retentionManager =
+        createRetentionManagerWithHybridRetentionOverride(realtimeTableConfig, resourceManager, new ControllerConf());
+
+    retentionManager.processTable(REALTIME_TABLE_NAME);
+
+    verify(retentionManager, never()).shouldEnableHybridTableRetentionStrategy(any(), any());
+    verify(retentionManager, never()).manageRetentionForHybridTable(any(), any());
+    verify(retentionManager).manageRetentionForRealtimeTable(eq(REALTIME_TABLE_NAME), any(), anyInt(), any());
+  }
+
+  /// Returns a spy of a real retention manager whose `shouldEnableHybridTableRetentionStrategy` always returns `true`,
+  /// simulating a subclass that overrides it. All other methods run their real implementation.
+  private RetentionManager createRetentionManagerWithHybridRetentionOverride(TableConfig realtimeTableConfig,
+      PinotHelixResourceManager resourceManager, ControllerConf conf) {
+    // The realtime retention path reads the ideal state through the Helix admin
+    when(resourceManager.getHelixAdmin()).thenReturn(mock(HelixAdmin.class));
+    stubSizeRetentionResourceManager(realtimeTableConfig, List.of(), resourceManager, conf);
+    RetentionManager retentionManager = spy(new RetentionManager(resourceManager, mock(LeadControllerManager.class),
+        conf, mock(ControllerMetrics.class), mock(BrokerServiceHelper.class)));
+    doReturn(true).when(retentionManager).shouldEnableHybridTableRetentionStrategy(any(), any());
+    return retentionManager;
+  }
+
   private TableConfig createOfflineTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setRetentionTimeUnit("DAYS")
         .setRetentionTimeValue("365").setNumReplicas(2).build();
@@ -1825,6 +1871,13 @@ public class RetentionManagerTest {
   private RetentionManager createSizeRetentionManager(TableConfig tableConfig, List<SegmentZKMetadata> segments,
       PinotHelixResourceManager resourceManager, ControllerMetrics metrics, ControllerConf conf,
       BrokerServiceHelper brokerServiceHelper) {
+    stubSizeRetentionResourceManager(tableConfig, segments, resourceManager, conf);
+    return createRetentionManager(resourceManager, mock(LeadControllerManager.class), conf,
+        metrics, brokerServiceHelper);
+  }
+
+  private void stubSizeRetentionResourceManager(TableConfig tableConfig, List<SegmentZKMetadata> segments,
+      PinotHelixResourceManager resourceManager, ControllerConf conf) {
     String tableName = tableConfig.getTableName();
     when(resourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
     when(resourceManager.getSegmentsZKMetadata(tableName)).thenReturn(segments);
@@ -1836,8 +1889,6 @@ public class RetentionManagerTest {
     when(resourceManager.getLastLLCCompletedSegments(anyList())).thenCallRealMethod();
     when(resourceManager.getLastLLCCompletedSegments(tableName)).thenCallRealMethod();
     conf.setUntrackedSegmentDeletionEnabled(false);
-    return createRetentionManager(resourceManager, mock(LeadControllerManager.class), conf,
-        metrics, brokerServiceHelper);
   }
 
   private void setupSizeRetentionOfflineCounterpart(PinotHelixResourceManager resourceManager) {

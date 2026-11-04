@@ -74,8 +74,8 @@ public class ArrayAggBytesFunction extends BaseArrayAggBytesFunction<ObjectArray
   }
 
   @Override
-  public ObjectArrayList<ByteArray> extractFinalResult(ObjectArrayList<ByteArray> intermediateResult) {
-    return intermediateResult == null ? new ObjectArrayList<>() : intermediateResult;
+  public ByteArray[] extractFinalResult(ObjectArrayList<ByteArray> intermediateResult) {
+    return intermediateResult != null ? intermediateResult.toArray(new ByteArray[0]) : new ByteArray[0];
   }
 
   @Override

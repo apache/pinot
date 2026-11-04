@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.datasketches.theta.ThetaIntersection;
@@ -47,7 +46,7 @@ class ThetaSketchMergeStrategy implements MergeStrategy<List<ThetaSketch>> {
   }
 
   @Override
-  public LongArrayList extractFinalResult(List<ThetaSketch> sketches) {
+  public long[] extractFinalResult(List<ThetaSketch> sketches) {
     long[] result = new long[_numSteps];
 
     ThetaSketch sketch = sketches.get(0);
@@ -57,6 +56,6 @@ class ThetaSketchMergeStrategy implements MergeStrategy<List<ThetaSketch>> {
       sketch = intersection.intersect(sketch, sketches.get(i));
       result[i] = Math.round(sketch.getEstimate());
     }
-    return LongArrayList.wrap(result);
+    return result;
   }
 }

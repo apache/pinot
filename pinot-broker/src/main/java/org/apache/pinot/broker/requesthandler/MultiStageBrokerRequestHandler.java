@@ -660,6 +660,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       RequestContext requestContext, HttpHeaders httpHeaders) {
   }
 
+  /// Extension hook for preparing a stage right before the broker sends it to its workers, to run the query or to
+  /// explain it on the servers. To run the query, the broker calls it for every stage, including stage 0 (the broker
+  /// reduce). To explain the query on the servers, it calls it only for the leaf stages that have segments.
+  ///
+  /// Subclasses can add entries to the custom properties of the stage
+  /// ([DispatchablePlanFragment#getCustomProperties()]), which its workers get in their stage metadata. They must not
+  /// replace the existing entries, such as the table name and the time boundary that servers use for leaf stages.
+  protected void prepareStageForDispatch(DispatchablePlanFragment stage, Map<String, String> queryOptions) {
+  }
+
   /// Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
   /// multi-stage query throttler before dispatch. Subclasses can override to accurately
   /// estimate the real per-server work.
@@ -900,6 +910,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId,
           _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
       return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
+    }
+
+    for (DispatchablePlanFragment stage : dispatchableSubPlan.getQueryStageMap().values()) {
+      prepareStageForDispatch(stage, query.getOptions());
     }
 
     // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
@@ -1151,6 +1165,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,
       RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
     List<PlanNode> stagePlans;
+    prepareStageForDispatch(fragment, queryOptions);
     try {
       stagePlans = _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
     } catch (Exception e) {
@@ -1262,13 +1277,27 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// Check if a server that was previously detected as unhealthy is now healthy.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
-    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
-    if (serverInstance == null) {
-      LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return FailureDetector.ServerState.UNHEALTHY;
+    ServerInstance serverInstance = getEnabledServerInstance(instanceId);
+    if (serverInstance != null) {
+      return _queryDispatcher.checkConnectivityToInstance(serverInstance);
     }
+    // Queries are also dispatched to workers that no routing manager knows, for example workers that a custom worker
+    // manager picks. Check them at the address that a query was last dispatched to.
+    return _queryDispatcher.checkConnectivityToInstance(instanceId);
+  }
 
-    return _queryDispatcher.checkConnectivityToInstance(serverInstance);
+  /// Returns the enabled server with the given instance id: a server of this cluster, or with multi-cluster routing, a
+  /// server of a remote cluster.
+  @Nullable
+  private ServerInstance getEnabledServerInstance(String instanceId) {
+    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    if (serverInstance == null && _multiClusterRoutingContext != null) {
+      RoutingManager multiClusterRoutingManager = _multiClusterRoutingContext.getMultiClusterRoutingManager();
+      if (multiClusterRoutingManager != null) {
+        serverInstance = multiClusterRoutingManager.getEnabledServerInstanceMap().get(instanceId);
+      }
+    }
+    return serverInstance;
   }
 
   public static boolean isYellowError(QueryException e) {

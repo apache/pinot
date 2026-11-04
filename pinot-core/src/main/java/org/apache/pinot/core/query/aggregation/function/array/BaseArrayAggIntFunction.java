@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntCollection;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -33,7 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggIntFunction<I extends IntCollection>
-    extends BaseArrayAggFunction<I, IntArrayList> {
+    extends BaseArrayAggFunction<I, int[]> {
   public BaseArrayAggIntFunction(ExpressionContext expression, DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
@@ -144,10 +143,10 @@ public abstract class BaseArrayAggIntFunction<I extends IntCollection>
   }
 
   @Override
-  public IntArrayList extractFinalResult(I ints) {
+  public int[] extractFinalResult(I ints) {
     if (ints == null) {
-      return new IntArrayList();
+      return new int[0];
     }
-    return new IntArrayList(ints);
+    return ints.toIntArray();
   }
 }

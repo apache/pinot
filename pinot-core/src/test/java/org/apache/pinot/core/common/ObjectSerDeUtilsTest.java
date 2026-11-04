@@ -30,6 +30,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.math.BigDecimal;
@@ -679,6 +680,22 @@ public class ObjectSerDeUtilsTest {
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       Double2LongOpenHashMap actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Double2LongMap);
+
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testString2LongMap() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      Object2LongOpenHashMap<String> expected = new Object2LongOpenHashMap<>(size);
+      for (int j = 0; j < size; j++) {
+        expected.put(RandomStringUtils.secure().next(RANDOM.nextInt(5)), RANDOM.nextLong());
+      }
+
+      byte[] bytes = ObjectSerDeUtils.STRING_2_LONG_MAP_SER_DE.serialize(expected);
+      Object2LongOpenHashMap<String> actual = ObjectSerDeUtils.deserialize(bytes, ObjectType.String2LongMap);
 
       assertEquals(actual, expected, ERROR_MESSAGE);
     }

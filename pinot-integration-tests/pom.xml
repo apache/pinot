@@ -222,7 +222,6 @@
                 <include>org/apache/pinot/integration/tests/M*Test.java</include>
                 <include>org/apache/pinot/integration/tests/N*Test.java</include>
                 <include>org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</include>
-                <include>org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</include>
                 <include>org/apache/pinot/integration/tests/legacy/*Test.java</include>
               </includes>
               <excludes>

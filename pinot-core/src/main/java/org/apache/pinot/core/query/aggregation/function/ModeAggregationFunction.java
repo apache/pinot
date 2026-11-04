@@ -30,8 +30,11 @@ import it.unimi.dsi.fastutil.ints.Int2LongMap;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
@@ -51,33 +54,71 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 /// This function is used for Mode calculations.
 ///
-/// The function can be used as MODE(expression, multiModeReducerType)
+/// The function can be used as MODE(expression, multiModeReducerType, dataType)
 ///
 /// Following arguments are supported:
 ///
-/// - Expression: expression that contains the column to be calculated mode on, can be any Numeric column
+/// - Expression: expression that contains the column to be calculated mode on
 /// - MultiModeReducerType (optional): the reducer to use in case of multiple modes present in data
+/// - DataType (optional): STRING, BOOLEAN or TIMESTAMP, which is also the result type. The expression must have the
+///   same stored type, and only the MIN and MAX reducers are supported. Without it, the expression must be numeric and
+///   the result is DOUBLE.
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
+public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<Map<?, Long>, Comparable<?>> {
 
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   private final MultiModeReducerType _multiModeReducerType;
+  private final ColumnDataType _resultType;
 
   public ModeAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(arguments.get(0), nullHandlingEnabled);
 
     int numArguments = arguments.size();
-    Preconditions.checkArgument(numArguments <= 2, "Mode expects at most 2 arguments, got: %s", numArguments);
+    Preconditions.checkArgument(numArguments <= 3, "Mode expects at most 3 arguments, got: %s", numArguments);
     if (numArguments > 1) {
       _multiModeReducerType = MultiModeReducerType.valueOf(arguments.get(1).getLiteral().getStringValue());
     } else {
       _multiModeReducerType = MultiModeReducerType.MIN;
     }
+    if (numArguments > 2) {
+      _resultType = getResultType(arguments.get(2).getLiteral().getStringValue());
+      Preconditions.checkArgument(_multiModeReducerType != MultiModeReducerType.AVG,
+          "Unsupported MODE reducer for %s: AVG", _resultType);
+    } else {
+      _resultType = ColumnDataType.DOUBLE;
+    }
+  }
+
+  private static ColumnDataType getResultType(String dataType) {
+    switch (DataType.valueOf(dataType.toUpperCase(Locale.ROOT))) {
+      case STRING:
+        return ColumnDataType.STRING;
+      case BOOLEAN:
+        return ColumnDataType.BOOLEAN;
+      case TIMESTAMP:
+        return ColumnDataType.TIMESTAMP;
+      default:
+        throw new IllegalArgumentException("Unsupported data type for MODE: " + dataType);
+    }
+  }
+
+  /// Returns the stored type of the values, which must match the result type when it is given. BOOLEAN and TIMESTAMP
+  /// values are stored as INT and LONG.
+  private DataType getStoredType(DataType valueType) {
+    DataType storedType = valueType.getStoredType();
+    if (_resultType != ColumnDataType.DOUBLE) {
+      Preconditions.checkState(storedType == _resultType.getStoredType().toDataType(),
+          "Illegal data type for MODE aggregation function with %s result: %s", _resultType, valueType);
+    } else {
+      Preconditions.checkState(storedType.isNumeric(), "Illegal data type for MODE aggregation function: %s",
+          storedType);
+    }
+    return storedType;
   }
 
   /// Helper method to create a value map for the given value type.
-  private static Map<? extends Number, Long> getValueMap(DataType valueType) {
+  private static Map<?, Long> getValueMap(DataType valueType) {
     switch (valueType) {
       case INT:
         return new Int2LongOpenHashMap();
@@ -87,15 +128,16 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         return new Float2LongOpenHashMap();
       case DOUBLE:
         return new Double2LongOpenHashMap();
+      case STRING:
+        return new Object2LongOpenHashMap<String>();
       default:
         throw new IllegalStateException("Illegal data type for MODE aggregation function: " + valueType);
     }
   }
 
   /// Returns the value map from the result holder or creates a new one if it does not exist.
-  private static Map<? extends Number, Long> getValueMap(AggregationResultHolder aggregationResultHolder,
-      DataType valueType) {
-    Map<? extends Number, Long> valueMap = aggregationResultHolder.getResult();
+  private static Map<?, Long> getValueMap(AggregationResultHolder aggregationResultHolder, DataType valueType) {
+    Map<?, Long> valueMap = aggregationResultHolder.getResult();
     if (valueMap == null) {
       valueMap = getValueMap(valueType);
       aggregationResultHolder.setValue(valueMap);
@@ -143,6 +185,16 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     valueMap.merge(value, 1, Long::sum);
   }
 
+  /// Helper method to set STRING value for the given group keys into the result holder.
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int groupKey, String value) {
+    Object2LongOpenHashMap<String> valueMap = groupByResultHolder.getResult(groupKey);
+    if (valueMap == null) {
+      valueMap = new Object2LongOpenHashMap<>();
+      groupByResultHolder.setValueForKey(groupKey, valueMap);
+    }
+    valueMap.addTo(value, 1);
+  }
+
   /// Returns the dictionary id count map from the result holder or creates a new one if it does not exist.
   protected static Int2IntOpenHashMap getDictIdCountMap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
@@ -166,12 +218,12 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   /// Helper method to read dictionary and convert dictionary ids to values for dictionary-encoded expression.
-  private static Map<? extends Number, Long> convertToValueMap(DictIdsWrapper dictIdsWrapper) {
+  private Map<?, Long> convertToValueMap(DictIdsWrapper dictIdsWrapper) {
     Dictionary dictionary = dictIdsWrapper._dictionary;
     Int2IntOpenHashMap dictIdCountMap = dictIdsWrapper._dictIdCountMap;
     int numValues = dictIdCountMap.size();
     ObjectIterator<Int2IntMap.Entry> iterator = Int2IntMaps.fastIterator(dictIdCountMap);
-    DataType storedType = dictionary.getValueType();
+    DataType storedType = getStoredType(dictionary.getValueType());
     switch (storedType) {
       case INT:
         Int2LongOpenHashMap intValueMap = new Int2LongOpenHashMap(numValues);
@@ -201,13 +253,20 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
           doubleValueMap.put(dictionary.getDoubleValue(next.getIntKey()), next.getIntValue());
         }
         return doubleValueMap;
+      case STRING:
+        Object2LongOpenHashMap<String> stringValueMap = new Object2LongOpenHashMap<>(numValues);
+        while (iterator.hasNext()) {
+          Int2IntMap.Entry next = iterator.next();
+          stringValueMap.put(dictionary.getStringValue(next.getIntKey()), next.getIntValue());
+        }
+        return stringValueMap;
       default:
         throw new IllegalStateException("Illegal data type for MODE aggregation function: " + storedType);
     }
   }
 
   /// Helper method to extract segment level intermediate result from the inner segment result.
-  private static Map<? extends Number, Long> extractIntermediateResult(@Nullable Object result) {
+  private Map<?, Long> extractIntermediateResult(@Nullable Object result) {
     if (result == null) {
       // NOTE: Return an empty Int2LongOpenHashMap for empty result.
       return new Int2LongOpenHashMap();
@@ -257,8 +316,8 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     }
 
     // For non-dictionary-encoded expression, store values into the value map
-    DataType storedType = blockValSet.getValueType().getStoredType();
-    Map<? extends Number, Long> valueMap = getValueMap(aggregationResultHolder, storedType);
+    DataType storedType = getStoredType(blockValSet.getValueType());
+    Map<?, Long> valueMap = getValueMap(aggregationResultHolder, storedType);
     switch (storedType) {
       case INT:
         Int2LongOpenHashMap intMap = (Int2LongOpenHashMap) valueMap;
@@ -296,6 +355,15 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
           }
         });
         break;
+      case STRING:
+        Object2LongOpenHashMap<String> stringMap = (Object2LongOpenHashMap<String>) valueMap;
+        String[] stringValues = blockValSet.getStringValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            stringMap.addTo(stringValues[i], 1);
+          }
+        });
+        break;
       default:
         throw new IllegalStateException("Illegal data type for MODE aggregation function: " + storedType);
     }
@@ -320,7 +388,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     }
 
     // For non-dictionary-encoded expression, store values into the value map
-    DataType storedType = blockValSet.getValueType().getStoredType();
+    DataType storedType = getStoredType(blockValSet.getValueType());
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -354,6 +422,14 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
           }
         });
         break;
+      case STRING:
+        String[] stringValues = blockValSet.getStringValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeyArray[i], stringValues[i]);
+          }
+        });
+        break;
       default:
         throw new IllegalStateException("Illegal data type for MODE aggregation function: " + storedType);
     }
@@ -379,7 +455,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     }
 
     // For non-dictionary-encoded expression, store values into the value map
-    DataType storedType = blockValSet.getValueType().getStoredType();
+    DataType storedType = getStoredType(blockValSet.getValueType());
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
@@ -421,24 +497,33 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
           }
         });
         break;
+      case STRING:
+        String[] stringValues = blockValSet.getStringValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              setValueForGroupKeys(groupByResultHolder, groupKey, stringValues[i]);
+            }
+          }
+        });
+        break;
       default:
         throw new IllegalStateException("Illegal data type for MODE aggregation function: " + storedType);
     }
   }
 
   @Override
-  public Map<? extends Number, Long> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public Map<?, Long> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return extractIntermediateResult(aggregationResultHolder.getResult());
   }
 
   @Override
-  public Map<? extends Number, Long> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public Map<?, Long> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return extractIntermediateResult(groupByResultHolder.getResult(groupKey));
   }
 
   @Override
-  public Map<? extends Number, Long> merge(Map<? extends Number, Long> intermediateResult1,
-      Map<? extends Number, Long> intermediateResult2) {
+  public Map<?, Long> merge(Map<?, Long> intermediateResult1, Map<?, Long> intermediateResult2) {
     if (intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
@@ -460,6 +545,10 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         && intermediateResult2 instanceof Double2LongOpenHashMap) {
       ((Double2LongOpenHashMap) intermediateResult2).double2LongEntrySet().fastForEach(
           e -> ((Double2LongOpenHashMap) intermediateResult1).merge(e.getDoubleKey(), e.getLongValue(), Long::sum));
+    } else if (intermediateResult1 instanceof Object2LongOpenHashMap
+        && intermediateResult2 instanceof Object2LongOpenHashMap) {
+      ((Object2LongOpenHashMap<String>) intermediateResult2).object2LongEntrySet().fastForEach(
+          e -> ((Object2LongOpenHashMap<String>) intermediateResult1).addTo(e.getKey(), e.getLongValue()));
     } else {
       throw new IllegalStateException(
           "Illegal data type for Intermediate Result of MODE aggregation function: " + intermediateResult1.getClass()
@@ -474,7 +563,7 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Map<? extends Number, Long> longMap) {
+  public SerializedIntermediateResult serializeIntermediateResult(Map<?, Long> longMap) {
     if (longMap instanceof Int2LongMap) {
       return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Int2LongMap.getValue(),
           ObjectSerDeUtils.INT_2_LONG_MAP_SER_DE.serialize((Int2LongMap) longMap));
@@ -487,6 +576,9 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     } else if (longMap instanceof Double2LongMap) {
       return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Double2LongMap.getValue(),
           ObjectSerDeUtils.DOUBLE_2_LONG_MAP_SER_DE.serialize((Double2LongMap) longMap));
+    } else if (longMap instanceof Object2LongMap) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.String2LongMap.getValue(),
+          ObjectSerDeUtils.STRING_2_LONG_MAP_SER_DE.serialize((Object2LongMap<String>) longMap));
     } else {
       throw new IllegalStateException(
           "Illegal data type for Intermediate Result of MODE aggregation function: " + longMap.getClass()
@@ -495,18 +587,22 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   }
 
   @Override
-  public Map<? extends Number, Long> deserializeIntermediateResult(CustomObject customObject) {
+  public Map<?, Long> deserializeIntermediateResult(CustomObject customObject) {
     return ObjectSerDeUtils.deserialize(customObject);
   }
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
-    return ColumnDataType.DOUBLE;
+    return _resultType;
   }
 
   @Nullable
   @Override
-  public Double extractFinalResult(@Nullable Map<? extends Number, Long> intermediateResult) {
+  public Comparable<?> extractFinalResult(@Nullable Map<?, Long> intermediateResult) {
+    if (_resultType != ColumnDataType.DOUBLE) {
+      return intermediateResult == null || intermediateResult.isEmpty() ? null
+          : extractTypedFinalResult(intermediateResult);
+    }
     // A null intermediate result means nothing was aggregated, and the mode of nothing is NULL. An empty map is a
     // different thing: it is what an untouched single-stage result holder produces, and it keeps its historical
     // sentinel below so that path is not silently changed.
@@ -717,6 +813,65 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
         return sum / count;
       default:
         throw new IllegalStateException("Illegal reducer type for MODE aggregation function: " + _multiModeReducerType);
+    }
+  }
+
+  /// Returns the most frequent value read as the result type, breaking ties with the MIN or MAX reducer.
+  private Comparable<?> extractTypedFinalResult(Map<?, Long> intermediateResult) {
+    boolean max = _multiModeReducerType == MultiModeReducerType.MAX;
+    if (intermediateResult instanceof Int2LongOpenHashMap) {
+      ObjectIterator<Int2LongMap.Entry> iterator =
+          ((Int2LongOpenHashMap) intermediateResult).int2LongEntrySet().fastIterator();
+      Int2LongMap.Entry first = iterator.next();
+      long maxFrequency = first.getLongValue();
+      int mode = first.getIntKey();
+      while (iterator.hasNext()) {
+        Int2LongMap.Entry next = iterator.next();
+        long frequency = next.getLongValue();
+        int value = next.getIntKey();
+        if (frequency > maxFrequency || (frequency == maxFrequency && (max ? value > mode : value < mode))) {
+          maxFrequency = frequency;
+          mode = value;
+        }
+      }
+      return mode;
+    } else if (intermediateResult instanceof Long2LongOpenHashMap) {
+      ObjectIterator<Long2LongMap.Entry> iterator =
+          ((Long2LongOpenHashMap) intermediateResult).long2LongEntrySet().fastIterator();
+      Long2LongMap.Entry first = iterator.next();
+      long maxFrequency = first.getLongValue();
+      long mode = first.getLongKey();
+      while (iterator.hasNext()) {
+        Long2LongMap.Entry next = iterator.next();
+        long frequency = next.getLongValue();
+        long value = next.getLongKey();
+        if (frequency > maxFrequency || (frequency == maxFrequency && (max ? value > mode : value < mode))) {
+          maxFrequency = frequency;
+          mode = value;
+        }
+      }
+      return mode;
+    } else if (intermediateResult instanceof Object2LongOpenHashMap) {
+      ObjectIterator<Object2LongMap.Entry<String>> iterator =
+          ((Object2LongOpenHashMap<String>) intermediateResult).object2LongEntrySet().fastIterator();
+      Object2LongMap.Entry<String> first = iterator.next();
+      long maxFrequency = first.getLongValue();
+      String mode = first.getKey();
+      while (iterator.hasNext()) {
+        Object2LongMap.Entry<String> next = iterator.next();
+        long frequency = next.getLongValue();
+        String value = next.getKey();
+        if (frequency > maxFrequency || (frequency == maxFrequency && (max ? value.compareTo(mode) > 0
+            : value.compareTo(mode) < 0))) {
+          maxFrequency = frequency;
+          mode = value;
+        }
+      }
+      return mode;
+    } else {
+      throw new IllegalStateException(
+          "Illegal data type for Intermediate Result of MODE aggregation function: " + intermediateResult.getClass()
+              .getSimpleName());
     }
   }
 

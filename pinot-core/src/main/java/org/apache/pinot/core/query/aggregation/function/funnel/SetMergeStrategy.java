@@ -24,7 +24,6 @@ import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.HashSet;
@@ -48,7 +47,7 @@ class SetMergeStrategy implements MergeStrategy<List<Set>> {
   }
 
   @Override
-  public LongArrayList extractFinalResult(List<Set> stepsSets) {
+  public long[] extractFinalResult(List<Set> stepsSets) {
     long[] result = new long[_numSteps];
     Set<?> intersection = stepsSets.get(0);
     result[0] = intersection.size();
@@ -67,7 +66,7 @@ class SetMergeStrategy implements MergeStrategy<List<Set>> {
       }
       result[i] = intersection.size();
     }
-    return LongArrayList.wrap(result);
+    return result;
   }
 
   private static Set<?> intersect(Set<?> smaller, Set<?> larger) {

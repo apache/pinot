@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -53,6 +52,28 @@ import static org.testng.Assert.*;
 
 public class IndexLoadingConfigTest {
   private static final String TABLE_NAME = "table01";
+
+  @Test
+  public void testMappedSegmentMetadataInstanceSetting() {
+    assertFalse(new IndexLoadingConfig().isMappedSegmentMetadataEnabled());
+    assertFalse(new IndexLoadingConfig((TableConfig) null, null).isMappedSegmentMetadataEnabled());
+
+    InstanceDataManagerConfig instanceConfig = mock(InstanceDataManagerConfig.class);
+    PinotConfiguration config = new PinotConfiguration();
+    when(instanceConfig.getConfig()).thenReturn(config);
+
+    IndexLoadingConfig defaultConfig = new IndexLoadingConfig(instanceConfig, null, null);
+    assertFalse(defaultConfig.isMappedSegmentMetadataEnabled());
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, true);
+    IndexLoadingConfig enabled = new IndexLoadingConfig(instanceConfig, null, null);
+    assertTrue(enabled.isMappedSegmentMetadataEnabled());
+    assertTrue(enabled.withSegmentTier("coldTier").isMappedSegmentMetadataEnabled());
+    config.setProperty(IndexLoadingConfig.MAPPED_SEGMENT_METADATA_ENABLED, false);
+    IndexLoadingConfig disabled = new IndexLoadingConfig(instanceConfig, null, null);
+    assertFalse(disabled.isMappedSegmentMetadataEnabled());
+    assertFalse(disabled.withSegmentTier("coldTier").isMappedSegmentMetadataEnabled());
+    assertTrue(enabled.isMappedSegmentMetadataEnabled());
+  }
 
   @Test
   public void testReadModePrecedenceAndOverrideIsolation() {
@@ -200,7 +221,8 @@ public class IndexLoadingConfigTest {
     ColumnMetadata child = mock(ColumnMetadata.class);
     when(child.getFieldSpec()).thenReturn(new DimensionFieldSpec("event$key", DataType.INT, true));
     SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
-    when(metadata.getColumnMetadataMap()).thenReturn(new TreeMap<>(Map.of("event$key", child)));
+    when(metadata.getPhysicalColumnNames()).thenReturn(Set.of("event$key"));
+    when(metadata.getColumnMetadataFor("event$key")).thenReturn(child);
 
     IndexLoadingConfig derived = base.withOpenStructChildConfigs(metadata);
     assertNotSame(derived, base);
