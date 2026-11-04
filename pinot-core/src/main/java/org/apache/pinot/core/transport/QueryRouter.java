@@ -344,21 +344,12 @@ public class QueryRouter {
   }
 
   /// [#evictChannels] for a server the routing manager just enabled, which is how a restart shows up through Helix,
-  /// called through `BrokerRequestHandler#onServerEnabled`. A channel that heard from the server since it was disabled
-  /// and still has queries waiting on it is kept, see [ServerChannels#evictChannelOfEnabledServer].
+  /// called through `BrokerRequestHandler#onServerEnabled`. A channel that still has queries waiting on it is kept,
+  /// see [ServerChannels#evictChannelOfEnabledServer].
   public int evictChannelsOfEnabledServer(ServerInstance serverInstance) {
     return countChannels(serverInstance, (serverChannels, routingInstance) ->
         serverChannels.evictChannelOfEnabledServer(routingInstance,
             channel -> hasQueryAwaitingResponseOn(routingInstance, channel)));
-  }
-
-  /// Notes that the routing manager disabled the server, called through `BrokerRequestHandler#onServerDisabled`. See
-  /// [ServerChannels#markServerDisabled].
-  public void markServerDisabled(ServerInstance serverInstance) {
-    countChannels(serverInstance, (serverChannels, routingInstance) -> {
-      serverChannels.markServerDisabled(routingInstance);
-      return false;
-    });
   }
 
   /// Applies `action` to each channel the server may have, one per table type over plaintext and, when configured,

@@ -409,39 +409,6 @@ public class BrokerRoutingManagerTest {
     verify(_serverRemovedCallback, times(3)).accept(any());
   }
 
-  /// The disabled callback fires when an enabled server is disabled but stays in the cluster, once per disable, so the
-  /// single-stage transport can later tell a channel that heard from the server since. A server that goes straight
-  /// from enabled to removed gets the removed callback instead.
-  @Test
-  public void testDisabledCallbackInvokedWhenEnabledServerIsDisabled() {
-    @SuppressWarnings("unchecked")
-    Consumer<ServerInstance> serverDisabledCallback = mock(Consumer.class);
-    _routingManager.addServerDisabledCallback(serverDisabledCallback);
-    _routingManager.addServerRemovedCallback(_serverRemovedCallback);
-
-    setInstanceConfigs(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
-    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
-    verify(serverDisabledCallback, never()).accept(any());
-
-    setInstanceConfigs(createDisabledServerZNRecord(SERVER_INSTANCE_ID));
-    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
-    ArgumentCaptor<ServerInstance> captor = ArgumentCaptor.forClass(ServerInstance.class);
-    verify(serverDisabledCallback).accept(captor.capture());
-    assertEquals(captor.getValue().getInstanceId(), SERVER_INSTANCE_ID);
-    assertEquals(captor.getValue().getPort(), SERVER_PORT);
-    // Still disabled: not reported again
-    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
-    verify(serverDisabledCallback, times(1)).accept(any());
-
-    // Enabled, then removed in one step: removed, not disabled
-    setInstanceConfigs(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
-    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
-    setInstanceConfigs();
-    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
-    verify(serverDisabledCallback, times(1)).accept(any());
-    verify(_serverRemovedCallback, times(1)).accept(any());
-  }
-
   /// A server back under the same id at a different address has left its previous address for good. Listeners key
   /// what they cache by address, so the removed callback gets the instance at the previous address: otherwise the
   /// single-stage channels to it would stay cached forever. Covered while the server stays enabled and across a

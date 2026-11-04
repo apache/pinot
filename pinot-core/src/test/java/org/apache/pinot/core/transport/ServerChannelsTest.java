@@ -65,7 +65,6 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.OsCheck;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
@@ -566,69 +565,41 @@ public class ServerChannelsTest {
     }
   }
 
-  /// When the routing manager enables a server again, a channel is kept only if it received data after the server was
-  /// disabled and still carries queries: the server was toggled, not restarted, and those queries are left to finish.
-  /// A channel that heard nothing since the disable leads to a process that may be gone, one that carries nothing
-  /// costs only a reconnect, and without a disable on record there is nothing to go by.
+  /// When the routing manager enables a server again, an open channel that still carries queries is kept, whether or
+  /// not the server sent anything since it was disabled: the server was most likely toggled, and those queries are
+  /// left to finish. A channel that carries nothing costs only a reconnect, and a closed one is dropped.
   @Test
-  public void testEnabledServerKeepsOnlyChannelHeardFromSinceDisabledThatCarriesQueries() {
+  public void testEnabledServerKeepsOnlyOpenChannelThatCarriesQueries() {
     ServerChannels serverChannels =
         new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
     try {
       ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
       long evictionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, routingInstance);
 
-      // Heard from since the disable, carries queries: kept, and the disable is cleared
+      // Carries queries: kept
       ServerChannels.ServerChannel kept = serverChannels.getOrCreateServerChannel(routingInstance);
-      EmbeddedChannel keptChannel = newChannelWithDataTableHandler(routingInstance);
+      EmbeddedChannel keptChannel = new EmbeddedChannel();
       kept.setChannel(keptChannel);
-      readFrame(keptChannel);
-      serverChannels.markServerDisabled(routingInstance);
-      readFrame(keptChannel);
       assertFalse(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> channel == keptChannel));
       assertSame(serverChannels.getOrCreateServerChannel(routingInstance), kept);
       assertTrue(keptChannel.isActive());
-      assertFalse(kept._disabled);
 
-      // Enabled again without another disable: nothing to go by, evicted
-      assertTrue(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> true));
-      assertFalse(keptChannel.isActive());
-
-      // Nothing received since the disable, although frames came before it: evicted
-      ServerChannels.ServerChannel silent = serverChannels.getOrCreateServerChannel(routingInstance);
-      EmbeddedChannel silentChannel = newChannelWithDataTableHandler(routingInstance);
-      silent.setChannel(silentChannel);
-      readFrame(silentChannel);
-      serverChannels.markServerDisabled(routingInstance);
-      assertTrue(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> true));
-      assertFalse(silentChannel.isActive());
-
-      // Heard from since the disable, but no query left on it: evicted
-      ServerChannels.ServerChannel idle = serverChannels.getOrCreateServerChannel(routingInstance);
-      EmbeddedChannel idleChannel = newChannelWithDataTableHandler(routingInstance);
-      idle.setChannel(idleChannel);
-      serverChannels.markServerDisabled(routingInstance);
-      readFrame(idleChannel);
+      // No query left on it: evicted
       assertTrue(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> false));
-      assertFalse(idleChannel.isActive());
+      assertFalse(keptChannel.isActive());
+      assertNotSame(serverChannels.getOrCreateServerChannel(routingInstance), kept);
 
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, routingInstance), evictionsBefore + 3);
+      // Closed, even though queries still point at it: dropped, with no live connection to count
+      ServerChannels.ServerChannel closed = serverChannels.getOrCreateServerChannel(routingInstance);
+      EmbeddedChannel closedChannel = new EmbeddedChannel();
+      closedChannel.close();
+      closed.setChannel(closedChannel);
+      assertFalse(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> true));
+      assertNotSame(serverChannels.getOrCreateServerChannel(routingInstance), closed);
+
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, routingInstance), evictionsBefore + 1);
     } finally {
       serverChannels.shutDown();
-    }
-  }
-
-  private static EmbeddedChannel newChannelWithDataTableHandler(ServerRoutingInstance routingInstance) {
-    return new EmbeddedChannel(
-        new DataTableHandler(mock(QueryRouter.class), ThreadAccountantUtils.getNoOpAccountant(), routingInstance));
-  }
-
-  /// Delivers an empty data table to the channel, as a server response would arrive.
-  private static void readFrame(EmbeddedChannel channel) {
-    try {
-      channel.writeInbound(Unpooled.wrappedBuffer(DataTableBuilderFactory.getEmptyDataTable().toBytes()));
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
   }
 

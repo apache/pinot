@@ -76,9 +76,9 @@ import org.slf4j.LoggerFactory;
 ///   - on the Epoll transport, data unacknowledged for [NettyConfig#TCP_USER_TIMEOUT_MS] makes the kernel close it;
 ///   - a channel whose outbound queue is above [NettyConfig#WRITE_BUFFER_HIGH_WATER_MARK_BYTES] rejects queries
 ///     instead of queueing them in direct memory ([#sendRequest]);
-///   - the routing manager evicts the cached channels of a server when it enables it, as after a restart, unless they
-///     have shown the server alive since it was disabled ([#evictChannelOfEnabledServer]), and when it sees the server
-///     removed from the cluster or moved to another address ([#evictChannel]).
+///   - the routing manager evicts the cached channels of a server when it enables it, as after a restart, except one
+///     that still carries queries ([#evictChannelOfEnabledServer]), and when it sees the server removed from the
+///     cluster or moved to another address ([#evictChannel]).
 @ThreadSafe
 public class ServerChannels {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
@@ -237,32 +237,24 @@ public class ServerChannels {
     return true;
   }
 
-  /// Notes that the routing manager disabled the server, so that [#evictChannelOfEnabledServer] can later tell a
-  /// channel that heard from the server since then. Has no effect when nothing is cached for the server.
-  public void markServerDisabled(ServerRoutingInstance serverRoutingInstance) {
-    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
-    if (serverChannel != null) {
-      serverChannel.markDisabled();
-    }
-  }
-
-  /// [#evictChannel] for a server the routing manager just enabled, except that a channel which received data after
-  /// the server was disabled (see [#markServerDisabled]) and still carries queries, as `carriesQueries` tells, is kept:
-  /// the server was disabled and enabled again without a restart, as when an operator toggles it, and the queries
-  /// still running on the channel are left to finish. Returns `true` if a live connection was closed.
+  /// [#evictChannel] for a server the routing manager just enabled, except that an open channel that still carries
+  /// queries, as `carriesQueries` tells, is kept: the server was most likely disabled and enabled again without a
+  /// restart, as when an operator toggles it, and the queries still running on the channel are left to finish, as
+  /// they were before channels were evicted on enable. Returns `true` if a live connection was closed.
   ///
-  /// A restart leaves nothing to keep. A server disables itself as it starts up, even after a crash, so the channel to
-  /// its previous process, gone or half-open, hears nothing after the disable. After a graceful shutdown the channel
-  /// is closed by the time the server comes back, and the queries it drained are no longer in flight.
+  /// A restart rarely leaves anything to keep. A process that exits on a live host has its socket closed by the
+  /// kernel, so its channel is closed by the time the server comes back. A channel left half-open takes a host or
+  /// network failure, and the server is back only after the host recovers and the new process has started and loaded
+  /// its segments, by when the queries written to the old channel have timed out. A query with a longer timeout can
+  /// keep a half-open channel past the restart; the next write then fails on the reset from a rebooted host, or the
+  /// write timeout closes the channel once writes back up.
   public boolean evictChannelOfEnabledServer(ServerRoutingInstance serverRoutingInstance,
       Predicate<Channel> carriesQueries) {
     ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
     if (serverChannel != null) {
-      Channel channel = serverChannel.getChannelHeardFromSinceDisabled();
-      if (channel != null && carriesQueries.test(channel)) {
-        serverChannel._disabled = false;
-        LOGGER.info("Kept cached channel to enabled server: {}, which received data since the server was disabled "
-            + "and still carries queries", serverRoutingInstance);
+      Channel channel = serverChannel._channel;
+      if (channel != null && channel.isActive() && carriesQueries.test(channel)) {
+        LOGGER.info("Kept cached channel to enabled server: {}, which still carries queries", serverRoutingInstance);
         return false;
       }
     }
@@ -343,9 +335,6 @@ public class ServerChannels {
     // sender that fetched the entry before the eviction neither writes into the evicted channel nor reconnects an
     // entry nobody can reach any more; it retries on a fresh entry instead.
     volatile boolean _evicted;
-    // Set while the routing manager has the server disabled, see markServerDisabled(). Written on the Helix callback
-    // thread only.
-    volatile boolean _disabled;
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
@@ -399,27 +388,6 @@ public class ServerChannels {
     void evict() {
       _evicted = true;
       closeChannel();
-    }
-
-    /// Clears the read mark of the current channel; a channel connected later starts without one.
-    void markDisabled() {
-      _disabled = true;
-      Channel channel = _channel;
-      DataTableHandler handler = channel != null ? channel.pipeline().get(DataTableHandler.class) : null;
-      if (handler != null) {
-        handler.clearReadMark();
-      }
-    }
-
-    /// The current channel if it is open and has received data since [#markDisabled], otherwise `null`.
-    @Nullable
-    Channel getChannelHeardFromSinceDisabled() {
-      Channel channel = _channel;
-      if (!_disabled || channel == null || !channel.isActive()) {
-        return null;
-      }
-      DataTableHandler handler = channel.pipeline().get(DataTableHandler.class);
-      return handler != null && handler.hasReadSinceMark() ? channel : null;
     }
 
     @VisibleForTesting

@@ -93,13 +93,6 @@ public interface BrokerRequestHandler {
   default void onServerEnabled(ServerInstance serverInstance) {
   }
 
-  /// Called when the routing manager disables a server that is still part of the cluster: an operator disabled it or
-  /// its queries, or it is shutting down or starting up. A handler that caches connections to the server may note it,
-  /// to tell at [#onServerEnabled] whether a connection heard from the server since. Same contract as
-  /// [#onServerEnabled].
-  default void onServerDisabled(ServerInstance serverInstance) {
-  }
-
   /// Called when the routing manager sees a server removed from the cluster altogether (its instance config is
   /// gone), and with the instance at the previous address when a server is back under the same id at a different
   /// address. A handler that caches connections to that instance drops them: nothing will be routed there any more,

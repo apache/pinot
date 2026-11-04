@@ -571,7 +571,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // A server that becomes enabled has most likely been restarted: let the handler drop the connections it cached to
     // a previous process, so the next query reconnects instead of writing into a half-open socket.
     _routingManager.addServerEnabledCallback(singleStageBrokerRequestHandler::onServerEnabled);
-    _routingManager.addServerDisabledCallback(singleStageBrokerRequestHandler::onServerDisabled);
     _routingManager.addServerRemovedCallback(singleStageBrokerRequestHandler::onServerRemoved);
 
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;

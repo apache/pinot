@@ -152,7 +152,6 @@ public abstract class BaseBrokerRoutingManager
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
   private final List<Consumer<ServerInstance>> _serverEnabledCallbacks = new CopyOnWriteArrayList<>();
-  private final List<Consumer<ServerInstance>> _serverDisabledCallbacks = new CopyOnWriteArrayList<>();
   private final List<Consumer<ServerInstance>> _serverRemovedCallbacks = new CopyOnWriteArrayList<>();
   // The callback installed through setServerEnabledCallback, so that setting it again replaces it rather than piling up
   @Nullable
@@ -264,14 +263,6 @@ public abstract class BaseBrokerRoutingManager
     }
     _serverEnabledCallback = callback;
     _serverEnabledCallbacks.add(callback);
-  }
-
-  /// Registers a callback invoked with the [ServerInstance] of an enabled server that becomes disabled while it stays
-  /// in the cluster: disabled by an operator, its queries disabled, or shutting down, which a server also reports as
-  /// it starts up. It runs once routing no longer selects the server. Same threading rules as
-  /// [#addServerEnabledCallback(Consumer)].
-  public void addServerDisabledCallback(Consumer<ServerInstance> callback) {
-    _serverDisabledCallbacks.add(callback);
   }
 
   /// Registers a callback invoked with the last known [ServerInstance] of a server that has been removed from the
@@ -595,7 +586,6 @@ public abstract class BaseBrokerRoutingManager
       if (presentServers.contains(newDisabledInstance)) {
         // Still in the cluster, just disabled or shutting down: remember it so that a later removal is reported
         _disabledServers.put(newDisabledInstance, serverInstance);
-        invokeCallbacks(_serverDisabledCallbacks, serverInstance, "disabled");
       } else {
         // Went from enabled to removed in one step
         notifyServerRemoved(serverInstance);
@@ -631,12 +621,19 @@ public abstract class BaseBrokerRoutingManager
   }
 
   private void notifyServerEnabled(ServerInstance serverInstance) {
-    invokeCallbacks(_serverEnabledCallbacks, serverInstance, "enabled");
+    for (Consumer<ServerInstance> callback : _serverEnabledCallbacks) {
+      try {
+        callback.accept(serverInstance);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception in server enabled callback for server: {}, ignoring it",
+            serverInstance.getInstanceId(), e);
+      }
+    }
   }
 
   private void notifyServerRemoved(ServerInstance serverInstance) {
     LOGGER.info("Server: {} has been removed from the cluster", serverInstance.getInstanceId());
-    invokeCallbacks(_serverRemovedCallbacks, serverInstance, "removed");
+    invokeServerRemovedCallbacks(serverInstance);
   }
 
   /// A server back under the same id at a different address (hostname, Netty port or Netty TLS port) has left its
@@ -655,16 +652,15 @@ public abstract class BaseBrokerRoutingManager
     LOGGER.info("Server: {} moved from {}:{} (TLS port {}) to {}:{} (TLS port {})", serverInstance.getInstanceId(),
         previousInstance.getHostname(), previousInstance.getPort(), previousInstance.getNettyTlsPort(),
         serverInstance.getHostname(), serverInstance.getPort(), serverInstance.getNettyTlsPort());
-    invokeCallbacks(_serverRemovedCallbacks, previousInstance, "removed");
+    invokeServerRemovedCallbacks(previousInstance);
   }
 
-  private static void invokeCallbacks(List<Consumer<ServerInstance>> callbacks, ServerInstance serverInstance,
-      String event) {
-    for (Consumer<ServerInstance> callback : callbacks) {
+  private void invokeServerRemovedCallbacks(ServerInstance serverInstance) {
+    for (Consumer<ServerInstance> callback : _serverRemovedCallbacks) {
       try {
         callback.accept(serverInstance);
       } catch (Exception e) {
-        LOGGER.error("Caught exception in server {} callback for server: {}, ignoring it", event,
+        LOGGER.error("Caught exception in server removed callback for server: {}, ignoring it",
             serverInstance.getInstanceId(), e);
       }
     }

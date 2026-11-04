@@ -836,11 +836,11 @@ public class QueryRoutingTest {
     }
   }
 
-  /// A server toggled off and on again, not restarted, keeps the channel that still carries a query and heard from it
-  /// after the disable, so the query can finish. A channel that heard nothing since the disable is evicted, and the
-  /// queries on it fail without the server being reported.
+  /// A server toggled off and on again, not restarted, keeps the channel that still carries a query, even though it
+  /// sent nothing between the disable and the enable, so the query can finish. A channel that carries nothing is
+  /// evicted, which costs the next query a reconnect.
   @Test
-  public void testEnabledServerKeepsChannelThatCarriesQueriesAndAnsweredSinceDisabled()
+  public void testEnabledServerKeepsChannelThatCarriesQueries()
       throws Exception {
     long heldRequestId = 201;
     long answeredRequestId = 202;
@@ -853,27 +853,24 @@ public class QueryRoutingTest {
     initializeTestFixtures(startAndGetPort(_queryServer));
     QueryRouter router = newIsolatedQueryRouter();
     try {
-      AsyncQueryResponse held =
-          router.submitQuery(heldRequestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
-      Channel channel = router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
-      router.markServerDisabled(_serverInstance);
+      // Nothing left on the channel once its query is answered: evicted
       AsyncQueryResponse answered =
           router.submitQuery(answeredRequestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
       assertNotNull(answered.getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+      Channel idleChannel = router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
+      assertEquals(router.evictChannelsOfEnabledServer(_serverInstance), 1);
+      TestUtils.waitForCondition(aVoid -> !idleChannel.isActive(), 10L, 5_000L, "Evicted channel was not closed");
 
+      // A query the server is still working on keeps its channel across the enable
+      AsyncQueryResponse held =
+          router.submitQuery(heldRequestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+      Channel channel = router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
+      assertNotSame(channel, idleChannel);
       assertEquals(router.evictChannelsOfEnabledServer(_serverInstance), 0);
       assertSame(router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel,
           channel);
       assertTrue(channel.isActive());
       assertEquals(held.getStatus(), QueryResponse.Status.IN_PROGRESS);
-
-      // Disabled again, and nothing heard since: evicted, and the held query fails without blaming the server
-      router.markServerDisabled(_serverInstance);
-      assertEquals(router.evictChannelsOfEnabledServer(_serverInstance), 1);
-      held.getFinalResponses();
-      assertEquals(held.getStatus(), QueryResponse.Status.FAILED);
-      assertNull(held.getFailedServer());
-      assertFalse(channel.isActive());
     } finally {
       router.shutDown();
     }

@@ -46,9 +46,6 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   // Set before the broker closes this channel on purpose after a restart: queries still in flight fail as usual,
   // but the server is not reported for the close
   private volatile boolean _closedByBroker;
-  // Whether a frame arrived since clearReadMark(), or since the channel opened if it was never cleared. Tells a
-  // channel that heard from the server after the routing manager disabled it (see ServerChannels#markServerDisabled).
-  private volatile boolean _readSinceMark;
 
   public DataTableHandler(QueryRouter queryRouter, ThreadAccountant threadAccountant,
       ServerRoutingInstance serverRoutingInstance) {
@@ -67,16 +64,6 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   /// See [#_closedByBroker]. Called by `ServerChannels` right before it closes the channel.
   void markClosedByBroker() {
     _closedByBroker = true;
-  }
-
-  /// See [#_readSinceMark].
-  void clearReadMark() {
-    _readSinceMark = false;
-  }
-
-  /// See [#_readSinceMark].
-  boolean hasReadSinceMark() {
-    return _readSinceMark;
   }
 
   @Override
@@ -98,10 +85,6 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
-    // Before decoding: a frame proves the server alive even if it then fails to decode
-    if (!_readSinceMark) {
-      _readSinceMark = true;
-    }
     int responseSize = msg.readableBytes();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
     try {
