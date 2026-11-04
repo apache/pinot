@@ -150,6 +150,8 @@
               </includes>
               <excludes>
                 <exclude>org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
+                <!-- Selected by CustomClusterSuite; preserve its original direct-test class name. -->
+                <exclude>org/apache/pinot/integration/tests/DimensionTableIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/ExactlyOnceKafkaRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/GrpcBrokerClusterIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
@@ -367,6 +369,8 @@
                 <include>org/apache/pinot/server/realtime/**</include>
               </includes>
               <excludes>
+                <!-- Selected by CustomClusterSuite; preserve its original direct-test class name. -->
+                <exclude>org/apache/pinot/integration/tests/SegmentWriterUploaderIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
                 <exclude>org/apache/pinot/integration/tests/TenantRebalanceIntegrationTest.java</exclude>
               </excludes>
