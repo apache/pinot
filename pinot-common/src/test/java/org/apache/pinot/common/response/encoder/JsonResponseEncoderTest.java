@@ -31,6 +31,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.UuidUtils;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -38,6 +39,22 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.fail;
 
 public class JsonResponseEncoderTest {
+
+  @DataProvider(name = "floatArrayValues")
+  public Object[][] floatArrayValues() {
+    return new Object[][]{{Float.NEGATIVE_INFINITY}, {Float.POSITIVE_INFINITY}, {Float.NaN}, {3.5f}};
+  }
+
+  @Test(dataProvider = "floatArrayValues")
+  public void testFloatArrayPreservesNonFiniteValues(float value)
+      throws IOException {
+    DataSchema schema = new DataSchema(new String[]{"value"}, new ColumnDataType[]{ColumnDataType.FLOAT_ARRAY});
+    ResultTable table = new ResultTable(schema, List.<Object[]>of(new Object[]{new float[]{value}}));
+    JsonResponseEncoder encoder = new JsonResponseEncoder();
+    byte[] encoded = encoder.encodeResultTable(table, 0, 1);
+    float actual = ((float[]) encoder.decodeResultTable(encoded, 1, schema).getRows().get(0)[0])[0];
+    assertEquals(actual, value, "The response codec must preserve non-finite FLOAT_ARRAY elements");
+  }
 
   @Test
   public void testEncodeDecodeSingleRow() throws IOException {

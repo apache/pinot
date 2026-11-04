@@ -2799,6 +2799,30 @@ public class TableConfigUtilsTest {
     }
   }
 
+  @Test
+  public void testConsumptionPolicyMatrix() {
+    ConsumingSegmentConsistencyModeListener listener = ConsumingSegmentConsistencyModeListener.getInstance();
+    try {
+      for (boolean protectedMode : new boolean[]{false, true}) {
+        listener.setMode(protectedMode ? ConsumingSegmentConsistencyModeListener.Mode.PROTECTED
+            : ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED);
+        for (UpsertConfig.Mode mode : new UpsertConfig.Mode[]{UpsertConfig.Mode.FULL, UpsertConfig.Mode.PARTIAL}) {
+          for (boolean drop : new boolean[]{false, true}) {
+            UpsertConfig config = new UpsertConfig(mode);
+            config.setDropOutOfOrderRecord(drop);
+            for (ParallelSegmentConsumptionPolicy policy : ParallelSegmentConsumptionPolicy.values()) {
+              boolean rejects = protectedMode && (mode == UpsertConfig.Mode.PARTIAL || drop)
+                  && policy != ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS;
+              checkConsumptionDuringUpsertRevert(config, policy, rejects);
+            }
+          }
+        }
+      }
+    } finally {
+      listener.reset();
+    }
+  }
+
   private void checkConsumptionDuringUpsertRevert(UpsertConfig upsertConfig, ParallelSegmentConsumptionPolicy policy,
       boolean expectRejected) {
     TableConfig tableConfig = createTableConfigWithConsumptionPolicy(upsertConfig, policy);
@@ -4811,6 +4835,14 @@ public class TableConfigUtilsTest {
     assertEquals(TableConfigUtils.getPartitionColumn(tableConfig), "legacyCol");
     tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("", 1));
     assertNull(TableConfigUtils.getPartitionColumn(tableConfig));
+  }
+
+  @Test
+  public void testUnknownSkipTokenCannotBypassValidation() {
+    for (String value : List.of("ACTIVE_TASKS", "TASK,ACTIVE_TASKS", "ALL,ACTIVE_TASKS", "active_tasks")) {
+      expectThrows(IllegalArgumentException.class, () -> TableConfigUtils.parseTypesToSkipString(value));
+    }
+    assertEquals(TableConfigUtils.parseTypesToSkipString(" task , TASK "), EnumSet.of(ValidationType.TASK));
   }
 
   @Test
