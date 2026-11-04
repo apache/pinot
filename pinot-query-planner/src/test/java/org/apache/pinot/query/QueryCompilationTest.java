@@ -1598,9 +1598,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       boolean expected) {
     QueryEnvironment environment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS,
         SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP, capability);
+    String options = "SET stageParallelism=2; SET streamingSortedMailboxReceive=" + enabled + "; ";
     DispatchableSubPlan plan;
-    try (CompiledQuery compiled = environment.compile(
-        "SET stageParallelism=2; SET streamingSortedMailboxReceive=" + enabled + "; " + query)) {
+    try (CompiledQuery compiled = environment.compile(options + query)) {
       plan = compiled.planQuery(0).getQueryPlan();
     }
     MailboxMergeReceiveNode merge = null;
@@ -1627,6 +1627,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       assertEquals(senderSort.getFetch(), 15);
       assertTrue(senderSort.isSingleRunRequired());
       assertTrue(senderSort.getOffset() <= 0);
+      try (CompiledQuery compiled = environment.compile(options + "EXPLAIN PLAN FOR " + query)) {
+        String explain = compiled.explain(0, fragment -> List.of()).getExplainPlan();
+        assertTrue(explain.contains("PinotKWayMergeSortExchange"), explain);
+        assertTrue(explain.contains("fetch=[10]"), explain);
+        assertTrue(explain.contains("offset=[5]"), explain);
+        assertTrue(explain.contains("NoPlanInformation"), explain);
+      }
     }
   }
 
