@@ -20,12 +20,13 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.URI;
-import java.util.concurrent.Callable;
+import java.net.URISyntaxException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
@@ -38,9 +39,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// A segment uploader which does segment upload to a segment store (with store root dir configured as
-/// \_segmentStoreUriStr) using PinotFS within a configurable timeout period. The final segment location would be in the
-/// URI \_segmentStoreUriStr/\_tableNameWithType/segmentName+random_uuid if successful.
+/// Uploads a segment to the configured segment store with PinotFS, bounded by a timeout.
+/// Each attempt uses `{segment}.tmp.{uuid}`. The object is deleted only when that attempt's URI is not returned.
+/// A timed-out copy that is still in flight is abandoned. The worker deletes it after the copy finishes, including a
+/// late success. A copy that published before the timeout is returned and kept.
 public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
@@ -49,6 +51,15 @@ public class PinotFSSegmentUploader implements SegmentUploader {
   private final ExecutorService _executorService = Executors.newCachedThreadPool();
   private final int _timeoutInMs;
   private final ServerMetrics _serverMetrics;
+
+  /// Per-attempt handoff. The state stays on the call, not on this uploader, because one uploader is shared across
+  /// segments and a field would let one timeout delete another segment's object.
+  enum AttemptState {
+    IN_FLIGHT,
+    PUBLISHED,
+    ABANDONED,
+    FAILED
+  }
 
   public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis, ServerMetrics serverMetrics) {
     _segmentStoreUriStr = segmentStoreDirUri;
@@ -69,47 +80,116 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       return null;
     }
     final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
-    Callable<URI> uploadTask = () -> {
-      URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
+    final URI destUri;
+    try {
+      destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
           SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName())));
-      long startTime = System.currentTimeMillis();
-      try {
-        PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
-        // Check and delete any existing segment file.
-        if (pinotFS.exists(destUri)) {
-          pinotFS.delete(destUri, true);
-        }
-        pinotFS.copyFromLocalFile(segmentFile, destUri);
-        return destUri;
-      } catch (Exception e) {
-        LOGGER.warn("Failed copy segment tar file {} to segment store {}: {}", segmentFile.getName(), destUri, e);
-      } finally {
-        long duration = System.currentTimeMillis() - startTime;
-        _serverMetrics.addTimedTableValue(rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
-            TimeUnit.MILLISECONDS);
-      }
+    } catch (URISyntaxException e) {
+      LOGGER.warn("Failed copy segment tar file {} to segment store {}", segmentFile.getName(), _segmentStoreUriStr,
+          e);
+      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
       return null;
-    };
-    Future<URI> future = _executorService.submit(uploadTask);
+    }
+    AtomicReference<AttemptState> state = new AtomicReference<>(AttemptState.IN_FLIGHT);
+    Future<URI> future = _executorService.submit(() -> copySegment(segmentFile, destUri, rawTableName, state));
     try {
       URI segmentLocation = future.get(timeoutInMillis, TimeUnit.MILLISECONDS);
-      LOGGER.info("Successfully upload segment {} to {}.", segmentName, segmentLocation);
-      _serverMetrics.addMeteredTableValue(rawTableName,
-          segmentLocation == null ? ServerMeter.SEGMENT_UPLOAD_FAILURE : ServerMeter.SEGMENT_UPLOAD_SUCCESS, 1);
-      return segmentLocation;
+      if (segmentLocation != null) {
+        LOGGER.info("Successfully upload segment {} to {}.", segmentName, segmentLocation);
+        _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_SUCCESS, 1);
+        return segmentLocation;
+      }
     } catch (InterruptedException e) {
       LOGGER.info("Interrupted while waiting for segment upload of {} to {}.", segmentName, _segmentStoreUriStr);
+      // future.get already cleared the interrupt flag. Leave it clear until a published object is deleted.
+      // S3 and HDFS abort a delete when the calling thread is interrupted, and the worker will not delete a URI
+      // it already published. Restore the flag after that delete.
+      if (abandonUnlessPublished(state)) {
+        deleteBestEffort(destUri);
+      }
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
-      // Emit a separate metric for timeout since this is relatively more common than other errors.
+      if (abandonUnlessPublished(state)) {
+        LOGGER.info("Successfully upload segment {} to {}.", segmentName, destUri);
+        _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_SUCCESS, 1);
+        return destUri;
+      }
       _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
       LOGGER.warn("Timed out waiting to upload segment: {} for table: {}", segmentName.getSegmentName(), rawTableName);
     } catch (Exception e) {
       LOGGER.warn("Failed to upload file {} of segment {} for table {}",
-              segmentFile.getAbsolutePath(), segmentName, rawTableName, e);
+          segmentFile.getAbsolutePath(), segmentName, rawTableName, e);
     }
     _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
-
     return null;
+  }
+
+  /// Settles a wait that ended without the worker's result (timeout or interrupt) against the worker's publish.
+  /// Returns true when the worker already published, so the object belongs to the caller. Otherwise the attempt is
+  /// abandoned (or had already failed) and the worker deletes whatever its copy leaves behind, including a late
+  /// success. The caller must not delete in that case: an early delete can race a copy that recreates the object.
+  /// Does not cancel the future. An interrupt mid-upload can leave multipart parts this code cannot abort.
+  static boolean abandonUnlessPublished(AtomicReference<AttemptState> state) {
+    return !state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.ABANDONED)
+        && state.get() == AttemptState.PUBLISHED;
+  }
+
+  private URI copySegment(File segmentFile, URI destUri, String rawTableName, AtomicReference<AttemptState> state) {
+    long startTime = System.currentTimeMillis();
+    try {
+      PinotFS pinotFS = openSegmentStore(segmentFile, destUri, state);
+      if (pinotFS == null) {
+        return null;
+      }
+      try {
+        pinotFS.copyFromLocalFile(segmentFile, destUri);
+      } catch (Exception e) {
+        // The SDK may have stored the object and then thrown. Delete that object, and do not let the delete
+        // replace the copy failure.
+        deleteBestEffort(pinotFS, destUri);
+        state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.FAILED);
+        LOGGER.warn("Failed copy segment tar file {} to segment store {}", segmentFile.getName(), destUri, e);
+        return null;
+      }
+      if (state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.PUBLISHED)) {
+        return destUri;
+      }
+      // The caller already abandoned this attempt and will not return the URI.
+      deleteBestEffort(pinotFS, destUri);
+      return null;
+    } finally {
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
+    }
+  }
+
+  /// Returns null when the filesystem cannot be opened. Nothing was stored, so there is nothing to delete.
+  private PinotFS openSegmentStore(File segmentFile, URI destUri, AtomicReference<AttemptState> state) {
+    try {
+      return PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
+    } catch (Exception e) {
+      state.compareAndSet(AttemptState.IN_FLIGHT, AttemptState.FAILED);
+      LOGGER.warn("Failed copy segment tar file {} to segment store {}", segmentFile.getName(), destUri, e);
+      return null;
+    }
+  }
+
+  private void deleteBestEffort(URI destUri) {
+    try {
+      PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
+      deleteBestEffort(pinotFS, destUri);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to delete temporary segment file: {}", destUri, e);
+    }
+  }
+
+  private static void deleteBestEffort(PinotFS pinotFS, URI destUri) {
+    try {
+      // Local and GCS return false for a missing object. ADLS and S3 can throw. Ignore the boolean.
+      pinotFS.delete(destUri, true);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to delete temporary segment file: {}", destUri, e);
+    }
   }
 }
