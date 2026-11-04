@@ -21,11 +21,14 @@ package org.apache.pinot.tools;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
+/// Quickstart with continuous JFR recording enabled through cluster config.
+///
+/// The JVM owns the location of the JFR repository. To keep the recorded chunks after the JVM exits, start the
+/// quickstart with `-XX:FlightRecorderOptions:repository=<path>,preserve-repository=true`.
 public class JfrQuickstart extends Quickstart {
   @Override
   public List<String> types() {
@@ -35,11 +38,7 @@ public class JfrQuickstart extends Quickstart {
   @Override
   protected Map<String, String> getClusterConfigOverrides() {
     Map<String, String> clusterConfigOverrides = new HashMap<>(super.getClusterConfigOverrides());
-    String jfrDirectory = System.getProperty("user.dir") + "/jfr";
     clusterConfigOverrides.put(CommonConstants.JFR + ".enabled", "true");
-    clusterConfigOverrides.put(CommonConstants.JFR + "." + ContinuousJfrStarter.DIRECTORY, jfrDirectory);
-    clusterConfigOverrides.put(CommonConstants.JFR + ".dumpPath", jfrDirectory);
-    clusterConfigOverrides.put(CommonConstants.JFR + ".preserveRepository", "true");
     return clusterConfigOverrides;
   }
 
