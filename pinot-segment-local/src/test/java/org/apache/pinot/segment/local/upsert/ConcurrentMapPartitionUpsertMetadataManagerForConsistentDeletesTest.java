@@ -404,37 +404,37 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
   public void testGetQueryableDocIds() {
     boolean[] deleteFlags1 = new boolean[]{false, false, false, true, true, false};
     int[] docIds1 = new int[]{2, 4, 5};
-    MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
-    validDocIdsSnapshot1.add(docIds1);
+    MutableRoaringBitmap validDocIdsOnDiskBitmap1 = new MutableRoaringBitmap();
+    validDocIdsOnDiskBitmap1.add(docIds1);
     MutableRoaringBitmap queryableDocIds1 = new MutableRoaringBitmap();
     queryableDocIds1.add(new int[]{2, 5});
-    verifyGetQueryableDocIds(false, deleteFlags1, validDocIdsSnapshot1, queryableDocIds1);
+    verifyGetQueryableDocIds(false, deleteFlags1, validDocIdsOnDiskBitmap1, queryableDocIds1);
 
     // all records are not deleted
     boolean[] deleteFlags2 = new boolean[]{false, false, false, false, false, false};
     int[] docIds2 = new int[]{2, 4, 5};
-    MutableRoaringBitmap validDocIdsSnapshot2 = new MutableRoaringBitmap();
-    validDocIdsSnapshot2.add(docIds2);
+    MutableRoaringBitmap validDocIdsOnDiskBitmap2 = new MutableRoaringBitmap();
+    validDocIdsOnDiskBitmap2.add(docIds2);
     MutableRoaringBitmap queryableDocIds2 = new MutableRoaringBitmap();
     queryableDocIds2.add(docIds2);
-    verifyGetQueryableDocIds(false, deleteFlags2, validDocIdsSnapshot2, queryableDocIds2);
+    verifyGetQueryableDocIds(false, deleteFlags2, validDocIdsOnDiskBitmap2, queryableDocIds2);
 
     // delete column has null values
     boolean[] deleteFlags3 = new boolean[]{false, false, false, false, false, false};
     int[] docIds3 = new int[]{2, 4, 5};
-    MutableRoaringBitmap validDocIdsSnapshot3 = new MutableRoaringBitmap();
-    validDocIdsSnapshot3.add(docIds3);
+    MutableRoaringBitmap validDocIdsOnDiskBitmap3 = new MutableRoaringBitmap();
+    validDocIdsOnDiskBitmap3.add(docIds3);
     MutableRoaringBitmap queryableDocIds3 = new MutableRoaringBitmap();
     queryableDocIds3.add(docIds3);
-    verifyGetQueryableDocIds(true, deleteFlags3, validDocIdsSnapshot3, queryableDocIds3);
+    verifyGetQueryableDocIds(true, deleteFlags3, validDocIdsOnDiskBitmap3, queryableDocIds3);
 
     // All records are deleted record.
     boolean[] deleteFlags4 = new boolean[]{true, true, true, true, true, true};
     int[] docIds4 = new int[]{2, 4, 5};
-    MutableRoaringBitmap validDocIdsSnapshot4 = new MutableRoaringBitmap();
-    validDocIdsSnapshot4.add(docIds4);
+    MutableRoaringBitmap validDocIdsOnDiskBitmap4 = new MutableRoaringBitmap();
+    validDocIdsOnDiskBitmap4.add(docIds4);
     MutableRoaringBitmap queryableDocIds4 = new MutableRoaringBitmap();
-    verifyGetQueryableDocIds(false, deleteFlags4, validDocIdsSnapshot4, queryableDocIds4);
+    verifyGetQueryableDocIds(false, deleteFlags4, validDocIdsOnDiskBitmap4, queryableDocIds4);
   }
 
   private void verifyAddReplaceRemoveSegment(HashFunction hashFunction)
@@ -458,11 +458,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     ImmutableSegmentImpl segment1 =
         mockImmutableSegmentWithSegmentMetadata(1, validDocIds1, null, primaryKeys1, segmentMetadata1, null);
     List<RecordInfo> recordInfoList1;
-    // get recordInfo from validDocIdSnapshot.
+    // get recordInfo from validDocIdsOnDiskBitmap.
     // segment1 snapshot: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
     int[] docIds1 = new int[]{2, 4, 5};
-    MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
-    validDocIdsSnapshot1.add(docIds1);
+    MutableRoaringBitmap validDocIdsOnDiskBitmap1 = new MutableRoaringBitmap();
+    validDocIdsOnDiskBitmap1.add(docIds1);
     recordInfoList1 = getRecordInfoList(primaryKeys.length, primaryKeys, timestamps, null);
     upsertMetadataManager.addSegment(segment1, validDocIds1, null, recordInfoList1.iterator());
     trackedSegments.add(segment1);
@@ -485,11 +485,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
         mockImmutableSegmentWithSegmentMetadata(2, validDocIds2, null, getPrimaryKeyList(numRecords, primaryKeys),
             segmentMetadata2, null);
     List<RecordInfo> recordInfoList2;
-    // get recordInfo from validDocIdSnapshot.
+    // get recordInfo from validDocIdsOnDiskBitmap.
     // segment2 snapshot: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     // segment1 snapshot: 1 -> {4, 120}
-    MutableRoaringBitmap validDocIdsSnapshot2 = new MutableRoaringBitmap();
-    validDocIdsSnapshot2.add(0, 2, 3);
+    MutableRoaringBitmap validDocIdsOnDiskBitmap2 = new MutableRoaringBitmap();
+    validDocIdsOnDiskBitmap2.add(0, 2, 3);
     recordInfoList2 = getRecordInfoList(primaryKeys.length, primaryKeys, timestamps, null);
     upsertMetadataManager.addSegment(segment2, validDocIds2, null, recordInfoList2.iterator());
     trackedSegments.add(segment2);
@@ -754,11 +754,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
     ImmutableSegmentImpl segment1 = mockImmutableSegment(1, validDocIds1, queryableDocIds1, primaryKeys1);
     List<RecordInfo> recordInfoList1;
-    // get recordInfo from validDocIdSnapshot.
+    // get recordInfo from validDocIdsOnDiskBitmap.
     // segment1 snapshot: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
     int[] docIds1 = new int[]{2, 4, 5};
-    MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
-    validDocIdsSnapshot1.add(docIds1);
+    MutableRoaringBitmap validDocIdsOnDiskBitmap1 = new MutableRoaringBitmap();
+    validDocIdsOnDiskBitmap1.add(docIds1);
     recordInfoList1 = getRecordInfoList(primaryKeys.length, primaryKeys, timestamps, deleteFlags);
     upsertMetadataManager.addSegment(segment1, validDocIds1, queryableDocIds1, recordInfoList1.iterator());
     trackedSegments.add(segment1);
@@ -783,11 +783,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     ImmutableSegmentImpl segment2 = mockImmutableSegmentWithSegmentMetadata(2, validDocIds2, queryableDocIds2,
         getPrimaryKeyList(numRecords, primaryKeys), segmentMetadata2, null);
     List<RecordInfo> recordInfoList2;
-    // get recordInfo from validDocIdSnapshot.
+    // get recordInfo from validDocIdsOnDiskBitmap.
     // segment2 snapshot: 0 -> {0, 100}, 2 -> {2, 120}, 3 -> {3, 80}
     // segment1 snapshot: 1 -> {4, 120}
-    MutableRoaringBitmap validDocIdsSnapshot2 = new MutableRoaringBitmap();
-    validDocIdsSnapshot2.add(0, 2, 3);
+    MutableRoaringBitmap validDocIdsOnDiskBitmap2 = new MutableRoaringBitmap();
+    validDocIdsOnDiskBitmap2.add(0, 2, 3);
     recordInfoList2 = getRecordInfoList(primaryKeys.length, primaryKeys, timestamps, deleteFlags);
     upsertMetadataManager.addSegment(segment2, validDocIds2, queryableDocIds2, recordInfoList2.iterator());
     trackedSegments.add(segment2);
@@ -922,11 +922,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     return recordInfoList;
   }
 
-  /// Get recordInfo from validDocIdsSnapshot (enabledSnapshot = True).
-  private List<RecordInfo> getRecordInfoList(MutableRoaringBitmap validDocIdsSnapshot, int[] primaryKeys,
+  /// Get recordInfo from validDocIdsOnDiskBitmap (enabledSnapshot = True).
+  private List<RecordInfo> getRecordInfoList(MutableRoaringBitmap validDocIdsOnDiskBitmap, int[] primaryKeys,
       int[] timestamps, @Nullable boolean[] deleteRecordFlags) {
     List<RecordInfo> recordInfoList = new ArrayList<>();
-    Iterator<java.lang.Integer> validDocIdsIterator = validDocIdsSnapshot.iterator();
+    Iterator<java.lang.Integer> validDocIdsIterator = validDocIdsOnDiskBitmap.iterator();
     validDocIdsIterator.forEachRemaining((docId) -> recordInfoList.add(
         new RecordInfo(makePrimaryKey(primaryKeys[docId]), docId, timestamps[docId],
             deleteRecordFlags != null && deleteRecordFlags[docId])));
@@ -1309,7 +1309,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
   }
 
   public void verifyGetQueryableDocIds(boolean isDeleteColumnNull, boolean[] deleteFlags,
-      MutableRoaringBitmap validDocIdsSnapshot, MutableRoaringBitmap queryableDocIds) {
+      MutableRoaringBitmap validDocIdsOnDiskBitmap, MutableRoaringBitmap queryableDocIds) {
     ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(REALTIME_TABLE_NAME, 0,
             _contextBuilder.build());
@@ -1332,8 +1332,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
 
       ImmutableSegmentImpl segment =
           mockImmutableSegmentWithSegmentMetadata(1, new ThreadSafeMutableRoaringBitmap(), null, null, segmentMetadata,
-              validDocIdsSnapshot);
-      assertEquals(upsertMetadataManager.getQueryableDocIds(segment, validDocIdsSnapshot), queryableDocIds);
+              validDocIdsOnDiskBitmap);
+      assertEquals(upsertMetadataManager.getQueryableDocIds(segment, validDocIdsOnDiskBitmap), queryableDocIds);
     }
   }
 
