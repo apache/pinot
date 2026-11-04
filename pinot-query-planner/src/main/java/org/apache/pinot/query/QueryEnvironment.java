@@ -746,8 +746,14 @@ public class QueryEnvironment {
 
   /// Whether the response must describe the spool decisions of the planner. See
   /// [CommonConstants.Broker.Request.QueryOptionKey#SPOOLS_FEEDBACK].
+  ///
+  /// @throws QueryException with [QueryErrorCode#QUERY_VALIDATION] if the query option is not `true` or `false`.
   public static boolean isSpoolsFeedback(Map<String, String> options) {
-    return Boolean.parseBoolean(options.get(CommonConstants.Broker.Request.QueryOptionKey.SPOOLS_FEEDBACK));
+    try {
+      return QueryOptionsUtils.isSpoolsFeedback(options);
+    } catch (IllegalArgumentException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
+    }
   }
 
   /// Whether to prune unused input (passthrough) columns from the UNNEST output. Defaults to the broker config

@@ -282,6 +282,18 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void testSpoolsFeedback() {
+    assertFalse(QueryOptionsUtils.isSpoolsFeedback(Map.of()));
+    assertTrue(QueryOptionsUtils.isSpoolsFeedback(Map.of(SPOOLS_FEEDBACK, "true")));
+    assertTrue(QueryOptionsUtils.isSpoolsFeedback(Map.of(SPOOLS_FEEDBACK, " TRUE ")));
+    assertFalse(QueryOptionsUtils.isSpoolsFeedback(Map.of(SPOOLS_FEEDBACK, "false")));
+    expectThrows(IllegalArgumentException.class,
+        () -> QueryOptionsUtils.isSpoolsFeedback(Map.of(SPOOLS_FEEDBACK, "1")));
+    expectThrows(IllegalArgumentException.class,
+        () -> QueryOptionsUtils.isSpoolsFeedback(Map.of(SPOOLS_FEEDBACK, "yes")));
+  }
+
+  @Test
   public void testVectorNprobeNull() {
     assertNull(QueryOptionsUtils.getVectorNprobe(Map.of()));
     assertNull(QueryOptionsUtils.getVectorNprobe(new HashMap<>()));

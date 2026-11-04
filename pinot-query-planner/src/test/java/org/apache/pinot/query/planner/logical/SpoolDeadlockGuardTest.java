@@ -161,6 +161,41 @@ public class SpoolDeadlockGuardTest extends StagesTestBase {
     assertRisk(SpoolDeadlockGuard.findRisk(root), 1, "UNION", 4, 2, 3);
   }
 
+  /// Input 2 waits behind inputs 0 and 1, but only input 1 needs the spool. The risk names that pair of receives.
+  @Test
+  public void unionDefersEachInputBehindAllEarlierInputs() {
+    SpoolBuilder spool = new SpoolBuilder(3, tableScan("T1"));
+    MailboxSendNode root = when(
+        exchange(1,
+            setOp(SetOpNode.SetOpType.UNION, List.of(
+                exchange(5, tableScan("T2")),
+                exchange(2, spool.newReceiver()),
+                exchange(4, spool.newReceiver())
+            ))
+        )
+    );
+    assertRisk(SpoolDeadlockGuard.findRisk(root), 1, "UNION", 4, 2, 3);
+  }
+
+  /// Both receives of the probe input wait behind the build input, but only stage 2 stops the spool. The risk names
+  /// that receive.
+  @Test
+  public void joinNamesTheProbeReceiveThatStopsTheSpool() {
+    SpoolBuilder spool = new SpoolBuilder(3, tableScan("T1"));
+    MailboxSendNode root = when(
+        exchange(1,
+            join(
+                setOp(SetOpNode.SetOpType.UNION, List.of(
+                    exchange(5, tableScan("T2")),
+                    exchange(2, spool.newReceiver())
+                )),
+                exchange(4, spool.newReceiver())
+            )
+        )
+    );
+    assertRisk(SpoolDeadlockGuard.findRisk(root), 1, "JOIN", 2, 4, 3);
+  }
+
   @Test
   public void unionWithAggregateOnLaterInput() {
     SpoolBuilder spool = new SpoolBuilder(3, tableScan("T1"));

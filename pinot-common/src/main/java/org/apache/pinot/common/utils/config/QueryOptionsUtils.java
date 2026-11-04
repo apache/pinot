@@ -1053,6 +1053,14 @@ public class QueryOptionsUtils {
         queryOptions.get(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE));
   }
 
+  /// Returns whether the response must describe the spool decisions of the multi-stage planner. Defaults to `false`.
+  ///
+  /// @throws IllegalArgumentException if the option is set to a value other than `true` or `false`
+  public static boolean isSpoolsFeedback(Map<String, String> queryOptions) {
+    return Boolean.TRUE.equals(checkedParseBooleanNullable(QueryOptionKey.SPOOLS_FEEDBACK,
+        queryOptions.get(QueryOptionKey.SPOOLS_FEEDBACK)));
+  }
+
   @Nullable
   private static Boolean checkedParseBooleanNullable(String optionName, @Nullable String optionValue) {
     if (optionValue == null) {

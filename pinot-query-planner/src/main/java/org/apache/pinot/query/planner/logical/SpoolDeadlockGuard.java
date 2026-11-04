@@ -125,8 +125,14 @@ public final class SpoolDeadlockGuard {
     }
   }
 
-  /// A pair of receives in one stage where `waiting` is read only after `blocking` finishes.
-  private record Deferral(MailboxReceiveNode waiting, MailboxReceiveNode blocking, String operator) {
+  /// Two groups of receives in one stage where each receive of `waiting` is read only after every receive of
+  /// `blocking` finishes.
+  ///
+  /// Grouping keeps the analysis small: a `UNION` of `n` inputs creates `n - 1` deferrals instead of one for each
+  /// pair of receives. It does not lose precision, because an operator defers every receive of one group behind every
+  /// receive of the other. A cycle that enters a group through one blocking receive and leaves it through one waiting
+  /// receive is also a cycle of that pair of receives.
+  private record Deferral(List<MailboxReceiveNode> waiting, List<MailboxReceiveNode> blocking, String operator) {
   }
 
   /// The receives of one subtree inside a stage. The lists are mutable: [Analysis#collect] fills them while it walks
@@ -161,18 +167,29 @@ public final class SpoolDeadlockGuard {
     DeadlockRisk findRisk(PlanNode root) {
       List<Deferral> deferrals = collectDeferrals(root);
       int numDeferrals = deferrals.size();
-      // shared[i][j] is the id of a stage that the waiting receive of deferral i stops and that the blocking receive
-      // of deferral j needs, or NO_STAGE. When it is not NO_STAGE, deferral i blocks deferral j.
+      BitSet[] stopped = new BitSet[numDeferrals];
+      BitSet[] needed = new BitSet[numDeferrals];
+      for (int i = 0; i < numDeferrals; i++) {
+        stopped[i] = new BitSet();
+        for (MailboxReceiveNode receive : deferrals.get(i).waiting()) {
+          stopped[i].or(getStopped(receive.getSender()));
+        }
+        needed[i] = new BitSet();
+        for (MailboxReceiveNode receive : deferrals.get(i).blocking()) {
+          needed[i].or(getNeeded(receive.getSender()));
+        }
+      }
+      // shared[i][j] is the id of a stage that a waiting receive of deferral i stops and that a blocking receive of
+      // deferral j needs, or NO_STAGE. When it is not NO_STAGE, deferral i blocks deferral j.
       int[][] shared = new int[numDeferrals][numDeferrals];
       for (int i = 0; i < numDeferrals; i++) {
-        BitSet stopped = getStopped(deferrals.get(i).waiting().getSender());
         for (int j = 0; j < numDeferrals; j++) {
-          shared[i][j] = firstShared(stopped, getNeeded(deferrals.get(j).blocking().getSender()));
+          shared[i][j] = firstShared(stopped[i], needed[j]);
         }
       }
       for (int i = 0; i < numDeferrals; i++) {
         if (shared[i][i] != NO_STAGE) {
-          return new DeadlockRisk(List.of(toWait(deferrals.get(i), shared[i][i])));
+          return new DeadlockRisk(List.of(toWait(deferrals.get(i), shared[i][i], shared[i][i])));
         }
       }
       List<Integer> cycle = findCycle(shared);
@@ -181,30 +198,52 @@ public final class SpoolDeadlockGuard {
       }
       // In the cycle, deferral cycle[k] blocks deferral cycle[k + 1]. A wait describes what keeps it waiting: its
       // blocking receive needs a stage that the next wait stops, so the waits are listed in the reverse order.
-      List<Wait> waits = new ArrayList<>(cycle.size());
-      for (int k = cycle.size() - 1; k >= 0; k--) {
+      int size = cycle.size();
+      List<Wait> waits = new ArrayList<>(size);
+      for (int k = size - 1; k >= 0; k--) {
         int blocked = cycle.get(k);
-        int blocker = cycle.get(k == 0 ? cycle.size() - 1 : k - 1);
-        waits.add(toWait(deferrals.get(blocked), shared[blocker][blocked]));
+        int blocker = cycle.get((k + size - 1) % size);
+        int successor = cycle.get((k + 1) % size);
+        waits.add(toWait(deferrals.get(blocked), shared[blocker][blocked], shared[blocked][successor]));
       }
       return new DeadlockRisk(waits);
     }
 
-    private static Wait toWait(Deferral deferral, int sharedStageId) {
+    /// Picks the pair of receives of `deferral` that forms the cycle: the blocking receive that needs `neededStageId`
+    /// and the waiting receive that stops `stoppedStageId`.
+    ///
+    /// Both receives exist, because the stage ids come from the union of the same sets over the same receives.
+    private Wait toWait(Deferral deferral, int neededStageId, int stoppedStageId) {
+      MailboxReceiveNode waiting = null;
+      for (MailboxReceiveNode receive : deferral.waiting()) {
+        if (getStopped(receive.getSender()).get(stoppedStageId)) {
+          waiting = receive;
+          break;
+        }
+      }
+      MailboxReceiveNode blocking = null;
+      for (MailboxReceiveNode receive : deferral.blocking()) {
+        if (getNeeded(receive.getSender()).get(neededStageId)) {
+          blocking = receive;
+          break;
+        }
+      }
+      if (waiting == null || blocking == null) {
+        throw new IllegalStateException("No receive of the " + deferral.operator() + " deferral stops stage "
+            + stoppedStageId + " or needs stage " + neededStageId);
+      }
       // Both receives of a deferral belong to the stage of the operator that defers one behind the other.
-      return new Wait(deferral.waiting().getStageId(), deferral.operator(), deferral.waiting().getSenderStageId(),
-          deferral.blocking().getSenderStageId(), sharedStageId);
+      return new Wait(waiting.getStageId(), deferral.operator(), waiting.getSenderStageId(),
+          blocking.getSenderStageId(), neededStageId);
     }
 
-    /// Returns the deferrals of every stage reachable from `root`. Two deferrals with the same pair of senders behave
-    /// the same, so only the first one is kept.
+    /// Returns the deferrals of every stage reachable from `root`.
     ///
     /// Returns an empty list when no stage sends to more than one stage. Without a spool, the stages form a tree: the
     /// subtrees of two inputs never share a stage, so no deferral can block itself or take part in a cycle.
     private List<Deferral> collectDeferrals(PlanNode root) {
       List<Deferral> result = new ArrayList<>();
       boolean hasSpool = false;
-      Map<MailboxSendNode, Set<MailboxSendNode>> seenPairs = new IdentityHashMap<>();
       ArrayDeque<PlanNode> pending = new ArrayDeque<>();
       Set<PlanNode> visited = Collections.newSetFromMap(new IdentityHashMap<>());
       pending.add(root);
@@ -213,13 +252,7 @@ public final class SpoolDeadlockGuard {
         PlanNode stageRoot = pending.poll();
         hasSpool |= stageRoot instanceof MailboxSendNode && ((MailboxSendNode) stageRoot).isMultiSend();
         StageInfo info = getStageInfo(stageRoot);
-        for (Deferral deferral : info.deferrals()) {
-          Set<MailboxSendNode> blockingSenders = seenPairs.computeIfAbsent(deferral.waiting().getSender(),
-              k -> Collections.newSetFromMap(new IdentityHashMap<>()));
-          if (blockingSenders.add(deferral.blocking().getSender())) {
-            result.add(deferral);
-          }
-        }
+        result.addAll(info.deferrals());
         for (MailboxReceiveNode receive : info.receives().all()) {
           MailboxSendNode sender = receive.getSender();
           if (visited.add(sender)) {
@@ -333,29 +366,27 @@ public final class SpoolDeadlockGuard {
     /// The main operator chain of a stage reads nothing until the pipeline breaker reads all its receives.
     ///
     /// The pipeline breaker itself reads its receives in round-robin with blocking reads, so a receive that has no data
-    /// can keep the others unread. Each pair of pipeline-breaker receives is therefore treated as deferred both ways.
+    /// can keep the others unread. Therefore each pipeline-breaker receive creates one deferral: every other receive of
+    /// the stage, including the other pipeline-breaker receives, waits behind it.
     private static void addPipelineBreakerDeferrals(Receives receives, List<Deferral> deferrals) {
-      List<MailboxReceiveNode> breakers = new ArrayList<>();
-      for (MailboxReceiveNode receive : receives.all()) {
-        if (receive.getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
-          breakers.add(receive);
+      for (MailboxReceiveNode breaker : receives.all()) {
+        if (breaker.getExchangeType() != PinotRelExchangeType.PIPELINE_BREAKER) {
+          continue;
         }
-      }
-      if (breakers.isEmpty()) {
-        return;
-      }
-      for (MailboxReceiveNode receive : receives.all()) {
-        for (MailboxReceiveNode breaker : breakers) {
+        List<MailboxReceiveNode> waiting = new ArrayList<>(receives.all().size() - 1);
+        for (MailboxReceiveNode receive : receives.all()) {
           if (receive != breaker) {
-            deferrals.add(new Deferral(receive, breaker, "the pipeline breaker"));
+            waiting.add(receive);
           }
         }
+        addDeferral(waiting, List.of(breaker), "the pipeline breaker", deferrals);
       }
-      receives.streaming().removeAll(breakers);
+      // The main operator chain reads only the receives that are not pipeline-breaker receives.
+      receives.streaming().removeIf(receive -> receive.getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER);
     }
 
     /// Collects the receives of the subtree that starts at `node`, without crossing into other stages, and adds to
-    /// `deferrals` every pair of receives that an operator of the subtree reads one after the other.
+    /// `deferrals` every pair of receive groups that an operator of the subtree reads one after the other.
     private static Receives collect(PlanNode node, List<Deferral> deferrals) {
       Receives result = new Receives();
       if (node instanceof MailboxReceiveNode) {
@@ -372,7 +403,7 @@ public final class SpoolDeadlockGuard {
         // BaseJoinOperator reads the whole right input to build its table before it reads the left input.
         Receives left = inputs.get(0);
         Receives right = inputs.get(1);
-        addDeferrals(left, right, "JOIN", deferrals);
+        addDeferral(left.all(), right.all(), "JOIN", deferrals);
         result.all().addAll(left.all());
         result.all().addAll(right.all());
         result.streaming().addAll(left.streaming());
@@ -382,10 +413,10 @@ public final class SpoolDeadlockGuard {
         SetOpNode setOp = (SetOpNode) node;
         if (setOp.getSetOpType() == SetOpNode.SetOpType.UNION) {
           // UnionOperator and UnionAllOperator read their inputs one after the other, each one until it finishes.
+          List<MailboxReceiveNode> earlier = new ArrayList<>(inputs.get(0).all());
           for (int i = 1; i < inputs.size(); i++) {
-            for (int j = 0; j < i; j++) {
-              addDeferrals(inputs.get(i), inputs.get(j), setOp.getSetOpType().name(), deferrals);
-            }
+            addDeferral(inputs.get(i).all(), List.copyOf(earlier), setOp.getSetOpType().name(), deferrals);
+            earlier.addAll(inputs.get(i).all());
           }
           for (Receives input : inputs) {
             result.addAll(input);
@@ -394,7 +425,7 @@ public final class SpoolDeadlockGuard {
           // BinarySetOperator reads the whole right input before it reads the left input.
           Receives left = inputs.get(0);
           Receives right = inputs.get(1);
-          addDeferrals(left, right, setOp.getSetOpType().name(), deferrals);
+          addDeferral(left.all(), right.all(), setOp.getSetOpType().name(), deferrals);
           result.all().addAll(left.all());
           result.all().addAll(right.all());
           result.streaming().addAll(left.streaming());
@@ -410,11 +441,11 @@ public final class SpoolDeadlockGuard {
       return result;
     }
 
-    private static void addDeferrals(Receives waiting, Receives blocking, String operator, List<Deferral> deferrals) {
-      for (MailboxReceiveNode waitingReceive : waiting.all()) {
-        for (MailboxReceiveNode blockingReceive : blocking.all()) {
-          deferrals.add(new Deferral(waitingReceive, blockingReceive, operator));
-        }
+    /// Adds a deferral of `waiting` behind `blocking`, unless one of the groups is empty.
+    private static void addDeferral(List<MailboxReceiveNode> waiting, List<MailboxReceiveNode> blocking,
+        String operator, List<Deferral> deferrals) {
+      if (!waiting.isEmpty() && !blocking.isEmpty()) {
+        deferrals.add(new Deferral(List.copyOf(waiting), List.copyOf(blocking), operator));
       }
     }
 
