@@ -279,7 +279,7 @@ public class UpsertSnapshotRestartTest {
       throws Exception {
     ImmutableSegmentImpl segment = load(segmentName);
     try {
-      return segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) != null;
+      return segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME) != null;
     } finally {
       segment.destroy();
     }
@@ -289,7 +289,7 @@ public class UpsertSnapshotRestartTest {
       throws Exception {
     ImmutableSegmentImpl segment = load(segmentName);
     try {
-      return String.valueOf(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+      return String.valueOf(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
     } finally {
       segment.destroy();
     }
@@ -324,7 +324,7 @@ public class UpsertSnapshotRestartTest {
     List<ImmutableSegmentImpl> segments = addSegBFirst ? List.of(segB, segA) : List.of(segA, segB);
     List<ImmutableSegmentImpl> segmentsToAdd = new ArrayList<>();
     for (ImmutableSegmentImpl segment : segments) {
-      if (preload && segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) != null) {
+      if (preload && segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME) != null) {
         manager.preloadSegment(segment);
       } else {
         segmentsToAdd.add(segment);
