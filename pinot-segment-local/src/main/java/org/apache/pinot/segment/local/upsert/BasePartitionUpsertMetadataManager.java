@@ -488,14 +488,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Preloading segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
 
-    MutableRoaringBitmap validDocIds = segment.loadDocIdsFromSnapshot(
+    MutableRoaringBitmap validDocIdsOnDiskBitmap = segment.loadDocIdsFromSnapshot(
         V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
-    Preconditions.checkState(validDocIds != null,
+    Preconditions.checkState(validDocIdsOnDiskBitmap != null,
         "Snapshot of validDocIds is required to preload segment: %s, table: %s", segmentName, _tableNameWithType);
     // Cache the maximum even when the snapshot has no valid docs: preloadSegment() still tracks this segment for
     // snapshots, and another thread may destroy it while an updated marker is being read.
     double maxComparisonValue = isTTLEnabled() ? getMaxComparisonValue(segment) : TTL_WATERMARK_NOT_SET;
-    if (validDocIds.isEmpty()) {
+    if (validDocIdsOnDiskBitmap.isEmpty()) {
       _logger.info("Skip preloading segment: {} without valid doc, current primary key count: {}",
           segment.getSegmentName(), getNumPrimaryKeys());
       ThreadSafeMutableRoaringBitmap queryableDocIds =
@@ -505,13 +505,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     // Bump watermark after rows are added; see doAddSegment.
     if (isTTLEnabled() && canSkipSegmentOutOfTTL(maxComparisonValue)
-        && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
+        && skipPreloadSegmentOutOfTTL(segment, validDocIdsOnDiskBitmap)) {
       updateLargestSeenComparisonValue(maxComparisonValue);
       return;
     }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
-      doPreloadSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds));
+      doPreloadSegment(segment, null, null,
+          UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIdsOnDiskBitmap));
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while preloading segment: %s, table: %s", segmentName, _tableNameWithType),
