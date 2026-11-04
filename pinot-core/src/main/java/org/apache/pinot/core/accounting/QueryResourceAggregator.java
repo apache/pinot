@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class QueryResourceAggregator implements ResourceAggregator {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryResourceAggregator.class);
+  private static final GcStateDescriber GC_STATE = GcStateDescriber.getInstance();
 
   enum TriggeringLevel {
     Normal, HeapMemoryAlarmingVerbose, CPUTimeBasedKilling, HeapMemoryCritical, HeapMemoryPanic
@@ -286,12 +287,12 @@ public class QueryResourceAggregator implements ResourceAggregator {
     if (_previousTriggeringLevel != _triggeringLevel) {
       switch (_triggeringLevel) {
         case HeapMemoryPanic:
-          LOGGER.error("Heap used bytes: {} exceeds panic level: {}, killing all queries", _usedBytes,
-              config.getPanicLevel());
+          LOGGER.error("Heap used bytes: {} exceeds panic level: {}, killing all queries. GC state: {}", _usedBytes,
+              config.getPanicLevel(), GC_STATE.describe());
           break;
         case HeapMemoryCritical:
-          LOGGER.warn("Heap used bytes: {} exceeds critical level: {}, killing most expensive query", _usedBytes,
-              config.getCriticalLevel());
+          LOGGER.warn("Heap used bytes: {} exceeds critical level: {}, killing most expensive query. GC state: {}",
+              _usedBytes, config.getCriticalLevel(), GC_STATE.describe());
           if (!_memorySamplingEnabled) {
             LOGGER.error("Unable to terminate queries as memory tracking is not enabled");
           }
@@ -307,7 +308,8 @@ public class QueryResourceAggregator implements ResourceAggregator {
           LOGGER.debug("Heap used bytes: {} exceeds alarming level: {}", _usedBytes, config.getAlarmingLevel());
           break;
         case Normal:
-          LOGGER.info("Heap used bytes: {} drops to safe zone, entering to normal mode", _usedBytes);
+          LOGGER.info("Heap used bytes: {} drops to safe zone, entering to normal mode. GC state: {}", _usedBytes,
+              GC_STATE.describe());
           break;
         default:
           throw new IllegalStateException("Unsupported triggering level: " + _triggeringLevel);
@@ -382,7 +384,8 @@ public class QueryResourceAggregator implements ResourceAggregator {
         }
       }
     }
-    LOGGER.error("Killed {} queries: {} due to OOM panic", killedQueries.size(), killedQueries);
+    LOGGER.error("Killed {} queries: {} due to OOM panic. GC state: {}", killedQueries.size(), killedQueries,
+        GC_STATE.describe());
     if (config.isQueryKilledMetricEnabled()) {
       _metrics.addMeteredGlobalValue(_queryKilledMeter, killedQueries.size());
     }
@@ -465,9 +468,9 @@ public class QueryResourceAggregator implements ResourceAggregator {
   }
 
   private void logTerminatedQuery(QueryResourceTracker queryTracker, long totalHeapUsage) {
-    LOGGER.warn("Query: {} terminated. CPU Usage (ns): {}. Memory Usage (bytes): {}. Total Heap Usage (bytes): {}",
-        queryTracker.getExecutionContext().getCid(), queryTracker.getCpuTimeNs(), queryTracker.getAllocatedBytes(),
-        totalHeapUsage);
+    LOGGER.warn("Query: {} terminated. CPU Usage (ns): {}. Memory Usage (bytes): {}. Total Heap Usage (bytes): {}. "
+            + "GC state: {}", queryTracker.getExecutionContext().getCid(), queryTracker.getCpuTimeNs(),
+        queryTracker.getAllocatedBytes(), totalHeapUsage, GC_STATE.describe());
   }
 
   @Override
