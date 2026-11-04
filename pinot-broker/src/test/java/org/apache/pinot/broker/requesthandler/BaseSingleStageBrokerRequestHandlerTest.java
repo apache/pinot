@@ -1169,6 +1169,96 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "combined filter must retain the original WHERE clause, got literals: " + literalValues);
   }
 
+  /// When an expression override rewrites a nested predicate to a literal (e.g. `REGEXP_LIKE(foo, '.*') -> TRUE`),
+  /// the broker re-runs the query optimizer for offline-only and realtime-only tables so that the literal is removed
+  /// before routing, as it already does for hybrid tables. The override is applied after the initial optimization, and
+  /// a leftover `TRUE` operand would reach the broker segment pruners, which expect every filter node to be a function
+  /// call (e.g. `TimeSegmentPruner.getFilterTimeIntervals` would throw a `NullPointerException`).
+  @Test
+  public void testExpressionOverrideToLiteralIsOptimizedAwayForNonHybridTables()
+      throws Exception {
+    for (String tableNameWithType : List.of("mytable_OFFLINE", "mytable_REALTIME")) {
+      BrokerRequest serverRequest = handleRequestWithExpressionOverride(tableNameWithType,
+          "SELECT COUNT(*) FROM mytable WHERE ts >= 1000 AND REGEXP_LIKE(foo, '.*')");
+      Expression filter = serverRequest.getPinotQuery().getFilterExpression();
+      Assert.assertNotNull(filter, tableNameWithType + ": time predicate must be retained");
+      Function filterFunction = filter.getFunctionCall();
+      Assert.assertNotNull(filterFunction, tableNameWithType + ": filter must be a function");
+      Assert.assertEquals(filterFunction.getOperator(), FilterKind.AND.name());
+      for (Expression operand : filterFunction.getOperands()) {
+        Assert.assertNotNull(operand.getFunctionCall(),
+            tableNameWithType + ": overridden TRUE literal must be optimized away, got filter: " + filter);
+      }
+    }
+  }
+
+  private static BrokerRequest handleRequestWithExpressionOverride(String tableNameWithType, String sql)
+      throws Exception {
+    String rawTable = "mytable";
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(rawTable)
+        .addSingleValueDimension("foo", DataType.STRING)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(rawTable)).thenReturn(rawTable);
+    when(tableCache.getSchema(rawTable)).thenReturn(schema);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("foo", "foo", "ts", "ts"));
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
+    when(tableCache.getTableConfig(tableNameWithType)).thenReturn(tableCfg);
+    when(tableCache.getExpressionOverrideMap(tableNameWithType)).thenReturn(
+        Map.of(CalciteSqlParser.compileToExpression("REGEXP_LIKE(foo, '.*')"),
+            CalciteSqlParser.compileToExpression("TRUE")));
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(tableNameWithType)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+
+    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+            routingManager, new AllowAllAccessControlFactory(), quotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId,
+              BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+              TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            capturedServerRequest.set(serverBrokerRequest);
+            return BrokerResponseNative.empty();
+          }
+        };
+
+    handler.handleRequest(sql);
+    BrokerRequest serverRequest = capturedServerRequest.get();
+    Assert.assertNotNull(serverRequest, tableNameWithType + ": server query should have been captured");
+    return serverRequest;
+  }
+
   /// Pins the security-style defense that a user-supplied `materializedViewRewrite=true` query
   /// option (e.g. via `SET materializedViewRewrite='true'`) is stripped at the broker entry
   /// before any compile work. Without the strip, a hostile client could stamp the

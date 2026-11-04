@@ -736,6 +736,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig);
+      _queryOptimizer.optimize(serverPinotQuery, schema);
       offlineBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.OFFLINE);
@@ -745,6 +746,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       setTableName(serverBrokerRequest, realtimeTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
       handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig);
+      _queryOptimizer.optimize(serverPinotQuery, schema);
       realtimeBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.REALTIME);
