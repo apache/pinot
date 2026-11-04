@@ -841,17 +841,18 @@ public class TablesResource {
     if (validDocIdsTypeStr == null) {
       // By default, we read the valid doc ids from snapshot.
       return Pair.of(ValidDocIdsType.SNAPSHOT,
-          ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+          ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
     }
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     switch (validDocIdsType) {
       case SNAPSHOT:
         return Pair.of(validDocIdsType,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(
+                V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
       case SNAPSHOT_WITH_DELETE:
         return Pair.of(validDocIdsType,
             ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(
-                V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+                V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
       case IN_MEMORY:
         return Pair.of(validDocIdsType,
             new DocIdsSnapshot(indexSegment.getValidDocIds().getMutableRoaringBitmap(), null));
@@ -863,7 +864,8 @@ public class TablesResource {
         LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
             ValidDocIdsType.SNAPSHOT);
         return Pair.of(ValidDocIdsType.SNAPSHOT,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(
+                V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
     }
   }
 

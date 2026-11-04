@@ -384,7 +384,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     String segmentName = segment.getSegmentName();
     _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
     MutableRoaringBitmap validDocIdsOnDiskBitmap =
-        segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+        segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     if (validDocIdsOnDiskBitmap != null) {
       MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsOnDiskBitmap);
       segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsOnDiskBitmap),
@@ -488,7 +488,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Preloading segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
 
-    MutableRoaringBitmap validDocIds = segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+    MutableRoaringBitmap validDocIds = segment.loadDocIdsFromSnapshot(
+        V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     Preconditions.checkState(validDocIds != null,
         "Snapshot of validDocIds is required to preload segment: %s, table: %s", segmentName, _tableNameWithType);
     // Cache the maximum even when the snapshot has no valid docs: preloadSegment() still tracks this segment for
@@ -672,7 +673,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       // snapshot's valid docs avoids resurrecting primary keys already expired/deleted by TTL.
       MutableRoaringBitmap validDocIdsOnDiskBitmap = null;
       if (isTTLEnabled() && segment instanceof ImmutableSegmentImpl immutableSegment) {
-        validDocIdsOnDiskBitmap = immutableSegment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+        validDocIdsOnDiskBitmap = immutableSegment.loadDocIdsFromSnapshot(
+            V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
       }
       Iterator<RecordInfo> recordInfoIterator;
       if (validDocIdsOnDiskBitmap != null) {
@@ -1118,7 +1120,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         if (validDocIds != null) {
           ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsOnDiskBitmap =
               validDocIds.getBytesAndCardinality();
-          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsOnDiskBitmap,
+          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, validDocIdsOnDiskBitmap,
               DocIdsSnapshot.metadata(validDocIdsOnDiskBitmap, DocIdsType.VALID_DOC_IDS, trigger));
           numPrimaryKeysInSnapshot += validDocIdsOnDiskBitmap.getCardinality();
         }
@@ -1127,7 +1129,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           if (queryableDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsOnDiskBitmap =
                 queryableDocIds.getBytesAndCardinality();
-            segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, queryableDocIdsOnDiskBitmap,
+            segment.persistDocIdsSnapshot(
+                V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, queryableDocIdsOnDiskBitmap,
                 DocIdsSnapshot.metadata(queryableDocIdsOnDiskBitmap, DocIdsType.QUERYABLE_DOC_IDS, trigger));
             numQueryableDocIdsInSnapshot += queryableDocIdsOnDiskBitmap.getCardinality();
           }
@@ -1170,7 +1173,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           if (validDocIds != null) {
             ThreadSafeMutableRoaringBitmap.CardinalityAndBytes validDocIdsOnDiskBitmap =
                 validDocIds.getBytesAndCardinality();
-            segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, validDocIdsOnDiskBitmap,
+            segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, validDocIdsOnDiskBitmap,
                 DocIdsSnapshot.metadata(validDocIdsOnDiskBitmap, DocIdsType.VALID_DOC_IDS, trigger));
             // The segment has its validDocIds snapshot file on disk now, so handle it as a segment with snapshot
             // from now on, even if persisting the queryableDocIds snapshot below fails.
@@ -1182,7 +1185,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             if (queryableDocIds != null) {
               ThreadSafeMutableRoaringBitmap.CardinalityAndBytes queryableDocIdsOnDiskBitmap =
                   queryableDocIds.getBytesAndCardinality();
-              segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME,
+              segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME,
                   queryableDocIdsOnDiskBitmap,
                   DocIdsSnapshot.metadata(queryableDocIdsOnDiskBitmap, DocIdsType.QUERYABLE_DOC_IDS, trigger));
               numQueryableDocIdsInSnapshot += queryableDocIdsOnDiskBitmap.getCardinality();
@@ -1288,9 +1291,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void deleteSnapshot(ImmutableSegmentImpl segment) {
-    segment.deleteSnapshotFile(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+    segment.deleteSnapshotFile(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     if (_deleteRecordColumn != null) {
-      segment.deleteSnapshotFile(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+      segment.deleteSnapshotFile(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     }
   }
 
@@ -1499,7 +1502,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// together, so a missing queryableDocIds snapshot file gets recreated the next time the segment's snapshot is
   /// taken.
   protected boolean hasValidDocIdsSnapshotFile(ImmutableSegmentImpl segment) {
-    return segment.hasSnapshotFile(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+    return segment.hasSnapshotFile(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
   }
 
   protected void doClose()

@@ -1339,7 +1339,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           File backupValidDocIdsSnapshotFile = restoreValidDocIdsSnapshot ? new File(
               SegmentDirectoryPaths.findSegmentDirectory(new File(indexDir.getParentFile(),
                   indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX)),
-              V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) : null;
+              V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME) : null;
           if (forceDownload) {
             _logger.info("Force downloading segment: {}", segmentName);
           } else {
@@ -1349,7 +1349,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
           indexDir = downloadSegment(zkMetadata);
           if (backupValidDocIdsSnapshotFile != null && backupValidDocIdsSnapshotFile.exists()) {
             FileUtils.copyFile(backupValidDocIdsSnapshotFile, new File(
-                SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+                SegmentDirectoryPaths.findSegmentDirectory(indexDir),
+                    V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
           }
         } else {
           _logger.info("Reloading existing segment: {} on tier: {}", segmentName,

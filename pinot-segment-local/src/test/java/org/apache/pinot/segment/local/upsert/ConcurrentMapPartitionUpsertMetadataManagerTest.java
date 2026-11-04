@@ -358,7 +358,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap snapshot = new ThreadSafeMutableRoaringBitmap();
     snapshot.add(0);
     snapshot.add(2);
-    segment2.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, snapshot.getBytesAndCardinality(),
+    segment2.persistDocIdsSnapshot(
+        V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, snapshot.getBytesAndCardinality(),
         null);
 
     upsertMetadataManager.replaceSegment(segment2, segment1);
@@ -1109,9 +1110,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     when(segmentMetadata.getColumnMetadataFor(comparisonColumns.get(0))).thenReturn(columnMetadata);
     doReturn(endTime).when(columnMetadata).getMaxValue();
     if (snapshot != null) {
-      when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(snapshot);
+      when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME)).thenReturn(snapshot);
     } else {
-      when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
+      when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME)).thenReturn(
           validDocIds.getMutableRoaringBitmap());
     }
     return segment;
@@ -1122,7 +1123,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       List<PrimaryKey> primaryKeys, SegmentMetadataImpl segmentMetadata, MutableRoaringBitmap snapshot) {
     ImmutableSegmentImpl segment = mockImmutableSegment(sequenceNumber, validDocIds, queryableDocIds, primaryKeys);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(snapshot);
+    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME)).thenReturn(snapshot);
     return segment;
   }
 
@@ -1471,7 +1472,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
     when(segment.getSegmentName()).thenReturn("emptyValidDocIdsSegment");
-    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
+    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME)).thenReturn(
         new MutableRoaringBitmap());
 
     upsertMetadataManager.preloadSegment(segment);
@@ -1499,7 +1500,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
     when(segment.getSegmentName()).thenReturn("emptyValidDocIdsSegment");
-    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
+    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME)).thenReturn(
         new MutableRoaringBitmap());
 
     upsertMetadataManager.preloadSegment(segment);

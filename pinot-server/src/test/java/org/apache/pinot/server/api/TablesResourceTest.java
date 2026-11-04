@@ -493,8 +493,8 @@ public class TablesResourceTest extends BaseResourceTest {
     // Upgrade both legacy fixtures to real persisted captures, without changing the live bitmaps.
     DocIdsSnapshot.Trigger trigger = new DocIdsSnapshot.Trigger("testTable__0__2__0", "123");
     Map<String, DocIdsSnapshot.DocIdsType> fileTypes =
-        Map.of(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, DocIdsSnapshot.DocIdsType.VALID_DOC_IDS,
-            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, DocIdsSnapshot.DocIdsType.QUERYABLE_DOC_IDS);
+        Map.of(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, DocIdsSnapshot.DocIdsType.VALID_DOC_IDS,
+            V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, DocIdsSnapshot.DocIdsType.QUERYABLE_DOC_IDS);
     for (Map.Entry<String, DocIdsSnapshot.DocIdsType> fileType : fileTypes.entrySet()) {
       ThreadSafeMutableRoaringBitmap bitmap =
           new ThreadSafeMutableRoaringBitmap(segment.loadDocIdsFromSnapshot(fileType.getKey()));
@@ -516,8 +516,8 @@ public class TablesResourceTest extends BaseResourceTest {
       return;
     }
     JsonNode diagnostics = metadata.get("diagnostics");
-    String file = expectedType.equals("SNAPSHOT") ? V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME
-        : V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME;
+    String file = expectedType.equals("SNAPSHOT") ? V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME
+        : V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME;
     long capturedAt = segment.loadDocIdsSnapshot(file).metadata().snapshotCapturedAtMs();
     assertEquals(diagnostics.get("snapshotCapturedAtMs").asLong(), capturedAt);
     assertTrue(diagnostics.get("snapshotAgeMs").asLong() >= beforeRequest - capturedAt);
@@ -596,14 +596,14 @@ public class TablesResourceTest extends BaseResourceTest {
     segment.enableUpsert(upsertMetadataManager, validDocIds, queryableDocIds);
     File validDocIdsOnDiskBitmapFile =
         new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+            V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     FileUtils.writeByteArrayToFile(validDocIdsOnDiskBitmapFile,
         RoaringBitmapUtils.serialize(validDocIdsOnDiskBitmap.getMutableRoaringBitmap()));
 
     // Create the queryableDocIds snapshot file needed for SNAPSHOT_WITH_DELETE
     File queryableDocIdsOnDiskBitmapFile =
         new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+            V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     FileUtils.writeByteArrayToFile(queryableDocIdsOnDiskBitmapFile,
         RoaringBitmapUtils.serialize(queryableDocIds.getMutableRoaringBitmap()));
 
