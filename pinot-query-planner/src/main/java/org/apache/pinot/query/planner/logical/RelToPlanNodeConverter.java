@@ -248,11 +248,16 @@ public final class RelToPlanNodeConverter {
   private BasePlanNode convertLogicalCorrelate(LogicalCorrelate node) {
     // Pattern: Correlate(left, Uncollect(Project(correlatedFields...)))
     RelNode right = node.getRight();
-    // A correlate survives decorrelation only when the decorrelator could not rewrite it into a join, and CROSS JOIN
-    // UNNEST is the only such shape implemented here. The right side of any other correlate is never converted, so
-    // planning it as an UNNEST would drop that whole subtree and return wrong rows without an error.
-    if (findUncollect(right) == null) {
-      throw new QueryException(QueryErrorCode.QUERY_PLANNING, unsupportedCorrelateMessage(right));
+    // A correlate survives decorrelation only when the decorrelator could not rewrite it into a join. The only such
+    // shape implemented here is CROSS JOIN UNNEST: an Uncollect, under projections and filters, of arrays projected
+    // from the left row over a one-row VALUES. Only that projection is read, against the left row, and nothing below
+    // it is converted, so any other correlate, including one whose array holds a sub-query, would lose that subtree
+    // and return wrong rows without an error.
+    // TODO: The projections above the Uncollect and the join type are not converted either, so a LEFT correlate runs
+    //  as an inner one, and a projection that trims, reorders or computes the UNNEST columns is lost.
+    Uncollect uncollect = findUncollect(right);
+    if (uncollect == null || !isUnnestArrayInput(uncollect.getInput())) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING, unsupportedCorrelateMessage(right, uncollect != null));
     }
     RelDataType leftRowType = node.getLeft().getRowType();
     Project aliasProject = right instanceof Project ? (Project) right : null;
@@ -306,19 +311,36 @@ public final class RelToPlanNodeConverter {
     return unnest;
   }
 
-  /// Returns the error for a correlate that is not CROSS JOIN UNNEST, i.e. a correlated sub-query the decorrelator
-  /// could not rewrite into a join. Calcite cannot move a correlation through a MATCH_RECOGNIZE, so a sub-query that
-  /// references the outer query below one ends up here, and gets a rewrite hint of its own.
-  private static String unsupportedCorrelateMessage(RelNode right) {
+  /// Returns the error for a correlate that is not CROSS JOIN UNNEST: a correlated sub-query the decorrelator could not
+  /// rewrite into a join, or, when `subQueryInUnnestArray`, an UNNEST whose array holds a sub-query. Calcite cannot
+  /// move a correlation through a MATCH_RECOGNIZE, so a sub-query that references the outer query below one ends up
+  /// here, and gets a rewrite hint of its own.
+  private static String unsupportedCorrelateMessage(RelNode right, boolean subQueryInUnnestArray) {
     if (containsMatch(right)) {
       return "A correlated sub-query over MATCH_RECOGNIZE is not supported: the planner cannot move a reference to a "
           + "column of the outer query or of an earlier FROM item through MATCH_RECOGNIZE. Remove the outer reference. "
           + "For an equality between an input column and an outer column, select the input column, add it to "
           + "PARTITION BY and join the MATCH_RECOGNIZE output on it.";
     }
+    if (subQueryInUnnestArray) {
+      return "A sub-query inside the array of CROSS JOIN UNNEST is not supported. Compute it in a separate FROM item, "
+          + "joined on the columns it references, and use that item's column in the array.";
+    }
     return "A correlated sub-query that cannot be rewritten into a join is not supported: the multi-stage engine only "
-        + "supports a reference to a column of the outer query or of an earlier FROM item as the array of CROSS JOIN "
-        + "UNNEST. Remove the outer reference from the sub-query.";
+        + "supports a reference to a column of the outer query or of an earlier FROM item as an array of CROSS JOIN "
+        + "UNNEST in the FROM clause, not inside a sub-query. Rewrite the sub-query as a join, or remove the outer "
+        + "reference.";
+  }
+
+  /// Whether `node`, the input of the Uncollect, is what Calcite builds for the arrays of CROSS JOIN UNNEST: a
+  /// projection of them over a one-row VALUES. Anything else, such as the aggregate of a scalar sub-query inside the
+  /// array, is a plan the conversion would drop.
+  private static boolean isUnnestArrayInput(RelNode node) {
+    RelNode current = node;
+    while (current instanceof Project) {
+      current = ((Project) current).getInput();
+    }
+    return current instanceof LogicalValues;
   }
 
   private static boolean containsMatch(RelNode node) {
