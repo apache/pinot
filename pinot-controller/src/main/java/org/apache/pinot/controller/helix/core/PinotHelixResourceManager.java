@@ -2729,6 +2729,9 @@ public class PinotHelixResourceManager {
 
     // Remove COMMITTING segment list
     if (tableType == TableType.REALTIME) {
+      if (_controllerMetrics != null) {
+        PinotTableIdealStateBuilder.removeSourceFailureGauges(tableNameWithType, _controllerMetrics);
+      }
       if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
         LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
       } else {

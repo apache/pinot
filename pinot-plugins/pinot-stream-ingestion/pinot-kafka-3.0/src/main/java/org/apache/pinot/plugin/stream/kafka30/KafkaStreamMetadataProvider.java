@@ -43,6 +43,8 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.plugin.stream.kafka.KafkaConsumerPartitionLag;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionSubsetUtils;
+import org.apache.pinot.plugin.stream.kafka.KafkaSourceErrorEvidence;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorEvidence;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -413,7 +415,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       try {
         if (!topicExists(requestTimeoutMs)) {
           topicMissing = true;
-          lastError = new RuntimeException("Topic does not exist: " + _topic);
         } else {
           topicMissing = false;
         }
@@ -434,10 +435,15 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       }
     }
 
-    if (lastError != null) {
-      if (topicMissing) {
-        throw new PermanentConsumerException(new RuntimeException("Topic does not exist: " + _topic));
+    if (topicMissing) {
+      RuntimeException topicDoesNotExist = new RuntimeException("Topic does not exist: " + _topic);
+      if (lastError != null) {
+        topicDoesNotExist.addSuppressed(lastError);
       }
+      throw new PermanentConsumerException(
+          IngestionSourceErrorEvidence.attach(topicDoesNotExist, KafkaSourceErrorEvidence.TOPIC_MISSING));
+    }
+    if (lastError != null) {
       if (lastError instanceof TransientConsumerException) {
         throw (TransientConsumerException) lastError;
       }
@@ -447,7 +453,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     }
 
     throw new TransientConsumerException(
-        new RuntimeException("Failed to fetch partition information for topic: " + _topic));
+        new RuntimeException("Failed to fetch partition information for topic: " + _topic, lastError));
   }
 
   private void validatePartitionIds(List<Integer> subset) {
@@ -484,7 +490,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } catch (ExecutionException e) {
       throw new TransientConsumerException(e);
     } catch (java.util.concurrent.TimeoutException e) {
-      throw new TransientConsumerException(e);
+      throw IngestionSourceErrorEvidence.attach(new TransientConsumerException(e),
+          KafkaSourceErrorEvidence.BROKER_UNREACHABLE);
     }
   }
 }

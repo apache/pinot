@@ -238,6 +238,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // The progress of a certain table rebalance job of a table
   TABLE_REBALANCE_JOB_PROGRESS_PERCENT("percent", false),
 
+  INGESTION_SOURCE_AUTH_FAILURE_TIME_SECONDS("seconds", false),
+  INGESTION_SOURCE_READ_FAILURE_TIME_SECONDS("seconds", false),
+
   // Mapping metric for table-to-tenant attribution. One gauge per (tenantType, tenantName) pair; always set to 1.
   // The compound key "<tenantType>.<tenantName>" is embedded as extra segments in the JMX metric name so that
   // Prometheus can extract both as labels and join them onto other table-scoped metrics via group_left.
