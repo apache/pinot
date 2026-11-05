@@ -1770,6 +1770,43 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  /// A force commit that arrives during a decode retry backoff wakes it, so the segment ends at the message being
+  /// retried at once instead of after the backoff.
+  @Test(timeOut = 30_000)
+  public void testForceCommitWakesTheDecodeRetryBackoff()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    long failingOffset = START_OFFSET_VALUE + 5;
+    OffsetPayloadDecoder.RETRIABLE_FAILURES.put(failingOffset, new AtomicInteger(Integer.MAX_VALUE));
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
+        new TimeSupplier(), Map.of())) {
+      // The backoff sleeps until woken
+      segmentDataManager._decodeRetrySleepStarted = new CountDownLatch(1);
+      segmentDataManager._stubConsumeLoop = false;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      LongMsgOffset failingMsgOffset = new LongMsgOffset(failingOffset);
+      segmentDataManager._consumeOffsets.add(failingMsgOffset);
+      segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+              SegmentCompletionProtocol.ControllerResponseStatus.COMMIT).withStreamPartitionMsgOffset(
+              failingMsgOffset.toString())));
+      Thread consumerThread = new Thread(segmentDataManager.createPartitionConsumer());
+      consumerThread.start();
+      Assert.assertTrue(segmentDataManager._decodeRetrySleepStarted.await(10, TimeUnit.SECONDS));
+
+      segmentDataManager.forceCommit();
+      consumerThread.join(10_000);
+
+      Assert.assertFalse(consumerThread.isAlive());
+      Assert.assertEquals(segmentDataManager.getStopReason(),
+          SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+      Assert.assertTrue(segmentDataManager._commitSegmentCalled);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), failingOffset);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), 5);
+    }
+  }
+
   /// CONSUMING_TO_ONLINE: catching up on the Helix thread has a deadline, which caps the backoff. Catching up gives up
   /// at the deadline without moving past the failing message, and the segment is downloaded instead.
   @Test(timeOut = 30_000)

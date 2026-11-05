@@ -313,6 +313,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile boolean _hasMessagesFetched = false;
   private volatile boolean _endOfPartitionGroup = false;
   private volatile boolean _forceCommitMessageReceived = false;
+  // Notified by forceCommit() to wake a decode retry backoff, so the segment ends without waiting it out
+  private final Object _decodeRetryBackoffLock = new Object();
   private volatile StreamPartitionMsgOffset _finalOffset; // Exclusive, used when we want to catch up to this one
   private volatile boolean _shouldStop = false;
 
@@ -983,11 +985,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// Sleeps before a message whose decoder threw `RetriableDecodeException` is fetched again, doubling the next backoff
   /// up to the configured cap. The sleep ends at the consumption deadline of states that have one, so that
   /// [#endCriteriaReached()] can end the segment (or give up catching up) at `_currentOffset`, which still points at
-  /// that message. It is skipped once a force commit, which pausing consumption also sends, ends the segment there.
-  /// [#stop()] interrupts the sleep.
+  /// that message. A force commit, which pausing consumption also sends, ends the segment there: it skips the sleep, or
+  /// wakes it. [#stop()] interrupts the sleep.
   private void backOffBeforeDecodeRetry()
       throws InterruptedException {
-    if (_shouldStop || (_state == State.INITIAL_CONSUMING && _forceCommitMessageReceived)) {
+    if (_shouldStop || forceCommitEndsSegment()) {
       return;
     }
     long backoffMs = _decodeRetryBackoffMs;
@@ -1003,7 +1005,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   void sleepBeforeDecodeRetry(long backoffMs)
       throws InterruptedException {
-    Thread.sleep(backoffMs);
+    long timeoutNs = TimeUnit.MILLISECONDS.toNanos(backoffMs);
+    long startNs = System.nanoTime();
+    synchronized (_decodeRetryBackoffLock) {
+      while (!forceCommitEndsSegment()) {
+        long remainingNs = timeoutNs - (System.nanoTime() - startNs);
+        if (remainingNs <= 0) {
+          return;
+        }
+        TimeUnit.NANOSECONDS.timedWait(_decodeRetryBackoffLock, remainingNs);
+      }
+    }
+  }
+
+  /// Whether a force commit ends the segment at the next end criteria check, which it only does in INITIAL_CONSUMING.
+  private boolean forceCommitEndsSegment() {
+    return _state == State.INITIAL_CONSUMING && _forceCommitMessageReceived;
   }
 
   @VisibleForTesting
@@ -2601,6 +2618,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public void forceCommit() {
     _forceCommitMessageReceived = true;
+    synchronized (_decodeRetryBackoffLock) {
+      _decodeRetryBackoffLock.notifyAll();
+    }
   }
 
   @VisibleForTesting
