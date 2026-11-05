@@ -734,8 +734,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else if (routeInfo.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
-      handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
+      Map<Expression, Expression> expressionOverrideMap = _tableCache.getExpressionOverrideMap(offlineTableName);
+      handleExpressionOverride(serverPinotQuery, expressionOverrideMap);
       handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig);
+      if (expressionOverrideMap != null) {
+        _queryOptimizer.optimize(serverPinotQuery, schema);
+      }
       offlineBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.OFFLINE);
@@ -743,8 +747,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else {
       // REALTIME only
       setTableName(serverBrokerRequest, realtimeTableName);
-      handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
+      Map<Expression, Expression> expressionOverrideMap = _tableCache.getExpressionOverrideMap(realtimeTableName);
+      handleExpressionOverride(serverPinotQuery, expressionOverrideMap);
       handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig);
+      if (expressionOverrideMap != null) {
+        _queryOptimizer.optimize(serverPinotQuery, schema);
+      }
       realtimeBrokerRequest = serverBrokerRequest;
 
       requestContext.setFanoutType(RequestContext.FanoutType.REALTIME);
