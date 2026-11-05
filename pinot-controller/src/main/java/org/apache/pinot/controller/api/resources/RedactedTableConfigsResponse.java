@@ -29,6 +29,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import org.apache.pinot.spi.config.TableConfigs;
 
 
@@ -54,6 +57,7 @@ public final class RedactedTableConfigsResponse {
   public static final String OFFLINE_VERSION_KEY = "offline";
   public static final String REALTIME_VERSION_KEY = "realtime";
   public static final String MEDIA_TYPE = "application/vnd.apache.pinot.redacted-table-configs-v1+json";
+  public static final MediaType MEDIA_TYPE_VALUE = MediaType.valueOf(MEDIA_TYPE);
 
   private final TableIdentity _tableName;
   private final Map<String, Integer> _baseVersions;
@@ -120,6 +124,12 @@ public final class RedactedTableConfigsResponse {
 
   public static boolean isEnvelope(JsonNode node) {
     return node.isObject() && node.has(RESPONSE_TYPE_KEY);
+  }
+
+  /// Returns whether the request negotiates this envelope instead of the legacy `application/json` [TableConfigs]
+  /// representation. Existing clients that never ask for the envelope keep receiving the legacy shape (redacted).
+  public static boolean isRequested(@Nullable HttpHeaders headers) {
+    return RedactedTableConfigResponse.isEnvelopeRequested(headers, MEDIA_TYPE_VALUE);
   }
 
   private static void validateTableTypeVersion(String type, Integer version, boolean configIncluded) {

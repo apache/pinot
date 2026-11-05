@@ -27,15 +27,19 @@ import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 public interface FineGrainedAccessControl {
   /// Checks whether the user has access to perform action on the particular resource
   ///
+  /// The default allows every action, which keeps implementations that never override this method (including the
+  /// allow-all factories used by clusters without authentication) behaving as before. Principal-based
+  /// implementations must gate [Actions.Cluster#GET_ZNODE] explicitly, because raw ZK reads return the persisted,
+  /// unredacted form of table configs; the basic-auth access controls require that permission to be granted by
+  /// name.
+  ///
   /// @param httpHeaders HTTP headers
   /// @param targetType type of resource being accessed
   /// @param targetId id of the resource
   /// @param action type to validate
   /// @return true if user is allowed to perform the action
   default boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
-    // Raw ZK reads can expose the persisted form of table configs, so implementations must grant this action
-    // explicitly. Keep the legacy allow-by-default behavior for all other fine-grained actions.
-    return !Actions.Cluster.GET_ZNODE.equals(action);
+    return true;
   }
 
   /// Checks whether the user has access to perform action on the particular resource type.

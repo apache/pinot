@@ -336,7 +336,10 @@ public class PinotTableRestletResource {
       URI tableConfigUri = new URI(urlBuilder.forTableGet(tableName));
       Map<String, String> tableConfigRequestHeaders =
           requestHeaders != null ? new HashMap<>(requestHeaders) : new HashMap<>();
-      tableConfigRequestHeaders.put(HttpHeaders.ACCEPT, RedactedTableConfigResponse.MEDIA_TYPE);
+      // Prefer the versioned redacted representation, but accept the legacy map from source controllers that
+      // predate it.
+      tableConfigRequestHeaders.put(HttpHeaders.ACCEPT,
+          RedactedTableConfigResponse.MEDIA_TYPE + ", " + MediaType.APPLICATION_JSON + ";q=0.5");
       SimpleHttpResponse tableConfigResponse = HttpClient.wrapAndThrowHttpException(
           HttpClient.getInstance().sendGetRequest(tableConfigUri, tableConfigRequestHeaders));
       String tableConfigJson = tableConfigResponse.getResponse();
@@ -409,15 +412,21 @@ public class PinotTableRestletResource {
     }
   }
 
+  /// Returns the table configs keyed by table type from either the versioned redacted envelope or the legacy
+  /// `application/json` map that controllers predating the envelope return.
   @VisibleForTesting
   static JsonNode unwrapTableConfigResponse(JsonNode responseNode)
       throws IOException {
-    if (!RedactedTableConfigResponse.isEnvelope(responseNode)) {
-      throw new IOException("Source controller did not return the requested table config representation");
+    if (RedactedTableConfigResponse.isEnvelope(responseNode)) {
+      RedactedTableConfigResponse response =
+          JsonUtils.jsonNodeToObject(responseNode, RedactedTableConfigResponse.class);
+      return JsonUtils.objectToJsonNode(response.getConfigs());
     }
-    RedactedTableConfigResponse response =
-        JsonUtils.jsonNodeToObject(responseNode, RedactedTableConfigResponse.class);
-    return JsonUtils.objectToJsonNode(response.getConfigs());
+    if (responseNode.isObject()
+        && (responseNode.has(TableType.OFFLINE.name()) || responseNode.has(TableType.REALTIME.name()))) {
+      return responseNode;
+    }
+    throw new IOException("Source controller did not return a recognized table config representation");
   }
 
   @VisibleForTesting
@@ -633,7 +642,9 @@ public class PinotTableRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIG)
   @Produces({MediaType.APPLICATION_JSON, RedactedTableConfigResponse.MEDIA_TYPE})
   @ApiOperation(value = "Lists the table configs",
-      notes = "Returns a versioned redacted response. Submit the complete response to PUT when retaining markers.")
+      notes = "Returns the redacted table configs keyed by table type. Request the "
+          + RedactedTableConfigResponse.MEDIA_TYPE + " media type for the versioned response, and submit that "
+          + "complete response to PUT when retaining redaction markers.")
   public String listTableConfigs(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
@@ -663,6 +674,16 @@ public class PinotTableRestletResource {
       if (configs.isEmpty()) {
         String tableNameWithType = tableTypeStr != null ? tableName + "_" + tableTypeStr.toUpperCase() : tableName;
         throw new TableNotFoundException("Table " + tableNameWithType + " does not exist");
+      }
+      if (!RedactedTableConfigResponse.isRequested(headers)) {
+        // Legacy representation for clients that key on the table type: the redacted configs without version
+        // information. A redacted config that still carries markers cannot be submitted back as a bare update body,
+        // so editing clients must request the envelope instead.
+        ObjectNode legacyResponse = JsonUtils.newObjectNode();
+        for (Map.Entry<String, TableConfig> entry : configs.entrySet()) {
+          legacyResponse.set(entry.getKey(), entry.getValue().toJsonNode());
+        }
+        return legacyResponse.toString();
       }
       Pair<Schema, Integer> schemaWithVersion = _pinotHelixResourceManager.getSchemaWithVersion(
           TableNameBuilder.extractRawTableName(tableName));

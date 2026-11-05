@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,7 +57,8 @@ public class TableConfigRedactionUtilsTest {
       "uri-token", "uri-signature", "batch-access-key", "batch-secret-key", "batch-credential",
       "reader-password", "tier-account-key", "connection-account-key", "custom-password", "task-auth-token",
       "task-secret-key", "schema-user", "schema-password", "dynamic-azure-key", "first-user", "first-pass",
-      "second-user", "second-pass", "first-query", "second-query", "endpoint-account-key");
+      "second-user", "second-pass", "first-query", "second-query", "endpoint-account-key", "default-key",
+      "service_account");
 
   @Test
   public void testRedactsCredentialsAcrossTableConfigSurfaces() {
@@ -113,10 +115,12 @@ public class TableConfigRedactionUtilsTest {
     assertEquals(tier.get("uri.connection.string"),
         "Endpoint=https://storage.example.test/container;AccountKey=" + MARKER + ";Region=west");
     assertEquals(redacted.getCustomConfig().getCustomConfigs().get("provider.custom.password"), MARKER);
+    // A placeholder default is the effective credential whenever the variable is unset, so only the variable name
+    // is displayed under credential-bearing keys.
     assertEquals(redacted.getCustomConfig().getCustomConfigs().get("placeholder.secretKey"),
-        "${CUSTOM_SECRET_KEY:default-key}");
+        "${CUSTOM_SECRET_KEY:" + MARKER + "}");
     assertEquals(redacted.getCustomConfig().getCustomConfigs().get("serviceAccountJson"),
-        "${SERVICE_ACCOUNT_JSON:{\"type\":\"service_account\",\"message\":\"use } literally\"}}");
+        "${SERVICE_ACCOUNT_JSON:" + MARKER + "}");
     assertEquals(redacted.getTaskConfig().getConfigsForTaskType("SegmentGenerationAndPushTask").get("authToken"),
         MARKER);
 
@@ -858,6 +862,64 @@ public class TableConfigRedactionUtilsTest {
         "Resolved provider password was resolved-literal", placeholderConfig);
     assertEquals(placeholderDiagnostic, "Invalid table config");
     assertFalse(placeholderDiagnostic.contains("resolved-literal"));
+  }
+
+  @Test
+  public void testRedactsPlaceholderDefaultsWithoutLosingTheVariable() {
+    Map<String, String> custom = new HashMap<>();
+    custom.put("provider.password", "${PROVIDER_PASSWORD:literal-default}");
+    custom.put("provider.registry", "${PROVIDER_REGISTRY:https://user:registry-pass@provider.example/path}");
+    custom.put("provider.region", "${PROVIDER_REGION:us-west-2}");
+    custom.put("provider.optional", "${PROVIDER_OPTIONAL:}");
+    custom.put("provider.token", "${PROVIDER_TOKEN}");
+    TableConfig stored = tableWithCustomConfigs(custom);
+
+    TableConfig redacted = TableConfigRedactionUtils.redact(stored);
+    Map<String, String> customConfigs = redacted.getCustomConfig().getCustomConfigs();
+
+    assertEquals(customConfigs.get("provider.password"), "${PROVIDER_PASSWORD:" + MARKER + "}");
+    // The URI policy masks the whole userinfo, as it does for literal URIs.
+    assertEquals(customConfigs.get("provider.registry"),
+        "${PROVIDER_REGISTRY:https://" + MARKER + ":" + MARKER + "@provider.example/path}");
+    assertEquals(customConfigs.get("provider.region"), "${PROVIDER_REGION:us-west-2}");
+    assertEquals(customConfigs.get("provider.optional"), "${PROVIDER_OPTIONAL:}");
+    assertEquals(customConfigs.get("provider.token"), "${PROVIDER_TOKEN}");
+    assertFalse(redacted.toJsonString().contains("literal-default"));
+    assertFalse(redacted.toJsonString().contains("registry-pass"));
+    assertEquals(TableConfigRedactionUtils.redactStructuredText(
+        "${PROVIDER_REGISTRY:https://user:registry-pass@provider.example/path}"),
+        "${PROVIDER_REGISTRY:https://" + MARKER + ":" + MARKER + "@provider.example/path}");
+    assertEquals(TableConfigRedactionUtils.maskPlaceholderDefault("${PROVIDER_REGION:us-west-2}"),
+        "${PROVIDER_REGION:" + MARKER + "}");
+    assertEquals(TableConfigRedactionUtils.maskPlaceholderDefault("${PROVIDER_TOKEN}"), "${PROVIDER_TOKEN}");
+    assertEquals(TableConfigRedactionUtils.maskPlaceholderDefault("literal"), "literal");
+
+    // Unchanged masked placeholders restore the stored default. A new default is an intentional replacement, while
+    // a masked default for a different variable has no stored value to restore.
+    assertEquals(TableConfigRedactionUtils.restoreRedactedValues(redacted, stored).toJsonNode(), stored.toJsonNode());
+    TableConfig edited = TableConfigRedactionUtils.redact(stored);
+    edited.getCustomConfig().getCustomConfigs().put("provider.password", "${PROVIDER_PASSWORD:new-default}");
+    assertEquals(TableConfigRedactionUtils.restoreRedactedValues(edited, stored).getCustomConfig().getCustomConfigs()
+        .get("provider.password"), "${PROVIDER_PASSWORD:new-default}");
+    TableConfig renamed = TableConfigRedactionUtils.redact(stored);
+    renamed.getCustomConfig().getCustomConfigs().put("provider.password", "${OTHER_PASSWORD:" + MARKER + "}");
+    assertThrows(IllegalArgumentException.class,
+        () -> TableConfigRedactionUtils.restoreRedactedValues(renamed, stored));
+    assertThrows(IllegalArgumentException.class,
+        () -> TableConfigRedactionUtils.restoreRedactedValues(redacted, null));
+  }
+
+  @Test
+  public void testCredentialOverrideCanReplaceMaskedPlaceholderDefault() {
+    Map<String, String> custom = new HashMap<>();
+    custom.put("provider.password", "${PROVIDER_PASSWORD:literal-default}");
+    JsonNode redacted = TableConfigRedactionUtils.redact(tableWithCustomConfigs(custom)).toJsonNode();
+    String pointer = "/" + TableConfig.CUSTOM_CONFIG_KEY + "/customConfigs/provider.password";
+
+    // The override must keep the variable and may only supply a new default.
+    assertTrue(TableConfigRedactionUtils.isValidCredentialOverride(redacted, pointer, "${PROVIDER_PASSWORD:other}"));
+    assertFalse(TableConfigRedactionUtils.isValidCredentialOverride(redacted, pointer, "literal"));
+    assertFalse(TableConfigRedactionUtils.isValidCredentialOverride(redacted, pointer, "${OTHER_PASSWORD:other}"));
   }
 
   private static TableConfig tableWithCustomConfigs(Map<String, String> customConfigs) {
