@@ -64,7 +64,7 @@ public class PluginManager {
   private static final String PINOUT_PLUGIN_PROPERTIES_FILE_NAME = "pinot-plugin.properties";
 
   // For backward compatibility, this map holds a mapping from old plugins class name to its new class name.
-  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>() {
+  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new ConcurrentHashMap<>() {
     {
       // MessageDecoder
       put("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder",
@@ -146,7 +146,7 @@ public class PluginManager {
 
   PluginManager() {
     // For the shaded plugins
-    _registry = new HashMap<>();
+    _registry = new ConcurrentHashMap<>();
     _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(List.of()));
 
     // for the new pinot plugins
@@ -406,7 +406,7 @@ public class PluginManager {
   }
 
   public static String loadClassWithBackwardCompatibleCheck(String className) {
-    return PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.getOrDefault(className, className);
+    return className == null ? null : PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.getOrDefault(className, className);
   }
 
   /// Create an instance of the className. The className can be in any of the following formats
