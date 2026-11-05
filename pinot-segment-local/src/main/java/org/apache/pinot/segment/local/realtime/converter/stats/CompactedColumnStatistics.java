@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.math.BigDecimal;
@@ -31,6 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -237,7 +237,7 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
           maxValue = values[_cardinality - 1];
           isAscii = true;
           for (String value : values) {
-            int length = Utf8.encodedLength(value);
+            int length = Utf8Utils.encodedLength(value);
             minElementLength = Math.min(minElementLength, length);
             maxElementLength = Math.max(maxElementLength, length);
             if (isAscii) {
