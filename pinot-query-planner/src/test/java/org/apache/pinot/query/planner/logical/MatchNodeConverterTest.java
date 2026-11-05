@@ -640,6 +640,12 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
   @DataProvider(name = "correlatedMatchInputQueries")
   public Object[][] correlatedMatchInputQueries() {
     String input = "(SELECT col1, col3, ts FROM a WHERE a.col2 = b.col2)";
+    // Inside the array of CROSS JOIN UNNEST the sub-query sits under the Uncollect, which the converter never converts,
+    // whether the outer reference is in the input or above the match.
+    String unnestOverCorrelatedInput = "SELECT b.col1, u.x FROM b CROSS JOIN UNNEST(ARRAY[(SELECT MAX(lastv) FROM "
+        + input + CORRELATION_TEST_MATCH + ")]) AS u(x)";
+    String unnestOverCorrelatedMatch = "SELECT b.col1, u.x FROM b CROSS JOIN UNNEST(ARRAY[(SELECT MAX(lastv) FROM a"
+        + CORRELATION_TEST_MATCH + " WHERE mr.col1 = b.col1)]) AS u(x)";
     return new Object[][]{
         new Object[]{"SELECT * FROM b, LATERAL " + input + CORRELATION_TEST_MATCH},
         // MatchRecognizeScope makes the enclosing FROM items visible to the input even without LATERAL.
@@ -647,7 +653,9 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT * FROM b, " + input + " AS s" + CORRELATION_TEST_MATCH},
         new Object[]{"SELECT * FROM b, LATERAL (SELECT * FROM " + input + CORRELATION_TEST_MATCH + ") AS l"},
         new Object[]{"SELECT col1 FROM b WHERE EXISTS (SELECT 1 FROM " + input + CORRELATION_TEST_MATCH + ")"},
-        new Object[]{"SELECT col1, (SELECT MAX(lastv) FROM " + input + CORRELATION_TEST_MATCH + ") AS m FROM b"}
+        new Object[]{"SELECT col1, (SELECT MAX(lastv) FROM " + input + CORRELATION_TEST_MATCH + ") AS m FROM b"},
+        new Object[]{unnestOverCorrelatedInput},
+        new Object[]{unnestOverCorrelatedMatch}
     };
   }
 

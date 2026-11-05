@@ -34,6 +34,8 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -340,6 +342,28 @@ public class UnnestSqlPlannerTest extends QueryEnvironmentTestBase {
       }
     }
     return null;
+  }
+
+  /// A sub-query inside the array of CROSS JOIN UNNEST, correlated or next to an outer column, keeps the correlate, and
+  /// its plan sits under the Uncollect. The converter evaluates the projection right under the Uncollect against the
+  /// outer row and never converts what is below it, so the scan of `a` and the aggregate used to disappear without an
+  /// error.
+  @Test(dataProvider = "subQueryInsideTheUnnestArray")
+  public void testSubQueryInsideTheUnnestArrayIsRejected(String sql) {
+    QueryException e = Assert.expectThrows(QueryException.class, () -> _queryEnvironment.planQuery(sql));
+    Assert.assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_PLANNING);
+    Assert.assertTrue(e.getMessage().contains("A sub-query inside the array of CROSS JOIN UNNEST is not supported"),
+        e.getMessage());
+  }
+
+  @DataProvider(name = "subQueryInsideTheUnnestArray")
+  public Object[][] subQueryInsideTheUnnestArray() {
+    return new Object[][]{
+        new Object[]{"SELECT b.col1, u.x FROM b "
+                + "CROSS JOIN UNNEST(ARRAY[(SELECT MAX(a.col3) FROM a WHERE a.col2 = b.col2)]) AS u(x)"},
+        new Object[]{"SELECT e.col1, u.m, u.l FROM e "
+                + "CROSS JOIN UNNEST(ARRAY[(SELECT MAX(a.col3) FROM a)], e.mcol2) AS u(m, l)"}
+    };
   }
 
   private static List<UnnestNode> findUnnestNodes(DispatchableSubPlan subPlan) {
