@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.match.MatchExpression;
 import org.apache.pinot.query.runtime.operator.match.MatchLimits;
 import org.apache.pinot.query.runtime.operator.match.MatchTape;
@@ -94,13 +95,20 @@ public class MatchOperator extends MultiStageOperator {
   private final int _maxRowsInMatchPartition;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
+  /// Rows of the partition being buffered or matched. Owned by this operator, never emitted, and replaced rather than
+  /// cleared at every partition boundary so that a large partition does not leave its capacity behind.
   private List<Object[]> _partitionRows = new ArrayList<>();
+  /// Rows of the input block being consumed, or `null` when the next block must be pulled. The list belongs to that
+  /// block, so it is only ever dropped, never cleared.
   @Nullable
   private List<Object[]> _inputRows;
   private int _inputRowIndex;
   private boolean _matchingPartition;
   private int _scanStart;
   private long _matchNumber;
+  /// The terminal block of the input once it has been read, returned once nothing buffered is left to match.
+  /// [#releaseBuffers()] sets a success block when the input has not ended yet, which marks the operator finished:
+  /// with its buffers gone, a `null` [#_inputRows] would otherwise send a later call back to a closed input.
   @Nullable
   private MseBlock.Eos _inputEos;
   private int _numRows;
@@ -188,6 +196,29 @@ public class MatchOperator extends MultiStageOperator {
     return new StatMap<>(_statMap);
   }
 
+  /// Drops the input block being consumed, the partition being matched and everything the matcher retains, and marks
+  /// the operator finished. A failure part way through a partition (the partition row limit, the step budget, an
+  /// expression error, a timeout or a cancellation) leaves all of them reachable otherwise, and with a receive that
+  /// sorts the whole worker input the input block can be that entire input.
+  ///
+  /// The input rows belong to their block, which another operator may still read, so that reference is dropped
+  /// rather than the list cleared. The partition list is replaced, the same as at a partition boundary.
+  @Override
+  protected void releaseBuffers() {
+    _inputRows = null;
+    _partitionRows = new ArrayList<>();
+    _matchingPartition = false;
+    _matcher.release();
+    if (_inputEos == null) {
+      _inputEos = SuccessMseBlock.INSTANCE;
+    }
+  }
+
+  @Override
+  protected boolean hasBufferedState() {
+    return _inputRows != null || !_partitionRows.isEmpty() || _matcher.hasBufferedState();
+  }
+
   @Override
   protected MseBlock getNextBlock() {
     List<Object[]> outputRows = new ArrayList<>(MAX_OUTPUT_ROWS_PER_BLOCK);
@@ -204,6 +235,8 @@ public class MatchOperator extends MultiStageOperator {
 
       if (_inputEos != null) {
         if (outputRows.isEmpty()) {
+          // Every partition has been matched, so only the matcher's reusable storage is left to drop.
+          releaseBuffers();
           return _inputEos;
         }
         break;
@@ -218,6 +251,9 @@ public class MatchOperator extends MultiStageOperator {
 
       _inputEos = (MseBlock.Eos) block;
       if (_inputEos.isError()) {
+        // The upstream failed, so no match will be reported from the buffered partition: drop it right away instead
+        // of waiting for close() or cancel().
+        releaseBuffers();
         return _inputEos;
       }
       if (!_partitionRows.isEmpty()) {

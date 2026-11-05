@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
@@ -32,12 +34,17 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.match.MatchTestFixtures;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.mockito.Mock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -418,6 +425,103 @@ public class OperatorBufferReleaseTest {
   }
 
   // ---------------------------------------------------------------------------------------------------------------
+  // MatchOperator
+  // ---------------------------------------------------------------------------------------------------------------
+
+  /// One output block of matches has been emitted and the rest of the partition, and the input block behind it, are
+  /// still buffered when the op chain is cancelled.
+  @Test
+  public void shouldReleaseMatchPartitionOnCancel() {
+    givenMatchInputLongerThanOneOutputBlock();
+    MatchOperator operator = matchOperator(_input, Map.of());
+
+    assertTrue(operator.nextBlock().isData());
+    assertTrue(operator.hasBufferedState(), "the partition is still being matched");
+
+    operator.cancel(ERROR);
+
+    assertFalse(operator.hasBufferedState());
+  }
+
+  /// The partition row limit fails the query while the partition and the input block it came from are buffered.
+  @Test
+  public void shouldReleaseMatchPartitionOnRowLimitError() {
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(MatchTestFixtures.INPUT_SCHEMA,
+        MatchTestFixtures.rows("AAAA").toArray(new Object[0][])));
+    MatchOperator operator = matchOperator(_input, Map.of(QueryOptionKey.MAX_ROWS_IN_MATCH_PARTITION, "2"));
+
+    assertTrue(operator.nextBlock().isError());
+    assertTrue(operator.hasBufferedState(), "the partial partition is still held when the error propagates");
+
+    operator.close();
+
+    assertFalse(operator.hasBufferedState());
+  }
+
+  /// The step budget fails a match attempt half way, so the matcher's tape still points at the partition.
+  @Test
+  public void shouldReleaseMatchTapeOnStepBudgetError() {
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(MatchTestFixtures.INPUT_SCHEMA,
+        MatchTestFixtures.rows("AAAAAAAAAA").toArray(new Object[0][]))).thenReturn(SuccessMseBlock.INSTANCE);
+    // PATTERN (A+) costs three steps per row, so it runs out of steps on the second row.
+    MatchOperator operator = matchOperator(_input,
+        MatchTestFixtures.quantifier(MatchTestFixtures.symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true),
+        Map.of(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, "3"));
+
+    assertTrue(operator.nextBlock().isError());
+    assertTrue(operator.hasBufferedState(), "the partition is still held by the matcher when the error propagates");
+
+    operator.close();
+
+    assertFalse(operator.hasBufferedState());
+  }
+
+  /// The upstream failed, so no match will ever be reported from the buffered partition: it is dropped as the error
+  /// block is produced instead of waiting for close()/cancel().
+  @Test
+  public void shouldReleaseMatchPartitionOnUpstreamError() {
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(MatchTestFixtures.INPUT_SCHEMA,
+        MatchTestFixtures.rows("AA").toArray(new Object[0][]))).thenReturn(ErrorMseBlock.fromException(ERROR));
+    MatchOperator operator = matchOperator(_input, Map.of());
+
+    assertTrue(operator.nextBlock().isError());
+
+    assertFalse(operator.hasBufferedState(), "the partition should be released on the error path");
+    operator.close();
+    assertFalse(operator.hasBufferedState());
+  }
+
+  /// A null input block means "pull the next one", so releasing it must also mark the operator finished: otherwise a
+  /// released operator would go back to an input that has already been closed.
+  @Test
+  public void shouldNotPullFromTheInputAfterMatchIsReleased() {
+    givenMatchInputLongerThanOneOutputBlock();
+    MatchOperator operator = matchOperator(_input, Map.of());
+    assertTrue(operator.nextBlock().isData());
+    reset(_input);
+
+    operator.close();
+
+    assertTrue(operator.nextBlock().isEos(), "a released operator must report end of stream");
+    verify(_input, times(0)).nextBlock();
+    assertFalse(operator.hasBufferedState());
+  }
+
+  /// The operator holds the row list of the input block it is consuming. That list belongs to the block, which another
+  /// operator may still read, so releasing must drop the reference rather than empty the list.
+  @Test
+  public void shouldNotEmptyTheInputBlockHeldByMatch() {
+    List<Object[]> inputRows = givenMatchInputLongerThanOneOutputBlock();
+    int numInputRows = inputRows.size();
+    MatchOperator operator = matchOperator(_input, Map.of());
+    assertTrue(operator.nextBlock().isData());
+
+    operator.close();
+
+    assertEquals(inputRows.size(), numInputRows, "the input block must survive the operator being closed");
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
   // Cross-operator sweep
   // ---------------------------------------------------------------------------------------------------------------
 
@@ -434,6 +538,7 @@ public class OperatorBufferReleaseTest {
       assertReleasedByEitherPath(cancelFirst, this::asofJoinHoldingRightTable);
       assertReleasedByEitherPath(cancelFirst, this::aggregateHoldingGroupByExecutor);
       assertReleasedByEitherPath(cancelFirst, this::repeatHoldingCurrentRows);
+      assertReleasedByEitherPath(cancelFirst, this::matchHoldingPartition);
     }
   }
 
@@ -517,6 +622,14 @@ public class OperatorBufferReleaseTest {
     return operator;
   }
 
+  private MultiStageOperator matchHoldingPartition() {
+    resetMocks();
+    givenMatchInputLongerThanOneOutputBlock();
+    MatchOperator operator = matchOperator(_input, Map.of());
+    operator.nextBlock();
+    return operator;
+  }
+
   private void resetMocks() {
     reset(_input, _leftInput, _rightInput);
   }
@@ -541,6 +654,19 @@ public class OperatorBufferReleaseTest {
   private void givenRightSideFails() {
     when(_rightInput.nextBlock()).thenReturn(OperatorTestUtil.block(SCHEMA, new Object[]{1, "a"}))
         .thenReturn(ErrorMseBlock.fromException(ERROR));
+  }
+
+  /// One partition with more matches than fit in one output block, closed by the first row of a second partition, so
+  /// the first block of matches leaves the operator mid-partition with the input block still unconsumed.
+  ///
+  /// @return the rows of the input block
+  private List<Object[]> givenMatchInputLongerThanOneOutputBlock() {
+    List<Object[]> rows =
+        new ArrayList<>(MatchTestFixtures.rows(0, "A".repeat(MatchOperator.MAX_OUTPUT_ROWS_PER_BLOCK + 1)));
+    rows.add(new Object[]{1, "A", 0});
+    when(_input.nextBlock()).thenReturn(new RowHeapDataBlock(rows, MatchTestFixtures.INPUT_SCHEMA))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    return rows;
   }
 
   private HashJoinOperator hashJoinOperator() {
@@ -592,6 +718,24 @@ public class OperatorBufferReleaseTest {
     return new AggregateOperator(OperatorTestUtil.getTracingContext(), _input,
         new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of(countStar), List.of(-1),
             groupKeys, AggType.DIRECT, false, null, 0));
+  }
+
+  /// `PATTERN (A)`, where `A` matches every row, reporting `MATCH_NUMBER()`: one match per row.
+  private static MatchOperator matchOperator(MultiStageOperator input, Map<String, String> opChainMetadata) {
+    return matchOperator(input, MatchTestFixtures.symbol(0), opChainMetadata);
+  }
+
+  private static MatchOperator matchOperator(MultiStageOperator input, RowPattern pattern,
+      Map<String, String> opChainMetadata) {
+    DataSchema resultSchema = new DataSchema(new String[]{"pid", "mno"}, new ColumnDataType[]{INT, LONG});
+    List<MatchNode.Measure> measures =
+        List.of(new MatchNode.Measure("mno", new RexExpression.FunctionCall(LONG, "MATCH_NUMBER", List.of())));
+    MatchNode node = new MatchNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(),
+        List.of(MatchTestFixtures.anySymbol("A")), pattern, measures,
+        List.of(MatchTestFixtures.PID_INDEX), List.of(), MatchNode.AfterMatchSkipMode.PAST_LAST_ROW,
+        MatchNode.NO_SKIP_TO_SYMBOL, MatchNode.RowsPerMatchMode.ONE_ROW_PER_MATCH);
+    return new MatchOperator(OperatorTestUtil.getContext(opChainMetadata), input, MatchTestFixtures.INPUT_SCHEMA,
+        node);
   }
 
   /// Two grouping sets, so the operator still holds the input block after emitting the first expansion.

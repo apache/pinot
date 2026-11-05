@@ -132,10 +132,27 @@ public class PartitionMatcher {
     return _tape;
   }
 
-  /// Releases the partition retained by the classifier tape after its final measures have been evaluated.
+  /// Releases the partition retained by the classifier tape after its final measures have been evaluated. The
+  /// backtracking arrays keep their capacity for the next partition; [#release()] drops them as well.
   public void releasePartition() {
     _tape.reset(List.of(), 0, 0);
     _choiceStackSize = 0;
+    _counterUndoSize = 0;
+  }
+
+  /// Releases everything this matcher retains, for when it will not be used again: the partition the tape points at,
+  /// even if a match attempt failed half way, and the tape storage, choice stack and counter undo log that are
+  /// otherwise reused at whatever capacity they grew to, which can reach [#MAX_RETAINED_BACKTRACKING_BYTES].
+  public void release() {
+    _tape.release();
+    _choiceState = new int[INITIAL_STACK_CAPACITY];
+    _choicePos = new int[INITIAL_STACK_CAPACITY];
+    _choiceNextTransition = new int[INITIAL_STACK_CAPACITY];
+    _choiceCounterUndoSize = new int[INITIAL_STACK_CAPACITY];
+    _choiceStackSize = 0;
+    _undoCounter = new int[INITIAL_STACK_CAPACITY];
+    _undoCount = new int[INITIAL_STACK_CAPACITY];
+    _undoLoopStart = new int[INITIAL_STACK_CAPACITY];
     _counterUndoSize = 0;
   }
 
@@ -345,6 +362,13 @@ public class PartitionMatcher {
     _undoCounter = Arrays.copyOf(_undoCounter, capacity);
     _undoCount = Arrays.copyOf(_undoCount, capacity);
     _undoLoopStart = Arrays.copyOf(_undoLoopStart, capacity);
+  }
+
+  /// Whether the matcher references a partition or holds storage grown past its initial capacity, i.e. whether
+  /// [#release()] has anything to drop.
+  public boolean hasBufferedState() {
+    return _tape.hasBufferedState() || _choiceState.length > INITIAL_STACK_CAPACITY
+        || _undoCounter.length > INITIAL_STACK_CAPACITY;
   }
 
   @VisibleForTesting

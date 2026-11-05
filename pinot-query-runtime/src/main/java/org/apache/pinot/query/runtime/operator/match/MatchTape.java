@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.match;
 
+import com.google.common.annotations.VisibleForTesting;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -54,13 +55,15 @@ public class MatchTape {
   /// Returned by [#lastRow] and [#firstRow] when no such row exists.
   public static final int NO_ROW = -1;
 
+  private static final int INITIAL_LABEL_CAPACITY = 16;
+
   private final List<PatternSymbol> _patternSymbols;
   /// Partition row indexes mapped to each symbol, in ascending order; index is the symbol ordinal.
   private final IntArrayList[] _rowsBySymbol;
 
   private List<Object[]> _partitionRows = List.of();
   private int _startPos;
-  private int[] _labels = new int[16];
+  private int[] _labels = new int[INITIAL_LABEL_CAPACITY];
   private int _length;
   private long _matchNumber;
 
@@ -183,5 +186,35 @@ public class MatchTape {
       return _startPos + logicalIndex;
     }
     return _rowsBySymbol[symbolOrdinal].getInt(logicalIndex);
+  }
+
+  /// Drops the partition and returns the row storage to its initial capacity. [#reset] keeps that storage for the
+  /// next match instead, so this is for when the tape will not be used again, i.e. operator teardown. The partition
+  /// list is only dereferenced, never cleared: it belongs to the operator.
+  public void release() {
+    _partitionRows = List.of();
+    _startPos = 0;
+    _length = 0;
+    _matchNumber = 0;
+    _labels = new int[INITIAL_LABEL_CAPACITY];
+    for (int i = 0; i < _rowsBySymbol.length; i++) {
+      _rowsBySymbol[i] = new IntArrayList();
+    }
+  }
+
+  /// Whether the tape references a partition or holds row storage grown past its initial capacity, i.e. whether
+  /// [#release()] has anything to drop.
+  public boolean hasBufferedState() {
+    return !_partitionRows.isEmpty() || _labels.length > INITIAL_LABEL_CAPACITY || getRetainedSymbolPositions() > 0;
+  }
+
+  /// Combined capacity, in row positions, of the per-symbol position lists.
+  @VisibleForTesting
+  long getRetainedSymbolPositions() {
+    long retainedPositions = 0;
+    for (IntArrayList rows : _rowsBySymbol) {
+      retainedPositions += rows.elements().length;
+    }
+    return retainedPositions;
   }
 }
