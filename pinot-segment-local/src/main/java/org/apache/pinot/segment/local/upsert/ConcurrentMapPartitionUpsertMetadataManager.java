@@ -19,6 +19,10 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,11 +32,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -46,6 +53,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @ThreadSafe
 public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {
 
+  // Stored in the watermark file itself: an older writer truncates this suffix when it writes a watermark.
+  // A separate sidecar would survive downgrade and incorrectly certify that older writer's unsafe state.
+  private static final long SNAPSHOT_WATERMARK_VERSION = 0x5550534552540001L;
+  private volatile boolean _recoveringLegacySnapshots;
+  private volatile boolean _initialSegmentsLoaded;
+
   // Used to initialize a reference to previous row for merging in partial upsert
   private final LazyRow _reusePreviousRow = new LazyRow();
   private final Map<String, Object> _reuseMergeResultHolder = new HashMap<>();
@@ -58,6 +71,85 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     super(tableNameWithType, partitionId, context);
+    _recoveringLegacySnapshots = _metadataTTL > 0 && !hasVersionedWatermark();
+    _initialSegmentsLoaded = _metadataTTL <= 0;
+    if (_recoveringLegacySnapshots) {
+      _logger.warn("Rebuilding legacy snapshot ownership before trusting the TTL watermark");
+    }
+  }
+
+  private boolean hasVersionedWatermark() {
+    try {
+      byte[] bytes = Files.readAllBytes(getWatermarkFile().toPath());
+      return bytes.length == 2 * Long.BYTES
+          && ByteBuffer.wrap(bytes).getLong(Double.BYTES) == SNAPSHOT_WATERMARK_VERSION;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  @Override
+  protected boolean canSkipSegmentOutOfTTL(double maxComparisonValue) {
+    return !_recoveringLegacySnapshots && super.canSkipSegmentOutOfTTL(maxComparisonValue);
+  }
+
+  @Override
+  protected boolean isOutOfMetadataTTL(IndexSegment segment) {
+    // Recovery retains expired keys, so offload must remove them before their segment is destroyed.
+    return !_recoveringLegacySnapshots && _initialSegmentsLoaded && super.isOutOfMetadataTTL(segment);
+  }
+
+  /// Wait for all assigned ONLINE segments, including segments without snapshots. The first consuming segment
+  /// alone is insufficient for full upsert: it can arrive before the historical segments.
+  protected boolean isInitialSegmentLoadComplete() {
+    TableDataManager tableDataManager = _context.getTableDataManager();
+    if (tableDataManager == null) {
+      return false;
+    }
+    HelixManager helixManager = tableDataManager.getHelixManager();
+    if (helixManager == null || helixManager.getHelixDataAccessor().getProperty(
+        helixManager.getHelixDataAccessor().keyBuilder().idealStates(_tableNameWithType)) == null) {
+      return false;
+    }
+    return TableStateUtils.isAllSegmentsLoaded(helixManager, _tableNameWithType);
+  }
+
+  @Override
+  protected boolean isReadyToTakeSnapshot() {
+    if (_initialSegmentsLoaded) {
+      return true;
+    }
+    try {
+      if (!isInitialSegmentLoadComplete()) {
+        _logger.info("Defer snapshot and TTL cleanup until all assigned segments are loaded");
+        return false;
+      }
+      _initialSegmentsLoaded = true;
+      return true;
+    } catch (Exception e) {
+      _logger.warn("Cannot verify that initial segment loading is complete, deferring snapshot and TTL cleanup", e);
+      return false;
+    }
+  }
+
+  @Override
+  protected synchronized void doTakeSnapshot(@Nullable DocIdsSnapshot.Trigger trigger) {
+    super.doTakeSnapshot(trigger);
+    if (_metadataTTL > 0) {
+      // The base pass caps the watermark for every missed bitmap. Publish the version with that value only after
+      // the pass. A crash before this atomic replacement leaves an unversioned watermark and retries recovery.
+      File watermarkFile = getWatermarkFile();
+      File temporaryFile = new File(watermarkFile.getPath() + ".versioned.tmp");
+      try {
+        Files.write(temporaryFile.toPath(), ByteBuffer.allocate(2 * Long.BYTES)
+            .putDouble(getPersistedWatermark()).putLong(SNAPSHOT_WATERMARK_VERSION).array());
+        Files.move(temporaryFile.toPath(), watermarkFile.toPath(), StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
+        _recoveringLegacySnapshots = false;
+      } catch (Exception e) {
+        _logger.warn("Failed to publish versioned snapshot watermark, retaining legacy recovery state", e);
+      }
+    }
   }
 
   @Override
@@ -308,6 +400,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @Override
   public void doRemoveExpiredPrimaryKeys() {
+    // Keep expired ownership until every initial candidate has been reconciled, even with a trusted capped
+    // watermark. Legacy recovery also waits for a versioned snapshot. Expired rows themselves remain visible.
+    if (_recoveringLegacySnapshots || !isReadyToTakeSnapshot()) {
+      return;
+    }
     AtomicInteger numMetadataTTLKeysRemoved = new AtomicInteger();
     AtomicInteger numDeletedTTLKeysRemoved = new AtomicInteger();
     AtomicInteger numTotalKeysMarkForDeletion = new AtomicInteger();

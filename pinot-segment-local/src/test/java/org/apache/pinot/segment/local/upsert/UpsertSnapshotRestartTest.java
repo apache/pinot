@@ -19,12 +19,19 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -78,6 +85,7 @@ public class UpsertSnapshotRestartTest {
 
   private final Set<String> _contendedSegments = ConcurrentHashMap.newKeySet();
   private TableDataManager _tableDataManager;
+  private boolean _allSegmentsLoaded;
 
   @BeforeMethod
   public void setUp()
@@ -85,6 +93,7 @@ public class UpsertSnapshotRestartTest {
     FileUtils.deleteQuietly(TEMP_DIR);
     FileUtils.forceMkdir(TEMP_DIR);
     ServerMetrics.register(mock(ServerMetrics.class));
+    _allSegmentsLoaded = true;
     _contendedSegments.clear();
     _tableDataManager = mock(TableDataManager.class);
     when(_tableDataManager.getTableDataDir()).thenReturn(TEMP_DIR);
@@ -224,6 +233,279 @@ public class UpsertSnapshotRestartTest {
     segA.destroy();
   }
 
+  /// Synthesizes the legacy format using public segment builders and the numeric watermark writer.
+  private void writeLegacyState(boolean stale, boolean missing)
+      throws Exception {
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager();
+    ImmutableSegmentImpl segA = addSegment(manager, "segA");
+    if (!missing) {
+      manager.takeSnapshot();
+    }
+    ImmutableSegmentImpl segB = addSegment(manager, "segB");
+    if (stale || missing) {
+      _contendedSegments.add("segA");
+    }
+    manager.takeSnapshot();
+    close(manager, segA, segB);
+    _contendedSegments.clear();
+    // An older writer persisted the live maximum, even if a bitmap was stale or missing.
+    WatermarkUtils.persistWatermark(290, new File(TEMP_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0));
+  }
+
+  @Test(dataProvider = "restartModes")
+  public void testLegacyStaleSnapshotMigration(boolean preload, boolean addSegBFirst)
+      throws Exception {
+    writeLegacyState(true, false);
+    assertEquals(loadSnapshot("segA"), "{0,1,2}");
+    assertFalse(hasSnapshot("segB"));
+    migrateLegacyState(preload, addSegBFirst, false);
+    assertEquals(restart(preload, addSegBFirst), "{2} | {0,1}");
+  }
+
+  @Test(dataProvider = "restartModes")
+  public void testLegacyMissingSnapshotMigration(boolean preload, boolean addSegBFirst)
+      throws Exception {
+    writeLegacyState(false, true);
+    assertFalse(hasSnapshot("segA"));
+    migrateLegacyState(preload, addSegBFirst, false);
+    assertEquals(restart(preload, addSegBFirst), "{2} | {0,1}");
+  }
+
+  @Test(dataProvider = "restartModes")
+  public void testLegacyFreshSnapshotMigration(boolean preload, boolean addSegBFirst)
+      throws Exception {
+    writeLegacyState(false, false);
+    migrateLegacyState(preload, addSegBFirst, false);
+    assertEquals(restart(preload, addSegBFirst), "{2} | {0,1}");
+  }
+
+  @Test(dataProvider = "restartModes")
+  public void testLegacyMigrationWithMissedSnapshot(boolean preload, boolean addSegBFirst)
+      throws Exception {
+    writeLegacyState(true, false);
+    migrateLegacyState(preload, addSegBFirst, true);
+    assertEquals(restart(preload, addSegBFirst), "{2} | {0,1}");
+  }
+
+  @Test(dataProvider = "restartModes")
+  public void testInterruptedLegacyMigration(boolean preload, boolean addSegBFirst)
+      throws Exception {
+    writeLegacyState(true, false);
+    _allSegmentsLoaded = false;
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager();
+    ImmutableSegmentImpl segA = load("segA");
+    if (preload) {
+      manager.preloadSegment(segA);
+    } else {
+      manager.addSegment(segA);
+    }
+    manager.removeExpiredPrimaryKeys();
+    manager.takeSnapshot();
+    assertEquals(Files.size(manager.getWatermarkFile().toPath()), 8L);
+    assertEquals(loadSnapshot("segA"), "{0,1,2}");
+    assertTrue(manager.getLastSnapshotPass() == null);
+    close(manager, segA);
+    migrateLegacyState(preload, addSegBFirst, false);
+    assertEquals(restart(preload, addSegBFirst), "{2} | {0,1}");
+  }
+
+  @Test
+  public void testLegacyWatermarkAfterDowngrade()
+      throws Exception {
+    writeLegacyState(false, false);
+    migrateLegacyState(true, false, false);
+    // The old writer truncates the version suffix even when the numeric value happens to stay the same.
+    WatermarkUtils.persistWatermark(290, new File(TEMP_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0));
+    _allSegmentsLoaded = false;
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager();
+    assertFalse(manager.canSkipSegmentOutOfTTL(100));
+    manager.takeSnapshot();
+    assertEquals(Files.size(manager.getWatermarkFile().toPath()), 8L);
+    close(manager);
+  }
+
+  @Test
+  public void testCappedSnapshotBootstrapDefersCleanup()
+      throws Exception {
+    buildSegment("segC", new int[]{4}, 400);
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager();
+    ImmutableSegmentImpl segA = addSegment(manager, "segA");
+    manager.takeSnapshot();
+    ImmutableSegmentImpl segB = addSegment(manager, "segB");
+    ImmutableSegmentImpl segC = addSegment(manager, "segC");
+    _contendedSegments.add("segA");
+    manager.takeSnapshot();
+    assertEquals(persistedWatermark(manager), 130.0);
+    close(manager, segA, segB, segC);
+    _contendedSegments.clear();
+
+    _allSegmentsLoaded = false;
+    manager = newManager();
+    segC = addSegment(manager, "segC");
+    segB = addSegment(manager, "segB");
+    // C advances the live watermark beyond B's TTL. B must still reconcile ownership with unloaded A.
+    manager.removeExpiredPrimaryKeys();
+    assertEquals(manager.getNumPrimaryKeys(), 3L);
+    segA = addSegment(manager, "segA");
+    assertEquals(validDocIds(segA) + " | " + validDocIds(segB), "{2} | {0,1}");
+    _allSegmentsLoaded = true;
+    manager.takeSnapshot();
+    manager.removeExpiredPrimaryKeys();
+    assertEquals(manager.getNumPrimaryKeys(), 1L);
+    assertEquals(validDocIds(segA), "{2}");
+    close(manager, segA, segB, segC);
+    assertEquals(restart(true, false), "{2} | {0,1}");
+  }
+
+  @Test
+  public void testMissingWatermarkDuringLegacyRecovery()
+      throws Exception {
+    writeLegacyState(true, false);
+    Files.delete(new File(TEMP_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0).toPath());
+    buildSegment("segC", new int[]{4}, 400);
+    _allSegmentsLoaded = false;
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager();
+    ImmutableSegmentImpl segC = addSegment(manager, "segC");
+    ImmutableSegmentImpl segB = addSegment(manager, "segB");
+    manager.removeExpiredPrimaryKeys();
+    manager.takeSnapshot();
+    assertFalse(manager.getWatermarkFile().exists());
+    ImmutableSegmentImpl segA = addSegment(manager, "segA");
+    assertEquals(validDocIds(segA) + " | " + validDocIds(segB), "{2} | {0,1}");
+    _allSegmentsLoaded = true;
+    manager.takeSnapshot();
+    close(manager, segA, segB, segC);
+    assertEquals(restart(true, false), "{2} | {0,1}");
+  }
+
+  @Test
+  public void testLegacyMigrationRequiresAssignmentEvidence()
+      throws Exception {
+    writeLegacyState(true, false);
+    ConcurrentMapPartitionUpsertMetadataManager manager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, newContext());
+    manager._gotFirstConsumingSegment = true;
+    assertFalse(manager.isReadyToTakeSnapshot(), "Missing Helix manager cannot certify recovery");
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixDataAccessor accessor = mock(HelixDataAccessor.class);
+    when(_tableDataManager.getHelixManager()).thenReturn(helixManager);
+    when(helixManager.getHelixDataAccessor()).thenReturn(accessor);
+    when(accessor.keyBuilder()).thenReturn(new PropertyKey.Builder("testCluster"));
+    assertFalse(manager.isReadyToTakeSnapshot(), "Missing assignment cannot certify recovery");
+    when(helixManager.getHelixDataAccessor()).thenThrow(new IllegalStateException("unavailable"));
+    manager.takeSnapshot();
+    assertTrue(manager.getLastSnapshotPass() == null);
+    assertEquals(Files.size(manager.getWatermarkFile().toPath()), 8L);
+    close(manager);
+  }
+
+  @Test
+  public void testInitialLoadReadinessUsesCurrentSessionState()
+      throws Exception {
+    writeLegacyState(true, false);
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixDataAccessor accessor = mock(HelixDataAccessor.class);
+    when(_tableDataManager.getHelixManager()).thenReturn(helixManager);
+    when(helixManager.getHelixDataAccessor()).thenReturn(accessor);
+    when(helixManager.getInstanceName()).thenReturn("server");
+    PropertyKey.Builder keys = new PropertyKey.Builder("testCluster");
+    when(accessor.keyBuilder()).thenReturn(keys);
+    IdealState assignment = new IdealState(REALTIME_TABLE_NAME);
+    assignment.setPartitionState("segA", "server", "ONLINE");
+    assignment.setPartitionState("segB", "server", "ONLINE");
+    when(accessor.getProperty(keys.idealStates(REALTIME_TABLE_NAME))).thenReturn(assignment);
+    LiveInstance instance = mock(LiveInstance.class);
+    when(instance.getEphemeralOwner()).thenReturn("session");
+    when(accessor.getProperty(keys.liveInstance("server"))).thenReturn(instance);
+    CurrentState current = new CurrentState(REALTIME_TABLE_NAME);
+    current.setState("segA", "ONLINE");
+    when(accessor.getProperty(keys.currentState("server", "session", REALTIME_TABLE_NAME))).thenReturn(current);
+    ConcurrentMapPartitionUpsertMetadataManager manager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, newContext());
+    assertFalse(manager.isReadyToTakeSnapshot());
+    current.setState("segB", "ERROR");
+    assertFalse(manager.isReadyToTakeSnapshot());
+    current.setState("segB", "ONLINE");
+    assertTrue(manager.isReadyToTakeSnapshot());
+    // Initial readiness is cached; later transitions retain the normal segment lifecycle behavior.
+    when(accessor.getProperty(keys.idealStates(REALTIME_TABLE_NAME))).thenReturn(null);
+    assertTrue(manager.isReadyToTakeSnapshot());
+    close(manager);
+  }
+
+  @Test
+  public void testOffloadDuringLegacyRecovery()
+      throws Exception {
+    writeLegacyState(true, false);
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager();
+    ImmutableSegmentImpl segA = addSegment(manager, "segA");
+    assertEquals(manager.getNumPrimaryKeys(), 3L);
+    manager.removeSegment(segA);
+    assertEquals(manager.getNumPrimaryKeys(), 0L, "No recovery key may reference an offloaded segment");
+    close(manager, segA);
+    migrateLegacyState(true, false, false);
+  }
+
+  @Test
+  public void testFailedLegacyVersionPublication()
+      throws Exception {
+    writeLegacyState(true, false);
+    File temporaryFile = new File(TEMP_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + "0.versioned.tmp");
+    FileUtils.forceMkdir(temporaryFile);
+    _allSegmentsLoaded = true;
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager();
+    ImmutableSegmentImpl segA = addSegment(manager, "segA");
+    ImmutableSegmentImpl segB = addSegment(manager, "segB");
+    manager.takeSnapshot();
+    assertEquals(Files.size(manager.getWatermarkFile().toPath()), 8L);
+    assertFalse(manager.canSkipSegmentOutOfTTL(100));
+    manager.removeExpiredPrimaryKeys();
+    assertEquals(manager.getNumPrimaryKeys(), 3L);
+    close(manager, segA, segB);
+    FileUtils.forceDelete(temporaryFile);
+    migrateLegacyState(true, false, false);
+    assertEquals(restart(true, false), "{2} | {0,1}");
+  }
+
+  private void migrateLegacyState(boolean preload, boolean addSegBFirst, boolean missSnapshot)
+      throws Exception {
+    _allSegmentsLoaded = false;
+    ConcurrentMapPartitionUpsertMetadataManager manager = newManager();
+    assertFalse(manager.canSkipSegmentOutOfTTL(100));
+    ImmutableSegmentImpl segA = load("segA");
+    ImmutableSegmentImpl segB = load("segB");
+    List<ImmutableSegmentImpl> ordered = addSegBFirst ? List.of(segB, segA) : List.of(segA, segB);
+    List<ImmutableSegmentImpl> remaining = new ArrayList<>();
+    for (ImmutableSegmentImpl segment : ordered) {
+      if (preload && segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) != null) {
+        manager.preloadSegment(segment);
+        manager.removeExpiredPrimaryKeys();
+      } else {
+        remaining.add(segment);
+      }
+    }
+    for (ImmutableSegmentImpl segment : remaining) {
+      manager.addSegment(segment);
+      manager.removeExpiredPrimaryKeys();
+      manager.takeSnapshot();
+      assertEquals(Files.size(manager.getWatermarkFile().toPath()), 8L);
+    }
+    assertEquals(validDocIds(segA) + " | " + validDocIds(segB), "{2} | {0,1}");
+    assertEquals(manager.getNumPrimaryKeys(), 3L, "Keep expired ownership until recovery finishes");
+    _allSegmentsLoaded = true;
+    if (missSnapshot) {
+      _contendedSegments.add("segA");
+    }
+    manager.takeSnapshot();
+    assertEquals(Files.size(manager.getWatermarkFile().toPath()), 16L);
+    assertEquals(persistedWatermark(manager), missSnapshot ? 130.0 : 290.0);
+    manager.removeExpiredPrimaryKeys();
+    assertEquals(manager.getNumPrimaryKeys(), 2L);
+    assertEquals(validDocIds(segA), "{2}", "TTL removes bookkeeping, not the surviving expired row");
+    close(manager, segA, segB);
+    _contendedSegments.clear();
+  }
+
   private ReentrantLock newSegmentLock(String segmentName) {
     return new ReentrantLock() {
       @Override
@@ -233,13 +515,21 @@ public class UpsertSnapshotRestartTest {
     };
   }
 
-  private ConcurrentMapPartitionUpsertMetadataManager newManager() {
-    UpsertContext context = new UpsertContext.Builder().setTableConfig(TABLE_CONFIG).setSchema(SCHEMA)
+  private UpsertContext newContext() {
+    return new UpsertContext.Builder().setTableConfig(TABLE_CONFIG).setSchema(SCHEMA)
         .setTableDataManager(_tableDataManager).setPrimaryKeyColumns(List.of("pk"))
         .setComparisonColumns(List.of("ts")).setEnableSnapshot(true).setMetadataTTL(METADATA_TTL)
         .setTableIndexDir(TEMP_DIR).build();
+  }
+
+  private ConcurrentMapPartitionUpsertMetadataManager newManager() {
     ConcurrentMapPartitionUpsertMetadataManager manager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, context);
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, newContext()) {
+          @Override
+          protected boolean isInitialSegmentLoadComplete() {
+            return _allSegmentsLoaded;
+          }
+        };
     manager._gotFirstConsumingSegment = true;
     return manager;
   }
