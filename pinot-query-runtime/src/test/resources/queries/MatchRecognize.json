@@ -120,5 +120,31 @@
         "ignoreLiteMode": true
       }
     ]
+  },
+  "match_recognize_row_source_alias": {
+    "tables": {
+      "readings": {
+        "schema": [
+          {"name": "id", "type": "STRING"},
+          {"name": "seq", "type": "LONG"},
+          {"name": "v", "type": "INT"}
+        ],
+        "inputs": [
+          ["k", 1, 10],
+          ["k", 2, 20]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Calcite names the unaliased sub-query input EXPR$0 and qualifies the unqualified v with that name, which is also the name of the first pattern variable. The unqualified LAST(v) belongs to the universal row pattern variable and must read the last row of the match (20); bound to the pattern variable it would read 10, the value LAST(\"EXPR$0\".v) correctly returns.",
+        "sql": "SELECT * FROM (SELECT v, seq, id FROM {readings}) MATCH_RECOGNIZE (PARTITION BY id ORDER BY seq MEASURES LAST(v) AS lastv, LAST(\"EXPR$0\".v) AS first_var_v PATTERN (\"EXPR$0\" B) DEFINE \"EXPR$0\" AS TRUE, B AS TRUE) AS mr",
+        "outputs": [
+          ["k", 20, 10]
+        ],
+        "ignoreV2Optimizer": true,
+        "ignoreLiteMode": true
+      }
+    ]
   }
 }

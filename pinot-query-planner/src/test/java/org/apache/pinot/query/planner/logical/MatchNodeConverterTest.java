@@ -524,6 +524,93 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     };
   }
 
+  /// Calcite names an unaliased derived input `EXPR$n`, where `n` counts the aliases it generated earlier in the query,
+  /// and qualifies the universal `col3` with that name. A pattern variable spelled like the generated name must not
+  /// capture the universal reference: `lastv` reads the last row of the match, and `pv` the last row mapped to the
+  /// variable.
+  @Test(dataProvider = "unaliasedDerivedInputQueries")
+  public void testUnaliasedDerivedInputCannotCaptureUniversalReferences(String rowSource, String variable,
+      String matchAlias) {
+    MatchNode match = planMatch("SELECT * FROM " + rowSource + " MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts "
+        + "MEASURES LAST(col3) AS lastv, LAST(" + variable + ".col3) AS pv PATTERN (" + variable + " B) "
+        + "DEFINE " + variable + " AS TRUE, B AS TRUE)" + matchAlias, "lastv");
+
+    List<RexExpression.PatternFieldRef> universalRefs =
+        collectPatternFieldRefs(match.getMeasures().get(0).getExpression());
+    assertEquals(universalRefs.size(), 1);
+    assertEquals(universalRefs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL,
+        "Unqualified col3 bound to pattern variable " + universalRefs.get(0).getAlpha());
+
+    List<RexExpression.PatternFieldRef> patternRefs =
+        collectPatternFieldRefs(match.getMeasures().get(1).getExpression());
+    assertEquals(patternRefs.size(), 1);
+    assertEquals(patternRefs.get(0).getSymbolOrdinal(), 0);
+  }
+
+  @DataProvider(name = "unaliasedDerivedInputQueries")
+  public Object[][] unaliasedDerivedInputQueries() {
+    String subquery = "(SELECT col1, col3, ts FROM a)";
+    return new Object[][]{
+        // The aliased MATCH_RECOGNIZE takes no generated name, so its input is EXPR$0.
+        new Object[]{subquery, "\"EXPR$0\"", " AS mr"},
+        // Unquoted pattern variables are upper-cased, so the unquoted spelling collides as well.
+        new Object[]{subquery, "EXPR$0", " AS mr"},
+        // Without its own alias the MATCH_RECOGNIZE is EXPR$0 and its input EXPR$1.
+        new Object[]{subquery, "\"EXPR$1\"", ""},
+        new Object[]{"(SELECT col1, col3, ts FROM a UNION ALL SELECT col1, col3, ts FROM b)", "\"EXPR$0\"", " AS mr"},
+        new Object[]{"(WITH t AS (SELECT col1, col3, ts FROM a) SELECT * FROM t)", "\"EXPR$0\"", " AS mr"},
+        new Object[]{"(SELECT col1, col3, ts FROM a ORDER BY ts LIMIT 10)", "\"EXPR$0\"", " AS mr"},
+        new Object[]{"(TABLE a)", "\"EXPR$0\"", " AS mr"},
+        new Object[]{
+            "(SELECT * FROM a MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts MEASURES LAST(col3) AS col3, "
+                + "LAST(ts) AS ts PATTERN (Z) DEFINE Z AS TRUE))", "\"EXPR$0\"", " AS mr"
+        }
+    };
+  }
+
+  /// Calcite only accepts a bare table or an `AS` call as the MATCH_RECOGNIZE input, and failed on a hinted table with
+  /// an `AssertionError`. A hinted table is aliased with its own name, or with the internal alias when that name equals
+  /// a pattern variable; a PARTITION BY / ORDER BY qualifier that names the table keeps resolving to it either way.
+  @Test(dataProvider = "hintedTableVariables")
+  public void testHintedTableInputBindsUniversalReferences(String variable) {
+    MatchNode match = planMatch("SELECT * FROM a /*+ tableOptions(partition_function='hashcode', "
+        + "partition_key='col2', partition_size='4') */ MATCH_RECOGNIZE (PARTITION BY a.col1 ORDER BY a.ts "
+        + "MEASURES LAST(col3) AS lastv, LAST(" + variable + ".col3) AS pv PATTERN (" + variable + " B) "
+        + "DEFINE " + variable + " AS TRUE, B AS TRUE)");
+    assertEquals(match.getPartitionKeys(), List.of(0));
+    List<RexExpression.PatternFieldRef> universalRefs =
+        collectPatternFieldRefs(match.getMeasures().get(0).getExpression());
+    assertEquals(universalRefs.size(), 1);
+    assertEquals(universalRefs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
+    List<RexExpression.PatternFieldRef> patternRefs =
+        collectPatternFieldRefs(match.getMeasures().get(1).getExpression());
+    assertEquals(patternRefs.size(), 1);
+    assertEquals(patternRefs.get(0).getSymbolOrdinal(), 0);
+  }
+
+  @DataProvider(name = "hintedTableVariables")
+  public Object[][] hintedTableVariables() {
+    return new Object[][]{new Object[]{"\"a\""}, new Object[]{"A"}, new Object[]{"X"}};
+  }
+
+  /// A `VALUES` input names its columns `EXPR$0`, `EXPR$1`, ..., but Calcite names the only column of an aliased
+  /// `VALUES` after the alias. Giving the input an internal alias must not rename that column, whether the `VALUES` had
+  /// no alias or had one that collides with a pattern variable.
+  @Test
+  public void testSingleColumnValuesInputKeepsItsColumnName() {
+    MatchNode unaliased = planMatch("SELECT * FROM (VALUES 1, 2) MATCH_RECOGNIZE (ORDER BY \"EXPR$0\" "
+        + "MEASURES LAST(\"EXPR$0\") AS lastv PATTERN (\"EXPR$1\" B) DEFINE \"EXPR$1\" AS TRUE, B AS TRUE)");
+    List<RexExpression.PatternFieldRef> refs = collectPatternFieldRefs(unaliased.getMeasures().get(0).getExpression());
+    assertEquals(refs.size(), 1);
+    assertEquals(refs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
+
+    MatchNode aliased = planMatch("SELECT * FROM (VALUES 1, 2) AS v MATCH_RECOGNIZE (ORDER BY v "
+        + "MEASURES LAST(v) AS lastv PATTERN (V B) DEFINE V AS TRUE, B AS TRUE)");
+    refs = collectPatternFieldRefs(aliased.getMeasures().get(0).getExpression());
+    assertEquals(refs.size(), 1);
+    assertEquals(refs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
+  }
+
   @Test
   public void testQuantifierBoundAboveTheCapIsRejected() {
     int overTheCap = RelToPlanNodeConverter.MAX_PATTERN_QUANTIFIER_BOUND + 1;
@@ -726,12 +813,27 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     return null;
   }
 
-  /// Plans {@code sql} through the full query environment and returns the single [MatchNode] in the resulting plan.
+  /// Plans `sql` through the full query environment and returns the single [MatchNode] in the resulting plan.
   ///
   /// These queries exercise pattern lowering rather than distribution, so most of them omit `PARTITION BY`, which
   /// [org.apache.pinot.calcite.rel.rules.PinotMatchExchangeNodeInsertRule] rejects by default. The query option opts
   /// into the resulting single-worker plan.
   private MatchNode planMatch(String sql) {
+    List<MatchNode> found = planMatches(sql);
+    assertEquals(found.size(), 1, "Expected exactly one MatchNode in the plan of: " + sql);
+    return found.get(0);
+  }
+
+  /// Plans `sql` like [#planMatch] and returns the [MatchNode] whose first measure is named `firstMeasure`, for a
+  /// plan that nests one MATCH_RECOGNIZE inside another.
+  private MatchNode planMatch(String sql, String firstMeasure) {
+    List<MatchNode> found = planMatches(sql).stream()
+        .filter(match -> match.getMeasures().get(0).getName().equals(firstMeasure)).collect(Collectors.toList());
+    assertEquals(found.size(), 1, "Expected exactly one MatchNode with measure " + firstMeasure + " in: " + sql);
+    return found.get(0);
+  }
+
+  private List<MatchNode> planMatches(String sql) {
     SqlNodeAndOptions sqlNodeAndOptions =
         new SqlNodeAndOptions(CalciteSqlParser.compileToSqlNodeAndOptions(sql).getSqlNode(), PinotSqlType.DQL,
             QueryOptionsUtils.resolveCaseInsensitiveOptions(
@@ -753,7 +855,6 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
         }
       }, null);
     }
-    assertEquals(found.size(), 1, "Expected exactly one MatchNode in the plan of: " + sql);
-    return found.get(0);
+    return found;
   }
 }

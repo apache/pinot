@@ -33,6 +33,7 @@ import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlUnresolvedFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParserPos;
@@ -66,8 +67,9 @@ import org.slf4j.LoggerFactory;
 ///     [#normalizePatternVariableNames].
 ///  5. **Pattern variables and the row source alias need separate internal names.** SQL gives those names separate
 ///     namespaces inside MATCH_RECOGNIZE, but Calcite reuses the row source alias as the alpha of the universal row
-///     pattern variable. [#isolateRowSourceAlias] gives a colliding input an internal alias before Calcite validation,
-///     so explicit pattern references and unqualified universal references remain distinguishable.
+///     pattern variable. [#isolateRowSourceAlias] gives the input an internal alias before Calcite validation whenever
+///     the name Calcite would use could equal a pattern variable, including the `EXPR$n` name it generates for a
+///     sub-query, so explicit pattern references and unqualified universal references remain distinguishable.
 ///  6. **`PREV` in `DEFINE` must be anchored before Calcite validation.** Calcite rewrites `PREV(x, n)` into the
 ///     logical `LAST(x, n)` unless `x` is qualified by the variable being defined, which silently changes the rows an
 ///     unqualified or cross-variable `PREV` reads. See [#anchorAtLastRow].
@@ -79,6 +81,10 @@ import org.slf4j.LoggerFactory;
 /// query, exactly like [RowExpressionValidationVisitor].
 public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MatchRecognizeValidator.class);
+  /// Alias given to the row source when Calcite's own name for it could equal a pattern variable. Pinot table and
+  /// column names do not start with an underscore pair, and [#internalRowSourceAlias] adds a suffix if a pattern
+  /// variable uses it.
+  private static final String INTERNAL_ROW_SOURCE_ALIAS = "__PINOT_MATCH_INPUT";
 
   private static final String PERMUTE = "PERMUTE";
   private static final String PERMUTE_NOT_SUPPORTED =
@@ -280,6 +286,13 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
       throw unsupported("WITHIN is not supported yet in MATCH_RECOGNIZE. Remove the WITHIN clause and bound the "
           + "match with a predicate in the DEFINE clause instead.");
     }
+    // The parser rejects a parenthesized join as the input, but not once it carries an alias, and Calcite then fails
+    // while converting the query with an internal error.
+    SqlNode input = match.getTableRef();
+    if (input.getKind() == SqlKind.AS && ((SqlCall) input).operand(0).getKind() == SqlKind.JOIN) {
+      throw unsupported("A join is not supported yet as the direct input of MATCH_RECOGNIZE. Wrap the join in a "
+          + "sub-query, e.g. FROM (SELECT ... FROM a JOIN b ON ...) MATCH_RECOGNIZE (...).");
+    }
   }
 
   /// Rejects the two `MEASURES` shapes whose Calcite row type is not `partition columns ++ measures`, which is what
@@ -319,61 +332,117 @@ public class MatchRecognizeValidator extends SqlBasicVisitor<Void> {
     }
   }
 
-  /// Gives the row source an internal alias when its SQL name equals a pattern variable.
+  /// Makes the name Calcite qualifies universal row pattern references with differ from every pattern variable.
   ///
   /// SQL places the input relation and pattern variables in separate namespaces: with input alias `A` and pattern
   /// variable `A`, a qualifier in PARTITION BY / ORDER BY names the input, a qualifier in MEASURES / DEFINE names the
   /// pattern variable, and an unqualified measure or definition column uses the universal row pattern variable.
   ///
-  /// Calcite does not retain that distinction: it qualifies an unqualified column in MEASURES / DEFINE with the row
-  /// source alias and later represents both forms as `RexPatternFieldRef(alpha, column)`. Re-aliasing the input before
-  /// Calcite sees the tree gives universal references an alpha that cannot equal a pattern variable. Qualified input
-  /// references in PARTITION BY / ORDER BY are rewritten with it; pattern references deliberately are not.
+  /// Calcite does not retain that distinction: `MatchRecognizeScope` qualifies an unqualified column in MEASURES /
+  /// DEFINE with the row source alias, and both forms later become `RexPatternFieldRef(alpha, column)`. That alias is
+  /// the explicit `AS` alias, the table name of a bare table reference, or, for any other input such as a sub-query, a
+  /// name `EXPR$n` that Calcite generates during validation, where `n` counts the aliases it generated earlier in the
+  /// whole statement. A quoted or unquoted pattern variable can be spelled like any of them, so this method:
+  ///  - keeps an explicit alias or a bare table name unless it equals a pattern variable. A colliding name is replaced
+  ///    with an internal alias, and the PARTITION BY / ORDER BY qualifiers that name the input are rewritten with it;
+  ///    pattern references in MEASURES / DEFINE deliberately are not.
+  ///  - gives a table under table hints, `EXTEND` or a snapshot clause an explicit alias: its table name, or the
+  ///    internal alias if that name collides. Calcite only accepts a bare table or an `AS` call as the input here, and
+  ///    fails on any other table reference with an `AssertionError`.
+  ///  - always gives any other input the internal alias. Whether its generated name collides depends on the rest of the
+  ///    statement rather than on this clause, and the generated name is not meant to be referenced by queries.
   private void isolateRowSourceAlias(SqlMatchRecognize match, Set<String> definedVariables) {
     SqlNode tableRef = match.getTableRef();
-    SqlIdentifier aliasIdentifier = rowSourceAliasIdentifier(tableRef);
-    if (aliasIdentifier == null) {
-      // A join or a sub-query with no explicit alias; Calcite does not qualify anything with a row source alias.
-      return;
-    }
     Set<String> variables = new LinkedHashSet<>(definedVariables);
     collectPatternVariables(match.getPattern(), variables);
-    // Isolate both SQL-equivalent names (so cosmetic case cannot change validity) and exact raw-name collisions
-    // (Calcite's maps can otherwise conflate distinct names such as unquoted a and quoted "a").
-    if (!variables.contains(aliasIdentifier.getSimple())
-        && !variables.contains(canonicalIdentifierComponent(aliasIdentifier, 0))) {
+    SqlIdentifier sourceName = rowSourceName(tableRef);
+    if (sourceName != null && !isPatternVariable(sourceName, variables)) {
+      if (!(tableRef instanceof SqlIdentifier) && tableRef.getKind() != SqlKind.AS) {
+        match.setOperand(SqlMatchRecognize.OPERAND_TABLE_REF, withAlias(tableRef, sourceName));
+      }
       return;
     }
 
-    String internalAlias = "__PINOT_MATCH_INPUT";
-    for (int suffix = 0; variables.contains(internalAlias); suffix++) {
-      internalAlias = "__PINOT_MATCH_INPUT_" + suffix;
+    SqlIdentifier internalAlias = new SqlIdentifier(internalRowSourceAlias(variables), SqlParserPos.ZERO);
+    if (sourceName != null) {
+      rewriteRowSourceQualifier(match.getPartitionList(), sourceName, internalAlias.getSimple());
+      rewriteRowSourceQualifier(match.getOrderList(), sourceName, internalAlias.getSimple());
     }
-    rewriteRowSourceQualifier(match.getPartitionList(), aliasIdentifier, internalAlias);
-    rewriteRowSourceQualifier(match.getOrderList(), aliasIdentifier, internalAlias);
-
-    SqlIdentifier internalAliasIdentifier = new SqlIdentifier(internalAlias, SqlParserPos.ZERO);
-    if (tableRef.getKind() == SqlKind.AS) {
-      ((SqlCall) tableRef).setOperand(1, internalAliasIdentifier);
-    } else {
-      match.setOperand(SqlMatchRecognize.OPERAND_TABLE_REF,
-          SqlStdOperatorTable.AS.createCall(tableRef.getParserPosition(), tableRef, internalAliasIdentifier));
-    }
+    match.setOperand(SqlMatchRecognize.OPERAND_TABLE_REF, withAlias(tableRef, internalAlias));
   }
 
+  /// Returns the name Calcite gives `tableRef` as written: its explicit alias, or the last name of a table, also under
+  /// table hints, `EXTEND` or a snapshot clause. Returns `null` for any other input, which Calcite names `EXPR$n`.
   @Nullable
-  private static SqlIdentifier rowSourceAliasIdentifier(SqlNode tableRef) {
-    SqlNode explicitAlias = asOperand(tableRef, 1);
-    if (explicitAlias instanceof SqlIdentifier && ((SqlIdentifier) explicitAlias).isSimple()) {
-      return (SqlIdentifier) explicitAlias;
+  private static SqlIdentifier rowSourceName(SqlNode tableRef) {
+    if (tableRef.getKind() == SqlKind.AS) {
+      SqlNode explicitAlias = ((SqlCall) tableRef).operand(1);
+      return explicitAlias instanceof SqlIdentifier && ((SqlIdentifier) explicitAlias).isSimple()
+          ? (SqlIdentifier) explicitAlias : null;
     }
-    if (tableRef instanceof SqlIdentifier) {
-      SqlIdentifier tableIdentifier = (SqlIdentifier) tableRef;
-      int lastComponent = tableIdentifier.names.size() - 1;
-      return new SqlIdentifier(tableIdentifier.names.get(lastComponent),
-          tableIdentifier.getComponentParserPosition(lastComponent));
+    SqlNode table = tableRef;
+    while (table.getKind() == SqlKind.TABLE_REF || table.getKind() == SqlKind.EXTEND
+        || table.getKind() == SqlKind.SNAPSHOT) {
+      table = ((SqlCall) table).operand(0);
     }
-    return null;
+    if (!(table instanceof SqlIdentifier)) {
+      return null;
+    }
+    SqlIdentifier tableIdentifier = (SqlIdentifier) table;
+    int lastComponent = tableIdentifier.names.size() - 1;
+    return new SqlIdentifier(tableIdentifier.names.get(lastComponent),
+        tableIdentifier.getComponentParserPosition(lastComponent));
+  }
+
+  /// Whether `name` equals a pattern variable, either exactly or as the same SQL identifier. The exact comparison
+  /// matters because Calcite's maps can otherwise conflate distinct names such as unquoted `a` and quoted `"a"`; the
+  /// SQL comparison keeps cosmetic case from changing whether a query is valid.
+  private static boolean isPatternVariable(SqlIdentifier name, Set<String> variables) {
+    return variables.contains(name.getSimple()) || variables.contains(canonicalIdentifierComponent(name, 0));
+  }
+
+  /// Returns an internal alias that differs from every pattern variable, ignoring case.
+  private static String internalRowSourceAlias(Set<String> variables) {
+    String alias = INTERNAL_ROW_SOURCE_ALIAS;
+    for (int suffix = 0; containsIgnoreCase(variables, alias); suffix++) {
+      alias = INTERNAL_ROW_SOURCE_ALIAS + "_" + suffix;
+    }
+    return alias;
+  }
+
+  private static boolean containsIgnoreCase(Set<String> names, String name) {
+    for (String candidate : names) {
+      if (candidate.equalsIgnoreCase(name)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Returns `tableRef` under the alias `alias`, without changing the input's column names.
+  ///
+  /// Calcite gives an aliased `VALUES`, `UNNEST` or table function call, or an alias with a column list, an alias
+  /// namespace that can rename columns: the only column of such an input is named after the alias. Re-aliasing one of
+  /// those directly would rename its column, so it is wrapped in `SELECT *` first, which keeps the names it had.
+  private static SqlNode withAlias(SqlNode tableRef, SqlIdentifier alias) {
+    if (tableRef.getKind() == SqlKind.AS) {
+      SqlCall as = (SqlCall) tableRef;
+      if (as.operandCount() == 2 && !namesColumnsAfterAlias(as.operand(0))) {
+        as.setOperand(1, alias);
+        return as;
+      }
+    } else if (!namesColumnsAfterAlias(tableRef)) {
+      return SqlStdOperatorTable.AS.createCall(tableRef.getParserPosition(), tableRef, alias);
+    }
+    SqlParserPos pos = tableRef.getParserPosition();
+    SqlSelect selectAll = new SqlSelect(pos, null, SqlNodeList.of(SqlIdentifier.star(pos)), tableRef, null, null, null,
+        null, null, null, null, null, null);
+    return SqlStdOperatorTable.AS.createCall(pos, selectAll, alias);
+  }
+
+  private static boolean namesColumnsAfterAlias(SqlNode input) {
+    SqlKind kind = input.getKind();
+    return kind == SqlKind.VALUES || kind == SqlKind.UNNEST || kind == SqlKind.COLLECTION_TABLE;
   }
 
   private static void rewriteRowSourceQualifier(SqlNodeList nodes, SqlIdentifier oldAlias, String newAlias) {
