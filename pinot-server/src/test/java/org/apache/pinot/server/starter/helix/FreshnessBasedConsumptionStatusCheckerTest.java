@@ -137,6 +137,42 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
+  /// Behavior lock, not a regression test: this passes with or without the consume-loop fix, because the checker
+  /// only reads the offset the consume loop already produced. It exists so nobody "fixes" the stuck-freshness
+  /// report here by treating `latest - 1` as caught up, which would mark a genuinely lagging partition READY.
+  /// The consume-loop advance itself is covered by
+  /// `RealtimeSegmentDataManagerTest#testEmptyBatchWithAdvancedNextOffsetMovesCurrentOffset`.
+  @Test
+  public void controlRecordTailDoesNotTreatLatestMinusOneAsCaughtUp() {
+    String segA0 = "tableA__0__0__123Z";
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0));
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10000L, 0L);
+
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    setupMinimumIngestionLag(segMngrA0, Long.MAX_VALUE);
+
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(segMngrA0.getStreamPartitionId()).thenReturn(0);
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+
+    // current=10, latest=11: one visible message of lag. Must not treat latest-1 as ready.
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(11)));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+
+    // current=11, latest=11: control-record tail already snapped; offset-caught-up.
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(11));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
+  }
+
   @Test
   public void testWithDroppedTableAndSegment() {
     String segA0 = "tableA__0__0__123Z";
