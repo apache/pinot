@@ -260,8 +260,8 @@
     <jopt-simple.version>5.0.4</jopt-simple.version>
 
     <spark3.version>3.5.9</spark3.version>
-    <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
+    <jose4j.version>0.9.6</jose4j.version>
     <confluent.version>8.2.0</confluent.version>
     <wire.version>7.1.2</wire.version>
     <pulsar.version>5.0.1</pulsar.version>
@@ -1693,30 +1693,28 @@
       <dependency>
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka-clients</artifactId>
-        <version>${kafka3.version}</version>
+        <version>${kafka4.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bitbucket.b_c</groupId>
+        <artifactId>jose4j</artifactId>
+        <version>${jose4j.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka_${scala.compat.version}</artifactId>
-        <version>${kafka3.version}</version>
+        <version>${kafka4.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.kafka</groupId>
-        <artifactId>kafka_${scala.compat.version}</artifactId>
-        <version>${kafka3.version}</version>
-        <classifier>test</classifier>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.kafka</groupId>
-        <artifactId>kafka-clients</artifactId>
-        <version>${kafka3.version}</version>
-        <classifier>test</classifier>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.kafka</groupId>
-        <artifactId>kafka-server-common</artifactId>
-        <version>${kafka3.version}</version>
-        <classifier>test</classifier>
+        <artifactId>kafka-test-common-runtime</artifactId>
+        <version>${kafka4.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <dependency>
@@ -2099,21 +2097,14 @@
       <!-- Tests are written with TestNG only (checkstyle rejects JUnit test APIs). JUnit is present as test
            infrastructure: Surefire no longer ships a native TestNG provider and runs TestNG through the JUnit
            Platform. -->
-      <!-- Runtime dependency of Kafka's KafkaClusterTestKit, the embedded broker behind EmbeddedKafkaCluster: its
-           readiness wait asserts through JUnit. Declared by the modules that start the broker. -->
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit.version}</version>
-        <scope>test</scope>
-      </dependency>
       <!-- @Suite classes that group TestNG tests into one Surefire fork (shared @BeforeSuite cluster, class order,
            TestNG groups) and OrderedTestNGSuite, which restores the declared class order. -->
       <dependency>
-        <groupId>org.junit.platform</groupId>
-        <artifactId>junit-platform-suite</artifactId>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
         <version>${junit.version}</version>
-        <scope>test</scope>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <!-- mockito bom -->
