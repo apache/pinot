@@ -24,9 +24,13 @@ import com.google.common.base.Preconditions;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.RestService;
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
 import io.confluent.kafka.schemaregistry.json.JsonSchemaProvider;
 import io.confluent.kafka.serializers.json.KafkaJsonSchemaDeserializer;
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -37,12 +41,14 @@ import javax.annotation.Nullable;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.types.Password;
+import org.apache.kafka.common.errors.RetriableException;
 import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.security.ssl.DefaultSslEngineFactory;
 import org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.stream.RetriableDecodeException;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -55,6 +61,11 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConfluentSchemaRegistryJsonMessageDecoder.class);
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private static final String SCHEMA_REGISTRY_OPTS_PREFIX = "schema.registry.";
+  // Registry responses the Confluent deserializer itself treats as retriable: request timeout, throttling, internal
+  // server error, bad gateway, service unavailable and gateway timeout
+  private static final Set<Integer> TRANSIENT_HTTP_STATUSES = Set.of(408, 429, 500, 502, 503, 504);
+  // Bounds the cause chain walk, in case of a cycle
+  private static final int MAX_CAUSE_DEPTH = 16;
   public static final String CACHED_SCHEMA_MAP_CAPACITY = "cached.schema.map.capacity";
   public static final String DEFAULT_CACHED_SCHEMA_MAP_CAPACITY = "1000";
   private KafkaJsonSchemaDeserializer _deserializer;
@@ -147,22 +158,17 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
   }
 
   /// This method handles specific serialisation exceptions. If the exception cannot be ignored the method
-  /// re-throws the exception.
+  /// re-throws it, as a [RetriableDecodeException] when the schema registry is temporarily unavailable.
   ///
   /// @param e exception to handle
-  private void ignoreOrRethrowException(RuntimeException e) {
-    if (isUnknownMagicByte(e) || isUnknownMagicByte(e.getCause())) {
-      // Do nothing, the message is not an JSON message and can't be decoded
-      LOGGER.error("Caught exception while decoding row in topic {}, discarding row", _topicName, e);
-      return;
-    }
-    throw e;
-  }
-
   private void ignoreOrRethrowException(Exception e) {
     if (isUnknownMagicByte(e) || (e.getCause() != null && isUnknownMagicByte(e.getCause()))) {
       LOGGER.error("Caught IOexception while mapping jsonNode in topic {}, discarding row", _topicName, e);
       return;
+    }
+    if (isTransientSchemaRegistryFailure(e)) {
+      throw new RetriableDecodeException("Schema registry unavailable while decoding a message in topic: " + _topicName,
+          e);
     }
     throw new RuntimeException(e);
   }
@@ -170,5 +176,30 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
   private boolean isUnknownMagicByte(Throwable e) {
     return e != null && e instanceof SerializationException && e.getMessage() != null && e.getMessage().toLowerCase()
         .contains("unknown magic byte");
+  }
+
+  /// Returns whether the failure comes from the schema registry being temporarily unavailable, in which case the same
+  /// message may decode later: a timeout, throttling or server error from the registry, or a network failure reaching
+  /// it. The deserializer wraps these, so the cause chain is searched. Failures of the message itself, e.g. an unknown
+  /// schema id or a malformed payload, are not transient.
+  @VisibleForTesting
+  static boolean isTransientSchemaRegistryFailure(Throwable e) {
+    Throwable cause = e;
+    for (int depth = 0; cause != null && depth < MAX_CAUSE_DEPTH; depth++) {
+      if (cause instanceof RetriableException) {
+        // The deserializer maps the transient HTTP statuses and socket timeouts to Kafka's retriable exceptions
+        return true;
+      }
+      if (cause instanceof RestClientException restClientException) {
+        return TRANSIENT_HTTP_STATUSES.contains(restClientException.getStatus());
+      }
+      if (cause instanceof SocketException || cause instanceof InterruptedIOException
+          || cause instanceof UnknownHostException) {
+        // The registry could not be reached. Other IOExceptions, e.g. EOFException, come from a malformed payload.
+        return true;
+      }
+      cause = cause.getCause();
+    }
+    return false;
   }
 }
