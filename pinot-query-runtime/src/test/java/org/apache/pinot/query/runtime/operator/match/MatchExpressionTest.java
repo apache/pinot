@@ -19,13 +19,18 @@
 package org.apache.pinot.query.runtime.operator.match;
 
 import java.math.BigDecimal;
+import java.util.AbstractList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.runtime.operator.operands.ReferenceOperand;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -276,6 +281,61 @@ public class MatchExpressionTest {
 
     assertTrue(exception.getMessage().contains("Multi-value operand type 'LONG_ARRAY'"), exception.getMessage());
     assertTrue(exception.getMessage().contains("Reduce the array to a scalar"), exception.getMessage());
+  }
+
+  /// Every aggregate loop runs the termination check while it scans, not only once the scan is done: a cancellation
+  /// requested after a known number of row evaluations stops the scan within one check interval instead of letting it
+  /// visit every remaining row of the match.
+  @Test(dataProvider = "scanningAggregates")
+  public void testAggregateScanChecksTerminationPeriodically(MatchTerm.Aggregate.Kind kind, ColumnDataType type,
+      Object value) {
+    int checkInterval = QueryThreadContext.CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK + 1;
+    int numRows = 4 * checkInterval;
+    int cancelAfter = 100;
+    AtomicInteger rowReads = new AtomicInteger();
+    Object[] row = {value};
+    List<Object[]> rows = new AbstractList<>() {
+      @Override
+      public Object[] get(int index) {
+        rowReads.incrementAndGet();
+        return row;
+      }
+
+      @Override
+      public int size() {
+        return numRows;
+      }
+    };
+    MatchTerm.Aggregate aggregate = new MatchTerm.Aggregate(kind, UNIVERSAL_SYMBOL_ORDINAL,
+        new ReferenceOperand(0, schema(type)), type, () -> {
+          if (rowReads.get() >= cancelAfter) {
+            throw QueryErrorCode.QUERY_CANCELLATION.asException("cancelled while aggregating");
+          }
+        });
+
+    QueryException exception = expectThrows(QueryException.class, () -> aggregate.evaluate(tape(rows)));
+
+    assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_CANCELLATION);
+    assertTrue(rowReads.get() <= cancelAfter + checkInterval,
+        kind + " over " + type + " must stop within one check interval of the cancellation, but read "
+            + rowReads.get() + " of " + numRows + " rows");
+  }
+
+  /// One case per accumulation loop: COUNT of an argument, MIN / MAX, and SUM / AVG in their integral, floating point
+  /// and decimal variants.
+  @DataProvider(name = "scanningAggregates")
+  public Object[][] scanningAggregates() {
+    return new Object[][]{
+        {MatchTerm.Aggregate.Kind.COUNT, ColumnDataType.LONG, 1L},
+        {MatchTerm.Aggregate.Kind.MIN, ColumnDataType.LONG, 1L},
+        {MatchTerm.Aggregate.Kind.MAX, ColumnDataType.LONG, 1L},
+        {MatchTerm.Aggregate.Kind.SUM, ColumnDataType.LONG, 1L},
+        {MatchTerm.Aggregate.Kind.AVG, ColumnDataType.LONG, 1L},
+        {MatchTerm.Aggregate.Kind.SUM, ColumnDataType.DOUBLE, 1.0},
+        {MatchTerm.Aggregate.Kind.AVG, ColumnDataType.DOUBLE, 1.0},
+        {MatchTerm.Aggregate.Kind.SUM, ColumnDataType.BIG_DECIMAL, BigDecimal.ONE},
+        {MatchTerm.Aggregate.Kind.AVG, ColumnDataType.BIG_DECIMAL, BigDecimal.ONE}
+    };
   }
 
   private static void assertNavigationCompileFails(RexExpression.Literal offset, String expectedMessage) {

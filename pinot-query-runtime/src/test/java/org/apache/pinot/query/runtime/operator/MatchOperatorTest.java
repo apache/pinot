@@ -35,6 +35,7 @@ import org.apache.pinot.query.runtime.operator.match.MatchTestFixtures;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -737,6 +738,71 @@ public class MatchOperatorTest {
     }
     builder.addRow(1, "A", 0).finishBlock();
     return builder.addRow(1, "A", 1).addRow(1, "A", 2).finishBlock();
+  }
+
+  /// Aggregate measures are evaluated after the matcher has finished, so the matcher's own termination checks do not
+  /// cover them. A cancellation that arrives while one of them scans a large match must stop that scan instead of
+  /// letting it visit every remaining row, and must fail the block rather than emit the measure.
+  @Test
+  public void testCancellationInterruptsAnAggregateMeasureScan() {
+    int numRows = 4 * (QueryThreadContext.CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK + 1);
+    CancellingValue value = new CancellingValue(100);
+    List<Object[]> inputRows = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      inputRows.add(new Object[]{0, "A", value});
+    }
+    DataSchema resultSchema = new DataSchema(new String[]{"pid", "total"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    MatchNode node = node(resultSchema, List.of(anySymbol("A")),
+        quantifier(symbol(0), 1, RowPattern.Quantifier.UNBOUNDED, true),
+        List.of(measure("total", aggregate("SUM", ColumnDataType.LONG, patternRef(0, "A")))),
+        MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL);
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(context, INPUT_SCHEMA)
+        .addBlock(inputRows.toArray(new Object[0][])).buildWithEos();
+
+    MseBlock block;
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      block = new MatchOperator(context, input, INPUT_SCHEMA, node).nextBlock();
+    }
+
+    assertErrorContains(block, QueryErrorCode.QUERY_CANCELLATION, "cancelled while summing");
+    assertTrue(value._numEvaluations < numRows,
+        "The SUM scan must stop after the cancellation, but it evaluated all " + value._numEvaluations + " rows");
+  }
+
+  /// An aggregated value that cancels the query once it has been read a given number of times.
+  private static final class CancellingValue extends Number {
+    private final int _cancelAfter;
+    private int _numEvaluations;
+
+    CancellingValue(int cancelAfter) {
+      _cancelAfter = cancelAfter;
+    }
+
+    @Override
+    public long longValue() {
+      if (++_numEvaluations == _cancelAfter) {
+        QueryThreadContext.get().getExecutionContext()
+            .terminate(QueryErrorCode.QUERY_CANCELLATION, "cancelled while summing");
+      }
+      return 1;
+    }
+
+    @Override
+    public int intValue() {
+      return (int) longValue();
+    }
+
+    @Override
+    public float floatValue() {
+      return longValue();
+    }
+
+    @Override
+    public double doubleValue() {
+      return longValue();
+    }
   }
 
   private static MatchNode node(DataSchema resultSchema, List<PatternSymbol> symbols, RowPattern pattern,
