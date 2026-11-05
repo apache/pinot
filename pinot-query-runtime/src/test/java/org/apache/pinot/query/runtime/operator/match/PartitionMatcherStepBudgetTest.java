@@ -37,6 +37,7 @@ import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.an
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.quantifier;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.symbol;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -152,6 +153,28 @@ public class PartitionMatcherStepBudgetTest {
       assertTrue(matcher.getRetainedBacktrackingBytes() <= maxRetainedBytes,
           "Matcher must reject growth before retaining more than its hard cap");
     }
+  }
+
+  /// The choice stack and counter undo log grow with the longest match and keep that capacity across partitions,
+  /// up to the hard limit above. [PartitionMatcher#releasePartition()] keeps them on purpose, for the next partition;
+  /// [PartitionMatcher#release()] is the final teardown and must hand them back as well as the tape.
+  @Test
+  public void testReleaseDropsTheGrownBacktrackingArrays() {
+    PartitionMatcher matcher =
+        new PartitionMatcher(PatternToNfaCompiler.compile(A_PLUS), ANY_A, INPUT_SCHEMA, Long.MAX_VALUE);
+    long initialBytes = matcher.getRetainedBacktrackingBytes();
+    assertEquals(matcher.match(matchingRows(1000), 0, 1), 1000);
+    long grownBytes = matcher.getRetainedBacktrackingBytes();
+    assertTrue(grownBytes > initialBytes, "A 1000-row A+ match must grow the backtracking arrays past "
+        + initialBytes + " bytes, retained: " + grownBytes);
+
+    matcher.releasePartition();
+    assertEquals(matcher.getRetainedBacktrackingBytes(), grownBytes, "backtracking arrays after releasePartition()");
+    assertTrue(matcher.hasBufferedState(), "grown backtracking arrays are buffered state");
+
+    matcher.release();
+    assertEquals(matcher.getRetainedBacktrackingBytes(), initialBytes, "backtracking arrays after release()");
+    assertFalse(matcher.hasBufferedState(), "release() must leave nothing to release");
   }
 
   private static List<Object[]> matchingRows(int numRows) {
