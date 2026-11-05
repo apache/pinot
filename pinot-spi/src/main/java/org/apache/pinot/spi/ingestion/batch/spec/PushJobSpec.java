@@ -55,6 +55,8 @@ public class PushJobSpec implements Serializable {
   ///    'glob:2022/\*.tar.gz' will include all segments under \_outputDirURI/2022/, but not sub directories;
   ///    'glob:\*\*\/stats\_\*.tar.gz' will include all the segments starting with "stats\_" under \_outputDirURI
   ///    recursively.
+  /// For URI push, the files matched by the pattern are pushed even without a segment archive extension, e.g. segments
+  /// stored in the deep store.
   private String _pushFileNamePattern;
 
   /// Prefer using segment metadata tar gz file to push segment if exists.

@@ -83,7 +83,7 @@ public abstract class BaseSparkSegmentUriPushJobRunner implements IngestionJobRu
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
     List<String> segmentUris = new ArrayList<>(
-        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files).keySet());
+        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files, true).keySet());
     if (segmentUris.isEmpty()) {
       return;
     }

@@ -629,6 +629,35 @@ public class SegmentPushUtilsTest {
     assertEquals(result.get(segmentFiles[3]), segmentFiles[3]);
   }
 
+  @Test
+  public void testGetSegmentUriToTarPathMapWithoutArchiveExtension() {
+    URI outputDirURI = _tempDir.toURI();
+    String segmentWithoutExtension = outputDirURI.resolve("myTable__0__0__20260601T1557Z").toString();
+    String segmentArchive = outputDirURI.resolve("myTable_offline.tar.gz").toString();
+    String[] files = {
+        segmentWithoutExtension, segmentArchive, outputDirURI.resolve("myTable_offline.metadata.tar.gz").toString(),
+        outputDirURI.resolve("_SUCCESS").toString()
+    };
+
+    // Files without archive extension are selected only when they are matched by the push file name pattern
+    PushJobSpec pushSpec = new PushJobSpec();
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files, true),
+        Map.of(segmentArchive, segmentArchive));
+    pushSpec.setPushFileNamePattern("glob:**/myTable*");
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files),
+        Map.of(segmentArchive, segmentArchive));
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files, true),
+        Map.of(segmentWithoutExtension, segmentWithoutExtension, segmentArchive, segmentArchive));
+
+    pushSpec.setSegmentUriPrefix("adl2://deepstore");
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files, true),
+        Map.of("adl2://deepstore" + URI.create(segmentWithoutExtension).getRawPath(), segmentWithoutExtension,
+            "adl2://deepstore" + URI.create(segmentArchive).getRawPath(), segmentArchive));
+
+    assertEquals(SegmentPushUtils.getSegmentName(segmentWithoutExtension), "myTable__0__0__20260601T1557Z");
+    assertEquals(SegmentPushUtils.getSegmentName(segmentArchive), "myTable_offline");
+  }
+
   @DataProvider(name = "segmentTarExtensions")
   public Object[][] segmentTarExtensions() {
     return new Object[][]{{".tar.gz"}, {".tar.lz4"}, {".tar.zst"}};

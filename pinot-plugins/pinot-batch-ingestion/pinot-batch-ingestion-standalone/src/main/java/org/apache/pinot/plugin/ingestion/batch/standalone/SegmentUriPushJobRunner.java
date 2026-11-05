@@ -36,6 +36,13 @@ public class SegmentUriPushJobRunner extends BaseSegmentPushJobRunner {
     init(spec);
   }
 
+  /// Segments matched by `pushFileNamePattern` are pushed even without a segment archive extension, so that segments
+  /// already in the deep store can be pushed by URI.
+  @Override
+  protected Map<String, String> getSegmentUriToTarPathMap() {
+    return SegmentPushUtils.getSegmentUriToTarPathMap(_outputDirURI, _spec.getPushJobSpec(), _files, true);
+  }
+
   public void uploadSegments(Map<String, String> segmentsUriToTarPathMap)
       throws AttemptsExceededException, RetriableOperationException {
     SegmentPushUtils.sendSegmentUris(_spec, new ArrayList<>(segmentsUriToTarPathMap.keySet()));

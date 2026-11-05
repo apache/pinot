@@ -470,8 +470,9 @@ public class SegmentPushUtils implements Serializable {
     return segmentName;
   }
 
-  /// Segments stored in the deep store can omit the archive extension.
-  private static String getSegmentName(String tarFilePath) {
+  /// Resolves the segment name from a segment archive path. Segments stored in the deep store can omit the archive
+  /// extension, in which case the file name is the segment name.
+  public static String getSegmentName(String tarFilePath) {
     String fileName = new File(tarFilePath).getName();
     if (Constants.isSegmentTarFile(fileName)) {
       return getSegmentNameFromTarFile(tarFilePath);
@@ -680,6 +681,17 @@ public class SegmentPushUtils implements Serializable {
 
   public static Map<String, String> getSegmentUriToTarPathMap(URI outputDirURI, PushJobSpec pushSpec,
       String[] files) {
+    return getSegmentUriToTarPathMap(outputDirURI, pushSpec, files, false);
+  }
+
+  /// Returns the map from segment URI to segment file path for the segments to push.
+  ///
+  /// By default, only files with a segment archive extension are selected. When `allowSegmentsWithoutExtension` is
+  /// true and `pushFileNamePattern` is configured, the files matched by the pattern are selected even without a
+  /// segment archive extension. This allows URI push for segments stored in the deep store, e.g. committed REALTIME
+  /// segments, which are stored without extension. Segment metadata files are always skipped.
+  public static Map<String, String> getSegmentUriToTarPathMap(URI outputDirURI, PushJobSpec pushSpec,
+      String[] files, boolean allowSegmentsWithoutExtension) {
     Map<String, String> segmentUriToTarPathMap = new HashMap<>();
     PathMatcher pushFilePathMatcher = null;
     if (pushSpec.getPushFileNamePattern() != null) {
@@ -699,7 +711,7 @@ public class SegmentPushUtils implements Serializable {
         // Skip segment metadata tar gz files
         continue;
       }
-      if (Constants.isSegmentTarFile(uri.getPath())) {
+      if (Constants.isSegmentTarFile(uri.getPath()) || (allowSegmentsWithoutExtension && pushFilePathMatcher != null)) {
         URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri, pushSpec.getSegmentUriPrefix(),
             pushSpec.getSegmentUriSuffix());
         segmentUriToTarPathMap.put(updatedURI.toString(), file);
