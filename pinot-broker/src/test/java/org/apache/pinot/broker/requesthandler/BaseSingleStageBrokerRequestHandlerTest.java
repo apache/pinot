@@ -1178,8 +1178,11 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   public void testExpressionOverrideToLiteralIsOptimizedAwayForNonHybridTables()
       throws Exception {
     for (String tableNameWithType : List.of("mytable_OFFLINE", "mytable_REALTIME")) {
-      BrokerRequest serverRequest = handleRequestWithExpressionOverride(tableNameWithType,
-          "SELECT COUNT(*) FROM mytable WHERE ts >= 1000 AND REGEXP_LIKE(foo, '.*')");
+      AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+      handleRequestWithExpressionOverride(tableNameWithType, "TRUE",
+          "SELECT COUNT(*) FROM mytable WHERE ts >= 1000 AND REGEXP_LIKE(foo, '.*')", capturedServerRequest);
+      BrokerRequest serverRequest = capturedServerRequest.get();
+      Assert.assertNotNull(serverRequest, tableNameWithType + ": server query should have been captured");
       Expression filter = serverRequest.getPinotQuery().getFilterExpression();
       Assert.assertNotNull(filter, tableNameWithType + ": time predicate must be retained");
       Function filterFunction = filter.getFunctionCall();
@@ -1192,7 +1195,40 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     }
   }
 
-  private static BrokerRequest handleRequestWithExpressionOverride(String tableNameWithType, String sql)
+  /// When an expression override rewrites a predicate under an AND to `FALSE`, the re-optimized filter collapses to
+  /// `FALSE` and the broker returns an empty response without querying any server.
+  @Test
+  public void testExpressionOverrideToFalseSkipsServersForNonHybridTables()
+      throws Exception {
+    for (String tableNameWithType : List.of("mytable_OFFLINE", "mytable_REALTIME")) {
+      AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+      BrokerResponse response = handleRequestWithExpressionOverride(tableNameWithType, "FALSE",
+          "SELECT COUNT(*) FROM mytable WHERE ts >= 1000 AND REGEXP_LIKE(foo, '.*')", capturedServerRequest);
+      Assert.assertNull(capturedServerRequest.get(),
+          tableNameWithType + ": always-false filter must not be sent to servers");
+      Assert.assertTrue(response.getExceptions().isEmpty(),
+          tableNameWithType + ": unexpected exceptions: " + response.getExceptions());
+    }
+  }
+
+  /// When an expression override rewrites a predicate under an OR to `TRUE`, the re-optimized filter collapses to
+  /// `TRUE` and the broker drops the filter entirely.
+  @Test
+  public void testExpressionOverrideToTrueUnderOrDropsFilterForNonHybridTables()
+      throws Exception {
+    for (String tableNameWithType : List.of("mytable_OFFLINE", "mytable_REALTIME")) {
+      AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+      handleRequestWithExpressionOverride(tableNameWithType, "TRUE",
+          "SELECT COUNT(*) FROM mytable WHERE ts >= 1000 OR REGEXP_LIKE(foo, '.*')", capturedServerRequest);
+      BrokerRequest serverRequest = capturedServerRequest.get();
+      Assert.assertNotNull(serverRequest, tableNameWithType + ": server query should have been captured");
+      Assert.assertNull(serverRequest.getPinotQuery().getFilterExpression(),
+          tableNameWithType + ": always-true filter must be dropped");
+    }
+  }
+
+  private static BrokerResponse handleRequestWithExpressionOverride(String tableNameWithType, String overrideValue,
+      String sql, AtomicReference<BrokerRequest> capturedServerRequest)
       throws Exception {
     String rawTable = "mytable";
     Schema schema = new Schema.SchemaBuilder()
@@ -1210,7 +1246,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(tableCache.getTableConfig(tableNameWithType)).thenReturn(tableCfg);
     when(tableCache.getExpressionOverrideMap(tableNameWithType)).thenReturn(
         Map.of(CalciteSqlParser.compileToExpression("REGEXP_LIKE(foo, '.*')"),
-            CalciteSqlParser.compileToExpression("TRUE")));
+            CalciteSqlParser.compileToExpression(overrideValue)));
 
     BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
     when(routingManager.routingExists(tableNameWithType)).thenReturn(true);
@@ -1230,7 +1266,6 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     PinotConfiguration config = new PinotConfiguration();
     BrokerQueryEventListenerFactory.init(config);
 
-    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
     BaseSingleStageBrokerRequestHandler handler =
         new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
             routingManager, new AllowAllAccessControlFactory(), quotaManager, tableCache,
@@ -1253,10 +1288,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
           }
         };
 
-    handler.handleRequest(sql);
-    BrokerRequest serverRequest = capturedServerRequest.get();
-    Assert.assertNotNull(serverRequest, tableNameWithType + ": server query should have been captured");
-    return serverRequest;
+    return handler.handleRequest(sql);
   }
 
   /// Pins the security-style defense that a user-supplied `materializedViewRewrite=true` query
