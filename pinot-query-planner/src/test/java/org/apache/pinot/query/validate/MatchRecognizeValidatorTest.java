@@ -20,9 +20,12 @@ package org.apache.pinot.query.validate;
 
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlMatchRecognize;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironment.CompiledQuery;
@@ -149,6 +152,13 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
             "Aggregate function 'SUM' is not supported yet in the MATCH_RECOGNIZE DEFINE clause"
         },
         new Object[]{
+            // Without the alias the parser itself rejects the join; with it, Calcite failed later with an internal
+            // error while converting the query.
+            "SELECT * FROM (a JOIN b ON a.col2 = b.col2) AS j MATCH_RECOGNIZE (ORDER BY a.ts "
+                + "MEASURES LAST(a.col3) AS v PATTERN (A) DEFINE A AS TRUE)",
+            "A join is not supported yet as the direct input of MATCH_RECOGNIZE"
+        },
+        new Object[]{
             "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts NULLS FIRST PATTERN (A) DEFINE A AS A.col3 > 0)",
             "NULLS FIRST / NULLS LAST is not supported yet"
         },
@@ -262,6 +272,74 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
     //@formatter:on
   }
 
+  /// Calcite names an input without an alias `EXPR$n`, where `n` counts the aliases it generated earlier in the query,
+  /// and qualifies every universal column with that name. A pattern variable can be spelled the same way, so every such
+  /// input must reach Calcite with an internal alias that no pattern variable equals.
+  @Test(dataProvider = "unaliasedDerivedRowSources")
+  public void testUnaliasedDerivedRowSourceGetsAnInternalAlias(String rowSource) {
+    SqlMatchRecognize match = validate("SELECT * FROM " + rowSource + " MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts "
+        + "MEASURES LAST(col3) AS lastv PATTERN (\"EXPR$0\" B) DEFINE \"EXPR$0\" AS TRUE, B AS TRUE) AS mr");
+    assertRowSourceAlias(match, "__PINOT_MATCH_INPUT");
+    // VALUES is wrapped in SELECT * so that the alias cannot rename a single VALUES column.
+    SqlNode input = ((SqlCall) match.getTableRef()).operand(0);
+    if (rowSource.startsWith("(VALUES")) {
+      assertTrue(input instanceof SqlSelect, "Expected SELECT * over the VALUES but got: " + input);
+      SqlNode from = ((SqlSelect) input).getFrom();
+      assertNotNull(from);
+      assertEquals(from.getKind(), SqlKind.VALUES);
+    }
+  }
+
+  @DataProvider(name = "unaliasedDerivedRowSources")
+  public Object[][] unaliasedDerivedRowSources() {
+    return new Object[][]{
+        new Object[]{"(SELECT col1, col3, ts FROM a)"},
+        new Object[]{"(SELECT col1, col3, ts FROM a UNION ALL SELECT col1, col3, ts FROM b)"},
+        new Object[]{"(WITH t AS (SELECT col1, col3, ts FROM a) SELECT * FROM t)"},
+        new Object[]{"(SELECT col1, col3, ts FROM a ORDER BY ts LIMIT 10)"},
+        new Object[]{"(TABLE a)"},
+        new Object[]{"(VALUES ('x', 1, CAST(1 AS BIGINT)))"}
+    };
+  }
+
+  /// The internal alias is renamed when a pattern variable already uses it, in any spelling.
+  @Test
+  public void testInternalRowSourceAliasAvoidsPatternVariables() {
+    SqlMatchRecognize match = validate("SELECT * FROM (SELECT col1, col3, ts FROM a) MATCH_RECOGNIZE (ORDER BY ts "
+        + "MEASURES LAST(col3) AS lastv PATTERN (\"__PINOT_MATCH_INPUT\" \"__pinot_match_input_0\" B) "
+        + "DEFINE \"__PINOT_MATCH_INPUT\" AS TRUE, B AS TRUE)");
+    assertRowSourceAlias(match, "__PINOT_MATCH_INPUT_1");
+  }
+
+  /// Calcite only accepts a bare table or an `AS` call as the input, so a hinted table is aliased with its table name,
+  /// which is what Calcite calls a bare table. Only a colliding name is replaced with the internal alias, and a
+  /// qualifier that names the table in PARTITION BY / ORDER BY follows it.
+  @Test
+  public void testHintedTableIsAliasedWithItsNameUnlessTheNameCollides() {
+    String hintedTable =
+        "a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */";
+    SqlMatchRecognize match = validate("SELECT * FROM " + hintedTable + " MATCH_RECOGNIZE (PARTITION BY a.col1 "
+        + "ORDER BY a.ts MEASURES LAST(col3) AS lastv PATTERN (\"a\" B) DEFINE \"a\" AS TRUE, B AS TRUE)");
+    assertRowSourceAlias(match, "__PINOT_MATCH_INPUT");
+    assertEquals(match.getPartitionList().get(0).toString(), "__PINOT_MATCH_INPUT.col1");
+    assertEquals(match.getOrderList().get(0).toString(), "__PINOT_MATCH_INPUT.ts");
+
+    SqlMatchRecognize ownName = validate("SELECT * FROM " + hintedTable + " MATCH_RECOGNIZE (PARTITION BY a.col1 "
+        + "ORDER BY a.ts MEASURES LAST(col3) AS lastv PATTERN (X B) DEFINE X AS TRUE, B AS TRUE)");
+    assertRowSourceAlias(ownName, "a");
+    assertEquals(((SqlCall) ownName.getTableRef()).operand(0).getKind(), SqlKind.TABLE_REF);
+    assertEquals(ownName.getPartitionList().get(0).toString(), "a.col1");
+  }
+
+  /// Calcite names a bare table after the table, so it is left alone unless that name collides. Unquoted `a` and `A`
+  /// are the same name, so only `X` and `B` leave it alone here.
+  @Test
+  public void testBareTableWithoutCollisionKeepsItsName() {
+    SqlMatchRecognize match = validate("SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES LAST(col3) AS lastv "
+        + "PATTERN (X B) DEFINE X AS TRUE, B AS TRUE)");
+    assertEquals(match.getTableRef().getKind(), SqlKind.IDENTIFIER);
+  }
+
   /// Calcite's validator rewrites `PREV(x, n)` into the logical `LAST(x, n)` whenever `x` is not qualified by the
   /// variable being defined, which is NULL whenever that row precedes the match start. Such a column must reach Calcite
   /// anchored at its variable's last row, `PREV(LAST(x, 0), n)`, which is the SQL:2016 meaning of `PREV(x, n)`.
@@ -371,6 +449,14 @@ public class MatchRecognizeValidatorTest extends QueryEnvironmentTestBase {
         "SET usePhysicalOptimizer=false; " + String.format(QUERY_TEMPLATE, ""))) {
       assertNotNull(ignored);
     }
+  }
+
+  private static void assertRowSourceAlias(SqlMatchRecognize match, String expectedAlias) {
+    SqlNode tableRef = match.getTableRef();
+    assertEquals(tableRef.getKind(), SqlKind.AS, "Expected an aliased row source but got: " + tableRef);
+    SqlNode alias = ((SqlCall) tableRef).operand(1);
+    assertTrue(alias instanceof SqlIdentifier, "Expected a simple alias but got: " + alias);
+    assertEquals(((SqlIdentifier) alias).getSimple(), expectedAlias);
   }
 
   private static void assertAfterOption(SqlMatchRecognize match, SqlMatchRecognize.AfterOption expected) {
