@@ -344,12 +344,13 @@ public class QueryRouter {
   }
 
   /// [#evictChannels] for a server the routing manager just enabled, which is how a restart shows up through Helix,
-  /// called through `BrokerRequestHandler#onServerEnabled`. A channel that still has queries waiting on it is kept,
-  /// see [ServerChannels#evictChannelOfEnabledServer].
+  /// called through `BrokerRequestHandler#onServerEnabled`. A channel that still has queries waiting on it is retired
+  /// rather than closed: the next query opens a fresh connection, and the old one is closed once those queries are
+  /// past their deadline, see [ServerChannels#evictChannelOfEnabledServer].
   public int evictChannelsOfEnabledServer(ServerInstance serverInstance) {
     return countChannels(serverInstance, (serverChannels, routingInstance) ->
         serverChannels.evictChannelOfEnabledServer(routingInstance,
-            channel -> hasQueryAwaitingResponseOn(routingInstance, channel)));
+            channel -> lastDeadlineOfQueriesAwaitingResponseOn(routingInstance, channel)));
   }
 
   /// Applies `action` to each channel the server may have, one per table type over plaintext and, when configured,
@@ -371,13 +372,15 @@ public class QueryRouter {
     return count;
   }
 
-  private boolean hasQueryAwaitingResponseOn(ServerRoutingInstance serverRoutingInstance, Channel channel) {
+  /// The latest deadline of the queries still waiting for a response from the server on `channel`, or 0 if none is.
+  private long lastDeadlineOfQueriesAwaitingResponseOn(ServerRoutingInstance serverRoutingInstance, Channel channel) {
+    long lastDeadlineMs = 0;
     for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
       if (asyncQueryResponse.isAwaitingResponseOn(serverRoutingInstance, channel)) {
-        return true;
+        lastDeadlineMs = Math.max(lastDeadlineMs, asyncQueryResponse.getMaxEndTimeMs());
       }
     }
-    return false;
+    return lastDeadlineMs;
   }
 
   public void shutDown() {

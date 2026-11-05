@@ -565,39 +565,80 @@ public class ServerChannelsTest {
     }
   }
 
-  /// When the routing manager enables a server again, an open channel that still carries queries is kept, whether or
-  /// not the server sent anything since it was disabled: the server was most likely toggled, and those queries are
-  /// left to finish. A channel that carries nothing costs only a reconnect, and a closed one is dropped.
+  /// When the routing manager enables a server again, an open channel that still carries queries is retired, whether
+  /// the server was toggled or restarted: it stays open for those queries, the next connect replaces it with a fresh
+  /// connection, and it is closed once they are past their deadline, later if a query raced the retirement. A channel
+  /// that carries nothing, or only queries past their deadline, is evicted, and a closed one dropped.
   @Test
-  public void testEnabledServerKeepsOnlyOpenChannelThatCarriesQueries() {
+  public void testEnabledServerRetiresChannelThatCarriesQueries()
+      throws Exception {
     ServerChannels serverChannels =
         new ServerChannels(mock(QueryRouter.class), null, null, ThreadAccountantUtils.getNoOpAccountant());
-    try {
-      ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
+    try (StalledServer server = new StalledServer()) {
+      ServerRoutingInstance routingInstance =
+          new ServerRoutingInstance("localhost", server.getPort(), TableType.OFFLINE);
       long evictionsBefore = meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, routingInstance);
 
-      // Carries queries: kept
-      ServerChannels.ServerChannel kept = serverChannels.getOrCreateServerChannel(routingInstance);
-      EmbeddedChannel keptChannel = new EmbeddedChannel();
-      kept.setChannel(keptChannel);
-      assertFalse(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> channel == keptChannel));
-      assertSame(serverChannels.getOrCreateServerChannel(routingInstance), kept);
-      assertTrue(keptChannel.isActive());
+      // Carries queries: retired, and left open for them
+      ServerChannels.ServerChannel entry = serverChannels.getOrCreateServerChannel(routingInstance);
+      EmbeddedChannel retiredChannel = new EmbeddedChannel();
+      entry.setChannel(retiredChannel);
+      AtomicLong lastDeadlineMs = new AtomicLong(System.currentTimeMillis() + 10_000L);
+      assertFalse(serverChannels.evictChannelOfEnabledServer(routingInstance,
+          channel -> channel == retiredChannel ? lastDeadlineMs.get() : 0L));
+      assertSame(serverChannels.getOrCreateServerChannel(routingInstance), entry);
+      assertTrue(retiredChannel.isActive());
 
-      // No query left on it: evicted
-      assertTrue(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> false));
-      assertFalse(keptChannel.isActive());
-      assertNotSame(serverChannels.getOrCreateServerChannel(routingInstance), kept);
+      // The next connect replaces it without closing it
+      entry.connect();
+      Channel freshChannel = entry._channel;
+      assertNotSame(freshChannel, retiredChannel);
+      assertTrue(freshChannel.isActive());
+      assertTrue(retiredChannel.isActive());
+
+      // A query written to it as it was retired holds it open past the first deadline
+      lastDeadlineMs.set(System.currentTimeMillis() + 60_000L);
+      retiredChannel.advanceTimeBy(10_000L + ServerChannels.RETIRED_CHANNEL_CLOSE_GRACE_MS, TimeUnit.MILLISECONDS);
+      retiredChannel.runScheduledPendingTasks();
+      assertTrue(retiredChannel.isActive());
+
+      // Closed once the last query on it is past its deadline
+      lastDeadlineMs.set(0L);
+      retiredChannel.advanceTimeBy(60_000L + ServerChannels.RETIRED_CHANNEL_CLOSE_GRACE_MS, TimeUnit.MILLISECONDS);
+      retiredChannel.runScheduledPendingTasks();
+      assertFalse(retiredChannel.isActive());
+      assertTrue(freshChannel.isActive());
+      assertSame(entry._channel, freshChannel);
+
+      // An eviction closes a retired channel still open along with the current one
+      assertFalse(serverChannels.evictChannelOfEnabledServer(routingInstance,
+          channel -> System.currentTimeMillis() + 10_000L));
+      entry.connect();
+      Channel successorChannel = entry._channel;
+      assertNotSame(successorChannel, freshChannel);
+      assertTrue(serverChannels.evictChannel(routingInstance));
+      assertTrue(freshChannel.closeFuture().await(5, TimeUnit.SECONDS));
+      assertTrue(successorChannel.closeFuture().await(5, TimeUnit.SECONDS));
+
+      // No query left on it, or only queries past their deadline: evicted
+      for (long deadlineMs : new long[]{0L, System.currentTimeMillis() - 1L}) {
+        ServerChannels.ServerChannel idle = serverChannels.getOrCreateServerChannel(routingInstance);
+        EmbeddedChannel idleChannel = new EmbeddedChannel();
+        idle.setChannel(idleChannel);
+        assertTrue(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> deadlineMs));
+        assertFalse(idleChannel.isActive());
+        assertNotSame(serverChannels.getOrCreateServerChannel(routingInstance), idle);
+      }
 
       // Closed, even though queries still point at it: dropped, with no live connection to count
       ServerChannels.ServerChannel closed = serverChannels.getOrCreateServerChannel(routingInstance);
       EmbeddedChannel closedChannel = new EmbeddedChannel();
       closedChannel.close();
       closed.setChannel(closedChannel);
-      assertFalse(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> true));
+      assertFalse(serverChannels.evictChannelOfEnabledServer(routingInstance, channel -> Long.MAX_VALUE));
       assertNotSame(serverChannels.getOrCreateServerChannel(routingInstance), closed);
 
-      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, routingInstance), evictionsBefore + 1);
+      assertEquals(meterCount(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, routingInstance), evictionsBefore + 3);
     } finally {
       serverChannels.shutDown();
     }

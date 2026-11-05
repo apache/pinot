@@ -176,6 +176,11 @@ public class AsyncQueryResponse implements QueryResponse {
     return _timeoutMs;
   }
 
+  /// When the query times out, in epoch milliseconds.
+  long getMaxEndTimeMs() {
+    return _maxEndTimeMs;
+  }
+
   void markRequestSubmitted(ServerRoutingInstance serverRoutingInstance) {
     _responseMap.get(serverRoutingInstance).markRequestSubmitted();
   }

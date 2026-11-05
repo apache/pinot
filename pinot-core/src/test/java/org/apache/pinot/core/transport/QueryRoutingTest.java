@@ -836,43 +836,67 @@ public class QueryRoutingTest {
     }
   }
 
-  /// A server toggled off and on again, not restarted, keeps the channel that still carries a query, even though it
-  /// sent nothing between the disable and the enable, so the query can finish. A channel that carries nothing is
-  /// evicted, which costs the next query a reconnect.
+  /// A server toggled off and on again, not restarted, answers the query in flight on its old channel, while the next
+  /// query goes to a fresh connection; the old channel is closed once the query on it is past its deadline. A channel
+  /// that carries nothing is evicted, which costs the next query a reconnect.
   @Test
-  public void testEnabledServerKeepsChannelThatCarriesQueries()
+  public void testEnabledServerRetiresChannelThatCarriesQueries()
       throws Exception {
     long heldRequestId = 201;
-    long answeredRequestId = 202;
-    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
-    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(answeredRequestId));
-    DataBuffer answer = PinotByteBuffer.wrap(dataTable.toBytes());
+    long heldTimeoutMs = 2_000L;
+    SettableFuture<DataBuffer> heldAnswer = SettableFuture.create();
     _queryServer = QueryServerTestUtils.newQueryServer(
-        queryRequest -> queryRequest.getRequestId() == answeredRequestId ? Futures.immediateFuture(answer)
-            : SettableFuture.create());
+        queryRequest -> queryRequest.getRequestId() == heldRequestId ? heldAnswer
+            : Futures.immediateFuture(answerTo(queryRequest.getRequestId())));
     initializeTestFixtures(startAndGetPort(_queryServer));
     QueryRouter router = newIsolatedQueryRouter();
     try {
       // Nothing left on the channel once its query is answered: evicted
       AsyncQueryResponse answered =
-          router.submitQuery(answeredRequestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+          router.submitQuery(202L, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
       assertNotNull(answered.getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
       Channel idleChannel = router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
       assertEquals(router.evictChannelsOfEnabledServer(_serverInstance), 1);
       TestUtils.waitForCondition(aVoid -> !idleChannel.isActive(), 10L, 5_000L, "Evicted channel was not closed");
 
-      // A query the server is still working on keeps its channel across the enable
+      // A query the server is still working on keeps its channel open across the enable
       AsyncQueryResponse held =
-          router.submitQuery(heldRequestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
-      Channel channel = router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
-      assertNotSame(channel, idleChannel);
+          router.submitQuery(heldRequestId, "testTable", BROKER_REQUEST, _routingTable, null, null, heldTimeoutMs);
+      Channel retiredChannel =
+          router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
+      assertNotSame(retiredChannel, idleChannel);
       assertEquals(router.evictChannelsOfEnabledServer(_serverInstance), 0);
-      assertSame(router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel,
-          channel);
-      assertTrue(channel.isActive());
+      assertTrue(retiredChannel.isActive());
+
+      // The next query goes to a fresh connection
+      AsyncQueryResponse next =
+          router.submitQuery(203L, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+      assertNotNull(next.getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+      Channel freshChannel =
+          router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
+      assertNotSame(freshChannel, retiredChannel);
+      assertTrue(retiredChannel.isActive());
       assertEquals(held.getStatus(), QueryResponse.Status.IN_PROGRESS);
+
+      // The held query is answered on the old channel, which is closed once that query is past its deadline
+      heldAnswer.set(answerTo(heldRequestId));
+      assertNotNull(held.getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+      assertEquals(held.getStatus(), QueryResponse.Status.COMPLETED);
+      TestUtils.waitForCondition(aVoid -> !retiredChannel.isActive(), 10L,
+          heldTimeoutMs + ServerChannels.RETIRED_CHANNEL_CLOSE_GRACE_MS + 5_000L, "Retired channel was not closed");
+      assertTrue(freshChannel.isActive());
     } finally {
       router.shutDown();
+    }
+  }
+
+  private static DataBuffer answerTo(long requestId) {
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    try {
+      return PinotByteBuffer.wrap(dataTable.toBytes());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 

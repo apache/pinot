@@ -45,7 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Predicate;
+import java.util.function.ToLongFunction;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.config.NettyConfig;
@@ -76,9 +76,10 @@ import org.slf4j.LoggerFactory;
 ///   - on the Epoll transport, data unacknowledged for [NettyConfig#TCP_USER_TIMEOUT_MS] makes the kernel close it;
 ///   - a channel whose outbound queue is above [NettyConfig#WRITE_BUFFER_HIGH_WATER_MARK_BYTES] rejects queries
 ///     instead of queueing them in direct memory ([#sendRequest]);
-///   - the routing manager evicts the cached channels of a server when it enables it, as after a restart, except one
-///     that still carries queries ([#evictChannelOfEnabledServer]), and when it sees the server removed from the
-///     cluster or moved to another address ([#evictChannel]).
+///   - the routing manager evicts the cached channels of a server when it enables it, as after a restart, and when it
+///     sees the server removed from the cluster or moved to another address ([#evictChannel]); a channel that still
+///     carries queries when its server is enabled is retired instead: the next query opens a fresh connection, and
+///     the old one is closed once the queries on it are past their deadline ([#evictChannelOfEnabledServer]).
 @ThreadSafe
 public class ServerChannels {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
@@ -87,6 +88,10 @@ public class ServerChannels {
   // A sender that raced with an eviction retries on a fresh entry; one retry is all it takes because an eviction is
   // a rare, per-server event, but bound it anyway.
   private static final int MAX_SEND_ATTEMPTS = 3;
+  // How long past the deadline of its last query a retired channel is closed, so that a query still waiting at its
+  // deadline ends on its own timeout rather than on the close
+  @VisibleForTesting
+  static final long RETIRED_CHANNEL_CLOSE_GRACE_MS = 1_000L;
 
   // TSerializer currently is not thread safe, must be put into a ThreadLocal.
   private static final ThreadLocal<TSerializer> THREAD_LOCAL_T_SERIALIZER = ThreadLocal.withInitial(() -> {
@@ -238,24 +243,30 @@ public class ServerChannels {
   }
 
   /// [#evictChannel] for a server the routing manager just enabled, except that an open channel that still carries
-  /// queries, as `carriesQueries` tells, is kept: the server was most likely disabled and enabled again without a
-  /// restart, as when an operator toggles it, and the queries still running on the channel are left to finish, as
-  /// they were before channels were evicted on enable. Returns `true` if a live connection was closed.
+  /// queries is retired rather than closed: the next query to the server, or the failure detector's reconnect probe,
+  /// replaces it with a fresh connection, and it is closed once the queries on it are past their deadline.
+  /// `lastQueryDeadlineMs` gives the latest deadline of the queries waiting for a response on a channel, or 0 if none
+  /// is. Returns `true` if a live connection was closed.
   ///
-  /// A restart rarely leaves anything to keep. A process that exits on a live host has its socket closed by the
-  /// kernel, so its channel is closed by the time the server comes back. A channel left half-open takes a host or
-  /// network failure, and the server is back only after the host recovers and the new process has started and loaded
-  /// its segments, by when the queries written to the old channel have timed out. A query with a longer timeout can
-  /// keep a half-open channel past the restart; the next write then fails on the reset from a rebooted host, or the
-  /// write timeout closes the channel once writes back up.
+  /// Retiring serves both ways a server comes to be enabled. Toggled off and on without a restart, as by an operator,
+  /// it is still answering on the old channel, and the queries running there finish, as they did before channels were
+  /// evicted on enable. Restarted, it may have left the old channel half-open: its host failed, or it came back at a
+  /// new address behind the same hostname, where the old address never answers with a reset. Queries routed to it now
+  /// reach the new process at once instead of being written into a socket nobody reads, and the queries on the old
+  /// channel time out as they would have.
   public boolean evictChannelOfEnabledServer(ServerRoutingInstance serverRoutingInstance,
-      Predicate<Channel> carriesQueries) {
+      ToLongFunction<Channel> lastQueryDeadlineMs) {
     ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
     if (serverChannel != null) {
       Channel channel = serverChannel._channel;
-      if (channel != null && channel.isActive() && carriesQueries.test(channel)) {
-        LOGGER.info("Kept cached channel to enabled server: {}, which still carries queries", serverRoutingInstance);
-        return false;
+      if (channel != null && channel.isActive()) {
+        long deadlineMs = lastQueryDeadlineMs.applyAsLong(channel);
+        if (deadlineMs > System.currentTimeMillis()) {
+          LOGGER.info("Retired cached channel to enabled server: {}, which still carries queries; the next query opens "
+              + "a fresh connection", serverRoutingInstance);
+          serverChannel.retire(channel, deadlineMs, lastQueryDeadlineMs);
+          return false;
+        }
       }
     }
     return evictChannel(serverRoutingInstance);
@@ -335,6 +346,10 @@ public class ServerChannels {
     // sender that fetched the entry before the eviction neither writes into the evicted channel nor reconnects an
     // entry nobody can reach any more; it retries on a fresh entry instead.
     volatile boolean _evicted;
+    // Set by retire() to the channel the server was enabled on while it still carried queries. connectWithoutLocking()
+    // then replaces it with a fresh connection rather than reuse it, and it stays open for those queries until it is
+    // closed once they are past their deadline. Compared by identity, so it never applies to a connection opened since.
+    volatile Channel _retiredChannel;
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
@@ -372,15 +387,28 @@ public class ServerChannels {
       }
     }
 
+    /// Closes the channel this entry holds, and the one it retired if that is still open: every caller is dropping the
+    /// entry.
     void closeChannel() {
       Channel channel = _channel;
       if (channel != null) {
-        DataTableHandler handler = channel.pipeline().get(DataTableHandler.class);
-        if (handler != null) {
-          handler.markClosedByBroker();
-        }
-        channel.close();
+        closeByBroker(channel);
       }
+      Channel retiredChannel = _retiredChannel;
+      if (retiredChannel != null && retiredChannel != channel) {
+        closeByBroker(retiredChannel);
+      }
+    }
+
+    /// Closes a channel the broker decided to drop (eviction, a retired channel once its queries are past their
+    /// deadline): the queries still in flight on it fail through `channelInactive` as on any closed channel, but the
+    /// server is not reported for it.
+    private void closeByBroker(Channel channel) {
+      DataTableHandler handler = channel.pipeline().get(DataTableHandler.class);
+      if (handler != null) {
+        handler.markClosedByBroker();
+      }
+      channel.close();
     }
 
     /// See [ServerChannels#evictChannel]. Flags the entry first, then closes whatever channel it holds; no lock is
@@ -388,6 +416,31 @@ public class ServerChannels {
     void evict() {
       _evicted = true;
       closeChannel();
+    }
+
+    /// See [ServerChannels#evictChannelOfEnabledServer]. Flags `channel` so that the next connect replaces it, and
+    /// closes it once `lastDeadlineMs`, the deadline of the last query on it, has passed. No lock is taken, as for
+    /// [#evict()]; a query that a sender holding the lock writes to the channel as it is retired is the last one it
+    /// takes, and pushes the close back to that query's deadline.
+    void retire(Channel channel, long lastDeadlineMs, ToLongFunction<Channel> lastQueryDeadlineMs) {
+      _retiredChannel = channel;
+      closeWhenDrained(channel, lastDeadlineMs, lastQueryDeadlineMs);
+    }
+
+    private void closeWhenDrained(Channel channel, long lastDeadlineMs, ToLongFunction<Channel> lastQueryDeadlineMs) {
+      if (!channel.isOpen()) {
+        return;
+      }
+      long delayMs = lastDeadlineMs - System.currentTimeMillis();
+      if (delayMs > 0) {
+        channel.eventLoop().schedule(
+            () -> closeWhenDrained(channel, lastQueryDeadlineMs.applyAsLong(channel), lastQueryDeadlineMs),
+            delayMs + RETIRED_CHANNEL_CLOSE_GRACE_MS, TimeUnit.MILLISECONDS);
+      } else {
+        LOGGER.info("Closing retired channel to server: {}, the queries on it are past their deadline",
+            _serverRoutingInstance);
+        closeByBroker(channel);
+      }
     }
 
     @VisibleForTesting
@@ -451,6 +504,12 @@ public class ServerChannels {
     /// -- blocks for Netty's 30 s default, however long the caller can actually wait.
     void connectWithoutLocking(long timeoutMs)
         throws InterruptedException, TimeoutException {
+      Channel channel = _channel;
+      if (channel != null && channel == _retiredChannel) {
+        // Left open for the queries already on it, and closed once they are past their deadline (see retire())
+        LOGGER.info("Replacing retired channel to server: {} with a fresh connection", _serverRoutingInstance);
+        _channel = null;
+      }
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
         ChannelFuture connectFuture = _bootstrap.connect();
