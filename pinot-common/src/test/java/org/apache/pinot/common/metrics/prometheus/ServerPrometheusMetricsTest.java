@@ -41,8 +41,9 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
   private static final List<ServerMeter> METERS_ACCEPTING_CLIENT_ID =
       List.of(ServerMeter.REALTIME_ROWS_CONSUMED, ServerMeter.REALTIME_ROWS_SANITIZED,
           ServerMeter.REALTIME_ROWS_FETCHED, ServerMeter.REALTIME_ROWS_FILTERED,
-          ServerMeter.INVALID_REALTIME_ROWS_DROPPED, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
-          ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, ServerMeter.ROWS_WITH_ERRORS);
+          ServerMeter.INVALID_REALTIME_ROWS_DROPPED, ServerMeter.REALTIME_DECODE_RETRIES,
+          ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS,
+          ServerMeter.ROWS_WITH_ERRORS);
 
   private static final List<ServerMeter> METERS_ACCEPTING_RAW_TABLE_NAMES =
       List.of(ServerMeter.SEGMENT_UPLOAD_FAILURE, ServerMeter.SEGMENT_UPLOAD_SUCCESS,
