@@ -660,14 +660,6 @@
 
   <dependencyManagement>
     <dependencies>
-      <!-- Keep Kafka's testkit and the TestNG platform provider on the same JUnit infrastructure. -->
-      <dependency>
-        <groupId>org.junit</groupId>
-        <artifactId>junit-bom</artifactId>
-        <version>${junit.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
       <!--
         Pinot Modules — managed via pinot-bom (see pinot-bom/pom.xml).
 
@@ -2105,21 +2097,14 @@
       <!-- Tests are written with TestNG only (checkstyle rejects JUnit test APIs). JUnit is present as test
            infrastructure: Surefire no longer ships a native TestNG provider and runs TestNG through the JUnit
            Platform. -->
-      <!-- Runtime dependency of Kafka's KafkaClusterTestKit, the embedded broker behind EmbeddedKafkaCluster: its
-           readiness wait asserts through JUnit. Declared by the modules that start the broker. -->
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit.version}</version>
-        <scope>test</scope>
-      </dependency>
       <!-- @Suite classes that group TestNG tests into one Surefire fork (shared @BeforeSuite cluster, class order,
            TestNG groups) and OrderedTestNGSuite, which restores the declared class order. -->
       <dependency>
-        <groupId>org.junit.platform</groupId>
-        <artifactId>junit-platform-suite</artifactId>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
         <version>${junit.version}</version>
-        <scope>test</scope>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <!-- mockito bom -->

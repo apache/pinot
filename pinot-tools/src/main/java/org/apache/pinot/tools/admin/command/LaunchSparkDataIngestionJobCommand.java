@@ -268,11 +268,13 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
 
   @VisibleForTesting
   boolean shouldLoadPlugin(String parentDir) {
-    boolean shouldLoadPlugin = _pluginsToLoad == null && !containsPlugin(_pluginsToExclude, parentDir)
-        && !parentDir.contains("spark");
-    shouldLoadPlugin = shouldLoadPlugin || (_pluginsToLoad != null && containsPlugin(_pluginsToLoad, parentDir));
-    shouldLoadPlugin = shouldLoadPlugin || _sparkVersion.getPluginName().contentEquals(parentDir);
-    return shouldLoadPlugin;
+    if (_sparkVersion.getPluginName().equals(parentDir)) {
+      return true;
+    }
+    if (_pluginsToLoad != null) {
+      return containsPlugin(_pluginsToLoad, parentDir);
+    }
+    return !parentDir.contains("spark") && !containsPlugin(_pluginsToExclude, parentDir);
   }
 
   private static boolean containsPlugin(List<String> plugins, String pluginName) {

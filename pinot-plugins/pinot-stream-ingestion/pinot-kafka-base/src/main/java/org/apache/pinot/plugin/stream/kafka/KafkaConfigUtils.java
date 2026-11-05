@@ -42,6 +42,8 @@ public class KafkaConfigUtils {
   private static final String CONFIG_PROVIDERS_PREFIX = AbstractConfig.CONFIG_PROVIDERS_CONFIG + ".";
   private static final String CONFIG_PROVIDER_CLASS_SUFFIX = ".class";
   private static final String CONFIG_PROVIDER_PARAM_PREFIX = ".param.";
+  private static final List<String> COMPATIBILITY_KEYS = List.of(SaslConfigs.SASL_LOGIN_CALLBACK_HANDLER_CLASS,
+      AUTO_INCLUDE_JMX_REPORTER_CONFIG, CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG);
 
   private KafkaConfigUtils() {
   }
@@ -72,35 +74,36 @@ public class KafkaConfigUtils {
   }
 
   private static void normalizeLegacyProperties(Properties properties) {
+    resolveCompatibilityReferences(properties);
+    normalizeJmxProperties(properties);
+    normalizeOAuthProperties(properties);
+  }
+
+  private static void normalizeJmxProperties(Properties properties) {
     boolean hasJmxSettings = properties.containsKey(AUTO_INCLUDE_JMX_REPORTER_CONFIG)
         || properties.containsKey(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG);
-    List<String> compatibilityKeys = new ArrayList<>();
-    compatibilityKeys.add(SaslConfigs.SASL_LOGIN_CALLBACK_HANDLER_CLASS);
-    if (hasJmxSettings) {
-      compatibilityKeys.add(AUTO_INCLUDE_JMX_REPORTER_CONFIG);
-      compatibilityKeys.add(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG);
+    if (!hasJmxSettings) {
+      return;
     }
-    resolveCompatibilityReferences(properties, compatibilityKeys);
-
-    if (hasJmxSettings) {
-      Object legacyJmxSetting = properties.remove(AUTO_INCLUDE_JMX_REPORTER_CONFIG);
-      boolean includeJmx = legacyJmxSetting == null || (Boolean) ConfigDef.parseType(AUTO_INCLUDE_JMX_REPORTER_CONFIG,
-          legacyJmxSetting, ConfigDef.Type.BOOLEAN);
-      Object configuredReporters = properties.getProperty(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG, "");
-      List<?> reporterNames = (List<?>) ConfigDef.parseType(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG,
-          configuredReporters, ConfigDef.Type.LIST);
-      List<String> reporters = new ArrayList<>();
-      for (Object reporterName : reporterNames) {
-        String name = (String) reporterName;
-        reporters.add(matchesKafkaClassName(name, JmxReporter.class.getName()) ? JmxReporter.class.getName() : name);
-      }
-      // Kafka 3 checked the exact class, so a JmxReporter subclass does not replace the automatic reporter.
-      if (includeJmx && !reporters.contains(JmxReporter.class.getName())) {
-        reporters.add(JmxReporter.class.getName());
-      }
-      properties.setProperty(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG, String.join(",", reporters));
+    Object legacyJmxSetting = properties.remove(AUTO_INCLUDE_JMX_REPORTER_CONFIG);
+    boolean includeJmx = legacyJmxSetting == null || (Boolean) ConfigDef.parseType(AUTO_INCLUDE_JMX_REPORTER_CONFIG,
+        legacyJmxSetting, ConfigDef.Type.BOOLEAN);
+    Object configuredReporters = properties.getProperty(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG, "");
+    List<?> reporterNames = (List<?>) ConfigDef.parseType(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG,
+        configuredReporters, ConfigDef.Type.LIST);
+    List<String> reporters = new ArrayList<>();
+    for (Object reporterName : reporterNames) {
+      String name = (String) reporterName;
+      reporters.add(matchesKafkaClassName(name, JmxReporter.class.getName()) ? JmxReporter.class.getName() : name);
     }
+    // Kafka 3 checked the exact class, so a JmxReporter subclass does not replace the automatic reporter.
+    if (includeJmx && !reporters.contains(JmxReporter.class.getName())) {
+      reporters.add(JmxReporter.class.getName());
+    }
+    properties.setProperty(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG, String.join(",", reporters));
+  }
 
+  private static void normalizeOAuthProperties(Properties properties) {
     String callback = properties.getProperty(SaslConfigs.SASL_LOGIN_CALLBACK_HANDLER_CLASS);
     String currentCallback = OAuthBearerLoginCallbackHandler.class.getName();
     String legacyCallback = currentCallback.replace(".oauthbearer.", ".oauthbearer.secured.");
@@ -115,10 +118,10 @@ public class KafkaConfigUtils {
         || configuredClass.equals(KafkaConfigBackwardCompatibleUtils.PINOT_SHADED_PACKAGE_PREFIX + unshadedClass);
   }
 
-  private static void resolveCompatibilityReferences(Properties properties, List<String> compatibilityKeys) {
+  private static void resolveCompatibilityReferences(Properties properties) {
     Properties resolutionProperties = new Properties();
     boolean needsResolution = false;
-    for (String key : compatibilityKeys) {
+    for (String key : COMPATIBILITY_KEYS) {
       String value = properties.getProperty(key);
       if (value != null) {
         resolutionProperties.setProperty(key, value);
@@ -136,7 +139,7 @@ public class KafkaConfigUtils {
     // Keep provider declarations in the same map so Kafka's automatic-provider security filter still applies.
     // AbstractConfig closes successfully initialized providers after resolving these values and does not log them.
     Map<String, Object> resolved = new AbstractConfig(new ConfigDef(), resolutionProperties, false).originals();
-    for (String key : compatibilityKeys) {
+    for (String key : COMPATIBILITY_KEYS) {
       Object value = resolved.get(key);
       if (value instanceof String) {
         if (ConfigTransformer.DEFAULT_PATTERN.matcher((String) value).find()) {

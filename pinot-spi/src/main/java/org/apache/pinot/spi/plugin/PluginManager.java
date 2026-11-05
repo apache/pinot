@@ -223,6 +223,12 @@ public class PluginManager {
     LOGGER.info("Plugin directories: {}, parsed directories to load: '{}'", pluginsDirectories, directories);
 
     HashMap<String, File> finalPluginsToLoad = new HashMap<>();
+    List<String> pluginsToLoad = null;
+    if (!StringUtils.isEmpty(pluginsInclude)) {
+      pluginsToLoad = Arrays.stream(pluginsInclude.split(";"))
+          .map(this::getBackwardCompatiblePluginName).collect(Collectors.toList());
+      LOGGER.info("Potential plugins to load: [{}]", Arrays.toString(pluginsToLoad.toArray()));
+    }
 
     for (String pluginsDirectory : directories) {
       if (!new File(pluginsDirectory).exists()) {
@@ -231,12 +237,7 @@ public class PluginManager {
 
       Collection<File> jarFiles =
           FileUtils.listFiles(new File(pluginsDirectory), new String[]{JAR_FILE_EXTENSION}, true);
-      List<String> pluginsToLoad = null;
-      if (!StringUtils.isEmpty(pluginsInclude)) {
-        pluginsToLoad = Arrays.stream(pluginsInclude.split(";"))
-            .map(this::getBackwardCompatiblePluginName).collect(Collectors.toList());
-        LOGGER.info("Potential plugins to load: [{}]", Arrays.toString(pluginsToLoad.toArray()));
-      } else {
+      if (pluginsToLoad == null) {
         LOGGER.info("Please use system property '{}' to customize plugins to load. Loading all plugins: {}",
             PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(jarFiles.toArray()));
       }
@@ -543,9 +544,18 @@ public class PluginManager {
   /// because only the old name was included, loads that replacement now. Repeated registration is harmless.
   public synchronized void registerBackwardCompatiblePluginName(String oldPluginName, String newPluginName) {
     String previousName = _backwardCompatiblePluginNames.put(oldPluginName, newPluginName);
-    if (newPluginName.equals(previousName) || StringUtils.isEmpty(_pluginsDirectories)
-        || StringUtils.isEmpty(_pluginsInclude) || !Arrays.asList(_pluginsInclude.split(";")).contains(oldPluginName)
-        || _registry.containsKey(new Plugin(newPluginName)) || _classWorld.getClassRealm(newPluginName) != null) {
+    if (newPluginName.equals(previousName)) {
+      return;
+    }
+    loadReplacementPluginIfNeeded(oldPluginName, newPluginName);
+  }
+
+  private void loadReplacementPluginIfNeeded(String oldPluginName, String newPluginName) {
+    if (StringUtils.isEmpty(_pluginsDirectories) || StringUtils.isEmpty(_pluginsInclude)
+        || !Arrays.asList(_pluginsInclude.split(";")).contains(oldPluginName)) {
+      return;
+    }
+    if (_registry.containsKey(new Plugin(newPluginName)) || _classWorld.getClassRealm(newPluginName) != null) {
       return;
     }
     File pluginDirectory = getPluginsToLoad(_pluginsDirectories, oldPluginName).get(newPluginName);

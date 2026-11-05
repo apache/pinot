@@ -583,12 +583,6 @@
       <artifactId>pinot-batch-ingestion-spark-3</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Runtime dependency of the embedded Kafka broker (EmbeddedKafkaCluster); not a test framework -->
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-api</artifactId>
-      <scope>test</scope>
-    </dependency>
     <!-- @Suite classes under suites/ that run the shared-cluster integration suites in one fork -->
     <dependency>
       <groupId>org.junit.platform</groupId>
