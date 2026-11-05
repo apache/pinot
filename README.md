@@ -53,6 +53,8 @@
 
 [Apache Pinot](https://pinot.apache.org) is a real-time distributed OLAP datastore, built to deliver scalable real-time analytics with low latency. It can ingest from batch data sources (such as Hadoop HDFS, Amazon S3, Azure ADLS, Google Cloud Storage) as well as stream data sources (such as Apache Kafka).
 
+Pinot also supports [vector similarity search](https://docs.pinot.apache.org/build-with-pinot/indexing/vector-index) for vector database use cases such as semantic search, recommendations, and retrieval-augmented generation (RAG). Its low-latency SQL queries over fresh data make it well suited to [agent-facing analytics](https://pinot.apache.org/agent-facing-analytics/), including AI assistants and automated decision systems.
+
 Pinot was built by engineers at LinkedIn and Uber and is designed to scale up and out with no upper bound. Performance always remains constant based on the size of your cluster and an expected query per second (QPS) threshold.
 
 For getting started guides, deployment recipes, tutorials, and more, please visit our project documentation at [https://docs.pinot.apache.org](https://docs.pinot.apache.org).
