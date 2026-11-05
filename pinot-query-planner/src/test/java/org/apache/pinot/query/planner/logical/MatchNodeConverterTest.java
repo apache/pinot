@@ -52,6 +52,8 @@ import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
@@ -74,6 +76,9 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
   /// bare `B.col3` measure is validated as `FINAL(B.col3)`, so `b` covers `LAST` and `b2` covers `FINAL` alone.
   private static final String OPTIONAL_VARIABLE_MATCH_QUERY = "SELECT b, b2 FROM a MATCH_RECOGNIZE (PARTITION BY col1 "
       + "ORDER BY ts MEASURES LAST(B.col3) AS b, B.col3 AS b2 PATTERN (A B?) DEFINE A AS A.col3 > 0, B AS B.col3 > 0)";
+  /// The MATCH_RECOGNIZE clause appended to the `LATERAL` and correlated input queries.
+  private static final String CORRELATION_TEST_MATCH = " MATCH_RECOGNIZE (PARTITION BY col1 ORDER BY ts "
+      + "MEASURES LAST(col3) AS lastv PATTERN (X B) DEFINE X AS TRUE, B AS TRUE) AS mr";
 
   @Test(dataProvider = "patternQueries")
   public void testPatternIsLowered(String patternClause, String expectedPattern) {
@@ -609,6 +614,41 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     refs = collectPatternFieldRefs(aliased.getMeasures().get(0).getExpression());
     assertEquals(refs.size(), 1);
     assertEquals(refs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
+  }
+
+  /// An uncorrelated `LATERAL` input is an ordinary sub-query: it plans with the match joined to the earlier FROM item.
+  /// Calcite only accepts a bare table or an `AS` call as the MATCH_RECOGNIZE input and used to fail on it with an
+  /// `AssertionError`.
+  @Test
+  public void testUncorrelatedLateralInputIsPlanned() {
+    MatchNode match = planMatch("SELECT * FROM b, LATERAL (SELECT col1, col3, ts FROM a)" + CORRELATION_TEST_MATCH);
+    assertEquals(match.getDataSchema().getColumnNames(), new String[]{"col1", "lastv"});
+  }
+
+  /// A reference to a column of the outer query or of an earlier FROM item under a MATCH_RECOGNIZE keeps the
+  /// `LogicalCorrelate`, because the decorrelator cannot move a correlation through a match. The converter used to
+  /// plan every correlate as CROSS JOIN UNNEST, so these queries unnested the first column of `b` and dropped the scan
+  /// of `a` and the match without an error. They must fail planning instead, whichever way the input is spelled.
+  @Test(dataProvider = "correlatedMatchInputQueries")
+  public void testCorrelatedMatchInputIsRejected(String sql) {
+    QueryException e = expectThrows(QueryException.class, () -> planMatches(sql));
+    assertEquals(e.getErrorCode(), QueryErrorCode.QUERY_PLANNING);
+    assertTrue(e.getMessage().contains("A correlated sub-query over MATCH_RECOGNIZE is not supported"),
+        e.getMessage());
+  }
+
+  @DataProvider(name = "correlatedMatchInputQueries")
+  public Object[][] correlatedMatchInputQueries() {
+    String input = "(SELECT col1, col3, ts FROM a WHERE a.col2 = b.col2)";
+    return new Object[][]{
+        new Object[]{"SELECT * FROM b, LATERAL " + input + CORRELATION_TEST_MATCH},
+        // MatchRecognizeScope makes the enclosing FROM items visible to the input even without LATERAL.
+        new Object[]{"SELECT * FROM b, " + input + CORRELATION_TEST_MATCH},
+        new Object[]{"SELECT * FROM b, " + input + " AS s" + CORRELATION_TEST_MATCH},
+        new Object[]{"SELECT * FROM b, LATERAL (SELECT * FROM " + input + CORRELATION_TEST_MATCH + ") AS l"},
+        new Object[]{"SELECT col1 FROM b WHERE EXISTS (SELECT 1 FROM " + input + CORRELATION_TEST_MATCH + ")"},
+        new Object[]{"SELECT col1, (SELECT MAX(lastv) FROM " + input + CORRELATION_TEST_MATCH + ") AS m FROM b"}
+    };
   }
 
   /// The runtime compiles a quantifier into one counter-guarded loop, so a repetition bound neither grows the automaton

@@ -248,6 +248,12 @@ public final class RelToPlanNodeConverter {
   private BasePlanNode convertLogicalCorrelate(LogicalCorrelate node) {
     // Pattern: Correlate(left, Uncollect(Project(correlatedFields...)))
     RelNode right = node.getRight();
+    // A correlate survives decorrelation only when the decorrelator could not rewrite it into a join, and CROSS JOIN
+    // UNNEST is the only such shape implemented here. The right side of any other correlate is never converted, so
+    // planning it as an UNNEST would drop that whole subtree and return wrong rows without an error.
+    if (findUncollect(right) == null) {
+      throw new QueryException(QueryErrorCode.QUERY_PLANNING, unsupportedCorrelateMessage(right));
+    }
     RelDataType leftRowType = node.getLeft().getRowType();
     Project aliasProject = right instanceof Project ? (Project) right : null;
     Project correlatedProject = findProjectUnderUncollect(right);
@@ -298,6 +304,33 @@ public final class RelToPlanNodeConverter {
           new ArrayList<>(List.of(unnest)), rewritten);
     }
     return unnest;
+  }
+
+  /// Returns the error for a correlate that is not CROSS JOIN UNNEST, i.e. a correlated sub-query the decorrelator
+  /// could not rewrite into a join. Calcite cannot move a correlation through a MATCH_RECOGNIZE, so a sub-query that
+  /// references the outer query below one ends up here, and gets a rewrite hint of its own.
+  private static String unsupportedCorrelateMessage(RelNode right) {
+    if (containsMatch(right)) {
+      return "A correlated sub-query over MATCH_RECOGNIZE is not supported: the planner cannot move a reference to a "
+          + "column of the outer query or of an earlier FROM item through MATCH_RECOGNIZE. Remove the outer reference. "
+          + "For an equality between an input column and an outer column, select the input column, add it to "
+          + "PARTITION BY and join the MATCH_RECOGNIZE output on it.";
+    }
+    return "A correlated sub-query that cannot be rewritten into a join is not supported: the multi-stage engine only "
+        + "supports a reference to a column of the outer query or of an earlier FROM item as the array of CROSS JOIN "
+        + "UNNEST. Remove the outer reference from the sub-query.";
+  }
+
+  private static boolean containsMatch(RelNode node) {
+    if (node instanceof Match) {
+      return true;
+    }
+    for (RelNode input : node.getInputs()) {
+      if (containsMatch(input)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Nullable
