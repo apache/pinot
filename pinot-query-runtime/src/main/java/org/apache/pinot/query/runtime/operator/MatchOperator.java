@@ -205,13 +205,19 @@ public class MatchOperator extends MultiStageOperator {
   /// rather than the list cleared. The partition list is replaced, the same as at a partition boundary.
   @Override
   protected void releaseBuffers() {
+    dropBufferedState();
+    if (_inputEos == null) {
+      _inputEos = SuccessMseBlock.INSTANCE;
+    }
+  }
+
+  /// The part of [#releaseBuffers()] that early termination shares: it has to drop the buffers before draining the
+  /// input, while the input has not ended yet.
+  private void dropBufferedState() {
     _inputRows = null;
     _partitionRows = new ArrayList<>();
     _matchingPartition = false;
     _matcher.release();
-    if (_inputEos == null) {
-      _inputEos = SuccessMseBlock.INSTANCE;
-    }
   }
 
   @Override
@@ -221,6 +227,11 @@ public class MatchOperator extends MultiStageOperator {
 
   @Override
   protected MseBlock getNextBlock() {
+    // The consumer calls earlyTerminate() on the op chain thread, between two calls to nextBlock(), so the flag cannot
+    // change while a call is matching and checking it once per call is enough.
+    if (_isEarlyTerminated) {
+      return finishEarly();
+    }
     List<Object[]> outputRows = new ArrayList<>(MAX_OUTPUT_ROWS_PER_BLOCK);
     while (outputRows.size() < MAX_OUTPUT_ROWS_PER_BLOCK) {
       if (_matchingPartition) {
@@ -261,6 +272,24 @@ public class MatchOperator extends MultiStageOperator {
       }
     }
     return new RowHeapDataBlock(outputRows, _resultSchema);
+  }
+
+  /// Ends the operator once its consumer needs no more rows, for instance because an outer LIMIT is satisfied.
+  ///
+  /// Matching stops right away: the attempts left over the buffered partition can cost as much as the rest of the
+  /// query, or exhaust the step budget and fail a query whose result is already complete. The buffers are dropped
+  /// before the input is drained to its terminal block, which is returned as is, so an upstream error still surfaces.
+  /// The stats are left alone.
+  private MseBlock.Eos finishEarly() {
+    dropBufferedState();
+    if (_inputEos == null) {
+      MseBlock block = _input.nextBlock();
+      while (block.isData()) {
+        block = _input.nextBlock();
+      }
+      _inputEos = (MseBlock.Eos) block;
+    }
+    return _inputEos;
   }
 
   /// Consumes rows without allocating extracted keys. A boundary row stays in the input block until the preceding
