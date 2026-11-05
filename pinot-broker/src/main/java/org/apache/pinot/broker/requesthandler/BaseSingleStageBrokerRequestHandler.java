@@ -2269,7 +2269,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   /// Rejects the query with access denied if a cross-table function in it would read rows that the row filters of
-  /// the queried table hide. Called when the access control returns row filters for that table.
+  /// the queried table hide. Called when the access control returns row filters for that table, which only the
+  /// physical-table path asks for: the logical-table path of [#doHandleRequest] applies no row filters at all today,
+  /// to the WHERE clause or here, so this check covers physical tables only.
   ///
   /// The row filters are added to the WHERE clause, which covers the queried table only, so every
   /// [CrossTableFunction] is decided here, and the switch is exhaustive so that a new one cannot be added without

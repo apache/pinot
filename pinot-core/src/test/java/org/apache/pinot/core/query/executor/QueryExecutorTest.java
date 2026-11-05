@@ -263,6 +263,12 @@ public class QueryExecutorTest {
     String error = executeExpectingFailure(queryNamingOtherTable, queryOptions);
     assertTrue(error.contains("must read the queried table"), error);
 
+    // Row filters stamped for another table only, which an older broker sends when a materialized view rewrite swaps
+    // the table after stamping them, fail the query rather than let the subquery run unfiltered
+    Map<String, String> otherTableOptions = Map.of(RlsUtils.buildRlsFilterKey("otherTable"), rowFilters);
+    error = executeExpectingFailure(query, otherTableOptions);
+    assertTrue(error.contains("none for the queried table"), error);
+
     // A subquery nested in the subquery is filtered the same way: with the filter the innermost ID_SET is empty, so
     // the middle one is too; without it both hold the single value 0 and every allowed row matches
     String nestedSubquery = "SELECT ID_SET(orderItemCount - orderItemCount) FROM " + OFFLINE_TABLE_NAME
