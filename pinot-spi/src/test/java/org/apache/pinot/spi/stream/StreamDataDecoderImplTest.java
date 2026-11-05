@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
@@ -131,9 +132,50 @@ public class StreamDataDecoderImplTest {
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getException());
     Assert.assertNull(result.getResult());
+    Assert.assertFalse(result.isRetriable());
+  }
+
+  @Test
+  public void testRetriableDecodeExceptionIsCarriedAsRetriable() {
+    SocketTimeoutException registryTimeout = new SocketTimeoutException("Read timed out");
+    RetriableDecodeException retriable = new RetriableDecodeException("Schema registry unavailable", registryTimeout);
+    BytesStreamMessage message = new BytesStreamMessage("Alice".getBytes(StandardCharsets.UTF_8), METADATA);
+
+    StreamDataDecoderResult result = new StreamDataDecoderImpl(new ThrowingDecoder(retriable)).decode(message);
+
+    Assert.assertNull(result.getResult());
+    Assert.assertTrue(result.isRetriable());
+    // Carried as is, so that the consumer can log the cause
+    Assert.assertSame(result.getException(), retriable);
+    Assert.assertSame(result.getException().getCause(), registryTimeout);
+  }
+
+  @Test
+  public void testOnlyRetriableDecodeExceptionIsRetriable() {
+    BytesStreamMessage message = new BytesStreamMessage("Alice".getBytes(StandardCharsets.UTF_8), METADATA);
+    // Returning null drops the message
+    StreamDataDecoderResult nullResult = new StreamDataDecoderImpl(new NullDecoder()).decode(message);
+    Assert.assertNotNull(nullResult.getException());
+    Assert.assertFalse(nullResult.isRetriable());
+    // So does any other exception, even one caused by a RetriableDecodeException: only the exception itself counts
+    StreamDataDecoderResult wrappedResult = new StreamDataDecoderImpl(
+        new ThrowingDecoder(new IllegalStateException(new RetriableDecodeException("wrapped")))).decode(message);
+    Assert.assertNotNull(wrappedResult.getException());
+    Assert.assertFalse(wrappedResult.isRetriable());
+    // A decoded row is not a failure at all
+    Assert.assertFalse(new StreamDataDecoderImpl(new TestDecoder()).decode(message).isRetriable());
   }
 
   private static class ThrowingDecoder implements StreamMessageDecoder<byte[]> {
+    private final RuntimeException _exception;
+
+    ThrowingDecoder() {
+      this(new RuntimeException("something failed during decoding"));
+    }
+
+    ThrowingDecoder(RuntimeException exception) {
+      _exception = exception;
+    }
 
     @Override
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
@@ -142,13 +184,27 @@ public class StreamDataDecoderImplTest {
     @Nullable
     @Override
     public GenericRow decode(byte[] payload, GenericRow destination) {
-      throw new RuntimeException("something failed during decoding");
+      throw _exception;
     }
 
     @Nullable
     @Override
     public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-      throw new RuntimeException("something failed during decoding");
+      throw _exception;
+    }
+  }
+
+  private static class NullDecoder implements StreamMessageDecoder<byte[]> {
+    @Nullable
+    @Override
+    public GenericRow decode(byte[] payload, GenericRow destination) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+      return null;
     }
   }
 

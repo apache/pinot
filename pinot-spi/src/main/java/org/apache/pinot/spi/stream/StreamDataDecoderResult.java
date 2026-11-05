@@ -42,4 +42,10 @@ public final class StreamDataDecoderResult {
   public Exception getException() {
     return _exception;
   }
+
+  /// Returns whether decoding failed with a [RetriableDecodeException], i.e. the message may decode later and should
+  /// be decoded again instead of being dropped.
+  public boolean isRetriable() {
+    return _exception instanceof RetriableDecodeException;
+  }
 }
