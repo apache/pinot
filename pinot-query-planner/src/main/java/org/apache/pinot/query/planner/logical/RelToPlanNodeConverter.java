@@ -106,10 +106,6 @@ import org.slf4j.LoggerFactory;
 public final class RelToPlanNodeConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelToPlanNodeConverter.class);
   private static final int DEFAULT_STAGE_ID = -1;
-  /// Largest repetition count accepted in a MATCH_RECOGNIZE pattern quantifier such as `A{n,m}`. Every
-  /// repetition expands into pattern matcher state, so an unbounded count would let a tiny query request an
-  /// arbitrary amount of work. BigQuery applies the same limit.
-  static final int MAX_PATTERN_QUANTIFIER_BOUND = 10_000;
   /// The value Calcite's parser writes for an unspecified MATCH_RECOGNIZE quantifier bound, i.e. the maximum of
   /// `*` / `+` / `{n,}` and the minimum of `{,m}`.
   private static final int UNSPECIFIED_QUANTIFIER_BOUND = -1;
@@ -930,18 +926,17 @@ public final class RelToPlanNodeConverter {
     return new RowPattern.Quantifier(child, minRepeat, maxRepeat, !RexLiteral.booleanValue(operands.get(3)));
   }
 
+  /// Reads one repetition bound. Any non-negative int is accepted: `SqlToRelConverter` has already rejected a bound
+  /// outside the int range, and a large bound costs nothing extra at runtime. The runtime compiles a quantifier into a
+  /// single loop guarded by a counter rather than one copy of its body per repetition, so the automaton does not grow
+  /// with the bound, and the counter never exceeds one more than the partition row count, which
+  /// `maxRowsInMatchPartition` caps. The work and memory of a match attempt are bounded by `maxStepsPerMatchAttempt`,
+  /// the partition row limit and the cap on retained backtracking state, none of which depends on the bound.
   private int toQuantifierBound(RexNode bound, RexCall call) {
     int value = RexExpressionUtils.getValueAsInt(bound);
     if (value < UNSPECIFIED_QUANTIFIER_BOUND) {
       throw new QueryException(QueryErrorCode.QUERY_PLANNING,
           "MATCH_RECOGNIZE pattern quantifier '" + call + "' has a negative repetition bound: " + value + ".");
-    }
-    if (value > MAX_PATTERN_QUANTIFIER_BOUND) {
-      throw new QueryException(QueryErrorCode.QUERY_PLANNING,
-          "MATCH_RECOGNIZE pattern quantifier bound " + value + " exceeds the maximum supported bound of "
-              + MAX_PATTERN_QUANTIFIER_BOUND + ": '" + call + "'. Every repetition expands into pattern matcher "
-              + "state, so rewrite the pattern with a smaller repetition count, or use an unbounded quantifier "
-              + "such as '*' or '+' together with a DEFINE predicate that bounds the match.");
     }
     return value;
   }

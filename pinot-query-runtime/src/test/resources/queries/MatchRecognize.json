@@ -87,6 +87,17 @@
         ],
         "ignoreV2Optimizer": true,
         "ignoreLiteMode": true
+      },
+      {
+        "description": "Quantifier bounds far above the partition size, up to the largest int, compile to the same counter-guarded loops as DOWN+ UP+ and return the same rows. Planning used to reject any bound above 10,000.",
+        "sql": "SELECT * FROM {ticker} MATCH_RECOGNIZE (PARTITION BY symbol ORDER BY seq MEASURES FIRST(DOWN.price) AS start_price, LAST(UP.price) AS end_price ONE ROW PER MATCH PATTERN (DOWN{1,100000} UP{1,2147483647}) DEFINE DOWN AS DOWN.price < PREV(DOWN.price), UP AS UP.price > PREV(UP.price)) AS mr",
+        "outputs": [
+          ["A", 8, 12],
+          ["A", 7, 11],
+          ["B", 3, 8]
+        ],
+        "ignoreV2Optimizer": true,
+        "ignoreLiteMode": true
       }
     ]
   },

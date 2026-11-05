@@ -155,6 +155,25 @@ public class PatternToNfaCompilerTest {
   }
 
   @Test
+  public void testQuantifierBoundsAtTheIntLimitMatchLikeUnboundedOnes() {
+    // The counter only grows with the rows a loop consumes, so the largest bounds behave like an open bound, and an
+    // unreachable minimum fails cleanly at the end of the partition instead of overflowing the counter.
+    assertMatch(quantifier(symbol(0), 0, Integer.MAX_VALUE, true), labelSymbols("A"), "AAA", "AAA");
+    assertMatch(quantifier(symbol(0), 2, Integer.MAX_VALUE, false), labelSymbols("A"), "AAAA", "AA");
+    assertNoMatch(quantifier(symbol(0), Integer.MAX_VALUE, Integer.MAX_VALUE, true), labelSymbols("A"), "AAAA");
+  }
+
+  @Test
+  public void testLargeLowerBoundCountsEveryRow() {
+    // PATTERN (A{20000,}) over exactly 20,000 matching rows: one row short of the minimum is no match at all.
+    String rows = "A".repeat(20_000);
+    RowPattern atLeastAll = quantifier(symbol(0), 20_000, RowPattern.Quantifier.UNBOUNDED, true);
+    RowPattern atLeastOneMore = quantifier(symbol(0), 20_001, RowPattern.Quantifier.UNBOUNDED, true);
+    assertEquals(matchAt(atLeastAll, labelSymbols("A"), rows, 0), 20_000);
+    assertEquals(matchAt(atLeastOneMore, labelSymbols("A"), rows, 0), PartitionMatcher.NO_MATCH);
+  }
+
+  @Test
   public void testNestedQuantifiersGetIndependentCounterRegisters() {
     PatternNfa nfa = PatternToNfaCompiler.compile(quantifier(quantifier(symbol(0), 2, 2, true), 3, 3, true));
     assertEquals(nfa.getNumCounters(), 2);

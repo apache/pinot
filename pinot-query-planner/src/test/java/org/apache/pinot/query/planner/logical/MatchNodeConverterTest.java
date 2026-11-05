@@ -611,23 +611,34 @@ public class MatchNodeConverterTest extends QueryEnvironmentTestBase {
     assertEquals(refs.get(0).getSymbolOrdinal(), RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL);
   }
 
-  @Test
-  public void testQuantifierBoundAboveTheCapIsRejected() {
-    int overTheCap = RelToPlanNodeConverter.MAX_PATTERN_QUANTIFIER_BOUND + 1;
-    RuntimeException e = expectThrows(RuntimeException.class, () -> planMatch(
-        "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno PATTERN (A{1," + overTheCap
-            + "}) DEFINE A AS A.col3 > 0)"));
-    assertTrue(e.getMessage().contains("exceeds the maximum supported bound of "
-        + RelToPlanNodeConverter.MAX_PATTERN_QUANTIFIER_BOUND), e.getMessage());
+  /// The runtime compiles a quantifier into one counter-guarded loop, so a repetition bound neither grows the automaton
+  /// nor needs a cap of its own: every bound up to the largest int reaches the plan unchanged.
+  @Test(dataProvider = "largeQuantifierBounds")
+  public void testLargeQuantifierBoundsAreLoweredUnchanged(String quantifier, int minRepeat, int maxRepeat) {
+    MatchNode match = planMatch("SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno "
+        + "PATTERN (A" + quantifier + ") DEFINE A AS A.col3 > 0)");
+    RowPattern.Quantifier lowered = (RowPattern.Quantifier) match.getPattern();
+    assertEquals(lowered.getMinRepeat(), minRepeat);
+    assertEquals(lowered.getMaxRepeat(), maxRepeat);
   }
 
+  @DataProvider(name = "largeQuantifierBounds")
+  public Object[][] largeQuantifierBounds() {
+    return new Object[][]{
+        new Object[]{"{100000,}", 100_000, RowPattern.Quantifier.UNBOUNDED},
+        new Object[]{"{1,2147483647}", 1, Integer.MAX_VALUE},
+        new Object[]{"{,2147483647}", 0, Integer.MAX_VALUE},
+        new Object[]{"{2147483647}", Integer.MAX_VALUE, Integer.MAX_VALUE}
+    };
+  }
+
+  /// A bound outside the int range never reaches the converter: Calcite rejects it while converting the pattern.
   @Test
-  public void testQuantifierBoundAtTheCapIsAccepted() {
-    int atTheCap = RelToPlanNodeConverter.MAX_PATTERN_QUANTIFIER_BOUND;
-    MatchNode match = planMatch(
-        "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno PATTERN (A{1," + atTheCap
-            + "}) DEFINE A AS A.col3 > 0)");
-    assertEquals(((RowPattern.Quantifier) match.getPattern()).getMaxRepeat(), atTheCap);
+  public void testQuantifierBoundOutsideTheIntRangeIsRejected() {
+    RuntimeException e = expectThrows(RuntimeException.class, () -> planMatch(
+        "SELECT * FROM a MATCH_RECOGNIZE (ORDER BY ts MEASURES MATCH_NUMBER() AS mno PATTERN (A{1,2147483648}) "
+            + "DEFINE A AS A.col3 > 0)"));
+    assertTrue(e.getMessage().contains("2147483648"), e.getMessage());
   }
 
   /// Covers [PlanNodeToRelConverter#visitMatch]: the anchors move back into `strictStart` / `strictEnd`, the pattern
