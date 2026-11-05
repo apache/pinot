@@ -33,6 +33,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.api.AccessControl;
@@ -89,6 +91,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.slf4j.MDC;
@@ -97,14 +100,18 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
@@ -868,6 +875,160 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(response.getExceptions().get(0).getErrorCode(),
         org.apache.pinot.spi.exception.QueryErrorCode.TOO_MANY_REQUESTS.getId(),
         "Expected TOO_MANY_REQUESTS error code");
+  }
+
+  @Test
+  public void testContainsInPartitionedSubquery() {
+    String subquery = "SELECT ID_SET(col1) FROM myTable WHERE col2 = 2";
+    // The server matches the function name with underscores removed and ignoring case per character, so every
+    // spelling counts, including one with the dotless i (U+0131) that only that case fold maps to the name
+    String[] spellings = {
+        "IN_PARTITIONED_SUBQUERY", "inpartitionedsubquery", "In_Partitioned_Sub_Query", "IN_PART\u0131TIONED_SUBQUERY"
+    };
+    for (String spelling : spellings) {
+      assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
+          CalciteSqlParser.compileToPinotQuery(
+              "SELECT COUNT(*) FROM myTable WHERE " + spelling + "(col1, '" + subquery + "') = 1")), spelling);
+    }
+    // Nested in other predicates and expressions, and outside the WHERE clause
+    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
+        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM myTable WHERE col2 = 1 AND NOT (col3 > 2 OR "
+            + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1)")));
+    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
+        CalciteSqlParser.compileToPinotQuery("SELECT CASE WHEN IN_PARTITIONED_SUBQUERY(col1, '" + subquery
+            + "') = 1 THEN 1 ELSE 0 END FROM myTable")));
+    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
+        CalciteSqlParser.compileToPinotQuery("SELECT col1, COUNT(*) FROM myTable GROUP BY col1 HAVING "
+            + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1")));
+    // Other functions, including the subquery the broker resolves itself, do not count
+    assertFalse(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
+        CalciteSqlParser.compileToPinotQuery(
+            "SELECT COUNT(*) FROM myTable WHERE IN_SUBQUERY(col1, '" + subquery + "') = 1")));
+    assertFalse(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
+        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col1, 'AQ==') = 1")));
+    assertFalse(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
+        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM myTable WHERE col1 = 1")));
+  }
+
+  /// The server resolves IN_PARTITIONED_SUBQUERY by running the quoted subquery on the segments of the table, outside
+  /// the WHERE clause the row filters are added to, so a principal with row filters must not get to use it unless the
+  /// operator turned the rejection off because every server applies the row filters to the subquery.
+  @Test
+  public void testInPartitionedSubqueryRejectedWhenRowFiltersApply()
+      throws Exception {
+    String tableName = "myTable_OFFLINE";
+    TableCache tableCache = mock(TableCache.class);
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCache.getActualTableName(anyString())).thenReturn(tableName);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("col1", "col1"));
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("tier_BROKER", "tier_SERVER", null));
+    when(tableCache.getTableConfig(tableName)).thenReturn(tableCfg);
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(tableName)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("Server_localhost_9000")),
+            new SegmentsToQuery(List.of("segment01"), List.of())));
+    when(routingManager.getRoutingTable(any(), anyLong())).thenReturn(rt);
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    AtomicReference<List<String>> rowFilters = new AtomicReference<>(List.of("tenant = 'allowed'"));
+    AccessControl accessControl = new AccessControl() {
+      @Override
+      public AuthorizationResult authorize(RequesterIdentity identity, BrokerRequest request) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableAuthorizationResult authorize(RequesterIdentity identity, Set<String> tables) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableRowColAccessResult getRowColFilters(RequesterIdentity identity, String table) {
+        return new TableRowColAccessResultImpl(rowFilters.get());
+      }
+    };
+    AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
+    when(accessControlFactory.create()).thenReturn(accessControl);
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config =
+        new PinotConfiguration(Map.of(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH, "true"));
+    BrokerQueryEventListenerFactory.init(config);
+    AtomicReference<BrokerRequest> serverRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        newServerRequestCapturingHandler(config, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+            serverRequest);
+
+    String query = "SELECT COUNT(*) FROM myTable WHERE IN_PARTITIONED_SUBQUERY(col1, "
+        + "'SELECT ID_SET(col1) FROM myTable WHERE tenant = 2') = 1";
+    // Rejected before anything reaches a server
+    WebApplicationException e = expectThrows(WebApplicationException.class, () -> handler.handleRequest(query));
+    assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
+    assertTrue(e.getMessage().contains("IN_PARTITIONED_SUBQUERY"), e.getMessage());
+    assertNull(serverRequest.get());
+
+    // Allowed, and left for the server to resolve, when no row filter applies to the principal
+    rowFilters.set(List.of());
+    BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(query);
+    assertFalse(response.getRLSFiltersApplied());
+    assertNotNull(serverRequest.get());
+    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(serverRequest.get().getPinotQuery()));
+
+    // With the rejection turned off, the query goes to the servers with the row filters on the outer query and the
+    // function left for the servers to resolve under those filters
+    rowFilters.set(List.of("tenant = 'allowed'"));
+    serverRequest.set(null);
+    PinotConfiguration lenientConfig = new PinotConfiguration(
+        Map.of(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH, "true",
+            Broker.CONFIG_OF_BROKER_RLS_REJECT_IN_PARTITIONED_SUBQUERY, "false"));
+    BaseSingleStageBrokerRequestHandler lenientHandler =
+        newServerRequestCapturingHandler(lenientConfig, routingManager, accessControlFactory, queryQuotaManager,
+            tableCache, serverRequest);
+    response = (BrokerResponseNative) lenientHandler.handleRequest(query);
+    assertTrue(response.getRLSFiltersApplied());
+    assertNotNull(serverRequest.get());
+    PinotQuery serverQuery = serverRequest.get().getPinotQuery();
+    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(serverQuery));
+    assertTrue(serverQuery.getFilterExpression().toString().contains("allowed"), serverQuery.toString());
+    assertNotNull(serverQuery.getQueryOptions().get(RlsUtils.buildRlsFilterKey("myTable")), serverQuery.toString());
+  }
+
+  /// A handler that records the request it would send to the servers instead of sending it.
+  private static BaseSingleStageBrokerRequestHandler newServerRequestCapturingHandler(PinotConfiguration config,
+      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, AtomicReference<BrokerRequest> serverRequest) {
+    return new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
+        routingManager, accessControlFactory, queryQuotaManager, tableCache, ThreadAccountantUtils.getNoOpAccountant(),
+        null, null) {
+      @Override
+      public void start() {
+      }
+
+      @Override
+      public void shutDown() {
+      }
+
+      @Override
+      protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+          BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+          RequestContext requestContext) {
+        serverRequest.set(serverBrokerRequest);
+        return BrokerResponseNative.empty();
+      }
+
+      @Override
+      protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+          long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+          TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
+          RequestContext requestContext) {
+        throw new UnsupportedOperationException("Not implemented in test");
+      }
+    };
   }
 
   /// Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so

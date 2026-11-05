@@ -38,6 +38,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -90,6 +91,10 @@ import org.apache.pinot.spi.trace.Tracer;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,8 +104,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public static final String ENABLE_PREFETCH = "enable.prefetch";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
-  // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
-  private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
+  // Stateless, so one instance serves every query. Used directly rather than through the configured rewriter list
+  // so that a server configured without it still filters the subquery.
+  private static final RlsFiltersRewriter ROW_FILTERS_REWRITER = new RlsFiltersRewriter();
 
   private InstanceDataManager _instanceDataManager;
   private ServerMetrics _serverMetrics;
@@ -511,7 +517,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       throws Exception {
     FilterContext filter = queryContext.getFilter();
     if (filter != null && !filter.isConstant()) {
-      handleSubquery(filter, tableExecutionInfo, timerContext, executorService, queryContext.getEndTimeMs());
+      handleSubquery(filter, tableExecutionInfo, timerContext, executorService, queryContext);
     }
   }
 
@@ -519,15 +525,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   ///
   /// Currently only supports subquery within the lhs of the predicate.
   private void handleSubquery(FilterContext filter, TableExecutionInfo executionInfo, TimerContext timerContext,
-      ExecutorService executorService, long endTimeMs)
+      ExecutorService executorService, QueryContext queryContext)
       throws Exception {
     List<FilterContext> children = filter.getChildren();
     if (children != null) {
       for (FilterContext child : children) {
-        handleSubquery(child, executionInfo, timerContext, executorService, endTimeMs);
+        handleSubquery(child, executionInfo, timerContext, executorService, queryContext);
       }
     } else {
-      handleSubquery(filter.getPredicate().getLhs(), executionInfo, timerContext, executorService, endTimeMs);
+      handleSubquery(filter.getPredicate().getLhs(), executionInfo, timerContext, executorService, queryContext);
     }
   }
 
@@ -537,23 +543,26 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   /// rewrites the expression with the subquery response.
   ///
   /// Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
-  /// rewritten to an IN_ID_SET transform function.
+  /// rewritten to an IN_ID_SET transform function. The subquery inherits the row-level security filter of the queried
+  /// table, see [#applyRowFilters(PinotQuery, QueryContext)].
   private void handleSubquery(ExpressionContext expression, TableExecutionInfo executionInfo, TimerContext timerContext,
-      ExecutorService executorService, long endTimeMs)
+      ExecutorService executorService, QueryContext queryContext)
       throws Exception {
     FunctionContext function = expression.getFunction();
     if (function == null) {
       return;
     }
     List<ExpressionContext> arguments = function.getArguments();
-    if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
+    if (RequestUtils.isInPartitionedSubquery(function.getFunctionName())) {
       Preconditions.checkArgument(arguments.size() == 2,
           "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
       Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
-      QueryContext subquery =
-          QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteral().getStringValue());
+      PinotQuery subqueryPinotQuery =
+          CalciteSqlParser.compileToPinotQuery(subqueryExpression.getLiteral().getStringValue());
+      applyRowFilters(subqueryPinotQuery, queryContext);
+      QueryContext subquery = QueryContextConverterUtils.getQueryContext(subqueryPinotQuery);
       // Subquery should be an ID_SET aggregation only query
       //noinspection rawtypes
       AggregationFunction[] aggregationFunctions = subquery.getAggregationFunctions();
@@ -563,7 +572,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           "Subquery in IN_PARTITIONED_SUBQUERY should be an ID_SET aggregation only query, found: %s",
           subqueryExpression.toString());
       // Execute the subquery
-      subquery.setEndTimeMs(endTimeMs);
+      subquery.setEndTimeMs(queryContext.getEndTimeMs());
       // Make a clone of indexSegments because the method might modify the list
       InstanceResponseBlock instanceResponse =
           executeInternal(executionInfo, subquery, timerContext, executorService, null, false, null);
@@ -579,9 +588,46 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       arguments.set(1, ExpressionContext.forLiteral(RequestUtils.getLiteral(((IdSet) result).toBase64String())));
     } else {
       for (ExpressionContext argument : arguments) {
-        handleSubquery(argument, executionInfo, timerContext, executorService, endTimeMs);
+        handleSubquery(argument, executionInfo, timerContext, executorService, queryContext);
       }
     }
+  }
+
+  /// Adds the row-level security filter of the queried table to the subquery of an `IN_PARTITIONED_SUBQUERY`.
+  ///
+  /// The broker adds the row filters of the principal to the WHERE clause of the query it sends and stamps them in
+  /// the query options under the key of the table it authorized (see [RlsUtils#buildRlsFilterKey(String)]), but the
+  /// subquery reaches the server as an opaque string literal that carries neither, so without this it would build
+  /// its ID_SET from rows the principal is not allowed to see. The subquery runs on the segments selected for the
+  /// outer query whatever table its FROM clause names, so the filter of the outer table is the one that applies: the
+  /// data source is renamed to that table so that the rewriter finds the filter even when the FROM clause names
+  /// another table. The filter is added to the options the subquery was written with, overriding any row filter
+  /// smuggled into them, so that a subquery nested in it is filtered the same way. A query that carries row filters
+  /// but none for the queried table, which an older broker produces when a materialized view rewrite swaps the table
+  /// after the filters were stamped, fails rather than run the subquery unfiltered.
+  private static void applyRowFilters(PinotQuery subquery, QueryContext queryContext) {
+    Map<String, String> queryOptions = queryContext.getQueryOptions();
+    if (queryOptions.isEmpty()) {
+      return;
+    }
+    Map<String, String> rowFilters = RlsUtils.extractRlsFilters(queryOptions);
+    if (rowFilters.isEmpty()) {
+      return;
+    }
+    String tableName = queryContext.getTableName();
+    Preconditions.checkState(tableName != null, "Row-level security filters %s are set, but the query has no table",
+        rowFilters.keySet());
+    String rowFilterKey = RlsUtils.buildRlsFilterKey(TableNameBuilder.extractRawTableName(tableName));
+    String rowFilter = rowFilters.get(rowFilterKey);
+    Preconditions.checkState(!StringUtils.isEmpty(rowFilter),
+        "Row-level security filters %s are set, but none for the queried table %s, cannot apply them to the subquery",
+        rowFilters.keySet(), tableName);
+    subquery.getDataSource().setTableName(tableName);
+    Map<String, String> subqueryOptions =
+        subquery.getQueryOptions() != null ? new HashMap<>(subquery.getQueryOptions()) : new HashMap<>();
+    subqueryOptions.put(rowFilterKey, rowFilter);
+    subquery.setQueryOptions(subqueryOptions);
+    ROW_FILTERS_REWRITER.rewrite(subquery);
   }
 
   /// Initializes scan-based query killing for this query. Sets up a [QueryScanCostContext]

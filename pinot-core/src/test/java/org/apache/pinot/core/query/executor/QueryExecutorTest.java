@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -78,6 +79,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
@@ -229,6 +231,55 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
+  }
+
+  /// The broker adds the row filters of the principal to the WHERE clause and stamps them in the query options; the
+  /// server has to add them to the subquery of IN_PARTITIONED_SUBQUERY too, which reaches it as a string literal.
+  @Test
+  public void testInPartitionedSubqueryAppliesRowFilters() {
+    // A row filter that keeps some rows and drops others
+    long minOrderItemCount =
+        ((Number) aggregate("SELECT MIN(orderItemCount) FROM " + OFFLINE_TABLE_NAME, null)).longValue();
+    String rowFilters = "orderItemCount > " + minOrderItemCount;
+    long numAllowedRows = (Long) aggregate("SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE " + rowFilters, null);
+    assertTrue(numAllowedRows > 0 && numAllowedRows < 60000, "Row filter should keep some rows and drop others");
+
+    // The subquery selects the rows the filter drops, so its ID_SET is empty iff the filter applies to it too
+    String subqueryTemplate = "SELECT ID_SET(orderItemCount - orderItemCount) FROM %s WHERE NOT (" + rowFilters + ")";
+    String queryTemplate = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE " + rowFilters
+        + " AND IN_PARTITIONED_SUBQUERY(orderItemCount - orderItemCount, '%s') = 1";
+    String query = String.format(queryTemplate, String.format(subqueryTemplate, OFFLINE_TABLE_NAME));
+    Map<String, String> queryOptions = Map.of(RlsUtils.buildRlsFilterKey(RAW_TABLE_NAME), rowFilters);
+    assertEquals(aggregate(query, queryOptions), 0L);
+
+    // The subquery runs on the segments of the queried table whatever table its FROM clause names, so naming another
+    // table does not dodge the filter
+    String queryNamingOtherTable = String.format(queryTemplate, String.format(subqueryTemplate, "otherTable"));
+    assertEquals(aggregate(queryNamingOtherTable, queryOptions), 0L);
+
+    // Without row filters the subquery sees every row
+    assertEquals(aggregate(query, null), numAllowedRows);
+
+    // A subquery nested in the subquery is filtered the same way: with the filter the innermost ID_SET is empty, so
+    // the middle one is too; without it both hold the single value 0 and every allowed row matches
+    String nestedSubquery = "SELECT ID_SET(orderItemCount - orderItemCount) FROM " + OFFLINE_TABLE_NAME
+        + " WHERE IN_PARTITIONED_SUBQUERY(orderItemCount - orderItemCount, ''"
+        + String.format(subqueryTemplate, OFFLINE_TABLE_NAME) + "'') = 1";
+    String nestedQuery = String.format(queryTemplate, nestedSubquery);
+    assertEquals(aggregate(nestedQuery, queryOptions), 0L);
+    assertEquals(aggregate(nestedQuery, null), numAllowedRows);
+  }
+
+  private Object aggregate(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    if (queryOptions != null) {
+      instanceRequest.getQuery().getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
+    }
+    instanceRequest.setSearchSegments(_segmentNames);
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
+    assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
+    assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
+    return ((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0);
   }
 
   @Test

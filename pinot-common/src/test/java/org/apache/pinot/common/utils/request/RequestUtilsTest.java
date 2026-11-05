@@ -49,6 +49,23 @@ import static org.testng.Assert.assertTrue;
 public class RequestUtilsTest {
 
   @Test
+  public void testIsInPartitionedSubquery() {
+    // Matched as the server resolves the function: underscores removed, case folded per character, so a look-alike
+    // spelling with the dotless i (U+0131) counts too
+    String[] matching = {
+        "IN_PARTITIONED_SUBQUERY", "inPartitionedSubquery", "inpartitionedsubquery", "In_Partitioned_Sub_Query",
+        "IN_PART\u0131TIONED_SUBQUERY", RequestUtils.canonicalizeFunctionName("IN_PARTITIONED_SUBQUERY")
+    };
+    for (String name : matching) {
+      assertTrue(RequestUtils.isInPartitionedSubquery(name), name);
+    }
+    String[] others = {"IN_SUBQUERY", "inIdSet", "IN_PARTITIONED_SUBQUERY2", "lookup", ""};
+    for (String name : others) {
+      assertFalse(RequestUtils.isInPartitionedSubquery(name), name);
+    }
+  }
+
+  @Test
   public void testNullLiteralParsing() {
     SqlLiteral nullLiteral = SqlLiteral.createNull(SqlParserPos.ZERO);
     Expression nullExpr = RequestUtils.getLiteralExpression(nullLiteral);

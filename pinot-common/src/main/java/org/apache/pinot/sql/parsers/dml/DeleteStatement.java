@@ -144,7 +144,8 @@ public class DeleteStatement implements DataManipulationStatement {
   /// Nothing derives this set from the function registries, so a function that reads another table must be added
   /// here when it is defined: `lookUp` is `TransformFunctionType#LOOKUP` (with `LookupTransformFunction` in
   /// pinot-core), `inSubquery` is rewritten by `BaseSingleStageBrokerRequestHandler#IN_SUBQUERY` in pinot-broker, and
-  /// `inPartitionedSubquery` by `ServerQueryExecutorV1Impl#IN_PARTITIONED_SUBQUERY` in pinot-core.
+  /// `inPartitionedSubquery`, matched with [RequestUtils#isInPartitionedSubquery(String)], by
+  /// `ServerQueryExecutorV1Impl` in pinot-core.
   private static final Set<String> CROSS_TABLE_FUNCTIONS = Set.of("LOOKUP", "INSUBQUERY", "INPARTITIONEDSUBQUERY");
 
   /// Canonical names of the functions that run a script. Rejected because the broker's groovy policy

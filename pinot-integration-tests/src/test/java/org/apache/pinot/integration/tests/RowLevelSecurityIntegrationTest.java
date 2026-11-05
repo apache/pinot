@@ -41,8 +41,10 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER_USER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest {
@@ -276,6 +278,33 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
 
     assertTrue(compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER),
         queryBroker(multiStageQuery, AUTH_HEADER_USER_2)));
+  }
+
+  /// The server resolves IN_PARTITIONED_SUBQUERY by running the quoted subquery on the segments of the table, where
+  /// the row filters the broker adds to the WHERE clause do not reach it, so the broker rejects the function for a
+  /// principal with row filters. Without that, the subquery below would see the rows of every other airline and the
+  /// count would be the user's full count instead of 0.
+  @Test
+  public void testInPartitionedSubqueryRejectedForPrincipalWithRowFilters()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT COUNT(*) FROM mytable WHERE IN_PARTITIONED_SUBQUERY(AirlineID - AirlineID, "
+        + "'SELECT ID_SET(AirlineID - AirlineID) FROM mytable WHERE AirlineID <> 19805') = 1";
+
+    // A principal without row filters keeps the function
+    JsonNode adminResponse = queryBroker(query, AUTH_HEADER);
+    assertFalse(adminResponse.get("rlsFiltersApplied").asBoolean());
+    assertEquals(adminResponse.get("resultTable").get("rows").get(0).get(0).asLong(),
+        queryBroker("SELECT COUNT(*) FROM mytable", AUTH_HEADER).get("resultTable").get("rows").get(0).get(0)
+            .asLong());
+
+    // A principal with row filters is rejected
+    try {
+      JsonNode response = queryBroker(query, AUTH_HEADER_USER);
+      fail("Expected the query to be rejected, got: " + response);
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("IN_PARTITIONED_SUBQUERY"), e.getMessage());
+    }
   }
 
   private JsonNode queryBroker(String query, Map<String, String> headers)

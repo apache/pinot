@@ -429,6 +429,13 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH =
         "pinot.broker.enable.row.column.level.auth";
     public static final boolean DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH = false;
+    // Whether the broker rejects IN_PARTITIONED_SUBQUERY for a principal with row filters. The server resolves the
+    // function by running the quoted subquery on the table's segments; servers from the release that introduced this
+    // config apply the row filters to that subquery themselves, older servers run it unfiltered. Turn this off only
+    // once every server runs such a release.
+    public static final String CONFIG_OF_BROKER_RLS_REJECT_IN_PARTITIONED_SUBQUERY =
+        "pinot.broker.rls.reject.in.partitioned.subquery";
+    public static final boolean DEFAULT_BROKER_RLS_REJECT_IN_PARTITIONED_SUBQUERY = true;
     public static final String CONFIG_OF_EXTRA_PASSIVE_TIMEOUT_MS = "pinot.broker.extraPassiveTimeoutMs";
     public static final long DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS = 100L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
