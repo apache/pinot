@@ -142,7 +142,11 @@ public final class Obfuscator {
             && TableConfigRedactionUtils.isUnresolvedPlaceholder(fieldValue.textValue());
         boolean sensitive = _patterns.stream().anyMatch(pattern -> pattern.matcher(field).matches())
             || (_useDefaultCredentialPolicy && TableConfigRedactionUtils.isSensitivePropertyName(field));
-        if (sensitive && !preservePlaceholder) {
+        if (sensitive && preservePlaceholder) {
+          // Keep the variable reference visible, but never its default: that is the effective credential whenever
+          // the variable is unset.
+          ((ObjectNode) node).put(field, TableConfigRedactionUtils.maskPlaceholderDefault(fieldValue.textValue()));
+        } else if (sensitive) {
           ((ObjectNode) node).put(field, _maskedValue);
         } else {
           ((ObjectNode) node).set(field, toJsonRecursive(fieldValue));

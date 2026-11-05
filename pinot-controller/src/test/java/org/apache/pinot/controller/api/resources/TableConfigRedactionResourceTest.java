@@ -24,8 +24,10 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableConfigVersionMismatchException;
@@ -93,7 +95,7 @@ public class TableConfigRedactionResourceTest {
     resource._pinotHelixResourceManager = resourceManager;
 
     JsonNode response = JsonUtils.stringToJsonNode(resource.listTableConfigs(
-        RAW_TABLE_NAME, TableType.OFFLINE.name(), headersWithoutDatabase()));
+        RAW_TABLE_NAME, TableType.OFFLINE.name(), tableEnvelopeHeaders()));
     JsonNode customConfigs = response.path(RedactedTableConfigResponse.CONFIGS_KEY).path(TableType.OFFLINE.name())
         .path(TableConfig.CUSTOM_CONFIG_KEY).path("customConfigs");
 
@@ -117,7 +119,7 @@ public class TableConfigRedactionResourceTest {
     TableConfigsRestletResource resource = new TableConfigsRestletResource();
     resource._pinotHelixResourceManager = resourceManager;
 
-    JsonNode response = JsonUtils.stringToJsonNode(resource.getConfig(RAW_TABLE_NAME, headersWithoutDatabase()));
+    JsonNode response = JsonUtils.stringToJsonNode(resource.getConfig(RAW_TABLE_NAME, tableConfigsEnvelopeHeaders()));
     JsonNode customConfigs = response.path(RedactedTableConfigsResponse.CONFIGS_KEY).path("offline")
         .path(TableConfig.CUSTOM_CONFIG_KEY).path("customConfigs");
 
@@ -143,8 +145,8 @@ public class TableConfigRedactionResourceTest {
     combinedResource._pinotHelixResourceManager = resourceManager;
 
     String tableResponse = tableResource.listTableConfigs(
-        RAW_TABLE_NAME, TableType.OFFLINE.name(), headersWithoutDatabase());
-    String combinedResponse = combinedResource.getConfig(RAW_TABLE_NAME, headersWithoutDatabase());
+        RAW_TABLE_NAME, TableType.OFFLINE.name(), tableEnvelopeHeaders());
+    String combinedResponse = combinedResource.getConfig(RAW_TABLE_NAME, tableConfigsEnvelopeHeaders());
 
     expectThrows(MismatchedInputException.class,
         () -> JsonUtils.stringToObject(tableResponse, TableConfig.class));
@@ -156,10 +158,72 @@ public class TableConfigRedactionResourceTest {
     assertEquals(unwrapped.path(TableType.OFFLINE.name()),
         responseNode.path(RedactedTableConfigResponse.CONFIGS_KEY).path(TableType.OFFLINE.name()));
 
+    // Source controllers that predate the envelope return the table configs keyed by table type; anything else is
+    // not a table config representation.
     ObjectNode legacyResponse = JsonUtils.newObjectNode();
     legacyResponse.set(TableType.OFFLINE.name(), TableConfigRedactionUtils.redact(stored).toJsonNode());
-    expectThrows(IOException.class,
-        () -> PinotTableRestletResource.unwrapTableConfigResponse(legacyResponse));
+    assertEquals(PinotTableRestletResource.unwrapTableConfigResponse(legacyResponse), legacyResponse);
+    expectThrows(IOException.class, () -> PinotTableRestletResource.unwrapTableConfigResponse(
+        TableConfigRedactionUtils.redact(stored).toJsonNode()));
+  }
+
+  @Test
+  public void testGetTableConfigDefaultsToLegacyRedactedShape()
+      throws Exception {
+    TableConfig stored = tableConfigWithCredentials();
+    PinotHelixResourceManager resourceManager = mockResourceManager(stored);
+    PinotTableRestletResource resource = new PinotTableRestletResource();
+    resource._pinotHelixResourceManager = resourceManager;
+
+    // No Accept header, application/json, a wildcard, or application/json preferred over the envelope all select the
+    // legacy map keyed by table type, which existing clients parse.
+    List<HttpHeaders> legacyHeaders = List.of(headersWithoutDatabase(),
+        headersAccepting(MediaType.APPLICATION_JSON_TYPE), headersAccepting(MediaType.WILDCARD_TYPE),
+        headersAccepting(MediaType.APPLICATION_JSON_TYPE, RedactedTableConfigResponse.MEDIA_TYPE_VALUE));
+    for (HttpHeaders headers : legacyHeaders) {
+      JsonNode response = JsonUtils.stringToJsonNode(resource.listTableConfigs(RAW_TABLE_NAME, null, headers));
+      assertFalse(response.has(RedactedTableConfigResponse.RESPONSE_TYPE_KEY), response.toString());
+      assertFalse(response.has(RedactedTableConfigResponse.CONFIGS_KEY), response.toString());
+      JsonNode customConfigs = response.path(TableType.OFFLINE.name()).path(TableConfig.CUSTOM_CONFIG_KEY)
+          .path("customConfigs");
+      assertEquals(customConfigs.path(LITERAL_PASSWORD_KEY).asText(), TableConfigRedactionUtils.REDACTION_MARKER);
+      assertEquals(customConfigs.path(PLACEHOLDER_PASSWORD_KEY).asText(), PASSWORD_PLACEHOLDER);
+      assertEquals(customConfigs.path(CLIENT_ID_KEY).asText(), ORIGINAL_CLIENT_ID);
+      assertFalse(response.toString().contains(LITERAL_PASSWORD));
+      // The legacy shape is still a plain (redacted) table config per type.
+      assertEquals(JsonUtils.jsonNodeToObject(response.get(TableType.OFFLINE.name()), TableConfig.class)
+          .getTableName(), OFFLINE_TABLE_NAME);
+    }
+    verify(resourceManager, never()).getSchemaWithVersion(anyString());
+
+    // Preferring the envelope selects it even when application/json is also acceptable.
+    JsonNode envelope = JsonUtils.stringToJsonNode(resource.listTableConfigs(RAW_TABLE_NAME, null,
+        headersAccepting(RedactedTableConfigResponse.MEDIA_TYPE_VALUE, MediaType.APPLICATION_JSON_TYPE)));
+    assertEquals(envelope.path(RedactedTableConfigResponse.RESPONSE_TYPE_KEY).asText(),
+        RedactedTableConfigResponse.RESPONSE_TYPE);
+    assertTrue(envelope.path(RedactedTableConfigResponse.CONFIGS_KEY).has(TableType.OFFLINE.name()));
+  }
+
+  @Test
+  public void testGetCombinedTableConfigsDefaultsToLegacyRedactedShape()
+      throws Exception {
+    TableConfig stored = tableConfigWithCredentials();
+    PinotHelixResourceManager resourceManager = mockResourceManager(stored);
+    TableConfigsRestletResource resource = new TableConfigsRestletResource();
+    resource._pinotHelixResourceManager = resourceManager;
+
+    List<HttpHeaders> legacyHeaders = List.of(headersWithoutDatabase(),
+        headersAccepting(MediaType.APPLICATION_JSON_TYPE), headersAccepting(MediaType.WILDCARD_TYPE));
+    for (HttpHeaders headers : legacyHeaders) {
+      String response = resource.getConfig(RAW_TABLE_NAME, headers);
+      assertFalse(response.contains(RedactedTableConfigsResponse.RESPONSE_TYPE_KEY), response);
+      assertFalse(response.contains(LITERAL_PASSWORD), response);
+      TableConfigs tableConfigs = JsonUtils.stringToObject(response, TableConfigs.class);
+      Map<String, String> customConfigs = tableConfigs.getOffline().getCustomConfig().getCustomConfigs();
+      assertEquals(customConfigs.get(LITERAL_PASSWORD_KEY), TableConfigRedactionUtils.REDACTION_MARKER);
+      assertEquals(customConfigs.get(PLACEHOLDER_PASSWORD_KEY), PASSWORD_PLACEHOLDER);
+      assertEquals(customConfigs.get(CLIENT_ID_KEY), ORIGINAL_CLIENT_ID);
+    }
   }
 
   @Test
@@ -172,7 +236,7 @@ public class TableConfigRedactionResourceTest {
     resource._controllerConf = mock(ControllerConf.class);
     resource._pinotTaskManager = mock(PinotTaskManager.class);
     String getResponse = resource.listTableConfigs(
-        RAW_TABLE_NAME, TableType.OFFLINE.name(), headersWithoutDatabase());
+        RAW_TABLE_NAME, TableType.OFFLINE.name(), tableEnvelopeHeaders());
     String editedResponse = editTableConfigResponse(getResponse, TableType.OFFLINE);
 
     try (MockedStatic<TableConfigValidationUtils> ignored = Mockito.mockStatic(TableConfigValidationUtils.class)) {
@@ -196,7 +260,7 @@ public class TableConfigRedactionResourceTest {
     resource._pinotHelixResourceManager = resourceManager;
     resource._controllerConf = mock(ControllerConf.class);
     resource._pinotTaskManager = mock(PinotTaskManager.class);
-    String getResponse = resource.getConfig(RAW_TABLE_NAME, headersWithoutDatabase());
+    String getResponse = resource.getConfig(RAW_TABLE_NAME, tableConfigsEnvelopeHeaders());
     String editedResponse = editTableConfigsResponse(getResponse, TableType.OFFLINE);
 
     try (MockedStatic<SchemaUtils> ignoredSchema = Mockito.mockStatic(SchemaUtils.class);
@@ -225,7 +289,7 @@ public class TableConfigRedactionResourceTest {
     PinotTableRestletResource tableResource = new PinotTableRestletResource();
     tableResource._pinotHelixResourceManager = resourceManager;
     String tableResponse = tableResource.listTableConfigs(
-        RAW_TABLE_NAME, TableType.OFFLINE.name(), headersWithoutDatabase());
+        RAW_TABLE_NAME, TableType.OFFLINE.name(), tableEnvelopeHeaders());
     String extractedTableConfig = JsonUtils.stringToJsonNode(tableResponse)
         .path(RedactedTableConfigResponse.CONFIGS_KEY).path(TableType.OFFLINE.name()).toString();
 
@@ -236,7 +300,7 @@ public class TableConfigRedactionResourceTest {
 
     TableConfigsRestletResource combinedResource = new TableConfigsRestletResource();
     combinedResource._pinotHelixResourceManager = resourceManager;
-    String combinedResponse = combinedResource.getConfig(RAW_TABLE_NAME, headersWithoutDatabase());
+    String combinedResponse = combinedResource.getConfig(RAW_TABLE_NAME, tableConfigsEnvelopeHeaders());
     String extractedTableConfigs = JsonUtils.stringToJsonNode(combinedResponse)
         .path(RedactedTableConfigsResponse.CONFIGS_KEY).toString();
     ControllerApplicationException combinedError = expectThrows(ControllerApplicationException.class,
@@ -330,7 +394,7 @@ public class TableConfigRedactionResourceTest {
     PinotTableRestletResource resource = new PinotTableRestletResource();
     resource._pinotHelixResourceManager = resourceManager;
     ObjectNode response = (ObjectNode) JsonUtils.stringToJsonNode(resource.listTableConfigs(
-        RAW_TABLE_NAME, TableType.OFFLINE.name(), headersWithoutDatabase()));
+        RAW_TABLE_NAME, TableType.OFFLINE.name(), tableEnvelopeHeaders()));
 
     ObjectNode missing = response.deepCopy();
     missing.remove(RedactedTableConfigResponse.BASE_VERSIONS_KEY);
@@ -363,8 +427,8 @@ public class TableConfigRedactionResourceTest {
     combinedResource._pinotHelixResourceManager = resourceManager;
 
     String tableResponse = tableResource.listTableConfigs(
-        RAW_TABLE_NAME, TableType.REALTIME.name(), headersWithoutDatabase());
-    String combinedResponse = combinedResource.getConfig(RAW_TABLE_NAME, headersWithoutDatabase());
+        RAW_TABLE_NAME, TableType.REALTIME.name(), tableEnvelopeHeaders());
+    String combinedResponse = combinedResource.getConfig(RAW_TABLE_NAME, tableConfigsEnvelopeHeaders());
     assertFalse(tableResponse.contains(LITERAL_PASSWORD));
     assertFalse(combinedResponse.contains(LITERAL_PASSWORD));
     assertEquals(JsonUtils.stringToJsonNode(tableResponse).path(RedactedTableConfigResponse.CONFIGS_KEY)
@@ -481,7 +545,7 @@ public class TableConfigRedactionResourceTest {
     resource._controllerConf = mock(ControllerConf.class);
     resource._pinotTaskManager = mock(PinotTaskManager.class);
 
-    String response = resource.listTableConfigs(RAW_TABLE_NAME, null, headersWithoutDatabase());
+    String response = resource.listTableConfigs(RAW_TABLE_NAME, null, tableEnvelopeHeaders());
     String editedResponse = editTableConfigResponse(
         editTableConfigResponse(response, TableType.OFFLINE), TableType.REALTIME);
     try (MockedStatic<TableConfigValidationUtils> ignored = Mockito.mockStatic(TableConfigValidationUtils.class);
@@ -507,7 +571,7 @@ public class TableConfigRedactionResourceTest {
     TableConfigsRestletResource resource = new TableConfigsRestletResource();
     resource._pinotHelixResourceManager = resourceManager;
     ObjectNode response = (ObjectNode) JsonUtils.stringToJsonNode(
-        resource.getConfig(RAW_TABLE_NAME, headersWithoutDatabase()));
+        resource.getConfig(RAW_TABLE_NAME, tableConfigsEnvelopeHeaders()));
     ((ObjectNode) response.path(RedactedTableConfigsResponse.BASE_VERSIONS_KEY))
         .put(RedactedTableConfigsResponse.SCHEMA_VERSION_KEY, SCHEMA_VERSION - 1);
 
@@ -531,7 +595,7 @@ public class TableConfigRedactionResourceTest {
     resource._controllerConf = mock(ControllerConf.class);
     resource._pinotTaskManager = mock(PinotTaskManager.class);
     ObjectNode response = (ObjectNode) JsonUtils.stringToJsonNode(
-        resource.getConfig(RAW_TABLE_NAME, headersWithoutDatabase()));
+        resource.getConfig(RAW_TABLE_NAME, tableConfigsEnvelopeHeaders()));
     ((ObjectNode) response.path(RedactedTableConfigsResponse.CONFIGS_KEY)).set("realtime",
         tableConfigWithCredentials(TableType.REALTIME).toJsonNode());
 
@@ -806,6 +870,21 @@ public class TableConfigRedactionResourceTest {
 
   private static HttpHeaders headersWithoutDatabase() {
     return mock(HttpHeaders.class);
+  }
+
+  private static HttpHeaders tableEnvelopeHeaders() {
+    return headersAccepting(RedactedTableConfigResponse.MEDIA_TYPE_VALUE);
+  }
+
+  private static HttpHeaders tableConfigsEnvelopeHeaders() {
+    return headersAccepting(RedactedTableConfigsResponse.MEDIA_TYPE_VALUE);
+  }
+
+  /// Headers whose acceptable media types are listed in preference order, as Jersey presents them.
+  private static HttpHeaders headersAccepting(MediaType... mediaTypes) {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getAcceptableMediaTypes()).thenReturn(List.of(mediaTypes));
+    return headers;
   }
 
   private static void assertRestoredCredentialAndEdit(TableConfig updatedConfig) {

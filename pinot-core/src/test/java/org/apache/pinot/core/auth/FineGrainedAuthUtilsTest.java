@@ -36,7 +36,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -119,11 +118,13 @@ public class FineGrainedAuthUtilsTest {
   }
 
   @Test
-  public void testRawZnodeReadIsDeniedByDefault() {
+  public void testFineGrainedAccessIsAllowedByDefault() {
     FineGrainedAccessControl accessControl = new FineGrainedAccessControl() {
     };
 
-    assertFalse(accessControl.hasAccess(null, TargetType.CLUSTER, null, Actions.Cluster.GET_ZNODE));
+    // Clusters without authentication rely on the allow-all default, including for raw ZK reads. Principal-based
+    // implementations gate GetZnode explicitly instead.
+    assertTrue(accessControl.hasAccess(null, TargetType.CLUSTER, null, Actions.Cluster.GET_ZNODE));
     assertTrue(accessControl.hasAccess(null, TargetType.CLUSTER, null, Actions.Cluster.GET_CLUSTER_CONFIG));
   }
 

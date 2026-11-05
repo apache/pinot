@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.Response;
@@ -28,6 +29,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -110,6 +112,40 @@ public class PinotReadOnlyTableConfigResourceTest extends ControllerTest {
       assertTrue(response.contains(PASSWORD_PLACEHOLDER), response);
       assertTrue(response.contains("preserved-client"), response);
     }
+  }
+
+  @Test
+  public void testTableConfigRepresentationFollowsAcceptHeader()
+      throws Exception {
+    String tableUrl = controllerUrl("/tables/" + RAW_TABLE_NAME + "?type=OFFLINE");
+    String combinedUrl = controllerUrl("/tableConfigs/" + RAW_TABLE_NAME);
+
+    // Clients that never ask for the envelope keep receiving the legacy shapes, redacted.
+    JsonNode legacyTable = JsonUtils.stringToJsonNode(sendGetRequest(tableUrl, ADMIN_HEADERS));
+    assertTrue(legacyTable.has(TableType.OFFLINE.name()), legacyTable.toString());
+    assertFalse(legacyTable.has(RedactedTableConfigResponse.RESPONSE_TYPE_KEY), legacyTable.toString());
+    assertFalse(legacyTable.toString().contains(LITERAL_PASSWORD), legacyTable.toString());
+    JsonNode legacyCombined = JsonUtils.stringToJsonNode(sendGetRequest(combinedUrl, ADMIN_HEADERS));
+    assertTrue(legacyCombined.has("offline"), legacyCombined.toString());
+    assertFalse(legacyCombined.has(RedactedTableConfigsResponse.RESPONSE_TYPE_KEY), legacyCombined.toString());
+    assertFalse(legacyCombined.toString().contains(LITERAL_PASSWORD), legacyCombined.toString());
+
+    // Requesting the envelope media type returns the versioned response.
+    Map<String, String> tableEnvelopeHeaders = new HashMap<>(ADMIN_HEADERS);
+    tableEnvelopeHeaders.put("Accept", RedactedTableConfigResponse.MEDIA_TYPE);
+    JsonNode tableEnvelope = JsonUtils.stringToJsonNode(sendGetRequest(tableUrl, tableEnvelopeHeaders));
+    assertEquals(tableEnvelope.path(RedactedTableConfigResponse.RESPONSE_TYPE_KEY).asText(),
+        RedactedTableConfigResponse.RESPONSE_TYPE);
+    assertTrue(tableEnvelope.path(RedactedTableConfigResponse.CONFIGS_KEY).has(TableType.OFFLINE.name()),
+        tableEnvelope.toString());
+
+    Map<String, String> combinedEnvelopeHeaders = new HashMap<>(ADMIN_HEADERS);
+    combinedEnvelopeHeaders.put("Accept", RedactedTableConfigsResponse.MEDIA_TYPE);
+    JsonNode combinedEnvelope = JsonUtils.stringToJsonNode(sendGetRequest(combinedUrl, combinedEnvelopeHeaders));
+    assertEquals(combinedEnvelope.path(RedactedTableConfigsResponse.RESPONSE_TYPE_KEY).asText(),
+        RedactedTableConfigsResponse.RESPONSE_TYPE);
+    assertTrue(combinedEnvelope.path(RedactedTableConfigsResponse.CONFIGS_KEY).has("offline"),
+        combinedEnvelope.toString());
   }
 
   @Test

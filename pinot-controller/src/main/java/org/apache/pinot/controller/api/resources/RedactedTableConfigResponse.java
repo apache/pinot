@@ -27,8 +27,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -53,6 +56,7 @@ public final class RedactedTableConfigResponse {
   public static final String RESPONSE_TYPE = "redactedTableConfig";
   public static final int RESPONSE_VERSION = 1;
   public static final String MEDIA_TYPE = "application/vnd.apache.pinot.redacted-table-config-v1+json";
+  public static final MediaType MEDIA_TYPE_VALUE = MediaType.valueOf(MEDIA_TYPE);
 
   private final TableIdentity _tableName;
   private final Map<String, Integer> _baseVersions;
@@ -129,6 +133,32 @@ public final class RedactedTableConfigResponse {
 
   public static boolean isEnvelope(JsonNode node) {
     return node.isObject() && node.has(RESPONSE_TYPE_KEY);
+  }
+
+  /// Returns whether the request negotiates this envelope instead of the legacy `application/json` map keyed by
+  /// table type. Existing clients that never ask for the envelope keep receiving the legacy shape (redacted).
+  public static boolean isRequested(@Nullable HttpHeaders headers) {
+    return isEnvelopeRequested(headers, MEDIA_TYPE_VALUE);
+  }
+
+  /// Mirrors the JAX-RS selection between `application/json` and an envelope media type that are both produced by an
+  /// endpoint: the most preferred acceptable media type that matches either one decides, and a wildcard resolves to
+  /// `application/json` because it is declared first. Headers without acceptable media types select the legacy shape.
+  static boolean isEnvelopeRequested(@Nullable HttpHeaders headers, MediaType envelopeMediaType) {
+    List<MediaType> acceptableMediaTypes = headers != null ? headers.getAcceptableMediaTypes() : null;
+    if (acceptableMediaTypes == null) {
+      return false;
+    }
+    for (MediaType candidate : acceptableMediaTypes) {
+      if (candidate.isWildcardType() || candidate.isWildcardSubtype()
+          || candidate.isCompatible(MediaType.APPLICATION_JSON_TYPE)) {
+        return false;
+      }
+      if (candidate.isCompatible(envelopeMediaType)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static TableIdentity tableIdentity(Map<String, TableConfig> configs) {
