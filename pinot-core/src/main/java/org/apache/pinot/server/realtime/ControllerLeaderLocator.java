@@ -19,8 +19,10 @@
 package org.apache.pinot.server.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -50,16 +52,23 @@ public class ControllerLeaderLocator {
   // with partition number being the key and controller hostname and port pair being the value.  If the lead
   // controller resource is disabled in the configuration then this map contains helix cluster leader co-ordinates
   // for all partitions of leadControllerResource.
+  // ConcurrentHashMap because refreshControllerLeaderMap() can write to it while other threads are reading via
+  // getControllerLeader() without going through _refreshLock (see below).
   private final Map<Integer, Pair<String, Integer>> _cachedControllerLeaderMap;
 
   // Indicates whether cached controller leader(s) value is(are) valid.
   private volatile boolean _cachedControllerLeaderValid = false;
   // Time in millis when cache invalidate was last set
-  private volatile long _lastCacheInvalidationTimeMs = 0L;
+  private final AtomicLong _lastCacheInvalidationTimeMs = new AtomicLong(0L);
+
+  // Guards refreshControllerLeaderMap(), which can call out to a slow or unresponsive ZK/Helix. tryLock() is used
+  // instead of lock() so that only the single thread performing a refresh ever pays that latency; concurrent callers
+  // fall through and reuse the (possibly stale, possibly invalid) cached value instead of queueing behind ZK.
+  private final ReentrantLock _refreshLock = new ReentrantLock();
 
   ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
-    _cachedControllerLeaderMap = new HashMap<>();
+    _cachedControllerLeaderMap = new ConcurrentHashMap<>();
   }
 
   /// To be called once when the server starts
@@ -86,14 +95,22 @@ public class ControllerLeaderLocator {
   /// [ControllerLeaderLocator::_cachedControllerLeaderMap] from helix if cached value is invalid
   /// @param rawTableName table name without type.
   /// @return The host-port pair of the current controller leader.
-  public synchronized Pair<String, Integer> getControllerLeader(String rawTableName) {
+  public Pair<String, Integer> getControllerLeader(String rawTableName) {
     int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
     if (_cachedControllerLeaderValid) {
       return _cachedControllerLeaderMap.get(partitionId);
     }
 
-    // No controller leader cached, fetches a fresh copy of external view and then gets the leader for the given table.
-    refreshControllerLeaderMap();
+    // No controller leader cached, fetches a fresh copy of external view and then gets the leader for the given
+    // table. If another thread is already refreshing (e.g. ZK/Helix is slow to respond), don't block on it here;
+    // fall through and return whatever is currently cached. Retry will be done on the next request.
+    if (_refreshLock.tryLock()) {
+      try {
+        refreshControllerLeaderMap();
+      } finally {
+        _refreshLock.unlock();
+      }
+    }
     return _cachedControllerLeaderValid ? _cachedControllerLeaderMap.get(partitionId) : null;
   }
 
@@ -241,16 +258,20 @@ public class ControllerLeaderLocator {
   /// being leader.
   /// Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be
   /// getting too many NOT_SENT responses due to some other errors.
-  public synchronized void invalidateCachedControllerLeader() {
+  public void invalidateCachedControllerLeader() {
     long now = getCurrentTimeMs();
-    long millisSinceLastInvalidate = now - _lastCacheInvalidationTimeMs;
+    // Atomically reads the previous invalidation time and, in the same step, bumps it to now unless the minimum
+    // interval hasn't elapsed yet. The returned previous value is what was actually used to make that decision, so
+    // it can be trusted below even if other threads raced to update it concurrently.
+    long previousInvalidationTimeMs = _lastCacheInvalidationTimeMs.getAndUpdate(
+        prev -> now - prev < MIN_INVALIDATE_INTERVAL_MS ? prev : now);
+    long millisSinceLastInvalidate = now - previousInvalidationTimeMs;
     if (millisSinceLastInvalidate < MIN_INVALIDATE_INTERVAL_MS) {
       LOGGER.info("Millis since last controller cache value invalidate {} is less than allowed frequency {}. Skipping "
           + "invalidate.", millisSinceLastInvalidate, MIN_INVALIDATE_INTERVAL_MS);
     } else {
       LOGGER.info("Invalidating cached controller leader value");
       _cachedControllerLeaderValid = false;
-      _lastCacheInvalidationTimeMs = now;
     }
   }
 
@@ -266,7 +287,7 @@ public class ControllerLeaderLocator {
 
   @VisibleForTesting
   protected long getLastCacheInvalidationTimeMs() {
-    return _lastCacheInvalidationTimeMs;
+    return _lastCacheInvalidationTimeMs.get();
   }
 
   @VisibleForTesting
