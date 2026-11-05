@@ -41,6 +41,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.INPUT_SCHEMA;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.VALUE_INDEX;
+import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.alternate;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.anySymbol;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.concat;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.labelSymbols;
@@ -48,6 +49,7 @@ import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.qu
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.rows;
 import static org.apache.pinot.query.runtime.operator.match.MatchTestFixtures.symbol;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -673,6 +675,68 @@ public class MatchOperatorTest {
     assertEquals(output.size(), 2);
     assertEquals(output.get(0), new Object[]{"Z", 0, 1L});
     assertEquals(output.get(1), new Object[]{"A", 1, 1L});
+  }
+
+  /// An outer LIMIT that is already satisfied early terminates the operator, which must then stop matching rather
+  /// than run the remaining attempts over the rows it still buffers. Here those attempts are a long B-only suffix that
+  /// `B+ C` cannot match, so every one of them would exhaust the step budget and turn a satisfied query into an error.
+  @Test
+  public void testEarlyTerminationStopsMatchingAndDrainsTheInput() {
+    OpChainExecutionContext context = earlyTerminationContext();
+    MatchOperator operator =
+        new MatchOperator(context, earlyTerminationInput(context).buildWithEos(), INPUT_SCHEMA, earlyTerminationNode());
+    MseBlock first = operator.nextBlock();
+    assertEquals(((MseBlock.Data) first).getNumRows(), MatchOperator.MAX_OUTPUT_ROWS_PER_BLOCK);
+
+    operator.earlyTerminate();
+    MseBlock block = operator.nextBlock();
+
+    assertTrue(block.isSuccess(), "Expecting a successful end of stream, got: " + block);
+    assertFalse(operator.hasBufferedState(), "early termination must drop the buffered partition");
+    // Dropping the buffers must not reset what the operator already reported.
+    assertEquals(operator.copyStatMaps().getLong(MatchOperator.StatKey.EMITTED_ROWS),
+        MatchOperator.MAX_OUTPUT_ROWS_PER_BLOCK);
+  }
+
+  /// Early termination drains the input to its terminal block and returns that block, so an upstream error that
+  /// arrives behind the already buffered rows still fails the query instead of being replaced by a success.
+  @Test
+  public void testEarlyTerminationStillSurfacesAnUpstreamError() {
+    OpChainExecutionContext context = earlyTerminationContext();
+    MultiStageOperator input = earlyTerminationInput(context)
+        .buildWithError(ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "upstream failed"));
+    MatchOperator operator = new MatchOperator(context, input, INPUT_SCHEMA, earlyTerminationNode());
+    assertTrue(operator.nextBlock().isData());
+
+    operator.earlyTerminate();
+
+    assertErrorContains(operator.nextBlock(), QueryErrorCode.INTERNAL, "upstream failed");
+  }
+
+  /// A step budget that every `A` attempt fits in and a `B+ C` attempt over the B-only suffix does not.
+  private static OpChainExecutionContext earlyTerminationContext() {
+    return OperatorTestUtil.getContext(Map.of(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, "1000"));
+  }
+
+  /// `PATTERN (A | B+ C)`, reporting `MATCH_NUMBER()`.
+  private static MatchNode earlyTerminationNode() {
+    RowPattern pattern = alternate(symbol(0),
+        concat(quantifier(symbol(1), 1, RowPattern.Quantifier.UNBOUNDED, true), symbol(2)));
+    DataSchema resultSchema = new DataSchema(new String[]{"pid", "mno"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    return node(resultSchema, labelSymbols("A", "B", "C"), pattern, List.of(measure("mno", matchNumber())),
+        MatchNode.AfterMatchSkipMode.PAST_LAST_ROW, MatchNode.NO_SKIP_TO_SYMBOL);
+  }
+
+  /// Partition 0 holds exactly one output block of `A` matches followed by a B-only suffix. A row of partition 1
+  /// closes it, so it is matched before the input ends, and one more block of partition 1 follows.
+  private static BlockListMultiStageOperator.Builder earlyTerminationInput(OpChainExecutionContext context) {
+    BlockListMultiStageOperator.Builder builder = new BlockListMultiStageOperator.Builder(context, INPUT_SCHEMA);
+    for (Object[] row : rows(0, "A".repeat(MatchOperator.MAX_OUTPUT_ROWS_PER_BLOCK) + "B".repeat(2000))) {
+      builder.addRow(row);
+    }
+    builder.addRow(1, "A", 0).finishBlock();
+    return builder.addRow(1, "A", 1).addRow(1, "A", 2).finishBlock();
   }
 
   private static MatchNode node(DataSchema resultSchema, List<PatternSymbol> symbols, RowPattern pattern,
