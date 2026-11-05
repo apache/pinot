@@ -204,6 +204,45 @@ public class MvAggregateGateTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testPositiveFilterOnMvKeyIsCopiedBelowTheAggregate() {
+    // The exact condition stays above the aggregate, and a copy filters the rows in the leaf stage
+    for (String condition : List.of("= 'x'", "IN ('x', 'z')", "> 'x'", "BETWEEN 'x' AND 'z'")) {
+      String query = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1) "
+          + "HAVING ARRAY_TO_MV(mcol1) " + condition;
+      for (QueryEnvironment queryEnvironment : List.of(_queryEnvironment, _gateOnEnvironment, _gateOffEnvironment)) {
+        String plan = explain(queryEnvironment, query);
+        assertTrue(plan.indexOf("'x'") < plan.indexOf("Aggregate"), plan);
+        assertTrue(plan.lastIndexOf("'x'") > plan.lastIndexOf("Aggregate"), plan);
+      }
+    }
+  }
+
+  @Test
+  public void testNegatedFilterOnMvKeyIsNotCopiedBelowTheAggregate() {
+    // As a multi-value predicate, a negated condition matches a row only when no element matches
+    for (String condition : List.of("<> 'x'", "NOT IN ('x', 'z')")) {
+      String query = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1) "
+          + "HAVING ARRAY_TO_MV(mcol1) " + condition;
+      for (QueryEnvironment queryEnvironment : List.of(_queryEnvironment, _gateOnEnvironment, _gateOffEnvironment)) {
+        String plan = explain(queryEnvironment, query);
+        assertTrue(plan.lastIndexOf("'x'") < plan.indexOf("Aggregate"), plan);
+      }
+    }
+  }
+
+  @Test
+  public void testFilterOnMvKeyAboveAJoinIsNotCopied() {
+    // Without a table scan under the aggregate, the copy can end up in an intermediate stage
+    String query = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e JOIN a ON e.col1 = a.col1 "
+        + "GROUP BY ARRAY_TO_MV(e.mcol1) HAVING ARRAY_TO_MV(e.mcol1) = 'x'";
+    for (QueryEnvironment queryEnvironment : List.of(_queryEnvironment, _gateOnEnvironment)) {
+      String plan = explain(queryEnvironment, query);
+      assertTrue(plan.contains(MV_AGGREGATE), plan);
+      assertTrue(plan.lastIndexOf("'x'") < plan.indexOf("Aggregate"), plan);
+    }
+  }
+
+  @Test
   public void testQueryOptionOverridesTheBrokerMode() {
     // true plans the MV aggregate also for a leaf-only aggregate.
     String plan = explain(_queryEnvironment, "SET useMvAggregate=true; " + QUERY);

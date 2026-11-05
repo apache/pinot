@@ -157,6 +157,30 @@
         "ignoreV2Optimizer": true
       },
       {
+        "description": "An IN filter on the MV key in HAVING keeps only the matching elements on a scan",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) IN ('b', 'c')",
+        "outputs": [["b", 2], ["c", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "An IN filter on the MV key in HAVING keeps only the matching elements on a scan with the gate on",
+        "sql": "SET useMvAggregate=true; SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) IN ('b', 'c')",
+        "outputs": [["b", 2], ["c", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "A range filter on the MV key in HAVING keeps only the matching elements on a scan",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) BETWEEN 'b' AND 'c'",
+        "outputs": [["b", 2], ["c", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "A negated filter on the MV key in HAVING also counts the rows that have the excluded element",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) <> 'a'",
+        "outputs": [["b", 2], ["c", 1]],
+        "ignoreV2Optimizer": true
+      },
+      {
         "description": "A filter on the MV key in an outer query keeps only the matching element",
         "sql": "SELECT key, cnt FROM (SELECT ARRAY_TO_MV(strMv) AS key, COUNT(*) AS cnt FROM {tbl} GROUP BY ARRAY_TO_MV(strMv)) WHERE key = 'b'",
         "outputs": [["b", 2]],
