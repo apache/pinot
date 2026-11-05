@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.match;
 
+import com.google.common.annotations.VisibleForTesting;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
@@ -82,11 +83,14 @@ public class MatchExpression {
 
   /// Compiles `expression`, which addresses columns of `inputSchema` through pattern field references.
   ///
+  /// @param terminationChecker checks for query termination and samples resource usage. Aggregates run it
+  ///        periodically while they scan the rows of a match, which no other check covers; see [MatchTerm.Aggregate].
   /// @throws org.apache.pinot.spi.exception.QueryException if the expression uses a construct that is not supported
   ///         yet. Nothing is dropped or approximated, because either would return wrong rows instead of an error.
-  public static MatchExpression compile(RexExpression expression, DataSchema inputSchema) {
+  public static MatchExpression compile(RexExpression expression, DataSchema inputSchema,
+      Runnable terminationChecker) {
     List<MatchTerm> terms = new ArrayList<>();
-    RexExpression slotExpression = rewrite(expression, inputSchema, terms);
+    RexExpression slotExpression = rewrite(expression, inputSchema, terms, terminationChecker);
     int numTerms = terms.size();
     String[] slotNames = new String[numTerms];
     ColumnDataType[] slotTypes = new ColumnDataType[numTerms];
@@ -97,6 +101,12 @@ public class MatchExpression {
     TransformOperand operand =
         TransformOperandFactory.getTransformOperand(slotExpression, new DataSchema(slotNames, slotTypes));
     return new MatchExpression(operand, terms);
+  }
+
+  /// Compiles `expression` with aggregates that never check for termination.
+  @VisibleForTesting
+  static MatchExpression compile(RexExpression expression, DataSchema inputSchema) {
+    return compile(expression, inputSchema, () -> { });
   }
 
   /// Evaluates this expression against the current state of `tape`.
@@ -123,7 +133,8 @@ public class MatchExpression {
 
   /// Replaces every match specific sub-expression of `expression` with an input reference to a freshly appended
   /// slot of `terms`, and returns the resulting expression over the synthetic slot row.
-  private static RexExpression rewrite(RexExpression expression, DataSchema inputSchema, List<MatchTerm> terms) {
+  private static RexExpression rewrite(RexExpression expression, DataSchema inputSchema, List<MatchTerm> terms,
+      Runnable terminationChecker) {
     if (expression instanceof RexExpression.PatternFieldRef) {
       // A bare column reference such as `A.price` is `LAST(A.price, 0)` per SQL:2016.
       RexExpression.PatternFieldRef ref = (RexExpression.PatternFieldRef) expression;
@@ -146,7 +157,7 @@ public class MatchExpression {
     RexExpression.FunctionCall call = (RexExpression.FunctionCall) expression;
     String functionName = call.getFunctionName();
     if (RUNNING.equals(functionName) || FINAL.equals(functionName)) {
-      return rewrite(singleOperand(call), inputSchema, terms);
+      return rewrite(singleOperand(call), inputSchema, terms, terminationChecker);
     }
     if (CLASSIFIER.equals(functionName)) {
       if (!call.getFunctionOperands().isEmpty()) {
@@ -164,18 +175,18 @@ public class MatchExpression {
       // `LAST(A.price, 0) * LAST(2, 0)`. Navigating a constant is the constant itself. CLASSIFIER has no
       // PatternFieldRef, but its designated row is significant and must not be mistaken for a constant.
       if (!containsPatternFieldRef(call) && !containsClassifier(call)) {
-        return rewrite(singleOperand(call), inputSchema, terms);
+        return rewrite(singleOperand(call), inputSchema, terms, terminationChecker);
       }
       return addTerm(terms, navigation(call, inputSchema));
     }
     if (AggregationFunctionType.isAggregationFunction(functionName)) {
-      return addTerm(terms, aggregate(call, inputSchema));
+      return addTerm(terms, aggregate(call, inputSchema, terminationChecker));
     }
 
     List<RexExpression> operands = call.getFunctionOperands();
     List<RexExpression> rewritten = new ArrayList<>(operands.size());
     for (RexExpression operand : operands) {
-      rewritten.add(rewrite(operand, inputSchema, terms));
+      rewritten.add(rewrite(operand, inputSchema, terms, terminationChecker));
     }
     return new RexExpression.FunctionCall(call.getDataType(), functionName, rewritten, call.isDistinct(),
         call.isIgnoreNulls());
@@ -311,7 +322,8 @@ public class MatchExpression {
 
   /// Compiles a single variable aggregate. The aggregated expression is compiled against the input schema so that it
   /// can be evaluated per row of the match, which is why `SUM(A.price * A.quantity)` works.
-  private static MatchTerm.Aggregate aggregate(RexExpression.FunctionCall call, DataSchema inputSchema) {
+  private static MatchTerm.Aggregate aggregate(RexExpression.FunctionCall call, DataSchema inputSchema,
+      Runnable terminationChecker) {
     String functionName = call.getFunctionName();
     if (call.isDistinct()) {
       throw QueryErrorCode.QUERY_EXECUTION.asException(
@@ -326,7 +338,7 @@ public class MatchExpression {
       }
       // COUNT(*) counts every row of the match, whatever variable it is mapped to.
       return new MatchTerm.Aggregate(kind, RexExpression.PatternFieldRef.UNIVERSAL_SYMBOL_ORDINAL, null,
-          call.getDataType());
+          call.getDataType(), terminationChecker);
     }
     if (operands.size() != 1) {
       throw QueryErrorCode.QUERY_EXECUTION.asException(
@@ -348,7 +360,7 @@ public class MatchExpression {
         : symbolOrdinals.iterator().nextInt();
     TransformOperand argumentOperand =
         TransformOperandFactory.getTransformOperand(toRowExpression(argument), inputSchema);
-    return new MatchTerm.Aggregate(kind, symbolOrdinal, argumentOperand, call.getDataType());
+    return new MatchTerm.Aggregate(kind, symbolOrdinal, argumentOperand, call.getDataType(), terminationChecker);
   }
 
   /// Rewrites pattern field references into plain input references so the expression can be evaluated against a single

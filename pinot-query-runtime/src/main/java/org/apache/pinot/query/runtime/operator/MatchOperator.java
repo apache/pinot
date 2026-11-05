@@ -141,10 +141,13 @@ public class MatchOperator extends MultiStageOperator {
     _partitionComparisonKeys = _partitionKeys.clone();
     Arrays.sort(_partitionComparisonKeys);
     _patternSymbols = node.getPatternSymbols();
+    Runnable terminationChecker = this::checkTerminationAndSampleUsage;
     List<MatchNode.Measure> measures = node.getMeasures();
     _measures = new MatchExpression[measures.size()];
     for (int i = 0; i < _measures.length; i++) {
-      _measures[i] = MatchExpression.compile(measures.get(i).getExpression(), inputSchema);
+      // Measures are evaluated after the matcher has finished, so their aggregate scans check for termination
+      // themselves.
+      _measures[i] = MatchExpression.compile(measures.get(i).getExpression(), inputSchema, terminationChecker);
     }
     if (_resultSchema.size() != _partitionKeys.length + _measures.length) {
       throw QueryErrorCode.QUERY_EXECUTION.asException(
@@ -159,8 +162,8 @@ public class MatchOperator extends MultiStageOperator {
         MatchLimits.getMaxRowsInMatchPartition(context.getOpChainMetadata(), node.getNodeHint());
     long maxStepsPerMatchAttempt =
         MatchLimits.getMaxStepsPerMatchAttempt(context.getOpChainMetadata(), node.getNodeHint());
-    _matcher = new PartitionMatcher(nfa, _patternSymbols, inputSchema, maxStepsPerMatchAttempt,
-        this::checkTerminationAndSampleUsage);
+    _matcher =
+        new PartitionMatcher(nfa, _patternSymbols, inputSchema, maxStepsPerMatchAttempt, terminationChecker);
   }
 
   @Override

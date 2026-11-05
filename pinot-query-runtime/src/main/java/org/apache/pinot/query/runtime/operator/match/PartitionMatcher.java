@@ -118,9 +118,11 @@ public class PartitionMatcher {
     _terminationChecker = Objects.requireNonNull(terminationChecker, "terminationChecker");
     _definitions = new MatchExpression[patternSymbols.size()];
     for (int i = 0; i < _definitions.length; i++) {
-      // A pattern variable that appears in PATTERN without a DEFINE entry matches every row, per SQL:2016.
+      // A pattern variable that appears in PATTERN without a DEFINE entry matches every row, per SQL:2016. Validation
+      // rejects aggregates in DEFINE today; one would scan the rows mapped so far within a single step, so the
+      // predicates get the termination check too.
       _definitions[i] = patternSymbols.get(i).getDefinition() == null ? null
-          : MatchExpression.compile(patternSymbols.get(i).getDefinition(), inputSchema);
+          : MatchExpression.compile(patternSymbols.get(i).getDefinition(), inputSchema, _terminationChecker);
     }
     _counters = new int[nfa.getNumCounters()];
     _loopStartPos = new int[nfa.getNumCounters()];

@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.query.runtime.operator.match;
 
+import java.util.AbstractList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
 
@@ -94,6 +98,43 @@ public class PartitionMatcherStepBudgetTest {
         expectThrows(QueryException.class, () -> matcher.match(matchingRows(10_000), 0, 1));
     assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_CANCELLATION);
     assertEquals(checks.get(), 1);
+  }
+
+  /// An aggregate inside DEFINE is evaluated with running semantics, so the predicate of the k-th candidate row scans
+  /// the k rows mapped so far. Between two of the transition loop's checks that is a quadratic number of row
+  /// evaluations, so the aggregate scan has to check for termination itself.
+  @Test
+  public void testTerminationCallbackInterruptsADefineAggregateScan() {
+    // DEFINE A AS COUNT(A.value) >= 0: always true, but every candidate row recounts the rows already mapped to A.
+    RexExpression count = new RexExpression.FunctionCall(ColumnDataType.LONG, "COUNT",
+        List.of(new RexExpression.PatternFieldRef(MatchTestFixtures.VALUE_INDEX, 0, "A")));
+    PatternSymbol a = new PatternSymbol("A", new RexExpression.FunctionCall(ColumnDataType.BOOLEAN,
+        "GREATER_THAN_OR_EQUAL", List.of(count, new RexExpression.Literal(ColumnDataType.LONG, 0L))));
+    PartitionMatcher matcher = new PartitionMatcher(PatternToNfaCompiler.compile(A_PLUS), List.of(a), INPUT_SCHEMA,
+        Long.MAX_VALUE, () -> {
+          throw QueryErrorCode.QUERY_CANCELLATION.asException("cancelled during MATCH_RECOGNIZE");
+        });
+    AtomicInteger rowReads = new AtomicInteger();
+    Object[] row = {0, "A", 0};
+    List<Object[]> rows = new AbstractList<>() {
+      @Override
+      public Object[] get(int index) {
+        rowReads.incrementAndGet();
+        return row;
+      }
+
+      @Override
+      public int size() {
+        return 10_000;
+      }
+    };
+
+    QueryException exception = expectThrows(QueryException.class, () -> matcher.match(rows, 0, 1));
+    assertEquals(exception.getErrorCode(), QueryErrorCode.QUERY_CANCELLATION);
+    int checkInterval = QueryThreadContext.CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK + 1;
+    assertTrue(rowReads.get() <= checkInterval,
+        "The first termination check must come within " + checkInterval + " aggregated rows, but the DEFINE "
+            + "aggregate had already read " + rowReads.get());
   }
 
   @Test

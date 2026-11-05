@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.match;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
@@ -29,6 +30,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /// A leaf of a MEASURES or DEFINE expression whose value depends on the match rather than on a single row: a row
@@ -39,7 +41,8 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 /// [TransformOperand] machinery instead of a second expression interpreter.
 ///
 /// Implementations are stateless with respect to the match: all match state is passed in through the
-/// [MatchTape], so one instance is reused across every match of every partition.
+/// [MatchTape], so one instance is reused across every match of every partition. [Aggregate] only counts the rows it
+/// visits, to pace its termination checks.
 public interface MatchTerm {
 
   /// The type this term reports to the enclosing expression. Values returned by [#evaluate] are in the
@@ -175,6 +178,17 @@ public interface MatchTerm {
   /// The argument is evaluated by an ordinary [TransformOperand] against the raw input row, so any scalar
   /// expression works, e.g. `SUM(A.price * A.quantity)`. Nulls are skipped, as SQL requires; an aggregate over
   /// zero rows is `null` except for `COUNT`, which is `0`.
+  ///
+  /// ## Termination checks
+  ///
+  /// A scan can visit every row of a partition, and the matcher's checks do not cover it: in MEASURES it runs after
+  /// the matcher has found the match. Every scan therefore runs the operator's termination check itself, once every
+  /// `CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK + 1` rows like
+  /// [QueryThreadContext#checkTerminationAndSampleUsagePeriodically]. The rows are counted across evaluations rather
+  /// than per scan, so many short scans are paced like one long one. Like [MatchExpression], an instance therefore
+  /// belongs to one operator. Validation rejects aggregates in DEFINE today. The DEFINE predicates get the check as
+  /// well, because there running semantics would make the k-th candidate row scan the k rows mapped so far inside a
+  /// single matcher step.
   final class Aggregate implements MatchTerm {
     private final Kind _kind;
     private final int _symbolOrdinal;
@@ -183,13 +197,24 @@ public interface MatchTerm {
     private final ColumnDataType _resultType;
     private final ColumnDataType _storedType;
     private final boolean _requiresResultConversion;
+    private final Runnable _terminationChecker;
+    /// Rows visited over every evaluation of this aggregate; paces [#_terminationChecker].
+    private int _numRowsVisited;
+
+    @VisibleForTesting
+    Aggregate(Kind kind, int symbolOrdinal, @Nullable TransformOperand argument, ColumnDataType resultType) {
+      this(kind, symbolOrdinal, argument, resultType, () -> { });
+    }
 
     /// @param argument the aggregated expression evaluated against an input row, or `null` for `COUNT(*)`,
     ///        which counts rows rather than values
-    public Aggregate(Kind kind, int symbolOrdinal, @Nullable TransformOperand argument, ColumnDataType resultType) {
+    /// @param terminationChecker checks for query termination and samples resource usage; throws to abort the scan
+    public Aggregate(Kind kind, int symbolOrdinal, @Nullable TransformOperand argument, ColumnDataType resultType,
+        Runnable terminationChecker) {
       _kind = kind;
       _symbolOrdinal = symbolOrdinal;
       _argument = argument;
+      _terminationChecker = terminationChecker;
       _resultType = resultType;
       _storedType = resultType.getStoredType();
       if (argument != null && argument.getResultType().isArray()) {
@@ -234,6 +259,7 @@ public interface MatchTerm {
     private long countNonNull(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
       long count = 0;
       for (int i = 0; i < rowCount; i++) {
+        checkTerminationPeriodically();
         Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value != null) {
           count++;
@@ -246,6 +272,7 @@ public interface MatchTerm {
     private Object evaluateExtremum(MatchTape tape, int rowCount, List<Object[]> partitionRows) {
       Object extremum = null;
       for (int i = 0; i < rowCount; i++) {
+        checkTerminationPeriodically();
         Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value == null) {
           continue;
@@ -282,6 +309,7 @@ public interface MatchTerm {
       long sum = 0;
       long count = 0;
       for (int i = 0; i < rowCount; i++) {
+        checkTerminationPeriodically();
         Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value != null) {
           sum += numericValue(value).longValue();
@@ -303,6 +331,7 @@ public interface MatchTerm {
       double sum = 0;
       long count = 0;
       for (int i = 0; i < rowCount; i++) {
+        checkTerminationPeriodically();
         Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value != null) {
           sum += numericValue(value).doubleValue();
@@ -324,6 +353,7 @@ public interface MatchTerm {
       BigDecimal sum = BigDecimal.ZERO;
       long count = 0;
       for (int i = 0; i < rowCount; i++) {
+        checkTerminationPeriodically();
         Object value = _argument.apply(partitionRows.get(tape.rowAt(_symbolOrdinal, i)));
         if (value != null) {
           sum = sum.add(toBigDecimal(numericValue(value)));
@@ -334,6 +364,14 @@ public interface MatchTerm {
         return null;
       }
       return _kind == Kind.AVG ? sum.divide(BigDecimal.valueOf(count), MathContext.DECIMAL128) : sum;
+    }
+
+    /// Runs the termination check once every `CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK + 1` visited rows. An
+    /// overflowing counter only shifts the phase of the checks.
+    private void checkTerminationPeriodically() {
+      if ((++_numRowsVisited & QueryThreadContext.CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK) == 0) {
+        _terminationChecker.run();
+      }
     }
 
     private Number numericValue(Object value) {
