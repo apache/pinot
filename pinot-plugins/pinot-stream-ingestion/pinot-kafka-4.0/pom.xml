@@ -52,6 +52,13 @@
       </exclusions>
     </dependency>
 
+    <!-- Kafka's OAuth callback needs jose4j, which kafka-clients does not supply transitively. -->
+    <dependency>
+      <groupId>org.bitbucket.b_c</groupId>
+      <artifactId>jose4j</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
     <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
