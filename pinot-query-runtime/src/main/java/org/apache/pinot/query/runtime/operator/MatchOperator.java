@@ -81,6 +81,9 @@ public class MatchOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MatchOperator.class);
   private static final String EXPLAIN_NAME = "MATCH_RECOGNIZE";
   static final int MAX_OUTPUT_ROWS_PER_BLOCK = 1024;
+  /// Once a block holds a row and this many more pattern matching steps have been spent, it is returned before it is
+  /// full, so that its consumer gets the chance to stop the operator. See [#getNextBlock()].
+  static final int PARTIAL_BLOCK_STEPS = 1 << 18;
 
   private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
@@ -112,6 +115,8 @@ public class MatchOperator extends MultiStageOperator {
   @Nullable
   private MseBlock.Eos _inputEos;
   private int _numRows;
+  /// Pattern matching steps spent since the block being built got its first row.
+  private long _stepsSinceFirstOutputRow;
 
   public MatchOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema inputSchema,
       MatchNode node) {
@@ -228,15 +233,27 @@ public class MatchOperator extends MultiStageOperator {
     return _inputRows != null || !_partitionRows.isEmpty() || _matcher.hasBufferedState();
   }
 
+  /// Returns the next block of matches, or the terminal block once every partition has been matched.
+  ///
+  /// The consumer calls earlyTerminate() on the op chain thread, between two calls to nextBlock(), so the flag cannot
+  /// change while a call is matching and checking it once per call is enough. For the same reason a block is not
+  /// always filled to [#MAX_OUTPUT_ROWS_PER_BLOCK] rows: once it holds a row and [#PARTIAL_BLOCK_STEPS] more steps
+  /// have been spent matching, it is returned as is. Otherwise a call holding the row an outer `LIMIT` needs could
+  /// go on matching for as long as the input lasts, for instance over a long run of rows where no match starts,
+  /// before the consumer could stop it. The bound applies to every block, including the one a mailbox sender
+  /// computes before it learns that its receiver terminated. Only the block boundaries change, never the result.
+  ///
+  /// The match attempt in progress when the bound is reached still runs to completion. An attempt that exceeds the
+  /// step budget therefore fails the query even if its consumer would have stopped after the rows already found,
+  /// the same way an upstream error takes precedence over the rows buffered here.
   @Override
   protected MseBlock getNextBlock() {
-    // The consumer calls earlyTerminate() on the op chain thread, between two calls to nextBlock(), so the flag cannot
-    // change while a call is matching and checking it once per call is enough.
     if (_isEarlyTerminated) {
       return finishEarly();
     }
     List<Object[]> outputRows = new ArrayList<>(MAX_OUTPUT_ROWS_PER_BLOCK);
-    while (outputRows.size() < MAX_OUTPUT_ROWS_PER_BLOCK) {
+    _stepsSinceFirstOutputRow = 0;
+    while (!isBlockDue(outputRows)) {
       if (_matchingPartition) {
         emitMatches(outputRows);
         continue;
@@ -275,6 +292,12 @@ public class MatchOperator extends MultiStageOperator {
       }
     }
     return new RowHeapDataBlock(outputRows, _resultSchema);
+  }
+
+  /// Whether `outputRows` is returned rather than filled further. See [#getNextBlock()].
+  private boolean isBlockDue(List<Object[]> outputRows) {
+    return outputRows.size() >= MAX_OUTPUT_ROWS_PER_BLOCK
+        || (!outputRows.isEmpty() && _stepsSinceFirstOutputRow >= PARTIAL_BLOCK_STEPS);
   }
 
   /// Ends the operator once its consumer needs no more rows, for instance because an outer LIMIT is satisfied.
@@ -377,14 +400,18 @@ public class MatchOperator extends MultiStageOperator {
     _matchNumber = 0;
   }
 
-  /// Resumes scanning the buffered partition until it is exhausted or the current output block is full.
+  /// Resumes scanning the buffered partition until it is exhausted or the current output block is due.
   private void emitMatches(List<Object[]> outputRows) {
     List<Object[]> rows = _partitionRows;
     int numPartitionRows = rows.size();
     MatchTape tape = _matcher.getTape();
-    while (_scanStart < numPartitionRows && outputRows.size() < MAX_OUTPUT_ROWS_PER_BLOCK) {
+    while (_scanStart < numPartitionRows && !isBlockDue(outputRows)) {
       checkTerminationAndSampleUsage();
       int endPos = _matcher.match(rows, _scanStart, _matchNumber + 1);
+      if (!outputRows.isEmpty()) {
+        // Every attempt counts, including one that took no step, so that a long scan is bounded too.
+        _stepsSinceFirstOutputRow += _matcher.getLastAttemptSteps() + 1;
+      }
       if (endPos == PartitionMatcher.NO_MATCH) {
         _scanStart++;
         continue;

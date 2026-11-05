@@ -714,6 +714,67 @@ public class MatchOperatorTest {
     assertErrorContains(operator.nextBlock(), QueryErrorCode.INTERNAL, "upstream failed");
   }
 
+  /// The consumer can only call earlyTerminate() between two calls, so a call that already holds the row an outer
+  /// `LIMIT 1` needs must not go on matching until its block is full. Here the one `A` match is followed by a long
+  /// run of rows that neither alternative matches, and then by a B-only suffix whose first `B+ C` attempt exceeds the
+  /// step budget. A call that kept filling its block would reach that attempt and fail a query whose result it holds.
+  @Test
+  public void testPartialBlockLetsAnOuterLimitStopTheOperatorBeforeAnExpensiveSuffix() {
+    OpChainExecutionContext context = earlyTerminationContext();
+    BlockListMultiStageOperator.Builder builder = new BlockListMultiStageOperator.Builder(context, INPUT_SCHEMA);
+    for (Object[] row : rows(0, "A" + "D".repeat(MatchOperator.PARTIAL_BLOCK_STEPS) + "B".repeat(2000))) {
+      builder.addRow(row);
+    }
+    MultiStageOperator input = builder.addRow(1, "A", 0).finishBlock().buildWithEos();
+    MatchNode node = earlyTerminationNode();
+    MatchOperator operator = new MatchOperator(context, input, INPUT_SCHEMA, node);
+    LimitSortOperator limit = new LimitSortOperator(context, operator, node.getDataSchema(), 0, 1,
+        MatchOperator.MAX_OUTPUT_ROWS_PER_BLOCK);
+
+    List<Object[]> output = new ArrayList<>();
+    MseBlock block = limit.nextBlock();
+    while (block.isData()) {
+      output.addAll(((MseBlock.Data) block).asRowHeap().getRows());
+      block = limit.nextBlock();
+    }
+
+    assertTrue(block.isSuccess(), "Expecting a successful end of stream, got: " + block);
+    assertEquals(output.size(), 1);
+    assertEquals(output.get(0), new Object[]{0, 1L});
+    assertFalse(operator.hasBufferedState(), "early termination must drop the buffered partition");
+  }
+
+  /// Returning a block early only changes where the output is split: matching resumes where the call stopped, so no
+  /// match is lost or repeated and `MATCH_NUMBER()` keeps counting across the blocks.
+  @Test
+  public void testSparseMatchesAreSplitAcrossBlocksWithoutChangingTheResult() {
+    String labels = "A" + "D".repeat(MatchOperator.PARTIAL_BLOCK_STEPS) + "AA";
+    OpChainExecutionContext context = earlyTerminationContext();
+    BlockListMultiStageOperator.Builder builder = new BlockListMultiStageOperator.Builder(context, INPUT_SCHEMA);
+    for (Object[] row : rows(0, labels)) {
+      builder.addRow(row);
+    }
+    MatchOperator operator =
+        new MatchOperator(context, builder.finishBlock().buildWithEos(), INPUT_SCHEMA, earlyTerminationNode());
+
+    List<Integer> blockSizes = new ArrayList<>();
+    List<Object[]> output = new ArrayList<>();
+    MseBlock block = operator.nextBlock();
+    while (block.isData()) {
+      List<Object[]> blockRows = ((MseBlock.Data) block).asRowHeap().getRows();
+      blockSizes.add(blockRows.size());
+      output.addAll(blockRows);
+      block = operator.nextBlock();
+    }
+
+    assertTrue(block.isSuccess(), "Expecting a successful end of stream, got: " + block);
+    assertEquals(blockSizes, List.of(1, 2));
+    assertEquals(output.size(), 3);
+    for (int i = 0; i < output.size(); i++) {
+      assertEquals(output.get(i), new Object[]{0, i + 1L});
+    }
+  }
+
   /// A step budget that every `A` attempt fits in and a `B+ C` attempt over the B-only suffix does not.
   private static OpChainExecutionContext earlyTerminationContext() {
     return OperatorTestUtil.getContext(Map.of(QueryOptionKey.MAX_STEPS_PER_MATCH_ATTEMPT, "1000"));
