@@ -55,17 +55,30 @@ import org.slf4j.LoggerFactory;
 ///
 /// ## What it expects from the plan
 ///
-/// Like [WindowAggregateOperator], this operator does not sort. `PinotMatchExchangeNodeInsertRule` puts a
-/// sort exchange underneath that hash distributes on the partition keys and sorts the receiver side on
-/// `(partitionKeys..., orderKeys...)`, so rows arrive grouped by partition and ordered within a partition. The
-/// operator therefore buffers one partition at a time and releases it at each boundary, and never reads
-/// [MatchNode#getCollations()]: the ordering has already been established below it.
+/// Like [WindowAggregateOperator], this operator does not sort. `PinotMatchExchangeNodeInsertRule` puts an explicit
+/// Sort underneath it, on `(partitionKeys..., orderKeys...)` with no fetch or offset, and below that Sort an exchange
+/// that hash distributes on the partition keys and sorts on neither side. The Sort runs as a [FullSortOperator], so
+/// rows arrive grouped by partition and ordered within a partition, in bounded blocks: a partition can span several
+/// blocks, and a block can hold the end of one partition and the start of the next. The operator never reads
+/// [MatchNode#getCollations()]: the ordering has already been established below it. A query with neither
+/// `PARTITION BY` nor `ORDER BY` has nothing to sort on, so it gets a plain exchange and is matched as one partition.
 ///
 /// The grouping half of that assumption is verified rather than trusted. Partition keys are compared directly on the
 /// incoming rows and must be monotonically increasing, so a key that reappears after its partition was closed fails
-/// without retaining every previously seen key. The ordering half is not re-checked per row, because an exchange that
-/// grouped correctly but sorted incorrectly is not a failure mode the exchange can produce - losing the sort loses the
-/// grouping too, which the partition-key order check already catches.
+/// without retaining every previously seen key. The ordering half is not re-checked per row, because a sort that
+/// grouped correctly but ordered incorrectly is not a failure mode the Sort can produce - one collation that leads
+/// with the partition keys establishes both, and losing the sort loses the grouping too, which the partition-key
+/// order check already catches.
+///
+/// ## Memory
+///
+/// The operator buffers one partition at a time and drops it at each partition boundary, but that bounds only its own
+/// buffer, which holds references to the rows of the current partition, plus the matcher's state for it. It does not
+/// bound the memory of the stage. The full sort below has already buffered every row the worker received for this
+/// `MATCH_RECOGNIZE`, across all of its partitions, before the first row reaches this operator. It keeps all of those
+/// rows reachable while this operator matches, because it hands them over as views of its own sorted list and holds
+/// that list until the op chain is closed or cancelled. The partition buffer shares those rows rather than copying
+/// them, so [QueryOptionKey#MAX_ROWS_IN_MATCH_PARTITION] limits the size of one partition, not the worker's input.
 ///
 /// ## Guardrails throw, they never truncate
 ///
@@ -140,9 +153,9 @@ public class MatchOperator extends MultiStageOperator {
                 + inputSchema.getColumnName(_partitionKeys[i]) + "' has type " + partitionKeyType);
       }
     }
-    // Calcite exposes the exchange distribution as an ImmutableBitSet, so the rule below this operator sorts
-    // partition fields by input ordinal. Preserve SQL declaration order in _partitionKeys for the output schema, but
-    // validate monotonic input against the order the exchange actually produces.
+    // Calcite exposes the MATCH partition keys as an ImmutableBitSet, so the Sort the rule puts below this operator
+    // orders partition fields by input ordinal. Preserve SQL declaration order in _partitionKeys for the output schema,
+    // but validate monotonic input against the order the Sort actually produces.
     _partitionComparisonKeys = _partitionKeys.clone();
     Arrays.sort(_partitionComparisonKeys);
     _patternSymbols = node.getPatternSymbols();
@@ -206,8 +219,8 @@ public class MatchOperator extends MultiStageOperator {
 
   /// Drops the input block being consumed, the partition being matched and everything the matcher retains, and marks
   /// the operator finished. A failure part way through a partition (the partition row limit, the step budget, an
-  /// expression error, a timeout or a cancellation) leaves all of them reachable otherwise, and with a receive that
-  /// sorts the whole worker input the input block can be that entire input.
+  /// expression error, a timeout or a cancellation) leaves all of them reachable otherwise, and the input block is a
+  /// view of the full sort's buffer, which holds the worker's entire input.
   ///
   /// The input rows belong to their block, which another operator may still read, so that reference is dropped
   /// rather than the list cleared. The partition list is replaced, the same as at a partition boundary.
