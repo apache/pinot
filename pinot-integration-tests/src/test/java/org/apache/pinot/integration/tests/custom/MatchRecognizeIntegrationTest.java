@@ -41,8 +41,8 @@ import static org.testng.Assert.assertTrue;
 ///
 /// The fixture is a small stock ticker with five symbols of different lengths, written round-robin into
 /// [#getNumAvroFiles()] Avro files, so every partition is spread over several segments and both servers. That
-/// makes every assertion here also an assertion that the sort exchange inserted by
-/// `PinotMatchExchangeNodeInsertRule` really does deliver each partition contiguously and in ORDER BY order.
+/// makes every assertion here also an assertion that the exchange and the Sort inserted by
+/// `PinotMatchExchangeNodeInsertRule` really do deliver each partition contiguously and in ORDER BY order.
 ///
 /// Every expected result set below is hand-computed from [#PRICES] rather than captured from a run.
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -939,7 +939,7 @@ public class MatchRecognizeIntegrationTest extends CustomDataQueryClusterIntegra
     try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
       List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
       // Round-robin so that consecutive rows of a partition land in different segments: the match operator must rely
-      // on the sort exchange below it, never on the physical layout.
+      // on the exchange and the Sort below it, never on the physical layout.
       int rowIndex = 0;
       for (int s = 0; s < SYMBOLS.length; s++) {
         int[] prices = PRICES[s];

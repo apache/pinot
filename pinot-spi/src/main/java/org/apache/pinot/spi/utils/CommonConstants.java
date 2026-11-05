@@ -1038,6 +1038,8 @@ public class CommonConstants {
         public static final String ALLOW_MATCH_RECOGNIZE_WITHOUT_PARTITION_BY = "allowMatchRecognizeWithoutPartitionBy";
         /// Maximum number of rows that a single MATCH_RECOGNIZE partition may buffer on a worker. This is a
         /// partition limit, not a per-match limit: all rows of a partition must be available before matching starts.
+        /// It does not bound the sort below MATCH_RECOGNIZE, which buffers every row the worker receives, across all
+        /// of its partitions, before the first partition is matched.
         public static final String MAX_ROWS_IN_MATCH_PARTITION = "maxRowsInMatchPartition";
         /// Maximum number of automaton transitions explored for one MATCH_RECOGNIZE start position.
         public static final String MAX_STEPS_PER_MATCH_ATTEMPT = "maxStepsPerMatchAttempt";
