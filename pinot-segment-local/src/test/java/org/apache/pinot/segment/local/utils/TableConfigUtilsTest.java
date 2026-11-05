@@ -1202,6 +1202,33 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void pauselessTimeFlushThresholdTest() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime("timeColumn", DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    for (String key : List.of(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME,
+        StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX)) {
+      Map<String, String> streamConfigs = getStreamConfigs();
+      streamConfigs.put(key, "30m");
+      StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
+      streamIngestionConfig.setPauselessConsumptionEnabled(true);
+      IngestionConfig ingestionConfig = new IngestionConfig();
+      ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+      TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+          .setTimeColumnName("timeColumn")
+          .setIngestionConfig(ingestionConfig)
+          .build();
+      IllegalStateException e =
+          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));
+      assertTrue(e.getMessage().contains(key), e.getMessage());
+
+      // The same config is valid when pauseless consumption is disabled
+      streamIngestionConfig.setPauselessConsumptionEnabled(false);
+      TableConfigUtils.validate(tableConfig, schema);
+    }
+  }
+
+  @Test
   public void ingestionServerIngestionOomProtectionTest() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     StreamIngestionConfig streamIngestionConfig =
