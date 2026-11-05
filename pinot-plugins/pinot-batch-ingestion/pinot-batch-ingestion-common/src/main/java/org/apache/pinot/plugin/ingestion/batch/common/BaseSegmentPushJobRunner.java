@@ -89,7 +89,7 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
 
     // Get list of files to process
     try {
-      _files = _outputDirFS.listFiles(_outputDirURI, true);
+      _files = SegmentPushUtils.listFiles(_outputDirFS, _outputDirURI, _spec.getPushJobSpec());
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + _outputDirURI + "'");
     }

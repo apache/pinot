@@ -55,9 +55,15 @@ public class PushJobSpec implements Serializable {
   ///    'glob:2022/\*.tar.gz' will include all segments under \_outputDirURI/2022/, but not sub directories;
   ///    'glob:\*\*\/stats\_\*.tar.gz' will include all the segments starting with "stats\_" under \_outputDirURI
   ///    recursively.
-  /// For URI push, the files matched by the pattern are pushed even without a segment archive extension, e.g. segments
-  /// stored in the deep store.
   private String _pushFileNamePattern;
+
+  /// Applicable for URI push type.
+  /// If true, and `pushFileNamePattern` is configured, the files matched by the pattern are pushed even without a
+  /// segment archive extension, e.g. segments stored in the deep store such as committed REALTIME segments.
+  /// Directories, segment metadata files and temporary segment files (`<segment>.tmp.<uuid>`) are always skipped.
+  /// When `outputDirURI` points to the deep store of another table, keep `cleanUpOutputDir` false, otherwise the pushed
+  /// segments are deleted from that deep store.
+  private boolean _allowSegmentsWithoutArchiveExtension;
 
   /// Prefer using segment metadata tar gz file to push segment if exists.
   private boolean _preferMetadataTarGz = true;
@@ -77,6 +83,14 @@ public class PushJobSpec implements Serializable {
 
   public void setPushFileNamePattern(String pushFileNamePattern) {
     _pushFileNamePattern = pushFileNamePattern;
+  }
+
+  public boolean isAllowSegmentsWithoutArchiveExtension() {
+    return _allowSegmentsWithoutArchiveExtension;
+  }
+
+  public void setAllowSegmentsWithoutArchiveExtension(boolean allowSegmentsWithoutArchiveExtension) {
+    _allowSegmentsWithoutArchiveExtension = allowSegmentsWithoutArchiveExtension;
   }
 
   public String getSegmentUriPrefix() {

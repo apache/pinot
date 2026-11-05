@@ -22,6 +22,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
@@ -42,26 +43,35 @@ public class SegmentUriPushJobRunnerTest {
     File outputDir = Files.createTempDirectory("segmentUriPush").toFile();
     try {
       // Segments copied from the deep store (e.g. committed REALTIME segments) have no archive extension
+      File subDir = new File(outputDir, "myTable_2026");
+      assertTrue(subDir.mkdir());
       File realtimeSegment = new File(outputDir, "myTable__0__0__20260601T1557Z");
+      File nestedRealtimeSegment = new File(subDir, "myTable__0__1__20260602T1557Z");
+      File tmpSegment = new File(outputDir, "myTable__0__0__20260601T1557Z.tmp." + UUID.randomUUID());
       File offlineSegment = new File(outputDir, "myTable_offline.tar.gz");
       File metadataFile = new File(outputDir, "myTable_offline.metadata.tar.gz");
       File otherFile = new File(outputDir, "_SUCCESS");
-      for (File file : List.of(realtimeSegment, offlineSegment, metadataFile, otherFile)) {
+      for (File file : List.of(realtimeSegment, nestedRealtimeSegment, tmpSegment, offlineSegment, metadataFile,
+          otherFile)) {
         assertTrue(file.createNewFile());
       }
 
       PushJobSpec pushJobSpec = new PushJobSpec();
       SegmentUriPushJobRunner runner = createRunner(outputDir, pushJobSpec);
-      // Without a pattern, only segment archives are selected
+      // Without allowSegmentsWithoutArchiveExtension, only segment archives are selected even with a pattern
+      assertEquals(getFileNames(runner.getSegmentUriToTarPathMap()), List.of("myTable_offline.tar.gz"));
+      pushJobSpec.setPushFileNamePattern("glob:**/myTable*");
+      runner = createRunner(outputDir, pushJobSpec);
       assertEquals(getFileNames(runner.getSegmentUriToTarPathMap()), List.of("myTable_offline.tar.gz"));
 
-      pushJobSpec.setPushFileNamePattern("glob:**/myTable*");
+      // Directories and temporary segment files are skipped even when matched by the pattern
+      pushJobSpec.setAllowSegmentsWithoutArchiveExtension(true);
       runner = createRunner(outputDir, pushJobSpec);
       Map<String, String> segmentUriToTarPathMap = runner.getSegmentUriToTarPathMap();
       assertEquals(getFileNames(segmentUriToTarPathMap),
-          List.of("myTable__0__0__20260601T1557Z", "myTable_offline.tar.gz"));
+          List.of("myTable__0__0__20260601T1557Z", "myTable__0__1__20260602T1557Z", "myTable_offline.tar.gz"));
       assertEquals(runner.getSegmentsToReplace(segmentUriToTarPathMap).stream().sorted().toList(),
-          List.of("myTable__0__0__20260601T1557Z", "myTable_offline"));
+          List.of("myTable__0__0__20260601T1557Z", "myTable__0__1__20260602T1557Z", "myTable_offline"));
     } finally {
       FileUtils.deleteQuietly(outputDir);
     }
