@@ -170,8 +170,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
   @Nullable
   protected final MaterializedViewHandler _materializedViewHandler;
-  // See Broker.CONFIG_OF_BROKER_RLS_REJECT_IN_PARTITIONED_SUBQUERY
-  private final boolean _rejectInPartitionedSubqueryUnderRowFilters;
   protected final boolean _disableGroovy;
   protected final int _defaultHllLog2m;
   protected final boolean _enableQueryLimitOverride;
@@ -209,9 +207,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
     _materializedViewHandler = materializedViewHandler;
-    _rejectInPartitionedSubqueryUnderRowFilters =
-        _config.getProperty(Broker.CONFIG_OF_BROKER_RLS_REJECT_IN_PARTITIONED_SUBQUERY,
-            Broker.DEFAULT_BROKER_RLS_REJECT_IN_PARTITIONED_SUBQUERY);
     _serverAdminAuthProvider = AuthProviderUtils.extractAuthProvider(config, Broker.SERVER_ADMIN_AUTH_PREFIX);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -567,10 +562,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
         List<String> rowFilters = rlsFilters.getRLSFilters().orElse(null);
         if (rowFilters != null && !rowFilters.isEmpty()) {
-          if (_rejectInPartitionedSubqueryUnderRowFilters) {
-            validateNoInPartitionedSubquery(requestId, query, requestContext, tableName, rawTableName, pinotQuery,
-                serverPinotQuery);
-          }
+          validateNoInPartitionedSubquery(requestId, query, requestContext, tableName, rawTableName, pinotQuery,
+              serverPinotQuery);
           /// Apply RLS to `serverPinotQuery` (the query the server actually executes), not to
           /// `pinotQuery` as the pre-MV codebase did — for gapfill queries `serverPinotQuery` is
           /// the inner stripped query and `pinotQuery` is the outer gapfill wrapper, so the pre-MV
@@ -2300,14 +2293,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   /// Rejects the query with access denied if it calls `IN_PARTITIONED_SUBQUERY`. Called when row-level security
-  /// filters apply to the queried table and [Broker#CONFIG_OF_BROKER_RLS_REJECT_IN_PARTITIONED_SUBQUERY] is on.
+  /// filters apply to the queried table.
   ///
   /// The server resolves that function by running the quoted subquery on the segments of the queried table, outside
-  /// the WHERE clause the row filters are added to. A server of this release adds the row filters to the subquery
-  /// itself, but the broker cannot tell an older server apart, so by default it fails closed rather than let the
-  /// subquery build its ID_SET from rows the principal is not allowed to see; the config turns the rejection off once
-  /// every server runs this release. The gapfill wrapper is checked along with the query the servers run, although
-  /// only the latter reaches a server.
+  /// the WHERE clause the row filters are added to, so the broker never forwards it for a principal with row filters.
+  /// The server adds the row filters to the subquery as well, as defense in depth for an older broker, but the broker
+  /// cannot tell an older server apart and does not rely on it. The gapfill wrapper is checked along with the query
+  /// the servers run, although only the latter reaches a server.
   private void validateNoInPartitionedSubquery(long requestId, String query, RequestContext requestContext,
       String tableName, String rawTableName, PinotQuery pinotQuery, PinotQuery serverPinotQuery) {
     if (containsInPartitionedSubquery(serverPinotQuery) || (serverPinotQuery != pinotQuery

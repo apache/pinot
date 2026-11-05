@@ -91,7 +91,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
-import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.slf4j.MDC;
@@ -911,8 +910,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   }
 
   /// The server resolves IN_PARTITIONED_SUBQUERY by running the quoted subquery on the segments of the table, outside
-  /// the WHERE clause the row filters are added to, so a principal with row filters must not get to use it unless the
-  /// operator turned the rejection off because every server applies the row filters to the subquery.
+  /// the WHERE clause the row filters are added to, so a principal with row filters must not get to use it.
   @Test
   public void testInPartitionedSubqueryRejectedWhenRowFiltersApply()
       throws Exception {
@@ -978,24 +976,6 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     assertFalse(response.getRLSFiltersApplied());
     assertNotNull(serverRequest.get());
     assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(serverRequest.get().getPinotQuery()));
-
-    // With the rejection turned off, the query goes to the servers with the row filters on the outer query and the
-    // function left for the servers to resolve under those filters
-    rowFilters.set(List.of("tenant = 'allowed'"));
-    serverRequest.set(null);
-    PinotConfiguration lenientConfig = new PinotConfiguration(
-        Map.of(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH, "true",
-            Broker.CONFIG_OF_BROKER_RLS_REJECT_IN_PARTITIONED_SUBQUERY, "false"));
-    BaseSingleStageBrokerRequestHandler lenientHandler =
-        newServerRequestCapturingHandler(lenientConfig, routingManager, accessControlFactory, queryQuotaManager,
-            tableCache, serverRequest);
-    response = (BrokerResponseNative) lenientHandler.handleRequest(query);
-    assertTrue(response.getRLSFiltersApplied());
-    assertNotNull(serverRequest.get());
-    PinotQuery serverQuery = serverRequest.get().getPinotQuery();
-    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(serverQuery));
-    assertTrue(serverQuery.getFilterExpression().toString().contains("allowed"), serverQuery.toString());
-    assertNotNull(serverQuery.getQueryOptions().get(RlsUtils.buildRlsFilterKey("myTable")), serverQuery.toString());
   }
 
   /// A handler that records the request it would send to the servers instead of sending it.
