@@ -166,7 +166,9 @@ public class TableConfigsRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIGS)
   @Authenticate(AccessType.READ)
   @ApiOperation(value = "Get the TableConfigs for a given raw tableName",
-      notes = "Returns a versioned redacted response. Submit the complete response to PUT when retaining markers.")
+      notes = "Returns the redacted TableConfigs. Request the " + RedactedTableConfigsResponse.MEDIA_TYPE
+          + " media type for the versioned response, and submit that complete response to PUT when retaining "
+          + "redaction markers.")
   public String getConfig(
       @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
@@ -206,6 +208,11 @@ public class TableConfigsRestletResource {
       TableConfigs config = new TableConfigs(tableName, schema,
           offlineTableConfig != null ? TableConfigRedactionUtils.redact(offlineTableConfig) : null,
           realtimeTableConfig != null ? TableConfigRedactionUtils.redact(realtimeTableConfig) : null);
+      if (!RedactedTableConfigsResponse.isRequested(headers)) {
+        // Legacy representation without version information. Redacted values that still carry markers cannot be
+        // submitted back as a bare TableConfigs body, so editing clients must request the envelope instead.
+        return config.toJsonString();
+      }
       return JsonUtils.objectToString(new RedactedTableConfigsResponse(config, baseVersions));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to retrieve TableConfigs",

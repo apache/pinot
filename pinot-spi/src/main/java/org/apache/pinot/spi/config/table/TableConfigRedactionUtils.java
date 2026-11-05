@@ -85,9 +85,17 @@ public final class TableConfigRedactionUtils {
   public static String redactStructuredText(String value) {
     Objects.requireNonNull(value, "value must not be null");
     if (isPlaceholder(value)) {
-      return value;
+      return redactPlaceholder(value, false);
     }
     return redactStructuredCredentials(value);
+  }
+
+  /// Returns the placeholder with its default replaced by [#REDACTION_MARKER], or the value unchanged when it is not
+  /// a `${VAR:default}` placeholder. The default is the effective value whenever the variable is unset, so a
+  /// credential-bearing field must not display it.
+  public static String maskPlaceholderDefault(String value) {
+    Objects.requireNonNull(value, "value must not be null");
+    return isPlaceholder(value) ? redactPlaceholder(value, true) : value;
   }
 
   /// Returns whether a property name is classified as credential-bearing by the shared display policy.
@@ -181,12 +189,13 @@ public final class TableConfigRedactionUtils {
         return false;
       }
     }
-    if (!node.isTextual() || isPlaceholder(node.textValue())) {
+    if (!node.isTextual()) {
       return false;
     }
-    boolean hasPolicyMarker = parentSensitive && REDACTION_MARKER.equals(node.textValue())
-        || containsCredentialMarker(node.textValue());
-    return hasPolicyMarker && redactText(fieldName, replacement, parentSensitive).equals(node.textValue());
+    String current = node.textValue();
+    boolean hasPolicyMarker = isPlaceholder(current) ? isMaskedPlaceholder(current)
+        : parentSensitive && REDACTION_MARKER.equals(current) || containsCredentialMarker(current);
+    return hasPolicyMarker && redactText(fieldName, replacement, parentSensitive).equals(current);
   }
 
   private static String decodeJsonPointerSegment(String segment) {
@@ -359,6 +368,15 @@ public final class TableConfigRedactionUtils {
 
     String submittedValue = submitted.textValue();
     String storedValue = stored != null && stored.isTextual() ? stored.textValue() : null;
+    if (isMaskedPlaceholder(submittedValue)) {
+      // Only the stored placeholder for the same variable can supply the masked default.
+      if (storedValue == null || !isPlaceholder(storedValue)
+          || !placeholderKey(storedValue).equals(placeholderKey(submittedValue))
+          || !redactText(fieldName, storedValue, sensitive).equals(submittedValue)) {
+        throw unresolvedMarker();
+      }
+      return JsonUtils.objectToJsonNode(storedValue);
+    }
     if (isPlaceholder(submittedValue)) {
       return submitted.deepCopy();
     }
@@ -757,10 +775,17 @@ public final class TableConfigRedactionUtils {
       }
       return false;
     }
-    if (!node.isTextual() || isPlaceholder(node.textValue()) || !node.textValue().contains(REDACTION_MARKER)) {
+    if (!node.isTextual()) {
       return false;
     }
-    return sensitive || containsCredentialMarker(node.textValue());
+    String value = node.textValue();
+    if (isPlaceholder(value)) {
+      return isMaskedPlaceholder(value);
+    }
+    if (!value.contains(REDACTION_MARKER)) {
+      return false;
+    }
+    return sensitive || containsCredentialMarker(value);
   }
 
   private static IllegalArgumentException unresolvedMarker() {
@@ -768,13 +793,48 @@ public final class TableConfigRedactionUtils {
   }
 
   private static String redactText(@Nullable String fieldName, String value, boolean sensitive) {
+    boolean sensitiveValue = sensitive || isSensitiveKey(fieldName);
     if (isPlaceholder(value)) {
-      return value;
+      return redactPlaceholder(value, sensitiveValue);
     }
-    if (sensitive || isSensitiveKey(fieldName)) {
+    if (sensitiveValue) {
       return REDACTION_MARKER;
     }
     return redactStructuredCredentials(value);
+  }
+
+  /// Redacts the default segment of a `${VAR:default}` placeholder: wholesale under a credential-bearing key, and by
+  /// the structured-text policy elsewhere so a URI or assignment default still hides its credentials. The variable
+  /// name is preserved because the restore path matches on it.
+  private static String redactPlaceholder(String placeholder, boolean sensitive) {
+    int defaultStart = placeholderDefaultStart(placeholder);
+    if (defaultStart < 0 || defaultStart == placeholder.length() - 1) {
+      return placeholder;
+    }
+    String defaultValue = placeholder.substring(defaultStart, placeholder.length() - 1);
+    String redactedDefault = sensitive ? REDACTION_MARKER : redactStructuredCredentials(defaultValue);
+    return placeholder.substring(0, defaultStart) + redactedDefault + "}";
+  }
+
+  /// Returns the index at which the default of a placeholder starts, or -1 when it declares no default.
+  private static int placeholderDefaultStart(String placeholder) {
+    int separator = placeholder.indexOf(':', 2);
+    return separator < 0 ? -1 : separator + 1;
+  }
+
+  private static String placeholderKey(String placeholder) {
+    int separator = placeholder.indexOf(':', 2);
+    return placeholder.substring(2, separator < 0 ? placeholder.length() - 1 : separator);
+  }
+
+  /// Returns whether a placeholder's default carries [#REDACTION_MARKER], meaning [#redactPlaceholder] produced it
+  /// and only the stored config can restore the default.
+  private static boolean isMaskedPlaceholder(String value) {
+    if (!isPlaceholder(value)) {
+      return false;
+    }
+    int defaultStart = placeholderDefaultStart(value);
+    return defaultStart >= 0 && value.substring(defaultStart, value.length() - 1).contains(REDACTION_MARKER);
   }
 
   private static boolean isPlaceholder(String value) {
