@@ -50,12 +50,25 @@ import org.apache.pinot.query.planner.plannode.PatternSymbol;
 /// row. Once the match is complete the tape holds all of its rows, so the same lookups give *final* semantics for
 /// MEASURES.
 ///
+/// ## Bounded retained capacity
+///
+/// The tape is reused for every match of every partition, and [#reset] empties the per symbol position lists without
+/// shrinking their backing arrays. Successive long matches dominated by different variables would otherwise leave
+/// every list at the length of the longest match mapped to its variable, so the tape would retain that match once per
+/// variable even though it only ever holds one. The rows of a match are split among the variables, so together the
+/// lists never need more positions than the match is long, which [#_labels] is sized for. [#reset] therefore replaces
+/// the lists once their combined capacity exceeds twice that, which costs the next match at most a regrowth
+/// proportional to its own length. [#release()] drops all of it when the tape is no longer needed.
+///
 /// Not thread safe: one instance belongs to one [PartitionMatcher].
 public class MatchTape {
   /// Returned by [#lastRow] and [#firstRow] when no such row exists.
   public static final int NO_ROW = -1;
 
   private static final int INITIAL_LABEL_CAPACITY = 16;
+  /// Combined capacity of the per symbol position lists that [#reset] always tolerates, so that a pattern with many
+  /// variables and short matches does not reallocate its lists for every attempt.
+  private static final int MIN_RETAINED_SYMBOL_POSITIONS = 1 << 16;
 
   private final List<PatternSymbol> _patternSymbols;
   /// Partition row indexes mapped to each symbol, in ascending order; index is the symbol ordinal.
@@ -82,8 +95,13 @@ public class MatchTape {
     _startPos = startPos;
     _length = 0;
     _matchNumber = matchNumber;
+    long retainedPositions = 0;
     for (IntArrayList rows : _rowsBySymbol) {
       rows.clear();
+      retainedPositions += rows.elements().length;
+    }
+    if (retainedPositions > Math.max(2L * _labels.length, MIN_RETAINED_SYMBOL_POSITIONS)) {
+      replaceSymbolLists();
     }
   }
 
@@ -197,6 +215,10 @@ public class MatchTape {
     _length = 0;
     _matchNumber = 0;
     _labels = new int[INITIAL_LABEL_CAPACITY];
+    replaceSymbolLists();
+  }
+
+  private void replaceSymbolLists() {
     for (int i = 0; i < _rowsBySymbol.length; i++) {
       _rowsBySymbol[i] = new IntArrayList();
     }
