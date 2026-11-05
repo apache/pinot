@@ -34,6 +34,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.function.CrossTableFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -553,7 +554,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return;
     }
     List<ExpressionContext> arguments = function.getArguments();
-    if (RequestUtils.isInPartitionedSubquery(function.getFunctionName())) {
+    if (CrossTableFunction.IN_PARTITIONED_SUBQUERY.matches(function.getFunctionName())) {
       Preconditions.checkArgument(arguments.size() == 2,
           "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);

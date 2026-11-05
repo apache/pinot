@@ -599,20 +599,6 @@ public class RequestUtils {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
 
-  // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
-  private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
-
-  /// Returns whether a function name, as written or as [#canonicalizeFunctionName(String)] leaves it, is
-  /// `IN_PARTITIONED_SUBQUERY`, ignoring case and underscores.
-  ///
-  /// This is the check the server resolves the function with, so a guard that has to cover exactly the calls the
-  /// server resolves, such as the broker's row-level security check, uses it too rather than comparing the canonical
-  /// name: the per-character case fold also matches a look-alike spelling, e.g. with a dotless `ı` for the `i`, which
-  /// `toLowerCase()` leaves apart.
-  public static boolean isInPartitionedSubquery(String functionName) {
-    return StringUtils.remove(functionName, '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY);
-  }
-
   private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP =
       Map.copyOf(Arrays.stream(FilterKind.values())
           .collect(Collectors.toMap(f -> canonicalizeFunctionName(f.name()), Enum::name)));

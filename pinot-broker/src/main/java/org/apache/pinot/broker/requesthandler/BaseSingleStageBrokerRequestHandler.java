@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,6 +39,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -58,6 +60,7 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
+import org.apache.pinot.common.function.CrossTableFunction;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -150,15 +153,10 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleStageBrokerRequestHandler.class);
-  // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
-  private static final String IN_SUBQUERY = "insubquery";
   private static final String IN_ID_SET = "inidset";
   private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
-  /// Canonical name (see [RequestUtils#canonicalizeFunctionName]) of the `lookup()` transform function, which reads a
-  /// dimension table named by a string literal argument instead of by the FROM clause.
-  private static final String LOOKUP_FUNCTION = "lookup";
   private static final String EXPR_MIN = "exprmin";
   private static final String EXPR_MAX = "exprmax";
   private static final Set<String> EXPR_MIN_MAX_FUNCTIONS = Set.of(EXPR_MIN, EXPR_MAX);
@@ -562,8 +560,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
         List<String> rowFilters = rlsFilters.getRLSFilters().orElse(null);
         if (rowFilters != null && !rowFilters.isEmpty()) {
-          validateNoInPartitionedSubquery(requestId, query, requestContext, tableName, rawTableName, pinotQuery,
-              serverPinotQuery);
+          validateCrossTableFunctionsUnderRowFilters(requestId, query, requestContext, tableName, rawTableName,
+              pinotQuery, serverPinotQuery);
           /// Apply RLS to `serverPinotQuery` (the query the server actually executes), not to
           /// `pinotQuery` as the pre-MV codebase did — for gapfill queries `serverPinotQuery` is
           /// the inner stripped query and `pinotQuery` is the outer gapfill wrapper, so the pre-MV
@@ -1634,7 +1632,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return;
     }
     List<Expression> operands = function.getOperands();
-    if (function.getOperator().equals(IN_SUBQUERY)) {
+    if (CrossTableFunction.IN_SUBQUERY.matches(function.getOperator())) {
       Preconditions.checkState(operands.size() == 2, "IN_SUBQUERY requires 2 arguments: expression, subquery");
       Literal subqueryLiteral = operands.get(1).getLiteral();
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
@@ -2257,88 +2255,97 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @VisibleForTesting
   static Set<String> extractLookupTableNames(PinotQuery pinotQuery) {
     Set<String> lookupTableNames = new HashSet<>();
-    for (Expression expression : pinotQuery.getSelectList()) {
-      collectLookupTableNames(expression, lookupTableNames);
-    }
-    collectLookupTableNames(pinotQuery.getFilterExpression(), lookupTableNames);
-    collectLookupTableNames(pinotQuery.getHavingExpression(), lookupTableNames);
-    collectLookupTableNames(pinotQuery.getGroupByList(), lookupTableNames);
-    collectLookupTableNames(pinotQuery.getOrderByList(), lookupTableNames);
+    forEachCrossTableFunction(pinotQuery, (crossTableFunction, functionCall) -> {
+      List<Expression> operands = functionCall.getOperands();
+      if (crossTableFunction == CrossTableFunction.LOOKUP && !operands.isEmpty()) {
+        Literal tableName = operands.get(0).getLiteral();
+        // A non-literal table name is rejected by LookupTransformFunction on the server
+        if (tableName != null && tableName.isSetStringValue()) {
+          lookupTableNames.add(tableName.getStringValue());
+        }
+      }
+    });
     return lookupTableNames;
   }
 
-  private static void collectLookupTableNames(@Nullable List<Expression> expressions, Set<String> lookupTableNames) {
+  /// Rejects the query with access denied if a cross-table function in it would read rows that the row filters of
+  /// the queried table hide. Called when the access control returns row filters for that table.
+  ///
+  /// The row filters are added to the WHERE clause, which covers the queried table only, so every
+  /// [CrossTableFunction] is decided here, and the switch is exhaustive so that a new one cannot be added without
+  /// deciding it:
+  /// - `IN_SUBQUERY` runs its subquery as a request of its own under the same identity, so the subquery's table gets
+  ///   its own access check and row filters.
+  /// - `lookup()` reads a dimension table by primary key, never through a filter; a dimension table with row filters
+  ///   for the principal rejects the query whether or not the queried table has any, see the check on the lookup
+  ///   table names in [#doHandleRequest].
+  /// - `IN_PARTITIONED_SUBQUERY` is resolved by the server on the segments of the queried table, outside the WHERE
+  ///   clause, so the query is rejected. The server adds the row filters to the subquery as well, as defense in depth
+  ///   for an older broker, but the broker cannot tell an older server apart and does not rely on it.
+  ///
+  /// The gapfill wrapper is checked along with the query the servers run, although only the latter reaches a server.
+  private void validateCrossTableFunctionsUnderRowFilters(long requestId, String query,
+      RequestContext requestContext, String tableName, String rawTableName, PinotQuery pinotQuery,
+      PinotQuery serverPinotQuery) {
+    BiConsumer<CrossTableFunction, Function> check = (crossTableFunction, functionCall) -> {
+      boolean readsHiddenRows = switch (crossTableFunction) {
+        case IN_SUBQUERY, LOOKUP -> false;
+        case IN_PARTITIONED_SUBQUERY -> true;
+      };
+      if (readsHiddenRows) {
+        throwAccessDeniedError(requestId, query, requestContext, tableName, new BasicAuthorizationResultImpl(false,
+            crossTableFunction + " is not allowed on table " + rawTableName
+                + " when row-level security filters apply"));
+      }
+    };
+    forEachCrossTableFunction(serverPinotQuery, check);
+    if (serverPinotQuery != pinotQuery) {
+      forEachCrossTableFunction(pinotQuery, check);
+    }
+  }
+
+  /// Returns the cross-table functions the query calls anywhere, see [#forEachCrossTableFunction].
+  @VisibleForTesting
+  static Set<CrossTableFunction> findCrossTableFunctions(PinotQuery pinotQuery) {
+    Set<CrossTableFunction> found = EnumSet.noneOf(CrossTableFunction.class);
+    forEachCrossTableFunction(pinotQuery, (crossTableFunction, functionCall) -> found.add(crossTableFunction));
+    return found;
+  }
+
+  /// Calls `consumer` with every call of a cross-table function in the query, see [CrossTableFunction]: in the select
+  /// list, the filter, the having clause and the group-by and order-by expressions, calls nested in other calls
+  /// included.
+  private static void forEachCrossTableFunction(PinotQuery pinotQuery,
+      BiConsumer<CrossTableFunction, Function> consumer) {
+    forEachCrossTableFunction(pinotQuery.getSelectList(), consumer);
+    forEachCrossTableFunction(pinotQuery.getFilterExpression(), consumer);
+    forEachCrossTableFunction(pinotQuery.getHavingExpression(), consumer);
+    forEachCrossTableFunction(pinotQuery.getGroupByList(), consumer);
+    forEachCrossTableFunction(pinotQuery.getOrderByList(), consumer);
+  }
+
+  private static void forEachCrossTableFunction(@Nullable List<Expression> expressions,
+      BiConsumer<CrossTableFunction, Function> consumer) {
     if (expressions != null) {
       for (Expression expression : expressions) {
-        collectLookupTableNames(expression, lookupTableNames);
+        forEachCrossTableFunction(expression, consumer);
       }
     }
   }
 
-  private static void collectLookupTableNames(@Nullable Expression expression, Set<String> lookupTableNames) {
+  private static void forEachCrossTableFunction(@Nullable Expression expression,
+      BiConsumer<CrossTableFunction, Function> consumer) {
     if (expression == null || expression.getType() != ExpressionType.FUNCTION) {
       return;
     }
     Function functionCall = expression.getFunctionCall();
-    List<Expression> operands = functionCall.getOperands();
-    if (LOOKUP_FUNCTION.equals(functionCall.getOperator()) && !operands.isEmpty()) {
-      Literal tableName = operands.get(0).getLiteral();
-      // A non-literal table name is rejected by LookupTransformFunction on the server
-      if (tableName != null && tableName.isSetStringValue()) {
-        lookupTableNames.add(tableName.getStringValue());
-      }
+    CrossTableFunction crossTableFunction = CrossTableFunction.fromFunctionName(functionCall.getOperator());
+    if (crossTableFunction != null) {
+      consumer.accept(crossTableFunction, functionCall);
     }
-    // Recurse regardless, so that a lookup() nested inside another lookup()'s join value is collected too
-    collectLookupTableNames(operands, lookupTableNames);
-  }
-
-  /// Rejects the query with access denied if it calls `IN_PARTITIONED_SUBQUERY`. Called when row-level security
-  /// filters apply to the queried table.
-  ///
-  /// The server resolves that function by running the quoted subquery on the segments of the queried table, outside
-  /// the WHERE clause the row filters are added to, so the broker never forwards it for a principal with row filters.
-  /// The server adds the row filters to the subquery as well, as defense in depth for an older broker, but the broker
-  /// cannot tell an older server apart and does not rely on it. The gapfill wrapper is checked along with the query
-  /// the servers run, although only the latter reaches a server.
-  private void validateNoInPartitionedSubquery(long requestId, String query, RequestContext requestContext,
-      String tableName, String rawTableName, PinotQuery pinotQuery, PinotQuery serverPinotQuery) {
-    if (containsInPartitionedSubquery(serverPinotQuery) || (serverPinotQuery != pinotQuery
-        && containsInPartitionedSubquery(pinotQuery))) {
-      throwAccessDeniedError(requestId, query, requestContext, tableName, new BasicAuthorizationResultImpl(false,
-          "IN_PARTITIONED_SUBQUERY is not allowed on table " + rawTableName
-              + " when row-level security filters apply"));
-    }
-  }
-
-  /// Returns whether the query calls `IN_PARTITIONED_SUBQUERY` anywhere, matching the name exactly as the server
-  /// does, see [RequestUtils#isInPartitionedSubquery(String)].
-  @VisibleForTesting
-  static boolean containsInPartitionedSubquery(PinotQuery pinotQuery) {
-    return containsInPartitionedSubquery(pinotQuery.getSelectList())
-        || containsInPartitionedSubquery(pinotQuery.getFilterExpression())
-        || containsInPartitionedSubquery(pinotQuery.getHavingExpression())
-        || containsInPartitionedSubquery(pinotQuery.getGroupByList())
-        || containsInPartitionedSubquery(pinotQuery.getOrderByList());
-  }
-
-  private static boolean containsInPartitionedSubquery(@Nullable List<Expression> expressions) {
-    if (expressions != null) {
-      for (Expression expression : expressions) {
-        if (containsInPartitionedSubquery(expression)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  private static boolean containsInPartitionedSubquery(@Nullable Expression expression) {
-    if (expression == null || expression.getType() != ExpressionType.FUNCTION) {
-      return false;
-    }
-    Function functionCall = expression.getFunctionCall();
-    return RequestUtils.isInPartitionedSubquery(functionCall.getOperator())
-        || containsInPartitionedSubquery(functionCall.getOperands());
+    // Recurse regardless, so that a call nested in another call's operands (a lookup() in a lookup()'s join value, a
+    // subquery function in a CASE) is visited too
+    forEachCrossTableFunction(functionCall.getOperands(), consumer);
   }
 
   /// Fixes the column names to the actual column names in the given expression.
@@ -2350,18 +2357,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       identifier.setName(getActualColumnName(rawTableName, identifier.getName(), columnNameMap, ignoreCase));
     } else if (expressionType == ExpressionType.FUNCTION) {
       final Function functionCall = expression.getFunctionCall();
-      switch (functionCall.getOperator()) {
-        case "as":
-          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, ignoreCase);
-          break;
-        case LOOKUP_FUNCTION:
-          // LOOKUP function looks up another table's schema, skip the check for now.
-          break;
-        default:
-          for (Expression operand : functionCall.getOperands()) {
-            fixColumnName(rawTableName, operand, columnNameMap, ignoreCase);
-          }
-          break;
+      String operator = functionCall.getOperator();
+      if (operator.equals("as")) {
+        fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, ignoreCase);
+      } else if (CrossTableFunction.LOOKUP.matches(operator)) {
+        // LOOKUP function looks up another table's schema, skip the check for now.
+      } else {
+        for (Expression operand : functionCall.getOperands()) {
+          fixColumnName(rawTableName, operand, columnNameMap, ignoreCase);
+        }
       }
     }
   }

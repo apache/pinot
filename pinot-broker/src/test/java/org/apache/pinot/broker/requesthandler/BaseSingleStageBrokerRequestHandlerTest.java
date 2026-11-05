@@ -43,6 +43,7 @@ import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.function.CrossTableFunction;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -877,36 +878,38 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testContainsInPartitionedSubquery() {
+  public void testFindCrossTableFunctions() {
     String subquery = "SELECT ID_SET(col1) FROM myTable WHERE col2 = 2";
-    // The server matches the function name with underscores removed and ignoring case per character, so every
-    // spelling counts, including one with the dotless i (U+0131) that only that case fold maps to the name
+    // The names are matched with underscores removed and the case folded per character, as the server resolves them,
+    // so every spelling counts, including one with the dotless i (U+0131) that only that case fold maps to the name
     String[] spellings = {
         "IN_PARTITIONED_SUBQUERY", "inpartitionedsubquery", "In_Partitioned_Sub_Query", "IN_PART\u0131TIONED_SUBQUERY"
     };
     for (String spelling : spellings) {
-      assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
-          CalciteSqlParser.compileToPinotQuery(
-              "SELECT COUNT(*) FROM myTable WHERE " + spelling + "(col1, '" + subquery + "') = 1")), spelling);
+      assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE " + spelling + "(col1, '" + subquery
+          + "') = 1"), Set.of(CrossTableFunction.IN_PARTITIONED_SUBQUERY), spelling);
     }
     // Nested in other predicates and expressions, and outside the WHERE clause
-    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
-        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM myTable WHERE col2 = 1 AND NOT (col3 > 2 OR "
-            + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1)")));
-    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
-        CalciteSqlParser.compileToPinotQuery("SELECT CASE WHEN IN_PARTITIONED_SUBQUERY(col1, '" + subquery
-            + "') = 1 THEN 1 ELSE 0 END FROM myTable")));
-    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
-        CalciteSqlParser.compileToPinotQuery("SELECT col1, COUNT(*) FROM myTable GROUP BY col1 HAVING "
-            + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1")));
-    // Other functions, including the subquery the broker resolves itself, do not count
-    assertFalse(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
-        CalciteSqlParser.compileToPinotQuery(
-            "SELECT COUNT(*) FROM myTable WHERE IN_SUBQUERY(col1, '" + subquery + "') = 1")));
-    assertFalse(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
-        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col1, 'AQ==') = 1")));
-    assertFalse(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(
-        CalciteSqlParser.compileToPinotQuery("SELECT COUNT(*) FROM myTable WHERE col1 = 1")));
+    assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE col2 = 1 AND NOT (col3 > 2 OR "
+            + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1)"),
+        Set.of(CrossTableFunction.IN_PARTITIONED_SUBQUERY));
+    assertEquals(findCrossTableFunctions("SELECT CASE WHEN IN_PARTITIONED_SUBQUERY(col1, '" + subquery
+        + "') = 1 THEN 1 ELSE 0 END FROM myTable"), Set.of(CrossTableFunction.IN_PARTITIONED_SUBQUERY));
+    assertEquals(findCrossTableFunctions("SELECT col1, COUNT(*) FROM myTable GROUP BY col1 HAVING "
+        + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1"), Set.of(CrossTableFunction.IN_PARTITIONED_SUBQUERY));
+    // The other cross-table functions, alone and together, a lookup() nested in a lookup() included
+    assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE IN_SUBQUERY(col1, '" + subquery
+        + "') = 1"), Set.of(CrossTableFunction.IN_SUBQUERY));
+    assertEquals(findCrossTableFunctions("SELECT lookup('dimTable', 'name', 'id', lookup('other', 'id', 'key', col1)) "
+        + "FROM myTable WHERE In_Sub_Query(col2, '" + subquery + "') = 1 ORDER BY LOOK_UP('third', 'v', 'k', col3)"),
+        Set.of(CrossTableFunction.LOOKUP, CrossTableFunction.IN_SUBQUERY));
+    // Other functions, IN_ID_SET on a literal included, are not cross-table functions
+    assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col1, 'AQ==') = 1"), Set.of());
+    assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE col1 = 1"), Set.of());
+  }
+
+  private static Set<CrossTableFunction> findCrossTableFunctions(String sql) {
+    return BaseSingleStageBrokerRequestHandler.findCrossTableFunctions(CalciteSqlParser.compileToPinotQuery(sql));
   }
 
   /// The server resolves IN_PARTITIONED_SUBQUERY by running the quoted subquery on the segments of the table, outside
@@ -975,7 +978,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(query);
     assertFalse(response.getRLSFiltersApplied());
     assertNotNull(serverRequest.get());
-    assertTrue(BaseSingleStageBrokerRequestHandler.containsInPartitionedSubquery(serverRequest.get().getPinotQuery()));
+    assertTrue(BaseSingleStageBrokerRequestHandler.findCrossTableFunctions(serverRequest.get().getPinotQuery())
+        .contains(CrossTableFunction.IN_PARTITIONED_SUBQUERY));
   }
 
   /// A handler that records the request it would send to the servers instead of sending it.
