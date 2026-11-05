@@ -1765,7 +1765,7 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  private static class TimeSupplier implements Supplier<Long> {
+  static class TimeSupplier implements Supplier<Long> {
     protected final AtomicInteger _timeCheckCounter = new AtomicInteger();
     protected long _timeNow = System.currentTimeMillis();
 

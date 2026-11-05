@@ -30,7 +30,9 @@ import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ThrottledLogger;
+import org.apache.pinot.spi.ingestion.error.IngestionSourceErrorReporter;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -54,15 +56,24 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   private static final int RATE_LIMIT_BACKOFF_JITTER_BOUND_MS = 250;
   private static final RequestRateLimiter SHARED_REQUEST_RATE_LIMITER = new SharedKinesisRequestRateLimiter();
   private static final double RATE_LIMIT_LOG_RATE_PER_MIN = 5.0;
+  private static final int MAX_CONSECUTIVE_THROTTLED_FETCHES = 5;
+  private static final Map<String, Integer> CONSECUTIVE_THROTTLED_FETCHES =
+      CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS).<String, Integer>build().asMap();
 
   private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
   private String _nextShardIterator = null;
+  private final String _throttleKeyPrefix;
   private final RequestRateLimiter _requestRateLimiter;
 
   public KinesisConsumer(KinesisConfig config) {
+    this(config, (String) null);
+  }
+
+  public KinesisConsumer(KinesisConfig config, @Nullable String clientId) {
     super(config);
     _requestRateLimiter = SHARED_REQUEST_RATE_LIMITER;
+    _throttleKeyPrefix = throttleKeyPrefix(config, clientId);
     LOGGER.info("Created Kinesis consumer with topic: {}, RPS limit: {}, max records per fetch: {}",
         config.getStreamTopicName(), config.getRpsLimitPerSecond(), config.getNumMaxRecordsToFetch());
   }
@@ -74,8 +85,21 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   @VisibleForTesting
   KinesisConsumer(KinesisConfig config, KinesisClient kinesisClient, RequestRateLimiter requestRateLimiter) {
+    this(config, kinesisClient, requestRateLimiter, null);
+  }
+
+  @VisibleForTesting
+  KinesisConsumer(KinesisConfig config, KinesisClient kinesisClient, RequestRateLimiter requestRateLimiter,
+      @Nullable String clientId) {
     super(config, kinesisClient);
     _requestRateLimiter = requestRateLimiter;
+    _throttleKeyPrefix = throttleKeyPrefix(config, clientId);
+  }
+
+  private static String throttleKeyPrefix(KinesisConfig config, @Nullable String clientId) {
+    return clientId != null
+        ? clientId
+        : config.getAwsRegion() + "/" + config.getEndpoint() + "/" + config.getStreamTopicName();
   }
 
   /// Based on Kinesis documentation, we might get a response with empty records but a non-null nextShardIterator.
@@ -94,18 +118,18 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     KinesisRateLimitException lastRateLimitException = null;
     while (true) {
       if (lastRateLimitException != null && currentTimeMillis() >= deadlineMs) {
-        logRateLimitTimeout(startOffset, attempts, lastRateLimitException);
-        return new KinesisMessageBatch(List.of(), startOffset, false, 0);
+        return throttleExhausted(startOffset, attempts, lastRateLimitException);
       }
       try {
-        return getKinesisMessageBatch(startOffset, deadlineMs);
+        KinesisMessageBatch messageBatch = getKinesisMessageBatch(startOffset, deadlineMs);
+        CONSECUTIVE_THROTTLED_FETCHES.remove(throttleKey(startOffset));
+        return messageBatch;
       } catch (KinesisRateLimitException e) {
         lastRateLimitException = e;
         attempts++;
         long remainingMs = deadlineMs - currentTimeMillis();
         if (remainingMs <= 0) {
-          logRateLimitTimeout(startOffset, attempts, e);
-          return new KinesisMessageBatch(List.of(), startOffset, false, 0);
+          return throttleExhausted(startOffset, attempts, e);
         }
         long backoffMs = Math.min(computeRateLimitBackoffMs(attempts), remainingMs);
         _throttledLogger.warn(
@@ -115,10 +139,27 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
                 _config.getRpsLimitPerSecond(), attempts, backoffMs), e.getCause());
         sleep(backoffMs);
       } catch (KinesisRequestTimeoutException e) {
+        if (lastRateLimitException != null) {
+          return throttleExhausted(startOffset, attempts, lastRateLimitException);
+        }
         logRequestLimiterTimeout(startOffset, e);
         return new KinesisMessageBatch(List.of(), startOffset, false, 0);
       }
     }
+  }
+
+  private KinesisMessageBatch throttleExhausted(KinesisPartitionGroupOffset startOffset, int attempts,
+      KinesisRateLimitException rateLimitException) {
+    logRateLimitTimeout(startOffset, attempts, rateLimitException);
+    if (CONSECUTIVE_THROTTLED_FETCHES.merge(throttleKey(startOffset), 1, Integer::sum)
+        > MAX_CONSECUTIVE_THROTTLED_FETCHES) {
+      IngestionSourceErrorReporter.report(rateLimitException.getCause());
+    }
+    return new KinesisMessageBatch(List.of(), startOffset, false, 0);
+  }
+
+  private String throttleKey(KinesisPartitionGroupOffset offset) {
+    return _throttleKeyPrefix + "/" + offset.getShardId();
   }
 
   private KinesisMessageBatch getKinesisMessageBatch(KinesisPartitionGroupOffset startMsgOffset, long deadlineMs) {
