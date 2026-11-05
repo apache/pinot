@@ -125,7 +125,7 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
         null);
   }
 
-  public List<Map<String, String>> loadJsonFile(String filePath)
+  public List<Map<String, Object>> loadJsonFile(String filePath)
       throws IOException {
     URL resourceUrl = this.getClass().getClassLoader().getResource(filePath);
     if (resourceUrl == null) {
@@ -141,7 +141,7 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
       throws Exception {
     setup(true, 0, null);
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
-    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
+    List<Map<String, Object>> rawData = loadJsonFile(DATA_FILE_PATH);
     for (int i = 0; i < 2; i++) {
       verifyGeneratedSegmentDataAgainstRawData(i, i, rawData);
     }
@@ -152,7 +152,7 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
       throws Exception {
     setup(false, 0, null);
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 4);
-    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
+    List<Map<String, Object>> rawData = loadJsonFile(DATA_FILE_PATH);
     for (int i = 0; i < 4; i++) {
       verifyGeneratedSegmentDataAgainstRawData(i, i, rawData);
     }
@@ -175,7 +175,7 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
   private void checkGeneratedSegmentDataWhenTableTimeColumnIsUsedAsDedupTimeColumn()
       throws IOException {
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 3);
-    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
+    List<Map<String, Object>> rawData = loadJsonFile(DATA_FILE_PATH);
     for (int i = 0; i < 2; i++) {
       verifyGeneratedSegmentDataAgainstRawData(i, i, rawData);
     }
@@ -187,14 +187,14 @@ public class MutableSegmentDedupTest implements PinotBuffersAfterMethodCheckRule
       throws Exception {
     setup(true, 1000, "dedupTime");
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
-    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
+    List<Map<String, Object>> rawData = loadJsonFile(DATA_FILE_PATH);
     for (int i = 0; i < 2; i++) {
       verifyGeneratedSegmentDataAgainstRawData(i, i, rawData);
     }
   }
 
   private void verifyGeneratedSegmentDataAgainstRawData(int docId, int rawDataIndex,
-      List<Map<String, String>> rawData) {
+      List<Map<String,Object>> rawData) {
     for (String columnName : rawData.get(0).keySet()) {
       Assert.assertEquals(String.valueOf(_mutableSegmentImpl.getValue(docId, columnName)),
           String.valueOf(rawData.get(rawDataIndex).get(columnName)));

@@ -119,7 +119,7 @@ import static java.util.Objects.requireNonNull;
 public abstract class BaseTableDataManager implements TableDataManager {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
-  protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
+  @io.tesseracta.annotation.TesseractaDoNotLog protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
   protected final ServerMetrics _serverMetrics = ServerMetrics.get();
 
   protected InstanceDataManagerConfig _instanceDataManagerConfig;

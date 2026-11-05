@@ -138,6 +138,8 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
 
+    <dependency.classifier></dependency.classifier>
+
     <arrow.version>18.3.0</arrow.version>
     <avro.version>1.12.1</avro.version>
     <parquet.version>1.16.0</parquet.version>
@@ -534,6 +536,96 @@
         <scala.compat.version>2.13</scala.compat.version>
       </properties>
     </profile>
+
+    <profile>
+      <id>tesseracta-build</id>
+      <properties>
+        <dependency.classifier>tesseracta</dependency.classifier>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>io.tesseracta</groupId>
+          <artifactId>tesseracta-runtime</artifactId>
+          <version>0.2.35</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.22</version>
+            <optional>true</optional>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>io.tesseracta</groupId>
+            <artifactId>tesseracta-maven-plugin</artifactId>
+            <version>0.1.24</version>
+            <configuration>
+              <orgName>demo</orgName>
+              <teamName>pinot</teamName>
+              <allowUnpushedChanges>true</allowUnpushedChanges>
+            </configuration>
+            <executions>
+              <execution>
+                <id>tesseracta-compile</id>
+                <phase>compile</phase>
+                <goals>
+                  <goal>compile</goal>
+                </goals>
+              </execution>
+                <execution>
+                  <id>tesseracta-testCompile</id>
+                  <phase>test-compile</phase>
+                  <goals>
+                    <goal>testCompile</goal>
+                  </goals>
+                </execution>
+            </executions>
+          </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                  <execution>
+                    <id>default-compile</id>
+                    <phase>none</phase>
+                  </execution>
+                  <execution>
+                    <id>default-testCompile</id>
+                    <phase>none</phase>
+                  </execution>
+                </executions>
+            </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <configuration>
+                  <classesDirectory>${project.build.outputDirectory}-tesseracta</classesDirectory>
+                  <testClassesDirectory>${project.build.testOutputDirectory}-tesseracta</testClassesDirectory>
+              </configuration>
+            </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>tesseracta-jar</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <configuration>
+                  <classesDirectory>${project.build.outputDirectory}-tesseracta</classesDirectory>
+                  <classifier>tesseracta</classifier>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
   </profiles>
 
   <dependencyManagement>
@@ -2270,7 +2362,7 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <configuration>
-            <forkCount>1</forkCount>
+            <forkCount>4</forkCount>
             <reuseForks>false</reuseForks>
             <!-- 60 minutes -->
             <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
@@ -2587,7 +2679,7 @@
           <excludes>
             <exclude>**/*IT.java</exclude>
           </excludes>
-          <forkCount>1</forkCount>
+          <forkCount>4</forkCount>
           <reuseForks>false</reuseForks>
         </configuration>
         <executions>

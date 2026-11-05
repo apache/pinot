@@ -236,6 +236,12 @@
       <artifactId>assertj-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>io.tesseracta</groupId>
+      <artifactId>tesseracta-annotation</artifactId>
+      <version>0.1.2</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>
@@ -252,6 +258,44 @@
       <properties>
         <shade.phase.prop>none</shade.phase.prop>
       </properties>
+    </profile>
+    <profile>
+        <id>tesseracta-build</id>
+        <build>
+            <resources>
+                <resource>
+                    <targetPath>${project.build.directory}/test-classes-tesseracta</targetPath>
+                    <directory>src/test/resources</directory>
+                </resource>
+            </resources>
+            <plugins>
+                <plugin>
+                    <groupId>io.tesseracta</groupId>
+                    <artifactId>tesseracta-maven-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>tesseracta-compile</id>
+                            <configuration>
+                                <srcDirsActiveTracing>
+                                    <srcDir>src/main/java/org/apache/pinot</srcDir>
+                                </srcDirsActiveTracing>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <id>tesseracta-testCompile</id>
+                            <configuration>
+                                <srcDirsModifiedDependencies>
+                                    <srcDir>src/main/java/org/apache/pinot</srcDir>
+                                </srcDirsModifiedDependencies>
+                                <srcDirsActiveTracing>
+                                    <srcDir>src/test/java/org/apache/pinot</srcDir>
+                                </srcDirsActiveTracing>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </build>
     </profile>
   </profiles>
 </project>

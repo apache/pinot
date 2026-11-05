@@ -371,7 +371,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDisabledTest
   public void testValidDocIdsMetadataPost()
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
@@ -406,7 +406,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(serverStatus, "NOT_STARTED", serverStatus);
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDisabledTest
   public void testValidDocIdsMetadataPostForSnapshotWithDelete()
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);

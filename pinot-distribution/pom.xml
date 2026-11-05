@@ -37,6 +37,72 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-timeseries-spi</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-core</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-timeseries-planner</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-runtime</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-server</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-broker</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
     </dependency>
     <dependency>

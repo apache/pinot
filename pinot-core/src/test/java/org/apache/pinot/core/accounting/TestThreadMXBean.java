@@ -46,7 +46,7 @@ public class TestThreadMXBean {
   /**
    * simple memory allocation
    */
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDisabledTest
   public void testThreadMXBeanSimpleMemAllocTracking() {
     if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
       ThreadResourceSnapshot threadResourceSnapshot = new ThreadResourceSnapshot();

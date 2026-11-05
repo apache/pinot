@@ -308,7 +308,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDoNotTrace
   public void testWhenOnlyDefaultAppQuotaIsSetItAffectsAllApplications()
       throws InterruptedException {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);

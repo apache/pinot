@@ -31,6 +31,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
+@io.tesseracta.annotation.TesseractaDisabledTest
 public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
   //all exported controller metrics have this prefix
   private static final String EXPORTED_METRIC_PREFIX = "pinot_controller_";

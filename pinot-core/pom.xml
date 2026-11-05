@@ -35,8 +35,39 @@
 
   <dependencies>
     <dependency>
+      <groupId>io.tesseracta</groupId>
+      <artifactId>tesseracta-annotation</artifactId>
+      <version>0.1.2</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-timeseries-spi</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-local</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
     </dependency>
 
     <!-- Netty dependencies -->
@@ -105,6 +136,8 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-spi</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
     </dependency>
 
     <dependency>
@@ -187,6 +220,60 @@
       <properties>
         <shade.phase.prop>none</shade.phase.prop>
       </properties>
+    </profile>
+    <profile>
+        <id>tesseracta-build</id>
+        <build>
+            <resources>
+                <resource>
+                    <targetPath>${project.build.directory}/test-classes-tesseracta</targetPath>
+                    <directory>src/test/resources</directory>
+                </resource>
+            </resources>
+            <plugins>
+                <plugin>
+                    <groupId>io.tesseracta</groupId>
+                    <artifactId>tesseracta-maven-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>tesseracta-compile</id>
+                            <configuration>
+                                <srcDirsModifiedDependencies>
+                                    <srcDir>../pinot-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-segment-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-segment-local/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-timeseries/pinot-timeseries-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-common/src/main/java/org/apache/pinot</srcDir>
+                                </srcDirsModifiedDependencies>
+                                <srcDirsActiveTracing>
+                                    <srcDir>src/main/java/org/apache/pinot</srcDir>
+                                </srcDirsActiveTracing>
+                                <entryMethods>
+                                    <entryMethod>org.apache.pinot.core.transport.InstanceRequestHandler.channelRead0</entryMethod>
+                                    <entryMethod>org.apache.pinot.core.query.scheduler.QueryScheduler.processQueryAndSerialize</entryMethod>
+                                </entryMethods>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <id>tesseracta-testCompile</id>
+                            <configuration>
+                                <srcDirsModifiedDependencies>
+                                    <srcDir>../pinot-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-segment-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-segment-local/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-timeseries/pinot-timeseries-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-common/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>src/main/java/org/apache/pinot</srcDir>
+                                </srcDirsModifiedDependencies>
+                                <srcDirsActiveTracing>
+                                    <srcDir>src/test/java/org/apache/pinot</srcDir>
+                                </srcDirsActiveTracing>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </build>
     </profile>
   </profiles>
 </project>

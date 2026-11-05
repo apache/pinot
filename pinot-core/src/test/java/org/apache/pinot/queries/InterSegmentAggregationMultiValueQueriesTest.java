@@ -557,7 +557,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     }
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDoNotTrace
   public void testPercentileEstMV() {
     List<String> queries = Arrays.asList("SELECT PERCENTILEEST50MV(column6) AS value FROM testTable",
         "SELECT PERCENTILEESTMV(column6, 50) AS value FROM testTable",
@@ -590,7 +590,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     }
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDoNotTrace
   public void testPercentileRawEstMV() {
     testPercentileRawEstMV(50);
     testPercentileRawEstMV(90);
@@ -619,7 +619,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         getBrokerResponse(regularQuery + FILTER + MV_GROUP_BY), quantileExtractor);
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDoNotTrace
   public void testPercentileRawTDigestMV() {
     testPercentileRawTDigestMV(50);
     testPercentileRawTDigestMV(90);

@@ -30,6 +30,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
+@io.tesseracta.annotation.TesseractaDisabledTest
 public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
 
   private static final String EXPORTED_METRIC_PREFIX = "pinot_broker_";
