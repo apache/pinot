@@ -205,6 +205,11 @@ public class PartitionMatcher {
     }
   }
 
+  /// The pattern matching steps the last [#match] call took, whether it found a match or not.
+  public long getLastAttemptSteps() {
+    return _steps;
+  }
+
   /// Applies `transition` at `pos`, updating the current state when its guard holds.
   ///
   /// @return whether the transition was taken; on success [#_state] and [#_pos] hold its target
