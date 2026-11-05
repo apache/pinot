@@ -83,13 +83,11 @@ import org.immutables.value.Value;
 /// ([QueryOptionKey#MAX_ROWS_IN_MATCH_PARTITION]) does not bound it either. That limit applies to the rows
 /// MATCH_RECOGNIZE buffers for one partition after the sort, not to the sort buffer below it.
 ///
-/// Sender-side sorting is not implemented for exchanges yet (see the same note in [PinotWindowExchangeNodeInsertRule]).
-///
 /// A query with no `PARTITION BY` is rejected, because hashing on zero keys sends the entire table to one worker.
 /// Set the [QueryOptionKey#ALLOW_MATCH_RECOGNIZE_WITHOUT_PARTITION_BY] query option to opt into that plan.
 ///
-/// TODO(#19395): Support sender-side sorting so the receiver can k-way merge already sorted streams instead of
-/// re-sorting.
+/// TODO(#19395): Sort on the sender side, so that each worker merges already sorted streams instead of fully sorting
+/// its input.
 @Value.Enclosing
 public class PinotMatchExchangeNodeInsertRule extends RelRule<PinotMatchExchangeNodeInsertRule.Config> {
   public static final PinotMatchExchangeNodeInsertRule INSTANCE =

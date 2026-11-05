@@ -60,8 +60,8 @@ import org.slf4j.LoggerFactory;
 /// that hash distributes on the partition keys and sorts on neither side. The Sort runs as a [FullSortOperator], so
 /// rows arrive grouped by partition and ordered within a partition, in bounded blocks: a partition can span several
 /// blocks, and a block can hold the end of one partition and the start of the next. The operator never reads
-/// [MatchNode#getCollations()]: the ordering has already been established below it. A query with neither
-/// `PARTITION BY` nor `ORDER BY` has nothing to sort on, so it gets a plain exchange and is matched as one partition.
+/// [MatchNode#getCollations()]: the ordering has already been established below it. Without `PARTITION BY`, which
+/// takes a query option, the exchange sends every row to one worker and the whole input is one partition.
 ///
 /// The grouping half of that assumption is verified rather than trusted. Partition keys are compared directly on the
 /// incoming rows and must be monotonically increasing, so a key that reappears after its partition was closed fails
@@ -253,8 +253,15 @@ public class MatchOperator extends MultiStageOperator {
   /// always filled to [#MAX_OUTPUT_ROWS_PER_BLOCK] rows: once it holds a row and [#PARTIAL_BLOCK_STEPS] more steps
   /// have been spent matching, it is returned as is. Otherwise a call holding the row an outer `LIMIT` needs could
   /// go on matching for as long as the input lasts, for instance over a long run of rows where no match starts,
-  /// before the consumer could stop it. The bound applies to every block, including the one a mailbox sender
-  /// computes before it learns that its receiver terminated. Only the block boundaries change, never the result.
+  /// before the consumer could stop it. Only the block boundaries change, never the result.
+  ///
+  /// The bound starts at the block's first row, because the operator never returns an empty data block, just as
+  /// filters and joins don't: a call that has not found a row keeps matching until it finds one or the input ends.
+  /// That matters when the operator feeds a mailbox, for instance when it is joined and the `LIMIT` is above the join.
+  /// The sender computes its next block before it learns that the receiver terminated, and if no further match
+  /// follows, that call matches the rest of the buffered input. Each of its attempts is still bounded by the step
+  /// budget, and the deadline and cancellation are checked while it matches.
+  /// TODO: Let a call that has not found a row see early termination too, for instance by polling the sending mailbox.
   ///
   /// The match attempt in progress when the bound is reached still runs to completion. An attempt that exceeds the
   /// step budget therefore fails the query even if its consumer would have stopped after the rows already found,
