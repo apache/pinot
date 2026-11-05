@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.Utils;
@@ -1410,12 +1411,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   ///
   /// A locally-built segment can diverge in CRC from the one the winning replica committed (e.g. different docId
   /// ordering); swapping in a divergent copy corrupts upsert metadata and leaves replicas inconsistent otherwise. So
-  /// when `committedSegmentZKMetadata` carries a CRC, a mismatch discards the local build (returns `false`) and the
+  /// when `committedSegmentZKMetadata` carries a CRC, a mismatch discards the local build and the
   /// caller downloads the committed segment. Skipped for pauseless tables and segments whose CRC is not yet set (the
   /// COMMITTING window), so we never download a not-yet-uploaded segment (see PR #17885).
   ///
+  /// Confirmed CRC mismatches are counted via {@link ServerMeter#SEGMENT_BUILD_WITH_CRC_MISMATCH} regardless of
+  /// whether the caller's download fallback succeeds. Build failures and CRC-read errors are not counted.
+  ///
   /// @param committedSegmentZKMetadata committed ZK metadata carrying the CRC, or `null` to skip the check
-  /// @return `true` if built and replaced locally; `false` if the build failed or was rejected on a CRC mismatch
+  /// @return `true` if the consuming segment was replaced with the local copy; `false` if the caller should download
   protected boolean buildSegmentAndReplace(@Nullable SegmentZKMetadata committedSegmentZKMetadata)
       throws Exception {
     SegmentBuildDescriptor descriptor;
@@ -1429,10 +1433,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     boolean crcCheckEnabled = committedSegmentZKMetadata != null && committedSegmentZKMetadata.getCrc() >= 0
         && !PauselessConsumptionUtils.isPauselessEnabled(_tableConfig);
-    if (crcCheckEnabled && !isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata)) {
-      _segmentLogger.warn("Locally-built segment: {} CRC does not match committed CRC: {} in zk. "
-          + "Skipping local build to replace", _segmentNameStr, committedSegmentZKMetadata.getCrc());
-      return false;
+    if (crcCheckEnabled) {
+      try {
+        if (!isLocalSegmentCrcMatchingZk(committedSegmentZKMetadata)) {
+          _segmentLogger.warn("Locally-built segment: {} CRC does not match committed CRC: {} in zk. "
+              + "Skipping local build to replace", _segmentNameStr, committedSegmentZKMetadata.getCrc());
+          _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_BUILD_WITH_CRC_MISMATCH, 1);
+          return false;
+        }
+      } catch (Exception e) {
+        _segmentLogger.warn("Failed to read CRC of locally-built segment: {}; treating as a build failure to download "
+            + "the committed segment", _segmentNameStr, e);
+        return false;
+      }
     }
     // On a CRC match use the committed metadata; otherwise the construction-time metadata.
     _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr,
@@ -1440,19 +1453,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  /// Whether the just-built local segment's CRC matches the committed CRC in ZK. Returns `false` if the local metadata
-  /// cannot be read, so the caller downloads the committed segment rather than failing the transition.
+  /// Whether the just-built local segment's CRC matches the committed CRC in ZK.
   @VisibleForTesting
-  protected boolean isLocalSegmentCrcMatchingZk(SegmentZKMetadata committedSegmentZKMetadata) {
+  protected boolean isLocalSegmentCrcMatchingZk(SegmentZKMetadata committedSegmentZKMetadata)
+      throws IOException, ConfigurationException {
     File indexDir = new File(_resourceDataDir, _segmentNameStr);
-    try {
-      SegmentMetadataImpl localMetadata = new SegmentMetadataImpl(indexDir);
-      return BaseTableDataManager.hasSameCRC(committedSegmentZKMetadata, localMetadata);
-    } catch (Exception e) {
-      _segmentLogger.warn("Failed to read CRC of locally-built segment: {}; treating as CRC mismatch to download the "
-          + "committed segment", _segmentNameStr, e);
-      return false;
-    }
+    SegmentMetadataImpl localMetadata = new SegmentMetadataImpl(indexDir);
+    return BaseTableDataManager.hasSameCRC(committedSegmentZKMetadata, localMetadata);
   }
 
   /// Closes the stream consumer so that no more data can be consumed into this segment. Does NOT release the consumer
