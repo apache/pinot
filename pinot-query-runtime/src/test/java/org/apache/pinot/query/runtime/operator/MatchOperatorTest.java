@@ -334,8 +334,8 @@ public class MatchOperatorTest {
 
   @Test
   public void testUngroupedPartitionsAreRejected() {
-    // The sort exchange below the operator guarantees that a partition arrives in one contiguous run. If it does not,
-    // matching each fragment separately would report matches that do not exist, so fail instead.
+    // The Sort below the operator guarantees that a partition arrives in one contiguous run. If it does not, matching
+    // each fragment separately would report matches that do not exist, so fail instead.
     RowPattern pattern = concat(symbol(0), symbol(0));
     DataSchema resultSchema = new DataSchema(new String[]{"pid", "lastA"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
@@ -658,9 +658,9 @@ public class MatchOperatorTest {
   }
 
   @Test
-  public void testPartitionGroupingIsValidatedInExchangeCollationOrder() {
-    // PARTITION BY label, pid is emitted in SQL order, but the exchange sorts the input fields by ordinal: pid, label.
-    // These rows increase in exchange order and decrease in SQL order ("Z" then "A"), so using the output-key order
+  public void testPartitionGroupingIsValidatedInSortCollationOrder() {
+    // PARTITION BY label, pid is emitted in SQL order, but the Sort below orders the input fields by ordinal: pid,
+    // label. These rows increase in sort order and decrease in SQL order ("Z" then "A"), so using the output-key order
     // for monotonic validation would reject valid input.
     DataSchema resultSchema = new DataSchema(new String[]{"label", "pid", "cnt"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG});
