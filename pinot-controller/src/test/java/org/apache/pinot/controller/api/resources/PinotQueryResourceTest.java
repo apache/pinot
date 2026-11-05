@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -630,10 +631,15 @@ public class PinotQueryResourceTest {
   /// Installs the controller's basic auth, as an operator configures it, with a single principal scoped to table `t`
   /// (`BASIC_AUTH_PRINCIPAL` with `BASIC_AUTH_PASSWORD`) and the given comma-separated permissions.
   private void tableScopedBasicAuth(String permissions) {
+    tableScopedBasicAuth(permissions, "t");
+  }
+
+  /// Installs basic auth with the given comma-separated permissions and table grants.
+  private void tableScopedBasicAuth(String permissions, String tables) {
     String principal = BASIC_AUTH_PRINCIPALS_PREFIX + "." + BASIC_AUTH_PRINCIPAL;
     BasicAuthAccessControlFactory factory = new BasicAuthAccessControlFactory();
     factory.init(new PinotConfiguration(Map.of(BASIC_AUTH_PRINCIPALS_PREFIX, BASIC_AUTH_PRINCIPAL,
-        principal + ".password", BASIC_AUTH_PASSWORD, principal + ".tables", "t",
+        principal + ".password", BASIC_AUTH_PASSWORD, principal + ".tables", tables,
         principal + ".permissions", permissions)));
     when(_accessControlFactory.create()).thenReturn(factory.create());
   }
@@ -800,6 +806,60 @@ public class PinotQueryResourceTest {
     // passed authorization even though the principal is not granted the logical name.
     assertTrue(response.contains(String.valueOf(QueryErrorCode.BROKER_RESOURCE_MISSING.getId())), response);
     verify(_resourceManager).getBrokerInstancesFor("lt");
+  }
+
+  @DataProvider
+  public Object[][] multiTableLogicalQueryPermissions() {
+    Object[][] permissionCases = {
+        {"table1,table2", true},
+        {"table1", false},
+        {"table2", false},
+        {"unrelated", false},
+        {"lt", false},
+        {"lt,table1", false},
+        {"lt,table2", false}
+    };
+    List<Object[]> cases = new ArrayList<>();
+    for (Map<String, PhysicalTableConfig> physicalTables : List.of(
+        Map.of("table1_OFFLINE", new PhysicalTableConfig(), "table2_OFFLINE", new PhysicalTableConfig()),
+        Map.of("table1_REALTIME", new PhysicalTableConfig(), "table2_REALTIME", new PhysicalTableConfig()),
+        Map.of("table1_OFFLINE", new PhysicalTableConfig(), "table2_REALTIME", new PhysicalTableConfig()))) {
+      for (Object[] permissionCase : permissionCases) {
+        cases.add(new Object[]{physicalTables, permissionCase[0], permissionCase[1]});
+      }
+    }
+
+    // Keep the order stable to test denials at the first, middle, and last physical table.
+    Map<String, PhysicalTableConfig> threePhysicalTables = new LinkedHashMap<>();
+    threePhysicalTables.put("table1_OFFLINE", new PhysicalTableConfig());
+    threePhysicalTables.put("table2_OFFLINE", new PhysicalTableConfig());
+    threePhysicalTables.put("table3_OFFLINE", new PhysicalTableConfig());
+    cases.add(new Object[]{threePhysicalTables, "table1,table2,table3", true});
+    cases.add(new Object[]{threePhysicalTables, "table2,table3", false});
+    cases.add(new Object[]{threePhysicalTables, "table1,table3", false});
+    cases.add(new Object[]{threePhysicalTables, "table1,table2", false});
+    return cases.toArray(Object[][]::new);
+  }
+
+  @Test(dataProvider = "multiTableLogicalQueryPermissions")
+  public void testLogicalQueryRequiresReadAccessToAllPhysicalTables(Map<String, PhysicalTableConfig> physicalTables,
+      String grantedTables, boolean allowed)
+      throws Exception {
+    tableScopedBasicAuth("read", grantedTables);
+    mockLogicalTable("lt", physicalTables);
+
+    String response = postSql("SELECT COUNT(*) FROM lt", null, basicAuthHeaders(BASIC_AUTH_PASSWORD));
+
+    BrokerResponseNative brokerResponse = JsonUtils.stringToObject(response, BrokerResponseNative.class);
+    assertEquals(brokerResponse.getExceptions().size(), 1, response);
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(),
+        (allowed ? QueryErrorCode.BROKER_RESOURCE_MISSING : QueryErrorCode.ACCESS_DENIED).getId(), response);
+    if (allowed) {
+      // Authorization passed if the query reaches broker selection; this unit test has no registered broker.
+      verify(_resourceManager).getBrokerInstancesFor("lt");
+    } else {
+      verify(_resourceManager, never()).getBrokerInstancesFor(any());
+    }
   }
 
   @Test
