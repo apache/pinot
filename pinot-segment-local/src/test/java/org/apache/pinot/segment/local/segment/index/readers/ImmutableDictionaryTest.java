@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
-import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -49,6 +48,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.FALFInterner;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -440,7 +440,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
     for (int i = 0; i < NUM_VALUES; i++) {
       assertEquals(stringDictionary.get(i), _stringValues[i]);
       assertEquals(stringDictionary.getStringValue(i), _stringValues[i]);
-      assertEquals(stringDictionary.getValueSize(i), Utf8.encodedLength(_stringValues[i]));
+      assertEquals(stringDictionary.getValueSize(i), Utf8Utils.encodedLength(_stringValues[i]));
 
       assertEquals(stringDictionary.indexOf(_stringValues[i]), i);
 

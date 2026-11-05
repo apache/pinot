@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
-import com.google.common.base.Utf8;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,6 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -205,7 +205,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       case BIG_DECIMAL:
         return BigDecimalUtils.byteSize((BigDecimal) value);
       case STRING:
-        return Utf8.encodedLength((String) value);
+        return Utf8Utils.encodedLength((String) value);
       case BYTES:
         return ((byte[]) value).length;
       default:

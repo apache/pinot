@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
-import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
@@ -181,11 +180,11 @@ public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public int getValueSize(int dictId) {
-    return Utf8.encodedLength(getStringValue(dictId));
+    return Utf8Utils.encodedLength(getStringValue(dictId));
   }
 
   private void updateStats(String value) {
-    int utf8Length = Utf8.encodedLength(value);
+    int utf8Length = Utf8Utils.encodedLength(value);
     if (_min == null) {
       _min = value;
       _max = value;
