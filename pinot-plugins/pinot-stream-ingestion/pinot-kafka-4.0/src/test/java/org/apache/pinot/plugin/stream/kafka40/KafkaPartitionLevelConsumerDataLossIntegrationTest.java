@@ -27,7 +27,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
-import org.apache.pinot.plugin.stream.kafka40.utils.MiniKafkaCluster;
+import org.apache.pinot.plugin.stream.kafka40.server.EmbeddedKafkaCluster;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.AfterClass;
@@ -43,13 +43,13 @@ import static org.testng.Assert.assertTrue;
 /// (see the fix for false `StreamDataLoss` on transactional Kafka topics).
 ///
 /// Unlike [KafkaPartitionLevelConsumerDataLossTest] (which mocks the Kafka consumer), these tests
-/// run against a real [MiniKafkaCluster], so they exercise the real transactional control-record
+/// run against a real [EmbeddedKafkaCluster], so they exercise the real transactional control-record
 /// offset gaps and the real `beginningOffsets` round-trip added by the fix.
 ///
 /// Two scenarios, mirroring the reviewer's request:
 /// 1. Perform a real transaction and confirm no data loss is reported for the (expected) offset gap
 ///    left by commit control records while the data is still retained.
-/// 2. Delete offsets (advance the log start via [MiniKafkaCluster#deleteRecordsBeforeOffset]) and
+/// 2. Delete offsets (advance the log start via [EmbeddedKafkaCluster#deleteRecordsBeforeOffset]) and
 ///    confirm data loss IS reported.
 /// 3. Replay the production pattern: a caught-up consumer on a low-traffic transactional topic with one
 ///    record per transaction, which sees every new record one offset past where it was parked.
@@ -84,15 +84,15 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
   // and a caught-up consumer is always parked at a marker offset. Produced during the test, not in setUp.
   private static final String LOW_TRAFFIC_TXN_TOPIC = "txn-low-traffic";
 
-  private MiniKafkaCluster _kafkaCluster;
+  private EmbeddedKafkaCluster _kafkaCluster;
   private String _kafkaBrokerAddress;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _kafkaCluster = new MiniKafkaCluster("0");
+    _kafkaCluster = new EmbeddedKafkaCluster();
     _kafkaCluster.start();
-    _kafkaBrokerAddress = _kafkaCluster.getKafkaServerAddress();
+    _kafkaBrokerAddress = _kafkaCluster.bootstrapServers();
 
     // createTopic uses AdminClient.createTopics().all().get() -> synchronous, no sleep needed.
     _kafkaCluster.createTopic(TXN_TOPIC, 1);
