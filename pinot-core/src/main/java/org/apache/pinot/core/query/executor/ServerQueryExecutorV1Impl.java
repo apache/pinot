@@ -39,6 +39,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -599,13 +600,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   /// The broker adds the row filters of the principal to the WHERE clause of the query it sends and stamps them in
   /// the query options under the key of the table it authorized (see [RlsUtils#buildRlsFilterKey(String)]), but the
   /// subquery reaches the server as an opaque string literal that carries neither, so without this it would build
-  /// its ID_SET from rows the principal is not allowed to see. The subquery runs on the segments selected for the
-  /// outer query whatever table its FROM clause names, so the filter of the outer table is the one that applies: the
-  /// data source is renamed to that table so that the rewriter finds the filter even when the FROM clause names
-  /// another table. The filter is added to the options the subquery was written with, overriding any row filter
-  /// smuggled into them, so that a subquery nested in it is filtered the same way. A query that carries row filters
-  /// but none for the queried table, which an older broker produces when a materialized view rewrite swaps the table
-  /// after the filters were stamped, fails rather than run the subquery unfiltered.
+  /// its ID_SET from rows the principal is not allowed to see. Row filters belong to one table, so the subquery has to
+  /// read the queried table: the one the filters were authorized for, and the one whose segments the subquery runs on
+  /// whatever its FROM clause names. A subquery that names another table fails, as does a query that carries row
+  /// filters but none for the queried table, which an older broker produces when a materialized view rewrite swaps
+  /// the table after the filters were stamped. The filter is added to the options the subquery was written with,
+  /// overriding any row filter smuggled into them, so that a subquery nested in it is filtered the same way.
   private static void applyRowFilters(PinotQuery subquery, QueryContext queryContext) {
     Map<String, String> queryOptions = queryContext.getQueryOptions();
     if (queryOptions.isEmpty()) {
@@ -618,12 +618,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     String tableName = queryContext.getTableName();
     Preconditions.checkState(tableName != null, "Row-level security filters %s are set, but the query has no table",
         rowFilters.keySet());
-    String rowFilterKey = RlsUtils.buildRlsFilterKey(TableNameBuilder.extractRawTableName(tableName));
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    String rowFilterKey = RlsUtils.buildRlsFilterKey(rawTableName);
     String rowFilter = rowFilters.get(rowFilterKey);
     Preconditions.checkState(!StringUtils.isEmpty(rowFilter),
         "Row-level security filters %s are set, but none for the queried table %s, cannot apply them to the subquery",
         rowFilters.keySet(), tableName);
-    subquery.getDataSource().setTableName(tableName);
+    DataSource subqueryDataSource = subquery.getDataSource();
+    String subqueryTableName = subqueryDataSource != null ? subqueryDataSource.getTableName() : null;
+    Preconditions.checkState(
+        subqueryTableName != null && rawTableName.equals(TableNameBuilder.extractRawTableName(subqueryTableName)),
+        "The subquery of IN_PARTITIONED_SUBQUERY must read the queried table %s under row-level security, got %s",
+        tableName, subqueryTableName);
     Map<String, String> subqueryOptions =
         subquery.getQueryOptions() != null ? new HashMap<>(subquery.getQueryOptions()) : new HashMap<>();
     subqueryOptions.put(rowFilterKey, rowFilter);

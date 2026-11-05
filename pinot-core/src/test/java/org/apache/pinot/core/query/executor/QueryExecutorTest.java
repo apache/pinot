@@ -252,13 +252,16 @@ public class QueryExecutorTest {
     Map<String, String> queryOptions = Map.of(RlsUtils.buildRlsFilterKey(RAW_TABLE_NAME), rowFilters);
     assertEquals(aggregate(query, queryOptions), 0L);
 
-    // The subquery runs on the segments of the queried table whatever table its FROM clause names, so naming another
-    // table does not dodge the filter
-    String queryNamingOtherTable = String.format(queryTemplate, String.format(subqueryTemplate, "otherTable"));
-    assertEquals(aggregate(queryNamingOtherTable, queryOptions), 0L);
-
     // Without row filters the subquery sees every row
     assertEquals(aggregate(query, null), numAllowedRows);
+
+    // Row filters belong to one table: a subquery that names another table is rejected under row filters instead of
+    // being filtered with the queried table's or run as is (without them it runs on the queried table's segments, as
+    // it always has)
+    String queryNamingOtherTable = String.format(queryTemplate, String.format(subqueryTemplate, "otherTable"));
+    assertEquals(aggregate(queryNamingOtherTable, null), numAllowedRows);
+    String error = executeExpectingFailure(queryNamingOtherTable, queryOptions);
+    assertTrue(error.contains("must read the queried table"), error);
 
     // A subquery nested in the subquery is filtered the same way: with the filter the innermost ID_SET is empty, so
     // the middle one is too; without it both hold the single value 0 and every allowed row matches
@@ -271,15 +274,26 @@ public class QueryExecutorTest {
   }
 
   private Object aggregate(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceResponseBlock instanceResponse = execute(newInstanceRequest(query, queryOptions));
+    assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
+    assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
+    return ((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0);
+  }
+
+  /// Runs the query and returns the text of the exceptions it fails with.
+  private String executeExpectingFailure(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceResponseBlock instanceResponse = execute(newInstanceRequest(query, queryOptions));
+    assertFalse(instanceResponse.getExceptions().isEmpty(), "Expected the query to fail");
+    return String.join("\n", instanceResponse.getExceptions().values());
+  }
+
+  private InstanceRequest newInstanceRequest(String query, @Nullable Map<String, String> queryOptions) {
     InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     if (queryOptions != null) {
       instanceRequest.getQuery().getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
     }
     instanceRequest.setSearchSegments(_segmentNames);
-    InstanceResponseBlock instanceResponse = execute(instanceRequest);
-    assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
-    assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    return ((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0);
+    return instanceRequest;
   }
 
   @Test
