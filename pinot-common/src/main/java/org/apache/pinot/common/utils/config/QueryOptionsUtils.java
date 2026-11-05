@@ -1002,6 +1002,12 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
   }
 
+  /// Returns whether `cosineDistance` must compute exact distances instead of taking them from a paired vector index
+  /// search. Defaults to `false`.
+  public static boolean isVectorExactDistance(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_DISTANCE));
+  }
+
   @Nullable
   public static Boolean getVectorExactRerank(Map<String, String> queryOptions) {
     String exactRerank = queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK);

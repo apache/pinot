@@ -124,6 +124,21 @@ public class CosineDistanceIndexTransformFunctionTest extends BaseTransformFunct
     verify(reader, never()).getDocDistances(any(float[].class), anyInt());
   }
 
+  /// With `vectorExactDistance` set, nothing is requested from the search and the distances are computed exactly.
+  @Test
+  public void testExactDistanceOptionRequestsNothing() {
+    float[] query = _vector2Values[0];
+    VectorIndexReader reader = mock(VectorIndexReader.class);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        CalciteSqlParser.compileToPinotQuery("SET vectorExactDistance = true; SELECT * FROM testTable"));
+    double[] actual = transform(withVectorIndex(reader, VectorDistanceFunction.COSINE),
+        "cosineDistance(vector1, " + toLiteral(query) + ")", queryContext);
+    assertNull(VectorSearchDistances.of(queryContext).getRequest(reader, query));
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(actual[i], VectorFunctions.cosineDistance(_vector1Values[i], query), 1e-9);
+    }
+  }
+
   /// Distances are matched by query vector: a search for another vector hands nothing over.
   @Test
   public void testIgnoresSearchForAnotherVector() {

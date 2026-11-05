@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.VectorSearchDistances;
@@ -42,7 +43,7 @@ public class VectorTransformFunctions {
   /// index search the filter runs instead of reading their vectors from the forward index. They are handed over
   /// through the query's [VectorSearchDistances], so nothing outlives the query. Index distances carry the index's
   /// single-precision arithmetic (within about 1e-6 of the exact value). When the index returns no distances or misses
-  /// a document, the distances are computed from the forward index.
+  /// a document, or the `vectorExactDistance` query option is set, the distances are computed from the forward index.
   public static class CosineDistanceTransformFunction extends VectorDistanceTransformFunction {
     public static final String FUNCTION_NAME = "cosineDistance";
     private Double _defaultValue = null;
@@ -85,6 +86,9 @@ public class VectorTransformFunctions {
     @Nullable
     private static VectorSearchDistances.Request requestIndexDistances(IdentifierTransformFunction column,
         ArrayLiteralTransformFunction vector, Map<String, ColumnContext> columnContextMap, QueryContext queryContext) {
+      if (QueryOptionsUtils.isVectorExactDistance(queryContext.getQueryOptions())) {
+        return null;
+      }
       ColumnContext columnContext = columnContextMap.get(column.getColumnName());
       DataSource dataSource = columnContext != null ? columnContext.getDataSource() : null;
       if (dataSource == null) {
