@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.plan;
 
+import com.google.common.base.Preconditions;
 import java.util.EnumSet;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -89,7 +90,42 @@ public class AggregationPlanNode implements PlanNode {
       return new EmptyAggregationOperator(_queryContext, _indexSegment.getSegmentMetadata().getTotalDocs());
     }
 
+    Operator<AggregationResultsBlock> textScoreStatsOperator = buildTextScoreStatsOperator();
+    if (textScoreStatsOperator != null) {
+      return textScoreStatsOperator;
+    }
+
     return _queryContext.hasFilteredAggregations() ? buildFilteredAggOperator() : buildNonFilteredAggOperator();
+  }
+
+  /// `TEXT_SCORE_STATS` reads corpus statistics straight from the text index, without scanning documents. The
+  /// statistics describe the whole segment (the filter is not applied, like Elasticsearch's DFS phase), so the query is
+  /// answered by the non-scan operator. That includes filters Pinot adds itself, such as the hybrid-table time
+  /// boundary and upsert valid-doc filtering (see `TextScoreStatsAggregationFunction`). Returns `null` when the query
+  /// has no `TEXT_SCORE_STATS`.
+  ///
+  /// @throws IllegalArgumentException if `TEXT_SCORE_STATS` is mixed with other aggregation functions
+  @Nullable
+  private Operator<AggregationResultsBlock> buildTextScoreStatsOperator() {
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
+    int numTextScoreStats = 0;
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
+      if (aggregationFunction.getType() == TEXTSCORESTATS) {
+        numTextScoreStats++;
+      }
+    }
+    if (numTextScoreStats == 0) {
+      return null;
+    }
+    Preconditions.checkArgument(numTextScoreStats == aggregationFunctions.length,
+        "TEXT_SCORE_STATS cannot be combined with other aggregation functions");
+    DataSource[] dataSources = new DataSource[aggregationFunctions.length];
+    for (int i = 0; i < aggregationFunctions.length; i++) {
+      dataSources[i] = getDataSourceForAggregationFunction(aggregationFunctions[i]);
+    }
+    return new NonScanBasedAggregationOperator(_queryContext, dataSources,
+        _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
   /// Build the operator to be used for filtered aggregations

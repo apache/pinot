@@ -335,7 +335,9 @@ public class AggregationFunctionNullContractTest {
       AggregationFunctionType.STUNION, AggregationFunctionType.BOOLAND, AggregationFunctionType.BOOLOR,
       AggregationFunctionType.FUNNELMAXSTEP, AggregationFunctionType.FUNNELCOMPLETECOUNT,
       AggregationFunctionType.FUNNELSTEPDURATIONSTATS, AggregationFunctionType.FUNNELMATCHSTEP,
-      AggregationFunctionType.FUNNELEVENTSFUNCTIONEVAL, AggregationFunctionType.FUNNELCOUNT
+      AggregationFunctionType.FUNNELEVENTSFUNCTIONEVAL, AggregationFunctionType.FUNNELCOUNT,
+      // Reads text index statistics, never row values: aggregating a block is rejected by design
+      AggregationFunctionType.TEXTSCORESTATS
   );
 
   /// Checks every function rather than a fixed list, so that a function gaining or losing null awareness is caught.

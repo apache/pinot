@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -78,6 +79,55 @@ public interface TextIndexReader extends IndexReader {
   default int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
       @Nullable QueryScopedCache queryScopedCache) {
     return getNumMatchingDocs(searchQuery, optionsString);
+  }
+
+  /// Returns a relevance score for every document matching the given search query, keyed by Pinot doc id.
+  ///
+  /// Lucene-based readers score with the searcher's similarity (BM25 with `k1 = 1.2`, `b = 0.75` by default).
+  /// Documents that do not match are absent from the returned map. Scores are computed from the statistics of
+  /// this index only (document frequency, average field length), so they are comparable within one segment but
+  /// not across segments.
+  ///
+  /// The query is parsed exactly like [#getDocIds(String, String)], so a document has a score if and only if
+  /// it would be returned by the same `TEXT_MATCH`.
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @return map from Pinot doc id to score, containing only matching documents
+  default Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException(
+        "Relevance scoring is not supported by text index reader: " + getClass().getSimpleName());
+  }
+
+  /// Like [#getDocScores(String, String)], but when `globalStats` is given the similarity uses those corpus
+  /// statistics (document count, average field length, per-term document frequency) instead of this index's own,
+  /// so that scores are comparable across segments. Terms or fields the statistics do not cover fall back to this
+  /// index's statistics. `globalStats` normally comes from merging [#getTextScoreStats] over every segment.
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @param globalStats corpus statistics to score with, or `null` to use this index's statistics
+  /// @return map from Pinot doc id to score, containing only matching documents
+  default Int2FloatMap getDocScores(String searchQuery, @Nullable String optionsString,
+      @Nullable TextScoreStats globalStats) {
+    if (globalStats == null) {
+      return getDocScores(searchQuery, optionsString);
+    }
+    throw new UnsupportedOperationException(
+        "Relevance scoring with global statistics is not supported by text index reader: "
+            + getClass().getSimpleName());
+  }
+
+  /// Returns this index's statistics for the terms of `searchQuery`, parsed and analyzed exactly as
+  /// [#getDocScores(String, String)] parses it: per queried field the collection statistics, and per query term its
+  /// document frequency and total term frequency. Merging the result of every segment gives the statistics of
+  /// the whole corpus, to pass to [#getDocScores(String, String, TextScoreStats)].
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  default TextScoreStats getTextScoreStats(String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException(
+        "Text score statistics are not supported by text index reader: " + getClass().getSimpleName());
   }
 
   /// Marker method that allows to differentiate between single-column and multi-column text index reader .
