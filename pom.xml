@@ -261,7 +261,7 @@
 
     <spark3.version>3.5.9</spark3.version>
     <kafka4.version>4.2.0</kafka4.version>
-    <jose4j.version>0.9.6</jose4j.version>
+    <jose4j.version>0.9.7</jose4j.version>
     <confluent.version>8.2.0</confluent.version>
     <wire.version>7.1.2</wire.version>
     <pulsar.version>5.0.1</pulsar.version>
