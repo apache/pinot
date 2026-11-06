@@ -103,6 +103,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
@@ -123,6 +124,22 @@ import static org.testng.Assert.assertTrue;
 // TODO Re-write this test using the stream abstraction
 public class RealtimeSegmentDataManagerTest {
   @Test
+  public void testReadinessWaitPropagatesInterruption() {
+    RealtimeSegmentDataManager manager = mock(RealtimeSegmentDataManager.class, CALLS_REAL_METHODS);
+    boolean wasInterrupted = Thread.interrupted();
+    try {
+      Thread.currentThread().interrupt();
+      assertThrows(InterruptedException.class, manager::waitBeforeReadinessCheck);
+      assertFalse(Thread.currentThread().isInterrupted());
+    } finally {
+      Thread.interrupted();
+      if (wasInterrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  @Test
   public void testReadinessGateRechecksUnlessTheConsumerHasBeenStopped()
       throws Exception {
     for (boolean stopped : new boolean[]{false, true}) {
@@ -130,20 +147,27 @@ public class RealtimeSegmentDataManagerTest {
       RealtimeTableDataManager tableManager = createTableDataManager(table);
       ConsumerCoordinator coordinator = mock(ConsumerCoordinator.class);
       AtomicInteger readinessChecks = new AtomicInteger();
-      // The initial check waits; the next poll observes readiness. A stopped consumer must skip that second check.
-      BooleanSupplier ready = () -> readinessChecks.incrementAndGet() > 1;
+      AtomicInteger waits = new AtomicInteger();
+      // Two polls wait before readiness; a stopped consumer must skip the next readiness check.
+      BooleanSupplier ready = () -> readinessChecks.incrementAndGet() > 2;
       doThrow(new ConsumerCoordinator.ShouldNotConsumeException("segment no longer needs consumption"))
           .when(coordinator).acquire(SEGMENT_NAME);
       RealtimeSegmentDataManager manager = new RealtimeSegmentDataManager(createZkMetadata(), table, tableManager,
           new File(TEMP_DIR, "readiness").getAbsolutePath(),
           new IndexLoadingConfig(FakeRealtimeSegmentDataManager.makeInstanceDataManagerConfig(), table),
-          Fixtures.createSchema(), SEGMENT_NAME, coordinator, mock(ServerMetrics.class), null, null, ready);
+          Fixtures.createSchema(), SEGMENT_NAME, coordinator, mock(ServerMetrics.class), null, null, ready) {
+        @Override
+        void waitBeforeReadinessCheck() {
+          waits.incrementAndGet();
+        }
+      };
       try {
         if (stopped) {
           manager.stop();
         }
         manager.new PartitionConsumer().run();
-        assertEquals(readinessChecks.get(), stopped ? 1 : 2);
+        assertEquals(readinessChecks.get(), stopped ? 1 : 3);
+        assertEquals(waits.get(), stopped ? 1 : 2);
         verify(coordinator).acquire(SEGMENT_NAME);
         verify(coordinator, never()).register(any());
         assertEquals(manager.getCurrentOffset().compareTo(START_OFFSET), 0);

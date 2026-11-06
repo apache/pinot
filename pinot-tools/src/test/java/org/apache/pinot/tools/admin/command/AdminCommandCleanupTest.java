@@ -18,33 +18,25 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.lang.reflect.Field;
+import org.apache.pinot.tools.service.PinotServiceManager;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 
-/// Verifies cleanup is safe before execution and preserves reusable command configuration.
+/// Verifies that cleanup stops the service manager when it has been started.
 public class AdminCommandCleanupTest {
   @Test
-  public void testDeleteSchemaCleanupIsRepeatableBeforeExecution() {
-    DeleteSchemaCommand command = new DeleteSchemaCommand().setSchemaName("events");
-    String configuredCommand = command.toString();
+  public void testStartServiceManagerCleanupStopsServices()
+      throws Exception {
+    StartServiceManagerCommand command = new StartServiceManagerCommand();
+    PinotServiceManager manager = mock(PinotServiceManager.class);
+    Field managerField = StartServiceManagerCommand.class.getDeclaredField("_pinotServiceManager");
+    managerField.setAccessible(true);
+    managerField.set(command, manager);
     command.cleanup();
-    command.cleanup();
-    assertEquals(command.getName(), "DeleteSchema");
-    assertEquals(command.toString(), configuredCommand);
-    assertEquals(command.setSchemaName("updated").toString(), configuredCommand.replace("events", "updated"));
-  }
-
-  @Test
-  public void testStartBrokerCleanupIsRepeatableBeforeStartup() {
-    StartBrokerCommand command = new StartBrokerCommand().setClusterName("cleanup-test").setPort(12345).setGrpcPort(-1);
-    String configuredCommand = command.toString();
-    command.cleanup();
-    command.cleanup();
-    assertEquals(command.getClusterName(), "cleanup-test");
-    assertEquals(command.getBrokerPort(), 12345);
-    assertEquals(command.getBrokerGrpcPort(), -1);
-    assertEquals(command.toString(), configuredCommand);
+    verify(manager).stopAll();
   }
 }

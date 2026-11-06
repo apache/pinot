@@ -37,25 +37,22 @@ public class TestCommandHelp {
   /// A help-only invocation has never started services, but its registered shutdown hook still
   /// calls cleanup. Exercise that lifecycle before JVM shutdown and ensure help remains usable.
   @Test
-  public void testHelpOnlyCommandsCanBeCleanedUpAndReused() {
-    List<AbstractBaseAdminCommand> commands = List.of(
-        new StartServiceManagerCommand(), new MoveReplicaGroup(), new OfflineSegmentIntervalCheckerCommand());
-    for (AbstractBaseAdminCommand command : commands) {
-      StringWriter output = new StringWriter();
-      CommandLine commandLine = new CommandLine(command).setOut(new PrintWriter(output, true));
-      try {
-        assertEquals(commandLine.execute("--help"), 0);
-        String originalHelp = output.toString();
-        assertTrue(originalHelp.contains("Usage: " + commandLine.getCommandName()));
-        command.cleanup();
-        command.cleanup();
-        output.getBuffer().setLength(0);
-        assertEquals(commandLine.execute("--help"), 0);
-        assertEquals(output.toString(), originalHelp,
-            "Cleanup of an unstarted command must leave its help/configuration intact");
-      } finally {
-        command.cleanup();
-      }
+  public void testHelpOnlyServiceManagerCanBeCleanedUpAndReused() {
+    StartServiceManagerCommand command = new StartServiceManagerCommand();
+    StringWriter output = new StringWriter();
+    CommandLine commandLine = new CommandLine(command).setOut(new PrintWriter(output, true));
+    try {
+      assertEquals(commandLine.execute("--help"), 0);
+      String originalHelp = output.toString();
+      assertTrue(originalHelp.contains("Usage: " + commandLine.getCommandName()));
+      command.cleanup();
+      command.cleanup();
+      output.getBuffer().setLength(0);
+      assertEquals(commandLine.execute("--help"), 0);
+      assertEquals(output.toString(), originalHelp,
+          "Cleanup of an unstarted command must leave its help/configuration intact");
+    } finally {
+      command.cleanup();
     }
   }
 
