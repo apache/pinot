@@ -101,6 +101,18 @@
       <artifactId>kafka-test-common-runtime</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- KafkaClusterTestKit's SSL setup needs client test fixtures and Bouncy Castle, absent from Kafka's POM. -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <classifier>test-fixtures</classifier>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>

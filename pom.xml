@@ -1696,6 +1696,12 @@
         <version>${kafka4.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.kafka</groupId>
+        <artifactId>kafka-clients</artifactId>
+        <version>${kafka4.version}</version>
+        <classifier>test-fixtures</classifier>
+      </dependency>
+      <dependency>
         <groupId>org.bitbucket.b_c</groupId>
         <artifactId>jose4j</artifactId>
         <version>${jose4j.version}</version>
