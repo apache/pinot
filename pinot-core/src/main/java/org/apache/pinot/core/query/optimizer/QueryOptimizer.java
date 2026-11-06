@@ -58,15 +58,21 @@ public class QueryOptimizer {
   public void optimize(PinotQuery pinotQuery, @Nullable Schema schema) {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
-        filterExpression = filterOptimizer.optimize(filterExpression, schema);
-      }
-      pinotQuery.setFilterExpression(filterExpression);
+      pinotQuery.setFilterExpression(optimizeFilter(filterExpression, schema));
     }
 
     // Run statement optimizer after filter has already been optimized.
     for (StatementOptimizer statementOptimizer : STATEMENT_OPTIMIZERS) {
       statementOptimizer.optimize(pinotQuery, schema);
     }
+  }
+
+  /// Optimizes the given filter expression with the filter optimizers that [#optimize(PinotQuery, Schema)] runs on the
+  /// WHERE clause. The optimizers can modify the given expression, so pass a copy to keep the original.
+  public Expression optimizeFilter(Expression filterExpression, @Nullable Schema schema) {
+    for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
+      filterExpression = filterOptimizer.optimize(filterExpression, schema);
+    }
+    return filterExpression;
   }
 }

@@ -260,6 +260,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return _stageStats;
   }
 
+  /// Removes the given broker stat from the response, so that it reads as 0.
+  public void removeBrokerStat(StatKey key) {
+    _brokerStats.remove(key);
+  }
+
   public void setStageStats(ObjectNode stageStats) {
     _stageStats = stageStats;
   }

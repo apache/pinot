@@ -35,10 +35,12 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
@@ -55,6 +57,7 @@ import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
+import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -68,11 +71,13 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
 import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,6 +89,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
   // Cap planning work independently of the query's configurable group limit.
+  private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
   private static final int MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES = 1 << 20;
 
   private final FetchPlanner _fetchPlanner = FetchPlannerRegistry.getPlanner();
@@ -289,6 +295,30 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
   }
 
+  /// Optimizes the row-level security (RLS) filter with the schema of the table, as the WHERE clause that holds the
+  /// same filter. Then the RLS bitmap and the WHERE clause evaluate the same predicate: for example, the optimizer
+  /// turns `intColumn = 2.0` into `intColumn = 2`, which the dictionary of an INT column can look up.
+  ///
+  /// Always starts from the filter that the broker sent, so a second call gives the same result. Fails the query when
+  /// the optimizer fails, because the query must not run without the RLS filter.
+  private static void optimizeRowFilter(QueryContext queryContext) {
+    Expression rowFilterExpression = queryContext.getRowFilterExpression();
+    if (rowFilterExpression == null) {
+      return;
+    }
+    FilterContext rowFilter;
+    try {
+      rowFilter = RequestContextUtils.getFilter(
+          QUERY_OPTIMIZER.optimizeFilter(rowFilterExpression.deepCopy(), queryContext.getSchema()));
+    } catch (Exception e) {
+      // Do not put the filter or the error in the message: they can show the RLS policy to the user
+      throw new BadQueryRequestException(
+          "Cannot apply the row-level security filter for table: " + TableNameBuilder.extractRawTableName(
+              queryContext.getTableName()));
+    }
+    queryContext.setRowFilter(rowFilter);
+  }
+
   @VisibleForTesting
   void applyQueryOptions(QueryContext queryContext) {
     Map<String, String> queryOptions = queryContext.getQueryOptions();
@@ -306,7 +336,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set skipScanFilterReorder
     queryContext.setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(queryOptions));
 
-    // Set andRestrictionPushdown, letting the query option override the server default
+    optimizeRowFilter(queryContext);
+
+    // Set andRestrictionPushdown, letting the query option override the server default. A query with a row-level
+    // security filter always pushes down, see QueryContext#isAndRestrictionPushdownEnabled().
     AndRestrictionPushdownMode andRestrictionPushdownMode =
         QueryOptionsUtils.getAndRestrictionPushdownMode(queryOptions);
     queryContext.setAndRestrictionPushdownEnabled(isAndRestrictionPushdownEnabled(

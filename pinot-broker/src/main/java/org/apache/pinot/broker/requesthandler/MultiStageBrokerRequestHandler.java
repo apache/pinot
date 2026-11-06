@@ -1117,6 +1117,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
               QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null, workloadName),
           queryWasLogged);
+      if (rlsFiltersApplied) {
+        RlsResponseUtils.hideTableLayoutStats(brokerResponse);
+      }
 
       return brokerResponse;
     } finally {

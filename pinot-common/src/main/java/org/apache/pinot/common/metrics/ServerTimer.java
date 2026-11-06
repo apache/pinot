@@ -98,7 +98,9 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   // Ingestion metrics
   INGESTION_DELAY_TRACKING_MS("milliseconds", false, "Time taken to run a trackIngestionDelay cycle"),
   // The total time spent in processing the workload queries
-  WORKLOAD_TOTAL_QUERY_TIME_MS("millis", false);
+  WORKLOAD_TOTAL_QUERY_TIME_MS("millis", false),
+  RLS_FILTER_TIME_MS("milliseconds", false,
+      "Time taken by a query to materialize the row-level security bitmap, summed over the queried segments");
 
   private final String _timerName;
   private final boolean _global;

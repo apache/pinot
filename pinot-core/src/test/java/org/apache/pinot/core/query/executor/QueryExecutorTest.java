@@ -40,6 +40,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -78,6 +80,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
@@ -89,8 +92,12 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -241,6 +248,43 @@ public class QueryExecutorTest {
     assertFalse(responseMetadata.containsKey(MetadataKey.REMOTE_ACCESS_BYTES.getName()));
     assertFalse(responseMetadata.containsKey(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()));
     assertFalse(responseMetadata.containsKey(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()));
+  }
+
+  /// Under row-level security, the server leaves out of the response the stats that show the layout of the whole
+  /// table, and keeps them for its own log and metrics. It also records the time spent on the RLS filter.
+  @Test
+  public void testRowLevelSecurityHidesTableLayoutStats() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE orderAmount > 0";
+    List<String> tableLayoutKeys = List.of(MetadataKey.TOTAL_DOCS.getName(),
+        MetadataKey.NUM_SEGMENTS_QUERIED.getName(), MetadataKey.NUM_SEGMENTS_PROCESSED.getName(),
+        MetadataKey.NUM_SEGMENTS_MATCHED.getName());
+
+    InstanceRequest adminRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    adminRequest.setSearchSegments(_segmentNames);
+    InstanceResponseBlock adminResponse = execute(adminRequest);
+    for (String key : tableLayoutKeys) {
+      assertTrue(adminResponse.getResponseMetadata().containsKey(key), key);
+    }
+
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    brokerRequest.getPinotQuery()
+        .setQueryOptions(new HashMap<>(Map.of(RlsUtils.buildRlsFilterKey(RAW_TABLE_NAME), "orderItemCount > 2")));
+    InstanceRequest userRequest = new InstanceRequest(1L, brokerRequest);
+    userRequest.setSearchSegments(_segmentNames);
+    InstanceResponseBlock userResponse = execute(userRequest);
+
+    assertTrue(userResponse.getExceptions().isEmpty(), userResponse.getExceptions().toString());
+    long userCount = (Long) ((AggregationResultsBlock) userResponse.getResultsBlock()).getResults().get(0);
+    long adminCount = (Long) ((AggregationResultsBlock) adminResponse.getResultsBlock()).getResults().get(0);
+    assertTrue(userCount > 0 && userCount < adminCount, userCount + " vs " + adminCount);
+    for (String key : tableLayoutKeys) {
+      assertFalse(userResponse.getResponseMetadata().containsKey(key), key + " must be hidden");
+      assertEquals(userResponse.getServerMetadata().get(key), adminResponse.getResponseMetadata().get(key), key);
+    }
+    // The stats of the tenant rows stay in the response
+    assertTrue(userResponse.getResponseMetadata().containsKey(MetadataKey.NUM_DOCS_SCANNED.getName()));
+    verify(ServerMetrics.get(), atLeastOnce()).addTimedTableValue(eq(OFFLINE_TABLE_NAME),
+        eq(ServerTimer.RLS_FILTER_TIME_MS), anyLong(), eq(TimeUnit.NANOSECONDS));
   }
 
   /// The remote accesses reported while the plan executes, from the query thread and the ones it spawns, are reported
