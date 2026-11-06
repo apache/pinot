@@ -78,7 +78,7 @@ public class ParquetAvroRecordReader implements RecordReader {
       // Advance even if extraction fails and the caller skips the rejected record.
       try {
         _nextRecord = _parquetReader.read();
-      } catch (IOException e) {
+      } catch (Exception e) {
         throw new RecordFetchException("Failed to read next Parquet Avro record", e);
       }
     }
