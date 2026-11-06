@@ -27,6 +27,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 
 
 public class StreamDataDecoderImplTest {
@@ -131,6 +133,21 @@ public class StreamDataDecoderImplTest {
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getException());
     Assert.assertNull(result.getResult());
+  }
+
+  @Test
+  public void testGetValueDecoderReturnsWrappedDecoder() {
+    TestDecoder messageDecoder = new TestDecoder();
+    // The impl exposes exactly the wrapped decoder, which is what callers reflect on to report the decoder class.
+    assertSame(new StreamDataDecoderImpl(messageDecoder).getValueDecoder(), messageDecoder);
+  }
+
+  @Test
+  public void testGetValueDecoderDefaultsToNull() {
+    // A StreamDataDecoder that does not override getValueDecoder() falls back to the default, which returns null so
+    // callers degrade gracefully (no decoder-class reporting) rather than requiring every implementation to support it.
+    StreamDataDecoder decoderWithoutValueAccessor = message -> new StreamDataDecoderResult(new GenericRow(), null);
+    assertNull(decoderWithoutValueAccessor.getValueDecoder());
   }
 
   private static class ThrowingDecoder implements StreamMessageDecoder<byte[]> {
