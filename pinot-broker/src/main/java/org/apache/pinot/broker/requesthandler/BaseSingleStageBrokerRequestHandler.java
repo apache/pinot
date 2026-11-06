@@ -596,9 +596,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             rlsFiltersApplied.set(true);
             _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
           } catch (Exception e) {
-            LOGGER.error(
-                "Unable to apply RLS filter: {}. Row-level security filtering will be disabled for this query.",
-                RlsFiltersRewriter.class.getName(), e);
+            // Fail closed: the query must not run without its row-level security filter. Do not put the filter or
+            // the parse error in the response, because they can show the RLS policy to the user.
+            LOGGER.error("Unable to apply the RLS filter for request {} on table {}. Failing the query.", requestId,
+                rawTableName, e);
+            requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+            return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
+                "Cannot apply the row-level security filter for table: " + rawTableName);
           }
         }
       }
@@ -640,7 +644,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     /// Per-query opt-out (default true). A user — or the MV minion executor for its own
     /// materialization query — sets `enableMaterializedViewRewrite=false` to force the base-table
     /// path and avoid rewriting a materialization query back onto an MV.
-    if (_materializedViewHandler != null
+    /// A query with a row-level security (RLS) filter is never rewritten. The server applies the RLS filter from the
+    /// `rlsFilters-<rawTableName>` query option, so after a swap to the MV it would find no RLS filter for the MV
+    /// table, and the user expressions would run on the rows that the RLS filter hides.
+    // TODO: Support the MV rewrite under RLS (the MV can lack the columns of the RLS filter)
+    if (_materializedViewHandler != null && !rlsFiltersApplied.get()
         && QueryOptionsUtils.isMaterializedViewRewriteEnabled(serverPinotQuery.getQueryOptions())) {
       MaterializedViewCompileOutcome outcome = applyMaterializedViewRewriteAtCompile(
           requestId, serverPinotQuery, tableName, rawTableName, schema, _tableCache.isIgnoreCase());
@@ -1118,6 +1126,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
             QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats, workloadName),
         queryWasLogged);
+    if (rlsFiltersApplied.get()) {
+      RlsResponseUtils.hideTableLayoutStats(brokerResponse);
+    }
 
     return brokerResponse;
   }
@@ -1435,30 +1446,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     return new MaterializedViewCompileOutcome(
         rewrittenServerQuery, rewrittenTableName, rewrittenRawTableName, rewrittenSchema, materializedViewContext);
-  }
-
-  /// Apply row-level security filters to `serverPinotQuery`.  When the accessor returns RLS rules
-  /// for `rawTableName`, the rewriter appends them to the query's WHERE clause and stamps a
-  /// `rlsFilters-<rawTableName>` entry in `queryOptions` — the marker the caller later reads to
-  /// stamp `rlsFiltersApplied` on the broker response.
-  private void applyRlsFilters(long requestId, String query, PinotQuery serverPinotQuery, String rawTableName,
-      @Nullable RequesterIdentity requesterIdentity, AccessControl accessControl) {
-    TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, rawTableName);
-    List<String> rowFilters = rlsFilters.getRLSFilters().orElse(null);
-    if (CollectionUtils.isEmpty(rowFilters)) {
-      return;
-    }
-
-    Map<String, String> queryOptions =
-        serverPinotQuery.getQueryOptions() == null ? new HashMap<>() : serverPinotQuery.getQueryOptions();
-    String combinedFilters =
-        rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
-    queryOptions.put(RlsUtils.buildRlsFilterKey(rawTableName), combinedFilters);
-    serverPinotQuery.setQueryOptions(queryOptions);
-    CalciteSqlParser.queryRewrite(serverPinotQuery, RlsFiltersRewriter.class);
-    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
-    LOGGER.debug("Applied RLS filters for request {} on table {}: {}", requestId, rawTableName,
-        _queryLogger.redactQuery(query));
   }
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
@@ -2687,6 +2674,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         new QueryLogger.QueryLogParams(requestContext, tableName, viewSplitResponse,
             QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats, workloadName),
         queryWasLogged);
+    if (rlsFiltersApplied) {
+      RlsResponseUtils.hideTableLayoutStats(viewSplitResponse);
+    }
     return viewSplitResponse;
   }
 

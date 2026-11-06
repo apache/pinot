@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -38,6 +39,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -97,6 +99,14 @@ import org.slf4j.LoggerFactory;
 
 @ThreadSafe
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
+  /// The response stats that a query with a row-level security filter does not return. See [#hideTableLayoutStats].
+  private static final List<MetadataKey> TABLE_LAYOUT_STATS = List.of(MetadataKey.TOTAL_DOCS,
+      MetadataKey.NUM_SEGMENTS_QUERIED, MetadataKey.NUM_SEGMENTS_PROCESSED, MetadataKey.NUM_SEGMENTS_MATCHED,
+      MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED, MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED,
+      MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED, MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
+      MetadataKey.NUM_SEGMENTS_PRUNED_INVALID, MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT,
+      MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
+
   public static final String ENABLE_PREFETCH = "enable.prefetch";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
@@ -366,8 +376,24 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           consumingSegmentsInfo.getNumConsumingSegmentsQueried(), minConsumingFreshnessTimeMs);
     }
 
+    if (queryContext.getRowFilter() != null) {
+      hideTableLayoutStats(instanceResponse);
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.RLS_FILTER_TIME_MS,
+          queryContext.getRowFilterTimeNs(), TimeUnit.NANOSECONDS);
+    }
+
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     return instanceResponse;
+  }
+
+  /// Under row-level security, removes from the response the stats that show the layout of the whole table: the total
+  /// number of documents, and the number of segments queried, processed, matched and pruned. A table that holds only
+  /// the rows of the tenant has a different layout, so these values cannot be emulated. The server query log and
+  /// metrics still read them, see [InstanceResponseBlock#getServerMetadata()].
+  private static void hideTableLayoutStats(InstanceResponseBlock instanceResponse) {
+    for (MetadataKey key : TABLE_LAYOUT_STATS) {
+      instanceResponse.hideMetadata(key.getName());
+    }
   }
 
   // NOTE: This method might change indexSegments. Do not use it after calling this method.

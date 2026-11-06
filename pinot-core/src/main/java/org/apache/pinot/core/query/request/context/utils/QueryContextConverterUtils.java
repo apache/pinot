@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -36,7 +37,10 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 
 
 public class QueryContextConverterUtils {
@@ -99,6 +103,10 @@ public class QueryContextConverterUtils {
         filter = null;
       }
     }
+
+    // Row-level security filter
+    Expression rowFilterExpression = getRowFilterExpression(tableName, pinotQuery.getQueryOptions());
+    FilterContext rowFilter = rowFilterExpression != null ? RequestContextUtils.getFilter(rowFilterExpression) : null;
 
     // GROUP BY
     List<ExpressionContext> groupByExpressions = null;
@@ -218,6 +226,7 @@ public class QueryContextConverterUtils {
         .setDistinct(distinct)
         .setAliasList(aliasList)
         .setFilter(filter)
+        .setRowFilter(rowFilterExpression, rowFilter)
         .setGroupByExpressions(groupByExpressions)
         .setGroupingSets(groupingSets)
         .setOrderByExpressions(orderByExpressions)
@@ -228,6 +237,38 @@ public class QueryContextConverterUtils {
         .setExpressionOverrideHints(expressionContextOverrideHints)
         .setExplain(explainMode)
         .build();
+  }
+
+  /// Returns the row-level security (RLS) filter for the table, or `null` if the query options hold none.
+  ///
+  /// The lookup and the parse follow [org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter], which ANDs the same
+  /// filter into the WHERE clause: the key is `rlsFilters-<rawTableName>` and the value is parsed with
+  /// [CalciteSqlParser#compileToExpression(String)]. The server later optimizes this filter with the schema of the
+  /// table, as the WHERE clause (see `InstancePlanMakerImplV2`). Then the RLS bitmap and the WHERE clause use the same
+  /// predicate.
+  ///
+  /// Fails the query when the filter is set but cannot be parsed, because the query must not run without it.
+  @Nullable
+  private static Expression getRowFilterExpression(@Nullable String tableName,
+      @Nullable Map<String, String> queryOptions) {
+    if (tableName == null || queryOptions == null || queryOptions.isEmpty()) {
+      return null;
+    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    String rowFilterString = RlsUtils.getRlsFilterForTable(queryOptions, rawTableName);
+    if (rowFilterString == null || rowFilterString.isEmpty()) {
+      return null;
+    }
+    Expression rowFilterExpression;
+    FilterContext rowFilter;
+    try {
+      rowFilterExpression = CalciteSqlParser.compileToExpression(rowFilterString);
+      rowFilter = RequestContextUtils.getFilter(rowFilterExpression);
+    } catch (Exception e) {
+      // Do not put the filter or the parse error in the message: they can show the RLS policy to the user
+      throw new BadQueryRequestException("Cannot apply the row-level security filter for table: " + rawTableName);
+    }
+    return rowFilter.isConstantTrue() ? null : rowFilterExpression;
   }
 
   private static boolean isMultiStage(PinotQuery pinotQuery) {
