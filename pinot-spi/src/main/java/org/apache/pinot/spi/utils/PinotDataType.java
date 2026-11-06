@@ -544,7 +544,12 @@ public enum PinotDataType {
 
     @Override
     public boolean toBoolean(Object value) {
-      return !value.equals(BigDecimal.ZERO);
+      // BigDecimal.equals() is scale-sensitive (0.0 does not equal ZERO), so test the numerical value.
+      // A mixed-type MV array can dispatch a non-BigDecimal element here when the source type is inferred
+      // from the first element; fall back to the element's own type instead of casting to BigDecimal.
+      return value instanceof BigDecimal
+          ? ((BigDecimal) value).signum() != 0
+          : getSingleValueType(value).toBoolean(value);
     }
 
     @Override
@@ -1727,7 +1732,18 @@ public enum PinotDataType {
       String[] stringArray = new String[length];
       PinotDataType singleValueType = getSingleValueType();
       for (int i = 0; i < length; i++) {
-        stringArray[i] = singleValueType.toString(valueArray[i]);
+        Object element = valueArray[i];
+        try {
+          // The source type is inferred from the first element, so mixed-type arrays (e.g. JSON [1.5, 2])
+          // can hold elements of other types. A BigDecimal element must still use toPlainString(): the
+          // other types' permissive value.toString() would silently keep exponent form ("1E+7") without
+          // throwing ClassCastException.
+          stringArray[i] = element instanceof BigDecimal
+              ? anyToString(element)
+              : singleValueType.toString(element);
+        } catch (ClassCastException e) {
+          stringArray[i] = anyToString(element);
+        }
       }
       return stringArray;
     }
@@ -2016,6 +2032,10 @@ public enum PinotDataType {
 
   private static double anyToDouble(Object val) {
     return getSingleValueType(val).toDouble(val);
+  }
+
+  private static String anyToString(Object val) {
+    return getSingleValueType(val).toString(val);
   }
 
   /// Returns the [PinotDataType] for the given [FieldSpec] for data ingestion purpose. Returns object array
