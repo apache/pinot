@@ -919,7 +919,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
     // run only the broker reduce stage locally. No server dispatch is attempted.
     boolean allLeafStagesEmpty = dispatchableSubPlan.isAllLeafStagesEmpty();
-    int estimatedNumQueryThreads = getEstimatedNumQueryThreads(dispatchableSubPlan);
+    // A query estimated above the throttler limit takes the whole limit, so it runs alone instead of never
+    int estimatedNumQueryThreads =
+        Math.min(getEstimatedNumQueryThreads(dispatchableSubPlan), _queryThrottler.getMaxPermits());
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.

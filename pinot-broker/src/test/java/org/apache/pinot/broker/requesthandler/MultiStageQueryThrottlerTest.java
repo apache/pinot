@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
@@ -58,6 +59,17 @@ public class MultiStageQueryThrottlerTest {
     ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "4"));
     when(_helixAdmin.getInstancesInCluster(eq("testCluster"))).thenReturn(
         List.of("Broker_0", "Broker_1", "Server_0", "Server_1"));
+    setBrokersServingTables("Broker_0", "Broker_1");
+  }
+
+  private void setBrokersServingTables(String... brokers) {
+    IdealState brokerResource = new IdealState(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    brokerResource.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    for (String broker : brokers) {
+      brokerResource.setPartitionState("myTable_OFFLINE", broker, "ONLINE");
+    }
+    when(_helixAdmin.getResourceIdealState(eq("testCluster"), eq(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)))
+        .thenReturn(brokerResource);
   }
 
   @AfterMethod
@@ -104,6 +116,7 @@ public class MultiStageQueryThrottlerTest {
     configMap.put(CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY, "LOG");
     PinotConfiguration config = new PinotConfiguration(configMap);
     _multiStageQueryThrottler = new MultiStageQueryThrottler(config);
+    _multiStageQueryThrottler.init(_helixManager);
 
     Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
     Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
@@ -133,6 +146,7 @@ public class MultiStageQueryThrottlerTest {
     for (int i = 0; i < 100; i++) {
       Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(10, 100, TimeUnit.MILLISECONDS));
     }
+    Assert.assertEquals(_multiStageQueryThrottler.getMaxPermits(), Integer.MAX_VALUE);
   }
 
   @Test
@@ -148,8 +162,7 @@ public class MultiStageQueryThrottlerTest {
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
 
     // Increase the number of brokers
-    when(_helixAdmin.getInstancesInCluster(eq("testCluster"))).thenReturn(
-        List.of("Broker_0", "Broker_1", "Broker_2", "Broker_3", "Server_0", "Server_1"));
+    setBrokersServingTables("Broker_0", "Broker_1", "Broker_2", "Broker_3");
     _multiStageQueryThrottler.processClusterChange(HelixConstants.ChangeType.EXTERNAL_VIEW);
 
     // Verify that the number of permits on this broker have been reduced to account for the new brokers
@@ -176,13 +189,26 @@ public class MultiStageQueryThrottlerTest {
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
 
     // Decrease the number of brokers
-    when(_helixAdmin.getInstancesInCluster(eq("testCluster"))).thenReturn(List.of("Broker_0", "Server_0", "Server_1"));
+    setBrokersServingTables("Broker_0");
     _multiStageQueryThrottler.processClusterChange(HelixConstants.ChangeType.EXTERNAL_VIEW);
 
     // Ensure that the permits from the removed broker are added to this one.
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
+    Assert.assertEquals(_multiStageQueryThrottler.getMaxPermits(), 8);
     Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(3, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 1);
+  }
+
+  @Test
+  public void testBrokerServingNoTableIsNotCounted() {
+    // Broker_2 serves no table, so it gets no queries
+    when(_helixAdmin.getInstancesInCluster(eq("testCluster"))).thenReturn(
+        List.of("Broker_0", "Broker_1", "Broker_2", "Server_0", "Server_1"));
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
+    _multiStageQueryThrottler.init(_helixManager);
+
+    // 4 threads per server * 2 servers / 2 brokers
+    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
   }
 
   @Test
@@ -405,9 +431,8 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler.init(_helixManager);
 
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
-    // Thrown if the estimated number of query threads is greater than the number of available permits to this broker
-    Assert.assertThrows(RuntimeException.class,
-        () -> _multiStageQueryThrottler.tryAcquire(10, 100, TimeUnit.MILLISECONDS));
+    // A query estimated above this limit acquires this limit instead of failing
+    Assert.assertEquals(_multiStageQueryThrottler.getMaxPermits(), 4);
   }
 
   @Test
