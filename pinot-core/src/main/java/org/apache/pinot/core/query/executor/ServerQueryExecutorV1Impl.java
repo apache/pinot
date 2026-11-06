@@ -539,7 +539,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   ///
   /// Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
   /// rewritten to an IN_ID_SET transform function. The function is not allowed under row-level security: the broker
-  /// rejects it, and a server behind an older broker fails the query, see [#checkNoRowFilters(QueryContext)].
+  /// rejects it, and a server behind an older broker fails the query.
   private void handleSubquery(ExpressionContext expression, TableExecutionInfo executionInfo, TimerContext timerContext,
       ExecutorService executorService, QueryContext queryContext)
       throws Exception {
@@ -549,7 +549,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
-      checkNoRowFilters(queryContext);
+      // Reject under RLS even when an older broker allows the function through: the subquery is an opaque string
+      // literal the row filters stamped in the options do not reach, so it would build its ID_SET from every row
+      Map<String, String> rowFilters = RlsUtils.extractRlsFilters(queryContext.getQueryOptions());
+      Preconditions.checkState(rowFilters.isEmpty(),
+          "IN_PARTITIONED_SUBQUERY is not allowed when row-level security filters apply, got filters for %s",
+          rowFilters.keySet());
       Preconditions.checkArgument(arguments.size() == 2,
           "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
@@ -585,19 +590,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         handleSubquery(argument, executionInfo, timerContext, executorService, queryContext);
       }
     }
-  }
-
-  /// Fails the query if row-level security filters are stamped in its options, see [RlsUtils#extractRlsFilters(Map)].
-  ///
-  /// The broker adds the row filters of the principal to the WHERE clause of the query it sends and stamps them in
-  /// the options, but the subquery of `IN_PARTITIONED_SUBQUERY` reaches the server as an opaque string literal that
-  /// carries neither, so it would build its ID_SET from rows the principal is not allowed to see. The broker rejects
-  /// the function under row filters; this covers a server behind an older broker that still lets it through.
-  private static void checkNoRowFilters(QueryContext queryContext) {
-    Map<String, String> rowFilters = RlsUtils.extractRlsFilters(queryContext.getQueryOptions());
-    Preconditions.checkState(rowFilters.isEmpty(),
-        "IN_PARTITIONED_SUBQUERY is not allowed when row-level security filters apply, got filters for %s",
-        rowFilters.keySet());
   }
 
   /// Initializes scan-based query killing for this query. Sets up a [QueryScanCostContext]

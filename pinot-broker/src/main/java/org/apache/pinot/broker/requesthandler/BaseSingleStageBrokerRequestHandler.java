@@ -409,7 +409,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     /// Dimension tables read by `lookup()` calls, which are not part of the data source
     final Set<String> _lookupTableNames;
     /// Whether the query calls a cross-table function as written, collected before `handleSubquery()` replaced its
-    /// `IN_SUBQUERY` calls with their results, see `rejectCrossTableFunctionsUnderRowFilters()`
+    /// `IN_SUBQUERY` calls with their results, for the row-filter rejection in `doHandleRequest()`
     final boolean _hasCrossTableFunction;
     final BrokerResponse _errorOrLiteralOnlyBrokerResponse;
 
@@ -567,8 +567,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
         List<String> rowFilters = rlsFilters.getRLSFilters().orElse(null);
         if (rowFilters != null && !rowFilters.isEmpty()) {
-          rejectCrossTableFunctionsUnderRowFilters(requestId, query, requestContext, tableName, rawTableName,
-              compileResult._hasCrossTableFunction);
+          // The row filters cover the queried table only, while a cross-table function (lookup(), IN_SUBQUERY,
+          // IN_PARTITIONED_SUBQUERY) reads rows from somewhere else: IN_PARTITIONED_SUBQUERY runs its subquery on the
+          // server outside that WHERE clause and leaked the hidden rows. Reject them all rather than decide each one,
+          // so a new one is covered the day it is added. Physical tables only: the logical-table path above applies
+          // no row filters at all today.
+          if (compileResult._hasCrossTableFunction) {
+            throwAccessDeniedError(requestId, query, requestContext, tableName,
+                new BasicAuthorizationResultImpl(false, "Cross-table functions are not allowed on table "
+                    + rawTableName + " when row-level security filters apply"));
+          }
           /// Apply RLS to `serverPinotQuery` (the query the server actually executes), not to
           /// `pinotQuery` as the pre-MV codebase did — for gapfill queries `serverPinotQuery` is
           /// the inner stripped query and `pinotQuery` is the outer gapfill wrapper, so the pre-MV
@@ -1188,10 +1196,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Collected before handleSubquery() replaces each IN_SUBQUERY call with IN_ID_SET on its result, for
-    // doHandleRequest to reject cross-table functions once it knows whether row filters apply. For a gapfill query
-    // the two differ, and only the stripped one reaches a server.
-    boolean hasCrossTableFunction = hasCrossTableFunction(serverPinotQuery)
-        || (serverPinotQuery != pinotQuery && hasCrossTableFunction(pinotQuery));
+    // doHandleRequest to reject cross-table functions once it knows whether row filters apply, and only consumed
+    // under that gate. For a gapfill query the two differ, and only the stripped one reaches a server.
+    boolean hasCrossTableFunction = _enableRowColumnLevelAuth
+        && (hasCrossTableFunction(serverPinotQuery)
+            || (serverPinotQuery != pinotQuery && hasCrossTableFunction(pinotQuery)));
 
     try {
       handleSubquery(serverPinotQuery, requestId, request, requesterIdentity, requestContext, httpHeaders,
@@ -2302,26 +2311,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     // Recurse regardless, so that a lookup() nested inside another lookup()'s join value is collected too
     collectLookupTableNames(operands, lookupTableNames);
-  }
-
-  /// Rejects the query with access denied if it calls a cross-table function, see
-  /// [RequestUtils#isCrossTableFunction(String)]. Called when the access control returns row filters for the queried
-  /// table, which only the physical-table path asks for: the logical-table path of [#doHandleRequest] applies no row
-  /// filters at all today, to the WHERE clause or here, so this check covers physical tables only.
-  ///
-  /// The row filters are added to the WHERE clause, which covers the queried table only, while every cross-table
-  /// function reads rows from somewhere else: `IN_PARTITIONED_SUBQUERY` runs its subquery on the server, outside that
-  /// WHERE clause, and leaked the hidden rows. Rather than decide each function on its own, the broker rejects them
-  /// all under row filters, so a new one is covered the day it is added. Whether the query calls one was collected at
-  /// compile time, before `IN_SUBQUERY` calls were replaced by their results; that nested request is checked and
-  /// filtered on its own, so running it before the rejection discloses nothing.
-  private void rejectCrossTableFunctionsUnderRowFilters(long requestId, String query, RequestContext requestContext,
-      String tableName, String rawTableName, boolean hasCrossTableFunction) {
-    if (hasCrossTableFunction) {
-      throwAccessDeniedError(requestId, query, requestContext, tableName, new BasicAuthorizationResultImpl(false,
-          "Cross-table functions are not allowed on table " + rawTableName
-              + " when row-level security filters apply"));
-    }
   }
 
   /// Returns whether the query calls a cross-table function anywhere: in the select list, the filter, the having
