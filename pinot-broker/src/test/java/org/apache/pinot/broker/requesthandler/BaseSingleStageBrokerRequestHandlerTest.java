@@ -912,10 +912,11 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     return BaseSingleStageBrokerRequestHandler.findCrossTableFunctions(CalciteSqlParser.compileToPinotQuery(sql));
   }
 
-  /// The server resolves IN_PARTITIONED_SUBQUERY by running the quoted subquery on the segments of the table, outside
-  /// the WHERE clause the row filters are added to, so a principal with row filters must not get to use it.
+  /// The row filters are added to the WHERE clause of the queried table, which no cross-table function reads through,
+  /// so a principal with row filters is denied every one of them. `IN_SUBQUERY` runs a nested request that needs a
+  /// server response, so RowLevelSecurityIntegrationTest covers it and `testFindCrossTableFunctions` its detection.
   @Test
-  public void testInPartitionedSubqueryRejectedWhenRowFiltersApply()
+  public void testCrossTableFunctionsRejectedWhenRowFiltersApply()
       throws Exception {
     String tableName = "myTable_OFFLINE";
     TableCache tableCache = mock(TableCache.class);
@@ -951,7 +952,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
       @Override
       public TableRowColAccessResult getRowColFilters(RequesterIdentity identity, String table) {
-        return new TableRowColAccessResultImpl(rowFilters.get());
+        // Row filters on the queried table only: a dimension table with row filters is rejected by the lookup check
+        return new TableRowColAccessResultImpl(table.equals(tableName) ? rowFilters.get() : List.of());
       }
     };
     AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
@@ -965,21 +967,30 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         newServerRequestCapturingHandler(config, routingManager, accessControlFactory, queryQuotaManager, tableCache,
             serverRequest);
 
-    String query = "SELECT COUNT(*) FROM myTable WHERE IN_PARTITIONED_SUBQUERY(col1, "
-        + "'SELECT ID_SET(col1) FROM myTable WHERE tenant = 2') = 1";
-    // Rejected before anything reaches a server
-    WebApplicationException e = expectThrows(WebApplicationException.class, () -> handler.handleRequest(query));
-    assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
-    assertTrue(e.getMessage().contains("IN_PARTITIONED_SUBQUERY"), e.getMessage());
-    assertNull(serverRequest.get());
+    Map<CrossTableFunction, String> queries = Map.of(
+        CrossTableFunction.IN_PARTITIONED_SUBQUERY,
+        "SELECT COUNT(*) FROM myTable WHERE IN_PARTITIONED_SUBQUERY(col1, 'SELECT ID_SET(col1) FROM myTable') = 1",
+        CrossTableFunction.LOOKUP, "SELECT lookup('dimTable', 'dimValue', 'dimKey', col1) FROM myTable");
+    for (Map.Entry<CrossTableFunction, String> entry : queries.entrySet()) {
+      CrossTableFunction function = entry.getKey();
+      String query = entry.getValue();
 
-    // Allowed, and left for the server to resolve, when no row filter applies to the principal
-    rowFilters.set(List.of());
-    BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(query);
-    assertFalse(response.getRLSFiltersApplied());
-    assertNotNull(serverRequest.get());
-    assertTrue(BaseSingleStageBrokerRequestHandler.findCrossTableFunctions(serverRequest.get().getPinotQuery())
-        .contains(CrossTableFunction.IN_PARTITIONED_SUBQUERY));
+      // Rejected before anything reaches a server
+      rowFilters.set(List.of("tenant = 'allowed'"));
+      serverRequest.set(null);
+      WebApplicationException e = expectThrows(WebApplicationException.class, () -> handler.handleRequest(query));
+      assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode(), function.name());
+      assertTrue(e.getMessage().contains(function.name()), e.getMessage());
+      assertNull(serverRequest.get(), function.name());
+
+      // Allowed, and left for the server to resolve, when no row filter applies to the principal
+      rowFilters.set(List.of());
+      BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(query);
+      assertFalse(response.getRLSFiltersApplied(), function.name());
+      assertNotNull(serverRequest.get(), function.name());
+      assertTrue(BaseSingleStageBrokerRequestHandler.findCrossTableFunctions(serverRequest.get().getPinotQuery())
+          .contains(function), function.name());
+    }
   }
 
   /// A handler that records the request it would send to the servers instead of sending it.

@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.function.CrossTableFunction;
@@ -39,8 +38,6 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
-import org.apache.pinot.common.request.DataSource;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -93,9 +90,6 @@ import org.apache.pinot.spi.trace.Tracer;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
-import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,9 +100,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public static final String ENABLE_PREFETCH = "enable.prefetch";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
-  // Stateless, so one instance serves every query. Used directly rather than through the configured rewriter list
-  // so that a server configured without it still filters the subquery.
-  private static final RlsFiltersRewriter ROW_FILTERS_REWRITER = new RlsFiltersRewriter();
 
   private InstanceDataManager _instanceDataManager;
   private ServerMetrics _serverMetrics;
@@ -545,8 +536,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   /// rewrites the expression with the subquery response.
   ///
   /// Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
-  /// rewritten to an IN_ID_SET transform function. The subquery inherits the row-level security filter of the queried
-  /// table, see [#applyRowFilters(PinotQuery, QueryContext)].
+  /// rewritten to an IN_ID_SET transform function. The function is not allowed under row-level security: the broker
+  /// rejects it, and a server behind an older broker fails the query, see [#checkNoRowFilters(QueryContext)].
   private void handleSubquery(ExpressionContext expression, TableExecutionInfo executionInfo, TimerContext timerContext,
       ExecutorService executorService, QueryContext queryContext)
       throws Exception {
@@ -556,15 +547,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (CrossTableFunction.IN_PARTITIONED_SUBQUERY.matches(function.getFunctionName())) {
+      checkNoRowFilters(queryContext);
       Preconditions.checkArgument(arguments.size() == 2,
           "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
       Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
-      PinotQuery subqueryPinotQuery =
-          CalciteSqlParser.compileToPinotQuery(subqueryExpression.getLiteral().getStringValue());
-      applyRowFilters(subqueryPinotQuery, queryContext);
-      QueryContext subquery = QueryContextConverterUtils.getQueryContext(subqueryPinotQuery);
+      QueryContext subquery =
+          QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteral().getStringValue());
       // Subquery should be an ID_SET aggregation only query
       //noinspection rawtypes
       AggregationFunction[] aggregationFunctions = subquery.getAggregationFunctions();
@@ -595,46 +585,17 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
-  /// Adds the row-level security filter of the queried table to the subquery of an `IN_PARTITIONED_SUBQUERY`.
+  /// Fails the query if row-level security filters are stamped in its options, see [RlsUtils#extractRlsFilters(Map)].
   ///
   /// The broker adds the row filters of the principal to the WHERE clause of the query it sends and stamps them in
-  /// the query options under the key of the table it authorized (see [RlsUtils#buildRlsFilterKey(String)]), but the
-  /// subquery reaches the server as an opaque string literal that carries neither, so without this it would build
-  /// its ID_SET from rows the principal is not allowed to see. Row filters belong to one table, so the subquery has to
-  /// read the queried table: the one the filters were authorized for, and the one whose segments the subquery runs on
-  /// whatever its FROM clause names. A subquery that names another table fails, as does a query that carries row
-  /// filters but none for the queried table, which an older broker produces when a materialized view rewrite swaps
-  /// the table after the filters were stamped. The filter is added to the options the subquery was written with,
-  /// overriding any row filter smuggled into them, so that a subquery nested in it is filtered the same way.
-  private static void applyRowFilters(PinotQuery subquery, QueryContext queryContext) {
-    Map<String, String> queryOptions = queryContext.getQueryOptions();
-    if (queryOptions.isEmpty()) {
-      return;
-    }
-    Map<String, String> rowFilters = RlsUtils.extractRlsFilters(queryOptions);
-    if (rowFilters.isEmpty()) {
-      return;
-    }
-    String tableName = queryContext.getTableName();
-    Preconditions.checkState(tableName != null, "Row-level security filters %s are set, but the query has no table",
+  /// the options, but the subquery of `IN_PARTITIONED_SUBQUERY` reaches the server as an opaque string literal that
+  /// carries neither, so it would build its ID_SET from rows the principal is not allowed to see. The broker rejects
+  /// the function under row filters; this covers a server behind an older broker that still lets it through.
+  private static void checkNoRowFilters(QueryContext queryContext) {
+    Map<String, String> rowFilters = RlsUtils.extractRlsFilters(queryContext.getQueryOptions());
+    Preconditions.checkState(rowFilters.isEmpty(),
+        "IN_PARTITIONED_SUBQUERY is not allowed when row-level security filters apply, got filters for %s",
         rowFilters.keySet());
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    String rowFilterKey = RlsUtils.buildRlsFilterKey(rawTableName);
-    String rowFilter = rowFilters.get(rowFilterKey);
-    Preconditions.checkState(!StringUtils.isEmpty(rowFilter),
-        "Row-level security filters %s are set, but none for the queried table %s, cannot apply them to the subquery",
-        rowFilters.keySet(), tableName);
-    DataSource subqueryDataSource = subquery.getDataSource();
-    String subqueryTableName = subqueryDataSource != null ? subqueryDataSource.getTableName() : null;
-    Preconditions.checkState(
-        subqueryTableName != null && rawTableName.equals(TableNameBuilder.extractRawTableName(subqueryTableName)),
-        "The subquery of IN_PARTITIONED_SUBQUERY must read the queried table %s under row-level security, got %s",
-        tableName, subqueryTableName);
-    Map<String, String> subqueryOptions =
-        subquery.getQueryOptions() != null ? new HashMap<>(subquery.getQueryOptions()) : new HashMap<>();
-    subqueryOptions.put(rowFilterKey, rowFilter);
-    subquery.setQueryOptions(subqueryOptions);
-    ROW_FILTERS_REWRITER.rewrite(subquery);
   }
 
   /// Initializes scan-based query killing for this query. Sets up a [QueryScanCostContext]

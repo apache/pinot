@@ -406,16 +406,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     final String _rawTableName;
     /// Dimension tables read by `lookup()` calls, which are not part of the data source
     final Set<String> _lookupTableNames;
+    /// The cross-table functions the query calls as written, collected before `handleSubquery()` replaced its
+    /// `IN_SUBQUERY` calls with their results, see `rejectCrossTableFunctionsUnderRowFilters()`
+    final Set<CrossTableFunction> _crossTableFunctions;
     final BrokerResponse _errorOrLiteralOnlyBrokerResponse;
 
     public CompileResult(PinotQuery pinotQuery, PinotQuery serverPinotQuery, Schema schema, String tableName,
-        String rawTableName, Set<String> lookupTableNames) {
+        String rawTableName, Set<String> lookupTableNames, Set<CrossTableFunction> crossTableFunctions) {
       _pinotQuery = pinotQuery;
       _serverPinotQuery = serverPinotQuery;
       _schema = schema;
       _tableName = tableName;
       _rawTableName = rawTableName;
       _lookupTableNames = lookupTableNames;
+      _crossTableFunctions = crossTableFunctions;
       _errorOrLiteralOnlyBrokerResponse = null;
     }
 
@@ -426,6 +430,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _tableName = null;
       _rawTableName = null;
       _lookupTableNames = Set.of();
+      _crossTableFunctions = Set.of();
       _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
     }
   }
@@ -560,8 +565,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
         List<String> rowFilters = rlsFilters.getRLSFilters().orElse(null);
         if (rowFilters != null && !rowFilters.isEmpty()) {
-          validateCrossTableFunctionsUnderRowFilters(requestId, query, requestContext, tableName, rawTableName,
-              pinotQuery, serverPinotQuery);
+          rejectCrossTableFunctionsUnderRowFilters(requestId, query, requestContext, tableName, rawTableName,
+              compileResult._crossTableFunctions);
           /// Apply RLS to `serverPinotQuery` (the query the server actually executes), not to
           /// `pinotQuery` as the pre-MV codebase did — for gapfill queries `serverPinotQuery` is
           /// the inner stripped query and `pinotQuery` is the outer gapfill wrapper, so the pre-MV
@@ -1180,6 +1185,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return new CompileResult(new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, "Table name not found"));
     }
 
+    // Collected before handleSubquery() replaces each IN_SUBQUERY call with IN_ID_SET on its result, for
+    // doHandleRequest to reject every cross-table function once it knows whether row filters apply. For a gapfill
+    // query the two differ, and only the stripped one reaches a server.
+    Set<CrossTableFunction> crossTableFunctions = findCrossTableFunctions(serverPinotQuery);
+    if (serverPinotQuery != pinotQuery) {
+      crossTableFunctions.addAll(findCrossTableFunctions(pinotQuery));
+    }
+
     try {
       handleSubquery(serverPinotQuery, requestId, request, requesterIdentity, requestContext, httpHeaders,
           accessControl);
@@ -1258,7 +1271,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Schema schema = _tableCache.getSchema(rawTableName);
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
-    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName, lookupTableNames);
+    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName, lookupTableNames,
+        crossTableFunctions);
   }
 
   /// Mutable holder returned from [#applyMaterializedViewRewriteAtCompile] — Java has no out
@@ -2268,41 +2282,23 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return lookupTableNames;
   }
 
-  /// Rejects the query with access denied if a cross-table function in it would read rows that the row filters of
-  /// the queried table hide. Called when the access control returns row filters for that table, which only the
-  /// physical-table path asks for: the logical-table path of [#doHandleRequest] applies no row filters at all today,
-  /// to the WHERE clause or here, so this check covers physical tables only.
+  /// Rejects the query with access denied if it calls a cross-table function, see [CrossTableFunction]. Called when
+  /// the access control returns row filters for the queried table, which only the physical-table path asks for: the
+  /// logical-table path of [#doHandleRequest] applies no row filters at all today, to the WHERE clause or here, so
+  /// this check covers physical tables only.
   ///
-  /// The row filters are added to the WHERE clause, which covers the queried table only, so every
-  /// [CrossTableFunction] is decided here, and the switch is exhaustive so that a new one cannot be added without
-  /// deciding it:
-  /// - `IN_SUBQUERY` runs its subquery as a request of its own under the same identity, so the subquery's table gets
-  ///   its own access check and row filters.
-  /// - `lookup()` reads a dimension table by primary key, never through a filter; a dimension table with row filters
-  ///   for the principal rejects the query whether or not the queried table has any, see the check on the lookup
-  ///   table names in [#doHandleRequest].
-  /// - `IN_PARTITIONED_SUBQUERY` is resolved by the server on the segments of the queried table, outside the WHERE
-  ///   clause, so the query is rejected. The server adds the row filters to the subquery as well, as defense in depth
-  ///   for an older broker, but the broker cannot tell an older server apart and does not rely on it.
-  ///
-  /// The gapfill wrapper is checked along with the query the servers run, although only the latter reaches a server.
-  private void validateCrossTableFunctionsUnderRowFilters(long requestId, String query,
-      RequestContext requestContext, String tableName, String rawTableName, PinotQuery pinotQuery,
-      PinotQuery serverPinotQuery) {
-    BiConsumer<CrossTableFunction, Function> check = (crossTableFunction, functionCall) -> {
-      boolean readsHiddenRows = switch (crossTableFunction) {
-        case IN_SUBQUERY, LOOKUP -> false;
-        case IN_PARTITIONED_SUBQUERY -> true;
-      };
-      if (readsHiddenRows) {
-        throwAccessDeniedError(requestId, query, requestContext, tableName, new BasicAuthorizationResultImpl(false,
-            crossTableFunction + " is not allowed on table " + rawTableName
-                + " when row-level security filters apply"));
-      }
-    };
-    forEachCrossTableFunction(serverPinotQuery, check);
-    if (serverPinotQuery != pinotQuery) {
-      forEachCrossTableFunction(pinotQuery, check);
+  /// The row filters are added to the WHERE clause, which covers the queried table only, while every cross-table
+  /// function reads rows from somewhere else: `IN_PARTITIONED_SUBQUERY` runs its subquery on the server, outside that
+  /// WHERE clause, and leaked the hidden rows. Rather than decide each function on its own, the broker rejects them
+  /// all under row filters, so a new one is covered the day it is added. The functions were collected at compile
+  /// time, before `IN_SUBQUERY` calls were replaced by their results; that nested request is checked and filtered on
+  /// its own, so running it before the rejection discloses nothing.
+  private void rejectCrossTableFunctionsUnderRowFilters(long requestId, String query, RequestContext requestContext,
+      String tableName, String rawTableName, Set<CrossTableFunction> crossTableFunctions) {
+    if (!crossTableFunctions.isEmpty()) {
+      throwAccessDeniedError(requestId, query, requestContext, tableName, new BasicAuthorizationResultImpl(false,
+          "Cross-table functions " + crossTableFunctions + " are not allowed on table " + rawTableName
+              + " when row-level security filters apply"));
     }
   }
 

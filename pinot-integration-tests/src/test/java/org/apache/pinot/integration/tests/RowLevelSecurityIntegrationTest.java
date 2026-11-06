@@ -280,30 +280,33 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
         queryBroker(multiStageQuery, AUTH_HEADER_USER_2)));
   }
 
-  /// The server resolves IN_PARTITIONED_SUBQUERY by running the quoted subquery on the segments of the table, where
-  /// the row filters the broker adds to the WHERE clause do not reach it, so the broker rejects the function for a
-  /// principal with row filters. Without that, the subquery below would see the rows of every other airline and the
-  /// count would be the user's full count instead of 0.
+  /// The row filters are added to the WHERE clause of the queried table, which no cross-table function reads through:
+  /// the server resolves IN_PARTITIONED_SUBQUERY by running the quoted subquery on the segments of the table, where
+  /// the filters do not reach it, so the subquery below would see the rows of every other airline. The broker rejects
+  /// every cross-table function for a principal with row filters, IN_SUBQUERY included although its nested request
+  /// is filtered on its own.
   @Test
-  public void testInPartitionedSubqueryRejectedForPrincipalWithRowFilters()
+  public void testCrossTableFunctionsRejectedForPrincipalWithRowFilters()
       throws Exception {
     setUseMultiStageQueryEngine(false);
-    String query = "SELECT COUNT(*) FROM mytable WHERE IN_PARTITIONED_SUBQUERY(AirlineID - AirlineID, "
-        + "'SELECT ID_SET(AirlineID - AirlineID) FROM mytable WHERE AirlineID <> 19805') = 1";
+    long numRows = queryBroker("SELECT COUNT(*) FROM mytable", AUTH_HEADER).get("resultTable").get("rows").get(0)
+        .get(0).asLong();
+    for (String function : new String[]{"IN_PARTITIONED_SUBQUERY", "IN_SUBQUERY"}) {
+      String query = "SELECT COUNT(*) FROM mytable WHERE " + function + "(AirlineID - AirlineID, "
+          + "'SELECT ID_SET(AirlineID - AirlineID) FROM mytable WHERE AirlineID <> 19805') = 1";
 
-    // A principal without row filters keeps the function
-    JsonNode adminResponse = queryBroker(query, AUTH_HEADER);
-    assertFalse(adminResponse.get("rlsFiltersApplied").asBoolean());
-    assertEquals(adminResponse.get("resultTable").get("rows").get(0).get(0).asLong(),
-        queryBroker("SELECT COUNT(*) FROM mytable", AUTH_HEADER).get("resultTable").get("rows").get(0).get(0)
-            .asLong());
+      // A principal without row filters keeps the function
+      JsonNode adminResponse = queryBroker(query, AUTH_HEADER);
+      assertFalse(adminResponse.get("rlsFiltersApplied").asBoolean(), function);
+      assertEquals(adminResponse.get("resultTable").get("rows").get(0).get(0).asLong(), numRows, function);
 
-    // A principal with row filters is rejected
-    try {
-      JsonNode response = queryBroker(query, AUTH_HEADER_USER);
-      fail("Expected the query to be rejected, got: " + response);
-    } catch (IOException e) {
-      assertTrue(e.getMessage().contains("IN_PARTITIONED_SUBQUERY"), e.getMessage());
+      // A principal with row filters is rejected
+      try {
+        JsonNode response = queryBroker(query, AUTH_HEADER_USER);
+        fail("Expected " + function + " to be rejected, got: " + response);
+      } catch (IOException e) {
+        assertTrue(e.getMessage().contains(function), e.getMessage());
+      }
     }
   }
 

@@ -27,8 +27,8 @@ import org.apache.commons.lang3.StringUtils;
 /// predicate rules each decide how to treat every one of them.
 ///
 /// Nothing derives this list from the function registries, so a function that reads another table or runs a nested
-/// query must be added here when it is defined; an exhaustive `switch` over this enum then stops compiling until the
-/// new value is decided.
+/// query must be added here when it is defined. The single-stage broker then rejects it for a principal with row
+/// filters on the queried table, and DELETE rejects it in its WHERE clause, with no further decision.
 ///
 /// [#matches(String)] is the one spelling check every caller shares: underscores dropped and case folded per
 /// character, as [String#equalsIgnoreCase(String)] does, so that the broker's checks and the server's resolver agree on

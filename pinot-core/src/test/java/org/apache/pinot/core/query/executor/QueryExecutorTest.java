@@ -233,50 +233,23 @@ public class QueryExecutorTest {
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
   }
 
-  /// The broker adds the row filters of the principal to the WHERE clause and stamps them in the query options; the
-  /// server has to add them to the subquery of IN_PARTITIONED_SUBQUERY too, which reaches it as a string literal.
+  /// The broker rejects IN_PARTITIONED_SUBQUERY for a principal with row filters. A server behind an older broker,
+  /// which stamps the row filters in the query options but lets the function through, fails the query instead: the
+  /// subquery reaches it as a string literal the filters do not cover, so it would build its ID_SET from every row.
   @Test
-  public void testInPartitionedSubqueryAppliesRowFilters() {
-    // A row filter that keeps some rows and drops others
-    long minOrderItemCount =
-        ((Number) aggregate("SELECT MIN(orderItemCount) FROM " + OFFLINE_TABLE_NAME, null)).longValue();
-    String rowFilters = "orderItemCount > " + minOrderItemCount;
-    long numAllowedRows = (Long) aggregate("SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE " + rowFilters, null);
-    assertTrue(numAllowedRows > 0 && numAllowedRows < 60000, "Row filter should keep some rows and drop others");
+  public void testInPartitionedSubqueryRejectedUnderRowFilters() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE IN_PARTITIONED_SUBQUERY(orderItemCount, "
+        + "'SELECT ID_SET(orderItemCount) FROM " + OFFLINE_TABLE_NAME + "') = 1";
+    // Without row filters the function resolves as it always has: every row's value is in the ID_SET
+    long numRows = (Long) aggregate("SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME, null);
+    assertEquals(aggregate(query, null), numRows);
 
-    // The subquery selects the rows the filter drops, so its ID_SET is empty iff the filter applies to it too
-    String subqueryTemplate = "SELECT ID_SET(orderItemCount - orderItemCount) FROM %s WHERE NOT (" + rowFilters + ")";
-    String queryTemplate = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE " + rowFilters
-        + " AND IN_PARTITIONED_SUBQUERY(orderItemCount - orderItemCount, '%s') = 1";
-    String query = String.format(queryTemplate, String.format(subqueryTemplate, OFFLINE_TABLE_NAME));
-    Map<String, String> queryOptions = Map.of(RlsUtils.buildRlsFilterKey(RAW_TABLE_NAME), rowFilters);
-    assertEquals(aggregate(query, queryOptions), 0L);
-
-    // Without row filters the subquery sees every row
-    assertEquals(aggregate(query, null), numAllowedRows);
-
-    // Row filters belong to one table: a subquery that names another table is rejected under row filters instead of
-    // being filtered with the queried table's or run as is (without them it runs on the queried table's segments, as
-    // it always has)
-    String queryNamingOtherTable = String.format(queryTemplate, String.format(subqueryTemplate, "otherTable"));
-    assertEquals(aggregate(queryNamingOtherTable, null), numAllowedRows);
-    String error = executeExpectingFailure(queryNamingOtherTable, queryOptions);
-    assertTrue(error.contains("must read the queried table"), error);
-
-    // Row filters stamped for another table only, which an older broker sends when a materialized view rewrite swaps
-    // the table after stamping them, fail the query rather than let the subquery run unfiltered
-    Map<String, String> otherTableOptions = Map.of(RlsUtils.buildRlsFilterKey("otherTable"), rowFilters);
-    error = executeExpectingFailure(query, otherTableOptions);
-    assertTrue(error.contains("none for the queried table"), error);
-
-    // A subquery nested in the subquery is filtered the same way: with the filter the innermost ID_SET is empty, so
-    // the middle one is too; without it both hold the single value 0 and every allowed row matches
-    String nestedSubquery = "SELECT ID_SET(orderItemCount - orderItemCount) FROM " + OFFLINE_TABLE_NAME
-        + " WHERE IN_PARTITIONED_SUBQUERY(orderItemCount - orderItemCount, ''"
-        + String.format(subqueryTemplate, OFFLINE_TABLE_NAME) + "'') = 1";
-    String nestedQuery = String.format(queryTemplate, nestedSubquery);
-    assertEquals(aggregate(nestedQuery, queryOptions), 0L);
-    assertEquals(aggregate(nestedQuery, null), numAllowedRows);
+    // With row filters stamped for any table the query fails before the subquery runs
+    for (String table : new String[]{RAW_TABLE_NAME, "otherTable"}) {
+      Map<String, String> queryOptions = Map.of(RlsUtils.buildRlsFilterKey(table), "orderItemCount > 0");
+      String error = executeExpectingFailure(query, queryOptions);
+      assertTrue(error.contains("not allowed when row-level security filters apply"), error);
+    }
   }
 
   private Object aggregate(String query, @Nullable Map<String, String> queryOptions) {
