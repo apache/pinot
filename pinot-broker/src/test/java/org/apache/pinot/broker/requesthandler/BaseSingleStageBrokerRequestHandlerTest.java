@@ -24,6 +24,7 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -879,8 +880,11 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   @Test
   public void testHasCrossTableFunction() {
     String subquery = "SELECT ID_SET(col1) FROM myTable WHERE col2 = 2";
-    // The operator of a compiled call is canonical (underscores removed, lower-cased), so every spelling counts
-    String[] spellings = {"IN_PARTITIONED_SUBQUERY", "inpartitionedsubquery", "In_Partitioned_Sub_Query"};
+    // The operator of a compiled call is canonical (underscores removed, lower-cased), so every spelling counts, the
+    // dotless ı (U+0131) look-alike that the server resolves too included
+    String[] spellings = {
+        "IN_PARTITIONED_SUBQUERY", "inpartitionedsubquery", "In_Partitioned_Sub_Query", "IN_PART\u0131TIONED_SUBQUERY"
+    };
     for (String spelling : spellings) {
       assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE " + spelling + "(col1, '" + subquery
           + "') = 1"), spelling);
@@ -903,6 +907,15 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     // Other functions, IN_ID_SET on a literal included, are not cross-table functions
     assertFalse(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col1, 'AQ==') = 1"));
     assertFalse(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE col1 = 1"));
+    // Under a Turkish default locale the parser lower-cases the I of the plain spelling to a dotless ı as well
+    Locale defaultLocale = Locale.getDefault();
+    Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+    try {
+      assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_PARTITIONED_SUBQUERY(col1, '" + subquery
+          + "') = 1"));
+    } finally {
+      Locale.setDefault(defaultLocale);
+    }
   }
 
   private static boolean hasCrossTableFunction(String sql) {

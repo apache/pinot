@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -2341,9 +2342,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return false;
     }
     Function functionCall = expression.getFunctionCall();
-    // The operator of a compiled call is canonical, see RequestUtils.canonicalizeFunctionName()
-    return RequestUtils.isCrossTableFunction(functionCall.getOperator())
-        || hasCrossTableFunction(functionCall.getOperands());
+    // The operator of a compiled call is canonical, see RequestUtils.canonicalizeFunctionName(), but lower-cased with
+    // the default locale, while the server resolves IN_PARTITIONED_SUBQUERY with equalsIgnoreCase(): fold it through
+    // Locale.ROOT so that a dotless ı (U+0131), written in the query or made of the I by a Turkish locale, and a long
+    // ſ (U+017F) are matched as the server matches them, or a server without the row-filter guard would run the
+    // subquery unfiltered behind this broker.
+    String canonicalName = functionCall.getOperator().toUpperCase(Locale.ROOT).toLowerCase(Locale.ROOT);
+    return RequestUtils.isCrossTableFunction(canonicalName) || hasCrossTableFunction(functionCall.getOperands());
   }
 
   /// Fixes the column names to the actual column names in the given expression.
