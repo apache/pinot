@@ -19,13 +19,15 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import com.google.common.annotations.VisibleForTesting;
+import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +60,35 @@ import org.slf4j.LoggerFactory;
 /// Not thread safe. Only used by the rebuild thread, for the duration of one rebuild.
 final class SegmentGroupsBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGroupsBuilder.class);
+
+  // Preserve Set equality regardless of instance iteration order.
+  // Mixed hashes reduce collisions without copying or sorting keys.
+  // Backing assignment maps must remain unchanged during the rebuild.
+  static final Hash.Strategy<Set<String>> INSTANCE_SET_STRATEGY =
+      new Hash.Strategy<>() {
+        @Override
+        public int hashCode(Set<String> instances) {
+          if (instances == null) {
+            return 0;
+          }
+
+          int first = 0;
+          int second = 0;
+          for (String instance : instances) {
+            int hash = instance.hashCode();
+            first += HashCommon.mix(hash);
+            second += HashCommon.mix(hash ^ 0x9e3779b9);
+          }
+
+          return HashCommon.mix(first ^ Integer.rotateLeft(second, 16) ^ instances.size());
+        }
+
+        @Override
+        public boolean equals(Set<String> left, Set<String> right) {
+          return left == right || (left != null && right != null && left.equals(right));
+        }
+      };
+
   private static final int UNKNOWN_POOL = Integer.MIN_VALUE;
   private static final int NO_GROUP = -1;
 
@@ -227,7 +258,8 @@ final class SegmentGroupsBuilder {
   /// Returns the instances unavailable for any old segment, keyed by the instances in the ideal state of the segment:
   /// the instances that are not online for routing in both the ideal state and the external view.
   private Map<Set<String>, Set<String>> computeUnavailableInstancesMap(List<InstanceStateMaps> instanceStateMapsList) {
-    Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
+    Map<Set<String>, Set<String>> unavailableInstancesMap =
+        new Object2ObjectOpenCustomHashMap<>(INSTANCE_SET_STRATEGY);
     for (InstanceStateMaps instanceStateMaps : instanceStateMapsList) {
       if (instanceStateMaps._numOldSegments == 0) {
         continue;
