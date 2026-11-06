@@ -750,6 +750,15 @@ public class SegmentPushUtils implements Serializable {
     return segmentUriToTarPathMap;
   }
 
+  /// Validates the job spec for URI push. `allowSegmentsWithoutArchiveExtension` is used to push segments already in
+  /// the deep store, so `cleanUpOutputDir` is rejected to avoid deleting the pushed segments from the deep store.
+  public static void validateUriPushJobSpec(SegmentGenerationJobSpec spec) {
+    Preconditions.checkArgument(
+        !spec.getPushJobSpec().isAllowSegmentsWithoutArchiveExtension() || !spec.isCleanUpOutputDir(),
+        "cleanUpOutputDir must be false when allowSegmentsWithoutArchiveExtension is enabled for URI push, otherwise "
+            + "the pushed segments are deleted from outputDirURI: %s", spec.getOutputDirURI());
+  }
+
   /// Lists the files under `outputDirURI` recursively for segment push. When `allowSegmentsWithoutArchiveExtension` is
   /// enabled, directories are excluded because files are not filtered by the segment archive extension anymore.
   public static String[] listFiles(PinotFS outputDirFS, URI outputDirURI, PushJobSpec pushSpec)

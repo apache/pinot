@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class SegmentUriPushJobRunnerTest {
@@ -77,11 +78,37 @@ public class SegmentUriPushJobRunnerTest {
     }
   }
 
+  @Test
+  public void testCleanUpOutputDirRejectedWithoutArchiveExtension()
+      throws Exception {
+    File outputDir = Files.createTempDirectory("segmentUriPush").toFile();
+    try {
+      File realtimeSegment = new File(outputDir, "myTable__0__0__20260601T1557Z");
+      assertTrue(realtimeSegment.createNewFile());
+
+      PushJobSpec pushJobSpec = new PushJobSpec();
+      pushJobSpec.setPushFileNamePattern("glob:**/myTable*");
+      pushJobSpec.setAllowSegmentsWithoutArchiveExtension(true);
+      SegmentGenerationJobSpec spec = createSpec(outputDir, pushJobSpec);
+      spec.setCleanUpOutputDir(true);
+      expectThrows(IllegalArgumentException.class, () -> new SegmentUriPushJobRunner(spec));
+      assertTrue(realtimeSegment.exists());
+    } finally {
+      FileUtils.deleteQuietly(outputDir);
+    }
+  }
+
   private static List<String> getFileNames(Map<String, String> segmentUriToTarPathMap) {
     return segmentUriToTarPathMap.values().stream().map(path -> new File(path).getName()).sorted().toList();
   }
 
   private static SegmentUriPushJobRunner createRunner(File outputDir, PushJobSpec pushJobSpec) {
+    SegmentUriPushJobRunner runner = new SegmentUriPushJobRunner(createSpec(outputDir, pushJobSpec));
+    runner.initFileSys();
+    return runner;
+  }
+
+  private static SegmentGenerationJobSpec createSpec(File outputDir, PushJobSpec pushJobSpec) {
     SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
     spec.setOutputDirURI(outputDir.toURI().toString());
     spec.setPushJobSpec(pushJobSpec);
@@ -92,8 +119,6 @@ public class SegmentUriPushJobRunnerTest {
     pinotFSSpec.setScheme("file");
     pinotFSSpec.setClassName(LocalPinotFS.class.getName());
     spec.setPinotFSSpecs(List.of(pinotFSSpec));
-    SegmentUriPushJobRunner runner = new SegmentUriPushJobRunner(spec);
-    runner.initFileSys();
-    return runner;
+    return spec;
   }
 }

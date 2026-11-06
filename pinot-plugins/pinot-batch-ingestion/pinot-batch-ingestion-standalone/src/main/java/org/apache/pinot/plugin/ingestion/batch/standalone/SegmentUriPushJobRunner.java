@@ -36,6 +36,12 @@ public class SegmentUriPushJobRunner extends BaseSegmentPushJobRunner {
     init(spec);
   }
 
+  @Override
+  public void init(SegmentGenerationJobSpec spec) {
+    super.init(spec);
+    SegmentPushUtils.validateUriPushJobSpec(spec);
+  }
+
   /// When `allowSegmentsWithoutArchiveExtension` is enabled, segments matched by `pushFileNamePattern` are pushed even
   /// without a segment archive extension, so that segments already in the deep store can be pushed by URI.
   @Override

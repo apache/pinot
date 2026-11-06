@@ -665,6 +665,21 @@ public class SegmentPushUtilsTest {
     assertEquals(SegmentPushUtils.getSegmentName(segmentArchive), "myTable_offline");
   }
 
+  @Test
+  public void testValidateUriPushJobSpec() {
+    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
+    PushJobSpec pushSpec = new PushJobSpec();
+    spec.setPushJobSpec(pushSpec);
+    spec.setCleanUpOutputDir(true);
+    SegmentPushUtils.validateUriPushJobSpec(spec);
+
+    // Pushed segments must not be deleted from the deep store
+    pushSpec.setAllowSegmentsWithoutArchiveExtension(true);
+    expectThrows(IllegalArgumentException.class, () -> SegmentPushUtils.validateUriPushJobSpec(spec));
+    spec.setCleanUpOutputDir(false);
+    SegmentPushUtils.validateUriPushJobSpec(spec);
+  }
+
   @DataProvider(name = "segmentTarExtensions")
   public Object[][] segmentTarExtensions() {
     return new Object[][]{{".tar.gz"}, {".tar.lz4"}, {".tar.zst"}};

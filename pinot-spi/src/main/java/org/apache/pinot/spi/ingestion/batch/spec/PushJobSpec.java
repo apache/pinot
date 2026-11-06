@@ -61,8 +61,8 @@ public class PushJobSpec implements Serializable {
   /// If true, and `pushFileNamePattern` is configured, the files matched by the pattern are pushed even without a
   /// segment archive extension, e.g. segments stored in the deep store such as committed REALTIME segments.
   /// Directories, segment metadata files and temporary segment files (`<segment>.tmp.<uuid>`) are always skipped.
-  /// When `outputDirURI` points to the deep store of another table, keep `cleanUpOutputDir` false, otherwise the pushed
-  /// segments are deleted from that deep store.
+  /// When this is true, `cleanUpOutputDir` must be false, otherwise the URI push job fails before pushing any segment,
+  /// so that the pushed segments are not deleted from the deep store.
   private boolean _allowSegmentsWithoutArchiveExtension;
 
   /// Prefer using segment metadata tar gz file to push segment if exists.

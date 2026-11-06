@@ -52,6 +52,7 @@ public class HadoopSegmentUriPushJobRunner implements IngestionJobRunner, Serial
     if (_spec.getPushJobSpec() == null) {
       throw new RuntimeException("Missing PushJobSpec");
     }
+    SegmentPushUtils.validateUriPushJobSpec(_spec);
   }
 
   @Override
