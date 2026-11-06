@@ -45,7 +45,6 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.util.Litmus;
-import org.apache.pinot.common.function.CrossTableFunction;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -64,6 +63,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 ///
 /// The rewrite changes the parsed query in place, so it is not thread-safe.
 final class IdSetSubqueryRewriter {
+  private static final String IN_SUBQUERY = "insubquery";
   private static final String IN_ID_SET = "inidset";
 
   static final String EMPTY_ID_SET;
@@ -115,7 +115,7 @@ final class IdSetSubqueryRewriter {
     node.accept(finder);
     for (IdSetCall idSetCall : finder._calls) {
       SqlBasicCall call = idSetCall._call;
-      if (CrossTableFunction.IN_SUBQUERY.matches(getFunctionName(call))) {
+      if (IN_SUBQUERY.equals(getFunctionName(call))) {
         String subquery = getSubquery(call);
         call.setOperator(new SqlUnresolvedFunction(new SqlIdentifier("IN_ID_SET", call.getParserPosition()), null,
             null, null, null, SqlFunctionCategory.USER_DEFINED_FUNCTION));
@@ -230,8 +230,7 @@ final class IdSetSubqueryRewriter {
       }
       if (call instanceof SqlBasicCall && call.operandCount() > 0) {
         String functionName = getFunctionName(call);
-        if (CrossTableFunction.IN_SUBQUERY.matches(functionName) || (IN_ID_SET.equals(functionName)
-            && call.operandCount() == 2
+        if (IN_SUBQUERY.equals(functionName) || (IN_ID_SET.equals(functionName) && call.operandCount() == 2
             && call.operand(1).getKind().belongsTo(SqlKind.QUERY))) {
           _calls.add(new IdSetCall((SqlBasicCall) call, _withNames));
           // The tested expression can hold more of them

@@ -43,7 +43,6 @@ import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.function.CrossTableFunction;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -878,43 +877,41 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testFindCrossTableFunctions() {
+  public void testHasCrossTableFunction() {
     String subquery = "SELECT ID_SET(col1) FROM myTable WHERE col2 = 2";
-    // The names are matched with underscores removed and the case folded per character, as the server resolves them,
-    // so every spelling counts, including one with the dotless i (U+0131) that only that case fold maps to the name
-    String[] spellings = {
-        "IN_PARTITIONED_SUBQUERY", "inpartitionedsubquery", "In_Partitioned_Sub_Query", "IN_PART\u0131TIONED_SUBQUERY"
-    };
+    // The operator of a compiled call is canonical (underscores removed, lower-cased), so every spelling counts
+    String[] spellings = {"IN_PARTITIONED_SUBQUERY", "inpartitionedsubquery", "In_Partitioned_Sub_Query"};
     for (String spelling : spellings) {
-      assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE " + spelling + "(col1, '" + subquery
-          + "') = 1"), Set.of(CrossTableFunction.IN_PARTITIONED_SUBQUERY), spelling);
+      assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE " + spelling + "(col1, '" + subquery
+          + "') = 1"), spelling);
     }
     // Nested in other predicates and expressions, and outside the WHERE clause
-    assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE col2 = 1 AND NOT (col3 > 2 OR "
-            + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1)"),
-        Set.of(CrossTableFunction.IN_PARTITIONED_SUBQUERY));
-    assertEquals(findCrossTableFunctions("SELECT CASE WHEN IN_PARTITIONED_SUBQUERY(col1, '" + subquery
-        + "') = 1 THEN 1 ELSE 0 END FROM myTable"), Set.of(CrossTableFunction.IN_PARTITIONED_SUBQUERY));
-    assertEquals(findCrossTableFunctions("SELECT col1, COUNT(*) FROM myTable GROUP BY col1 HAVING "
-        + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1"), Set.of(CrossTableFunction.IN_PARTITIONED_SUBQUERY));
+    assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE col2 = 1 AND NOT (col3 > 2 OR "
+        + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1)"));
+    assertTrue(hasCrossTableFunction("SELECT CASE WHEN IN_PARTITIONED_SUBQUERY(col1, '" + subquery
+        + "') = 1 THEN 1 ELSE 0 END FROM myTable"));
+    assertTrue(hasCrossTableFunction("SELECT col1, COUNT(*) FROM myTable GROUP BY col1 HAVING "
+        + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1"));
     // The other cross-table functions, alone and together, a lookup() nested in a lookup() included
-    assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE IN_SUBQUERY(col1, '" + subquery
-        + "') = 1"), Set.of(CrossTableFunction.IN_SUBQUERY));
-    assertEquals(findCrossTableFunctions("SELECT lookup('dimTable', 'name', 'id', lookup('other', 'id', 'key', col1)) "
-        + "FROM myTable WHERE In_Sub_Query(col2, '" + subquery + "') = 1 ORDER BY LOOK_UP('third', 'v', 'k', col3)"),
-        Set.of(CrossTableFunction.LOOKUP, CrossTableFunction.IN_SUBQUERY));
+    assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_SUBQUERY(col1, '" + subquery
+        + "') = 1"));
+    assertTrue(hasCrossTableFunction("SELECT lookup('dimTable', 'name', 'id', col1) FROM myTable"));
+    assertTrue(hasCrossTableFunction("SELECT UPPER(lookup('dimTable', 'name', 'id', col1)) FROM myTable"));
+    assertTrue(hasCrossTableFunction("SELECT lookup('dimTable', 'name', 'id', lookup('other', 'id', 'key', col1)) "
+        + "FROM myTable WHERE In_Sub_Query(col2, '" + subquery + "') = 1 ORDER BY LOOK_UP('third', 'v', 'k', col3)"));
+    assertTrue(hasCrossTableFunction("SELECT col1 FROM myTable ORDER BY LOOK_UP('dimTable', 'v', 'k', col1)"));
     // Other functions, IN_ID_SET on a literal included, are not cross-table functions
-    assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col1, 'AQ==') = 1"), Set.of());
-    assertEquals(findCrossTableFunctions("SELECT COUNT(*) FROM myTable WHERE col1 = 1"), Set.of());
+    assertFalse(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col1, 'AQ==') = 1"));
+    assertFalse(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE col1 = 1"));
   }
 
-  private static Set<CrossTableFunction> findCrossTableFunctions(String sql) {
-    return BaseSingleStageBrokerRequestHandler.findCrossTableFunctions(CalciteSqlParser.compileToPinotQuery(sql));
+  private static boolean hasCrossTableFunction(String sql) {
+    return BaseSingleStageBrokerRequestHandler.hasCrossTableFunction(CalciteSqlParser.compileToPinotQuery(sql));
   }
 
   /// The row filters are added to the WHERE clause of the queried table, which no cross-table function reads through,
   /// so a principal with row filters is denied every one of them. `IN_SUBQUERY` runs a nested request that needs a
-  /// server response, so RowLevelSecurityIntegrationTest covers it and `testFindCrossTableFunctions` its detection.
+  /// server response, so RowLevelSecurityIntegrationTest covers it and `testHasCrossTableFunction` its detection.
   @Test
   public void testCrossTableFunctionsRejectedWhenRowFiltersApply()
       throws Exception {
@@ -967,29 +964,29 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         newServerRequestCapturingHandler(config, routingManager, accessControlFactory, queryQuotaManager, tableCache,
             serverRequest);
 
-    Map<CrossTableFunction, String> queries = Map.of(
-        CrossTableFunction.IN_PARTITIONED_SUBQUERY,
+    Map<String, String> queries = Map.of(
+        "IN_PARTITIONED_SUBQUERY",
         "SELECT COUNT(*) FROM myTable WHERE IN_PARTITIONED_SUBQUERY(col1, 'SELECT ID_SET(col1) FROM myTable') = 1",
-        CrossTableFunction.LOOKUP, "SELECT lookup('dimTable', 'dimValue', 'dimKey', col1) FROM myTable");
-    for (Map.Entry<CrossTableFunction, String> entry : queries.entrySet()) {
-      CrossTableFunction function = entry.getKey();
+        "lookup", "SELECT lookup('dimTable', 'dimValue', 'dimKey', col1) FROM myTable");
+    for (Map.Entry<String, String> entry : queries.entrySet()) {
+      String function = entry.getKey();
       String query = entry.getValue();
 
       // Rejected before anything reaches a server
       rowFilters.set(List.of("tenant = 'allowed'"));
       serverRequest.set(null);
       WebApplicationException e = expectThrows(WebApplicationException.class, () -> handler.handleRequest(query));
-      assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode(), function.name());
-      assertTrue(e.getMessage().contains(function.name()), e.getMessage());
-      assertNull(serverRequest.get(), function.name());
+      assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode(), function);
+      assertTrue(e.getMessage().contains("Cross-table functions are not allowed"), e.getMessage());
+      assertNull(serverRequest.get(), function);
 
       // Allowed, and left for the server to resolve, when no row filter applies to the principal
       rowFilters.set(List.of());
       BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(query);
-      assertFalse(response.getRLSFiltersApplied(), function.name());
-      assertNotNull(serverRequest.get(), function.name());
-      assertTrue(BaseSingleStageBrokerRequestHandler.findCrossTableFunctions(serverRequest.get().getPinotQuery())
-          .contains(function), function.name());
+      assertFalse(response.getRLSFiltersApplied(), function);
+      assertNotNull(serverRequest.get(), function);
+      assertTrue(BaseSingleStageBrokerRequestHandler.hasCrossTableFunction(serverRequest.get().getPinotQuery()),
+          function);
     }
   }
 

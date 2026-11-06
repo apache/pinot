@@ -305,7 +305,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
         JsonNode response = queryBroker(query, AUTH_HEADER_USER);
         fail("Expected " + function + " to be rejected, got: " + response);
       } catch (IOException e) {
-        assertTrue(e.getMessage().contains(function), e.getMessage());
+        assertTrue(e.getMessage().contains("Cross-table functions are not allowed"), e.getMessage());
       }
     }
   }

@@ -31,9 +31,9 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.function.CrossTableFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -100,6 +100,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public static final String ENABLE_PREFETCH = "enable.prefetch";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
+  // Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function
+  private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
 
   private InstanceDataManager _instanceDataManager;
   private ServerMetrics _serverMetrics;
@@ -546,7 +548,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return;
     }
     List<ExpressionContext> arguments = function.getArguments();
-    if (CrossTableFunction.IN_PARTITIONED_SUBQUERY.matches(function.getFunctionName())) {
+    if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
       checkNoRowFilters(queryContext);
       Preconditions.checkArgument(arguments.size() == 2,
           "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
