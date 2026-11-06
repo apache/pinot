@@ -106,6 +106,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
       Map<String, TaskCount> tableAccumulatedCount = new HashMap<>();
       Map<String, Long> tableMaxWaitTimeMs = new HashMap<>();
       Map<String, Long> tableMaxRunningTimeMs = new HashMap<>();
+      Map<String, Long> tableMaxQueueStallTimeMs = new HashMap<>();
       try {
         // Capture the current execution timestamp for this task type collection cycle
         long currentExecutionTimestamp = System.currentTimeMillis();
@@ -149,6 +150,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
                 taskStatusSummary.getSubtaskRunningTimes().values().forEach(subtaskRunningTime -> {
                   tableMaxRunningTimeMs.merge(tableNameWithType, subtaskRunningTime, Math::max);
                 });
+                tableMaxQueueStallTimeMs.merge(tableNameWithType, taskStatusSummary.getQueueStallTimeMs(), Math::max);
                 return count;
               });
             });
@@ -214,6 +216,9 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
               ControllerGauge.MAX_SUBTASK_RUNNING_TIME_MS,
               tableMaxRunningTimeMs.getOrDefault(tableNameWithType, 0L));
+          _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
+              ControllerGauge.MAX_SUBTASK_QUEUE_STALL_TIME_MS,
+              tableMaxQueueStallTimeMs.getOrDefault(tableNameWithType, 0L));
         });
 
         if (_preReportedTables.containsKey(taskType)) {
@@ -293,6 +298,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.MAX_SUBTASK_RUNNING_TIME_MS);
+      _controllerMetrics.removeTableGauge(tableNameWithType, taskType,
+          ControllerGauge.MAX_SUBTASK_QUEUE_STALL_TIME_MS);
     });
   }
 }
