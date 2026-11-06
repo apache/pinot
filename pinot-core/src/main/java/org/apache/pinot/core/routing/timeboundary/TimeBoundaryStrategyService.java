@@ -25,21 +25,21 @@ import java.util.ServiceLoader;
 public class TimeBoundaryStrategyService {
 
   private static volatile TimeBoundaryStrategyService _instance = fromServiceLoader();
-  private final Map<String, TimeBoundaryStrategy> _strategyMap;
+  private final Map<String, ServiceLoader.Provider<TimeBoundaryStrategy>> _strategyMap;
 
-  private TimeBoundaryStrategyService(Map<String, TimeBoundaryStrategy> strategyMap) {
+  private TimeBoundaryStrategyService(Map<String, ServiceLoader.Provider<TimeBoundaryStrategy>> strategyMap) {
     _strategyMap = strategyMap;
   }
 
   public static TimeBoundaryStrategyService fromServiceLoader() {
-    Map<String, TimeBoundaryStrategy> strategyMap = new java.util.HashMap<>();
-    for (TimeBoundaryStrategy strategy : ServiceLoader.load(TimeBoundaryStrategy.class)) {
-      String strategyName = strategy.getName();
+    Map<String, ServiceLoader.Provider<TimeBoundaryStrategy>> strategyMap = new java.util.HashMap<>();
+    ServiceLoader.load(TimeBoundaryStrategy.class).stream().forEach(provider -> {
+      String strategyName = provider.get().getName();
       if (strategyMap.containsKey(strategyName)) {
         throw new IllegalStateException("Duplicate TimeBoundaryStrategy found: " + strategyName);
       }
-      strategyMap.put(strategyName, strategy);
-    }
+      strategyMap.put(strategyName, provider);
+    });
     return new TimeBoundaryStrategyService(strategyMap);
   }
 
@@ -57,11 +57,12 @@ public class TimeBoundaryStrategyService {
     _instance = service;
   }
 
+  /// Returns a new strategy instance so logical-table-specific initialization is not shared between requests.
   public TimeBoundaryStrategy getTimeBoundaryStrategy(String name) {
-    TimeBoundaryStrategy strategy = _instance._strategyMap.get(name);
-    if (strategy == null) {
+    ServiceLoader.Provider<TimeBoundaryStrategy> provider = _instance._strategyMap.get(name);
+    if (provider == null) {
       throw new IllegalArgumentException("No TimeBoundaryStrategy found for name: " + name);
     }
-    return strategy;
+    return provider.get();
   }
 }
