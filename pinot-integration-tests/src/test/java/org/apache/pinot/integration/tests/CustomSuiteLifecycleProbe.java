@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Properties;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.integration.tests.custom.CustomDataQueryClusterIntegrationTest;
-import org.apache.pinot.plugin.stream.kafka30.server.EmbeddedKafkaCluster;
+import org.apache.pinot.plugin.stream.kafka40.server.EmbeddedKafkaCluster;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.data.Schema;
 
