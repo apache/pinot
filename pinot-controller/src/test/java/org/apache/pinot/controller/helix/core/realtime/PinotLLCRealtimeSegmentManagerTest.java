@@ -212,6 +212,42 @@ public class PinotLLCRealtimeSegmentManagerTest {
     testSetUpNewTable(8, 10, 4, false);
   }
 
+  @Test
+  public void testSegmentCreationCapturesReplicateMode() {
+    for (boolean replicateMode : List.of(false, true)) {
+      FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+      segmentManager._numReplicas = 3;
+      StreamIngestionConfig streamConfig = new StreamIngestionConfig(
+          List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
+      streamConfig.setReplicateMode(replicateMode);
+      IngestionConfig ingestionConfig = new IngestionConfig();
+      ingestionConfig.setStreamIngestionConfig(streamConfig);
+      segmentManager._tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+          .setNumReplicas(3).setIngestionConfig(ingestionConfig).build();
+      segmentManager._streamConfigs = IngestionConfigUtils.getStreamConfigs(segmentManager._tableConfig);
+      segmentManager._numInstances = 3;
+      segmentManager.makeConsumingInstancePartitions();
+      segmentManager._numPartitions = 1;
+      segmentManager.setUpNewTable();
+
+      String originalSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+      SegmentZKMetadata metadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, originalSegment, null);
+      assertEquals(metadata.isReplicateMode(), replicateMode);
+      assertEquals(metadata.getNumReplicas(), 3);
+
+      // A newly discovered partition uses the updated mode without changing existing segment metadata.
+      streamConfig.setReplicateMode(!replicateMode);
+      segmentManager._numPartitions = 2;
+      segmentManager.ensureAllPartitionsConsuming();
+      assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, originalSegment, null).isReplicateMode(),
+          replicateMode);
+      String newSegment = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
+      metadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, newSegment, null);
+      assertEquals(metadata.isReplicateMode(), !replicateMode);
+      assertEquals(metadata.getNumReplicas(), 3);
+    }
+  }
+
   private void testSetUpNewTable(int numReplicas, int numInstances, int numPartitions, boolean expectException) {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     segmentManager._numReplicas = numReplicas;
@@ -247,6 +283,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       assertEquals(segmentZKMetadata.getStatus(), Status.IN_PROGRESS);
       assertEquals(new LongMsgOffset(segmentZKMetadata.getStartOffset()).compareTo(PARTITION_OFFSET), 0);
       assertEquals(segmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
+      assertFalse(segmentZKMetadata.isReplicateMode());
     }
   }
 

@@ -1199,6 +1199,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     newSegmentZKMetadata.setStartOffset(startOffset);
     // Leave maxOffset as null.
     newSegmentZKMetadata.setNumReplicas(numReplicas);
+    newSegmentZKMetadata.setReplicateMode(IngestionConfigUtils.isReplicateModeEnabled(tableConfig));
     newSegmentZKMetadata.setStatus(Status.IN_PROGRESS);
 
     // Add the partition metadata if available

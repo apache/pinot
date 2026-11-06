@@ -44,6 +44,10 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether pauseless consumption is enabled for the table")
   private boolean _pauselessConsumptionEnabled;
 
+  @JsonPropertyDescription("Whether only one replica consumes each stream partition, with followers loading the "
+      + "committed segment. Defaults to false.")
+  private boolean _replicateMode;
+
   @JsonPropertyDescription("Enforce consumption of segments in order of segment creation by the controller")
   private boolean _enforceConsumptionInOrder;
 
@@ -101,6 +105,14 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
     _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
+  }
+
+  public boolean isReplicateMode() {
+    return _replicateMode;
+  }
+
+  public void setReplicateMode(boolean replicateMode) {
+    _replicateMode = replicateMode;
   }
 
   public boolean isEnforceConsumptionInOrder() {
