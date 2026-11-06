@@ -16,25 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka30.server;
+package org.apache.pinot.plugin.stream.kafka40.server;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
+
+/// Verifies managed quickstart broker selection and lifecycle.
 public class KafkaServerStartableTest {
   @Test
   public void testShouldStartManagedKafkaForDefaultManagedBroker() {
     KafkaServerStartable kafkaServerStartable = new KafkaServerStartable();
     kafkaServerStartable.init(new Properties());
 
-    Assert.assertTrue(kafkaServerStartable.shouldStartManagedKafka("localhost:19092"));
-    Assert.assertFalse(kafkaServerStartable.shouldStartManagedKafka("localhost:19093"));
+    assertTrue(kafkaServerStartable.shouldStartManagedKafka("localhost:19092"));
+    assertFalse(kafkaServerStartable.shouldStartManagedKafka("localhost:19093"));
   }
 
   @Test
@@ -44,9 +48,9 @@ public class KafkaServerStartableTest {
     serverProperties.put("kafka.server.allow.managed.for.configured.broker", "true");
     kafkaServerStartable.init(serverProperties);
 
-    Assert.assertTrue(kafkaServerStartable.shouldStartManagedKafka("localhost:19093"));
-    Assert.assertTrue(kafkaServerStartable.shouldStartManagedKafka("127.0.0.1:19093"));
-    Assert.assertFalse(kafkaServerStartable.shouldStartManagedKafka("kafka-broker:19093"));
+    assertTrue(kafkaServerStartable.shouldStartManagedKafka("localhost:19093"));
+    assertTrue(kafkaServerStartable.shouldStartManagedKafka("127.0.0.1:19093"));
+    assertFalse(kafkaServerStartable.shouldStartManagedKafka("kafka-broker:19093"));
   }
 
   @Test
@@ -54,7 +58,7 @@ public class KafkaServerStartableTest {
     TestableKafkaServerStartable kafkaServerStartable = new TestableKafkaServerStartable();
     kafkaServerStartable.setAvailableBrokers("localhost:9092");
 
-    Assert.assertEquals(kafkaServerStartable.resolveKafkaBrokerList("localhost:19092"), "localhost:9092");
+    assertEquals(kafkaServerStartable.resolveKafkaBrokerList("localhost:19092"), "localhost:9092");
   }
 
   @Test(expectedExceptions = IllegalStateException.class,
@@ -80,12 +84,12 @@ public class KafkaServerStartableTest {
     kafkaServerStartable.init(serverProperties);
     kafkaServerStartable.start();
     try {
-      Assert.assertTrue(kafkaServerStartable.isKafkaAvailable(brokerList),
+      assertTrue(kafkaServerStartable.isKafkaAvailable(brokerList),
           "Kafka broker should be reachable while running");
     } finally {
       kafkaServerStartable.stop();
     }
-    Assert.assertFalse(kafkaServerStartable.isKafkaAvailable(brokerList),
+    assertFalse(kafkaServerStartable.isKafkaAvailable(brokerList),
         "Kafka broker should be unavailable after stop");
   }
 
