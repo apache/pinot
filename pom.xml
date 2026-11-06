@@ -306,7 +306,7 @@
     <!-- Google Libraries -->
     <protobuf.version>4.36.2</protobuf.version>
     <grpc.version>1.85.1</grpc.version>
-    <guava.version>33.7.2-jre</guava.version>
+    <guava.version>33.8.0-jre</guava.version>
     <google.cloud.libraries.version>26.91.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
