@@ -151,17 +151,22 @@ import static org.testng.Assert.assertTrue;
 // TODO Re-write this test using the stream abstraction
 public class RealtimeSegmentDataManagerTest {
   @Test
-  public void testReadinessGateRechecksUnlessTheConsumerHasBeenStopped()
+  public void testUnsuccessfulAdmissionDoesNotStartConsumption()
       throws Exception {
     for (boolean stopped : new boolean[]{false, true}) {
       TableConfig table = createTableConfig();
       RealtimeTableDataManager tableManager = createTableDataManager(table);
       ConsumerCoordinator coordinator = mock(ConsumerCoordinator.class);
-      AtomicInteger readinessChecks = new AtomicInteger();
-      // The initial check waits; the next poll observes readiness. A stopped consumer must skip that second check.
-      BooleanSupplier ready = () -> readinessChecks.incrementAndGet() > 1;
-      doThrow(new ConsumerCoordinator.ShouldNotConsumeException("segment no longer needs consumption"))
-          .when(coordinator).acquire(SEGMENT_NAME);
+      BooleanSupplier ready = mock(BooleanSupplier.class);
+      AtomicBoolean stopRequested = new AtomicBoolean();
+      doAnswer(invocation -> {
+        BooleanSupplier shouldStop = invocation.getArgument(2);
+        stopRequested.set(shouldStop.getAsBoolean());
+        if (stopRequested.get()) {
+          return false;
+        }
+        throw new ConsumerCoordinator.ShouldNotConsumeException("segment no longer needs consumption");
+      }).when(coordinator).acquire(eq(SEGMENT_NAME), same(ready), any());
       RealtimeSegmentDataManager manager = new RealtimeSegmentDataManager(createZkMetadata(), table, tableManager,
           new File(TEMP_DIR, "readiness").getAbsolutePath(),
           new IndexLoadingConfig(FakeRealtimeSegmentDataManager.makeInstanceDataManagerConfig(), table),
@@ -171,9 +176,11 @@ public class RealtimeSegmentDataManagerTest {
           manager.stop();
         }
         manager.new PartitionConsumer().run();
-        assertEquals(readinessChecks.get(), stopped ? 1 : 2);
-        verify(coordinator).acquire(SEGMENT_NAME);
+        assertEquals(stopRequested.get(), stopped);
+        verify(coordinator).acquire(eq(SEGMENT_NAME), same(ready), any());
+        verify(ready, never()).getAsBoolean();
         verify(coordinator, never()).register(any());
+        verify(coordinator, never()).release();
         assertEquals(manager.getCurrentOffset().compareTo(START_OFFSET), 0);
         assertEquals(manager.getSegment().getNumDocsIndexed(), 0);
       } finally {

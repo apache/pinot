@@ -476,6 +476,57 @@ public class ConsumerCoordinatorTest {
     Assert.assertNull(consumerCoordinator.getUnsealedRelease());
   }
 
+  @Test
+  public void testReadinessGateRechecksUnlessTheConsumerHasBeenStopped()
+      throws Exception {
+    for (boolean stopped : new boolean[]{false, true}) {
+      try (ReadinessFixture fixture = new ReadinessFixture()) {
+        ConsumerCoordinator coordinator = spy(fixture._coordinator);
+        AtomicInteger readinessChecks = new AtomicInteger();
+        AtomicInteger waits = new AtomicInteger();
+        doAnswer(invocation -> {
+          waits.incrementAndGet();
+          return null;
+        }).when(coordinator).waitBeforeReadinessCheck(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+        BooleanSupplier ready = () -> readinessChecks.incrementAndGet() > 2;
+
+        assertEquals(coordinator.acquire(getLLCSegment(101), ready, () -> stopped), !stopped);
+        assertEquals(readinessChecks.get(), stopped ? 0 : 3);
+        assertEquals(waits.get(), stopped ? 0 : 2);
+        assertEquals(coordinator.getSemaphore().availablePermits(), stopped ? 1 : 0);
+        if (!stopped) {
+          fixture.assertGauge(1);
+          fixture.assertGauge(0);
+          coordinator.release();
+        }
+        assertTrue(fixture._gaugeUpdates.isEmpty());
+        assertEquals(coordinator.getSemaphore().availablePermits(), 1);
+      }
+    }
+  }
+
+  @Test
+  public void testReadinessWaitPropagatesInterruption()
+      throws Exception {
+    try (ReadinessFixture fixture = new ReadinessFixture()) {
+      boolean wasInterrupted = Thread.interrupted();
+      try {
+        Thread.currentThread().interrupt();
+        expectThrows(InterruptedException.class,
+            () -> fixture._coordinator.acquire(getLLCSegment(101), () -> false, () -> false));
+        assertFalse(Thread.currentThread().isInterrupted());
+        assertEquals(fixture._coordinator.getSemaphore().availablePermits(), 1);
+        fixture.assertGauge(1);
+        fixture.assertGauge(0);
+      } finally {
+        Thread.interrupted();
+        if (wasInterrupted) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+  }
+
   @DataProvider
   public Object[][] historyOrderingModes() {
     return new Object[][]{{false}, {true}};
