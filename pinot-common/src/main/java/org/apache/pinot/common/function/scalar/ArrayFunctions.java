@@ -557,7 +557,8 @@ public class ArrayFunctions {
   }
 
   /// Generates the sequence `start, start + inc, ...`, stopping at the last value that does not pass `end`. Both
-  /// bounds are inclusive when `end` lands exactly on a step, and `inc` may be negative to count down.
+  /// bounds are inclusive when `end` lands on a step (within floating-point rounding error for floating-point inputs),
+  /// and `inc` may be negative to count down.
   ///
   /// The main use is building a dense time grid to `UNNEST` and left join a sparse time series onto, which is how gap
   /// filling is expressed in the multi-stage engine:
@@ -642,21 +643,29 @@ public class ArrayFunctions {
   }
 
   /// Length of the `float` sequence `start, start + inc, ...` bounded by `end`, inclusive. The step count is computed
-  /// in `float` arithmetic, as the single-stage engine always did.
+  /// in double precision; the rounding tolerance is based on the ULPs of the original float inputs.
   private static int generatedArrayLength(float start, float end, float inc) {
     checkFloatingPointArguments(start, end, inc);
-    // TODO: decimal steps such as 0.1 are not exact in binary, so this can drop the end; see apache/pinot#19814
-    return checkGeneratedArrayLength((long) ((end - start) / inc + 1) - 1);
+    // Use double precision for the step count and compare its error with ULPs of the original float inputs.
+    double steps = (end - start) / inc;
+    return generatedFloatingArrayLength(steps, Math.ulp(start), Math.ulp(end), Math.ulp(inc), inc);
   }
 
   /// Length of the `double` sequence `start, start + inc, ...` bounded by `end`, inclusive.
   private static int generatedArrayLength(double start, double end, double inc) {
     checkFloatingPointArguments(start, end, inc);
-    // Adding 1 before truncating matches the length the single-stage engine always computed. It absorbs part of the
-    // rounding error of decimal steps, so 0.1 to 0.3 by 0.1 keeps its end.
-    // TODO: it does not absorb all of it, so 0.1 to 0.7 by 0.1 still drops its end; see apache/pinot#19814
-    // A span too wide for a long saturates the cast at Long.MAX_VALUE, which the length check below rejects.
-    return checkGeneratedArrayLength((long) ((end - start) / inc + 1) - 1);
+    return generatedFloatingArrayLength((end - start) / inc, Math.ulp(start), Math.ulp(end), Math.ulp(inc), inc);
+  }
+
+  /// Snaps a floating-point step count to an integer only when the distance is within the rounding error of the input
+  /// bounds and increments. Otherwise, truncates toward the last step that does not pass the end.
+  private static int generatedFloatingArrayLength(double steps, double startUlp, double endUlp, double incUlp,
+      double inc) {
+    double nearestSteps = Math.rint(steps);
+    double roundingError = 2 * (startUlp + endUlp + Math.abs(nearestSteps) * incUlp) / Math.abs(inc);
+    double fullSteps = Math.abs(steps - nearestSteps) <= roundingError ? nearestSteps : Math.floor(steps);
+    // A step count too wide for a long saturates at Long.MAX_VALUE, which the length check below rejects.
+    return checkGeneratedArrayLength((long) fullSteps);
   }
 
   private static void checkFloatingPointArguments(double start, double end, double inc) {
