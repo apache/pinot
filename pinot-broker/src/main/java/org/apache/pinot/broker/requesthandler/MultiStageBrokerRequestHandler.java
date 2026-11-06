@@ -42,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -144,6 +145,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   // uses the empty IdSet in their place.
   private static final String EXPLAIN_ID_SET_SUBQUERIES_FIELD = "ID_SET_SUBQUERIES_NOT_RUN";
 
+  private volatile BooleanSupplier _kWayMergeSupported = () -> false;
   private final WorkerManager _workerManager;
   private final WorkerManager _multiClusterWorkerManager;
   private final MailboxService _mailboxService;
@@ -268,6 +270,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
     return Set.copyOf(
         config.getCommaSeparatedList(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()));
+  }
+
+  /// Supplies the production version gate; integration tests can force capability for SNAPSHOT clusters.
+  @VisibleForTesting
+  public void setKWayMergeSupported(BooleanSupplier supported) {
+    _kWayMergeSupported = supported;
   }
 
   @Override
@@ -596,6 +604,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sealedInListThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SEALED_IN_LIST_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD);
+    boolean windowKWayMerge = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_WINDOW_K_WAY_MERGE,
+        CommonConstants.Broker.DEFAULT_WINDOW_K_WAY_MERGE);
     boolean defaultUnnestColumnPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
         CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
@@ -635,6 +646,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
         .defaultSealedInListThreshold(sealedInListThreshold)
+        .defaultWindowKWayMerge(windowKWayMerge)
+        .isKWayMergeSupported(QueryOptionsUtils.isWindowKWayMerge(queryOptions, windowKWayMerge)
+            && !QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
+            && _kWayMergeSupported.getAsBoolean())
         .build();
   }
 

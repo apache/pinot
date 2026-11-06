@@ -563,6 +563,95 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     return enabled;
   }
 
+  /// Resolves [SortedSelectionMergeMode#AUTO] to `ON` or `OFF` from segment metadata alone, before any plan node is
+  /// built. `ON` and `OFF` pass through untouched.
+  ///
+  /// This has to happen here rather than in the plan-node gates. [CombinePlanNode] builds every leaf operator before
+  /// it evaluates its own gate, so a decision taken there would arrive too late to stop streaming leaves from being
+  /// built underneath a non-streaming combine -- the half-honored pairing that
+  /// [org.apache.pinot.core.operator.combine.StreamingSelectionOrderByCombineOperator] exists to avoid. Deciding once
+  /// here leaves both gates reading a single settled value.
+  ///
+  /// The heuristic is the fraction of queried segments physically sorted on the leading ORDER BY column, compared
+  /// against [QueryContext#getSortedSelectionMergeAutoMinSortedRatio()]. A DESC leading expression additionally
+  /// requires `allowReverseOrder`, without which no leaf can stream in the query's direction. An unsorted child
+  /// forces a full scan plus top-K synchronously on the consumer thread, so it is the unsorted segments that cost
+  /// the query its `maxExecutionThreads` worth of parallelism. Reading
+  /// [org.apache.pinot.segment.spi.datasource.DataSourceMetadata] does not touch column buffers, so no segment is
+  /// acquired.
+  private void resolveSortedSelectionMergeMode(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    if (queryContext.getSortedSelectionMergeMode() != SortedSelectionMergeMode.AUTO) {
+      return;
+    }
+    queryContext.setSortedSelectionMergeMode(
+        isSortedEnoughForStreamingMerge(segmentContexts, queryContext) ? SortedSelectionMergeMode.ON
+            : SortedSelectionMergeMode.OFF);
+  }
+
+  private boolean isSortedEnoughForStreamingMerge(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    int numSegments = segmentContexts.size();
+    if (numSegments == 0) {
+      return false;
+    }
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    if (orderByExpressions == null || orderByExpressions.isEmpty()) {
+      return false;
+    }
+    ExpressionContext firstOrderByExpression = orderByExpressions.get(0).getExpression();
+    if (firstOrderByExpression.getType() != ExpressionContext.Type.IDENTIFIER) {
+      // Sortedness is only defined for a physical column. Forcing the merge over an expression is what ON is for.
+      LOGGER.debug("Not using {} for a non-identifier leading ORDER BY expression: {}",
+          QueryOptionKey.SORTED_SELECTION_MERGE_MODE, firstOrderByExpression);
+      return false;
+    }
+    if (!orderByExpressions.get(0).isAsc() && !QueryOptionsUtils.isReverseOrderAllowed(
+        queryContext.getQueryOptions())) {
+      // DataSourceMetadata.isSorted() reports ascending physical order, so a DESC query can only stream when the
+      // project operator's docId scan is reversed, and SelectionPlanNode.getSortedByProject() only attempts that
+      // under allowReverseOrder. Without it every leaf falls back to the materialized
+      // SelectionPartiallyOrderedByDescOperation, and resolving to ON here would install the streaming combine over
+      // children that each materialize their top-K serially on the consumer thread -- losing both the MinMax
+      // combine's parallelism and its min/max segment pruning, in exchange for nothing.
+      //
+      // allowReverseOrder stays the user's lever rather than being implied here: ReverseDocIdSetOperator buffers the
+      // whole matching docId set into a RoaringBitmap before emitting its first block, which would trade away the
+      // bounded memory this merge exists to provide.
+      //
+      // TODO: allowReverseOrder=true still does not guarantee streaming leaves. getSortedByProject() swallows the
+      //       failure when a docId set cannot be reversed and returns the unreversed operator, so the leaf gate then
+      //       declines and AUTO has resolved ON over materialized children.
+      //       See https://github.com/apache/pinot/issues/19923 (item A3)
+      LOGGER.debug("Not using {} for a DESC leading ORDER BY expression without {}: {}",
+          QueryOptionKey.SORTED_SELECTION_MERGE_MODE, QueryOptionKey.ALLOW_REVERSE_ORDER, firstOrderByExpression);
+      return false;
+    }
+    String column = firstOrderByExpression.getIdentifier();
+    boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    int numSorted = 0;
+    for (SegmentContext segmentContext : segmentContexts) {
+      // Physical sortedness is metadata. SelectionPlanNode.isColumnSorted() also rejects a null-bearing column, but
+      // that reads the null value vector, a mapped buffer, and this runs before any segment is acquired. Use
+      // SelectionPlanNode.isColumnFlaggedNonNull() instead. It is one-sided (false means nulls or unknown) and
+      // stricter than the leaf, which can see an empty bitmap after acquire: an old segment with no flag resolves OFF
+      // rather than streaming over a materialized child.
+      IndexSegment segment = segmentContext.getIndexSegment();
+      if (!SelectionPlanNode.isColumnPhysicallySorted(segment, queryContext, column)) {
+        continue;
+      }
+      if (nullHandlingEnabled && !SelectionPlanNode.isColumnFlaggedNonNull(segment, column)) {
+        continue;
+      }
+      numSorted++;
+    }
+    double sortedRatio = (double) numSorted / numSegments;
+    double minSortedRatio = queryContext.getSortedSelectionMergeAutoMinSortedRatio();
+    boolean enabled = sortedRatio >= minSortedRatio;
+    LOGGER.debug("{}=AUTO resolved to {}: {}/{} segments sorted on '{}' (ratio {}, threshold {})",
+        QueryOptionKey.SORTED_SELECTION_MERGE_MODE, enabled ? "ON" : "OFF", numSorted, numSegments, column,
+        sortedRatio, minSortedRatio);
+    return enabled;
+  }
+
   @Override
   public PlanNode makeStreamingSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     if (QueryContextUtils.isSelectionOnlyQuery(queryContext) && queryContext.getLimit() != 0) {

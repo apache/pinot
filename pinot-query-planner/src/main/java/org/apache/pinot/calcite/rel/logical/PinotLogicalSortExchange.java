@@ -118,10 +118,14 @@ public class PinotLogicalSortExchange extends SortExchange {
     return relWriter;
   }
 
+  /// @deprecated Ordering belongs to explicit sort or merge exchange nodes.
+  @Deprecated(since = "1.6.0")
   public boolean isSortOnSender() {
     return _isSortOnSender;
   }
 
+  /// @deprecated Ordering belongs to explicit sort or merge exchange nodes.
+  @Deprecated(since = "1.6.0")
   public boolean isSortOnReceiver() {
     return _isSortOnReceiver;
   }

@@ -39,6 +39,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -296,6 +297,11 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   /// Returns the controller starter from the shared suite instance.
   protected BaseControllerStarter getSharedControllerStarter() {
     return _sharedClusterTestSuite._controllerStarter;
+  }
+
+  /// Returns broker starters from the shared suite instance.
+  protected List<BaseBrokerStarter> getSharedBrokerStarters() {
+    return _sharedClusterTestSuite._brokerStarters;
   }
 
   /// Returns server starters from the shared suite instance.
