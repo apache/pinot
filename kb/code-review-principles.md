@@ -124,6 +124,10 @@ Original scope of a flag must be understood before extending to new behavior.
 
 **C1.10 — Backward-compatibility mechanisms must have a sunset plan**
 Shims should be scrutinized for ongoing operational cost and have a clear removal date.
+Distinguish Java constructor compatibility from mixed-version JSON compatibility before adding overloads.
+Retain legacy constructors only when they protect a supported Java source/binary API contract; public visibility alone
+does not make an internal DTO such a contract. Preserve mixed-version JSON compatibility independently, including
+missing-field defaults and unknown-field handling.
 - Trigger: Any PR adding backward-compat shims or fallback code paths
 
 **C1.11 — Default value changes require production testing confidence**
@@ -1149,7 +1153,9 @@ Import `FieldSpec.DataType` and `DataSchema.ColumnDataType` directly. Use `DataT
 instead of the enclosing-class-qualified names.
 - Trigger: Any PR using `FieldSpec.DataType` or `DataSchema.ColumnDataType` outside import declarations
 
-**C7.23 — Put multiline ternary branches on separate lines**
+**C7.23 — Ternary condition and formatting conventions**
+For nullable-value ternaries, prefer the non-null branch first: `value != null ? value.method() : null`.
+See C5.21 before adding a null guard for a constructor-enforced invariant.
 Keep a ternary expression on one line when it fits. Otherwise, put the true and false branches on separate lines:
 
 ```java
@@ -1158,7 +1164,16 @@ condition
     : falseExpression;
 ```
 
-- Trigger: Any PR adding or modifying a multiline ternary expression
+- Trigger: Any PR adding or modifying a ternary expression
+
+**C7.24 — Keep getter order consistent with field declarations**
+Keep getters in field-declaration order, matching constructor parameter and assignment order where those already align.
+- Trigger: Any PR adding or moving getters in a class with an established field/accessor order
+
+**C7.25 — Avoid consecutive blank lines inside class bodies**
+Use at most one blank line between members in touched code. Preserve the repository's two-blank-line separator between
+imports and top-level class documentation.
+- Trigger: Any PR adding or touching class members with consecutive blank lines
 
 ---
 
