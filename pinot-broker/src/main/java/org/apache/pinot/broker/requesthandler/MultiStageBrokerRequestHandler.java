@@ -41,7 +41,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -470,8 +469,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
             httpHeaders, queryTimer)) {
       validatePhysicalTablesWithMultiClusterRouting(compiledQuery.getTableNames(), compiledQuery.getOptions());
-      AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
-      checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery, rlsFiltersApplied);
+      boolean rlsFiltersApplied = checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery);
 
       // Apply broker-default query options before branching to EXPLAIN/execute so both paths see the same options.
       applyBrokerDefaultQueryOptions(compiledQuery.getOptions());
@@ -481,7 +479,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return explain(compiledQuery, requestId, requestContext, queryTimer, idSetSubqueries);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied.get(), queryWasLogged, workloadName);
+            rlsFiltersApplied, queryWasLogged, workloadName);
       }
     }
   }
@@ -518,8 +516,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private void checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
-      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery, AtomicBoolean rlsFiltersApplied) {
+  private boolean checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
+      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery) {
     Set<String> tables = compiledQuery.getTableNames();
     if (tables != null && !tables.isEmpty()) {
       TableAuthorizationResult tableAuthorizationResult =
@@ -527,10 +525,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
       }
-      if (_enableRowColumnLevelAuth && applyRlsFilters(requesterIdentity, tables, compiledQuery.getOptions())) {
-        rlsFiltersApplied.set(true);
-      }
+      return _enableRowColumnLevelAuth && applyRlsFilters(requesterIdentity, tables, compiledQuery.getOptions());
     }
+    return false;
   }
 
   /// Returns `true` if an RLS filter was added for at least one table.
