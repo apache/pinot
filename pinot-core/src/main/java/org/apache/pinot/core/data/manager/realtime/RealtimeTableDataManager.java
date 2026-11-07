@@ -249,6 +249,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   /// Checks the assigned history again for each consumer, including partitions added after table initialization.
   /// The consumer thread polls this supplier before acquiring its permit, so segment loading is never blocked by it.
+  /// TODO: Coordinate history removal (e.g. RESET or manual delete) with an already running consumer. This startup
+  /// check does not prevent later removal from discarding a key's base value before its next partial update.
   @VisibleForTesting
   BooleanSupplier createReadyToConsumeDataSupplier(LLCSegmentName llcSegmentName) {
     if (!requiresHistoryForConsumption()) {
