@@ -19,9 +19,11 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.ObjIntConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
@@ -445,6 +447,16 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   /// @return STRING type single-value at the given document id
   default String getString(int docId, T context) {
     throw new UnsupportedOperationException();
+  }
+
+  /// Visits BYTES values for positions `[from, to)` in `docIds`. The callback receives the position in `docIds`.
+  /// Each view is borrowed: consume it synchronously and do not retain it, its slices, or objects backed by it
+  /// after the callback returns. The callback must not re-enter this reader/context. Implementations may reuse or free
+  /// the backing storage immediately afterward. The default preserves compatibility with readers returning byte arrays.
+  default void readBytesValues(int[] docIds, int from, int to, ObjIntConsumer<ByteBuffer> consumer, T context) {
+    for (int i = from; i < to; i++) {
+      consumer.accept(ByteBuffer.wrap(getBytes(docIds[i], context)).asReadOnlyBuffer(), i);
+    }
   }
 
   /// Reads the BYTES type single-value at the given document id.
