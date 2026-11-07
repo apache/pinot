@@ -35,6 +35,7 @@ import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
+import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -359,13 +360,15 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   @Test
   public void testResolvedOnlyColumnExcludedFromProjection() {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
-        "select max(metricCol), sum(intCol) from " + PREDICTABLE_TABLE_NAME);
+        "select max(metricCol), sum(add(intCol, intCol)) from " + PREDICTABLE_TABLE_NAME);
     Operator<?> operator =
         PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_predictableSegment), queryContext).run();
     assertTrue(operator instanceof AggregationOperator);
 
     BaseProjectOperator<?> projectOperator = ((AggregationOperator) operator).getChildOperators().get(0);
-    // Only intCol (used by the scanned sum) is projected; metricCol (used solely by the resolved max) is excluded.
+    // The expression forces a TransformOperator whose input contains only intCol; metricCol is resolved from metadata.
+    assertTrue(projectOperator instanceof TransformOperator,
+        projectOperator.getClass() + ": " + queryContext.getAggregationFunctions()[1].getInputExpressions());
     assertEquals(projectOperator.getNumColumnsProjected(), 1);
     assertTrue(projectOperator.getSourceColumnContextMap().containsKey("intCol"));
     assertFalse(projectOperator.getSourceColumnContextMap().containsKey("metricCol"));
@@ -373,12 +376,12 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     AggregationResultsBlock resultsBlock = (AggregationResultsBlock) operator.nextBlock();
     List<Object> results = resultsBlock.getResults();
     assertNotNull(results);
-    // max(metricCol) is resolved from the dictionary; sum(intCol) is scanned.
-    // intCol = i + 10 for i = 1..10 over the two row copies, so sum(intCol) = 2 * (11 + 12 + ... + 20) = 310.
+    // max(metricCol) is resolved from the dictionary; sum(add(intCol, intCol)) is scanned.
+    // intCol = i + 10 for i = 1..10 over the two row copies, so the sum is 4 * (11 + 12 + ... + 20) = 620.
     assertEquals(((Number) results.get(0)).doubleValue(), 10.0);
-    assertEquals(((Number) results.get(1)).doubleValue(), 310.0);
+    assertEquals(((Number) results.get(1)).doubleValue(), 620.0);
 
-    // All 20 docs are still scanned for the unresolved sum(intCol).
+    // All 20 docs are still scanned for the unresolved sum(add(intCol, intCol)).
     assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 20);
     // With metricCol excluded, only 1 column is projected, so entries scanned post-filter is 20 docs * 1 column = 20
     // (it would be 40 if the resolved-only metricCol were still projected).

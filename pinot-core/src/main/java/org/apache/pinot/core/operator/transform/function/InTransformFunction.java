@@ -64,6 +64,12 @@ public class InTransformFunction extends BaseTransformFunction {
     Preconditions.checkArgument(numArguments >= 2, "At least 2 arguments are required for [%s] "
         + "transform function: (expression, values)", getName());
     _mainFunction = arguments.get(0);
+    for (TransformFunction argument : arguments) {
+      // Reject raw VARIANT operands only; preserve existing IN behavior for all other types.
+      DataType dataType = argument.getResultMetadata().getDataType();
+      Preconditions.checkArgument(dataType != DataType.VARIANT,
+          "Raw VARIANT values do not support IN; extract a typed path with variantGet first");
+    }
 
     boolean allLiteralValues = true;
     ObjectOpenHashSet<String> stringValues = new ObjectOpenHashSet<>(numArguments - 1);
