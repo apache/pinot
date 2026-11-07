@@ -28,17 +28,18 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class SumArrayLongAggregationFunction
     extends BaseSingleInputAggregationFunction<LongArrayList, long[]> {
+  private static final int LONG_ARRAY_LIST_TYPE = 43;
 
   public SumArrayLongAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "SUM_ARRAY"), nullHandlingEnabled);
@@ -150,9 +151,8 @@ public class SumArrayLongAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(LongArrayList longArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongArrayList.getValue(),
-        ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(longArrayList));
+  public SerializedResult serializeIntermediateResult(LongArrayList longArrayList) {
+    return new SerializedValue<>(LONG_ARRAY_LIST_TYPE, longArrayList, ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE);
   }
 
   @Override

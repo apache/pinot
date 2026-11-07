@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.lang.foreign.MemorySegment;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -28,7 +29,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -58,6 +58,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 ///   sketch object to be used externally.
 public class PercentileKLLAggregationFunction
     extends BaseSingleInputAggregationFunction<KllDoublesSketch, Comparable<?>> {
+  private static final int KLL_DATA_SKETCH_TYPE = 36;
 
   protected final double _percentile;
   protected int _kValue;
@@ -299,14 +300,16 @@ public class PercentileKLLAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(KllDoublesSketch kllDoublesSketch) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.KllDataSketch.getValue(),
-        ObjectSerDeUtils.KLL_SKETCH_SER_DE.serialize(kllDoublesSketch));
+  public SerializedResult serializeIntermediateResult(KllDoublesSketch kllDoublesSketch) {
+    return new SerializedBytes(KLL_DATA_SKETCH_TYPE, kllDoublesSketch.toByteArray());
   }
 
   @Override
   public KllDoublesSketch deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(customObject.getBuffer());
+    ByteBuffer buffer = customObject.getBuffer();
+    byte[] bytes = new byte[buffer.remaining()];
+    buffer.get(bytes);
+    return KllDoublesSketch.wrap(MemorySegment.ofArray(bytes).asReadOnly());
   }
 
   @Override

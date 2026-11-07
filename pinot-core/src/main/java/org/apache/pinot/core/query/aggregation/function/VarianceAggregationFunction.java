@@ -25,7 +25,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -41,6 +40,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 /// Sample Variances" by Chan et al. Please refer to the "Parallel Algorithm" section from
 /// - [this wiki](https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm)
 public class VarianceAggregationFunction extends BaseSingleInputAggregationFunction<VarianceTuple, Double> {
+  private static final int VARIANCE_TUPLE_TYPE = 33;
+
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final boolean _isSample;
   protected final boolean _isStdDev;
@@ -164,14 +165,13 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(VarianceTuple varianceTuple) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.VarianceTuple.getValue(),
-        ObjectSerDeUtils.VARIANCE_TUPLE_OBJECT_SER_DE.serialize(varianceTuple));
+  public SerializedResult serializeIntermediateResult(VarianceTuple varianceTuple) {
+    return new SerializedBytes(VARIANCE_TUPLE_TYPE, varianceTuple.toBytes());
   }
 
   @Override
   public VarianceTuple deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.VARIANCE_TUPLE_OBJECT_SER_DE.deserialize(customObject.getBuffer());
+    return VarianceTuple.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

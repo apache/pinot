@@ -18,15 +18,23 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
+import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils.SizedObjectSerDe;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -36,14 +44,15 @@ import org.apache.pinot.spi.utils.ByteArray;
 /// make the aggregation associative and idempotent (merge = set-union), which is what the star-tree requires; the
 /// non-distinct variant would need an unbounded per-node multiset and is intentionally not supported here.
 ///
-/// The set is stored as a variable-length `BYTES` cell in the star-tree forward index. The serialized layout is
-/// intentionally byte-for-byte identical to `ObjectSerDeUtils.*_SET_SER_DE` (in pinot-core) so the query-time
-/// `arrayAgg` function can deserialize the stored cell directly. The wire layout cannot be shared as code because
-/// pinot-segment-local must not depend on pinot-core; any change here must be mirrored there.
+/// The set is stored as a variable-length `BYTES` cell in the star-tree forward index: a leading element type tag,
+/// then the set as written by the `ObjectSerDeUtils` codec of the element type, so the query-time `arrayAgg` function
+/// reads the stored cell with the same codec after checking the tag. Primitive element types are kept in fastutil
+/// primitive sets, the other types in object sets.
 ///
 /// NOTE: Only single-value source columns are supported (enforced at star-tree build config validation time), so the
 /// raw value handed in by the builder is always a single boxed scalar, never an array.
-public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, ObjectSet<Object>> {
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, Set> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
   // Runtime element kind, inferred lazily from the first raw value (mirrors DistinctCountThetaSketchValueAggregator's
@@ -89,20 +98,8 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
     }
   }
 
-  /// Distinct value set carrying a running total of its variable-width serialized payload bytes, so cell-size
-  /// tracking is O(1) per insertion instead of re-serializing the growing set. Instances are only created by this
-  /// aggregator; callers see a plain ObjectSet with content-based equality, so the extra state is invisible to them.
-  private static class TrackedSet extends ObjectOpenHashSet<Object> {
-    // Sum over elements of (4-byte length prefix + encoded length); only maintained for variable-width element types.
-    private long _variableWidthPayloadBytes;
-
-    TrackedSet() {
-    }
-
-    TrackedSet(int expectedSize) {
-      super(expectedSize);
-    }
-  }
+  // Size of the leading element-type tag byte prepended to every serialized cell.
+  private static final int TAG_BYTES = Byte.BYTES;
 
   @Nullable
   private ElementType _elementType;
@@ -119,44 +116,40 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
   }
 
   @Override
-  public ObjectSet<Object> getInitialAggregatedValue(@Nullable Object rawValue) {
-    TrackedSet set = new TrackedSet();
-    if (rawValue != null) {
-      addRawValue(set, rawValue);
-    }
-    updateMaxByteSize(set);
-    return set;
+  public Set getInitialAggregatedValue(@Nullable Object rawValue) {
+    return rawValue != null ? add(null, rawValue) : newSet();
   }
 
   @Override
-  public ObjectSet<Object> applyRawValue(ObjectSet<Object> value, Object rawValue) {
-    // Aggregated values are always produced by this aggregator (initialization, cloning or deserialization), so they
-    // are always TrackedSets.
-    TrackedSet set = (TrackedSet) value;
-    if (rawValue != null) {
-      addRawValue(set, rawValue);
-      updateMaxByteSize(set);
-    }
-    return set;
+  public Set applyRawValue(Set value, @Nullable Object rawValue) {
+    return rawValue != null ? add(value, rawValue) : value;
   }
 
   @Override
-  public ObjectSet<Object> applyAggregatedValue(ObjectSet<Object> value, ObjectSet<Object> aggregatedValue) {
-    TrackedSet set = (TrackedSet) value;
-    for (Object element : aggregatedValue) {
-      addElement(set, element);
+  public Set applyAggregatedValue(Set value, Set aggregatedValue) {
+    if (aggregatedValue.isEmpty()) {
+      return value;
     }
-    updateMaxByteSize(set);
-    return set;
+    if (value.isEmpty()) {
+      return cloneAggregatedValue(aggregatedValue);
+    }
+    value.addAll(aggregatedValue);
+    return value;
   }
 
   @Override
-  public ObjectSet<Object> cloneAggregatedValue(ObjectSet<Object> value) {
-    TrackedSet clone = new TrackedSet(value.size());
-    for (Object element : value) {
-      addElement(clone, element);
+  public Set cloneAggregatedValue(Set value) {
+    if (value.isEmpty()) {
+      return newSet();
     }
-    return clone;
+    assert _elementType != null;
+    return switch (_elementType) {
+      case INT -> new IntOpenHashSet((IntSet) value);
+      case LONG -> new LongOpenHashSet((LongSet) value);
+      case FLOAT -> new FloatOpenHashSet((FloatSet) value);
+      case DOUBLE -> new DoubleOpenHashSet((DoubleSet) value);
+      default -> new ObjectOpenHashSet<>(value);
+    };
   }
 
   @Override
@@ -165,244 +158,130 @@ public class ArrayAggDistinctValueAggregator implements ValueAggregator<Object, 
   }
 
   @Override
+  public boolean isMaxAggregatedValueByteSizeDerivedFromSerialization() {
+    return true;
+  }
+
+  /// Returns the size of the largest cell serialized so far.
+  @Override
   public int getMaxAggregatedValueByteSize() {
     return _maxByteSize;
   }
 
   @Override
-  public byte[] serializeAggregatedValue(ObjectSet<Object> value) {
-    // Layout: [1-byte element type tag][int size][payload]. The tag makes the cell self-describing so it can be
-    // deserialized (during build re-ingestion) without aggregator instance state. An all-empty aggregator that never
-    // saw a value defaults to LONG; the payload is empty either way so the tag choice is immaterial for empty cells.
-    ElementType elementType = _elementType != null ? _elementType : ElementType.LONG;
-    switch (elementType) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE:
-        return serializeFixedWidth(value, elementType);
-      case BIG_DECIMAL:
-      case STRING:
-      case BYTES:
-        return serializeVariableWidth(value, elementType);
-      default:
-        throw new IllegalStateException("Unsupported element type: " + elementType);
+  public byte[] serializeAggregatedValue(Set value) {
+    // Layout: [1-byte element type tag][set codec payload]. The tag makes the cell self-describing so it can be
+    // deserialized (during build re-ingestion) without aggregator instance state. Every set codec writes an empty set
+    // as a zero count, so an empty set is written without its codec; an aggregator that never saw a value tags it LONG.
+    byte[] bytes;
+    if (value.isEmpty()) {
+      bytes = new byte[TAG_BYTES + Integer.BYTES];
+      bytes[0] = (_elementType != null ? _elementType : ElementType.LONG).getTag();
+    } else {
+      assert _elementType != null;
+      SizedObjectSerDe<Set> serDe = setSerDe(_elementType);
+      bytes = new byte[TAG_BYTES + serDe.getSerializedSize(value)];
+      ByteBuffer buffer = ByteBuffer.wrap(bytes);
+      buffer.put(_elementType.getTag());
+      serDe.serialize(value, buffer);
     }
+    _maxByteSize = Math.max(_maxByteSize, bytes.length);
+    return bytes;
   }
 
   @Override
-  public ObjectSet<Object> deserializeAggregatedValue(byte[] bytes) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    ElementType elementType = ElementType.fromTag(byteBuffer.get());
+  public Set deserializeAggregatedValue(byte[] bytes) {
+    ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    ElementType elementType = ElementType.fromTag(buffer.get());
     if (_elementType == null) {
       // A merge-only flow (e.g. re-merging stored cells) may deserialize before any raw value has been seen; the tag
-      // pins the element type so subsequent size tracking and serialization interpret elements correctly.
+      // pins the element type so subsequent values and serialization interpret elements correctly.
       _elementType = elementType;
     }
-    int size = byteBuffer.getInt();
-    TrackedSet set = new TrackedSet(size);
-    for (int i = 0; i < size; i++) {
-      switch (elementType) {
-        case INT:
-          addElement(set, byteBuffer.getInt());
-          break;
-        case LONG:
-          addElement(set, byteBuffer.getLong());
-          break;
-        case FLOAT:
-          addElement(set, byteBuffer.getFloat());
-          break;
-        case DOUBLE:
-          addElement(set, byteBuffer.getDouble());
-          break;
-        case BIG_DECIMAL: {
-          byte[] valueBytes = readLengthPrefixed(byteBuffer);
-          addElement(set, BigDecimalUtils.deserialize(valueBytes));
-          break;
-        }
-        case STRING: {
-          byte[] valueBytes = readLengthPrefixed(byteBuffer);
-          addElement(set, new String(valueBytes, StandardCharsets.UTF_8));
-          break;
-        }
-        case BYTES: {
-          byte[] valueBytes = readLengthPrefixed(byteBuffer);
-          addElement(set, new ByteArray(valueBytes));
-          break;
-        }
-        default:
-          throw new IllegalStateException("Unsupported element type: " + elementType);
-      }
-    }
-    return set;
+    return setSerDe(elementType).deserialize(buffer);
   }
 
-  private void addRawValue(TrackedSet set, Object rawValue) {
-    // Normalize BYTES to ByteArray so hashCode/equals work as a set key; other types are already value types.
-    addElement(set, rawValue instanceof byte[] ? new ByteArray((byte[]) rawValue) : rawValue);
-  }
-
-  /// Adds an element to the set, maintaining the running variable-width payload total when the element is new.
-  private void addElement(TrackedSet set, Object element) {
+  /// Returns an empty set for the element type, or an object set before the first value fixes the type.
+  private Set newSet() {
     if (_elementType == null) {
-      _elementType = inferElementType(element);
+      return new ObjectOpenHashSet<>();
     }
-    if (set.add(element) && fixedElementBytes(_elementType) == 0) {
-      set._variableWidthPayloadBytes += Integer.BYTES + variableWidthEncodedLength(element);
-    }
+    return switch (_elementType) {
+      case INT -> new IntOpenHashSet();
+      case LONG -> new LongOpenHashSet();
+      case FLOAT -> new FloatOpenHashSet();
+      case DOUBLE -> new DoubleOpenHashSet();
+      default -> new ObjectOpenHashSet<>();
+    };
   }
 
-  /// Fixed serialized width of an element in bytes, or `0` for variable-width element types.
-  private static int fixedElementBytes(@Nullable ElementType elementType) {
-    if (elementType == null) {
-      return 0;
+  /// Adds `rawValue` to `value` and returns the set it was added to: `value` when it is a set of the element type,
+  /// otherwise a new one. `value` is `null` for a new set, or may be the empty object set created before the first
+  /// value fixed the element type.
+  private Set add(@Nullable Set value, Object rawValue) {
+    if (_elementType == null) {
+      _elementType = inferElementType(rawValue);
     }
-    switch (elementType) {
-      case INT:
-      case FLOAT:
-        return Integer.BYTES;
-      case LONG:
-      case DOUBLE:
-        return Long.BYTES;
-      default:
-        return 0;
-    }
-  }
-
-  private long variableWidthEncodedLength(Object element) {
-    assert _elementType != null;
-    switch (_elementType) {
-      case BIG_DECIMAL:
-        return BigDecimalUtils.byteSize((BigDecimal) element);
-      case STRING:
-        return ((String) element).getBytes(StandardCharsets.UTF_8).length;
-      case BYTES:
-        return ((ByteArray) element).length();
-      default:
-        throw new IllegalStateException("Not a variable-width element type: " + _elementType);
-    }
-  }
-
-  /// Exact serialized size of the set, computed in O(1) from the element count (fixed-width types) or the running
-  /// payload total (variable-width types), instead of serializing the set.
-  private long serializedByteSize(TrackedSet set) {
-    int fixedElementBytes = fixedElementBytes(_elementType);
-    long payloadBytes =
-        fixedElementBytes != 0 ? (long) set.size() * fixedElementBytes : set._variableWidthPayloadBytes;
-    return TAG_BYTES + Integer.BYTES + payloadBytes;
+    return switch (_elementType) {
+      case INT -> {
+        IntSet set = value instanceof IntSet intSet ? intSet : new IntOpenHashSet();
+        set.add((int) rawValue);
+        yield set;
+      }
+      case LONG -> {
+        LongSet set = value instanceof LongSet longSet ? longSet : new LongOpenHashSet();
+        set.add((long) rawValue);
+        yield set;
+      }
+      case FLOAT -> {
+        FloatSet set = value instanceof FloatSet floatSet ? floatSet : new FloatOpenHashSet();
+        set.add((float) rawValue);
+        yield set;
+      }
+      case DOUBLE -> {
+        DoubleSet set = value instanceof DoubleSet doubleSet ? doubleSet : new DoubleOpenHashSet();
+        set.add((double) rawValue);
+        yield set;
+      }
+      case BYTES -> {
+        Set set = value != null ? value : new ObjectOpenHashSet<>();
+        // Normalize BYTES to ByteArray so hashCode/equals work as a set key
+        set.add(rawValue instanceof byte[] bytes ? new ByteArray(bytes) : rawValue);
+        yield set;
+      }
+      default -> {
+        Set set = value != null ? value : new ObjectOpenHashSet<>();
+        set.add(rawValue);
+        yield set;
+      }
+    };
   }
 
   private static ElementType inferElementType(Object rawValue) {
-    if (rawValue instanceof Integer) {
-      return ElementType.INT;
-    } else if (rawValue instanceof Long) {
-      return ElementType.LONG;
-    } else if (rawValue instanceof Float) {
-      return ElementType.FLOAT;
-    } else if (rawValue instanceof Double) {
-      return ElementType.DOUBLE;
-    } else if (rawValue instanceof BigDecimal) {
-      return ElementType.BIG_DECIMAL;
-    } else if (rawValue instanceof String) {
-      return ElementType.STRING;
-    } else if (rawValue instanceof byte[] || rawValue instanceof ByteArray) {
-      return ElementType.BYTES;
-    } else {
-      throw new IllegalStateException(
+    return switch (rawValue) {
+      case Integer _ -> ElementType.INT;
+      case Long _ -> ElementType.LONG;
+      case Float _ -> ElementType.FLOAT;
+      case Double _ -> ElementType.DOUBLE;
+      case BigDecimal _ -> ElementType.BIG_DECIMAL;
+      case String _ -> ElementType.STRING;
+      case byte[] _, ByteArray _ -> ElementType.BYTES;
+      default -> throw new IllegalStateException(
           "Unsupported data type for arrayAgg star-tree aggregation: " + rawValue.getClass().getSimpleName());
-    }
+    };
   }
 
-  private void updateMaxByteSize(TrackedSet value) {
-    _maxByteSize = Math.max(_maxByteSize, Math.toIntExact(serializedByteSize(value)));
-  }
-
-  // Size of the leading element-type tag byte prepended to every serialized cell.
-  private static final int TAG_BYTES = Byte.BYTES;
-
-  private static byte[] serializeFixedWidth(ObjectSet<Object> value, ElementType elementType) {
-    int size = value.size();
-    int elementBytes;
-    switch (elementType) {
-      case INT:
-      case FLOAT:
-        elementBytes = Integer.BYTES;
-        break;
-      case LONG:
-      case DOUBLE:
-        elementBytes = Long.BYTES;
-        break;
-      default:
-        throw new IllegalStateException("Not a fixed-width element type: " + elementType);
-    }
-    byte[] bytes = new byte[TAG_BYTES + Integer.BYTES + size * elementBytes];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    byteBuffer.put(elementType.getTag());
-    byteBuffer.putInt(size);
-    for (Object element : value) {
-      switch (elementType) {
-        case INT:
-          byteBuffer.putInt((Integer) element);
-          break;
-        case LONG:
-          byteBuffer.putLong((Long) element);
-          break;
-        case FLOAT:
-          byteBuffer.putFloat((Float) element);
-          break;
-        case DOUBLE:
-          byteBuffer.putDouble((Double) element);
-          break;
-        default:
-          throw new IllegalStateException("Not a fixed-width element type: " + elementType);
-      }
-    }
-    return bytes;
-  }
-
-  private static byte[] serializeVariableWidth(ObjectSet<Object> value, ElementType elementType) {
-    int size = value.size();
-    byte[][] valueBytesArray = new byte[size][];
-    long bufferSize = TAG_BYTES + (1 + (long) size) * Integer.BYTES;
-    int index = 0;
-    for (Object element : value) {
-      byte[] valueBytes;
-      switch (elementType) {
-        case BIG_DECIMAL:
-          // Must match ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE element encoding (scale + unscaled bytes), not
-          // toString(), so the query-time function can deserialize the star-tree cell with BIG_DECIMAL_SET_SER_DE.
-          valueBytes = BigDecimalUtils.serialize((BigDecimal) element);
-          break;
-        case STRING:
-          valueBytes = ((String) element).getBytes(StandardCharsets.UTF_8);
-          break;
-        case BYTES:
-          valueBytes = ((ByteArray) element).getBytes();
-          break;
-        default:
-          throw new IllegalStateException("Unsupported variable width element type: " + elementType);
-      }
-      bufferSize += valueBytes.length;
-      valueBytesArray[index++] = valueBytes;
-    }
-    if (bufferSize > Integer.MAX_VALUE) {
-      throw new IllegalStateException("Serialized arrayAgg set exceeds 2GB");
-    }
-    byte[] bytes = new byte[(int) bufferSize];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    byteBuffer.put(elementType.getTag());
-    byteBuffer.putInt(size);
-    for (byte[] valueBytes : valueBytesArray) {
-      byteBuffer.putInt(valueBytes.length);
-      byteBuffer.put(valueBytes);
-    }
-    return bytes;
-  }
-
-  private static byte[] readLengthPrefixed(ByteBuffer byteBuffer) {
-    int length = byteBuffer.getInt();
-    byte[] valueBytes = new byte[length];
-    byteBuffer.get(valueBytes);
-    return valueBytes;
+  /// Returns the codec of the sets of an element type.
+  private static SizedObjectSerDe<Set> setSerDe(ElementType elementType) {
+    SizedObjectSerDe<? extends Set> setSerDe = switch (elementType) {
+      case INT -> ObjectSerDeUtils.INT_SET_SER_DE;
+      case LONG -> ObjectSerDeUtils.LONG_SET_SER_DE;
+      case FLOAT -> ObjectSerDeUtils.FLOAT_SET_SER_DE;
+      case DOUBLE -> ObjectSerDeUtils.DOUBLE_SET_SER_DE;
+      case BIG_DECIMAL -> ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE;
+      case STRING -> ObjectSerDeUtils.STRING_SET_SER_DE;
+      case BYTES -> ObjectSerDeUtils.BYTES_SET_SER_DE;
+    };
+    return (SizedObjectSerDe<Set>) setSerDe;
   }
 }
