@@ -49,6 +49,7 @@ import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
 import org.apache.pinot.core.operator.filter.VectorRadiusFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorSearchDistances;
 import org.apache.pinot.core.operator.filter.VectorSearchMode;
 import org.apache.pinot.core.operator.filter.VectorSearchParams;
 import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
@@ -435,8 +436,10 @@ public class FilterPlanNode implements PlanNode {
             "Cannot apply vectorDistanceThreshold on column: %s -- forward index required for threshold refinement",
             column);
       }
-      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
-          vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
+      VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs,
+          searchParams, forwardIndexReader, vectorIndexConfig, hasMetadataFilter, _requiredVectorDocIds);
+      operator.setSearchDistances(VectorSearchDistances.of(_queryContext));
+      return operator;
     }
 
     // Exact scan fallback: no vector index on this segment
