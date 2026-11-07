@@ -121,6 +121,18 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String UPLOAD_SEGMENT_TO_DEEP_STORE = "segment.upload.to.deep.store";
   public static final boolean DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE = false;
 
+  // Uploads a `<segment>.metadata.tar.gz` sidecar next to each committed REALTIME segment, so a METADATA push or
+  // recovery does not have to download the segment. Only takes effect when:
+  // - the server uploads segments to the deep store itself (`segment.upload.to.deep.store`), i.e. not a
+  //   controller-upload commit, and
+  // - consumption is not pauseless (pauseless commits never create sidecars).
+  // The controller keeps the sidecar after the segment is deleted only when
+  // `controller.deleted.segments.preserveMetadata` is true and the deleted-segment retention is positive. The wait for
+  // the upload is bounded independently by `segment.upload.metadata.tar.gz.timeout.ms` and never fails the commit.
+  public static final String UPLOAD_SEGMENT_METADATA_TAR_GZ = "segment.upload.metadata.tar.gz";
+  public static final boolean DEFAULT_UPLOAD_SEGMENT_METADATA_TAR_GZ = false;
+  public static final String UPLOAD_SEGMENT_METADATA_TAR_GZ_TIMEOUT_MS = "segment.upload.metadata.tar.gz.timeout.ms";
+
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private static final int DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES = 60;
@@ -360,5 +372,16 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public boolean isDimensionTablePreloadDisabled() {
     return _serverConfig.getProperty(DISABLE_DIMENSION_TABLE_PRELOAD,
         DEFAULT_DISABLE_DIMENSION_TABLE_PRELOAD);
+  }
+
+  @Override
+  public boolean isUploadSegmentMetadataTarGz() {
+    return _serverConfig.getProperty(UPLOAD_SEGMENT_METADATA_TAR_GZ, DEFAULT_UPLOAD_SEGMENT_METADATA_TAR_GZ);
+  }
+
+  @Override
+  public int getUploadSegmentMetadataTarGzTimeoutMs() {
+    return _serverConfig.getProperty(UPLOAD_SEGMENT_METADATA_TAR_GZ_TIMEOUT_MS,
+        DEFAULT_UPLOAD_SEGMENT_METADATA_TAR_GZ_TIMEOUT_MS);
   }
 }
