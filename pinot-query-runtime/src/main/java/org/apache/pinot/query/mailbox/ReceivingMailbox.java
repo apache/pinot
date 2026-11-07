@@ -119,6 +119,11 @@ public class ReceivingMailbox {
     _blocks.registerReader(reader);
   }
 
+  /// Returns whether a reader has been registered, meaning that some operator has read, or is reading, this mailbox.
+  public boolean hasReader() {
+    return _blocks._reader != null;
+  }
+
   /// Registers the [QueryThreadContext] of the mailbox receive operator.
   public synchronized void registerReceiveOperatorThreadContext(@Nullable QueryThreadContext threadContext) {
     assert _receiveOperatorThreadContext == null;
