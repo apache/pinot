@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.spi.index;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
@@ -139,8 +140,8 @@ public class TextIndexConfig extends IndexConfig {
 
   @JsonCreator
   public TextIndexConfig(@JsonProperty("disabled") Boolean disabled,
-      @JsonProperty("rawValue") @Nullable Object rawValueForTextIndex,
-      @JsonProperty("queryCache") boolean enableQueryCache,
+      @JsonProperty("rawValue") @JsonAlias("rawValueForTextIndex") @Nullable Object rawValueForTextIndex,
+      @JsonProperty("queryCache") @JsonAlias("enableQueryCache") boolean enableQueryCache,
       @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
       @JsonProperty("stopWordsInclude") List<String> stopWordsInclude,
       @JsonProperty("stopWordsExclude") List<String> stopWordsExclude,
@@ -224,6 +225,7 @@ public class TextIndexConfig extends IndexConfig {
     return CsvParser.parse(value.toString(), escapeComma, trim);
   }
 
+  @JsonProperty("rawValue")
   @Nullable
   public Object getRawValueForTextIndex() {
     return _rawValueForTextIndex;
@@ -232,6 +234,7 @@ public class TextIndexConfig extends IndexConfig {
   /// Whether Lucene query result cache should be enabled.
   ///
   /// While it helps a lot with performance for repeated queries, on the downside it causes heap issues.
+  @JsonProperty("queryCache")
   public boolean isEnableQueryCache() {
     return _enableQueryCache;
   }

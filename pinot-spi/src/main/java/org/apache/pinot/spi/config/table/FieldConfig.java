@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
@@ -72,11 +73,16 @@ public class FieldConfig extends BaseJsonConfig {
       "luceneNRTCachingDirectoryMaxBufferSizeMB";
 
   private final String _name;
+  @JsonProperty("encodingType")
+  @Nullable
+  @Deprecated(since = "1.7.0", forRemoval = true)
   private final EncodingType _encodingType;
   private final List<IndexType> _indexTypes;
   private final JsonNode _indexes;
   private final JsonNode _tierOverwrites;
+  @Deprecated(since = "1.7.0", forRemoval = true)
   private final CompressionCodec _compressionCodec;
+  @Deprecated(since = "1.7.0", forRemoval = true)
   private final Map<String, String> _properties;
   private final TimestampConfig _timestampConfig;
 
@@ -85,7 +91,7 @@ public class FieldConfig extends BaseJsonConfig {
     this(name, encodingType, null, indexTypes, compressionCodec, null, null, properties, null);
   }
 
-  @Deprecated
+  @Deprecated(since = "0.13.0", forRemoval = true)
   public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
       @Nullable List<IndexType> indexTypes, @Nullable CompressionCodec compressionCodec,
       @Nullable TimestampConfig timestampConfig, @Nullable Map<String, String> properties) {
@@ -104,7 +110,7 @@ public class FieldConfig extends BaseJsonConfig {
       @JsonProperty(value = "tierOverwrites") @Nullable JsonNode tierOverwrites) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
-    _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
+    _encodingType = encodingType;
     _indexTypes =
         indexTypes != null ? indexTypes : (indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;
@@ -216,8 +222,32 @@ public class FieldConfig extends BaseJsonConfig {
     return _name;
   }
 
+  /// Returns the legacy field-level forward-index encoding.
+  ///
+  /// Prefer configuring and reading `encodingType` from `indexes.forward`. This method keeps backward-compatible
+  /// defaulting for older configs: when the deprecated field-level value is absent, it returns `DICTIONARY`.
+  @JsonIgnore
+  @Deprecated(since = "1.7.0", forRemoval = true)
   public EncodingType getEncodingType() {
-    return _encodingType;
+    return _encodingType == null ? EncodingType.DICTIONARY : _encodingType;
+  }
+
+  /// Returns whether the deprecated field-level forward-index encoding was explicitly configured.
+  @JsonIgnore
+  public boolean hasFieldLevelEncodingType() {
+    return _encodingType != null;
+  }
+
+  /// Returns whether the deprecated field-level forward-index compression codec was explicitly configured.
+  @JsonIgnore
+  public boolean hasFieldLevelCompressionCodec() {
+    return _compressionCodec != null;
+  }
+
+  /// Returns whether the deprecated field-level index properties map was explicitly configured.
+  @JsonIgnore
+  public boolean hasFieldLevelProperties() {
+    return _properties != null;
   }
 
   /// @deprecated Use `fieldConfigList[].indexTypes` instead.
@@ -239,9 +269,12 @@ public class FieldConfig extends BaseJsonConfig {
     return _tierOverwrites;
   }
 
-  /// Returns the raw forward-index compression codec, or `null` when using `codecSpec` or the
-  /// default. Still the only way to express `MV_ENTRY_DICT` and the CLP family — not deprecated.
+  /// Returns the legacy field-level forward-index compression codec, or `null` when unspecified.
+  ///
+  /// @deprecated Use `indexes.forward.compressionCodec`, which supports every [CompressionCodec], including
+  /// `MV_ENTRY_DICT` and the CLP family. Use `indexes.forward.codecSpec` for codec-pipeline compression.
   @Nullable
+  @Deprecated(since = "1.7.0", forRemoval = true)
   public CompressionCodec getCompressionCodec() {
     return _compressionCodec;
   }
@@ -252,6 +285,7 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   @Nullable
+  @Deprecated(since = "1.7.0", forRemoval = true)
   public Map<String, String> getProperties() {
     return _properties;
   }
@@ -291,6 +325,10 @@ public class FieldConfig extends BaseJsonConfig {
       return this;
     }
 
+    /// Sets the deprecated field-level forward-index encoding.
+    ///
+    /// Prefer `indexes.forward.encodingType` for new configs.
+    @Deprecated(since = "1.7.0", forRemoval = true)
     public Builder withEncodingType(EncodingType encodingType) {
       _encodingType = encodingType;
       return this;
@@ -301,11 +339,19 @@ public class FieldConfig extends BaseJsonConfig {
       return this;
     }
 
+    /// Sets the deprecated field-level forward-index compression codec.
+    ///
+    /// Prefer `indexes.forward.compressionCodec` for new configs.
+    @Deprecated(since = "1.7.0", forRemoval = true)
     public Builder withCompressionCodec(CompressionCodec compressionCodec) {
       _compressionCodec = compressionCodec;
       return this;
     }
 
+    /// Sets the deprecated field-level index properties map.
+    ///
+    /// Prefer the relevant `indexes.<indexName>` block for new configs.
+    @Deprecated(since = "1.7.0", forRemoval = true)
     public Builder withProperties(Map<String, String> properties) {
       _properties = properties;
       return this;

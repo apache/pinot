@@ -450,6 +450,11 @@ public class ControllerConf extends PinotConfiguration {
   public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
   public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
 
+  /// Enable only after all reader roles support canonical field index configs; migration changes persisted configs.
+  public static final String AUTO_MIGRATE_LEGACY_FIELD_CONFIGS_ENABLED =
+      "controller.table.config.auto.migrate.legacy.fields.enabled";
+  public static final boolean DEFAULT_AUTO_MIGRATE_LEGACY_FIELD_CONFIGS_ENABLED = false;
+
   public static final String EXIT_ON_TABLE_CONFIG_CHECK_FAILURE = "controller.startup.exitOnTableConfigCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_TABLE_CONFIG_CHECK_FAILURE = true;
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
@@ -1584,6 +1589,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isEnforcePoolBasedAssignmentEnabled() {
     return getProperty(ENFORCE_POOL_BASED_ASSIGNMENT_KEY, DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT);
+  }
+
+  public boolean isAutoMigrateLegacyFieldConfigsEnabled() {
+    return getProperty(AUTO_MIGRATE_LEGACY_FIELD_CONFIGS_ENABLED, DEFAULT_AUTO_MIGRATE_LEGACY_FIELD_CONFIGS_ENABLED);
   }
 
   public boolean isExitOnTableConfigCheckFailure() {

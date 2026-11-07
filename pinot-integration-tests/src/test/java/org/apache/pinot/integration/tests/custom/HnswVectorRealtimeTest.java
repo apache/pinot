@@ -19,11 +19,11 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -110,19 +110,19 @@ public class HnswVectorRealtimeTest extends CustomDataQueryClusterIntegrationTes
   @Override
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
+    ObjectNode indexes = indexesWithForwardEncoding(FieldConfig.EncodingType.RAW);
+    ObjectNode vector = indexes.putObject("vector");
+    vector.put("vectorIndexType", "HNSW");
+    vector.put("vectorDimension", VECTOR_DIM_SIZE);
+    vector.put("vectorDistanceFunction", "COSINE");
+    vector.put("version", 1);
     return getTableConfigBuilder(TableType.REALTIME)
         // The pre-filter is only wired when every non-vector filter can produce a bitmap; without an index the
         // category predicate plans as a full scan and the vector operator never receives the bitmap.
         .setInvertedIndexColumns(List.of(CATEGORY))
         .setFieldConfigList(List.of(
             new FieldConfig.Builder(VECTOR_COL)
-                .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
-                .withEncodingType(FieldConfig.EncodingType.RAW)
-                .withProperties(Map.of(
-                    "vectorIndexType", "HNSW",
-                    "vectorDimension", String.valueOf(VECTOR_DIM_SIZE),
-                    "vectorDistanceFunction", "COSINE",
-                    "version", "1"))
+                .withIndexes(indexes)
                 .build()
         ))
         .build();

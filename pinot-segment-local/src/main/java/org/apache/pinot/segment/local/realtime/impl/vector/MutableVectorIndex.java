@@ -178,13 +178,16 @@ public class MutableVectorIndex
     _vectorIndexConfig = vectorIndexConfig;
     _vectorDimension = vectorIndexConfig.getVectorDimension();
     _segmentName = segmentName;
+    Map<String, String> properties = vectorIndexConfig.getProperties() != null
+        ? vectorIndexConfig.getProperties()
+        : Map.of();
     _commitIntervalMs = Long.parseLong(
-        vectorIndexConfig.getProperties().getOrDefault("commitIntervalMs", String.valueOf(DEFAULT_COMMIT_INTERVAL_MS)));
+        properties.getOrDefault("commitIntervalMs", String.valueOf(DEFAULT_COMMIT_INTERVAL_MS)));
     _commitDocs = Long.parseLong(
-        vectorIndexConfig.getProperties().getOrDefault("commitDocs", String.valueOf(DEFAULT_COMMIT_DOCS)));
-    _refreshMinIntervalMs = Long.parseLong(vectorIndexConfig.getProperties()
+        properties.getOrDefault("commitDocs", String.valueOf(DEFAULT_COMMIT_DOCS)));
+    _refreshMinIntervalMs = Long.parseLong(properties
         .getOrDefault(REFRESH_MIN_INTERVAL_MS, String.valueOf(DEFAULT_REFRESH_MIN_INTERVAL_MS)));
-    _refreshWaitTimeoutMs = Long.parseLong(vectorIndexConfig.getProperties()
+    _refreshWaitTimeoutMs = Long.parseLong(properties
         .getOrDefault(REFRESH_WAIT_TIMEOUT_MS, String.valueOf(DEFAULT_REFRESH_WAIT_TIMEOUT_MS)));
     Preconditions.checkArgument(_refreshMinIntervalMs >= 0, "Require %s >= 0, got %s for column: %s",
         REFRESH_MIN_INTERVAL_MS, _refreshMinIntervalMs, vectorColumn);
