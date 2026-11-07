@@ -298,7 +298,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new ContinuousJfrStarter(_instanceId));
     initTransitionThreadPoolManager();
 
     NettyInspector.logAllChecks();

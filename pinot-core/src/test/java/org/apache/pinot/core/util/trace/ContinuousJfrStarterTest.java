@@ -18,455 +18,260 @@
  */
 package org.apache.pinot.core.util.trace;
 
-import java.lang.management.ManagementFactory;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
+import jdk.jfr.Configuration;
+import jdk.jfr.Recording;
+import jdk.jfr.RecordingState;
 import org.apache.pinot.spi.utils.DataSizeUtils;
-import org.assertj.core.api.Assertions;
-import org.testng.SkipException;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 
+
+/// Tests [ContinuousJfrStarter] against the real JFR of the test JVM.
 public class ContinuousJfrStarterTest {
-  private static final long DEFAULT_MAX_SIZE_BYTES = DataSizeUtils.toBytes(ContinuousJfrStarter.DEFAULT_MAX_SIZE);
-  private static final long DEFAULT_MAX_AGE_MILLIS = 7L * 24 * 60 * 60 * 1000;
+  private static final String SERVER_ID = "Server_pinot-server-0.pinot-server-headless_8098";
+  private static final String BROKER_ID = "Broker_pinot-broker-0.pinot-broker-headless_8099";
+  private static final Set<String> ENABLED_CHANGED = Set.of("pinot.jfr.enabled");
 
-  private TestContinuousJfrStarter _continuousJfrStarter;
+  private ContinuousJfrStarter _server;
 
   @BeforeMethod
   public void setUp() {
     ContinuousJfrStarter.resetGlobalStateForTesting();
-    _continuousJfrStarter = new TestContinuousJfrStarter();
+    _server = new ContinuousJfrStarter(SERVER_ID, List.of());
+  }
+
+  @AfterMethod
+  public void tearDown() {
+    ContinuousJfrStarter.resetGlobalStateForTesting();
   }
 
   @Test
   public void disabledByDefault() {
-    _continuousJfrStarter.onChange(Set.of(), Map.of());
+    _server.onChange(Set.of(), Map.of());
 
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should be disabled")
-        .isFalse();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).isEmpty();
+    assertThat(_server.isRunning()).isFalse();
+    assertThat(_server.getRecording()).isNull();
   }
 
   @Test
-  public void canBeEnabled() {
-    Map<String, String> config = Map.of("pinot.jfr.enabled", "true");
-    _continuousJfrStarter.onChange(Set.of(), config);
+  public void startsRecordingWithDefaults()
+      throws Exception {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
 
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should be enabled")
-        .isTrue();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
+    assertThat(_server.isRunning()).isTrue();
+    Recording recording = _server.getRecording();
+    assertThat(recording.getState()).isEqualTo(RecordingState.RUNNING);
+    assertThat(recording.getName()).isEqualTo(ContinuousJfrStarter.DEFAULT_NAME);
+    assertThat(recording.isToDisk()).isTrue();
+    assertThat(recording.getDumpOnExit()).isFalse();
+    assertThat(recording.getMaxSize()).isEqualTo(DataSizeUtils.toBytes(ContinuousJfrStarter.DEFAULT_MAX_SIZE));
+    assertThat(recording.getMaxAge()).isEqualTo(Duration.ofDays(7));
+    assertThat(recording.getSettings()).isEqualTo(Configuration.getConfiguration("default").getSettings());
   }
 
   @Test
-  public void canBeTurnedOff() {
-    // First start it
-    Map<String, String> enabledConfig = Map.of("pinot.jfr.enabled", "true");
-    _continuousJfrStarter.onChange(Set.of(), enabledConfig);
+  public void stopKeepsTheRecordedData() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    Recording recording = _server.getRecording();
 
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should be enabled")
-        .isTrue();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).hasSize(1);
+    _server.onChange(ENABLED_CHANGED, Map.of("pinot.jfr.enabled", "false"));
 
-    // Then stop it
-    Set<String> changed = Set.of("pinot.jfr.enabled");
-    Map<String, String> disabledConfig = Map.of("pinot.jfr.enabled", "false");
-    _continuousJfrStarter.onChange(changed, disabledConfig);
-
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should be disabled")
-        .isFalse();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
-        "jfrStop name=pinot-continuous");
+    assertThat(_server.isRunning()).isFalse();
+    // A closed recording deletes its chunks from the repository. A stopped one keeps them.
+    assertThat(recording.getState()).isEqualTo(RecordingState.STOPPED);
+    assertThat(ContinuousJfrStarter.getStoppedRecording(ContinuousJfrStarter.DEFAULT_NAME)).isSameAs(recording);
   }
 
   @Test
-  public void canBeTurnedOn() {
-    // First setup with it off
-    Map<String, String> disabledConfig = Map.of("pinot.jfr.enabled", "false");
-    _continuousJfrStarter.onChange(Set.of(), disabledConfig);
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should be disabled")
-        .isFalse();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).isEmpty();
+  public void keepsOnlyTheLastStoppedRecording() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    Recording first = _server.getRecording();
+    _server.onChange(ENABLED_CHANGED, Map.of("pinot.jfr.enabled", "false"));
+    _server.onChange(ENABLED_CHANGED, Map.of("pinot.jfr.enabled", "true"));
+    Recording second = _server.getRecording();
+    _server.onChange(ENABLED_CHANGED, Map.of("pinot.jfr.enabled", "false"));
 
-    // Then start it
-    Set<String> changed = Set.of("pinot.jfr.enabled");
-    Map<String, String> enabledConfig = Map.of("pinot.jfr.enabled", "true");
-    _continuousJfrStarter.onChange(changed, enabledConfig);
-
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should be enabled")
-        .isTrue();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
+    assertThat(first.getState()).isEqualTo(RecordingState.CLOSED);
+    assertThat(second.getState()).isEqualTo(RecordingState.STOPPED);
   }
 
   @Test
-  public void noOpWhenOtherPropChanges() {
-    // First setup with it off
-    Map<String, String> disabledConfig = Map.of("pinot.jfr.enabled", "false");
-    _continuousJfrStarter.onChange(Set.of(), disabledConfig);
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should be disabled")
-        .isFalse();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).isEmpty();
+  public void ignoresChangesToOtherConfigs() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "false"));
 
-    // Then call onChange with no relevant changes
-    Set<String> changed = Set.of("some.other.config");
-    Map<String, String> stillDisabledConfig = Map.of("pinot.jfr.enabled", "false", "some.other.config", "true");
-    _continuousJfrStarter.onChange(changed, stillDisabledConfig);
+    _server.onChange(Set.of("some.other.config"), Map.of("pinot.jfr.enabled", "true", "some.other.config", "true"));
 
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should still be disabled")
-        .isFalse();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).isEmpty();
+    assertThat(_server.isRunning()).isFalse();
   }
 
   @Test
-  public void noOpWhenNewConfigIsEqual() {
-    // First setup with it off
-    Map<String, String> disabledConfig = Map.of("pinot.jfr.enabled", "false");
-    _continuousJfrStarter.onChange(Set.of(), disabledConfig);
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should be disabled")
-        .isFalse();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).isEmpty();
+  public void retunesTheRunningRecordingInPlace()
+      throws Exception {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    Recording recording = _server.getRecording();
 
-    // Then call onChange with the same config
-    Set<String> changed = Set.of("pinot.jfr.enabled");
-    Map<String, String> stillDisabledConfig = Map.of("pinot.jfr.enabled", "false");
-    _continuousJfrStarter.onChange(changed, stillDisabledConfig);
+    _server.onChange(Set.of("pinot.jfr.configuration", "pinot.jfr.maxSize", "pinot.jfr.maxAge"),
+        Map.of("pinot.jfr.enabled", "true", "pinot.jfr.configuration", "profile", "pinot.jfr.maxSize", "10MB",
+            "pinot.jfr.maxAge", "PT1H"));
 
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should still be disabled")
-        .isFalse();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).isEmpty();
+    assertThat(_server.getRecording()).isSameAs(recording);
+    assertThat(recording.getState()).isEqualTo(RecordingState.RUNNING);
+    assertThat(recording.getSettings()).isEqualTo(Configuration.getConfiguration("profile").getSettings());
+    assertThat(recording.getMaxSize()).isEqualTo(DataSizeUtils.toBytes("10MB"));
+    assertThat(recording.getMaxAge()).isEqualTo(Duration.ofHours(1));
   }
 
   @Test
-  public void restartsWhenConfigurationChanges() {
-    Map<String, String> config = Map.of(
-        "pinot.jfr.enabled", "true",
-        "pinot.jfr.maxAge", "PT2H");
-    _continuousJfrStarter.onChange(Set.of(), config);
+  public void restartsTheRecordingWhenToDiskChanges() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    Recording diskRecording = _server.getRecording();
 
-    Set<String> changed = Set.of("pinot.jfr.maxAge");
-    Map<String, String> updatedConfig = Map.of(
-        "pinot.jfr.enabled", "true",
-        "pinot.jfr.maxAge", "PT1H");
-    _continuousJfrStarter.onChange(changed, updatedConfig);
+    _server.onChange(Set.of("pinot.jfr.toDisk"), Map.of("pinot.jfr.enabled", "true", "pinot.jfr.toDisk", "false"));
 
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=7200000ms",
-        "jfrStop name=pinot-continuous",
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=3600000ms");
+    Recording memoryRecording = _server.getRecording();
+    assertThat(memoryRecording).isNotSameAs(diskRecording);
+    assertThat(memoryRecording.getState()).isEqualTo(RecordingState.RUNNING);
+    assertThat(memoryRecording.isToDisk()).isFalse();
+    assertThat(diskRecording.getState()).isEqualTo(RecordingState.STOPPED);
   }
 
   @Test
-  public void configuresRepositoryAndDumpPathsViaMBean() {
-    Map<String, String> config = Map.of(
-        "pinot.jfr.enabled", "true",
-        "pinot.jfr.directory", "/var/log/pinot/jfr-repository",
-        "pinot.jfr.dumpPath", "/var/log/pinot/jfr-dumps");
-    _continuousJfrStarter.onChange(Set.of(), config);
+  public void acceptsAJfcFilePath() {
+    Path profile = Path.of(System.getProperty("java.home"), "lib", "jfr", "profile.jfc");
 
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrConfigure repositorypath=/var/log/pinot/jfr-repository dumppath=/var/log/pinot/jfr-dumps "
-            + "preserve-repository=true",
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true", "pinot.jfr.configuration", profile.toString()));
+
+    assertThat(_server.isRunning()).isTrue();
   }
 
   @Test
-  public void doesNotFailWhenMBeanIsUnavailable() {
-    _continuousJfrStarter.setMBeanAvailable(false);
-    Map<String, String> config = Map.of("pinot.jfr.enabled", "true");
-    _continuousJfrStarter.onChange(Set.of(), config);
+  public void recordsWhenTheRegexMatchesTheFullInstanceId() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true", "pinot.jfr.instanceRegex", "Server_.*"));
 
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Recording should remain disabled when MBean is unavailable")
-        .isFalse();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).isEmpty();
+    assertThat(_server.isRunning()).isTrue();
   }
 
   @Test
-  public void keepsRunningWhenStopCommandFails() {
-    _continuousJfrStarter.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
-    _continuousJfrStarter.failCommand("jfrStop");
+  public void doesNotRecordWhenTheRegexMatchesOnlyPartOfTheInstanceId() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true", "pinot.jfr.instanceRegex", "Server"));
 
-    _continuousJfrStarter.onChange(Set.of("pinot.jfr.enabled"), Map.of("pinot.jfr.enabled", "false"));
-
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Starter should keep running state when stop fails")
-        .isTrue();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
-        "jfrStop name=pinot-continuous");
+    assertThat(_server.isRunning()).isFalse();
   }
 
   @Test
-  public void keepsRunningWhenMBeanBecomesUnavailableOnStop() {
-    _continuousJfrStarter.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
-    _continuousJfrStarter.setMBeanAvailable(false);
+  public void regexChangeStopsTheRecordingLive() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    assertThat(_server.isRunning()).isTrue();
 
-    _continuousJfrStarter.onChange(Set.of("pinot.jfr.enabled"), Map.of("pinot.jfr.enabled", "false"));
+    _server.onChange(Set.of("pinot.jfr.instanceRegex"),
+        Map.of("pinot.jfr.enabled", "true", "pinot.jfr.instanceRegex", "Broker_.*"));
 
-    Assertions.assertThat(_continuousJfrStarter.isRunning())
-        .describedAs("Starter should keep running state when MBean is unavailable for stop")
-        .isTrue();
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
+    assertThat(_server.isRunning()).isFalse();
   }
 
   @Test
-  public void supportsHumanReadableMaxSize() {
-    Map<String, String> config = Map.of(
-        "pinot.jfr.enabled", "true",
-        "pinot.jfr.maxSize", "512MB");
-    _continuousJfrStarter.onChange(Set.of(), config);
+  public void regexSelectsOneRoleAmongComponentsInTheSameJvm() {
+    ContinuousJfrStarter broker = new ContinuousJfrStarter(BROKER_ID, List.of());
+    Map<String, String> config = Map.of("pinot.jfr.enabled", "true", "pinot.jfr.instanceRegex", "Broker_.*");
 
-    Assertions.assertThat(_continuousJfrStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=536870912 maxage="
-            + DEFAULT_MAX_AGE_MILLIS + "ms");
+    _server.onChange(Set.of(), config);
+    broker.onChange(Set.of(), config);
+
+    assertThat(_server.isRunning()).isFalse();
+    assertThat(broker.isRunning()).isTrue();
   }
 
   @Test
-  public void coordinatesMultipleStartersInSameJvm() {
-    TestContinuousJfrStarter firstStarter = new TestContinuousJfrStarter();
-    TestContinuousJfrStarter secondStarter = new TestContinuousJfrStarter();
-    Map<String, String> enabledConfig = Map.of("pinot.jfr.enabled", "true");
-    Map<String, String> disabledConfig = Map.of("pinot.jfr.enabled", "false");
+  public void invalidRegexKeepsTheCurrentState() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    Recording recording = _server.getRecording();
 
-    firstStarter.onChange(Set.of(), enabledConfig);
-    secondStarter.onChange(Set.of(), enabledConfig);
+    _server.onChange(Set.of("pinot.jfr.instanceRegex"),
+        Map.of("pinot.jfr.enabled", "true", "pinot.jfr.instanceRegex", "Server_("));
 
-    Assertions.assertThat(firstStarter.isRunning()).isTrue();
-    Assertions.assertThat(secondStarter.isRunning()).isTrue();
-    Assertions.assertThat(firstStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
-    Assertions.assertThat(secondStarter.getExecutedCommands()).isEmpty();
-
-    firstStarter.onChange(Set.of("pinot.jfr.enabled"), disabledConfig);
-    Assertions.assertThat(firstStarter.isRunning()).isFalse();
-    Assertions.assertThat(secondStarter.isRunning()).isTrue();
-    Assertions.assertThat(firstStarter.getExecutedCommands()).hasSize(1);
-
-    secondStarter.onChange(Set.of("pinot.jfr.enabled"), disabledConfig);
-    Assertions.assertThat(secondStarter.isRunning()).isFalse();
-    Assertions.assertThat(secondStarter.getExecutedCommands()).containsExactly("jfrStop name=pinot-continuous");
+    assertThat(_server.isRunning()).isTrue();
+    assertThat(recording.getState()).isEqualTo(RecordingState.RUNNING);
   }
 
   @Test
-  public void coordinatesPerRecordingName() {
-    TestContinuousJfrStarter firstStarter = new TestContinuousJfrStarter();
-    TestContinuousJfrStarter secondStarter = new TestContinuousJfrStarter();
-    Map<String, String> enabledFirstConfig = Map.of("pinot.jfr.enabled", "true", "pinot.jfr.name",
-        "pinot-continuous-a");
-    Map<String, String> enabledSecondConfig = Map.of("pinot.jfr.enabled", "true", "pinot.jfr.name",
-        "pinot-continuous-b");
-    Map<String, String> disabledFirstConfig =
-        Map.of("pinot.jfr.enabled", "false", "pinot.jfr.name", "pinot-continuous-a");
-    Map<String, String> disabledSecondConfig =
-        Map.of("pinot.jfr.enabled", "false", "pinot.jfr.name", "pinot-continuous-b");
+  public void invalidRecordingOptionsKeepTheCurrentState() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    Recording recording = _server.getRecording();
 
-    firstStarter.onChange(Set.of(), enabledFirstConfig);
-    secondStarter.onChange(Set.of(), enabledSecondConfig);
+    _server.onChange(Set.of("pinot.jfr.maxSize"), Map.of("pinot.jfr.enabled", "true", "pinot.jfr.maxSize", "lots"));
+    _server.onChange(Set.of("pinot.jfr.configuration"),
+        Map.of("pinot.jfr.enabled", "true", "pinot.jfr.configuration", "no-such-configuration"));
 
-    Assertions.assertThat(firstStarter.isRunning()).isTrue();
-    Assertions.assertThat(secondStarter.isRunning()).isTrue();
-    Assertions.assertThat(firstStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous-a settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
-    Assertions.assertThat(secondStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous-b settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms");
-
-    firstStarter.onChange(Set.of("pinot.jfr.enabled"), disabledFirstConfig);
-    Assertions.assertThat(firstStarter.isRunning()).isFalse();
-    Assertions.assertThat(secondStarter.isRunning()).isTrue();
-    Assertions.assertThat(firstStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous-a settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
-        "jfrStop name=pinot-continuous-a");
-
-    secondStarter.onChange(Set.of("pinot.jfr.enabled"), disabledSecondConfig);
-    Assertions.assertThat(secondStarter.isRunning()).isFalse();
-    Assertions.assertThat(secondStarter.getExecutedCommands()).containsExactly(
-        "jfrStart name=pinot-continuous-b settings=default dumponexit=false disk=true maxsize=" + DEFAULT_MAX_SIZE_BYTES
-            + " maxage=" + DEFAULT_MAX_AGE_MILLIS + "ms",
-        "jfrStop name=pinot-continuous-b");
+    assertThat(_server.getRecording()).isSameAs(recording);
+    assertThat(recording.getState()).isEqualTo(RecordingState.RUNNING);
+    assertThat(recording.getMaxSize()).isEqualTo(DataSizeUtils.toBytes(ContinuousJfrStarter.DEFAULT_MAX_SIZE));
   }
 
   @Test
-  public void integrationTestWithRealDiagnosticCommandMBean() {
-    ContinuousJfrStarter starter = new ContinuousJfrStarter();
-    if (!starter.isDiagnosticCommandAvailable()) {
-      throw new SkipException("JFR DiagnosticCommand MBean is not available in this runtime");
-    }
+  public void doesNothingWhenTheJvmStartsARecording() {
+    ContinuousJfrStarter starter = new ContinuousJfrStarter(SERVER_ID,
+        List.of("-Xmx4g", "-XX:StartFlightRecording=name=jvm,settings=default"));
 
-    String recordingName = "pinot-continuous-it-" + System.currentTimeMillis();
-    Map<String, String> enabledConfig = Map.of(
-        "pinot.jfr.enabled", "true",
-        "pinot.jfr.name", recordingName,
-        "pinot.jfr.toDisk", "false");
-    Map<String, String> disabledConfig = Map.of(
-        "pinot.jfr.enabled", "false",
-        "pinot.jfr.name", recordingName,
-        "pinot.jfr.toDisk", "false");
+    starter.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
 
-    try {
-      starter.onChange(Set.of(), enabledConfig);
-      Assertions.assertThat(starter.isRunning()).isTrue();
-      Assertions.assertThat(waitForRecordingPresence(recordingName, true, 10, 100))
-          .describedAs("Recording should be visible via JFR.check")
-          .isTrue();
-
-      starter.onChange(Set.of("pinot.jfr.enabled"), disabledConfig);
-      Assertions.assertThat(starter.isRunning()).isFalse();
-      Assertions.assertThat(waitForRecordingPresence(recordingName, false, 10, 100))
-          .describedAs("Recording should be absent via JFR.check after disable")
-          .isTrue();
-    } finally {
-      if (starter.isRunning()) {
-        starter.onChange(Set.of("pinot.jfr.enabled"), disabledConfig);
-      }
-    }
+    assertThat(starter.isRunning()).isFalse();
   }
 
   @Test
-  public void removesOldRepositoriesWhenTotalSizeExceedsLimit() throws Exception {
-    Path root = Files.createTempDirectory("pinot-jfr-repo-root");
-    try {
-      Path oldest = createRepositoryWithSize(root.resolve("repo-oldest"), 8);
-      Path newer = createRepositoryWithSize(root.resolve("repo-newer"), 8);
-      Path active = createRepositoryWithSize(root.resolve("repo-active"), 8);
-      Files.setLastModifiedTime(oldest, FileTime.fromMillis(1000));
-      Files.setLastModifiedTime(newer, FileTime.fromMillis(2000));
-      Files.setLastModifiedTime(active, FileTime.fromMillis(3000));
+  public void recordsWhenTheJvmOnlySetsFlightRecorderOptions() {
+    ContinuousJfrStarter starter = new ContinuousJfrStarter(SERVER_ID,
+        List.of("-XX:FlightRecorderOptions:repository=/var/pinot/jfr,preserve-repository=true"));
 
-      ContinuousJfrStarter.cleanupOldRepositoriesInternal(root, 16, active);
+    starter.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
 
-      Assertions.assertThat(Files.exists(oldest)).isFalse();
-      Assertions.assertThat(Files.exists(newer)).isTrue();
-      Assertions.assertThat(Files.exists(active)).isTrue();
-    } finally {
-      ContinuousJfrStarter.cleanupOldRepositoriesInternal(root, 0, null);
-      Files.deleteIfExists(root);
-    }
+    assertThat(starter.isRunning()).isTrue();
   }
 
   @Test
-  public void keepsActiveRepositoryEvenWhenLargerThanLimit() throws Exception {
-    Path root = Files.createTempDirectory("pinot-jfr-repo-root");
-    try {
-      Path old = createRepositoryWithSize(root.resolve("repo-old"), 8);
-      Path active = createRepositoryWithSize(root.resolve("repo-active"), 24);
-      Files.setLastModifiedTime(old, FileTime.fromMillis(1000));
-      Files.setLastModifiedTime(active, FileTime.fromMillis(2000));
+  public void ignoresTheRemovedRepositoryConfigs() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true", "pinot.jfr.directory", "/does/not/exist",
+        "pinot.jfr.preserveRepository", "true", "pinot.jfr.repositoryMaxTotalSize", "1GB"));
 
-      ContinuousJfrStarter.cleanupOldRepositoriesInternal(root, 20, active);
-
-      Assertions.assertThat(Files.exists(old)).isFalse();
-      Assertions.assertThat(Files.exists(active)).isTrue();
-    } finally {
-      ContinuousJfrStarter.cleanupOldRepositoriesInternal(root, 0, null);
-      Files.deleteIfExists(root);
-    }
+    assertThat(_server.isRunning()).isTrue();
   }
 
-  private static Path createRepositoryWithSize(Path repositoryPath, int bytes) throws Exception {
-    Files.createDirectories(repositoryPath);
-    Files.write(repositoryPath.resolve("chunk.jfr"), new byte[bytes]);
-    return repositoryPath;
+  @Test
+  public void componentsInTheSameJvmShareOneRecording() {
+    ContinuousJfrStarter broker = new ContinuousJfrStarter(BROKER_ID, List.of());
+    Map<String, String> enabled = Map.of("pinot.jfr.enabled", "true");
+    Map<String, String> disabled = Map.of("pinot.jfr.enabled", "false");
+
+    _server.onChange(Set.of(), enabled);
+    broker.onChange(Set.of(), enabled);
+    assertThat(broker.getRecording()).isSameAs(_server.getRecording());
+    Recording recording = _server.getRecording();
+
+    _server.onChange(ENABLED_CHANGED, disabled);
+    assertThat(recording.getState()).isEqualTo(RecordingState.RUNNING);
+
+    broker.onChange(ENABLED_CHANGED, disabled);
+    assertThat(recording.getState()).isEqualTo(RecordingState.STOPPED);
   }
 
-  private static boolean waitForRecordingPresence(String recordingName, boolean expectedPresent, int maxAttempts,
-      long delayMs) {
-    for (int i = 0; i < maxAttempts; i++) {
-      boolean present = isRecordingPresent(recordingName);
-      if (present == expectedPresent) {
-        return true;
-      }
-      try {
-        Thread.sleep(delayMs);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return false;
-      }
-    }
-    return false;
-  }
+  @Test
+  public void renameMovesTheInstanceToANewRecording() {
+    Map<String, String> config = new HashMap<>(Map.of("pinot.jfr.enabled", "true"));
+    _server.onChange(Set.of(), config);
+    Recording oldRecording = _server.getRecording();
 
-  private static boolean isRecordingPresent(String recordingName) {
-    try {
-      MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
-      ObjectName objectName = new ObjectName("com.sun.management:type=DiagnosticCommand");
-      Object result = mBeanServer.invoke(objectName, "jfrCheck", new Object[]{new String[0]},
-          new String[]{String[].class.getName()});
-      return result != null && result.toString().contains(recordingName);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to query JFR.check via DiagnosticCommand MBean", e);
-    }
-  }
+    config.put("pinot.jfr.name", "renamed");
+    _server.onChange(Set.of("pinot.jfr.name"), config);
 
-  private static class TestContinuousJfrStarter extends ContinuousJfrStarter {
-    private final List<String> _executedCommands = new ArrayList<>();
-    private final Set<String> _failingCommands = new HashSet<>();
-    private boolean _mBeanAvailable = true;
-
-    @Override
-    protected boolean executeDiagnosticCommand(String operationName, String... arguments) {
-      String command = operationName;
-      if (arguments.length > 0) {
-        command += " " + String.join(" ", arguments);
-      }
-      _executedCommands.add(command);
-      return !_failingCommands.contains(operationName);
-    }
-
-    @Override
-    protected boolean isDiagnosticCommandAvailable() {
-      return _mBeanAvailable;
-    }
-
-    @Override
-    protected boolean isRepositoryCleanupEnabled() {
-      return false;
-    }
-
-    private void setMBeanAvailable(boolean mBeanAvailable) {
-      _mBeanAvailable = mBeanAvailable;
-    }
-
-    private void failCommand(String operationName) {
-      _failingCommands.add(operationName);
-    }
-
-    private List<String> getExecutedCommands() {
-      return _executedCommands;
-    }
+    assertThat(_server.getRecording().getName()).isEqualTo("renamed");
+    assertThat(oldRecording.getState()).isEqualTo(RecordingState.STOPPED);
   }
 }

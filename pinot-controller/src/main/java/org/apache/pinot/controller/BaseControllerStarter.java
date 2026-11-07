@@ -828,7 +828,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _serviceStatusCallbackList.add(generateResourceUtilizationCheckerStatusCallback());
     }
 
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new ContinuousJfrStarter(_helixParticipantInstanceId));
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
         ConsumingSegmentConsistencyModeListener.getInstance());
     LOGGER.info("Registered ConsumingSegmentConsistencyModeListener as cluster config change listener");
