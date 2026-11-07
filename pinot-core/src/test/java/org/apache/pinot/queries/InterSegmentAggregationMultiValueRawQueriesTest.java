@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.io.IOException;
+import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
@@ -27,8 +28,9 @@ import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 
@@ -543,7 +545,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
 
   private void testPercentileRawEstMV(int percentile) {
     Function<Object, Object> quantileExtractor =
-        value -> ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+        value -> QuantileDigest.fromBytes(BytesUtils.toBytes((String) value))
             .getQuantile(percentile / 100.0);
 
     String rawQuery = String.format("SELECT PERCENTILERAWEST%dMV(column6) AS value FROM testTable", percentile);
@@ -630,7 +632,8 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
   private void testPercentileRawKLLMV(int percentile) {
     Function<Object, Object> quantileExtractor = value -> {
       try {
-        KllDoublesSketch sketch = ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(Base64.decode((String) value));
+        KllDoublesSketch sketch =
+            KllDoublesSketch.wrap(MemorySegment.ofArray(Base64.decode((String) value)).asReadOnly());
         return sketch.getQuantile(percentile / 100.0);
       } catch (IOException e) {
         return null;

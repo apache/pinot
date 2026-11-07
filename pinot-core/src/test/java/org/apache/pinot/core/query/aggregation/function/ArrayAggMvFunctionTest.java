@@ -30,7 +30,6 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctDoubleFunction;
@@ -45,6 +44,7 @@ import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFuncti
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.Test;
 
@@ -191,8 +191,8 @@ public class ArrayAggMvFunctionTest extends AbstractAggregationFunctionTest {
     assertEquals(result.size(), 6);
 
     // round-trip ser/de
-    AggregationFunction.SerializedIntermediateResult ser = fn.serializeIntermediateResult(result);
-    DoubleArrayList deser = ObjectSerDeUtils.deserialize(ser.getBytes(), ObjectSerDeUtils.ObjectType.DoubleArrayList);
+    AggregationFunction.SerializedResult ser = fn.serializeIntermediateResult(result);
+    DoubleArrayList deser = ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.deserialize(ser.getBytes());
     assertEquals(deser.size(), 6);
   }
 

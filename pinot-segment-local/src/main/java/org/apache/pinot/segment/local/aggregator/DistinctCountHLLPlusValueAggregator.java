@@ -24,8 +24,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.HyperLogLogPlusUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -139,12 +139,12 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
 
   @Override
   public byte[] serializeAggregatedValue(HyperLogLogPlus value) {
-    return CustomSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(value);
+    return ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(value);
   }
 
   @Override
   public HyperLogLogPlus deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytes);
+    return ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytes);
   }
 
   @VisibleForTesting

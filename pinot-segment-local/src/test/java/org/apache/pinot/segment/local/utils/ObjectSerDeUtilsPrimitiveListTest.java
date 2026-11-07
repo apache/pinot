@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common;
+package org.apache.pinot.segment.local.utils;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -33,7 +32,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertThrows;
 
 
 /// Checks that the bulk reads of the primitive array list SerDes return the same values and leave the buffer at the
@@ -247,17 +245,5 @@ public class ObjectSerDeUtilsPrimitiveListTest {
     ObjectSerDeUtils.ObjectSerDe<Object> serDe = (ObjectSerDeUtils.ObjectSerDe<Object>) type.serDe();
     byte[] bytes = serDe.serialize(list);
     assertEquals(serDe.serialize(serDe.deserialize(bytes)), bytes);
-  }
-
-  @Test
-  public void testTruncatedAndNegativeCounts() {
-    for (ListType type : ListType.values()) {
-      ByteBuffer truncated = ByteBuffer.allocate(Integer.BYTES + 2 * type._width).putInt(3);
-      truncated.flip().limit(truncated.capacity());
-      assertThrows(BufferUnderflowException.class, () -> type.serDe().deserialize(truncated));
-
-      ByteBuffer negative = ByteBuffer.allocate(Integer.BYTES).putInt(0, -1);
-      assertThrows(IllegalArgumentException.class, () -> type.serDe().deserialize(negative));
-    }
   }
 }

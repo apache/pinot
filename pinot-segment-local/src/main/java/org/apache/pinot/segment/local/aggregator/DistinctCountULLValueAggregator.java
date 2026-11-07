@@ -23,7 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -99,12 +99,12 @@ public class DistinctCountULLValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public byte[] serializeAggregatedValue(UltraLogLog value) {
-    return CustomSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(value);
+    return ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.serialize(value);
   }
 
   @Override
   public UltraLogLog deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytes).downsize(_p); // downsize when we load
+    return ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(bytes).downsize(_p); // downsize when we load
   }
 
   @VisibleForTesting

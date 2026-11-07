@@ -28,11 +28,11 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -42,6 +42,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLog, Long> {
+  private static final int HYPER_LOG_LOG_TYPE = 6;
+
   protected final int _log2m;
 
   public DistinctCountHLLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
@@ -757,9 +759,8 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(HyperLogLog hyperLogLog) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.HyperLogLog.getValue(),
-        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog));
+  public SerializedResult serializeIntermediateResult(HyperLogLog hyperLogLog) {
+    return new SerializedValue<>(HYPER_LOG_LOG_TYPE, hyperLogLog, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE);
   }
 
   @Override

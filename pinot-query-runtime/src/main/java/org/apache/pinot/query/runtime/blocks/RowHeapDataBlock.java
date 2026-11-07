@@ -149,7 +149,7 @@ public class RowHeapDataBlock implements MseBlock.Data {
               "RowHeapDataBlock#copyObjectColumns");
           // NOTE: The first (numColumns - numAggFunctions) columns are key columns
           AggregationFunction aggFunction = _aggFunctions[colId + _aggFunctions.length - numColumns];
-          AggregationFunction.SerializedIntermediateResult serialized = aggFunction.serializeIntermediateResult(value);
+          AggregationFunction.SerializedResult serialized = aggFunction.serializeIntermediateResult(value);
           copiedRow[colId] = aggFunction.deserializeIntermediateResult(
               new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
         }

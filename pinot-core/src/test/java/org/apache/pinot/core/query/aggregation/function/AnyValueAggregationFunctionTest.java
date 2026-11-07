@@ -85,7 +85,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     assertEquals(function.extractGroupByResult(groupHolder, 0), expected);
     assertEquals(function.extractGroupByResult(groupHolder, 1), expected);
 
-    AggregationFunction.SerializedIntermediateResult serialized = function.serializeIntermediateResult(intermediate);
+    AggregationFunction.SerializedResult serialized = function.serializeIntermediateResult(intermediate);
     Object restored = function.deserializeIntermediateResult(
         new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
 
@@ -523,8 +523,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   }
 
   private static CustomObject serialize(AnyValueAggregationFunction function, Object intermediateResult) {
-    AggregationFunction.SerializedIntermediateResult serialized =
-        function.serializeIntermediateResult(intermediateResult);
+    AggregationFunction.SerializedResult serialized = function.serializeIntermediateResult(intermediateResult);
     return new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes()));
   }
 }

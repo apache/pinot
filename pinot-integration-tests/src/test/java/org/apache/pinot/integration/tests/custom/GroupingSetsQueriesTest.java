@@ -598,7 +598,8 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
   /// - the null-handling variant produces empty base intermediates (a base group of only rolled-up nulls),
   ///   which is exactly the case where AggregationFunction#merge returns its argument unchanged and would leak
   ///   an uncloned base object without the defensive clone on the merge branch;
-  /// - scalar (SUM) and a non-CUBE GROUPING SETS shape guard the general derivation math.
+  /// - scalar (SUM) and a non-CUBE GROUPING SETS shape guard the general derivation math;
+  /// - a parent aggregation (EXPR_MAX) merges deserialized ExprMinMaxObject intermediates of different base groups.
   @Test(dataProvider = "baseAggregationEquivalenceCases")
   public void testBaseAggregationMatchesExpansion(String description, String aggregations, String groupBy,
       boolean nullHandling)
@@ -608,14 +609,17 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
         + ") FROM " + getTableName() + " GROUP BY " + groupBy;
     String prefix = nullHandling ? "SET enableNullHandling=true; " : "";
 
-    Map<String, String> baseAgg =
-        rowsByKey(postQuery(prefix + "SET groupingSetsBaseAggregation=true; " + query));
-    Map<String, String> expansion =
-        rowsByKey(postQuery(prefix + "SET groupingSetsBaseAggregation=false; " + query));
+    JsonNode baseAggResponse = postQuery(prefix + "SET groupingSetsBaseAggregation=true; " + query);
+    JsonNode expansionResponse = postQuery(prefix + "SET groupingSetsBaseAggregation=false; " + query);
+    Map<String, String> baseAgg = rowsByKey(baseAggResponse);
+    Map<String, String> expansion = rowsByKey(expansionResponse);
 
     assertEquals(baseAgg, expansion,
         "base-aggregation and per-row expansion must produce identical results for case: " + description);
     assertFalse(baseAgg.isEmpty(), "case produced no rows: " + description);
+    // Rows that share a key, such as the tied rows of EXPR_MAX, collapse in rowsByKey, so the row counts must match too
+    assertEquals(baseAggResponse.get("resultTable").get("rows").size(),
+        expansionResponse.get("resultTable").get("rows").size(), "row count mismatch for case: " + description);
   }
 
   @DataProvider(name = "baseAggregationEquivalenceCases")
@@ -630,6 +634,7 @@ public class GroupingSetsQueriesTest extends CustomDataQueryClusterIntegrationTe
         {"sum-cube", "SUM(" + LNG + "), COUNT(*)", "CUBE(" + D1 + ", " + D2 + ")", false},
         {"distinctcount-groupingsets", "DISTINCTCOUNT(" + LNG + "), COUNT(*)",
             "GROUPING SETS ((" + D1 + "), (" + D2 + "), ())", true},
+        {"exprmax-rollup", "EXPR_MAX(" + LNG + ", " + DBL + "), COUNT(*)", "ROLLUP(" + D1 + ", " + D2 + ")", false},
     };
   }
 

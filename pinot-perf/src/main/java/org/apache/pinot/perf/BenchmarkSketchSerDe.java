@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.perf;
 
+import java.lang.foreign.MemorySegment;
 import java.util.concurrent.TimeUnit;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
@@ -26,11 +27,13 @@ import org.apache.datasketches.theta.CompactThetaSketch;
 import org.apache.datasketches.theta.ThetaSetOperationBuilder;
 import org.apache.datasketches.theta.ThetaUnion;
 import org.apache.datasketches.theta.UpdatableThetaSketch;
+import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -116,7 +119,7 @@ public class BenchmarkSketchSerDe {
         new TupleUnion<>(NOMINAL_ENTRIES, new IntegerSummarySetOperations(IntegerSummary.Mode.Sum,
             IntegerSummary.Mode.Sum));
     for (byte[] bytes : _tupleBytes) {
-      union.union(ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(bytes));
+      union.union(TupleSketch.heapifySketch(MemorySegment.ofArray(bytes), new IntegerSummaryDeserializer()));
     }
     return union.getResult().getEstimate();
   }
@@ -125,7 +128,7 @@ public class BenchmarkSketchSerDe {
   public double kllDeserializeAndMerge() {
     KllDoublesSketch merged = KllDoublesSketch.newHeapInstance();
     for (byte[] bytes : _kllBytes) {
-      merged.merge(ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(bytes));
+      merged.merge(KllDoublesSketch.wrap(MemorySegment.ofArray(bytes).asReadOnly()));
     }
     return merged.getQuantile(0.5);
   }
@@ -134,7 +137,7 @@ public class BenchmarkSketchSerDe {
   public double cpcDeserializeAndUnion() {
     CpcUnion union = new CpcUnion(LG_K);
     for (byte[] bytes : _cpcBytes) {
-      union.update(ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes));
+      union.update(CpcSketch.heapify(MemorySegment.ofArray(bytes)));
     }
     return union.getResult().getEstimate();
   }
