@@ -48,6 +48,7 @@
     <module>pinot-server</module>
     <module>pinot-core</module>
     <module>pinot-materialized-view</module>
+    <module>pinot-coordination-ratis</module>
     <module>pinot-controller</module>
     <module>pinot-minion</module>
     <module>pinot-plugins</module>
@@ -189,6 +190,7 @@
     <orc.version>1.9.9</orc.version>
     <hive.version>4.2.1</hive.version>
     <helix.version>2.0.1</helix.version>
+    <ratis.version>3.3.1</ratis.version>
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.22.4</jackson.version>
     <opentelemetry.version>1.67.0</opentelemetry.version>
@@ -920,6 +922,26 @@
         <groupId>org.apache.helix</groupId>
         <artifactId>helix-core</artifactId>
         <version>${helix.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-server</artifactId>
+        <version>${ratis.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-client</artifactId>
+        <version>${ratis.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-grpc</artifactId>
+        <version>${ratis.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-metrics-default</artifactId>
+        <version>${ratis.version}</version>
       </dependency>
       <dependency>
         <groupId>org.openjdk.jmh</groupId>
