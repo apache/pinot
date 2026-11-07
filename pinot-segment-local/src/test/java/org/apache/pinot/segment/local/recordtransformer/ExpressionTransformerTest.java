@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -31,12 +32,18 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests the evaluation of transform expressions by the ExpressionTransformer
@@ -533,6 +540,8 @@ public class ExpressionTransformerTest {
     genericRow.putValue("x", null);
     expressionTransformer.transform(genericRow);
     Assert.assertNull(genericRow.getValue("y"));
+    assertFalse(expressionTransformer.getColumnsWithOnlyTransformedValues().contains("y"));
+    assertFalse(expressionTransformer.getColumnsWithDependencyClosedTransformValues().contains("y"));
   }
 
   @Test
@@ -590,5 +599,167 @@ public class ExpressionTransformerTest {
     Object transformedValue = row.getValue("columnArray");
     Assert.assertTrue(transformedValue.getClass().isArray());
     Assert.assertEquals(Arrays.asList((Object[]) transformedValue), Arrays.asList("a", "b", "c"));
+  }
+
+  @Test
+  public void testPreserveExistingTransformOutputsDuringReplay() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMetric("source", DataType.INT)
+        .addSingleValueDimension("json", DataType.STRING)
+        .addMetric("derived", DataType.INT)
+        .addMultiValueDimension("arrayDerived", DataType.STRING)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig("derived", "plus(source, 1)"),
+        new TransformConfig("arrayDerived", "jsonPathArray(json, '$')")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testPreserveExistingTransformOutputsDuringReplay")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer transformer =
+        new ExpressionTransformer(tableConfig, schema, Set.of("derived", "arrayDerived"));
+
+    GenericRow replayed = new GenericRow();
+    replayed.putValue("source", 10);
+    replayed.putValue("json", "[\"new\"]");
+    replayed.putDefaultNullValue("derived", Integer.MIN_VALUE);
+    replayed.putValue("arrayDerived", new Object[]{"stored"});
+    transformer.transform(replayed);
+    assertEquals(replayed.getValue("derived"), Integer.MIN_VALUE);
+    assertTrue(replayed.isNullValue("derived"));
+    assertEquals((Object[]) replayed.getValue("arrayDerived"), new Object[]{"stored"});
+
+    GenericRow missingOutputs = new GenericRow();
+    missingOutputs.putValue("source", 10);
+    missingOutputs.putValue("json", "[\"new\"]");
+    transformer.transform(missingOutputs);
+    assertEquals(missingOutputs.getValue("derived"), 11.0);
+    assertEquals((Object[]) missingOutputs.getValue("arrayDerived"), new Object[]{"new"});
+  }
+
+  @Test
+  public void testOnlyTransformedValuesRequiresGeneratedDependencyClosure() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMetric("source", DataType.INT)
+        .addMetric("final", DataType.INT)
+        .addMetric("independent", DataType.INT)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig("intermediate", "plus(source, 10)"),
+        new TransformConfig("final", "plus(intermediate, 100)"),
+        new TransformConfig("independent", "plus(source, 1)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testGeneratedDependencyClosure")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer transformer = new ExpressionTransformer(tableConfig, schema);
+    GenericRow row = new GenericRow();
+    row.putValue("source", 1);
+    // A non-schema intermediate can be supplied by the input and then disappear when the segment persists only schema
+    // columns. The downstream output must not claim replay-safe dependency provenance in that case.
+    row.putValue("intermediate", 50);
+
+    transformer.transform(row);
+
+    assertEquals(row.getValue("final"), 150.0);
+    assertEquals(row.getValue("independent"), 2.0);
+    assertEquals(transformer.getColumnsWithOnlyTransformedValues(), Set.of("final", "independent"));
+    assertEquals(transformer.getColumnsWithDependencyClosedTransformValues(), Set.of("independent"));
+  }
+
+  // Exercises the deprecated TimeFieldSpec conversion path that still runs for backward-compatible schemas.
+  @SuppressWarnings("deprecation")
+  @Test
+  public void testImplicitTransformsAndDependentsLackDependencyClosedProvenance() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("source", DataType.INT)
+        .addMultiValueDimension("attributes__KEYS", DataType.STRING)
+        .addSingleValueDimension("keyCount", DataType.INT)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "incomingHours"),
+            new TimeGranularitySpec(DataType.LONG, TimeUnit.DAYS, "eventDays"))
+        .addSingleValueDimension("dayPlusOne", DataType.LONG)
+        .addSingleValueDimension("independent", DataType.INT)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig("keyCount", "Groovy({attributes__KEYS.size()}, attributes__KEYS)"),
+        new TransformConfig("dayPlusOne", "plus(eventDays, 1)"),
+        new TransformConfig("independent", "plus(source, 1)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testImplicitTransformDependencyClosure")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer transformer = new ExpressionTransformer(tableConfig, schema);
+    GenericRow row = new GenericRow();
+    row.putValue("source", 1);
+    row.putValue("attributes", Map.of("first", "one", "second", "two"));
+    row.putValue("incomingHours", 440_496L);
+
+    transformer.transform(row);
+
+    assertEquals(transformer.getColumnsWithOnlyTransformedValues(),
+        Set.of("attributes__KEYS", "keyCount", "eventDays", "dayPlusOne", "independent"));
+    assertEquals(transformer.getColumnsWithDependencyClosedTransformValues(), Set.of("independent"));
+  }
+
+  @Test
+  public void testDependencyClosureCanExtendThroughTrustedPreservedOutput() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMetric("source", DataType.INT)
+        .addMetric("derived", DataType.INT)
+        .addMetric("final", DataType.INT)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig("derived", "plus(source, 1)"),
+        new TransformConfig("intermediate", "plus(derived, 10)"),
+        new TransformConfig("final", "plus(intermediate, 100)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTrustedPreservedDependency")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer transformer =
+        new ExpressionTransformer(tableConfig, schema, Set.of("derived"), Set.of("derived"));
+    GenericRow row = new GenericRow();
+    row.putValue("source", 1);
+    row.putValue("derived", 2);
+
+    transformer.transform(row);
+
+    assertEquals(row.getValue("final"), 112.0);
+    assertEquals(transformer.getColumnsWithOnlyTransformedValues(), Set.of("intermediate", "final"));
+    assertEquals(transformer.getColumnsWithDependencyClosedTransformValues(),
+        Set.of("derived", "intermediate", "final"));
+  }
+
+  @Test
+  public void testTrustedPreservedNullIsExposedAsLogicalNullToDependentTransform() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addMetric("source", DataType.INT)
+        .addMetric("derived", DataType.INT)
+        .addMetric("final", DataType.INT)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig("derived", "plus(source, 1)"),
+        new TransformConfig("final", "Groovy({derived == null ? 1 : derived}, derived)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTrustedPreservedNull")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer transformer =
+        new ExpressionTransformer(tableConfig, schema, Set.of("derived"), Set.of("derived"));
+    GenericRow row = new GenericRow();
+    row.putValue("source", 10);
+    row.putDefaultNullValue("derived", Integer.MIN_VALUE);
+
+    transformer.transform(row);
+
+    assertNull(row.getValue("derived"));
+    assertTrue(row.isNullValue("derived"));
+    assertEquals(((Number) row.getValue("final")).intValue(), 1);
+    assertEquals(transformer.getColumnsWithDependencyClosedTransformValues(), Set.of("derived", "final"));
   }
 }

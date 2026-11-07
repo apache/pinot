@@ -321,6 +321,29 @@ public class StarTreeBuilderUtils {
     return dimensions;
   }
 
+  /// Returns `true` if any existing star-tree uses one of the given columns as a dimension or aggregation input.
+  /// COUNT(*) (`*`) is ignored. Used to force a rebuild when derived-column values change but star-tree config does
+  /// not.
+  public static boolean usesAnyColumn(@Nullable List<StarTreeV2Metadata> metadataList, Set<String> columns) {
+    if (metadataList == null || columns.isEmpty()) {
+      return false;
+    }
+    for (StarTreeV2Metadata metadata : metadataList) {
+      for (String dimension : metadata.getDimensionsSplitOrder()) {
+        if (columns.contains(dimension)) {
+          return true;
+        }
+      }
+      for (AggregationFunctionColumnPair pair : metadata.getFunctionColumnPairs()) {
+        String column = pair.getColumn();
+        if (!AggregationFunctionColumnPair.STAR.equals(column) && columns.contains(column)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Returns `true` if the given star-tree builder configs are equal, `false` otherwise.
   public static boolean areStarTreeBuilderConfigListsEqual(List<StarTreeV2BuilderConfig> builderConfig1,
       List<StarTreeV2BuilderConfig> builderConfig2) {

@@ -145,6 +145,16 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     }
   }
 
+  /// Marks the index for a rebuild that survives a restart: [#needUpdateIndices] treats the marker as an unfinished
+  /// build until [#updateIndices] completes. Used before the values of a column the index covers are rewritten.
+  public void markForRebuild()
+      throws IOException {
+    File marker = getBuildMarker();
+    if (marker != null) {
+      FileUtils.touch(marker);
+    }
+  }
+
   private File getBuildMarker() {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     return indexDir == null
