@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
@@ -60,6 +61,19 @@ public class IFSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
   public void tearDown()
       throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
+  }
+
+  @Test
+  public void testOverlappingRegexAndComplement()
+      throws IOException {
+    FST<BytesRef> fst = IFSTBuilder.buildIFST(new TreeMap<>(Map.of("A", 1, "AA", 2, "B", 3)));
+    List<Integer> matches = new ArrayList<>();
+    RegexpMatcherCaseInsensitive.regexMatch("(A|AA)*", fst, matches::add);
+    assertEquals(matches.stream().sorted().toList(), List.of(1, 2));
+    assertTrue(new RegexpMatcherCaseInsensitive("(A|AA)*", fst).match("AAA"));
+    matches.clear();
+    RegexpMatcherCaseInsensitive.regexMatch("~(A)", fst, matches::add);
+    assertEquals(matches.stream().sorted().toList(), List.of(2, 3));
   }
 
   @Test

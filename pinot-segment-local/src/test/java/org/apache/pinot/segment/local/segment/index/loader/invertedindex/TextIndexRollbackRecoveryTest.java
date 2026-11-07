@@ -34,6 +34,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -64,6 +65,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.SkipException;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -428,6 +430,9 @@ public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassChec
 
   private void installLucene10(File segmentDir, SegmentVersion version, boolean multiColumn, boolean combined)
       throws Exception {
+    if (Version.LATEST.major != 9) {
+      throw new SkipException("Lucene 10 fixture exercises rollback recovery on Lucene 9 only");
+    }
     String column = multiColumn ? MultiColumnTextIndexConstants.INDEX_DIR_NAME : "text";
     File actualDirectory = SegmentDirectoryPaths.segmentDirectoryFor(segmentDir, version);
     File luceneDir = new File(actualDirectory, column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);

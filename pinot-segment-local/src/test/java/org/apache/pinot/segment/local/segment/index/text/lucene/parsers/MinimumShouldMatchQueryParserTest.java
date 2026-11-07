@@ -55,7 +55,7 @@ public class MinimumShouldMatchQueryParserTest {
     // Should have 2 clauses: MUST(OpenSearch) and MUST(nested BooleanQuery)
     Assert.assertEquals(booleanQuery1.clauses().size(), 2);
     // The nested BooleanQuery should have minimumShouldMatch=3 (80% of 4 = 3.2, rounded down to 3)
-    BooleanQuery nestedQuery1 = (BooleanQuery) booleanQuery1.clauses().get(1).getQuery();
+    BooleanQuery nestedQuery1 = (BooleanQuery) booleanQuery1.clauses().get(1).query();
     Assert.assertEquals(nestedQuery1.getMinimumNumberShouldMatch(), 3);
 
     // Test 2: MUST_SHOULD_negative_20_percent - OpenSearch AND (one OR two OR three OR four) with
@@ -65,7 +65,7 @@ public class MinimumShouldMatchQueryParserTest {
     BooleanQuery booleanQuery2 = (BooleanQuery) result2;
     Assert.assertEquals(booleanQuery2.clauses().size(), 2);
     // The nested BooleanQuery should have minimumShouldMatch=3 (100+(-20)=80% of 4 = 3.2, rounded down to 3)
-    BooleanQuery nestedQuery2 = (BooleanQuery) booleanQuery2.clauses().get(1).getQuery();
+    BooleanQuery nestedQuery2 = (BooleanQuery) booleanQuery2.clauses().get(1).query();
     Assert.assertEquals(nestedQuery2.getMinimumNumberShouldMatch(), 3);
 
     // Test 3: SHOULD_only_default_one - one OR two OR three OR four without minimumShouldMatch
@@ -131,17 +131,17 @@ public class MinimumShouldMatchQueryParserTest {
     Assert.assertEquals(booleanQuery10.clauses().size(), 2);
 
     // Get the nested BooleanQuery: ((one OR two) AND (three OR four OR five))
-    BooleanQuery nestedQuery10 = (BooleanQuery) booleanQuery10.clauses().get(1).getQuery();
+    BooleanQuery nestedQuery10 = (BooleanQuery) booleanQuery10.clauses().get(1).query();
     Assert.assertEquals(nestedQuery10.clauses().size(), 2);
 
     // Get the first sub-nested BooleanQuery: (one OR two)
-    BooleanQuery subNested1 = (BooleanQuery) nestedQuery10.clauses().get(0).getQuery();
+    BooleanQuery subNested1 = (BooleanQuery) nestedQuery10.clauses().get(0).query();
     Assert.assertEquals(subNested1.clauses().size(), 2);
     // 60% of 2 = 1.2, rounded down to 1
     Assert.assertEquals(subNested1.getMinimumNumberShouldMatch(), 1);
 
     // Get the second sub-nested BooleanQuery: (three OR four OR five)
-    BooleanQuery subNested2 = (BooleanQuery) nestedQuery10.clauses().get(1).getQuery();
+    BooleanQuery subNested2 = (BooleanQuery) nestedQuery10.clauses().get(1).query();
     Assert.assertEquals(subNested2.clauses().size(), 3);
     // 60% of 3 = 1.8, rounded down to 1
     Assert.assertEquals(subNested2.getMinimumNumberShouldMatch(), 1);

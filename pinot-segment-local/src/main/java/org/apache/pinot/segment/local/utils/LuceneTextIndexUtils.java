@@ -115,7 +115,7 @@ public class LuceneTextIndexUtils {
     ArrayList<SpanQuery> spanQueryLst = new ArrayList<>();
     boolean prefixOrSuffixQueryFound = false;
     for (BooleanClause clause : ((BooleanQuery) query).clauses()) {
-      Query q = clause.getQuery();
+      Query q = clause.query();
       if (q instanceof WildcardQuery || q instanceof PrefixQuery) {
         prefixOrSuffixQueryFound = true;
         spanQueryLst.add(new SpanMultiTermQueryWrapper<>((AutomatonQuery) q));

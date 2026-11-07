@@ -31,6 +31,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
@@ -303,11 +304,12 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
         _buffer =
             PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ true, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
       } else {
+        StoredFields storedFields = indexSearcher.storedFields();
         _buffer =
             PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
         for (int i = 0; i < numDocs; i++) {
           try {
-            Document document = indexSearcher.doc(i);
+            Document document = storedFields.document(i);
             int pinotDocId = Integer.parseInt(document.get(HnswVectorIndexCreator.VECTOR_INDEX_DOC_ID_COLUMN_NAME));
             _buffer.putInt(i * Integer.BYTES, pinotDocId);
           } catch (Exception e) {
@@ -337,10 +339,11 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
         // Mapping absent from combined buffer: build in heap from the Lucene index.
         _buffer = null;
         _borrowedBuffer = false;
+        StoredFields storedFields = indexSearcher.storedFields();
         int[] heapMapping = new int[numDocs];
         for (int i = 0; i < numDocs; i++) {
           try {
-            Document document = indexSearcher.doc(i);
+            Document document = storedFields.document(i);
             heapMapping[i] =
                 Integer.parseInt(document.get(HnswVectorIndexCreator.VECTOR_INDEX_DOC_ID_COLUMN_NAME));
           } catch (Exception e) {

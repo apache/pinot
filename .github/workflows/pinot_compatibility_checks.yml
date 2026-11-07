@@ -180,8 +180,8 @@ jobs:
       - name: Compare API
         run: |
           for mod in pinot-spi pinot-segment-spi; do
-            OLD=$(ls master-head/$mod/target/$mod-*.jar | grep -v '\-tests.jar' | head -1)
-            NEW=$(ls $mod/target/$mod-*.jar | grep -v '\-tests.jar' | head -1)
+            OLD=$(find "master-head/$mod/target" -maxdepth 1 -name "$mod-*.jar" ! -name '*-tests.jar' -print -quit)
+            NEW=$(find "$mod/target" -maxdepth 1 -name "$mod-*.jar" ! -name '*-tests.jar' -print -quit)
 
             java -jar japicmp.jar \
               --old "$OLD" \
@@ -198,8 +198,9 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
+        # Releases before 1.6.0 cannot roll back from Lucene 10 text/HNSW indexes.
         old_commit: [
-          "release-1.5.0", "master"
+          "release-1.6.0", "master"
         ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
@@ -257,8 +258,9 @@ jobs:
       fail-fast: false
       matrix:
         test_suite: [ "compatibility-verifier/multi-stage-query-engine-test-suite" ]
+        # Releases before 1.6.0 cannot roll back from Lucene 10 text/HNSW indexes.
         old_commit: [
-          "release-1.5.0", "master"
+          "release-1.6.0", "master"
         ]
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
