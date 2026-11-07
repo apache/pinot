@@ -192,6 +192,18 @@ public class ServerChannels {
     return _serverToChannelMap.computeIfAbsent(instance, ServerChannel::new);
   }
 
+  /// The channel to one server, with the lock that serializes the writes into it.
+  ///
+  /// A request is handed to Netty with `writeAndFlush`. Once the flush has run on the event loop, which happens
+  /// right after the write task, the message sits in the channel's outbound buffer until the kernel accepts it, and
+  /// Netty offers no way to take a single message back out of that buffer: `ChannelOutboundBuffer` only discards an
+  /// entry whose promise was cancelled before the flush marked it uncancellable. So when the connection stalls, the
+  /// requests queued on it are delivered as soon as it recovers, including those whose query has long timed out at
+  /// the broker. Pulling them back here is not possible; what keeps them harmless is the server, which answers a
+  /// request that arrives after the broker's deadline (the `requestDeadlineMs` query option) with a timeout error
+  /// instead of executing it. On the broker side, the request write timeout and the write-buffer watermark of
+  /// apache/pinot#20021 bound how much can queue up on a stalled channel, and closing the channel, which that write
+  /// timeout does, is the only way to drop what is already queued.
   @ThreadSafe
   class ServerChannel {
     final ServerRoutingInstance _serverRoutingInstance;
