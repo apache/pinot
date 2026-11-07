@@ -355,6 +355,33 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _ingestionDelayTracker.stopTrackingPartition(segmentName);
   }
 
+  /// Removes the LLC_PARTITION_CONSUMING gauge of the partition of a segment that reached end of life after this server
+  /// moved it to ONLINE. Kept while a consuming segment of the partition is on this server.
+  public void removePartitionConsumingGauge(String segmentName) {
+    int partitionGroupId = new LLCSegmentName(segmentName).getPartitionGroupId();
+    // Wait for an ongoing CONSUMING to ONLINE transition of the segment, which sets the gauge when it ends
+    Lock segmentLock = getSegmentLock(segmentName);
+    segmentLock.lock();
+    try {
+      for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
+        if (segmentDataManager instanceof RealtimeSegmentDataManager
+            && new LLCSegmentName(segmentDataManager.getSegmentName()).getPartitionGroupId() == partitionGroupId) {
+          return;
+        }
+      }
+      TableConfig tableConfig = getCachedTableConfigAndSchema().getLeft();
+      String streamTopic = IngestionConfigUtils.getStreamConfigFromPinotPartitionId(
+          IngestionConfigUtils.getStreamConfigs(tableConfig), partitionGroupId).getTopicName();
+      String clientId = RealtimeSegmentDataManager.getClientId(_tableNameWithType, streamTopic,
+          IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(tableConfig, partitionGroupId),
+          _instanceDataManagerConfig);
+      _logger.info("Removing consuming gauge of partition: {} which reached end of life", partitionGroupId);
+      _serverMetrics.removeTableGauge(clientId, ServerGauge.LLC_PARTITION_CONSUMING);
+    } finally {
+      segmentLock.unlock();
+    }
+  }
+
   /// Method to handle CONSUMING -> DROPPED segment state transitions:
   /// We stop tracking partitions whose segments are dropped.
   ///

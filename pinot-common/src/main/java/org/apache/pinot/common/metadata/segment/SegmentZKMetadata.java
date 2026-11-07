@@ -370,6 +370,15 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.Realtime.NUM_REPLICAS, numReplicas);
   }
 
+  /// Returns whether this is the last segment of a partition group that reached end of life, as reported by the stream.
+  public boolean isEndOfPartitionGroup() {
+    return Boolean.parseBoolean(_simpleFields.get(Segment.Realtime.END_OF_PARTITION_GROUP));
+  }
+
+  public void setEndOfPartitionGroup(boolean endOfPartitionGroup) {
+    setValue(Segment.Realtime.END_OF_PARTITION_GROUP, endOfPartitionGroup ? Boolean.TRUE : null);
+  }
+
   /* FOR PARALLEL PUSH PROTECTION */
 
   public long getSegmentUploadStartTime() {

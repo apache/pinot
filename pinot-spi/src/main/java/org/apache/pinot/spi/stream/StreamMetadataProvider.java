@@ -89,6 +89,19 @@ public interface StreamMetadataProvider extends Closeable {
         forceGetOffsetFromStream ? List.of() : partitionGroupConsumptionStatuses, timeoutMillis);
   }
 
+  /// Returns the ids of the partition groups in `partitionGroupConsumptionStatuses` that reached end of life: the
+  /// stream will never add messages to them, and they were consumed up to their end offset. A closed Kinesis shard
+  /// after a split or merge is one example. Pinot then creates no new consuming segment for them and stops reporting
+  /// them as consuming. Streams whose partitions never end keep the default, which returns none.
+  ///
+  /// Only statuses of completed segments (with an end offset) are passed in. Returns their
+  /// [PartitionGroupConsumptionStatus#getPartitionGroupId()].
+  default Set<Integer> fetchEndOfLifePartitionGroupIds(StreamConfig streamConfig,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
+      throws IOException, TimeoutException {
+    return Set.of();
+  }
+
   default Map<String, PartitionLagState> getCurrentPartitionLagState(
       Map<String, ConsumerPartitionState> currentPartitionStateMap) {
     Map<String, PartitionLagState> result = new HashMap<>();

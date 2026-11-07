@@ -19,6 +19,7 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -683,6 +684,31 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void removePartitionGauge(final String tableName, final int partitionId, final G gauge) {
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
     removeGauge(fullGaugeName);
+  }
+
+  /// Removes all partition gauges of the given gauge for the table.
+  public void removePartitionGauges(final String tableName, final G gauge) {
+    retainPartitionGauges(tableName, gauge, Set.of());
+  }
+
+  /// Removes the partition gauges of the given gauge for the table, except the ones of the given partitions. Skipped
+  /// when table level metrics are off for the table, because its gauges are then shared with other tables.
+  public void retainPartitionGauges(final String tableName, final G gauge, final Set<Integer> partitionIds) {
+    if (!getTableName(tableName).equals(tableName)) {
+      return;
+    }
+    Set<String> partitionIdsToRetain = new HashSet<>();
+    for (int partitionId : partitionIds) {
+      partitionIdsToRetain.add(String.valueOf(partitionId));
+    }
+    String prefix = composeTableGaugeName(tableName, gauge) + ".";
+    for (String gaugeName : new ArrayList<>(_gaugeValues.keySet())) {
+      String partitionId = gaugeName.startsWith(prefix) ? gaugeName.substring(prefix.length()) : "";
+      if (!partitionId.isEmpty() && partitionId.chars().allMatch(Character::isDigit)
+          && !partitionIdsToRetain.contains(partitionId)) {
+        removeGauge(gaugeName);
+      }
+    }
   }
 
   /// Removes a table gauge given the table name, the key and the gauge.
