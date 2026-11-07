@@ -41,8 +41,8 @@ import org.slf4j.LoggerFactory;
 
 
 /// Interface for caching table configs and schemas within the cluster.
-/// The `TableCache` caches all the table configs and schemas within the cluster, and listens on ZK changes to
-/// keep them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
+/// Implementations supply config/schema updates from their coordination backend or a static input. The cache also
+/// maintains table and column name maps for case-insensitive queries; it does not imply a cluster-wide snapshot.
 public interface TableCache extends PinotConfigProvider {
   Logger LOGGER = LoggerFactory.getLogger(TableCache.class);
 

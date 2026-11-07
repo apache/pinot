@@ -26,8 +26,7 @@ import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 
 
-/// Interface for ZK cluster config providers. Will be registered with Helix to listen on cluster config changes and
-/// will propagate changes to all registered listeners
+/// Backend-neutral interface for reading cluster config snapshots and registering change listeners.
 public interface PinotClusterConfigProvider {
   /// Get the cluster configs
   /// @return map of cluster configs
@@ -38,9 +37,9 @@ public interface PinotClusterConfigProvider {
   /// @return returns 'true' if the registration was successful
   boolean registerClusterConfigChangeListener(PinotClusterConfigChangeListener clusterConfigChangeListener);
 
-  /// Copies the ZK cluster configs without the null-valued entries. The cluster config update API stores a JSON
+  /// Copies the cluster configs without the null-valued entries. The cluster config update API stores a JSON
   /// `null` as a null value, which carries no information for a `String` config, so the key is treated as absent.
-  /// @param clusterConfigs map of ZK cluster configs
+  /// @param clusterConfigs map of cluster configs
   /// @return immutable copy of the cluster configs without the null-valued entries
   default Map<String, String> copyWithoutNullValues(Map<String, String> clusterConfigs) {
     Map<String, String> copy = Maps.newHashMapWithExpectedSize(clusterConfigs.size());
@@ -52,9 +51,9 @@ public interface PinotClusterConfigProvider {
     return Collections.unmodifiableMap(copy);
   }
 
-  /// Calculates the set of keys that changed in ZK cluster configs between the old and new
-  /// @param oldProperties map of previously cached ZK cluster configs
-  /// @param newProperties map of newly fetched ZK cluster configs
+  /// Calculates the set of keys that changed in cluster configs between the old and new
+  /// @param oldProperties map of previously cached cluster configs
+  /// @param newProperties map of newly fetched cluster configs
   /// @return set of changed (added/deleted/updated) cluster config keys
   default Set<String> getChangedProperties(Map<String, String> oldProperties, Map<String, String> newProperties) {
     if (MapUtils.isEmpty(oldProperties)) {
