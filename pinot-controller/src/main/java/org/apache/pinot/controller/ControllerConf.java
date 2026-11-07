@@ -444,8 +444,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
-  public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
-  public static final boolean DEFAULT_DISABLE_GROOVY = true;
+  public static final String DISABLE_GROOVY = CommonConstants.Groovy.DISABLE_INGESTION_GROOVY;
+  public static final boolean DEFAULT_DISABLE_GROOVY = CommonConstants.Groovy.DEFAULT_DISABLE_INGESTION_GROOVY;
 
   public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
   public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
@@ -478,6 +478,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_SEGMENT_REPLACE_MAX_RETRY_ATTEMPTS = 5;
 
   private final Map<String, String> _invalidConfigs = new ConcurrentHashMap<>();
+  private volatile Boolean _clusterIngestionGroovyDisabled;
 
   public ControllerConf() {
     super(new HashMap<>());
@@ -1544,9 +1545,15 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONTROLLER_RESOURCE_PACKAGES, DEFAULT_CONTROLLER_RESOURCE_PACKAGES);
   }
 
-  /// @return true if Groovy functions are disabled in controller config, otherwise returns false.
+  /// Updates the live cluster policy without mutating the instance configuration shared by request threads.
+  public void setClusterIngestionGroovyDisabled(boolean disabled) {
+    _clusterIngestionGroovyDisabled = disabled;
+  }
+
+  /// @return true if ingestion Groovy functions are disabled by the cluster policy or controller config.
   public boolean isDisableIngestionGroovy() {
-    return getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
+    Boolean clusterDisabled = _clusterIngestionGroovyDisabled;
+    return clusterDisabled != null ? clusterDisabled : getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
   }
 
   private long convertPeriodToUnit(String period, TimeUnit timeUnitToConvertTo) {

@@ -19,16 +19,20 @@
 package org.apache.pinot.controller;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_PORT;
+import static org.apache.pinot.controller.ControllerConf.DISABLE_GROOVY;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_INSTANCE_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONTROLLER_INSTANCE;
 import static org.testng.Assert.assertEquals;
@@ -42,6 +46,45 @@ public class ControllerStarterStatelessTest extends ControllerTest {
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.putAll(_configOverride);
+  }
+
+  @Test
+  public void testClusterIngestionGroovyPolicyAtStartup() {
+    List<Map<String, String>> clusterPolicies = List.of(Map.of(), Map.of(DISABLE_GROOVY, " FaLsE "),
+        Map.of(DISABLE_GROOVY, "true"), Map.of(DISABLE_GROOVY, "invalid"),
+        Map.of(DISABLE_GROOVY, "${other.flag}"), Map.of("CONTROLLER.DISABLE.INGESTION.GROOVY", "false"));
+    _configOverride.clear();
+    startZk();
+    try {
+      for (int i = 0; i < clusterPolicies.size(); i++) {
+        Map<String, String> clusterPolicy = clusterPolicies.get(i);
+        boolean expectedDisabled = i != 1;
+        ControllerStarter starter = new ControllerStarter() {
+          @Override
+          protected Map<String, String> getDefaultClusterConfigs() {
+            Map<String, String> configs = super.getDefaultClusterConfigs();
+            configs.putAll(clusterPolicy);
+            return configs;
+          }
+
+          @Override
+          protected void applyCustomConfigs(ControllerConf config) {
+            config.setProperty(DISABLE_GROOVY, !expectedDisabled);
+          }
+        };
+        Map<String, Object> config = getDefaultControllerConfiguration();
+        config.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName() + "Groovy" + i);
+        config.put(ControllerConf.CONTROLLER_MODE, ControllerConf.ControllerMode.HELIX_ONLY.name());
+        config.put(DISABLE_GROOVY, !expectedDisabled);
+        config.put("other.flag", "false");
+        runWithHelixMock(() -> starter.init(new PinotConfiguration(config)));
+        assertEquals(starter.getConfig().isDisableIngestionGroovy(), expectedDisabled, clusterPolicy.toString());
+      }
+    } finally {
+      TableConfigUtils.setDisableGroovy(false);
+      _controllerPort = 0;
+      stopZk();
+    }
   }
 
   @Test

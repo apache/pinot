@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.pinot.common.utils.config.IngestionGroovyConfigListener;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -76,6 +77,7 @@ public class ServiceStartableUtils {
       ZNRecord clusterConfigZNRecord =
           zkClient.readData(String.format(CLUSTER_CONFIG_ZK_PATH_TEMPLATE, clusterName, clusterName), true);
       if (clusterConfigZNRecord == null) {
+        applyIngestionGroovyConfig(instanceConfig, serviceRole, Map.of());
         LOGGER.warn("Failed to find cluster config for cluster: {}, skipping applying cluster config", clusterName);
         setTimezone(instanceConfig);
         initForwardIndexConfig(instanceConfig);
@@ -84,6 +86,7 @@ public class ServiceStartableUtils {
       }
 
       Map<String, String> clusterConfigs = clusterConfigZNRecord.getSimpleFields();
+      applyIngestionGroovyConfig(instanceConfig, serviceRole, clusterConfigs);
       String instanceConfigKeyPrefix =
           String.format(PINOT_INSTANCE_CONFIG_KEY_PREFIX_TEMPLATE, serviceRole.name().toLowerCase());
       for (Map.Entry<String, String> entry : clusterConfigs.entrySet()) {
@@ -105,6 +108,17 @@ public class ServiceStartableUtils {
     initForwardIndexConfig(instanceConfig);
     initFieldSpecConfig(instanceConfig);
     initRequestUtilsConfig(instanceConfig);
+  }
+
+  private static void applyIngestionGroovyConfig(PinotConfiguration instanceConfig, ServiceRole serviceRole,
+      Map<String, String> clusterConfigs) {
+    if (serviceRole == ServiceRole.CONTROLLER) {
+      instanceConfig.setProperty(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY,
+          CommonConstants.Groovy.isIngestionGroovyDisabled(
+              clusterConfigs.get(CommonConstants.Groovy.DISABLE_INGESTION_GROOVY)));
+    } else if (serviceRole == ServiceRole.SERVER || serviceRole == ServiceRole.MINION) {
+      IngestionGroovyConfigListener.applyClusterConfig(clusterConfigs);
+    }
   }
 
   private static void addConfigIfNotExists(PinotConfiguration instanceConfig, String key, String value) {
