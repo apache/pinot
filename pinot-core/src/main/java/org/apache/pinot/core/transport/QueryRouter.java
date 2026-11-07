@@ -345,6 +345,17 @@ public class QueryRouter {
     }
   }
 
+  // Unlike receiveDataTable, a deserialization failure cannot be tied to a single requestId (the bytes didn't
+  // parse), so this method must broadcast to every in-flight query on the server. This is consistent with
+  // markServerUnavailable and safe because the channel is closed immediately after.
+  void markServerDeserializationError(ServerRoutingInstance serverRoutingInstance, Exception exception,
+      int responseSize, int deserializationTimeMs) {
+    for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
+      asyncQueryResponse.receiveDeserializationError(serverRoutingInstance, exception, responseSize,
+          deserializationTimeMs);
+    }
+  }
+
   /// Marks a server as unavailable for every in-flight query. Called when a server's channel goes inactive
   /// ([DataTableHandler]) or a request write to it fails ([ServerChannels]). Queries submitted with
   /// `skipUnavailableServers=true` degrade to partial results for this genuine unavailability; others are failed.
