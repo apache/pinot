@@ -127,44 +127,45 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
-        /// Route the block by its record layout. A base-aggregation grouping-set segment emits BASE-layout
-        /// blocks (no synthetic $groupingId column, exactly `numUnionColumns + numAggregationFunctions`
-        /// columns); the expansion path (and non-grouping-set queries) emits full-layout blocks. The layout is
-        /// per segment -- MV carve-out and cardinality gate are per-segment decisions -- so both tables can be
-        /// live in the same query.
-        boolean baseLayout = _groupingSets && resultsBlock.getDataSchema() != null
-            && resultsBlock.getDataSchema().size() == _numBaseColumns;
-        if (!baseLayout) {
-          GroupByUtils.validateFullGroupingSetsLayout(resultsBlock, _queryContext);
-        }
-        IndexedTable indexedTable = baseLayout ? ensureBaseIndexedTable(resultsBlock)
-            : ensureIndexedTable(resultsBlock);
-        int numKeyColumns = baseLayout ? _numBaseKeyColumns : _numKeyColumns;
-        int numColumns = baseLayout ? _numBaseColumns : _numColumns;
+        // Hold the group-by result so its group key generator (which may own off-heap resources) is always
+        // released, even when indexed-table creation or the merge below throws
+        AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+        try {
+          /// Route the block by its record layout. A base-aggregation grouping-set segment emits BASE-layout
+          /// blocks (no synthetic $groupingId column, exactly `numUnionColumns + numAggregationFunctions`
+          /// columns); the expansion path (and non-grouping-set queries) emits full-layout blocks. The layout is
+          /// per segment -- MV carve-out and cardinality gate are per-segment decisions -- so both tables can be
+          /// live in the same query.
+          boolean baseLayout = _groupingSets && resultsBlock.getDataSchema() != null
+              && resultsBlock.getDataSchema().size() == _numBaseColumns;
+          if (!baseLayout) {
+            GroupByUtils.validateFullGroupingSetsLayout(resultsBlock, _queryContext);
+          }
+          IndexedTable indexedTable = baseLayout ? ensureBaseIndexedTable(resultsBlock)
+              : ensureIndexedTable(resultsBlock);
+          int numKeyColumns = baseLayout ? _numBaseKeyColumns : _numKeyColumns;
+          int numColumns = baseLayout ? _numBaseColumns : _numColumns;
 
-        if (resultsBlock.isGroupsTrimmed()) {
-          _groupsTrimmed = true;
-        }
-        // Set groups limit reached flag.
-        if (resultsBlock.isNumGroupsLimitReached()) {
-          _numGroupsLimitReached = true;
-        }
-        if (resultsBlock.isNumGroupsWarningLimitReached()) {
-          _numGroupsWarningLimitReached = true;
-        }
+          if (resultsBlock.isGroupsTrimmed()) {
+            _groupsTrimmed = true;
+          }
+          // Set groups limit reached flag.
+          if (resultsBlock.isNumGroupsLimitReached()) {
+            _numGroupsLimitReached = true;
+          }
+          if (resultsBlock.isNumGroupsWarningLimitReached()) {
+            _numGroupsWarningLimitReached = true;
+          }
 
-        // Merge aggregation group-by result.
-        // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-        Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
-        // Count the number of merged keys
-        int mergedKeys = 0;
-        // For now, only GroupBy OrderBy query has pre-constructed intermediate records
-        if (intermediateRecords == null) {
           // Merge aggregation group-by result.
-          AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-          if (aggregationGroupByResult != null) {
-            // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-            try {
+          // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+          Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
+          // Count the number of merged keys
+          int mergedKeys = 0;
+          // For now, only GroupBy OrderBy query has pre-constructed intermediate records
+          if (intermediateRecords == null) {
+            if (aggregationGroupByResult != null) {
+              // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
               Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
               while (dicGroupKeyIterator.hasNext()) {
                 QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
@@ -182,16 +183,18 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
                   indexedTable.upsert(new Key(keys), new Record(values));
                 }
               }
-            } finally {
-              // Release the resources used by the group key generator
-              aggregationGroupByResult.closeGroupKeyGenerator();
+            }
+          } else {
+            for (IntermediateRecord intermediateResult : intermediateRecords) {
+              QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
+              //TODO: change upsert api so that it accepts intermediateRecord directly
+              indexedTable.upsert(intermediateResult._key, intermediateResult._record);
             }
           }
-        } else {
-          for (IntermediateRecord intermediateResult : intermediateRecords) {
-            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
-            //TODO: change upsert api so that it accepts intermediateRecord directly
-            indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+        } finally {
+          if (aggregationGroupByResult != null) {
+            // Release the resources used by the group key generator
+            aggregationGroupByResult.closeGroupKeyGenerator();
           }
         }
       } catch (RuntimeException e) {
