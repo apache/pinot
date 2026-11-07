@@ -71,8 +71,15 @@ export const getTenant = (name: string): Promise<AxiosResponse<TableData>> =>
 export const getTenantTable = (name: string): Promise<AxiosResponse<TableName>> =>
   baseApi.get(`/tenants/${name}/tables`);
 
+// Ask for the versioned redacted table config envelope so unchanged masked credentials can be submitted back with
+// the versions GET returned. The application/json fallback keeps the UI working against older controllers, which
+// return the table config map directly.
+const tableConfigHeaders = {
+  'Accept': 'application/vnd.apache.pinot.redacted-table-config-v1+json, application/json;q=0.9'
+};
+
 export const getTenantTableDetails = (tableName: string): Promise<AxiosResponse<IdealState>> =>
-  baseApi.get(`/tables/${tableName}`);
+  baseApi.get(`/tables/${tableName}`, { headers: tableConfigHeaders });
 
 export const putTable = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.put(`/tables/${name}`, params, { headers });

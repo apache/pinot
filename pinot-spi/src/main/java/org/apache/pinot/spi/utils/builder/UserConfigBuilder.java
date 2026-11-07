@@ -33,6 +33,7 @@ public class UserConfigBuilder {
   private List<String> _tableList;
   private List<String> _excludeTableList;
   private List<AccessType> _permissionList;
+  private List<String> _fineGrainedPermissionList;
 
   public UserConfigBuilder setComponentType(ComponentType componentType) {
     _componentType = componentType;
@@ -69,8 +70,13 @@ public class UserConfigBuilder {
     return this;
   }
 
+  public UserConfigBuilder setFineGrainedPermissionList(List<String> fineGrainedPermissionList) {
+    _fineGrainedPermissionList = fineGrainedPermissionList;
+    return this;
+  }
+
   public UserConfig build() {
     return new UserConfig(_username, _password, _componentType.toString(), _roleType.toString(), _tableList,
-        _excludeTableList, _permissionList);
+        _excludeTableList, _permissionList, _fineGrainedPermissionList);
   }
 }

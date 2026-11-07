@@ -28,13 +28,66 @@ import java.nio.file.Files;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class SegmentGenerationUtilsTest {
+
+  @Test
+  public void testParseTableConfigFromRedactedEnvelope()
+      throws Exception {
+    TableConfig offline = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+    TableConfig realtime = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").build();
+    String response = "{\"responseType\":\"redactedTableConfig\",\"responseVersion\":1,"
+        + "\"tableName\":{\"raw\":\"myTable\"},\"baseVersions\":{\"OFFLINE\":3,\"REALTIME\":5},"
+        + "\"configs\":{\"OFFLINE\":" + JsonUtils.objectToString(offline) + ",\"REALTIME\":"
+        + JsonUtils.objectToString(realtime) + "}}";
+
+    TableConfig parsed = SegmentGenerationUtils.parseTableConfig(response);
+
+    Assert.assertEquals(parsed.getTableName(), "myTable_OFFLINE");
+    Assert.assertEquals(parsed.getTableType(), TableType.OFFLINE);
+  }
+
+  @Test
+  public void testParseTableConfigRetainsLegacyResponseSupport()
+      throws Exception {
+    TableConfig realtime = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").build();
+    String wrappedResponse = "{\"REALTIME\":" + JsonUtils.objectToString(realtime) + "}";
+
+    Assert.assertEquals(SegmentGenerationUtils.parseTableConfig(wrappedResponse).getTableName(),
+        "myTable_REALTIME");
+    Assert.assertEquals(
+        SegmentGenerationUtils.parseTableConfig(JsonUtils.objectToString(realtime)).getTableName(),
+        "myTable_REALTIME");
+  }
+
+  @Test
+  public void testTableConfigDecodeErrorsDoNotExposeInput() {
+    String sentinel = "literal-table-config-secret";
+
+    RuntimeException malformedJson = Assert.expectThrows(RuntimeException.class,
+        () -> SegmentGenerationUtils.parseTableConfig("{malformed:" + sentinel));
+    Assert.assertFalse(malformedJson.getMessage().contains(sentinel), malformedJson.getMessage());
+    Assert.assertNull(malformedJson.getCause());
+
+    RuntimeException invalidConfig = Assert.expectThrows(RuntimeException.class,
+        () -> SegmentGenerationUtils.parseTableConfig("\"" + sentinel + "\""));
+    Assert.assertFalse(invalidConfig.getMessage().contains(sentinel), invalidConfig.getMessage());
+    Assert.assertNull(invalidConfig.getCause());
+
+    RuntimeException invalidUri = Assert.expectThrows(RuntimeException.class,
+        () -> SegmentGenerationUtils.getTableConfig("https://user:" + sentinel + "@[invalid", null));
+    Assert.assertFalse(invalidUri.getMessage().contains(sentinel), invalidUri.getMessage());
+    Assert.assertNull(invalidUri.getCause());
+  }
 
   @Test
   public void testExtractFileNameFromURI() {

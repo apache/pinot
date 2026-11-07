@@ -75,7 +75,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
-import org.apache.pinot.spi.utils.Obfuscator;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -171,9 +170,7 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
 
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String taskType = pinotTaskConfig.getTaskType();
-    if (LOGGER.isInfoEnabled()) {
-      LOGGER.info("Starting task: {} with configs: {}", taskType, Obfuscator.DEFAULT.toJsonString(configs));
-    }
+    LOGGER.info("Starting task: {} with task id: {}", taskType, pinotTaskConfig.getTaskId());
 
     String tableName = configs.get(MinionConstants.TABLE_NAME_KEY);
     long windowStartMs = Long.parseLong(configs.get(MaterializedViewTask.WINDOW_START_MS_KEY));
@@ -191,8 +188,7 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
     validateSourceFingerprintAtCommit(configs, tableName, windowStartMs, windowEndMs, taskFingerprint);
 
     String definedSQL = configs.get(MaterializedViewTask.DEFINED_SQL_KEY);
-    LOGGER.info("MaterializedViewTask for table: {}, window: [{}, {}), SQL: {}",
-        tableName, windowStartMs, windowEndMs, definedSQL);
+    LOGGER.info("MaterializedViewTask for table: {}, window: [{}, {})", tableName, windowStartMs, windowEndMs);
 
     TableConfig tableConfig = getTableConfig(tableName);
     Schema schema = getSchema(tableName);

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -239,6 +240,34 @@ public class ObfuscatorTest {
     JsonNode output = _obfuscator.toJson(configs);
 
     keys.forEach(key -> Assert.assertEquals(output.get(key).asText(), VALUE, key));
+  }
+
+  @Test
+  public void testDefaultUsesStructuredCredentialPolicy() {
+    Map<String, Object> config = new HashMap<>();
+    config.put("endpoint", "https://uri-user:uri-password@store.example/path?access_token=uri-token&region=west");
+    config.put("input.fs.prop.fs.azure.account.key.account.dfs.core.windows.net", "azure-account-key");
+    config.put("placeholder.password", "${PASSWORD}");
+    config.put("defaulted.password", "${DEFAULTED_PASSWORD:default-secret}");
+    config.put("mixedEndpoint", "${IGNORED} https://mixed-user:mixed-password@mixed.example.test/path"
+        + "?token=mixed-token}");
+    config.put("ordinary", "preserved");
+
+    String output = Obfuscator.DEFAULT.toJsonString(config);
+
+    for (String credential : List.of("uri-user", "uri-password", "uri-token", "azure-account-key", "mixed-user",
+        "mixed-password", "mixed-token", "default-secret")) {
+      Assert.assertFalse(output.contains(credential), output);
+    }
+    Assert.assertTrue(output.contains("store.example/path"), output);
+    Assert.assertTrue(output.contains("region=west"), output);
+    Assert.assertTrue(output.contains("${PASSWORD}"), output);
+    // The variable stays visible; its default is the effective credential and is masked.
+    Assert.assertTrue(output.contains("${DEFAULTED_PASSWORD:" + TableConfigRedactionUtils.REDACTION_MARKER + "}"),
+        output);
+    Assert.assertTrue(output.contains("${IGNORED}"), output);
+    Assert.assertTrue(output.contains("mixed.example.test/path"), output);
+    Assert.assertTrue(output.contains("preserved"), output);
   }
 
   private static Map<String, Object> createEntry(String key, String value) {
