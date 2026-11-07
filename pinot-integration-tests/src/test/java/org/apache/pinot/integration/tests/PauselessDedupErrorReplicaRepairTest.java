@@ -19,13 +19,20 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.MetricValueUtils;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider;
 import org.apache.pinot.integration.tests.realtime.utils.PauselessRealtimeTestUtils;
@@ -45,20 +52,25 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/// Verifies that on a pauseless dedup table WITHOUT the disaster recovery override, the segment-level validation
-/// repairs ERROR replicas whose segment another replica holds, by resetting only those replicas so they reload from
-/// a peer or the deep store.
+/// Verifies the segment-level validation's repair of ERROR replicas on a pauseless dedup table. Without the override,
+/// it leaves them in ERROR and counts their segments as unrecoverable: a pauseless server can consume the segments
+/// after a failed one without its keys, so reloading the failed segment could serve wrong rows. With the override for
+/// one run, it resets only the ERROR replicas, which reload from a peer or the deep store.
 ///
 /// The consuming transition is made to fail on one server only, so every affected segment keeps one healthy replica
-/// and one ERROR replica. Re-ingestion is never needed for this repair, so it must run even though re-ingestion is
-/// disallowed for dedup tables. The dedup consume gate also blocks the failing server's consumers while any of its
-/// replicas is in ERROR, so without this repair the lagging server never catches up.
+/// and one ERROR replica, and the healthy replica commits it.
 public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegrationTest {
   private static final int NUM_PARTITIONS = 2;
   private static final long VALIDATION_RERUN_INTERVAL_MS = 10_000L;
+  private static final int NUM_VALIDATION_RUNS_WITHOUT_OVERRIDE = 3;
+
+  private String _realtimeTableName;
+  // Segment name to the servers holding it in ERROR state, once the healthy replicas have committed every such segment
+  private Map<String, Set<String>> _errorReplicas;
 
   @Override
   protected String getAvroTarFileName() {
@@ -100,8 +112,8 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     streamIngestionConfig.setPauselessConsumptionEnabled(true);
     streamIngestionConfig.setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
     streamIngestionConfig.setEnforceConsumptionInOrder(true);
-    // Intentionally no disasterRecoveryMode: repair of COMMITTING segments stays disallowed for this dedup table,
-    // which must not stop the reset of ERROR replicas that have a healthy copy elsewhere.
+    // Intentionally no disasterRecoveryMode: repairs stay disallowed for this dedup table unless a validation run
+    // overrides it
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     return ingestionConfig;
   }
@@ -153,57 +165,107 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
     addTableConfig(tableConfig);
+
+    // Wait for the injected failures, and for the healthy replicas to commit every segment with an ERROR replica, so
+    // the validation finds them committed rather than waiting for their commit
+    _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    TestUtils.waitForCondition(aVoid -> {
+      Map<String, Set<String>> errorReplicas = getErrorReplicas();
+      Map<String, Map<String, String>> idealStateMaps =
+          _helixResourceManager.getTableIdealState(_realtimeTableName).getRecord().getMapFields();
+      Set<Integer> partitionIds = new HashSet<>();
+      for (String segmentName : errorReplicas.keySet()) {
+        Map<String, String> idealStateMap = idealStateMaps.get(segmentName);
+        if (idealStateMap == null || idealStateMap.containsValue(SegmentStateModel.CONSUMING)) {
+          return false;
+        }
+        partitionIds.add(new LLCSegmentName(segmentName).getPartitionGroupId());
+      }
+      if (partitionIds.size() < NUM_PARTITIONS) {
+        return false;
+      }
+      _errorReplicas = errorReplicas;
+      return true;
+    }, 1000L, 600_000L, "Injected failures did not leave a committed segment with an ERROR replica per partition");
   }
 
-  @Test
-  public void testErrorReplicasAreRepairedWithoutDisasterRecoveryOverride()
+  @Test(priority = 0)
+  public void testErrorReplicasAreNotResetWithoutOverride()
       throws Exception {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    // Space the runs out as in production, so a reset sent by one run would have landed before the next check
+    for (int run = 0; run < NUM_VALIDATION_RUNS_WITHOUT_OVERRIDE; run++) {
+      runSegmentLevelValidation(false);
+      Thread.sleep(VALIDATION_RERUN_INTERVAL_MS);
+      assertEquals(getErrorReplicas(), _errorReplicas, "ERROR replicas changed after validation run: " + run);
+      assertEquals(MetricValueUtils.getTableGaugeValue(_controllerStarter.getControllerMetrics(), _realtimeTableName,
+              ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT), _errorReplicas.size(),
+          "Unexpected number of unrecoverable segments after validation run: " + run);
+    }
+  }
 
-    TestUtils.waitForCondition(aVoid -> getNumErrorReplicasInEV(realtimeTableName) > 0, 600_000L,
-        "Injected failures did not put any replica in ERROR state");
-
-    // Drive the segment-level validation periodically (as it runs in production) until every ERROR replica is
-    // repaired, i.e. reaches its ideal state: leaving ERROR is not enough, since a reset replica goes through OFFLINE.
-    // The runs are spaced out so a pass does not re-trigger resets still in flight from the previous pass.
+  @Test(priority = 1)
+  public void testErrorReplicasAreRepairedWithOverride()
+      throws Exception {
+    // Drive the segment-level validation with the override until every ERROR replica is repaired, i.e. reaches its
+    // ideal state: leaving ERROR is not enough, since a reset replica goes through OFFLINE. The runs are spaced out
+    // so a run does not re-trigger resets still in flight from the previous run.
     long[] lastValidationRunMs = new long[1];
     TestUtils.waitForCondition(aVoid -> {
-      if (PauselessRealtimeTestUtils.isExternalViewConverged(_helixResourceManager, realtimeTableName)) {
+      if (PauselessRealtimeTestUtils.isExternalViewConverged(_helixResourceManager, _realtimeTableName)) {
         return true;
       }
       long nowMs = System.currentTimeMillis();
       if (nowMs - lastValidationRunMs[0] >= VALIDATION_RERUN_INTERVAL_MS) {
         lastValidationRunMs[0] = nowMs;
-        runSegmentLevelValidation();
+        runSegmentLevelValidation(true);
       }
       return false;
-    }, 1000L, 600_000L, "ERROR replicas were not repaired without the disaster recovery override");
+    }, 1000L, 600_000L, "ERROR replicas were not repaired with the override");
 
-    // With all its replicas repaired, the lagging server passes the dedup consume gate and catches up, so queries
-    // return the deduplicated count from either replica group.
+    // Wait for the broker to route to the repaired server again: each routing table it builds picks one replica
+    // group, alternating between them
+    Set<String> routedServers = new HashSet<>();
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        getDebugInfo("debug/routingTable/" + _realtimeTableName).get(_realtimeTableName).fieldNames()
+            .forEachRemaining(routedServers::add);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      return routedServers.size() == getNumReplicas();
+    }, 1000L, 60_000L, "Broker does not route to both replica groups");
+
+    // With all its replicas repaired, the lagging server catches up. Strict replica-group routing sends consecutive
+    // queries to alternating replica groups, so both must return the deduplicated count.
     waitForAllDocsLoaded(600_000L);
+    for (int i = 0; i < 2 * getNumReplicas(); i++) {
+      assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    }
   }
 
-  private int getNumErrorReplicasInEV(String realtimeTableName) {
+  private Map<String, Set<String>> getErrorReplicas() {
     ExternalView externalView = _helixResourceManager.getHelixAdmin()
-        .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
+        .getResourceExternalView(_helixResourceManager.getHelixClusterName(), _realtimeTableName);
+    Map<String, Set<String>> errorReplicas = new HashMap<>();
     if (externalView == null) {
-      return 0;
+      return errorReplicas;
     }
-    int numErrorReplicas = 0;
-    for (Map<String, String> instanceStateMap : externalView.getRecord().getMapFields().values()) {
-      for (String state : instanceStateMap.values()) {
-        if (state.equals(SegmentStateModel.ERROR)) {
-          numErrorReplicas++;
+    for (Map.Entry<String, Map<String, String>> entry : externalView.getRecord().getMapFields().entrySet()) {
+      for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+        if (instanceState.getValue().equals(SegmentStateModel.ERROR)) {
+          errorReplicas.computeIfAbsent(entry.getKey(), k -> new HashSet<>()).add(instanceState.getKey());
         }
       }
     }
-    return numErrorReplicas;
+    return errorReplicas;
   }
 
-  private void runSegmentLevelValidation() {
+  private void runSegmentLevelValidation(boolean repairErrorSegmentsForPartialUpsertOrDedup) {
     Properties periodicTaskProperties = new Properties();
     periodicTaskProperties.setProperty(ControllerPeriodicTask.RUN_SEGMENT_LEVEL_VALIDATION, Boolean.TRUE.toString());
+    periodicTaskProperties.setProperty(
+        RealtimeSegmentValidationManager.REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP,
+        Boolean.toString(repairErrorSegmentsForPartialUpsertOrDedup));
     _controllerStarter.getRealtimeSegmentValidationManager().run(periodicTaskProperties);
   }
 

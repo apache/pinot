@@ -3141,8 +3141,10 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   /// Consuming from the stream again is unsafe on dedup and partial upsert tables: re-ingestion can admit duplicate
   /// or inconsistent rows, and a re-consumed segment can drop rows as duplicates of keys left by the failed attempt,
   /// or merge partial upsert rows against previous values that no replica has loaded. So unless
-  /// [#allowRepairOfCommittingSegments] allows it, such tables skip re-ingestion and, when pauseless, the reset that
-  /// re-consumes an IN_PROGRESS segment. Resets that reload a segment run for every table.
+  /// [#allowRepairOfCommittingSegments] allows it, such tables skip re-ingestion and, when pauseless, every reset.
+  /// Reloading a segment is unsafe on them too: a pauseless server can keep consuming the segments after a failed one
+  /// without the failed segment's keys, so reloading it can put a replica that holds wrong rows back into routing.
+  /// Non-pauseless tables still reset the replicas of segments that reload.
   ///
   /// Segments counted as unrecoverable are those this pass cannot repair or cannot issue a repair for: skipped by the
   /// policy above, with no replica left consuming, with nothing but a possible local copy to load from, with no server
@@ -3285,6 +3287,18 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         continue;
       }
 
+      // A reset either re-consumes the segment or reloads it. On a pauseless dedup or partial upsert table, the server
+      // may have consumed the later segments without this one's keys, so neither is safe there without the override.
+      if (isPauselessTable && !repairCommittingSegments.get()) {
+        unrecoverableSegments.add(segmentName);
+        LOGGER.warn(
+            "Segment: {} in table: {} has replicas in ERROR state. Skipping their reset, because repair is disabled "
+                + "for pauseless dedup and partial upsert tables. Set disasterRecoveryMode=ALWAYS or run the "
+                + "validation task with repairErrorSegmentsForPartialUpsertOrDedup=true to repair it.",
+            segmentName, realtimeTableName);
+        continue;
+      }
+
       // 2) A reset re-consumes a segment that is still CONSUMING in the ideal state: an IN_PROGRESS segment, or a
       // COMMITTING one whose commit has not updated the ideal state yet
       if (status == Status.IN_PROGRESS || (status == Status.COMMITTING && idealStateMap.containsValue(
@@ -3300,16 +3314,6 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
                 + "it and the others are in ERROR state. Leaving them to be reset once the segment commits.",
                 segmentName, realtimeTableName);
           }
-          continue;
-        }
-        if (isPauselessTable && !repairCommittingSegments.get()) {
-          unrecoverableSegments.add(segmentName);
-          LOGGER.warn(
-              "Segment: {} in table: {} is IN_PROGRESS with all replicas in ERROR state. Skipping the reset, which "
-                  + "re-consumes it, because repair by re-consuming is disabled for pauseless dedup and partial upsert "
-                  + "tables. Set disasterRecoveryMode=ALWAYS or run the validation task with "
-                  + "repairErrorSegmentsForPartialUpsertOrDedup=true to repair it.",
-              segmentName, realtimeTableName);
           continue;
         }
         LOGGER.info("Resetting IN_PROGRESS segment: {} in table: {} since all replicas are in ERROR state.",
@@ -3354,8 +3358,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     return disasterRecoveryMode == DisasterRecoveryMode.ALWAYS;
   }
 
-  /// Whether to allow the repairs of ERROR segments that consume from the stream again: re-ingesting a COMMITTING
-  /// segment, and on pauseless tables, resetting an IN_PROGRESS segment
+  /// Whether to allow the repairs of ERROR segments that are unsafe on dedup and partial upsert tables: re-ingesting a
+  /// COMMITTING segment, and on pauseless tables, every reset of ERROR replicas
   /// This method is only useful for tables with features like dedup enabled (Since such repairs can lead to incorrect
   /// data for them).
   /// @param repairErrorSegmentsForPartialUpsertOrDedup API context flag, if true then always allow repair
@@ -3381,7 +3385,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         == UpsertConfig.Mode.PARTIAL);
     if (isPartialUpsertEnabled) {
       // If isPartialUpsert is enabled, do not allow repair.
-      LOGGER.warn("Disallowing repairs that re-consume errored segments in table: {} because partialUpsert is enabled",
+      LOGGER.warn("Disallowing unsafe repairs of errored segments in table: {} because partialUpsert is enabled",
           tableConfig.getTableName());
       return false;
     }
@@ -3390,7 +3394,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     boolean isDedupEnabled = (dedupConfig != null) && (dedupConfig.isDedupEnabled());
     if (isDedupEnabled) {
       // If dedup is enabled, do not allow repair of error segment.
-      LOGGER.warn("Disallowing repairs that re-consume errored segments in table: {} because dedup is enabled",
+      LOGGER.warn("Disallowing unsafe repairs of errored segments in table: {} because dedup is enabled",
           tableConfig.getTableName());
       return false;
     }
