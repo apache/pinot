@@ -40,6 +40,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
@@ -87,6 +88,8 @@ public class PlanNodeDeserializer {
         return deserializeEnrichedJoinNode(protoNode);
       case UNNESTNODE:
         return deserializeUnnestNode(protoNode);
+      case MVAGGREGATENODE:
+        return deserializeMvAggregateNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -229,6 +232,26 @@ public class PlanNodeDeserializer {
     Plan.ExplainNode protoExplainNode = protoNode.getExplainNode();
     return new ExplainedNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), protoExplainNode.getTitle(), protoExplainNode.getAttributesMap());
+  }
+
+  private static MvAggregateNode deserializeMvAggregateNode(Plan.PlanNode protoNode) {
+    Plan.MvAggregateNode protoMvAggregateNode = protoNode.getMvAggregateNode();
+    Plan.AggregateNode protoAggregateNode = protoMvAggregateNode.getAggregate();
+    Preconditions.checkState(protoAggregateNode.getGroupingSetsCount() == 0,
+        "Grouping sets are not supported in MvAggregateNode");
+    List<Integer> mvKeyIndexes = protoMvAggregateNode.getMvKeyIndexesList();
+    int previous = -1;
+    for (int mvKeyIndex : mvKeyIndexes) {
+      Preconditions.checkState(mvKeyIndex > previous && mvKeyIndex < protoAggregateNode.getGroupKeysCount(),
+          "MV key indexes must be ascending positions in the group keys, got: %s", mvKeyIndexes);
+      previous = mvKeyIndex;
+    }
+    return new MvAggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), convertFunctionCalls(protoAggregateNode.getAggCallsList()),
+        protoAggregateNode.getFilterArgsList(), protoAggregateNode.getGroupKeysList(),
+        convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult(),
+        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit(),
+        mvKeyIndexes);
   }
 
   private static UnnestNode deserializeUnnestNode(Plan.PlanNode protoNode) {

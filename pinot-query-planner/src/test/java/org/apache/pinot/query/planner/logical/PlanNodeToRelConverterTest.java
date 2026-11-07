@@ -28,6 +28,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
@@ -80,6 +81,26 @@ public class PlanNodeToRelConverterTest {
     RelNode relNode = PlanNodeToRelConverter.convert(relBuilder, aggregate);
     assertEquals(RelOptUtil.toString(relNode),
         "LogicalAggregate(group=[{1, 2}], groups=[[{1, 2}, {1}, {}]], agg#0=[MAX($3)])\n"
+            + "  Leaf\n");
+  }
+
+  @Test
+  public void testMvAggregate() {
+    // COUNT(*), COUNT(*) ... GROUP BY a, ARRAY_TO_MV(b). The duplicate call must not turn the aggregate into a Project.
+    DataSchema leafSchema = new DataSchema(new String[]{"a", "b"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING_ARRAY});
+    PlanNode leaf = new ExplainedNode(0, leafSchema, null, List.of(), "Leaf", Map.of());
+    DataSchema aggregateSchema = new DataSchema(new String[]{"a", "b", "cnt1", "cnt2"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.LONG, ColumnDataType.LONG});
+    RexExpression.FunctionCall count = new RexExpression.FunctionCall(ColumnDataType.LONG, "COUNT", List.of());
+    PlanNode mvAggregate = new MvAggregateNode(0, aggregateSchema, null, List.of(leaf), List.of(count, count),
+        List.of(-1, -1), List.of(0, 1), AggregateNode.AggType.LEAF, false, null, 0, List.of(1));
+
+    RelBuilder relBuilder = RelBuilder.create(Frameworks.newConfigBuilder().build());
+    RelNode relNode = PlanNodeToRelConverter.convert(relBuilder, mvAggregate);
+    assertEquals(RelOptUtil.toString(relNode),
+        "PinotLogicalMvAggregate(group=[{0, 1}], agg#0=[COUNT()], agg#1=[COUNT()], mvKeys=[[1]], aggType=[LEAF], "
+            + "collations=[[]])\n"
             + "  Leaf\n");
   }
 

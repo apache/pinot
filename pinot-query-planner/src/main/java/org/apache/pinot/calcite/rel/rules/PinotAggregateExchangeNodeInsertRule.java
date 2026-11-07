@@ -62,12 +62,15 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalMvAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Special rule for Pinot, this rule is fixed to generate a 2-stage aggregation split between the
@@ -103,11 +106,18 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /// 3. [WithoutSort]:
 ///   Matches Aggregate node if there is no match of [SortProjectAggregate] or [SortAggregate].
 ///
+/// `GROUP BY ARRAY_TO_MV(col)`: when the MV aggregate is enabled (query option `useMvAggregate`, broker config
+/// `pinot.broker.multistage.use.mv.aggregate`), the group keys whose expression is exactly `ARRAY_TO_MV(expr)` are
+/// MV keys (see [ArrayToMvGroupKeys]). The aggregate is then split into a LEAF [PinotLogicalMvAggregate] over the
+/// array expressions, an EXCHANGE and a plain FINAL aggregate over the scalar elements, in every position of the plan.
+/// An aggregate with grouping sets is never an MV aggregate.
+///
 /// TODO:
 ///   1. Always enable group trim when the result is guaranteed to be accurate
 ///   2. Add intermediate stage group trim
 ///   3. Allow tuning group trim parameters with query hint
 public class PinotAggregateExchangeNodeInsertRule {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotAggregateExchangeNodeInsertRule.class);
 
   public static class SortProjectAggregate extends RelOptRule {
     public static final SortProjectAggregate INSTANCE = new SortProjectAggregate(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -227,6 +237,16 @@ public class PinotAggregateExchangeNodeInsertRule {
       Map<String, String> hintOptions, @Nullable List<RelFieldCollation> collations, int limit) {
     // WITHIN GROUP collation is not supported in leaf stage aggregation.
     RelCollation withinGroupCollation = extractWithinGroupCollation(aggRel);
+    // Grouping sets over MV keys are not supported by the MV aggregate yet. Such an aggregate keeps the plain plan, as
+    // if the MV aggregate were disabled: it runs when the aggregate is pushed whole to the leaf stage, and the
+    // ARRAY_TO_MV validation rejects it in an intermediate stage.
+    List<Integer> mvKeys = List.of();
+    if (hasGroupBy && aggRel.getGroupType() == Aggregate.Group.SIMPLE) {
+      mvKeys = ArrayToMvGroupKeys.detect(aggRel);
+      if (!mvKeys.isEmpty() && !PinotRuleUtils.isMvAggregateEnabled(call)) {
+        mvKeys = List.of();
+      }
+    }
     if (aggRel.getGroupType() != Aggregate.Group.SIMPLE) {
       /// GROUP BY GROUPING SETS / ROLLUP / CUBE only supports the LEAF+EXCHANGE+FINAL split: the DIRECT paths
       /// (WITHIN GROUP ordered aggregates and the skip-leaf-stage / partitioned-by hints) would carry the grouping
@@ -257,6 +277,13 @@ public class PinotAggregateExchangeNodeInsertRule {
                 + "engine. Run the query on the single-stage query engine instead.");
       }
     }
+    if (!mvKeys.isEmpty()) {
+      RelNode mvAggregatePlan =
+          createMvAggregatePlan(aggRel, mvKeys, hintOptions, withinGroupCollation, collations, limit);
+      if (mvAggregatePlan != null) {
+        return mvAggregatePlan;
+      }
+    }
     if (withinGroupCollation != null || (hasGroupBy && Boolean.parseBoolean(
         hintOptions.get(PinotHintOptions.AggregateOptions.IS_SKIP_LEAF_STAGE_GROUP_BY)))) {
       return createPlanWithExchangeDirectAggregation(call, aggRel, withinGroupCollation, collations, limit);
@@ -269,6 +296,62 @@ public class PinotAggregateExchangeNodeInsertRule {
           Boolean.parseBoolean(hintOptions.get(PinotHintOptions.AggregateOptions.IS_LEAF_RETURN_FINAL_RESULT));
       return createPlanWithLeafExchangeFinalAggregate(aggRel, leafReturnFinalResult, collations, limit);
     }
+  }
+
+  /// Splits a `GROUP BY ARRAY_TO_MV(expr)` aggregate into LEAF [PinotLogicalMvAggregate] + EXCHANGE + FINAL:
+  ///   - The Project under the aggregate gets `expr` (an array) instead of `ARRAY_TO_MV(expr)` for each MV key.
+  ///   - The LEAF MV aggregate groups by every element of the MV keys. Its row type gives each MV key the component
+  ///     type, so it equals the row type of the original aggregate.
+  ///   - EXCHANGE: hash by all the group keys, which are scalars now.
+  ///   - FINAL: a plain aggregate over the scalar keys.
+  ///
+  /// The hints `is_skip_leaf_stage_group_by` and `is_partitioned_by_group_by_keys` are ignored: a skip-leaf plan would
+  /// hash whole arrays and a partitioned plan would assume a partitioning by element that no partition function gives.
+  ///
+  /// Returns null, so that the caller plans a plain aggregate as before, when an MV key column is also an argument or
+  /// the filter of an aggregate call: rewriting the column would change the argument from the element type to the
+  /// array type.
+  @Nullable
+  private static RelNode createMvAggregatePlan(Aggregate aggRel, List<Integer> mvKeys, Map<String, String> hintOptions,
+      @Nullable RelCollation withinGroupCollation, @Nullable List<RelFieldCollation> collations, int limit) {
+    if (withinGroupCollation != null) {
+      throw new UnsupportedOperationException(
+          "GROUP BY ARRAY_TO_MV() is not supported with WITHIN GROUP ordered aggregates in the multi-stage query "
+              + "engine");
+    }
+    List<Integer> mvColumns = ArrayToMvGroupKeys.toInputColumns(aggRel, mvKeys);
+    for (AggregateCall aggCall : aggRel.getAggCallList()) {
+      if (aggCall.filterArg >= 0 && mvColumns.contains(aggCall.filterArg)) {
+        LOGGER.debug("Not planning an MV aggregate: MV key column {} is the filter of {}", aggCall.filterArg, aggCall);
+        return null;
+      }
+      for (int arg : aggCall.getArgList()) {
+        if (mvColumns.contains(arg)) {
+          LOGGER.debug("Not planning an MV aggregate: MV key column {} is an argument of {}", arg, aggCall);
+          return null;
+        }
+      }
+    }
+    if (LOGGER.isDebugEnabled() && (Boolean.parseBoolean(
+        hintOptions.get(PinotHintOptions.AggregateOptions.IS_SKIP_LEAF_STAGE_GROUP_BY)) || Boolean.parseBoolean(
+        hintOptions.get(PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS)))) {
+      LOGGER.debug("Ignoring the hints {} and {} for the MV aggregate: {}",
+          PinotHintOptions.AggregateOptions.IS_SKIP_LEAF_STAGE_GROUP_BY,
+          PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS, aggRel);
+    }
+    boolean leafReturnFinalResult =
+        Boolean.parseBoolean(hintOptions.get(PinotHintOptions.AggregateOptions.IS_LEAF_RETURN_FINAL_RESULT));
+    // ArrayToMvGroupKeys.detect returns keys only when the unboxed input is a Project.
+    Project project = (Project) PinotRuleUtils.unboxRel(aggRel.getInput());
+    Project newProject = ArrayToMvGroupKeys.rewriteProject(project, mvColumns);
+    PinotLogicalMvAggregate leafAggRel =
+        new PinotLogicalMvAggregate(aggRel.getCluster(), aggRel.getTraitSet(), aggRel.getHints(), newProject,
+            aggRel.getGroupSet(), null,
+            buildAggCalls(aggRel, newProject, aggRel.getAggCallList(), AggType.LEAF, leafReturnFinalResult),
+            AggType.LEAF, leafReturnFinalResult, collations, limit, mvKeys);
+    PinotLogicalExchange exchange = PinotLogicalExchange.create(leafAggRel,
+        RelDistributions.hash(ImmutableIntList.range(0, aggRel.getGroupCount())));
+    return convertAggFromIntermediateInput(aggRel, exchange, AggType.FINAL, leafReturnFinalResult, collations, limit);
   }
 
   // TODO: Currently it only handles one WITHIN GROUP collation across all AggregateCalls.
@@ -533,7 +616,13 @@ public class PinotAggregateExchangeNodeInsertRule {
   /// grouping-set split passes only the real (non-GROUPING) aggregates to push down to the leaf.
   private static List<AggregateCall> buildAggCalls(Aggregate aggRel, List<AggregateCall> orgAggCalls, AggType aggType,
       boolean leafReturnFinalResult) {
-    RelNode input = aggRel.getInput();
+    return buildAggCalls(aggRel, aggRel.getInput(), orgAggCalls, aggType, leafReturnFinalResult);
+  }
+
+  /// As above, but over an explicit input (rather than `aggRel.getInput()`). The MV aggregate split passes the
+  /// rewritten Project.
+  private static List<AggregateCall> buildAggCalls(Aggregate aggRel, RelNode input, List<AggregateCall> orgAggCalls,
+      AggType aggType, boolean leafReturnFinalResult) {
     List<RexNode> projects = findImmediateProjects(input);
     List<AggregateCall> aggCalls = new ArrayList<>(orgAggCalls.size());
     for (AggregateCall orgAggCall : orgAggCalls) {
