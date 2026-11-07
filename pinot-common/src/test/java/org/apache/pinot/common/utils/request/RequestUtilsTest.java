@@ -267,6 +267,25 @@ public class RequestUtilsTest {
 
   // ---------- helpers ----------
 
+  @Test
+  public void testIsCrossTableFunction() {
+    // The names the parser leaves on a compiled call, see RequestUtils.canonicalizeFunctionName()
+    String[] spellings = {
+        "LOOKUP", "look_Up", "IN_SUBQUERY", "inSubquery", "IN_PARTITIONED_SUBQUERY", "In_Partitioned_Sub_Query"
+    };
+    for (String spelling : spellings) {
+      assertTrue(RequestUtils.isCrossTableFunction(RequestUtils.canonicalizeFunctionName(spelling)), spelling);
+    }
+    // The input must already be canonical: a name as written in a query is not matched
+    assertFalse(RequestUtils.isCrossTableFunction("IN_SUBQUERY"));
+    assertFalse(RequestUtils.isCrossTableFunction("inSubquery"));
+    // Other functions, IN_ID_SET on a literal included
+    String[] others = {"inidset", "idset", "lookups", "subquery", "inpartitionedsubquery2", "as", ""};
+    for (String other : others) {
+      assertFalse(RequestUtils.isCrossTableFunction(other), other);
+    }
+  }
+
   private static Expression sumOf(String column) {
     Function func = new Function("sum");
     func.setOperands(List.of(RequestUtils.getIdentifierExpression(column)));

@@ -14,7 +14,9 @@ impact; pattern matches are investigation triggers, not findings or automatic se
 - Inline fully-qualified class names — flag (CLAUDE.md convention).
 - Qualified `Assert.` or `Mockito.` method calls in test files — apply C7.21.
 - `FieldSpec.DataType` or `DataSchema.ColumnDataType` outside import declarations — apply C7.22.
-- Multiline ternary expressions — verify C7.23 formatting.
+- Added or modified ternary expressions — apply C7.23 condition and formatting conventions.
+- Added or moved getters — verify field-declaration order per C7.24.
+- Consecutive blank lines in touched class bodies — apply C7.25; preserve the import/class-documentation separator.
 - New public classes without class-level Javadoc — flag (CLAUDE.md convention).
 - License headers on new files — flag missing.
 
