@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.core.accounting;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.accounting.ExternalExecutionSampler;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
@@ -63,6 +67,33 @@ public class ThreadResourceTrackerImpl implements ThreadResourceTracker {
 
   public void updateMemorySnapshot() {
     _allocatedBytes = _threadResourceSnapshot.getAllocatedBytes();
+  }
+
+  /// Captures the owning query thread. Only that thread creates/closes the scope, and it must not sample or clear this
+  /// tracker until the scope is closed. The monitor never samples its own thread or adds duplicate untracked usage.
+  @VisibleForTesting
+  @Nullable
+  ExternalExecutionSampler captureExternalExecutionSampler(boolean cpuSamplingEnabled, boolean memorySamplingEnabled,
+      BooleanSupplier isPaused) {
+    Thread owner = Thread.currentThread();
+    QueryThreadContext context = _currentThreadContext.get();
+    if (context == null || QueryThreadContext.getIfAvailable() != context || owner.isVirtual()
+        || (cpuSamplingEnabled && !ThreadResourceUsageProvider.isCrossThreadCpuTimeMeasurementEnabled())
+        || (memorySamplingEnabled && !ThreadResourceUsageProvider.isCrossThreadMemoryMeasurementEnabled())) {
+      return null;
+    }
+    long threadId = owner.threadId();
+    return new ExternalExecutionSampler(() -> {
+      if (_currentThreadContext.get() != context) {
+        throw new IllegalStateException("External execution outlived its query accounting context");
+      }
+      if (cpuSamplingEnabled) {
+        _cpuTimeNs = _threadResourceSnapshot.getCpuTimeNs(threadId);
+      }
+      if (memorySamplingEnabled) {
+        _allocatedBytes = _threadResourceSnapshot.getAllocatedBytes(threadId);
+      }
+    }, isPaused);
   }
 
   public void clear() {

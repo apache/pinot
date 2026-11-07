@@ -37,6 +37,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.accounting.ExternalExecutionSampler;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
@@ -154,6 +155,16 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       if (_memorySamplingEnabled) {
         threadTracker.updateMemorySnapshot();
       }
+    }
+
+    @Override
+    public ExternalExecutionSampler captureExternalExecutionSampler() {
+      // Subclasses may change sampling or pause policies; they must explicitly opt into external execution.
+      if (getClass() != PerQueryCPUMemResourceUsageAccountant.class) {
+        return null;
+      }
+      return _threadLocalEntry.get().captureExternalExecutionSampler(_cpuSamplingEnabled, _memorySamplingEnabled,
+          () -> false);
     }
 
     @Override
