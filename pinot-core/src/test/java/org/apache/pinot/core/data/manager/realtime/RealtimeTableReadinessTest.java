@@ -264,7 +264,7 @@ public class RealtimeTableReadinessTest {
       table.registerLocal(base, manager);
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
       assertFalse(ready.getAsBoolean(), "Publication before upsert metadata initialization is not sufficient");
-      manager.markMetadataReady();
+      manager.markPartitionMetadataInitialized();
       assertTrue(ready.getAsBoolean(), "Local completion must clear rejection before Helix publishes ONLINE");
       table.registerLocal(base, new ImmutableSegmentDataManager(mock(ImmutableSegment.class)));
       assertFalse(ready.getAsBoolean(), "Replacing a ready manager must not preserve readiness by segment name");
@@ -285,7 +285,7 @@ public class RealtimeTableReadinessTest {
       table.assign(predecessor, ONLINE);
       table.assign(consumer, CONSUMING);
       ImmutableSegmentDataManager manager = new ImmutableSegmentDataManager(mock(ImmutableSegment.class));
-      manager.markMetadataReady();
+      manager.markPartitionMetadataInitialized();
       table.registerLocal(predecessor, manager);
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
       assertFalse(ready.getAsBoolean());

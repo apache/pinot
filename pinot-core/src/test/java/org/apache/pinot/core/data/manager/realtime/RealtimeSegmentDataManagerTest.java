@@ -881,7 +881,7 @@ public class RealtimeSegmentDataManagerTest {
     BooleanSupplier observedReady = () -> {
       boolean result = ready.getAsBoolean();
       firstCheck.countDown();
-      if (replacement.isMetadataReady()) {
+      if (replacement.isPartitionMetadataInitialized()) {
         checkedReplacement.countDown();
       }
       return result;
@@ -904,7 +904,7 @@ public class RealtimeSegmentDataManagerTest {
         // Real Base replacement marks and publishes the immutable manager before real predecessor offload releases
         // the permit. Helix deliberately continues to report CONSUMING throughout the handoff.
         table.replacePredecessor(predecessor, replacement);
-        assertTrue(replacement.isMetadataReady());
+        assertTrue(replacement.isPartitionMetadataInitialized());
         assertFalse(predecessor.hasReleasedConsumerSemaphore(), "Ordinary offload must not use pauseless readiness");
         assertEquals(table._currentState.getState(predecessorName.getSegmentName()), CONSUMING);
         if (missingHistory) {

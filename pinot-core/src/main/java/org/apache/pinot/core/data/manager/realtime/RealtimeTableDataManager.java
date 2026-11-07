@@ -285,24 +285,26 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         snapshot = TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType);
         _readinessSnapshot = snapshot;
         _readinessSnapshotTimeNs = nowNs;
-        return snapshot.isReadyToConsume(consumer, this::isSegmentMetadataReady, true);
+        return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized, true);
       }
       snapshot = _readinessSnapshot;
     }
     // Local completion can clear a cached rejection immediately, without waiting for the next ZooKeeper poll.
     // A cached success must never authorize consumption: newly assigned history could be absent from the snapshot.
-    return snapshot.isReadyToConsume(consumer, this::isSegmentMetadataReady)
-        && TableStateUtils.isReadyToConsume(_helixManager, _tableNameWithType, consumer, this::isSegmentMetadataReady);
+    return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized)
+        && TableStateUtils.isReadyToConsume(_helixManager, _tableNameWithType, consumer,
+            this::isPartitionMetadataInitialized);
   }
 
-  private boolean isSegmentMetadataReady(String segmentName) {
+  private boolean isPartitionMetadataInitialized(String segmentName) {
     SegmentDataManager manager = _segmentDataManagerMap.get(segmentName);
     // Pauseless release publishes completed mutable metadata; ordinary rollover publishes a ready immutable manager
     // before releasing the permit. Mere immutable presence is insufficient because initial upsert loading registers
     // the manager before its metadata is populated. Always inspect the currently registered manager.
     return manager instanceof RealtimeSegmentDataManager
         && ((RealtimeSegmentDataManager) manager).hasReleasedConsumerSemaphore()
-        || manager instanceof ImmutableSegmentDataManager && ((ImmutableSegmentDataManager) manager).isMetadataReady();
+        || manager instanceof ImmutableSegmentDataManager
+        && ((ImmutableSegmentDataManager) manager).isPartitionMetadataInitialized();
   }
 
   @VisibleForTesting

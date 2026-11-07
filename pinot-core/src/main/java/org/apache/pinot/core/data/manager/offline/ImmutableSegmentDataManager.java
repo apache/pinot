@@ -22,11 +22,12 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 
 
-/// Segment data manager for immutable segment.
+/// Manages an immutable segment. Segment loading publishes completion of this segment's upsert/dedup metadata
+/// initialization through a volatile flag, which consumer threads read before relying on it as partition history.
 public class ImmutableSegmentDataManager extends SegmentDataManager {
 
   private final ImmutableSegment _immutableSegment;
-  private volatile boolean _metadataReady;
+  private volatile boolean _partitionMetadataInitialized;
 
   public ImmutableSegmentDataManager(ImmutableSegment immutableSegment) {
     _immutableSegment = immutableSegment;
@@ -42,16 +43,18 @@ public class ImmutableSegmentDataManager extends SegmentDataManager {
     return _immutableSegment;
   }
 
-  /// Marks this segment's partition metadata as initialized after a successful add, preload, or replacement.
-  public void markMetadataReady() {
-    _metadataReady = true;
+  /// Marks this segment's upsert/dedup metadata initialization complete after add, preload, or replacement.
+  /// Also called when the table requires no partition metadata.
+  public void markPartitionMetadataInitialized() {
+    _partitionMetadataInitialized = true;
   }
 
-  /// Returns whether this instance has finished initializing its partition metadata. Registration alone is not enough:
-  /// a new upsert segment is published before its metadata finishes loading. Callers must look up the currently
-  /// registered manager because this flag does not carry over to a replacement instance.
-  public boolean isMetadataReady() {
-    return _metadataReady;
+  /// Returns whether this segment has finished initializing its contribution to the partition's upsert/dedup state.
+  /// This does not imply that all partition history is ready. A new upsert segment is registered before initialization
+  /// finishes, so registration alone is insufficient. Callers must inspect the currently registered manager because
+  /// initialization of an old instance does not establish readiness for its replacement.
+  public boolean isPartitionMetadataInitialized() {
+    return _partitionMetadataInitialized;
   }
 
   @Override
