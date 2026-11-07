@@ -79,6 +79,10 @@ import org.slf4j.LoggerFactory;
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
 ///
+/// A batch that reports data loss (records between the requested offset and the batch were deleted from the stream
+/// before they could be replayed) fails the replay before anything from it is indexed: the replayed segment would
+/// otherwise silently miss part of its offset range.
+///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
 ///   2. Use a different segment impl for better performance because it doesn't need to serve queries.
@@ -272,6 +276,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
+          Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s",
+              _currentOffset, _endOffset);
 
           int messageCount = messageBatch.getMessageCount();
 
