@@ -28,11 +28,13 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -61,7 +63,7 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   private final Int2ObjectOpenHashMap<IntList> _childPlanFragmentIdsMap = new Int2ObjectOpenHashMap<>();
 
   private final IdentityHashMap<MailboxSendNode, ExchangeNode> _mailboxSendToExchangeNodeMap = new IdentityHashMap<>();
-  private final IdentityHashMap<MailboxReceiveNode, ExchangeNode> _mailboxReceiveToExchangeNodeMap =
+  private final IdentityHashMap<BaseMailboxReceiveNode, ExchangeNode> _mailboxReceiveToExchangeNodeMap =
       new IdentityHashMap<>();
 
   // ROOT PlanFragment ID is 0, current PlanFragment ID starts with 1, next PlanFragment ID starts with 2.
@@ -137,6 +139,11 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   }
 
   @Override
+  public PlanNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, Context context) {
+    throw new UnsupportedOperationException("MailboxReceiveNode should not be visited by PlanNodeFragmenter");
+  }
+
+  @Override
   public PlanNode visitMailboxSend(MailboxSendNode node, Context context) {
     throw new UnsupportedOperationException("MailboxSendNode should not be visited by PlanNodeFragmenter");
   }
@@ -197,8 +204,10 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     _mailboxSendToExchangeNodeMap.put(mailboxSendNode, node);
 
     // Return the MailboxReceiveNode as the leave node of the current PlanFragment.
-    MailboxReceiveNode mailboxReceiveNode =
-        new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
+    BaseMailboxReceiveNode mailboxReceiveNode = node.isKWayMerge()
+        ? new MailboxMergeReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
+            senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), mailboxSendNode)
+        : new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
             senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), node.isSortOnReceiver(),
             node.isSortOnSender(), mailboxSendNode);
     _mailboxReceiveToExchangeNodeMap.put(mailboxReceiveNode, node);
@@ -219,7 +228,7 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     return _mailboxSendToExchangeNodeMap;
   }
 
-  public IdentityHashMap<MailboxReceiveNode, ExchangeNode> getMailboxReceiveToExchangeNodeMap() {
+  public IdentityHashMap<BaseMailboxReceiveNode, ExchangeNode> getMailboxReceiveToExchangeNodeMap() {
     return _mailboxReceiveToExchangeNodeMap;
   }
 
