@@ -26,7 +26,6 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
@@ -51,7 +50,7 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
 
   private BlockDocIdSet _blockDocIdSet;
   private BlockDocIdIterator _blockDocIdIterator;
-  private int _currentDocId = 0;
+  private boolean _exhausted;
   private long _lastReportedEntriesScanned = 0;
 
   public DocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
@@ -62,7 +61,7 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   protected DocIdSetBlock getNextBlock() {
-    if (_currentDocId == Constants.EOF) {
+    if (_exhausted) {
       return null;
     }
 
@@ -74,15 +73,10 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
 
     QueryThreadContext.sampleUsage();
 
-    int pos = 0;
     int[] docIds = THREAD_LOCAL_DOC_IDS.get();
-    for (int i = 0; i < _maxSizeOfDocIdSet; i++) {
-      _currentDocId = _blockDocIdIterator.next();
-      if (_currentDocId == Constants.EOF) {
-        break;
-      }
-      docIds[pos++] = _currentDocId;
-    }
+    int pos = _blockDocIdIterator.nextBatch(docIds, _maxSizeOfDocIdSet);
+    // A short batch has already consumed EOF in the scalar fallback. Do not call the iterator again.
+    _exhausted = pos < _maxSizeOfDocIdSet;
     if (pos > 0) {
       // Push scan cost delta for proactive query killing
       QueryScanCostContext scanCost = getScanCostContext();
