@@ -92,6 +92,27 @@ execEnv.execute();
 
 For more examples, please see `src/main/java/org/apache/pinot/connector/flink/FlinkQuickStart.java`
 
+## Authentication
+If the controller has authentication enabled, pass the auth headers to the `PinotAdminClient` and the token to
+`PinotSink`. The sink sends the token as the `Authorization` header when uploading segments.
+```java
+String authToken = "Basic <base64(user:password)>";
+try (PinotAdminClient client =
+    new PinotAdminClient(controllerAddress, properties, Map.of("Authorization", authToken))) {
+  Schema schema = client.getSchemaClient().getSchemaObject("starbucksStores");
+  TableConfig tableConfig =
+      client.getTableClient().getTableConfigObjectForType("starbucksStores", TableType.OFFLINE);
+  srcDs.sinkTo(new PinotSink<>(new PinotRowRecordConverter(TEST_TYPE_INFO), tableConfig, schema,
+      controllerUrl, authToken));
+}
+```
+ - The token can be `Basic <base64(user:password)>` or `Bearer <token>`.
+ - The sink adds the token to its own copy of the table config; the `tableConfig` you pass in is not modified. Do not
+   save the token in the table config stored in the controller: that config is kept in ZooKeeper and returned by the
+   table APIs.
+ - Like any credential passed to a Flink job, the token is part of the serialized job graph sent to the task managers.
+ - Only static tokens are supported for segment upload.
+
 ## Notes for backfilling upsert table
  - To correctly partition the output segments by the primary key, the Flink job *must* also include the partitionCustom operator with the same stream partition logic before the Sink operator
  - The parallelism of the job *must* be set the same as the number of partitions of the Pinot table(same as upstream), so that the sink in each task executor can generate the segment of same partitions.
