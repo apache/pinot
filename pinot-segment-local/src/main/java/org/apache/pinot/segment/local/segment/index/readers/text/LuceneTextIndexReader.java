@@ -64,12 +64,16 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;
   private final IndexSearcher _indexSearcher;
-  /// Number of documents in the Pinot segment. A Lucene index holding more than this means a corrupted or
-  /// partially converted segment; see [#getNumMatchingDocs].
+  /// Number of documents in the Pinot segment, or dictionary entries for a dictionary-based index.
+  /// A per-row Lucene index holding more than this means a corrupted or partially converted segment.
   private final int _numDocs;
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
+  // When true, this index was built over the column dictionary (one Lucene document per distinct value).
+  // Derived from the persisted segment properties so a mix of dictionary-based and per-row segments reads correctly.
+  // The doc-id translator maps Lucene document IDs to dictionary IDs in this mode.
+  private final boolean _buildOnDictionary;
   private boolean _useANDForMultiTermQueries = false;
   private final String _queryParserClass;
   private Constructor<QueryParserBase> _queryParserClassConstructor;
@@ -85,7 +89,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      _numDocs = numDocs;
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it can cause heap issues.
@@ -103,9 +106,13 @@ public class LuceneTextIndexReader implements TextIndexReader {
       File propertiesFile = new File(indexFile, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
       if (propertiesFile.exists()) {
         config = TextIndexUtils.getUpdatedConfigFromPropertiesFile(propertiesFile, config);
+      } else {
+        config = new TextIndexConfigBuilder(config).withBuildOnDictionary(false).build();
       }
 
-      _docIdTranslator = prepareDocIdTranslator(indexDir, _column, numDocs, _indexSearcher, config, indexFile);
+      _buildOnDictionary = config.isBuildOnDictionary();
+      _numDocs = _buildOnDictionary ? _indexReader.maxDoc() : numDocs;
+      _docIdTranslator = prepareDocIdTranslator(indexDir, _column, _numDocs, _indexSearcher, config, indexFile);
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
@@ -149,15 +156,12 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
       // Extract properties from buffer
       Properties properties = LuceneTextIndexBufferReader.extractProperties(indexBuffer, column);
-      if (!properties.isEmpty()) {
-        config = updateConfigFromProperties(properties, config);
-      }
+      config = updateConfigFromProperties(properties, config);
 
       // Initialize from components
       _indexDirectory = indexDirectory;
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-      _numDocs = numDocs;
 
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
@@ -172,10 +176,12 @@ public class LuceneTextIndexReader implements TextIndexReader {
       if (config.isEnablePrefixSuffixMatchingInPhraseQueries()) {
         _enablePrefixSuffixMatchingInPhraseQueries = true;
       }
+      _buildOnDictionary = config.isBuildOnDictionary();
+      _numDocs = _buildOnDictionary ? _indexReader.maxDoc() : numDocs;
       PinotDataBuffer docIdMappingBuffer = LuceneTextIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
       // Initialize docId translator
       long startTime = System.currentTimeMillis();
-      _docIdTranslator = createDocIdTranslator(docIdMappingBuffer, config, numDocs);
+      _docIdTranslator = createDocIdTranslator(docIdMappingBuffer, config, _numDocs);
       LOGGER.info("Time taken to create docIdTranslator for column {}: {} ms", column,
           System.currentTimeMillis() - startTime);
       // Initialize analyzer and query parser
@@ -215,8 +221,18 @@ public class LuceneTextIndexReader implements TextIndexReader {
   }
 
   @Override
+  public boolean isBuildOnDictionary() {
+    return _buildOnDictionary;
+  }
+
+  @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
-    throw new UnsupportedOperationException("");
+    if (_buildOnDictionary) {
+      // The translator resolves Lucene document IDs to the original dictionary IDs, including after merges.
+      return getDocIds(searchQuery, null, null);
+    }
+    throw new UnsupportedOperationException(
+        "getDictIds is only supported when the text index is built on the dictionary for column: " + _column);
   }
 
   @Deprecated
@@ -445,6 +461,12 @@ public class LuceneTextIndexReader implements TextIndexReader {
     if (docIdTranslatorMode != null) {
       builder.withDocIdTranslatorMode(docIdTranslatorMode);
     }
+
+    // The build mode is intrinsic to the segment: default to false when the property is absent (segments written
+    // before this feature are always per-row). Must NOT keep the live table-config value, otherwise a per-row segment
+    // could be misread as dictionary-based after the flag is flipped on.
+    builder.withBuildOnDictionary(
+        Boolean.parseBoolean(properties.getProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY)));
 
     return builder.build();
   }
