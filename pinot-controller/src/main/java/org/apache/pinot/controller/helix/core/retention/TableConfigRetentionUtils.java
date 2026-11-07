@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.controller.helix.core.retention;
 
-import java.util.Locale;
+import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -46,18 +47,12 @@ public class TableConfigRetentionUtils {
   public static RetentionStrategy buildRetentionStrategy(TableConfig tableConfig,
       boolean useCreationTimeFallback) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    String unit = validationConfig.getRetentionTimeUnit();
-    String value = validationConfig.getRetentionTimeValue();
-    if (unit == null || unit.isEmpty() || value == null || value.isEmpty()) {
-      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", unit, value, tableConfig.getTableName());
+    OptionalLong retentionMs = RetentionUtils.parseTableDataRetentionMillis(validationConfig);
+    if (retentionMs.isEmpty()) {
+      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", validationConfig.getRetentionTimeUnit(),
+          validationConfig.getRetentionTimeValue(), tableConfig.getTableName());
       return null;
     }
-    try {
-      return new TimeRetentionStrategy(TimeUnit.valueOf(unit.toUpperCase(Locale.ROOT)), Long.parseLong(value),
-          useCreationTimeFallback);
-    } catch (Exception e) {
-      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", unit, value, tableConfig.getTableName());
-      return null;
-    }
+    return new TimeRetentionStrategy(TimeUnit.MILLISECONDS, retentionMs.getAsLong(), useCreationTimeFallback);
   }
 }
