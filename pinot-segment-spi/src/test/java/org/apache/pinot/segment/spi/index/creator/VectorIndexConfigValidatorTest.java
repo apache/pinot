@@ -20,10 +20,13 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /// Tests for [VectorIndexConfigValidator].
@@ -100,9 +103,40 @@ public class VectorIndexConfigValidatorTest {
     properties.put("maxBufferSizeMB", "256.5");
     properties.put("useCompoundFile", "true");
     properties.put("mode", "BEST_SPEED");
+    properties.put("buildThreads", "4");
+    properties.put("forceMerge", "FALSE");
+    properties.put("concurrentMerge", "true");
+    properties.put("parallelBuildMaxDocs", "20000");
 
     VectorIndexConfig config = new VectorIndexConfig(properties);
     VectorIndexConfigValidator.validate(config);
+  }
+
+  @DataProvider
+  public Object[][] invalidHnswBuildProperties() {
+    return new Object[][]{
+        {"buildThreads", "four", ".*buildThreads must be a valid integer.*"},
+        {"buildThreads", "0", ".*buildThreads must be a positive integer.*"},
+        {"buildThreads", "2000", ".*buildThreads must be <= 32.*"},
+        {"parallelBuildMaxDocs", "-1", ".*parallelBuildMaxDocs must be a positive integer.*"},
+        {"forceMerge", "yes", ".*forceMerge must be true or false.*"},
+        {"concurrentMerge", "1", ".*concurrentMerge must be true or false.*"}
+    };
+  }
+
+  @Test(dataProvider = "invalidHnswBuildProperties")
+  public void testRejectsInvalidHnswBuildProperty(String key, String value, String messageRegex) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "128");
+    properties.put("vectorDistanceFunction", "COSINE");
+    properties.put(key, value);
+    try {
+      VectorIndexConfigValidator.validate(new VectorIndexConfig(properties));
+      fail("Expected " + key + "=" + value + " to be rejected");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().matches(messageRegex), e.getMessage());
+    }
   }
 
   @Test
