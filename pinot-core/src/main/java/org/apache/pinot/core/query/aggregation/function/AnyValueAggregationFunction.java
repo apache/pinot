@@ -174,6 +174,11 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   }
 
   @Override
+  public Object mergeFinalResult(Object finalResult1, Object finalResult2) {
+    return finalResult1;
+  }
+
+  @Override
   public void aggregate(int length, AggregationResultHolder holder,
                         Map<ExpressionContext, BlockValSet> blockValSetMap) {
     if (holder.getResult() != null) {

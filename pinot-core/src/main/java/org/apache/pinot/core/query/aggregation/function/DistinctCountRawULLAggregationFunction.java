@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
+import java.util.Base64;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -41,12 +42,24 @@ public class DistinctCountRawULLAggregationFunction extends DistinctCountULLAggr
     return new SerializedULL(intermediateResult);
   }
 
+  @Override
   public AggregationFunctionType getType() {
-    return AggregationFunctionType.DISTINCTCOUNTULL;
+    return AggregationFunctionType.DISTINCTCOUNTRAWULL;
   }
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
     return ColumnDataType.STRING;
+  }
+
+  /// Merges two final results, which are serialized ULLs in string form, into the string form of the merged ULL.
+  @Override
+  public String mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    UltraLogLog merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedULL(merged).toString();
+  }
+
+  private static UltraLogLog deserializeFinalResult(Comparable finalResult) {
+    return UltraLogLog.wrap(Base64.getDecoder().decode((String) finalResult));
   }
 }

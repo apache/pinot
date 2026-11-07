@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.math.BigDecimal;
+import java.util.List;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -25,6 +29,8 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class SumPrecisionAggregationFunctionTest extends AbstractAggregationFunctionTest {
@@ -143,6 +149,19 @@ public class SumPrecisionAggregationFunctionTest extends AbstractAggregationFunc
             "tag2    | " + getStringValueOfSum(3, scenario.getDataType()),
             "tag3    | null"
         );
+  }
+
+  @Test
+  void mergeFinalResultRoundsToPrecisionAndScale() {
+    ExpressionContext column = ExpressionContext.forIdentifier("myField");
+    ExpressionContext precision = ExpressionContext.forLiteral(Literal.intValue(3));
+    SumPrecisionAggregationFunction function = new SumPrecisionAggregationFunction(List.of(column, precision), false);
+    assertEquals(function.mergeFinalResult(new BigDecimal("999"), new BigDecimal("999")), new BigDecimal("2.00E+3"));
+
+    ExpressionContext scale = ExpressionContext.forLiteral(Literal.intValue(1));
+    function = new SumPrecisionAggregationFunction(List.of(column, precision, scale), false);
+    assertEquals(function.mergeFinalResult(new BigDecimal("999.0"), new BigDecimal("999.0")),
+        new BigDecimal("2000.0"));
   }
 
   private String getStringValueOfSum(int sum, DataType dataType) {

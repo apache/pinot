@@ -322,9 +322,16 @@ public interface AggregationFunction<IntermediateResult, FinalResult> {
   @Nullable
   FinalResult extractFinalResult(@Nullable IntermediateResult intermediateResult);
 
-  /// Merges two final results, neither of which is `null`. This can be used to optimized certain functions (e.g.
+  /// Merges two final results, neither of which is `null`. This can be used to optimize certain functions (e.g.
   /// DISTINCT_COUNT) when data is partitioned on each server, where we may directly request servers to return final
-  /// result and merge them on broker. The result may be `finalResult1` itself, modified in place.
+  /// result and merge them on broker. Final results are only merged across partitions of the aggregated values, so no
+  /// value is aggregated into both final results.
+  ///
+  /// Final results are merged in the form they are transported in, the value their column stores: a `STRING` final
+  /// result is a string even where [#extractFinalResult] returns an object stored as its string, e.g. the serialized
+  /// sketch of a raw sketch function. The merged result takes the same form. Like other column values, a final result
+  /// can be shared, e.g. when the multi-stage engine broadcasts a block to several stages, so the merge must not modify
+  /// either final result. It may return one of them unchanged.
   ///
   /// Call [AggregationFunctionUtils#mergeFinalResult] instead of calling this directly, on the same terms as [#merge].
   default FinalResult mergeFinalResult(FinalResult finalResult1, FinalResult finalResult2) {

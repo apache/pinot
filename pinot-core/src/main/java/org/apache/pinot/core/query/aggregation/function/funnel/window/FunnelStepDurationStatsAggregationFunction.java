@@ -257,9 +257,4 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
     }
     return maxStep;
   }
-
-  @Override
-  public double[] mergeFinalResult(double[] finalResult1, double[] finalResult2) {
-    return finalResult1;
-  }
 }

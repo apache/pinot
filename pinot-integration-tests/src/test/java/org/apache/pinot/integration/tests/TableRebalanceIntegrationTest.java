@@ -74,6 +74,8 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
   protected void overrideControllerConf(Map<String, Object> properties) {
     super.overrideControllerConf(properties);
     properties.put(ControllerConf.CONFIG_OF_MAX_TABLE_REBALANCE_JOBS_IN_ZK, 2);
+    // Keep disk usage unavailable for the rebalance pre-checks, regardless of how long the test takes.
+    properties.put(ControllerConf.RESOURCE_UTILIZATION_CHECKER_FREQUENCY, 0);
   }
 
   @Test
@@ -879,10 +881,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
         expectedReplicaGroupStatus);
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
         expectedReplicaGroupMessage);
-    // As the disk utilization check periodic task was disabled in the test controller (ControllerConf
-    // .RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY was set to 30000s, see org.apache.pinot.controller.helix
-    // .ControllerTest.getDefaultControllerConfiguration), server's disk util should be unavailable on all servers if
-    // not explicitly set via org.apache.pinot.controller.validation.ResourceUtilizationInfo.setDiskUsageInfo
+    // Periodic resource utilization collection is disabled in overrideControllerConf(), so disk usage is unavailable.
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.WARN);
   }

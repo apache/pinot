@@ -18,25 +18,25 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
-import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 /// Virtual column provider that returns the partition information of the segment.
@@ -88,12 +88,13 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     List<String> partitionInfo = new ArrayList<>();
     SegmentMetadata segmentMetadata = context.getSegmentMetadata();
 
-    if (segmentMetadata != null && segmentMetadata.getColumnMetadataMap() != null) {
+    if (segmentMetadata != null && !segmentMetadata.isMutableSegment()) {
       // Get partition info from all partitioned columns in the segment metadata
-      Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
-      for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
-        String columnName = entry.getKey();
-        ColumnMetadata columnMetadata = entry.getValue();
+      Set<String> physicalColumns = segmentMetadata instanceof SegmentMetadataImpl
+          ? ((SegmentMetadataImpl) segmentMetadata).getPhysicalColumnNames()
+          : segmentMetadata.getSchema().getPhysicalColumnNames();
+      for (String columnName : physicalColumns) {
+        ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
         Set<Integer> partitions = columnMetadata.getPartitions();
         if (partitions != null && !partitions.isEmpty()) {
           // Add all partition IDs for this column
@@ -211,7 +212,7 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
 
     @Override
     public int getValueSize(int dictId) {
-      return Utf8.encodedLength(_values.get(dictId));
+      return Utf8Utils.encodedLength(_values.get(dictId));
     }
 
     @Override

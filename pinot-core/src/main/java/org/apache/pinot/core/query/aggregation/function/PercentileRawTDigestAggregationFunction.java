@@ -31,12 +31,13 @@ import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /// The `PercentileRawTDigestAggregationFunction` returns the serialized `TDigest` data structure of the
 /// `PercentileEstAggregationFunction`.
 public class PercentileRawTDigestAggregationFunction
-    extends BaseSingleInputAggregationFunction<TDigest, SerializedTDigest> {
+    extends BaseSingleInputAggregationFunction<TDigest, Comparable<?>> {
   private final PercentileTDigestAggregationFunction _percentileTDigestAggregationFunction;
 
   public PercentileRawTDigestAggregationFunction(ExpressionContext expressionContext, int percentile,
@@ -161,5 +162,17 @@ public class PercentileRawTDigestAggregationFunction
               _percentileTDigestAggregationFunction._percentile);
     }
     return new SerializedTDigest(intermediateResult, _percentileTDigestAggregationFunction._percentile);
+  }
+
+  /// Merges two final results, which are serialized digests in string form, into the string form of the merged
+  /// digest.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    TDigest merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedTDigest(merged, _percentileTDigestAggregationFunction._percentile).toString();
+  }
+
+  private static TDigest deserializeFinalResult(Comparable<?> finalResult) {
+    return ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) finalResult));
   }
 }

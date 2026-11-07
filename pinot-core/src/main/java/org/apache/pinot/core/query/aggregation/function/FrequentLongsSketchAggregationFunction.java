@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import java.lang.foreign.MemorySegment;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -302,5 +303,14 @@ public class FrequentLongsSketchAggregationFunction
     // has never substituted an empty accumulator during extraction, so NULL is the answer in both modes and there is
     // no disabled-mode identity to preserve here.
     return sketch != null ? new SerializedFrequentLongsSketch(sketch) : null;
+  }
+
+  /// Merges two final results, which are serialized sketches in string form, into the string form of the merged
+  /// sketch.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    FrequentLongsSketch sketch1 = deserializeSketch(Base64.getDecoder().decode((String) finalResult1));
+    FrequentLongsSketch sketch2 = deserializeSketch(Base64.getDecoder().decode((String) finalResult2));
+    return new SerializedFrequentLongsSketch(merge(sketch1, sketch2)).toString();
   }
 }

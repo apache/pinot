@@ -511,6 +511,12 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
         serialize(bigDecimalFunction, value)), new BigDecimal("1")), value);
   }
 
+  @Test
+  void testMergeFinalResult() {
+    AnyValueAggregationFunction function = createFunction("LONG");
+    assertEquals(function.mergeFinalResult(1L, 2L), 1L);
+  }
+
   private static AnyValueAggregationFunction createFunction(String dataType) {
     return new AnyValueAggregationFunction(List.of(EXPRESSION, ExpressionContext.forLiteral(DataType.STRING, dataType)),
         true);

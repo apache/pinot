@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -31,6 +35,10 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _deletedSegmentsRetentionPeriod;
   private String _replacedSegmentsRetentionPeriod;
   private String _lineageEntryCleanupRetentionPeriod;
+  // Stored as null when DEFAULT so that it is only serialized when explicitly set to ENABLE or DISABLE.
+  @JsonProperty("hybridTableRetentionStrategy")
+  @Nullable
+  private Enablement _hybridTableRetentionStrategy;
   @Deprecated
   private String _segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
   @Deprecated
@@ -182,6 +190,27 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setLineageEntryCleanupRetentionPeriod(String lineageEntryCleanupRetentionPeriod) {
     _lineageEntryCleanupRetentionPeriod = lineageEntryCleanupRetentionPeriod;
+  }
+
+  /// Whether to use the hybrid table retention strategy as the time-based retention policy for this table. Only
+  /// applicable to realtime tables. DEFAULT falls back to the controller-level config
+  /// `controller.enable.hybrid.table.retention.strategy`.
+  ///
+  /// When enabled and an OFFLINE counterpart exists, realtime segments are purged once the OFFLINE time boundary moves
+  /// past them instead of by `retentionTimeValue`. Valid `retentionTimeUnit` and `retentionTimeValue` are still
+  /// required for time-based retention to run. When disabled, or when there is no OFFLINE counterpart, ordinary
+  /// realtime time-based retention applies. Size-based retention ([#getRetentionSize()]) runs independently and may
+  /// still delete realtime data newer than the OFFLINE time boundary.
+  // Ignored for serialization so that DEFAULT is omitted, see the field
+  @JsonIgnore
+  public Enablement getHybridTableRetentionStrategy() {
+    return _hybridTableRetentionStrategy == null ? Enablement.DEFAULT : _hybridTableRetentionStrategy;
+  }
+
+  @JsonProperty("hybridTableRetentionStrategy")
+  public void setHybridTableRetentionStrategy(@Nullable Enablement hybridTableRetentionStrategy) {
+    _hybridTableRetentionStrategy =
+        hybridTableRetentionStrategy == Enablement.DEFAULT ? null : hybridTableRetentionStrategy;
   }
 
   /// @deprecated Use `segmentIngestionFrequency` from

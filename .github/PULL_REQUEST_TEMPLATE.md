@@ -9,7 +9,6 @@ Instructions:
 2. Remove these instructions before publishing the PR.
  
 (*) Other labels to consider:
-- `testing`
 - `dependencies`
 - `docker`
 - `kubernetes`

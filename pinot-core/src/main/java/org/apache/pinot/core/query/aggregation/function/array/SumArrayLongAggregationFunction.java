@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -176,5 +177,14 @@ public class SumArrayLongAggregationFunction
   @Override
   public long[] extractFinalResult(@Nullable LongArrayList result) {
     return result != null ? ArrayListUtils.toLongArray(result) : null;
+  }
+
+  @Override
+  public long[] mergeFinalResult(long[] finalResult1, long[] finalResult2) {
+    long[] mergedResult = Arrays.copyOf(finalResult1, Math.max(finalResult1.length, finalResult2.length));
+    for (int i = 0; i < finalResult2.length; i++) {
+      mergedResult[i] += finalResult2[i];
+    }
+    return mergedResult;
   }
 }

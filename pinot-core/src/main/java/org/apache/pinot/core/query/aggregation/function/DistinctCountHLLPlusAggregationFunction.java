@@ -32,6 +32,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.HyperLogLogPlusUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -59,6 +60,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     } else if (arguments.size() == 3) {
       _p = arguments.get(1).getLiteral().getIntValue();
       _sp = arguments.get(2).getLiteral().getIntValue();
+      HyperLogLogPlusUtils.validateSp(_sp);
     } else {
       _p = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P;
       _sp = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_SP;

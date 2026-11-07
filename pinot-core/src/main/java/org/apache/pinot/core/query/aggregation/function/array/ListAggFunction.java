@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import java.util.Arrays;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -198,12 +199,18 @@ public class ListAggFunction extends BaseSingleInputAggregationFunction<ObjectCo
     return ColumnDataType.STRING;
   }
 
+  /// Joins the values with the separator. Returns `null` when there are no values, which keeps them apart from a
+  /// single empty-string value.
   @Nullable
   @Override
   public String extractFinalResult(@Nullable ObjectCollection<String> strings) {
-    if (strings == null) {
-      return null;
-    }
-    return StringUtils.join(strings, _separator);
+    return CollectionUtils.isNotEmpty(strings) ? StringUtils.join(strings, _separator) : null;
+  }
+
+  /// Merges two final results by joining them with the separator. Final results are only merged across partitions of
+  /// the aggregated values, so the values of the distinct variant do not overlap.
+  @Override
+  public String mergeFinalResult(String finalResult1, String finalResult2) {
+    return finalResult1 + _separator + finalResult2;
   }
 }
