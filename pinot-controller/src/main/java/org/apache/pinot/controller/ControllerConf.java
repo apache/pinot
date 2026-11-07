@@ -379,8 +379,8 @@ public class ControllerConf extends PinotConfiguration {
   /// A rejected RealtimeToOffline upload does not advance its watermark, so the task retries the same window until the
   /// source segments age out (indefinitely with the hybrid retention strategy, since the time boundary cannot advance).
   /// Review task schedules and buffer periods against table retention before enabling.
-  public static final String SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED =
-      "controller.segment.upload.rejectOutOfRetention.enabled";
+  public static final String SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION =
+      "controller.segment.upload.reject.out.of.retention";
   public static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
       "controller.realtime.segment.metadata.commit.numLocks";
   public static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
@@ -430,8 +430,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DEFAULT_REBALANCE_PRE_CHECKER =
       "org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker";
   public static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
-  /// Default for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED}: disabled until explicitly enabled.
-  public static final boolean DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED = false;
+  /// Default for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION}: disabled until explicitly enabled.
+  public static final boolean DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION = false;
   public static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
   public static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   public static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
@@ -1268,14 +1268,13 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   /// @return whether out-of-retention single-segment upload rejection is enabled
-  public boolean isSegmentUploadRejectOutOfRetentionEnabled() {
-    return getProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED,
-        DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED);
+  public boolean isSegmentUploadRejectOutOfRetention() {
+    return getProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION, DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION);
   }
 
-  /// @param enabled value for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED}
-  public void setSegmentUploadRejectOutOfRetentionEnabled(boolean enabled) {
-    setProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED, enabled);
+  /// @param rejectOutOfRetention value for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION}
+  public void setSegmentUploadRejectOutOfRetention(boolean rejectOutOfRetention) {
+    setProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION, rejectOutOfRetention);
   }
 
   public int getRealtimeSegmentMetadataCommitNumLocks() {

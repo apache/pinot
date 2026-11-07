@@ -32,6 +32,9 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
+/// Tests for {@link TableConfigRetentionUtils#buildRetentionStrategy}: the strategy purges segments older than the
+/// table retention window, accepts case-insensitive time units, honors the creation-time fallback flag, and is not
+/// built when the retention unit or value is missing or invalid.
 public class TableConfigRetentionUtilsTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";

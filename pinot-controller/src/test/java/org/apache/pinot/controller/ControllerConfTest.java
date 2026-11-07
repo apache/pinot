@@ -32,6 +32,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class ControllerConfTest {
@@ -300,15 +302,15 @@ public class ControllerConfTest {
   @Test
   public void testSegmentUploadRejectOutOfRetentionDefault() {
     ControllerConf conf = new ControllerConf();
-    Assert.assertFalse(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+    assertFalse(conf.isSegmentUploadRejectOutOfRetention());
   }
 
   @Test
   public void testSegmentUploadRejectOutOfRetentionOverride() {
     ControllerConf conf = new ControllerConf();
-    conf.setSegmentUploadRejectOutOfRetentionEnabled(true);
-    Assert.assertTrue(conf.isSegmentUploadRejectOutOfRetentionEnabled());
-    conf.setSegmentUploadRejectOutOfRetentionEnabled(false);
-    Assert.assertFalse(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+    conf.setSegmentUploadRejectOutOfRetention(true);
+    assertTrue(conf.isSegmentUploadRejectOutOfRetention());
+    conf.setSegmentUploadRejectOutOfRetention(false);
+    assertFalse(conf.isSegmentUploadRejectOutOfRetention());
   }
 }

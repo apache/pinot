@@ -108,7 +108,7 @@ public class SegmentValidationUtils {
     return null;
   }
 
-  /// When `controller.segment.upload.rejectOutOfRetention.enabled` is true on the controller, rejects the upload if
+  /// When `controller.segment.upload.reject.out.of.retention` is true on the controller, rejects the upload if
   /// the segment's data end time (from segment file metadata) is past the table's `retentionTimeValue` /
   /// `retentionTimeUnit` window. This matches the retention manager's time-based boundary. It does not model the
   /// hybrid retention strategy (`controller.enable.hybrid.table.retention.strategy`), under which the REALTIME side of
@@ -132,24 +132,20 @@ public class SegmentValidationUtils {
   /// For tables where the retention manager does not apply time-based retention to completed segments (offline tables
   /// whose batch ingestion type is not `APPEND`), this method returns without evaluating retention.
   public static void rejectUploadIfOutOfRetention(SegmentMetadata segmentMetadata, TableConfig tableConfig,
-      long currentTimeMs, boolean controllerRejectOutOfRetentionEnabled,
-      @Nullable ControllerMetrics controllerMetrics) {
-    if (!controllerRejectOutOfRetentionEnabled) {
-      return;
-    }
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig == null) {
+      long currentTimeMs, boolean rejectOutOfRetention, @Nullable ControllerMetrics controllerMetrics) {
+    if (!rejectOutOfRetention) {
       return;
     }
     if (!RetentionUtils.shouldManageTimeBasedDataRetention(tableConfig)) {
       return;
     }
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     OptionalLong retentionMsOpt = RetentionUtils.parseTableDataRetentionMillis(validationConfig);
     if (retentionMsOpt.isEmpty()) {
       return;
     }
     long retentionMs = retentionMsOpt.getAsLong();
-    if (RetentionUtils.isPurgeable(tableConfig.getTableName(), segmentMetadata, retentionMs, currentTimeMs, false)) {
+    if (RetentionUtils.isPurgeable(tableConfig.getTableName(), segmentMetadata, retentionMs, currentTimeMs)) {
       if (controllerMetrics != null) {
         controllerMetrics.addMeteredGlobalValue(ControllerMeter.OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED, 1L);
       }

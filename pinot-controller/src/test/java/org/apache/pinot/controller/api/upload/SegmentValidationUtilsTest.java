@@ -42,10 +42,7 @@ import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -151,8 +148,8 @@ public class SegmentValidationUtilsTest {
   public void testRejectUploadSkippedWhenDisabled() {
     long now = System.currentTimeMillis();
     TableConfig tableConfig = getRetentionTableConfig(TableType.OFFLINE);
-    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30),
-        0L), tableConfig, now, false, null);
+    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30)),
+        tableConfig, now, false, null);
   }
 
   @Test
@@ -164,8 +161,8 @@ public class SegmentValidationUtilsTest {
         .setRetentionTimeValue("7")
         .setSegmentPushType("REFRESH")
         .build();
-    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30),
-        0L), tableConfig, now, true, null);
+    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30)),
+        tableConfig, now, true, null);
   }
 
   @Test
@@ -176,8 +173,8 @@ public class SegmentValidationUtilsTest {
         .setRetentionTimeUnit("BAD")
         .setRetentionTimeValue("7")
         .build();
-    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30),
-        0L), tableConfig, now, true, null);
+    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30)),
+        tableConfig, now, true, null);
   }
 
   @Test
@@ -187,7 +184,7 @@ public class SegmentValidationUtilsTest {
     ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
     ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
         () -> SegmentValidationUtils.rejectUploadIfOutOfRetention(
-            mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30), 0L), tableConfig, now, true,
+            mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30)), tableConfig, now, true,
             controllerMetrics));
     assertEquals(exception.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
     verify(controllerMetrics).addMeteredGlobalValue(ControllerMeter.OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED, 1L);
@@ -197,35 +194,25 @@ public class SegmentValidationUtilsTest {
   public void testRejectUploadAllowsRecentSegment() {
     long now = System.currentTimeMillis();
     TableConfig tableConfig = getRetentionTableConfig(TableType.OFFLINE);
-    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(1),
-        0L), tableConfig, now, true, null);
+    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(1)),
+        tableConfig, now, true, null);
   }
 
   @Test
   public void testRejectUploadDoesNotUseIndexCreationTimeFallback() {
     long now = System.currentTimeMillis();
     TableConfig tableConfig = getRetentionTableConfig(TableType.OFFLINE);
-    SegmentValidationUtils.rejectUploadIfOutOfRetention(
-        mockRetentionSegmentMetadata(-1, now - TimeUnit.DAYS.toMillis(30)), tableConfig, now, true, null);
-  }
-
-  @Test
-  public void testRejectUploadSkippedWhenValidationConfigNull() {
-    long now = System.currentTimeMillis();
-    TableConfig tableConfig = mock(TableConfig.class);
-    when(tableConfig.getValidationConfig()).thenReturn(null);
-    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
-    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30),
-        0L), tableConfig, now, true, controllerMetrics);
-    verify(controllerMetrics, never()).addMeteredGlobalValue(any(ControllerMeter.class), anyLong());
+    SegmentMetadata segmentMetadata = mockRetentionSegmentMetadata(-1);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(now - TimeUnit.DAYS.toMillis(30));
+    SegmentValidationUtils.rejectUploadIfOutOfRetention(segmentMetadata, tableConfig, now, true, null);
   }
 
   @Test
   public void testRejectUploadSkippedWhenRetentionNotConfigured() {
     long now = System.currentTimeMillis();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
-    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30),
-        0L), tableConfig, now, true, null);
+    SegmentValidationUtils.rejectUploadIfOutOfRetention(mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30)),
+        tableConfig, now, true, null);
   }
 
   @Test
@@ -234,7 +221,7 @@ public class SegmentValidationUtilsTest {
     TableConfig tableConfig = getRetentionTableConfig(TableType.OFFLINE);
     ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
         () -> SegmentValidationUtils.rejectUploadIfOutOfRetention(
-            mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30), 0L), tableConfig, now, true, null));
+            mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30)), tableConfig, now, true, null));
     assertEquals(exception.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
   }
 
@@ -244,7 +231,7 @@ public class SegmentValidationUtilsTest {
     TableConfig tableConfig = getRetentionTableConfig(TableType.REALTIME);
     ControllerApplicationException exception = expectThrows(ControllerApplicationException.class,
         () -> SegmentValidationUtils.rejectUploadIfOutOfRetention(
-            mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30), 0L), tableConfig, now, true, null));
+            mockRetentionSegmentMetadata(now - TimeUnit.DAYS.toMillis(30)), tableConfig, now, true, null));
     assertEquals(exception.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
   }
 
@@ -289,12 +276,10 @@ public class SegmentValidationUtilsTest {
     return segmentMetadata;
   }
 
-  private static SegmentMetadata mockRetentionSegmentMetadata(long endTimeMs, long indexCreationTimeMs) {
+  private static SegmentMetadata mockRetentionSegmentMetadata(long endTimeMs) {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getTimeInterval()).thenReturn(null);
     when(segmentMetadata.getTimeUnit()).thenReturn(TimeUnit.MILLISECONDS);
     when(segmentMetadata.getEndTime()).thenReturn(endTimeMs);
-    when(segmentMetadata.getIndexCreationTime()).thenReturn(indexCreationTimeMs);
     when(segmentMetadata.getName()).thenReturn(SEGMENT_NAME);
     return segmentMetadata;
   }

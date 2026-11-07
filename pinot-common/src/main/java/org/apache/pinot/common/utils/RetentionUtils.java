@@ -21,7 +21,6 @@ package org.apache.pinot.common.utils;
 import java.util.Locale;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -69,38 +68,18 @@ public class RetentionUtils {
   /// @return true if the segment is past the retention boundary, false otherwise
   public static boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata, long retentionMs,
       long currentTimeMs, boolean useCreationTimeFallback) {
-    return isPurgeableInternal(segmentZKMetadata.getEndTimeMs(), segmentZKMetadata.getCreationTime(), retentionMs,
-        currentTimeMs, useCreationTimeFallback, tableNameWithType, segmentZKMetadata.getSegmentName());
-  }
-
-  /// Whether segment file metadata is past the retention window, using end time from
-  /// {@link #getSegmentMetadataEndTimeMillis(SegmentMetadata)} and
-  /// {@link SegmentMetadata#getIndexCreationTime()} as the optional fallback clock. Invalid-end paths emit the same
-  /// style of debug/warn lines as the ZK overload, using
-  /// {@link SegmentMetadata#getName()} for the segment in log messages.
-  ///
-  /// - If end time is valid: purgeable when `currentTimeMs - endTimeMs > retentionMs`.
-  /// - If end time is invalid and `useCreationTimeFallback` is true and index creation time is valid: purgeable when
-  ///   `currentTimeMs - creationTimeMs > retentionMs`.
-  /// - Otherwise: not purgeable (fail-open).
-  public static boolean isPurgeable(String tableNameWithType, SegmentMetadata segmentMetadata, long retentionMs,
-      long currentTimeMs, boolean useCreationTimeFallback) {
-    return isPurgeableInternal(getSegmentMetadataEndTimeMillis(segmentMetadata), segmentMetadata.getIndexCreationTime(),
-        retentionMs, currentTimeMs, useCreationTimeFallback, tableNameWithType, segmentMetadata.getName());
-  }
-
-  private static boolean isPurgeableInternal(long endTimeMs, long creationTimeMs, long retentionMs,
-      long currentTimeMs, boolean useCreationTimeFallback, String tableNameWithType,
-      String segmentName) {
+    String segmentName = segmentZKMetadata.getSegmentName();
+    long endTimeMs = segmentZKMetadata.getEndTimeMs();
     if (TimeUtils.timeValueInValidRange(endTimeMs)) {
       return currentTimeMs - endTimeMs > retentionMs;
     }
-    if (useCreationTimeFallback && TimeUtils.timeValueInValidRange(creationTimeMs)) {
-      LOGGER.debug("Segment: {} of table: {} has invalid end time: {}. Using creation time: {} as fallback",
-          segmentName, tableNameWithType, endTimeMs, creationTimeMs);
-      return currentTimeMs - creationTimeMs > retentionMs;
-    }
     if (useCreationTimeFallback) {
+      long creationTimeMs = segmentZKMetadata.getCreationTime();
+      if (TimeUtils.timeValueInValidRange(creationTimeMs)) {
+        LOGGER.debug("Segment: {} of table: {} has invalid end time: {}. Using creation time: {} as fallback",
+            segmentName, tableNameWithType, endTimeMs, creationTimeMs);
+        return currentTimeMs - creationTimeMs > retentionMs;
+      }
       LOGGER.warn("Segment: {} of table: {} has invalid end time: {} and invalid creation time: {}. "
           + "Cannot determine retention, skipping", segmentName, tableNameWithType, endTimeMs, creationTimeMs);
     } else {
@@ -110,16 +89,29 @@ public class RetentionUtils {
     return false;
   }
 
+  /// Whether segment file metadata is past the retention window, using the end time from
+  /// {@link SegmentMetadata#getEndTime()} converted with {@link SegmentMetadata#getTimeUnit()}. Unlike the
+  /// {@link SegmentZKMetadata} overload, there is no creation-time fallback.
+  ///
+  /// - If end time is valid: purgeable when `currentTimeMs - endTimeMs > retentionMs`.
+  /// - Otherwise: not purgeable (fail-open).
+  public static boolean isPurgeable(String tableNameWithType, SegmentMetadata segmentMetadata, long retentionMs,
+      long currentTimeMs) {
+    long endTimeMs = getSegmentMetadataEndTimeMillis(segmentMetadata);
+    if (TimeUtils.timeValueInValidRange(endTimeMs)) {
+      return currentTimeMs - endTimeMs > retentionMs;
+    }
+    LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}. Cannot determine retention, skipping",
+        segmentMetadata.getName(), tableNameWithType, endTimeMs);
+    return false;
+  }
+
   /// Parses {@link SegmentsValidationAndRetentionConfig#getRetentionTimeUnit()} and
   /// {@link SegmentsValidationAndRetentionConfig#getRetentionTimeValue()} into table data retention duration in
   /// milliseconds (same interpretation as controller time-based retention).
   ///
   /// @return millis, or empty if unset or not parseable
-  public static OptionalLong parseTableDataRetentionMillis(
-      @Nullable SegmentsValidationAndRetentionConfig validationConfig) {
-    if (validationConfig == null) {
-      return OptionalLong.empty();
-    }
+  public static OptionalLong parseTableDataRetentionMillis(SegmentsValidationAndRetentionConfig validationConfig) {
     String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
     String retentionTimeValue = validationConfig.getRetentionTimeValue();
     if (StringUtils.isEmpty(retentionTimeUnit) || StringUtils.isEmpty(retentionTimeValue)) {
@@ -140,7 +132,7 @@ public class RetentionUtils {
   /// executors pass when configuring generation from segment files). When `timeUnit` is non-null and raw end time is
   /// not {@link Long#MIN_VALUE}, returns `timeUnit.toMillis(endTime)`; otherwise returns the raw end time (typically
   /// `Long.MIN_VALUE` when unset).
-  public static long getSegmentMetadataEndTimeMillis(SegmentMetadata segmentMetadata) {
+  private static long getSegmentMetadataEndTimeMillis(SegmentMetadata segmentMetadata) {
     TimeUnit timeUnit = segmentMetadata.getTimeUnit();
     long endTime = segmentMetadata.getEndTime();
     if (timeUnit != null && endTime != Long.MIN_VALUE) {

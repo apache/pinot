@@ -56,6 +56,12 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
+
 
 /// Test for advanced push types.
 /// Currently only tests METADATA push type.
@@ -104,7 +110,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   protected void overrideControllerConf(Map<String, Object> properties) {
     super.overrideControllerConf(properties);
     // Applies to every test in this class: any APPEND table configured with a retention window is checked on upload.
-    properties.put(ControllerConf.SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED, true);
+    properties.put(ControllerConf.SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION, true);
   }
 
   @BeforeClass
@@ -412,16 +418,16 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     long rejectedBefore = getOutOfRetentionRejectedCount();
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      HttpErrorStatusException exception = Assert.expectThrows(HttpErrorStatusException.class,
+      HttpErrorStatusException exception = expectThrows(HttpErrorStatusException.class,
           () -> fileUploadDownloadClient.uploadSegment(URI.create(getOrCreateAdminClient().getSegmentUploadUrl()),
               segmentTarFile.getName(), segmentTarFile, getTableName(), TableType.OFFLINE));
-      Assert.assertEquals(exception.getStatusCode(), HttpStatus.SC_FORBIDDEN);
-      Assert.assertTrue(exception.getMessage().contains("outside the retention window"), exception.getMessage());
+      assertEquals(exception.getStatusCode(), HttpStatus.SC_FORBIDDEN);
+      assertTrue(exception.getMessage().contains("outside the retention window"), exception.getMessage());
     }
 
-    Assert.assertEquals(getSegmentsList().size(), 0);
-    Assert.assertFalse(new File(_controllerConfig.getDataDir(), getTableName()).exists());
-    Assert.assertEquals(getOutOfRetentionRejectedCount(), rejectedBefore + 1);
+    assertEquals(getSegmentsList().size(), 0);
+    assertFalse(new File(_controllerConfig.getDataDir(), getTableName()).exists());
+    assertEquals(getOutOfRetentionRejectedCount(), rejectedBefore + 1);
   }
 
   @Test
@@ -431,14 +437,14 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     long rejectedBefore = getOutOfRetentionRejectedCount();
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      Assert.assertEquals(
+      assertEquals(
           fileUploadDownloadClient.uploadSegment(URI.create(getOrCreateAdminClient().getSegmentUploadUrl()),
               segmentTarFile.getName(), segmentTarFile, getTableName(), TableType.OFFLINE).getStatusCode(),
           HttpStatus.SC_OK);
     }
 
-    Assert.assertEquals(getSegmentsList().size(), 1);
-    Assert.assertEquals(getOutOfRetentionRejectedCount(), rejectedBefore);
+    assertEquals(getSegmentsList().size(), 1);
+    assertEquals(getOutOfRetentionRejectedCount(), rejectedBefore);
   }
 
   private File createTableAndBuildSegment(String retentionDays)
@@ -454,8 +460,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     ClusterIntegrationTestUtils.buildSegmentFromAvro(getAllAvroFiles().get(0), offlineTableConfig, schema,
         "_retention", _segmentDir, _tarDir);
     File[] tarFiles = _tarDir.listFiles();
-    Assert.assertNotNull(tarFiles);
-    Assert.assertEquals(tarFiles.length, 1);
+    assertNotNull(tarFiles);
+    assertEquals(tarFiles.length, 1);
     return tarFiles[0];
   }
 
