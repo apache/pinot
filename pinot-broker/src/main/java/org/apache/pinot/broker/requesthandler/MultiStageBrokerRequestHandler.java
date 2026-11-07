@@ -41,7 +41,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -470,8 +469,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
             httpHeaders, queryTimer)) {
       validatePhysicalTablesWithMultiClusterRouting(compiledQuery.getTableNames(), compiledQuery.getOptions());
-      AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
-      checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery, rlsFiltersApplied);
+      boolean rlsFiltersApplied = checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery);
 
       // Apply broker-default query options before branching to EXPLAIN/execute so both paths see the same options.
       applyBrokerDefaultQueryOptions(compiledQuery.getOptions());
@@ -481,7 +479,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return explain(compiledQuery, requestId, requestContext, queryTimer, idSetSubqueries);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied.get(), queryWasLogged, workloadName);
+            rlsFiltersApplied, queryWasLogged, workloadName);
       }
     }
   }
@@ -518,8 +516,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private void checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
-      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery, AtomicBoolean rlsFiltersApplied) {
+  private boolean checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
+      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery) {
     Set<String> tables = compiledQuery.getTableNames();
     if (tables != null && !tables.isEmpty()) {
       TableAuthorizationResult tableAuthorizationResult =
@@ -527,21 +525,30 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
       }
-      if (_enableRowColumnLevelAuth) {
-        AccessControl accessControl = _accessControlFactory.create();
-        for (String tableName : tables) {
-          accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
-              .ifPresent(rowFilters -> {
-                rlsFiltersApplied.set(true);
-                String combinedFilters =
-                    rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
-                String key = RlsUtils.buildRlsFilterKey(tableName);
-                compiledQuery.getOptions().put(key, combinedFilters);
-                _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
-              });
-        }
-      }
+      return _enableRowColumnLevelAuth && applyRlsFilters(requesterIdentity, tables, compiledQuery.getOptions());
     }
+    return false;
+  }
+
+  /// Returns `true` if an RLS filter was added for at least one table.
+  @VisibleForTesting
+  boolean applyRlsFilters(@Nullable RequesterIdentity requesterIdentity, Set<String> tables,
+      Map<String, String> queryOptions) {
+    AccessControl accessControl = _accessControlFactory.create();
+    boolean applied = false;
+    for (String tableName : tables) {
+      List<String> rowFilters = accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
+          .orElse(null);
+      if (rowFilters == null || rowFilters.isEmpty()) {
+        continue;
+      }
+      String combinedFilters =
+          rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+      queryOptions.put(RlsUtils.buildRlsFilterKey(tableName), combinedFilters);
+      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
+      applied = true;
+    }
+    return applied;
   }
 
   private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
