@@ -30,6 +30,7 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
@@ -156,6 +157,17 @@ public class MultiClusterRoutingManager implements RoutingManager {
       combined.putAll(remoteCluster.getEnabledServerInstanceMap());
     }
     return combined;
+  }
+
+  /// The minimum over the local cluster and every remote cluster. A remote cluster that has not processed its instance
+  /// configs yet counts as 0.
+  @Override
+  public int getMinServerCapabilityRevision(InstanceCapability capability) {
+    int minRevision = _localClusterRoutingManager.getMinServerCapabilityRevision(capability);
+    for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
+      minRevision = Math.min(minRevision, remoteCluster.getMinServerCapabilityRevision(capability));
+    }
+    return minRevision;
   }
 
   @Override

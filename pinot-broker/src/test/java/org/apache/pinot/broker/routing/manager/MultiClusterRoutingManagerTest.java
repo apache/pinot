@@ -26,11 +26,13 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.QuerySource;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeMethod;
@@ -73,6 +75,19 @@ public class MultiClusterRoutingManagerTest {
         _remoteClusterRoutingManager1, _remoteClusterRoutingManager2);
     _multiClusterRoutingManager = new MultiClusterRoutingManager(
         _localClusterRoutingManager, remoteClusterManagers);
+  }
+
+  @Test
+  public void testMinServerCapabilityRevisionAcrossClusters() {
+    InstanceCapability capability = new InstanceCapability("TEST_CAPABILITY", InstanceType.SERVER, 1);
+    when(_localClusterRoutingManager.getMinServerCapabilityRevision(capability)).thenReturn(3);
+    when(_remoteClusterRoutingManager1.getMinServerCapabilityRevision(capability)).thenReturn(2);
+    when(_remoteClusterRoutingManager2.getMinServerCapabilityRevision(capability)).thenReturn(4);
+    assertEquals(_multiClusterRoutingManager.getMinServerCapabilityRevision(capability), 2);
+
+    // A remote cluster that has not processed its instance configs yet counts as 0.
+    when(_remoteClusterRoutingManager2.getMinServerCapabilityRevision(capability)).thenReturn(0);
+    assertEquals(_multiClusterRoutingManager.getMinServerCapabilityRevision(capability), 0);
   }
 
   @Test

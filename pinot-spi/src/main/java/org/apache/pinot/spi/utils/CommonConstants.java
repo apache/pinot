@@ -216,6 +216,17 @@ public class CommonConstants {
 
       public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
       public static final String PINOT_VERSION_KEY = "pinotVersion";
+      /// The map field with the features that an instance supports: the key is the capability name and the value is
+      /// its revision, an integer that only grows. Any instance type may write it at startup. Other components read
+      /// it to decide whether they can use a feature that instances of an older version do not support. A missing
+      /// map or key means revision 0: not supported. See `InstanceCapability` in pinot-common.
+      public static final String CAPABILITIES_KEY = "capabilities";
+      /// The reserved entry of the [#CAPABILITIES_KEY] map with the Pinot version that wrote the map. A reader uses the
+      /// capabilities only when this entry is string-equal to the simple field [#PINOT_VERSION_KEY] of the same
+      /// instance config. A version that predates the capabilities rewrites [#PINOT_VERSION_KEY] at startup but keeps
+      /// the map, so after a rollback the two values differ and the stale map is ignored. Capability names are upper
+      /// case, so they never clash with this key.
+      public static final String CAPABILITIES_PINOT_VERSION_KEY = PINOT_VERSION_KEY;
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
