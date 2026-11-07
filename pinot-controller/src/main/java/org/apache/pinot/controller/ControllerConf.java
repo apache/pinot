@@ -149,6 +149,13 @@ public class ControllerConf extends PinotConfiguration {
     public static final String STALE_INSTANCES_CLEANUP_TASK_INSTANCES_RETENTION_PERIOD =
         "controller.stale.instances.cleanup.task.minOfflineTimeBeforeDeletionPeriod";
 
+    // Cluster config: applies to both schemas and table configs without restarting controllers.
+    public static final String CONFIG_MIGRATION_AUTO_UPDATE_ENABLED = "controller.config.migration.auto.update.enabled";
+    public static final String CONFIG_MIGRATION_FREQUENCY_PERIOD = "controller.config.migration.frequencyPeriod";
+    public static final String CONFIG_MIGRATION_INITIAL_DELAY_SECONDS =
+        "controller.config.migration.initialDelaySeconds";
+    public static final String CONFIG_MIGRATION_CRON_EXPRESSION = "controller.config.migration.cronExpression";
+
     public static final String TASK_METRICS_EMITTER_FREQUENCY_PERIOD =
         "controller.minion.task.metrics.emitter.frequencyPeriod";
     public static final String TASK_METRICS_EMITTER_CRON_EXPRESSION =
@@ -325,6 +332,11 @@ public class ControllerConf extends PinotConfiguration {
 
     public static final String DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD = "24h";
     public static final String DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_PERIOD = "1h";
+
+    // Inspect stored definitions by default. Rewriting them requires explicit opt-in after upgrading all nodes,
+    // because the new format may not be accepted by a previous release during rollback.
+    public static final boolean DEFAULT_CONFIG_MIGRATION_AUTO_UPDATE_ENABLED = false;
+    public static final String DEFAULT_CONFIG_MIGRATION_FREQUENCY_PERIOD = "1h";
 
     // Realtime Consumer Monitor
     public static final String RT_CONSUMER_MONITOR_FREQUENCY_PERIOD =
@@ -1184,6 +1196,24 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setStaleInstancesCleanupTaskInstancesRetentionPeriod(String retentionPeriod) {
     setProperty(ControllerPeriodicTasksConf.STALE_INSTANCES_CLEANUP_TASK_INSTANCES_RETENTION_PERIOD, retentionPeriod);
+  }
+
+  public int getConfigMigrationFrequencyInSeconds() {
+    String period = getProperty(ControllerPeriodicTasksConf.CONFIG_MIGRATION_FREQUENCY_PERIOD,
+        ControllerPeriodicTasksConf.DEFAULT_CONFIG_MIGRATION_FREQUENCY_PERIOD);
+    if (!isValidPeriodWithLogging(ControllerPeriodicTasksConf.CONFIG_MIGRATION_FREQUENCY_PERIOD, period)) {
+      period = ControllerPeriodicTasksConf.DEFAULT_CONFIG_MIGRATION_FREQUENCY_PERIOD;
+    }
+    return (int) convertPeriodToSeconds(period);
+  }
+
+  public long getConfigMigrationInitialDelaySeconds() {
+    return getProperty(ControllerPeriodicTasksConf.CONFIG_MIGRATION_INITIAL_DELAY_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  }
+
+  public String getConfigMigrationCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.CONFIG_MIGRATION_CRON_EXPRESSION);
   }
 
   public int getDefaultTableMinReplicas() {
