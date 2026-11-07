@@ -4682,6 +4682,18 @@ public class PinotHelixResourceManager {
             // 2. Proactively delete the oldest data snapshot to make sure that we only keep at most 2 data snapshots
             //    at any time in case of REFRESH use case.
             if (forceCleanup) {
+              // A 'COMPLETED' entry has already replaced its 'segmentsFrom', so replacing them again would leave two
+              // 'COMPLETED' entries claiming the same source and serve both outputs. The 'segmentsFrom' existence
+              // check above runs outside the lineage lock, so a concurrent 'endReplaceSegments' can complete an entry
+              // after that check passed. Re-validate against the lineage read under the lock; 'forceCleanup' only
+              // un-blocks incomplete entries, it must not allow replacing a replaced segment.
+              if (lineageEntry.getState() == LineageEntryState.COMPLETED && !Collections.disjoint(segmentsFrom,
+                  lineageEntry.getSegmentsFrom())) {
+                throw new IllegalStateException(
+                    "Segments: " + segmentsFrom + " from 'segmentsFrom' overlap with 'segmentsFrom': "
+                        + lineageEntry.getSegmentsFrom() + " of the 'COMPLETED' lineage entry: " + entryId
+                        + " in table: " + tableNameWithType + " (replacing a replaced segment)");
+              }
               if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && (
                   !Collections.disjoint(segmentsFrom, lineageEntry.getSegmentsFrom()) || !Collections.disjoint(
                       segmentsTo, lineageEntry.getSegmentsTo()))) {
