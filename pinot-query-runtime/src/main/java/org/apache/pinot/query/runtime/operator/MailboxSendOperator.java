@@ -165,7 +165,8 @@ public class MailboxSendOperator extends MultiStageOperator {
         MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
             mailboxInfos);
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
-        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
+        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getReceiverInstanceIdHash(),
+            v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
     return BlockExchange.getExchange(sendingMailboxes, distributionType, node.getKeys(), splitter,

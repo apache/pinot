@@ -294,7 +294,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
   }
 
-  /// Override to customize the [WorkerManager] used for multi-stage query engine worker assignment.
+  /// Override to customize the [WorkerManager] used for multi-stage query engine worker assignment. The worker manager
+  /// must use `brokerId` as its instance id: plans address this broker by that id, and the mailbox server of the broker
+  /// rejects the streams of a plan that addresses another instance.
   protected WorkerManager createWorkerManager(String brokerId, String hostname, int port,
       RoutingManager routingManager) {
     return new WorkerManager(brokerId, hostname, port, routingManager);

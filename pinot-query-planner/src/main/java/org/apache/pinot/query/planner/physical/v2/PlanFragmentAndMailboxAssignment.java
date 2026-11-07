@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.TableScan;
@@ -286,10 +287,10 @@ public class PlanFragmentAndMailboxAssignment {
         for (int workerId = 0; workerId < senderWorkers.size(); workerId++) {
           QueryServerInstance senderWorker = senderWorkers.get(workerId);
           QueryServerInstance receiverWorker = receiverWorkers.get(workerId);
-          MailboxInfos mailboxInfosForSender = new SharedMailboxInfos(new MailboxInfo(receiverWorker.getHostname(),
-              receiverWorker.getQueryMailboxPort(), List.of(workerId)));
-          MailboxInfos mailboxInfosForReceiver = new SharedMailboxInfos(new MailboxInfo(senderWorker.getHostname(),
-              senderWorker.getQueryMailboxPort(), List.of(workerId)));
+          MailboxInfos mailboxInfosForSender =
+              new SharedMailboxInfos(MailboxInfo.ofReceivers(receiverWorker, List.of(workerId)));
+          MailboxInfos mailboxInfosForReceiver =
+              new SharedMailboxInfos(MailboxInfo.ofSenders(senderWorker, List.of(workerId)));
           senderMailboxMap.computeIfAbsent(workerId, (x) -> new HashMap<>()).put(receiverStageId,
               mailboxInfosForSender);
           receiverMailboxMap.computeIfAbsent(workerId, (x) -> new HashMap<>()).put(
@@ -299,13 +300,13 @@ public class PlanFragmentAndMailboxAssignment {
       case SINGLETON_EXCHANGE: {
         Preconditions.checkState(receiverWorkers.size() == 1, "Singleton expects single instance in receiver");
         QueryServerInstance receiverWorker = receiverWorkers.get(0);
-        MailboxInfos mailboxInfosForSender = new SharedMailboxInfos(
-            new MailboxInfo(receiverWorker.getHostname(), receiverWorker.getQueryMailboxPort(), List.of(0)));
+        MailboxInfos mailboxInfosForSender =
+            new SharedMailboxInfos(MailboxInfo.ofReceivers(receiverWorker, List.of(0)));
         for (int workerId = 0; workerId < senderWorkers.size(); workerId++) {
           senderMailboxMap.computeIfAbsent(workerId, (x) -> new HashMap<>())
               .put(receiverStageId, mailboxInfosForSender);
         }
-        List<MailboxInfo> mailboxInfoListForReceiver = createMailboxInfo(senderWorkers);
+        List<MailboxInfo> mailboxInfoListForReceiver = createMailboxInfo(senderWorkers, MailboxInfo::ofSenders);
         receiverMailboxMap.computeIfAbsent(0, (x) -> new HashMap<>())
             .put(senderStageId, new SharedMailboxInfos(mailboxInfoListForReceiver));
         break;
@@ -313,8 +314,10 @@ public class PlanFragmentAndMailboxAssignment {
       case RANDOM_EXCHANGE:
       case PARTITIONING_EXCHANGE:
       case BROADCAST_EXCHANGE: {
-        MailboxInfos mailboxInfoListForSender = new MailboxInfos(createMailboxInfo(receiverWorkers));
-        MailboxInfos mailboxInfoListForReceiver = new MailboxInfos(createMailboxInfo(senderWorkers));
+        MailboxInfos mailboxInfoListForSender =
+            new MailboxInfos(createMailboxInfo(receiverWorkers, MailboxInfo::ofReceivers));
+        MailboxInfos mailboxInfoListForReceiver =
+            new MailboxInfos(createMailboxInfo(senderWorkers, MailboxInfo::ofSenders));
         for (int receiverWorkerId = 0; receiverWorkerId < receiverWorkers.size(); receiverWorkerId++) {
           receiverMailboxMap.computeIfAbsent(receiverWorkerId, (x) -> new HashMap<>()).put(senderStageId,
               mailboxInfoListForReceiver);
@@ -333,14 +336,15 @@ public class PlanFragmentAndMailboxAssignment {
     }
   }
 
-  private static List<MailboxInfo> createMailboxInfo(Map<Integer, QueryServerInstance> workers) {
+  private static List<MailboxInfo> createMailboxInfo(Map<Integer, QueryServerInstance> workers,
+      BiFunction<QueryServerInstance, List<Integer>, MailboxInfo> mailboxInfoFactory) {
     Map<QueryServerInstance, List<Integer>> workersByUniqueHostPort = new HashMap<>();
     for (var entry : workers.entrySet()) {
       workersByUniqueHostPort.computeIfAbsent(entry.getValue(), (x) -> new ArrayList<>()).add(entry.getKey());
     }
     List<MailboxInfo> result = new ArrayList<>();
     for (var entry : workersByUniqueHostPort.entrySet()) {
-      result.add(new MailboxInfo(entry.getKey().getHostname(), entry.getKey().getQueryMailboxPort(), entry.getValue()));
+      result.add(mailboxInfoFactory.apply(entry.getKey(), entry.getValue()));
     }
     // IMP: Return mailbox info sorted by workerIds. This is because SendingMailbox are created in this order, and
     // record assignment for hash exchange follows modulo arithmetic. e.g. if we have sending mailbox in order:

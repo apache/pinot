@@ -22,11 +22,17 @@ public class RoutingInfo {
   private final String _hostname;
   private final int _port;
   private final String _mailboxId;
+  private final long _receiverInstanceIdHash;
 
   public RoutingInfo(String hostname, int port, String mailboxId) {
+    this(hostname, port, mailboxId, 0);
+  }
+
+  public RoutingInfo(String hostname, int port, String mailboxId, long receiverInstanceIdHash) {
     _hostname = hostname;
     _port = port;
     _mailboxId = mailboxId;
+    _receiverInstanceIdHash = receiverInstanceIdHash;
   }
 
   public String getHostname() {
@@ -39,5 +45,11 @@ public class RoutingInfo {
 
   public String getMailboxId() {
     return _mailboxId;
+  }
+
+  /// Returns the hash of the instance id of the receiver the mailbox is meant for, or 0 if unknown. See
+  /// [MailboxInfo#getInstanceIdHash()].
+  public long getReceiverInstanceIdHash() {
+    return _receiverInstanceIdHash;
   }
 }
