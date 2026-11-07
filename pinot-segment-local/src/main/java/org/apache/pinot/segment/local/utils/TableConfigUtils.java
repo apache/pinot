@@ -533,7 +533,7 @@ public final class TableConfigUtils {
   /// - Batch ingestion: each batch config map is well-formed, and a dimension table has batch ingestion configured
   ///   with `REFRESH` segment ingestion type.
   /// - Stream ingestion: streams are declared in only one place, at least one stream is present, and pauseless
-  ///   consumption has a valid `peerSegmentDownloadScheme`.
+  ///   consumption has a valid `peerSegmentDownloadScheme` and no time flush threshold.
   /// - Filter config: the filter function is valid and not a disabled Groovy expression.
   /// - Source field configs: no source field is duplicated within the same complex-type phase.
   /// - Enrichment configs: each config is valid.
@@ -607,6 +607,17 @@ public final class TableConfigUtils {
               "Must have a valid peerSegmentDownloadScheme set in validation config for pauseless consumption");
         } else {
           LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
+        }
+        // Pauseless consumption needs a row or size flush threshold, which stops all replicas at the same offset. Each
+        // replica checks a time threshold on its own (a restarted replica also extends it), so replicas can stop at
+        // different offsets. A replica past the committed end offset can only download the segment, so if the
+        // committer fails before the upload, no replica has a copy.
+        for (Map<String, String> streamConfigMap : streamConfigMaps) {
+          for (String key : List.of(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME,
+              StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX)) {
+            Preconditions.checkState(!streamConfigMap.containsKey(key),
+                "%s is not supported with pauseless consumption enabled, use a row or size based flush threshold", key);
+          }
         }
       }
     }
