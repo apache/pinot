@@ -205,8 +205,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     LOGGER.info("Concurrent task scheduling cluster default: {}", _clusterConcurrentSchedulingEnabled);
     if (_clusterConcurrentSchedulingEnabled && _distributedTaskLockManager == null) {
       // The concurrent path relies on the distributed ZK lock to coordinate same-table task
-      // generation (and to mutually exclude with ad-hoc createTask, which still takes
-      // synchronized(this)). Running without distributed locking leaves those races unprotected.
+      // generation (and to mutually exclude with ad-hoc createTask, which stays on synchronized(this)
+      // whenever distributed locking is off). Running without distributed locking leaves those races
+      // unprotected.
       LOGGER.warn("Concurrent task scheduling is enabled but distributed locking is disabled. "
           + "Same-table scheduleTasks and ad-hoc createTask will not be mutually exclusive. "
           + "Enable {} to close this race window.",
@@ -235,7 +236,56 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  public synchronized Map<String, String> createTask(String taskType, String tableName, @Nullable String taskName,
+  /// Creates ad-hoc tasks for the given table.
+  ///
+  /// Dispatches like [#scheduleTasks]: when every targeted table opts into concurrent scheduling (see
+  /// [#shouldUseConcurrentPathForAdhoc]) the call holds no controller-wide monitor, so ad-hoc generation for
+  /// one table no longer waits behind another's; otherwise it runs under `synchronized(this)` as before. Both
+  /// paths share [#doCreateTask].
+  public Map<String, String> createTask(String taskType, String tableName, @Nullable String taskName,
+      Map<String, String> taskConfigs)
+      throws Exception {
+    if (shouldUseConcurrentPathForAdhoc(tableName)) {
+      return doCreateTask(taskType, tableName, taskName, taskConfigs);
+    }
+    synchronized (this) {
+      return doCreateTask(taskType, tableName, taskName, taskConfigs);
+    }
+  }
+
+  /// Resolves whether an ad-hoc [#createTask] may skip the controller-wide monitor. Every table the request
+  /// targets must opt in via [#resolveConcurrentScheduling] — the table-level override, else the cluster
+  /// default.
+  ///
+  /// Unlike [#shouldUseConcurrentPath], distributed locking is also required: without the monitor the ZK lock
+  /// is the only thing stopping two ad-hoc requests for the same table from generating tasks side by side.
+  ///
+  /// A table that cannot be resolved falls back to the legacy path, so an invalid name still fails inside
+  /// the synchronized call exactly as before.
+  protected boolean shouldUseConcurrentPathForAdhoc(String tableName) {
+    if (_distributedTaskLockManager == null) {
+      return false;
+    }
+    List<String> tableNameWithTypes;
+    try {
+      tableNameWithTypes = getTableNameWithTypes(tableName);
+    } catch (TableNotFoundException e) {
+      return false;
+    }
+    if (tableNameWithTypes.isEmpty()) {
+      return false;
+    }
+    for (String tableNameWithType : tableNameWithTypes) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null || !resolveConcurrentScheduling(tableConfig)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Shared body used by both the legacy (synchronized) and concurrent paths of [#createTask].
+  private Map<String, String> doCreateTask(String taskType, String tableName, @Nullable String taskName,
       Map<String, String> taskConfigs)
       throws Exception {
     prepTaskQueue(taskType);
@@ -1314,13 +1364,17 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  protected synchronized void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
-    if (!_taskTypeMetricsUpdaterMap.containsKey(taskType)) {
-      TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(taskType, this);
+  /// Registers the per-task-type metrics listener once. Not `synchronized` on the manager: this runs from
+  /// [#prepTaskQueue] on every generation path, the concurrent ones included, so taking the manager's monitor
+  /// here made each concurrent caller wait out any legacy-path generation still holding it. `computeIfAbsent`
+  /// keeps the once-per-type guarantee without that coupling.
+  protected void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
+    _taskTypeMetricsUpdaterMap.computeIfAbsent(taskType, type -> {
+      TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(type, this);
       _pinotHelixResourceManager.getPropertyStore()
-          .subscribeDataChanges(getPropertyStorePathForTaskQueue(taskType), taskTypeMetricsUpdater);
-      _taskTypeMetricsUpdaterMap.put(taskType, taskTypeMetricsUpdater);
-    }
+          .subscribeDataChanges(getPropertyStorePathForTaskQueue(type), taskTypeMetricsUpdater);
+      return taskTypeMetricsUpdater;
+    });
   }
 
   protected boolean isTaskSchedulable(String taskType, List<String> tables) {
