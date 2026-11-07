@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -59,6 +60,7 @@ import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
 
@@ -70,6 +72,9 @@ public class GcsPinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(GcsPinotFS.class);
   // See https://cloud.google.com/storage/docs/json_api/v1/how-tos/batch
   private static final int DELETE_BATCH_LIMIT = 100;
+  // GCS returns at most 1,000 objects per list request.
+  private static final int LIST_PAGE_SIZE = 1000;
+
   private Storage _storage;
 
   @Override
@@ -292,15 +297,7 @@ public class GcsPinotFS extends BasePinotFS {
           }
           final String filePath = GcsUri.createGcsUri(bucketName, blob.getName()).toString();
           if (pathFilter.test(filePath)) {
-            final FileMetadata.Builder fileBuilder = new FileMetadata.Builder()
-                .setFilePath(filePath)
-                .setLength(blob.getSize())
-                .setIsDirectory(false);
-            OffsetDateTime blobUpdateTime = blob.getUpdateTimeOffsetDateTime();
-            if (blobUpdateTime != null) {
-              fileBuilder.setLastModifiedTime(blobUpdateTime.toInstant().toEpochMilli());
-            }
-            result.add(fileBuilder.build());
+            result.add(fileMetadata(filePath, blob));
             if (result.size() >= maxResults) {
               break;
             }
@@ -314,6 +311,72 @@ public class GcsPinotFS extends BasePinotFS {
     LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
         result.size(), maxResults, gcsFileUri, recursive);
     return result;
+  }
+
+  @Override
+  public boolean supportsListingAfter() {
+    return true;
+  }
+
+  /// GCS lists objects by name and file paths are those names URI-escaped, so `startAfter` is decoded back to the
+  /// object name it spells.
+  @Override
+  public List<FileMetadata> listFilesWithMetadataAfter(final URI fileUri, @Nullable final String startAfter,
+      final int maxResults)
+      throws IOException {
+    final List<FileMetadata> result = new ArrayList<>();
+    if (maxResults <= 0) {
+      return result;
+    }
+    final GcsUri gcsFileUri = new GcsUri(fileUri);
+    final String bucketName = gcsFileUri.getBucketName();
+    final String prefix = gcsFileUri.getPrefix();
+    String startName = null;
+    if (startAfter != null) {
+      final URI start = URI.create(startAfter);
+      checkArgument(GcsUri.SCHEME.equals(start.getScheme()) && bucketName.equals(start.getAuthority()),
+          "startAfter %s is not in bucket %s", startAfter, bucketName);
+      startName = start.getPath().substring(1);
+    }
+    try {
+      final List<Storage.BlobListOption> options = new ArrayList<>();
+      options.add(Storage.BlobListOption.prefix(prefix));
+      options.add(Storage.BlobListOption.pageSize(Math.min(maxResults, LIST_PAGE_SIZE)));
+      if (startName != null) {
+        // startOffset is inclusive.
+        options.add(Storage.BlobListOption.startOffset(startName));
+      }
+      Page<Blob> page = _storage.list(bucketName, options.toArray(new Storage.BlobListOption[0]));
+      while (page != null && result.size() < maxResults) {
+        for (final Blob blob : page.getValues()) {
+          final String name = blob.getName();
+          if (name.equals(startName) || name.equals(prefix) || name.endsWith(GcsUri.DELIMITER)) {
+            continue;
+          }
+          result.add(fileMetadata(GcsUri.createGcsUri(bucketName, name).toString(), blob));
+          if (result.size() >= maxResults) {
+            break;
+          }
+        }
+        page = page.hasNextPage() ? page.getNextPage() : null;
+      }
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
+    LOGGER.debug("Listed {} files (max: {}) after {} from URI: {}", result.size(), maxResults, startAfter, fileUri);
+    return result;
+  }
+
+  private static FileMetadata fileMetadata(final String filePath, final Blob blob) {
+    final FileMetadata.Builder fileBuilder = new FileMetadata.Builder()
+        .setFilePath(filePath)
+        .setLength(blob.getSize())
+        .setIsDirectory(false);
+    final OffsetDateTime blobUpdateTime = blob.getUpdateTimeOffsetDateTime();
+    if (blobUpdateTime != null) {
+      fileBuilder.setLastModifiedTime(blobUpdateTime.toInstant().toEpochMilli());
+    }
+    return fileBuilder.build();
   }
 
   @Override
