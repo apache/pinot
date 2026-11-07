@@ -90,6 +90,7 @@ import org.apache.pinot.spi.trace.Tracer;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -511,7 +512,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       throws Exception {
     FilterContext filter = queryContext.getFilter();
     if (filter != null && !filter.isConstant()) {
-      handleSubquery(filter, tableExecutionInfo, timerContext, executorService, queryContext.getEndTimeMs());
+      handleSubquery(filter, tableExecutionInfo, timerContext, executorService, queryContext);
     }
   }
 
@@ -519,15 +520,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   ///
   /// Currently only supports subquery within the lhs of the predicate.
   private void handleSubquery(FilterContext filter, TableExecutionInfo executionInfo, TimerContext timerContext,
-      ExecutorService executorService, long endTimeMs)
+      ExecutorService executorService, QueryContext queryContext)
       throws Exception {
     List<FilterContext> children = filter.getChildren();
     if (children != null) {
       for (FilterContext child : children) {
-        handleSubquery(child, executionInfo, timerContext, executorService, endTimeMs);
+        handleSubquery(child, executionInfo, timerContext, executorService, queryContext);
       }
     } else {
-      handleSubquery(filter.getPredicate().getLhs(), executionInfo, timerContext, executorService, endTimeMs);
+      handleSubquery(filter.getPredicate().getLhs(), executionInfo, timerContext, executorService, queryContext);
     }
   }
 
@@ -537,9 +538,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   /// rewrites the expression with the subquery response.
   ///
   /// Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
-  /// rewritten to an IN_ID_SET transform function.
+  /// rewritten to an IN_ID_SET transform function. The function is not allowed under row-level security: the broker
+  /// rejects it, and a server behind an older broker fails the query.
   private void handleSubquery(ExpressionContext expression, TableExecutionInfo executionInfo, TimerContext timerContext,
-      ExecutorService executorService, long endTimeMs)
+      ExecutorService executorService, QueryContext queryContext)
       throws Exception {
     FunctionContext function = expression.getFunction();
     if (function == null) {
@@ -547,6 +549,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     List<ExpressionContext> arguments = function.getArguments();
     if (StringUtils.remove(function.getFunctionName(), '_').equalsIgnoreCase(IN_PARTITIONED_SUBQUERY)) {
+      // Reject under RLS even when an older broker allows the function through: the subquery is an opaque string
+      // literal the row filters stamped in the options do not reach, so it would build its ID_SET from every row
+      Map<String, String> rowFilters = RlsUtils.extractRlsFilters(queryContext.getQueryOptions());
+      Preconditions.checkState(rowFilters.isEmpty(),
+          "IN_PARTITIONED_SUBQUERY is not allowed when row-level security filters apply, got filters for %s",
+          rowFilters.keySet());
       Preconditions.checkArgument(arguments.size() == 2,
           "IN_PARTITIONED_SUBQUERY requires 2 arguments: expression, subquery");
       ExpressionContext subqueryExpression = arguments.get(1);
@@ -563,7 +571,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           "Subquery in IN_PARTITIONED_SUBQUERY should be an ID_SET aggregation only query, found: %s",
           subqueryExpression.toString());
       // Execute the subquery
-      subquery.setEndTimeMs(endTimeMs);
+      subquery.setEndTimeMs(queryContext.getEndTimeMs());
       // Make a clone of indexSegments because the method might modify the list
       InstanceResponseBlock instanceResponse =
           executeInternal(executionInfo, subquery, timerContext, executorService, null, false, null);
@@ -579,7 +587,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       arguments.set(1, ExpressionContext.forLiteral(RequestUtils.getLiteral(((IdSet) result).toBase64String())));
     } else {
       for (ExpressionContext argument : arguments) {
-        handleSubquery(argument, executionInfo, timerContext, executorService, endTimeMs);
+        handleSubquery(argument, executionInfo, timerContext, executorService, queryContext);
       }
     }
   }
