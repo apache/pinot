@@ -29,16 +29,17 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class ListAggFunction extends BaseSingleInputAggregationFunction<ObjectCollection<String>, String> {
+  private static final int STRING_ARRAY_LIST_TYPE = 45;
 
   private final String _separator;
 
@@ -183,14 +184,13 @@ public class ListAggFunction extends BaseSingleInputAggregationFunction<ObjectCo
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ObjectCollection<String> strings) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringArrayList.getValue(),
-        ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.serialize((ObjectArrayList<String>) strings));
+  public SerializedResult serializeIntermediateResult(ObjectCollection<String> strings) {
+    return new SerializedValue<>(STRING_ARRAY_LIST_TYPE, (ObjectArrayList<String>) strings,
+        ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE);
   }
 
   @Override
   public ObjectCollection<String> deserializeIntermediateResult(CustomObject customObject) {
-    //noinspection unchecked
     return ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 

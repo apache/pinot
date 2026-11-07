@@ -28,7 +28,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -56,6 +55,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 ///
 /// Example: IDSET(col, 'sizeThresholdInBytes=1000;expectedInsertions=10000;fpp=0.03')
 public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction<IdSet, String> {
+  private static final int ID_SET_TYPE = 20;
+
   private static final char PARAMETER_DELIMITER = ';';
   private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
   private static final String UPPER_CASE_SIZE_THRESHOLD_IN_BYTES = "SIZETHRESHOLDINBYTES";
@@ -623,14 +624,21 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(IdSet idSet) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IdSet.getValue(),
-        ObjectSerDeUtils.ID_SET_SER_DE.serialize(idSet));
+  public SerializedResult serializeIntermediateResult(IdSet idSet) {
+    try {
+      return new SerializedBytes(ID_SET_TYPE, idSet.toBytes());
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while serializing IdSet", e);
+    }
   }
 
   @Override
   public IdSet deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.ID_SET_SER_DE.deserialize(customObject.getBuffer());
+    try {
+      return IdSets.fromByteBuffer(customObject.getBuffer());
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while deserializing IdSet", e);
+    }
   }
 
   @Override

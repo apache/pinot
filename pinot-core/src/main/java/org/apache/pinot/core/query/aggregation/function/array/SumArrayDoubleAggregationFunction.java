@@ -28,17 +28,18 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class SumArrayDoubleAggregationFunction
     extends BaseSingleInputAggregationFunction<DoubleArrayList, double[]> {
+  private static final int DOUBLE_ARRAY_LIST_TYPE = 3;
 
   public SumArrayDoubleAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "SUM_ARRAY"), nullHandlingEnabled);
@@ -158,9 +159,8 @@ public class SumArrayDoubleAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubleArrayList));
+  public SerializedResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
+    return new SerializedValue<>(DOUBLE_ARRAY_LIST_TYPE, doubleArrayList, ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE);
   }
 
   @Override

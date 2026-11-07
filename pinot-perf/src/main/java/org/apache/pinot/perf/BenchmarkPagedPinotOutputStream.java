@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.perf;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutput;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
-import org.apache.pinot.segment.spi.memory.PrimitiveArrayOutput;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -41,21 +37,19 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/// Compares ways to write a primitive array to the outputs data blocks and data tables use:
-/// - `*PerValue`: one writeInt/writeLong/writeDouble call per value.
-/// - `*Chunked`: [PrimitiveArrayOutput] through a plain [DataOutput], which encodes small chunks into a scratch array.
-/// - `pagedBulk`: the [PagedPinotOutputStream] override, which puts the values straight into the pages.
+/// Compares ways to write a primitive array to the [PagedPinotOutputStream] that data blocks and data tables use:
+/// - `perValue`: one writeInt/writeLong/writeFloat/writeDouble call per value.
+/// - `bulk`: the bulk write, which puts the values straight into the pages.
 ///
-/// Each operation writes `size` values into a new output: [PagedPinotOutputStream] with small heap pages (as data
-/// blocks use), or a [DataOutputStream] over a presized [ByteArrayOutputStream] (as data tables use).
+/// Each operation writes `size` values into a new stream with small heap pages.
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Fork(3)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
 @State(Scope.Benchmark)
-public class BenchmarkPrimitiveArrayOutput {
-  @Param({"INT", "LONG", "DOUBLE"})
+public class BenchmarkPagedPinotOutputStream {
+  @Param({"INT", "LONG", "FLOAT", "DOUBLE"})
   private String _type;
 
   @Param({"1", "4", "16", "64", "1024", "65536", "1048576"})
@@ -63,61 +57,25 @@ public class BenchmarkPrimitiveArrayOutput {
 
   private int[] _ints;
   private long[] _longs;
+  private float[] _floats;
   private double[] _doubles;
-  private int _numBytes;
 
   @Setup
   public void setUp() {
     Random random = new Random(42);
     _ints = random.ints(_size).toArray();
     _longs = random.longs(_size).toArray();
+    _floats = new float[_size];
+    for (int i = 0; i < _size; i++) {
+      _floats[i] = random.nextFloat();
+    }
     _doubles = random.doubles(_size).toArray();
-    _numBytes = _size * ("INT".equals(_type) ? Integer.BYTES : Long.BYTES);
   }
 
   @Benchmark
-  public PagedPinotOutputStream pagedPerValue()
+  public PagedPinotOutputStream perValue()
       throws IOException {
     PagedPinotOutputStream output = PagedPinotOutputStream.createHeap();
-    writePerValue(output);
-    return output;
-  }
-
-  @Benchmark
-  public PagedPinotOutputStream pagedChunked()
-      throws IOException {
-    PagedPinotOutputStream output = PagedPinotOutputStream.createHeap();
-    // A DataOutputStream wrapper is not a PinotOutputStream, so PrimitiveArrayOutput uses the chunked encoding.
-    writeDispatched(new DataOutputStream(output));
-    return output;
-  }
-
-  @Benchmark
-  public PagedPinotOutputStream pagedBulk()
-      throws IOException {
-    PagedPinotOutputStream output = PagedPinotOutputStream.createHeap();
-    writeDispatched(output);
-    return output;
-  }
-
-  @Benchmark
-  public ByteArrayOutputStream dataOutputStreamPerValue()
-      throws IOException {
-    ByteArrayOutputStream bytes = new ByteArrayOutputStream(_numBytes);
-    writePerValue(new DataOutputStream(bytes));
-    return bytes;
-  }
-
-  @Benchmark
-  public ByteArrayOutputStream dataOutputStreamChunked()
-      throws IOException {
-    ByteArrayOutputStream bytes = new ByteArrayOutputStream(_numBytes);
-    writeDispatched(new DataOutputStream(bytes));
-    return bytes;
-  }
-
-  private void writePerValue(DataOutput output)
-      throws IOException {
     switch (_type) {
       case "INT":
         for (int value : _ints) {
@@ -129,31 +87,43 @@ public class BenchmarkPrimitiveArrayOutput {
           output.writeLong(value);
         }
         break;
+      case "FLOAT":
+        for (float value : _floats) {
+          output.writeFloat(value);
+        }
+        break;
       default:
         for (double value : _doubles) {
           output.writeDouble(value);
         }
         break;
     }
+    return output;
   }
 
-  private void writeDispatched(DataOutput output)
+  @Benchmark
+  public PagedPinotOutputStream bulk()
       throws IOException {
+    PagedPinotOutputStream output = PagedPinotOutputStream.createHeap();
     switch (_type) {
       case "INT":
-        PrimitiveArrayOutput.writeInts(output, _ints, 0, _size);
+        output.writeInts(_ints, 0, _size);
         break;
       case "LONG":
-        PrimitiveArrayOutput.writeLongs(output, _longs, 0, _size);
+        output.writeLongs(_longs, 0, _size);
+        break;
+      case "FLOAT":
+        output.writeFloats(_floats, 0, _size);
         break;
       default:
-        PrimitiveArrayOutput.writeDoubles(output, _doubles, 0, _size);
+        output.writeDoubles(_doubles, 0, _size);
         break;
     }
+    return output;
   }
 
   public static void main(String[] args)
       throws Exception {
-    new Runner(new OptionsBuilder().include(BenchmarkPrimitiveArrayOutput.class.getSimpleName()).build()).run();
+    new Runner(new OptionsBuilder().include(BenchmarkPagedPinotOutputStream.class.getSimpleName()).build()).run();
   }
 }
