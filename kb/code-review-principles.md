@@ -1308,6 +1308,6 @@ Approve the immediate fix while deferring broader design to separate threads.
 | 4. Performance & Efficiency | 2 | 16 | 4 | 22 |
 | 5. Correctness & Safety | 9 | 16 | 3 | 28 |
 | 6. Testing Strategies | 2 | 7 | 9 | 18 |
-| 7. Naming & API Design | 1 | 9 | 13 | 23 |
+| 7. Naming & API Design | 1 | 9 | 15 | 25 |
 | 8. Process & Scope | 2 | 10 | 8 | 20 |
-| **Total** | **32** | **83** | **52** | **167** |
+| **Total** | **32** | **83** | **54** | **169** |
