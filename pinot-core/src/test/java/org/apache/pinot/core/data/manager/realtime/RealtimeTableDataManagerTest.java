@@ -77,6 +77,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -100,6 +101,33 @@ public class RealtimeTableDataManagerTest {
     RealtimeSegmentDataManager segment = mock(RealtimeSegmentDataManager.class);
     doCallRealMethod().when(segment).stop();
     segment.stop();
+  }
+
+  @Test
+  public void testConsumingSegmentReceivesReadinessSupplier()
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    File indexDir = Files.createTempDirectory("consuming-readiness").toFile();
+    RealtimeSegmentDataManager segment = mock(RealtimeSegmentDataManager.class);
+    MutableSegment mutableSegment = mock(MutableSegment.class);
+    when(segment.getSegment()).thenReturn(mutableSegment);
+    when(mutableSegment.getSegmentMetadata()).thenReturn(mock(SegmentMetadata.class));
+    when(segment.decreaseReferenceCount()).thenReturn(true);
+    LifecycleTableDataManager table =
+        spy(new LifecycleTableDataManager(indexDir, segment, false, () -> { }));
+    LLCSegmentName segmentName = new LLCSegmentName(LifecycleTableDataManager.SEGMENT_NAME);
+    BooleanSupplier ready = () -> false;
+    doReturn(ready).when(table).createReadyToConsumeDataSupplier(segmentName);
+    try {
+      table.addConsumingSegment(segmentName.getSegmentName());
+
+      verify(table).createRealtimeSegmentDataManager(any(), any(), any(), any(), eq(segmentName), any(), any(), any(),
+          same(ready));
+      verify(segment).startConsumption();
+    } finally {
+      table.shutDown();
+      FileUtils.deleteDirectory(indexDir);
+    }
   }
 
   @DataProvider
