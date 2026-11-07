@@ -32,6 +32,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.common.datatable.ResponseSizeLimitExceededException;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -175,6 +176,13 @@ public abstract class QueryScheduler {
   protected DataBuffer processQueryAndSerializeResponse(ServerQueryRequest queryRequest,
       ExecutorService executorService) {
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceId);
+    // The data table builders read this limit and stop building the response as soon as it is exceeded. Only this
+    // path applies maxServerResponseSizeBytes. The gRPC query server never applied it.
+    Long maxResponseSizeBytes =
+        QueryOptionsUtils.getMaxServerResponseSizeBytes(queryRequest.getQueryContext().getQueryOptions());
+    if (maxResponseSizeBytes != null) {
+      executionContext.setMaxResponseSizeBytes(maxResponseSizeBytes);
+    }
     _latestQueryTime.accumulate(executionContext.getStartTimeMs());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       InstanceResponseBlock instanceResponse;
@@ -197,38 +205,56 @@ public abstract class QueryScheduler {
       responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
       responseMetadata.put(MetadataKey.QUERY_ID.getName(), queryId);
       responseMetadata.put(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
-      DataBuffer response = serializeResponse(queryRequest, instanceResponse);
+      DataBuffer response;
+      boolean responseSizeExceeded = false;
+      try {
+        response = serializeResponse(queryRequest, instanceResponse);
+      } catch (ResponseSizeLimitExceededException e) {
+        // A data table builder stopped because the rows already exceed the limit. The full size is unknown, so the
+        // meter records the bytes written until the builder stopped.
+        _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERY_RESPONSE_SIZE,
+            e.getSizeBytes());
+        response = responseSizeExceeded(queryRequest, executionContext, e.getMessage());
+        responseSizeExceeded = true;
+      }
 
       // Log the statistics
       if (_queryLogger != null) {
         _queryLogger.logQuery(queryRequest, instanceResponse, name());
       }
 
-      // TODO: Perform this check sooner during the serialization of DataTable.
-      Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-      if (response != null) {
+      // This check also counts the header, the data schema, the exceptions and the metadata, which the data table
+      // builders do not count.
+      if (response != null && !responseSizeExceeded) {
         long responseSizeBytes = response.size();
-        String tableNameWithType = queryRequest.getTableNameWithType();
-        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_RESPONSE_SIZE, responseSizeBytes);
-        Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
+        _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERY_RESPONSE_SIZE,
+            responseSizeBytes);
         if (maxResponseSizeBytes != null && responseSizeBytes > maxResponseSizeBytes) {
-          String errMsg =
-              "Serialized query response size " + responseSizeBytes + " exceeds threshold " + maxResponseSizeBytes
-                  + " for requestId " + requestId + " from broker " + queryRequest.getBrokerId();
-          LOGGER.error(errMsg);
-          _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
-
-          instanceResponse = new InstanceResponseBlock();
-          instanceResponse.addException(QueryErrorCode.QUERY_CANCELLATION, errMsg);
-          instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-          instanceResponse.addMetadata(MetadataKey.QUERY_ID.getName(), queryId);
-          instanceResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
-          response = serializeResponse(queryRequest, instanceResponse);
+          response = responseSizeExceeded(queryRequest, executionContext,
+              "Serialized query response size " + responseSizeBytes + " exceeds threshold " + maxResponseSizeBytes);
         }
       }
 
       return response;
     }
+  }
+
+  /// Returns the error response that replaces a response larger than `maxServerResponseSizeBytes`.
+  @Nullable
+  private DataBuffer responseSizeExceeded(ServerQueryRequest queryRequest, QueryExecutionContext executionContext,
+      String message) {
+    String errMsg = message + " for requestId " + executionContext.getRequestId() + " from broker "
+        + queryRequest.getBrokerId();
+    LOGGER.error(errMsg);
+    _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(),
+        ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
+
+    InstanceResponseBlock errorResponse = new InstanceResponseBlock();
+    errorResponse.addException(QueryErrorCode.QUERY_CANCELLATION, errMsg);
+    errorResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(executionContext.getRequestId()));
+    errorResponse.addMetadata(MetadataKey.QUERY_ID.getName(), executionContext.getCid());
+    errorResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), executionContext.getWorkloadName());
+    return serializeResponse(queryRequest, errorResponse);
   }
 
   /// Serialize the instance response for query request
@@ -246,6 +272,11 @@ public abstract class QueryScheduler {
     DataBuffer response = null;
     try {
       response = instanceResponse.toDataTable().toDataBuffer();
+    } catch (ResponseSizeLimitExceededException e) {
+      // The caller replies with the same error as when the serialized response exceeds the limit. Record the time
+      // spent building the rows before the builder stopped.
+      responseSerializationTimer.stopAndRecord();
+      throw e;
     } catch (Exception e) {
       // First check terminate exception and use it as the response if exists. We want to return the termination reason
       // when query is explicitly terminated.

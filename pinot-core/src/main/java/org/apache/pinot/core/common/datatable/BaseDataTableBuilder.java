@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common.datatable;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
@@ -48,6 +50,14 @@ import org.roaringbitmap.RoaringBitmap;
 /// identical to one produced before null bitmaps existed. Readers detect the section by buffer length and cannot
 /// distinguish "no section because no nulls" from "no section because the writer never emitted one" -- both mean the
 /// same thing.
+///
+/// [#finishRow] stops the build early, so that the server never holds a response larger than the query allows:
+/// - It throws [ResponseSizeLimitExceededException] when the rows written so far are larger than the maximum response
+///   size of the query (see [org.apache.pinot.spi.query.QueryExecutionContext#getMaxResponseSizeBytes]).
+/// - It checks termination and samples the resource usage every [#SAMPLE_USAGE_BYTES] bytes. Callers sample every
+///   8192 rows, which misses responses with few large rows.
+///
+/// Not thread-safe.
 public abstract class BaseDataTableBuilder implements DataTableBuilder {
   /// Column types whose null value is already representable in-band, and which therefore need no bitmap entry:
   /// - `OBJECT` and `UNKNOWN` are read back via `DataTable.getCustomObject`, which returns `null` for the
@@ -62,6 +72,10 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   /// Heap pages need no release, so one stateless allocator serves every builder.
   private static final PagedPinotOutputStream.PageAllocator PAGE_ALLOCATOR =
       PagedPinotOutputStream.HeapPageAllocator.createSmall();
+  /// [#finishRow] checks termination and samples the resource usage each time this many more bytes are written. 1 MB
+  /// is small compared to the responses that put the heap at risk, and large enough that sampling costs nothing
+  /// measurable.
+  static final long SAMPLE_USAGE_BYTES = 1024 * 1024;
 
   protected final DataSchema _dataSchema;
   protected final int _version;
@@ -83,6 +97,9 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
 
   protected int _numRows;
 
+  private final long _maxSizeBytes;
+  private long _nextSampleUsageBytes = SAMPLE_USAGE_BYTES;
+
   public BaseDataTableBuilder(DataSchema dataSchema, int version) {
     _dataSchema = dataSchema;
     _version = version;
@@ -93,6 +110,20 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     _currentRowDataByteBuffer = ByteBuffer.allocate(rowSizeInBytes);
     _storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     _nullBitmaps = new RoaringBitmap[dataSchema.size()];
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    _maxSizeBytes = threadContext != null ? Math.min(threadContext.getExecutionContext().getMaxResponseSizeBytes(),
+        Integer.MAX_VALUE) : Integer.MAX_VALUE;
+  }
+
+  @VisibleForTesting
+  long getMaxSizeBytes() {
+    return _maxSizeBytes;
+  }
+
+  /// Returns a lower bound of the size of the serialized table, from the bytes written so far. It does not include the
+  /// header, the data schema, the exceptions and the metadata.
+  protected long getSizeBytes() {
+    return _fixedSizeDataOutputStream.getCurrentOffset() + _variableSizeDataOutputStream.getCurrentOffset();
   }
 
   /// Returns the offset of the next byte in the variable size section. The wire format stores it as an int. The
@@ -264,6 +295,14 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   public void finishRow()
       throws IOException {
     _fixedSizeDataOutputStream.write(_currentRowDataByteBuffer.array());
+    long sizeBytes = getSizeBytes();
+    if (sizeBytes > _maxSizeBytes) {
+      throw new ResponseSizeLimitExceededException(sizeBytes, _maxSizeBytes);
+    }
+    if (sizeBytes >= _nextSampleUsageBytes) {
+      QueryThreadContext.checkTerminationAndSampleUsage("DataTableBuilder#finishRow");
+      _nextSampleUsageBytes = sizeBytes + SAMPLE_USAGE_BYTES;
+    }
   }
 
   @Override

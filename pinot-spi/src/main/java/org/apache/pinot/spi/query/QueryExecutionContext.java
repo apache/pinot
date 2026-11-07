@@ -85,6 +85,10 @@ public class QueryExecutionContext {
   @Nullable
   private volatile Accounting.ScanKillingMode _effectiveScanKillingMode;
 
+  /// Maximum size in bytes of the response that a single-stage server builds for this query. The default is
+  /// `Integer.MAX_VALUE` because the data table wire format stores its section offsets as ints.
+  private volatile long _maxResponseSizeBytes = Integer.MAX_VALUE;
+
   /// Guards single-emission of the scan-based killing dry-run log line and metric for this query
   private final AtomicBoolean _scanKillingDryRunEmitted = new AtomicBoolean(false);
 
@@ -292,6 +296,14 @@ public class QueryExecutionContext {
 
   public void setQueryId(@Nullable String queryId) {
     _queryId = queryId;
+  }
+
+  public long getMaxResponseSizeBytes() {
+    return _maxResponseSizeBytes;
+  }
+
+  public void setMaxResponseSizeBytes(long maxResponseSizeBytes) {
+    _maxResponseSizeBytes = maxResponseSizeBytes;
   }
 
   /// Returns the per-table scan killing mode override set for this query, or `null` if no
