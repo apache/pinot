@@ -966,8 +966,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     takeSnapshot(new DocIdsSnapshot.Trigger(consumingSegmentName, consumedUpToOffset));
   }
 
+  /// Allows recovery implementations to defer snapshot publication until their input segments are loaded.
+  protected boolean isReadyToTakeSnapshot() {
+    return true;
+  }
+
   private void takeSnapshot(@Nullable DocIdsSnapshot.Trigger trigger) {
-    if (!_enableSnapshot) {
+    if (!_enableSnapshot || !isReadyToTakeSnapshot()) {
       return;
     }
     if (_partialUpsertHandler == null && !_gotFirstConsumingSegment) {

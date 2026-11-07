@@ -31,6 +31,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -140,12 +144,35 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     TableDataManager tableDataManager = mock(TableDataManager.class);
     when(tableDataManager.getTableDataDir()).thenReturn(INDEX_DIR);
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixDataAccessor accessor = mock(HelixDataAccessor.class);
+    when(tableDataManager.getHelixManager()).thenReturn(helixManager);
+    when(helixManager.getHelixDataAccessor()).thenReturn(accessor);
+    PropertyKey.Builder keyBuilder = new PropertyKey.Builder("testCluster");
+    when(accessor.keyBuilder()).thenReturn(keyBuilder);
+    when(accessor.getProperty(keyBuilder.idealStates(REALTIME_TABLE_NAME)))
+        .thenReturn(new IdealState(REALTIME_TABLE_NAME));
     _contextBuilder = new UpsertContext.Builder()
         .setTableConfig(mock(TableConfig.class))
         .setSchema(mock(Schema.class))
         .setTableDataManager(tableDataManager)
         .setPrimaryKeyColumns(PRIMARY_KEY_COLUMNS)
         .setComparisonColumns(COMPARISON_COLUMNS);
+    // These unit cases start with an empty, fully loaded assignment. Certify that starting state rather than
+    // exercising legacy bootstrap in every map-operation test; the restart fixture covers that recovery path.
+    ConcurrentMapPartitionUpsertMetadataManager bootstrap =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30).build()) {
+          @Override
+          protected boolean isInitialSegmentLoadComplete() {
+            return true;
+          }
+        };
+    bootstrap._gotFirstConsumingSegment = true;
+    bootstrap.takeSnapshot();
+    bootstrap.stop();
+    bootstrap.close();
+    _contextBuilder.setEnableSnapshot(false).setMetadataTTL(0);
   }
 
   @AfterClass
