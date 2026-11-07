@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.VariantUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -590,5 +591,40 @@ public class ExpressionTransformerTest {
     Object transformedValue = row.getValue("columnArray");
     Assert.assertTrue(transformedValue.getClass().isArray());
     Assert.assertEquals(Arrays.asList((Object[]) transformedValue), Arrays.asList("a", "b", "c"));
+  }
+
+  @Test
+  public void testVariantScalarIngestionTransforms() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("payload", FieldSpec.DataType.VARIANT)
+        .addSingleValueDimension("eventType", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("amount", FieldSpec.DataType.DOUBLE)
+        .addSingleValueDimension("hasCustomer", FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension("nullValue", FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension("payloadType", FieldSpec.DataType.STRING)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig("eventType", "variantGet(payload, '$.eventType', 'STRING')"),
+        new TransformConfig("amount", "tryVariantGet(payload, '$.amount', 'DOUBLE')"),
+        new TransformConfig("hasCustomer", "variantExists(payload, '$.customerId')"),
+        new TransformConfig("nullValue", "isVariantNull(payload, '$.deletedAt')"),
+        new TransformConfig("payloadType", "variantTypeOf(payload)")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testVariantScalarIngestionTransforms")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer transformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    row.putValue("payload", VariantUtils.parseJsonToVariant(
+        "{\"eventType\":\"checkout\",\"amount\":42.5,\"customerId\":\"u-1\",\"deletedAt\":null}"));
+    transformer.transform(row);
+
+    Assert.assertEquals(row.getValue("eventType"), "checkout");
+    Assert.assertEquals(row.getValue("amount"), 42.5D);
+    Assert.assertEquals(row.getValue("hasCustomer"), true);
+    Assert.assertEquals(row.getValue("nullValue"), true);
+    Assert.assertEquals(row.getValue("payloadType"), "OBJECT");
   }
 }

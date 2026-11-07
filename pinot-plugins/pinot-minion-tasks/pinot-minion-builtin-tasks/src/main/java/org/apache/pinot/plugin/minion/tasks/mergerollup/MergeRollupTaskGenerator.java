@@ -502,6 +502,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   @Override
   public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
     Set<String> columnNames = schema.getColumnNames();
+    // Reject rollup/dedup for VARIANT schemas per configured merge level, reading levels through the same parser
+    // the execution path uses. SegmentProcessorConfig re-enforces this at execution time.
+    MergeRollupTaskUtils.getLevelToConfigMap(taskConfigs).forEach((mergeLevel, levelConfig) ->
+        MergeTaskUtils.validateMergeTypeForVariantColumns(schema, levelConfig.get(MergeTask.MERGE_TYPE_KEY)));
     // check no mis-configured columns when erasing dimensions
     Set<String> dimensionsToErase = MergeRollupTaskUtils.getDimensionsToErase(taskConfigs);
     for (String dimension : dimensionsToErase) {

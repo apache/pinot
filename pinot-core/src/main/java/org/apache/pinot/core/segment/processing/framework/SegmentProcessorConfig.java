@@ -30,6 +30,7 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
@@ -70,6 +71,21 @@ public class SegmentProcessorConfig {
     };
     _segmentNameGenerator = segmentNameGenerator;
     _customCreationTime = customCreationTime;
+  }
+
+  /// Rollup and dedup merges group rows by the raw stored bytes of every dimension. Raw VARIANT values deliberately
+  /// reject equality and hashing (equivalent values can use different encodings), so only CONCAT is allowed for
+  /// schemas with a VARIANT column. This is the enforcement choke point: every merge flows through this config, so
+  /// task generators, executors, and command-line tools all inherit the rejection.
+  public static void validateMergeTypeForVariantColumns(Schema schema, MergeType mergeType) {
+    if (mergeType == MergeType.CONCAT) {
+      return;
+    }
+    boolean hasVariantColumn = schema.getAllFieldSpecs().stream()
+        .anyMatch(fieldSpec -> fieldSpec.getDataType() == FieldSpec.DataType.VARIANT);
+    Preconditions.checkState(!hasVariantColumn,
+        "MergeType %s is not supported for tables with VARIANT columns; raw VARIANT values do not support equality. "
+            + "Use CONCAT instead.", mergeType);
   }
 
   /// The Pinot table config
@@ -230,6 +246,7 @@ public class SegmentProcessorConfig {
       if (_mergeType == null) {
         _mergeType = DEFAULT_MERGE_TYPE;
       }
+      validateMergeTypeForVariantColumns(_schema, _mergeType);
       if (_aggregationTypes == null) {
         _aggregationTypes = Map.of();
       }
