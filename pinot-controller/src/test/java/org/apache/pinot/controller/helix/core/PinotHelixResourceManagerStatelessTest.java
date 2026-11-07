@@ -1517,8 +1517,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertNull(segmentLineage);
   }
 
-  /// Run A completes its replacement after run B's `startReplaceSegments` passed the 'segmentsFrom' existence check
-  /// but before B takes the lineage lock. B must be rejected instead of adding a second 'COMPLETED' entry for the same
+  /// Run A completes its replacement after run B's `startReplaceSegments` passed the existence check before the lineage
+  /// lock but before B takes the lock. B must be rejected instead of adding a second 'COMPLETED' entry for the same
   /// 'segmentsFrom', even with 'forceCleanup = true'.
   @Test
   public void testStartReplaceSegmentsForceCleanupRejectsConcurrentlyCompletedEntry()
@@ -1543,23 +1543,91 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "a0"),
         getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "a0"));
 
+    Throwable failure = startReplaceSegmentsWhileEndingOtherEntry(segmentsFrom, List.of("b0"), lineageEntryIdA);
+    assertTrue(failure instanceof IllegalStateException, String.valueOf(failure));
+    assertTrue(failure.getMessage().contains("Segment: s0 from 'segmentsFrom' does not exist"), failure.getMessage());
+
+    // Only A's entry exists, and nothing from run B is left behind
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
+    assertEquals(segmentLineage.getLineageEntryIds(), Set.of(lineageEntryIdA));
+    assertEquals(segmentLineage.getLineageEntry(lineageEntryIdA).getState(), LineageEntryState.COMPLETED);
+
+    // Partial overlap is rejected by the check before the lineage lock because s1 is already replaced
+    try {
+      _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s2"), List.of("b1"), true,
+          null);
+      fail("Expected startReplaceSegments to reject partially overlapping segmentsFrom");
+    } catch (RuntimeException e) {
+      Throwable rootCause = e;
+      while (rootCause.getCause() != null) {
+        rootCause = rootCause.getCause();
+      }
+      assertTrue(rootCause instanceof IllegalStateException);
+      assertTrue(rootCause.getMessage().contains("does not exist"), rootCause.getMessage());
+    }
+    // A disjoint start is still accepted
+    String lineageEntryIdC =
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, List.of("s2"), List.of("c0"), true, null);
+    segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
+    assertSetEquals(segmentLineage.getLineageEntryIds(), lineageEntryIdA, lineageEntryIdC);
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+  }
+
+  /// Initial push variant with empty 'segmentsFrom': run A completes after run B passed the check before the lineage
+  /// lock. B reuses A's 'segmentsTo', which A has now committed, so B must be rejected. Otherwise reverting B would
+  /// delete A's data.
+  @Test
+  public void testStartReplaceSegmentsForceCleanupRejectsConcurrentlyCommittedSegmentsTo()
+      throws Exception {
+    addDummySchema(RAW_TABLE_NAME);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    // Run A starts pushing (a0) and uploads its data, but has not ended yet
+    String lineageEntryIdA =
+        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, List.of(), List.of("a0"), true, null);
+    _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "a0"),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "a0"));
+
+    Throwable failure = startReplaceSegmentsWhileEndingOtherEntry(List.of(), Arrays.asList("a0", "b1"),
+        lineageEntryIdA);
+    assertTrue(failure instanceof IllegalStateException, String.valueOf(failure));
+    assertTrue(failure.getMessage().contains("Segment: a0 from 'segmentsTo' exists"), failure.getMessage());
+
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
+    assertEquals(segmentLineage.getLineageEntryIds(), Set.of(lineageEntryIdA));
+    assertEquals(segmentLineage.getLineageEntry(lineageEntryIdA).getState(), LineageEntryState.COMPLETED);
+    assertEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true), List.of("a0"));
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+  }
+
+  /// Runs `startReplaceSegments` with 'forceCleanup = true' on another thread, waits until it has passed the checks
+  /// before the lineage lock and is blocked on that lock, then ends 'lineageEntryIdToEnd'. Returns the root cause of
+  /// the start's failure.
+  private Throwable startReplaceSegmentsWhileEndingOtherEntry(List<String> segmentsFrom, List<String> segmentsTo,
+      String lineageEntryIdToEnd)
+      throws Exception {
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
-      Future<String> startB;
-      // Hold the lineage lock so run B passes the existence check (A is still 'IN_PROGRESS') and then blocks on the
-      // lock. 'synchronized' is reentrant, so this thread can still end run A while holding it.
+      Future<String> start;
+      // 'synchronized' is reentrant, so this thread can still end the other entry while holding the lineage lock
       Object lineageLock = _helixResourceManager.getLineageUpdaterLock(OFFLINE_TABLE_NAME);
       int lineageLockIdentity = System.identityHashCode(lineageLock);
       synchronized (lineageLock) {
-        AtomicReference<Thread> threadB = new AtomicReference<>();
-        startB = executor.submit(() -> {
-          threadB.set(Thread.currentThread());
-          return _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom, List.of("b0"), true,
-              null);
+        AtomicReference<Thread> startThread = new AtomicReference<>();
+        start = executor.submit(() -> {
+          startThread.set(Thread.currentThread());
+          return _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, segmentsFrom, segmentsTo, true, null);
         });
-        // Wait until B is blocked on this lineage lock, not merely Thread.State.BLOCKED (which can be another monitor).
+        // Thread.State.BLOCKED alone can mean another monitor
         TestUtils.waitForCondition(aVoid -> {
-          Thread thread = threadB.get();
+          Thread thread = startThread.get();
           if (thread == null) {
             return false;
           }
@@ -1569,51 +1637,24 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
           }
           LockInfo lockInfo = threadInfo.getLockInfo();
           return lockInfo != null && lockInfo.getIdentityHashCode() == lineageLockIdentity;
-        }, 10_000L, "Run B did not reach the lineage lock");
-        _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryIdA, null);
+        }, 10_000L, "startReplaceSegments did not reach the lineage lock");
+        _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, lineageEntryIdToEnd, null);
       }
 
-      Throwable failure = null;
+      String lineageEntryId;
       try {
-        startB.get(30, TimeUnit.SECONDS);
+        lineageEntryId = start.get(30, TimeUnit.SECONDS);
       } catch (ExecutionException e) {
-        failure = e.getCause();
+        Throwable failure = e.getCause();
+        while (failure.getCause() != null) {
+          failure = failure.getCause();
+        }
+        return failure;
       }
-      assertNotNull(failure, "Run B should be rejected because (s0, s1) were already replaced by run A");
-      while (failure.getCause() != null) {
-        failure = failure.getCause();
-      }
-      assertTrue(failure instanceof IllegalStateException);
-      assertTrue(failure.getMessage().contains("replacing a replaced segment"), failure.getMessage());
+      throw new AssertionError("startReplaceSegments should be rejected, but created lineage entry: " + lineageEntryId);
     } finally {
       executor.shutdownNow();
     }
-
-    // Only A's entry exists, and nothing from run B is left behind
-    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
-    assertEquals(segmentLineage.getLineageEntryIds(), Set.of(lineageEntryIdA));
-    assertEquals(segmentLineage.getLineageEntry(lineageEntryIdA).getState(), LineageEntryState.COMPLETED);
-
-    // Partial overlap is rejected by the pre-lock existence check (s1 already replaced), not the new in-lock branch
-    try {
-      _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, Arrays.asList("s1", "s2"), List.of("b1"), true,
-          null);
-      fail("Expected startReplaceSegments to reject partially overlapping segmentsFrom");
-    } catch (RuntimeException e) {
-      Throwable failure = e;
-      while (failure.getCause() != null) {
-        failure = failure.getCause();
-      }
-      assertTrue(failure instanceof IllegalStateException);
-      assertTrue(failure.getMessage().contains("does not exist"), failure.getMessage());
-    }
-    // A disjoint start is still accepted
-    String lineageEntryIdC =
-        _helixResourceManager.startReplaceSegments(OFFLINE_TABLE_NAME, List.of("s2"), List.of("c0"), true, null);
-    segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
-    assertSetEquals(segmentLineage.getLineageEntryIds(), lineageEntryIdA, lineageEntryIdC);
-
-    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
   }
 
   @Test
