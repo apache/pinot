@@ -982,6 +982,13 @@ public class QueryEnvironment {
     default int defaultSealedInListThreshold() {
       return CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD;
     }
+
+    /// See [CommonConstants.Broker#CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY]. Can be overridden per query with
+    /// [CommonConstants.Broker.Request.QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY].
+    @Value.Default
+    default boolean defaultPreferSelectAliasInGroupBy() {
+      return CommonConstants.Broker.DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY;
+    }
   }
 
   /// A query that have been parsed, validates, transformed into a [RelNode] and optimized with Calcite.

@@ -941,5 +941,56 @@
       { "sql": "SELECT upper(string_col), count(int_col) FROM {tbl} GROUP BY upper(string_col) HAVING sum(int_col) > 0 ORDER BY upper(string_col)" },
       { "sql": "SELECT upper(string_col), count(int_col) FROM {tbl} GROUP BY upper(string_col) HAVING sum(int_col) >= 0 AND count(int_col) >= 0 ORDER BY count(int_col)" }
     ]
+  },
+  "group_by_select_alias_precedence": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "STRING"},
+          {"name": "int_col", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", "x", 1],
+          ["foo", "y", 2],
+          ["bar", "x", 4],
+          ["baz", "y", 8]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "group by a name that is both a column and a select alias groups by the column by default",
+        "sql": "SELECT CASE WHEN col1 = 'foo' THEN 'bar' ELSE col1 END AS col1, SUM(int_col) FROM {tbl} GROUP BY col1",
+        "outputs": [
+          ["bar", 3],
+          ["bar", 4],
+          ["baz", 8]
+        ]
+      },
+      {
+        "description": "group by a name that is both a column and a select alias groups by the alias with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; SELECT CASE WHEN col1 = 'foo' THEN 'bar' ELSE col1 END AS col1, SUM(int_col) FROM {tbl} GROUP BY col1",
+        "outputs": [
+          ["bar", 7],
+          ["baz", 8]
+        ]
+      },
+      {
+        "description": "having on a grouped select alias filters on the alias with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; SELECT CASE WHEN col1 = 'foo' THEN 'bar' ELSE col1 END AS col1, SUM(int_col) FROM {tbl} GROUP BY col1 HAVING col1 <> 'baz'",
+        "outputs": [
+          ["bar", 7]
+        ]
+      },
+      {
+        "description": "group by the alias of another column groups by that column with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; SELECT col2 AS col1, SUM(int_col) FROM {tbl} GROUP BY col1",
+        "outputs": [
+          ["x", 5],
+          ["y", 10]
+        ]
+      }
+    ]
   }
 }

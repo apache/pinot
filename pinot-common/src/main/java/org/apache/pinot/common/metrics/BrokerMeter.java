@@ -254,6 +254,16 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   /// For each query with at least one window function, this meter is increased as many times as window functions in the
   /// query.
   public static final BrokerMeter WINDOW_COUNT = create("WINDOW_COUNT", "queries", true);
+  /// How many multi-stage queries group by a name that is both a column and the alias of a different `SELECT`
+  /// expression, as in `SELECT CASE WHEN c = 'a' THEN 'x' ELSE c END AS c, COUNT(*) FROM t GROUP BY c`.
+  ///
+  /// Since Calcite 1.42 (CALCITE-7052) such a name resolves to the column. Before, it resolved to the alias. The query
+  /// can then fail with `Expression '...' is not being grouped` or return different groups. The broker config
+  /// `pinot.broker.multistage.prefer.select.alias.in.group.by` and the query option `preferSelectAliasInGroupBy`
+  /// restore the old resolution. This meter is marked at most once per query, whether that option is set or not, and
+  /// also when the query then fails.
+  public static final BrokerMeter QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN =
+      create("QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN", "queries", true);
 
   public static final BrokerMeter MSE_STAGES_STARTED = create("MSE_STAGES_STARTED", "stages", true);
   public static final BrokerMeter MSE_STAGES_COMPLETED = create("MSE_STAGES_COMPLETED", "stages", true);
