@@ -272,6 +272,44 @@ public class QuotaConfigTest {
   }
 
   @Test
+  public void testPrimaryKeyQuotaSerDe()
+      throws IOException {
+    // Absent by default, and not serialized when null
+    QuotaConfig quotaConfig = JsonUtils.stringToObject("{\"storage\":\"1G\"}", QuotaConfig.class);
+    assertNull(quotaConfig.getMaxPrimaryKeysPerPartition());
+    assertNull(quotaConfig.getPrimaryKeyQuotaEnforcementMode());
+    assertNull(quotaConfig.toJsonNode().get("maxPrimaryKeysPerPartition"));
+    assertNull(quotaConfig.toJsonNode().get("primaryKeyQuotaEnforcementMode"));
+
+    // Numeric value
+    quotaConfig = JsonUtils.stringToObject(
+        "{\"maxPrimaryKeysPerPartition\":5000000,\"primaryKeyQuotaEnforcementMode\":\"SHADOW\"}", QuotaConfig.class);
+    assertEquals(quotaConfig.getMaxPrimaryKeysPerPartition(), Long.valueOf(5000000L));
+    assertEquals(quotaConfig.getPrimaryKeyQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
+
+    // Jackson also coerces a quoted numeric string to a Long
+    quotaConfig = JsonUtils.stringToObject("{\"maxPrimaryKeysPerPartition\":\"42\"}", QuotaConfig.class);
+    assertEquals(quotaConfig.getMaxPrimaryKeysPerPartition(), Long.valueOf(42L));
+
+    // Round trip, including equality (equals() is JSON based)
+    QuotaConfig roundTripped = JsonUtils.stringToObject(quotaConfig.toJsonString(), QuotaConfig.class);
+    assertEquals(roundTripped, quotaConfig);
+    assertEquals(roundTripped.getMaxPrimaryKeysPerPartition(), Long.valueOf(42L));
+  }
+
+  @Test
+  public void testInvalidPrimaryKeyQuota() {
+    for (String value : new String[]{"0", "-1"}) {
+      try {
+        JsonUtils.stringToObject("{\"maxPrimaryKeysPerPartition\":" + value + "}", QuotaConfig.class);
+        fail("Expected failure for maxPrimaryKeysPerPartition=" + value);
+      } catch (Exception e) {
+        // Expected
+      }
+    }
+  }
+
+  @Test
   public void testInvalidEnforcementMode() {
     try {
       JsonUtils.stringToObject("{\"storageQuotaEnforcementMode\":\"SOFT\"}", QuotaConfig.class);

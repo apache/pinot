@@ -87,6 +87,8 @@ public class PauseState extends BaseJsonConfig {
   }
 
   public enum ReasonCode {
-    ADMINISTRATIVE, STORAGE_QUOTA_EXCEEDED, RESOURCE_UTILIZATION_LIMIT_EXCEEDED
+    // NOTE: Serialized by name into the IdealState; only append new values so older binaries can still parse the
+    // existing ones. A controller that predates a value cannot deserialize a PauseState that uses it.
+    ADMINISTRATIVE, STORAGE_QUOTA_EXCEEDED, RESOURCE_UTILIZATION_LIMIT_EXCEEDED, PRIMARY_KEY_QUOTA_EXCEEDED
   }
 }

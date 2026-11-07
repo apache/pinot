@@ -102,7 +102,10 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
   LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false),
   // Storage quota breach detected for a table whose enforcement mode is ENFORCED or SHADOW (not DISABLED)
-  STORAGE_QUOTA_EXCEEDED("StorageQuotaExceeded", false);
+  STORAGE_QUOTA_EXCEEDED("StorageQuotaExceeded", false),
+
+  // Primary key quota breach detected for an upsert table whose enforcement mode is ENFORCED or SHADOW (not DISABLED)
+  PRIMARY_KEY_QUOTA_EXCEEDED("PrimaryKeyQuotaExceeded", false);
 
   private final String _brokerMeterName;
   private final String _unit;
