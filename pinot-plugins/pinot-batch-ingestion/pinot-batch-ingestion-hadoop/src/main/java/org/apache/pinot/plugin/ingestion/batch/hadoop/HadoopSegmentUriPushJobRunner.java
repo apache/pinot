@@ -52,6 +52,7 @@ public class HadoopSegmentUriPushJobRunner implements IngestionJobRunner, Serial
     if (_spec.getPushJobSpec() == null) {
       throw new RuntimeException("Missing PushJobSpec");
     }
+    SegmentPushUtils.validateUriPushJobSpec(_spec);
   }
 
   @Override
@@ -77,12 +78,12 @@ public class HadoopSegmentUriPushJobRunner implements IngestionJobRunner, Serial
     //Get list of files to process
     String[] files;
     try {
-      files = outputDirFS.listFiles(outputDirURI, true);
+      files = SegmentPushUtils.listFiles(outputDirFS, outputDirURI, _spec.getPushJobSpec());
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
     List<String> segmentUris = new ArrayList<>(
-        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files).keySet());
+        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files, true).keySet());
     if (segmentUris.isEmpty()) {
       return;
     }
