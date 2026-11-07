@@ -64,9 +64,10 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
             ? ImmutableRoaringBitmap.andNotCardinality(nullBitmap, docIds) == 0
             : !ImmutableRoaringBitmap.intersects(docIds, nullBitmap))
         : "The null bitmap must be disjoint from the trues";
-    _docIds = docIds;
+    // A consuming segment can hand out bitmaps holding documents ingested after numDocs was read, e.g. its null bitmap
+    _docIds = FilterOperatorUtils.limitToNumDocs(docIds, numDocs);
     _exclusive = exclusive;
-    _nullBitmap = nullBitmap;
+    _nullBitmap = nullBitmap != null ? FilterOperatorUtils.limitToNumDocs(nullBitmap, numDocs) : null;
   }
 
   @Override

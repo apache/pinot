@@ -106,6 +106,10 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
       potentialMatchDocIds[i] = _h3IndexReader.getDocIds(potentiallyCoveredCellsIterator.nextLong());
     }
     MutableRoaringBitmap potentialMatch = BufferFastAggregation.or(potentialMatchDocIds);
+    // On a consuming segment, the H3 index can hold documents ingested after numDocs was read at planning time, which
+    // the flip of the negative check would turn into matches
+    fullMatch.remove(_numDocs, 0x100000000L);
+    potentialMatch.remove(_numDocs, 0x100000000L);
 
     if (_isPositiveCheck) {
       return getFilterBlock(fullMatch, potentialMatch);
