@@ -227,7 +227,8 @@ public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   @Override
   protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
-    return getFloatValue(dictId) == (Float) value;
+    // Compare bits like Float.equals() and the on-heap dictionary, so NaN matches itself and gets one dictionary id.
+    return Float.floatToIntBits(getFloatValue(dictId)) == Float.floatToIntBits((Float) value);
   }
 
   @Override
