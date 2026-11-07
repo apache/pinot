@@ -142,7 +142,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-yammer</artifactId>
+      <artifactId>pinot-dropwizard</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

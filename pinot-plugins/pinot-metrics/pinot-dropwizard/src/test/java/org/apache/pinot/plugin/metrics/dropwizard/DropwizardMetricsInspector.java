@@ -109,7 +109,7 @@ public class DropwizardMetricsInspector extends MetricsInspector {
       throw new IllegalArgumentException("Not a timer metric: " + name);
     }
     // Dropwizard Timer has no sum() method — derive it from the snapshot's recorded values (in ns).
-    // For tests the timer uses a SlidingTimeWindowArrayReservoir so every recorded value is present.
+    // These tests record fewer values than the bounded reservoir's capacity, so every recorded value is present.
     long totalNanos = 0;
     for (long ns : ((Timer) metric).getSnapshot().getValues()) {
       totalNanos += ns;

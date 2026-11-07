@@ -21,11 +21,23 @@ package org.apache.pinot.plugin.metrics.dropwizard;
 import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.common.metrics.AbstractMetricsTest;
 import org.apache.pinot.common.metrics.MetricsInspector;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertTrue;
 
 
 /// Runs the shared [AbstractMetricsTest] against the real [DropwizardMetricsRegistry].
 public class DropwizardAbstractMetricsTest extends AbstractMetricsTest {
+
+  @Test
+  public void testDefaultMetricsFactory() {
+    PinotMetricUtils.cleanUp();
+    PinotMetricUtils.init(new PinotConfiguration());
+    assertTrue(PinotMetricUtils.getPinotMetricsRegistry() instanceof DropwizardMetricsRegistry);
+  }
 
   @Override
   protected String metricsFactoryClassName() {

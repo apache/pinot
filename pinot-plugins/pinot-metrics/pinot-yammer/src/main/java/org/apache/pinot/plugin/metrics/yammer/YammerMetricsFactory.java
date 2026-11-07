@@ -29,6 +29,11 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
+/// Yammer implementation of the Pinot metrics factory.
+///
+/// @deprecated Since 1.6.0. Use the factory in the pinot-dropwizard module:
+///     {@code org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory}.
+@Deprecated(since = "1.6.0")
 @AutoService(PinotMetricsFactory.class)
 @MetricsFactory
 public class YammerMetricsFactory implements PinotMetricsFactory {
