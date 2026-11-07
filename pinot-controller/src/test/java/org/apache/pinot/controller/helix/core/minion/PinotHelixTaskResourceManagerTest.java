@@ -62,6 +62,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -2419,5 +2420,23 @@ public class PinotHelixTaskResourceManagerTest {
     assertEquals(response.getTotalRunningTasks(), 0);
     assertEquals(response.getTotalWaitingTasks(), 0);
     assertTrue(response.getTaskBreakdown().isEmpty());
+  }
+
+  @Test
+  public void testExistingEmptyQueueHasNoInProgressOrRecentTasks() {
+    String taskType = "EmptyQueueTask";
+    String queue = PinotHelixTaskResourceManager.getHelixJobQueueName(taskType);
+    TaskDriver driver = mock(TaskDriver.class);
+    WorkflowConfig workflow = mock(WorkflowConfig.class);
+    when(workflow.getJobDag()).thenReturn(new JobDag());
+    when(driver.getWorkflowConfig(queue)).thenReturn(workflow);
+    PinotHelixTaskResourceManager manager =
+        new PinotHelixTaskResourceManager(mock(PinotHelixResourceManager.class), driver);
+
+    PinotHelixTaskResourceManager.TasksByStatus tasks = manager.getTasksByStatus(taskType, 1234L);
+
+    assertTrue(tasks.getInProgressTasks().isEmpty());
+    assertTrue(tasks.getRecentTasks().isEmpty());
+    verify(driver, never()).getWorkflowContext(queue);
   }
 }

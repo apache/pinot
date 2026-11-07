@@ -92,6 +92,19 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ObjectSerDeUtilsTest {
+  @Test
+  @SuppressWarnings("deprecation") // Verify the legacy map wire format remains readable across mixed versions.
+  public void testEmptyLegacyMapRoundTripDoesNotConsumeTheNextValue() {
+    byte[] bytes = ObjectSerDeUtils.MAP_SER_DE.serialize(Map.of());
+    assertEquals(bytes, new byte[Integer.BYTES]);
+    assertEquals(ObjectSerDeUtils.MAP_SER_DE.deserialize(bytes), Map.of());
+    ByteBuffer buffer = ByteBuffer.allocate(2 * Integer.BYTES).put(bytes).putInt(12345);
+    buffer.flip();
+    assertEquals(ObjectSerDeUtils.MAP_SER_DE.deserialize(buffer), Map.of());
+    assertEquals(buffer.position(), Integer.BYTES);
+    assertEquals(buffer.getInt(), 12345);
+  }
+
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;

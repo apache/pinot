@@ -22,11 +22,26 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+
 
 public class RegexImplementationsTest {
   private static final String FIND_VALUE = "value to match against";
   private static final String MATCHES_VALUE = "to match";
   private static final String PATTERN = "(to match)";
+
+  @Test
+  public void testRe2jCaseSensitivity() {
+    Pattern caseSensitive = new Re2jPattern("pinot", false);
+    assertTrue(caseSensitive.matcher("pinot").matches());
+    assertFalse(caseSensitive.matcher("pInOt").matches());
+
+    Pattern caseInsensitive = new Re2jPattern("pinot", true);
+    assertTrue(caseInsensitive.matcher("pinot").matches());
+    assertTrue(caseInsensitive.matcher("pInOt").matches());
+    assertFalse(caseInsensitive.matcher("other").matches());
+  }
 
   @Test(dataProvider = "regexImplementationProvider")
   public void testRegexImplementations(RegexClass regexClass) {

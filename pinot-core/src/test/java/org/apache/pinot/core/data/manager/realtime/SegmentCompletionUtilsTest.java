@@ -18,13 +18,33 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class SegmentCompletionUtilsTest {
+
+  @Test
+  public void testControllerNotSentAndKeepResponsesHaveSeparateMeters() {
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    SegmentCompletionProtocolUtils.raiseSegmentCompletionProtocolResponseMetric(metrics,
+        SegmentCompletionProtocol.RESP_NOT_SENT);
+    SegmentCompletionProtocolUtils.raiseSegmentCompletionProtocolResponseMetric(metrics,
+        new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params()
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP)));
+    verify(metrics).addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_SENT, 1);
+    verify(metrics).addMeteredGlobalValue(ServerMeter.LLC_CONTROLLER_RESPONSE_KEEP, 1);
+    verifyNoMoreInteractions(metrics);
+  }
 
   @Test
   public void testGenerateSegmentFilePrefix() {

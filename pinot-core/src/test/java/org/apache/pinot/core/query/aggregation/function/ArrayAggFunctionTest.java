@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.Map;
@@ -29,6 +30,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctDoubleFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctLongFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDoubleFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggIntFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFunction;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -36,9 +38,24 @@ import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
 
 
 public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
+
+  @Test
+  public void testIntArrayMergePreservesValuesWhenEitherPartialResultIsEmpty() {
+    ArrayAggIntFunction function =
+        new ArrayAggIntFunction(ExpressionContext.forIdentifier("value"), DataType.INT, true);
+    IntArrayList first = new IntArrayList(new int[] {3, 1, 3});
+    assertSame(function.merge(null, first), first);
+    assertSame(function.merge(new IntArrayList(), first), first);
+    assertSame(function.merge(first, null), first);
+    assertSame(function.merge(first, new IntArrayList()), first);
+    IntArrayList merged = function.merge(first, new IntArrayList(new int[] {7, 1}));
+    assertSame(merged, first);
+    assertEquals(function.extractFinalResult(merged), new int[] {3, 1, 3, 7, 1});
+  }
 
   @Test
   void aggregationAllNullsWithNullHandlingDisabled() {
