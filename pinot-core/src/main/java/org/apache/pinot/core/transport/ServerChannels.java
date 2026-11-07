@@ -28,7 +28,9 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.epoll.Epoll;
+import io.netty.channel.epoll.EpollChannelOption;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.kqueue.KQueue;
@@ -43,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.ToLongFunction;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.config.NettyConfig;
@@ -65,11 +68,30 @@ import org.slf4j.LoggerFactory;
 ///
 /// There is only one channel between the broker and each connected server (we count OFFLINE and REALTIME as different
 /// servers)
+///
+/// Liveness of a cached channel is not left to the kernel's retransmission timeout, which takes many minutes to
+/// notice a half-open socket while `isActive()` still reports `true`:
+///   - pending writes that make no socket progress for [NettyConfig#WRITE_TIMEOUT_MS] close the channel
+///     ([RequestWriteTimeoutHandler]);
+///   - on the Epoll transport, data unacknowledged for [NettyConfig#TCP_USER_TIMEOUT_MS] makes the kernel close it;
+///   - a channel whose outbound queue is above [NettyConfig#WRITE_BUFFER_HIGH_WATER_MARK_BYTES] rejects queries
+///     instead of queueing them in direct memory ([#sendRequest]);
+///   - the routing manager evicts the cached channels of a server when it enables it, as after a restart, and when it
+///     sees the server removed from the cluster or moved to another address ([#evictChannel]); a channel that still
+///     carries queries when its server is enabled is retired instead: the next query opens a fresh connection, and
+///     the old one is closed once the queries on it are past their deadline ([#evictChannelOfEnabledServer]).
 @ThreadSafe
 public class ServerChannels {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerChannels.class);
   public static final String CHANNEL_LOCK_TIMEOUT_MSG = "Timeout while acquiring channel lock";
   private static final long TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS = 5_000L;
+  // A sender that raced with an eviction retries on a fresh entry; one retry is all it takes because an eviction is
+  // a rare, per-server event, but bound it anyway.
+  private static final int MAX_SEND_ATTEMPTS = 3;
+  // How long past the deadline of its last query a retired channel is closed, so that a query still waiting at its
+  // deadline ends on its own timeout rather than on the close
+  @VisibleForTesting
+  static final long RETIRED_CHANNEL_CLOSE_GRACE_MS = 1_000L;
 
   // TSerializer currently is not thread safe, must be put into a ThreadLocal.
   private static final ThreadLocal<TSerializer> THREAD_LOCAL_T_SERIALIZER = ThreadLocal.withInitial(() -> {
@@ -86,6 +108,9 @@ public class ServerChannels {
   private final Class<? extends SocketChannel> _channelClass;
   private final ThreadAccountant _threadAccountant;
   private final PooledByteBufAllocator _bufAllocatorWithLimits;
+  private final long _writeTimeoutMs;
+  private final int _tcpUserTimeoutMs;
+  private final WriteBufferWaterMark _writeBufferWaterMark;
 
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannel> _serverToChannelMap = new ConcurrentHashMap<>();
@@ -96,7 +121,10 @@ public class ServerChannels {
   /// @param tlsConfig TLS/SSL config
   public ServerChannels(QueryRouter queryRouter, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
       ThreadAccountant threadAccountant) {
-    boolean enableNativeTransports = nettyConfig != null && nettyConfig.isNativeTransportsEnabled();
+    if (nettyConfig == null) {
+      nettyConfig = new NettyConfig();
+    }
+    boolean enableNativeTransports = nettyConfig.isNativeTransportsEnabled();
     OsCheck.OSType operatingSystemType = OsCheck.getOperatingSystemType();
     if (enableNativeTransports
         && operatingSystemType == OsCheck.OSType.Linux
@@ -127,6 +155,13 @@ public class ServerChannels {
     _queryRouter = queryRouter;
     _tlsConfig = tlsConfig;
     _threadAccountant = threadAccountant;
+    _writeTimeoutMs = nettyConfig.getWriteTimeoutMs();
+    _tcpUserTimeoutMs = nettyConfig.getTcpUserTimeoutMs();
+    _writeBufferWaterMark = new WriteBufferWaterMark(nettyConfig.getWriteBufferLowWaterMarkBytes(),
+        nettyConfig.getWriteBufferHighWaterMarkBytes());
+    LOGGER.info("Server channel liveness settings: write timeout: {}ms, TCP user timeout: {}ms ({}), write buffer "
+            + "water mark: {}", _writeTimeoutMs, _tcpUserTimeoutMs,
+        isTcpUserTimeoutApplied() ? "applied" : "not applied, requires the Epoll transport", _writeBufferWaterMark);
 
     _bufAllocatorWithLimits = PooledByteBufAllocatorWithLimits.getSharedBufferAllocatorWithLimits();
     PooledByteBufAllocatorMetric metric = _bufAllocatorWithLimits.metric();
@@ -146,10 +181,102 @@ public class ServerChannels {
       ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
     byte[] requestBytes = THREAD_LOCAL_T_SERIALIZER.get().serialize(instanceRequest);
-    ServerChannel serverChannel = _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new);
-    // This server is now query-carrying, whoever opened the channel. See [#hasChannel].
-    serverChannel._openedByQuery = true;
-    return serverChannel.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
+    // A ping is queued even behind a full outbound queue: it is tiny, and whether it gets answered is how the broker
+    // tells a server that drains a large request from one that stalled. Rejecting it would fail the ping either way.
+    boolean rejectIfUnwritable = !instanceRequest.isPing();
+    // One deadline for the whole call: a sender that races an eviction retries on a fresh entry, but the lock waits
+    // and connects of all its attempts together stay within the caller's timeout.
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
+    for (int attempt = 1; attempt <= MAX_SEND_ATTEMPTS; attempt++) {
+      ServerChannel serverChannel = _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new);
+      // This server is now query-carrying, whoever opened the channel. See [#hasChannel].
+      serverChannel._openedByQuery = true;
+      Channel channel = serverChannel.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance,
+          requestBytes, rejectIfUnwritable, Math.max(0L, deadlineMs - System.currentTimeMillis()));
+      if (channel != null) {
+        return channel;
+      }
+      // The entry was evicted between the lookup and the send (see [#evictChannel]); it is already out of the map, so
+      // the next lookup creates a fresh one.
+      LOGGER.info("Channel to server: {} was evicted while sending a request, retrying on a fresh channel (attempt {})",
+          serverRoutingInstance, attempt);
+    }
+    throw new IllegalStateException(
+        "Channel to server: " + serverRoutingInstance + " kept being evicted while sending a request");
+  }
+
+  /// Closes and forgets the cached channel to the given routing instance, if there is one. Returns `true` if that
+  /// closed a live connection. An entry whose channel had already closed (the server sent a FIN as it shut down) or
+  /// never connected is dropped all the same but not counted, so that
+  /// [BrokerMeter#NETTY_CONNECTION_CHANNEL_EVICTIONS] reads as connections that were still open, possibly half-open,
+  /// when the broker gave up on them, and a graceful rolling restart does not bump it for every server.
+  ///
+  /// Called when the routing manager sees a server removed from the cluster, or moved to another address, and when it
+  /// enables a server, which is what a restart looks like through Helix (see [#evictChannelOfEnabledServer]). The
+  /// cached channel then belongs to a previous process: if that process went away without a FIN (node flap, OOM kill,
+  /// a network path that stopped forwarding), the socket is half-open, `isActive()` keeps reporting `true` until the
+  /// kernel gives up on retransmits, and every query routed to the readmitted server would be written into it and
+  /// lost. Evicting here makes the next query reconnect, to the new process at whatever address its hostname now
+  /// resolves to.
+  ///
+  /// Queries in flight on the evicted channel fail fast through `channelInactive` rather than waiting out their
+  /// timeout: the process they were sent to is gone. The entry is flagged before it is closed so that a sender that
+  /// already holds it does not reconnect it after it has left the map, which would leak a channel nobody routes to
+  /// (see [ServerChannel#sendRequest]).
+  public boolean evictChannel(ServerRoutingInstance serverRoutingInstance) {
+    ServerChannel serverChannel = _serverToChannelMap.remove(serverRoutingInstance);
+    if (serverChannel == null) {
+      return false;
+    }
+    // Read before the eviction closes it; a snapshot is enough, as it only decides what is counted
+    Channel channel = serverChannel._channel;
+    boolean wasConnected = channel != null && channel.isActive();
+    serverChannel.evict();
+    if (!wasConnected) {
+      LOGGER.debug("Dropped cached entry without a live channel to server: {}", serverRoutingInstance);
+      return false;
+    }
+    LOGGER.info("Evicted live cached channel to server: {}", serverRoutingInstance);
+    _brokerMetrics.addMeteredValue(BrokerMeter.NETTY_CONNECTION_CHANNEL_EVICTIONS, 1,
+        serverRoutingInstance.getShortName());
+    return true;
+  }
+
+  /// [#evictChannel] for a server the routing manager just enabled, except that an open channel that still carries
+  /// queries is retired rather than closed: the next query to the server, or the failure detector's reconnect probe,
+  /// replaces it with a fresh connection, and it is closed once the queries on it are past their deadline.
+  /// `lastQueryDeadlineMs` gives the latest deadline of the queries waiting for a response on a channel, or 0 if none
+  /// is. Returns `true` if a live connection was closed.
+  ///
+  /// Retiring serves both ways a server comes to be enabled. Toggled off and on without a restart, as by an operator,
+  /// it is still answering on the old channel, and the queries running there finish, as they did before channels were
+  /// evicted on enable. Restarted, it may have left the old channel half-open: its host failed, or it came back at a
+  /// new address behind the same hostname, where the old address never answers with a reset. Queries routed to it now
+  /// reach the new process at once instead of being written into a socket nobody reads, and the queries on the old
+  /// channel time out as they would have.
+  public boolean evictChannelOfEnabledServer(ServerRoutingInstance serverRoutingInstance,
+      ToLongFunction<Channel> lastQueryDeadlineMs) {
+    ServerChannel serverChannel = _serverToChannelMap.get(serverRoutingInstance);
+    if (serverChannel != null) {
+      Channel channel = serverChannel._channel;
+      if (channel != null && channel.isActive()) {
+        long deadlineMs = lastQueryDeadlineMs.applyAsLong(channel);
+        if (deadlineMs > System.currentTimeMillis()) {
+          LOGGER.info("Retired cached channel to enabled server: {}, which still carries queries; the next query opens "
+              + "a fresh connection", serverRoutingInstance);
+          serverChannel.retire(channel, deadlineMs, lastQueryDeadlineMs);
+          return false;
+        }
+      }
+    }
+    return evictChannel(serverRoutingInstance);
+  }
+
+  /// Whether [NettyConfig#TCP_USER_TIMEOUT_MS] is set on the channels: it is a Linux socket option that Netty only
+  /// exposes on the Epoll transport.
+  @VisibleForTesting
+  boolean isTcpUserTimeoutApplied() {
+    return _tcpUserTimeoutMs > 0 && _channelClass == EpollSocketChannel.class;
   }
 
   /// Whether this broker has sent, or tried to send, a single-stage query to the given server.
@@ -192,28 +319,53 @@ public class ServerChannels {
     return _serverToChannelMap.computeIfAbsent(instance, ServerChannel::new);
   }
 
+  /// Thrown when a query is rejected because the channel's outbound queue is above its high watermark. It is
+  /// backpressure rather than evidence against the server: a healthy server draining a large request closes the send
+  /// window for a moment too. The query fails or skips the server as for any send failure, but the server is not
+  /// reported to the failure detector for it.
+  public static class UnwritableChannelException extends IllegalStateException {
+    public UnwritableChannelException(String message) {
+      super(message);
+    }
+  }
+
   @ThreadSafe
   class ServerChannel {
     final ServerRoutingInstance _serverRoutingInstance;
     final Bootstrap _bootstrap;
     // lock to protect channel as requests must be written into channel sequentially
     final ReentrantLock _channelLock = new ReentrantLock();
-    Channel _channel;
+    // Written under _channelLock; volatile so that evict(), which does not take the lock, closes the current channel
+    volatile Channel _channel;
     // Set once a query has been sent, or attempted, through this channel; startup pre-connect leaves it
     // false. Read by hasChannel(), which the failure detector uses to decide whether the single-stage
     // transport has any opinion on this server's health. Volatile: written on a query thread, read on the
     // failure-detector retry thread.
     volatile boolean _openedByQuery;
+    // Set by evict() once this entry has left the map. Checked under _channelLock before and after connecting, so a
+    // sender that fetched the entry before the eviction neither writes into the evicted channel nor reconnects an
+    // entry nobody can reach any more; it retries on a fresh entry instead.
+    volatile boolean _evicted;
+    // Set by retire() to the channel the server was enabled on while it still carried queries. connectWithoutLocking()
+    // then replaces it with a fresh connection rather than reuse it, and it stays open for those queries until it is
+    // closed once they are past their deadline. Compared by identity, so it never applies to a connection opened since.
+    volatile Channel _retiredChannel;
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
           .option(ChannelOption.ALLOCATOR, _bufAllocatorWithLimits).group(_eventLoopGroup).channel(_channelClass)
-          .option(ChannelOption.SO_KEEPALIVE, true).handler(new ChannelInitializer<SocketChannel>() {
+          .option(ChannelOption.SO_KEEPALIVE, true)
+          .option(ChannelOption.WRITE_BUFFER_WATER_MARK, _writeBufferWaterMark)
+          .handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
+              if (_writeTimeoutMs > 0) {
+                // Observe actual socket bytes, including SSL ciphertext. Plaintext waiting inside SSL is bounded
+                // separately by its handshake timeout and the explicit pre-connect handshake budget.
+                ch.pipeline().addLast(new RequestWriteTimeoutHandler(_serverRoutingInstance, _writeTimeoutMs));
+              }
               if (_tlsConfig != null) {
-                // Add SSL handler first to encrypt and decrypt everything.
                 ch.pipeline()
                     .addLast(ChannelHandlerFactory.SSL, ChannelHandlerFactory.getClientTlsHandler(_tlsConfig, ch));
               }
@@ -230,11 +382,64 @@ public class ServerChannels {
                       _serverRoutingInstance));
             }
           });
+      if (isTcpUserTimeoutApplied()) {
+        _bootstrap.option(EpollChannelOption.TCP_USER_TIMEOUT, _tcpUserTimeoutMs);
+      }
     }
 
+    /// Closes the channel this entry holds, and the one it retired if that is still open: every caller is dropping the
+    /// entry.
     void closeChannel() {
-      if (_channel != null) {
-        _channel.close();
+      Channel channel = _channel;
+      if (channel != null) {
+        closeByBroker(channel);
+      }
+      Channel retiredChannel = _retiredChannel;
+      if (retiredChannel != null && retiredChannel != channel) {
+        closeByBroker(retiredChannel);
+      }
+    }
+
+    /// Closes a channel the broker decided to drop (eviction, a retired channel once its queries are past their
+    /// deadline): the queries still in flight on it fail through `channelInactive` as on any closed channel, but the
+    /// server is not reported for it.
+    private void closeByBroker(Channel channel) {
+      DataTableHandler handler = channel.pipeline().get(DataTableHandler.class);
+      if (handler != null) {
+        handler.markClosedByBroker();
+      }
+      channel.close();
+    }
+
+    /// See [ServerChannels#evictChannel]. Flags the entry first, then closes whatever channel it holds; no lock is
+    /// taken so that the routing manager's Helix callback is never blocked behind a connect or write in progress.
+    void evict() {
+      _evicted = true;
+      closeChannel();
+    }
+
+    /// See [ServerChannels#evictChannelOfEnabledServer]. Flags `channel` so that the next connect replaces it, and
+    /// closes it once `lastDeadlineMs`, the deadline of the last query on it, has passed. No lock is taken, as for
+    /// [#evict()]; a query that a sender holding the lock writes to the channel as it is retired is the last one it
+    /// takes, and pushes the close back to that query's deadline.
+    void retire(Channel channel, long lastDeadlineMs, ToLongFunction<Channel> lastQueryDeadlineMs) {
+      _retiredChannel = channel;
+      closeWhenDrained(channel, lastDeadlineMs, lastQueryDeadlineMs);
+    }
+
+    private void closeWhenDrained(Channel channel, long lastDeadlineMs, ToLongFunction<Channel> lastQueryDeadlineMs) {
+      if (!channel.isOpen()) {
+        return;
+      }
+      long delayMs = lastDeadlineMs - System.currentTimeMillis();
+      if (delayMs > 0) {
+        channel.eventLoop().schedule(
+            () -> closeWhenDrained(channel, lastQueryDeadlineMs.applyAsLong(channel), lastQueryDeadlineMs),
+            delayMs + RETIRED_CHANNEL_CLOSE_GRACE_MS, TimeUnit.MILLISECONDS);
+      } else {
+        LOGGER.info("Closing retired channel to server: {}, the queries on it are past their deadline",
+            _serverRoutingInstance);
+        closeByBroker(channel);
       }
     }
 
@@ -244,28 +449,49 @@ public class ServerChannels {
     }
 
     void setSilentShutdown() {
-      if (_channel != null) {
-        DirectOOMHandler directOOMHandler = _channel.pipeline().get(DirectOOMHandler.class);
+      Channel channel = _channel;
+      if (channel != null) {
+        DirectOOMHandler directOOMHandler = channel.pipeline().get(DirectOOMHandler.class);
         if (directOOMHandler != null) {
           directOOMHandler.setSilentShutDown();
         }
       }
     }
 
+    /// Returns the channel the request was written to, or `null` if this entry was evicted before the request could
+    /// be written, in which case the caller retries on a fresh entry. The lock wait and the connect together take at
+    /// most `timeoutMs`.
+    @Nullable
     Channel sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
+        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, boolean rejectIfUnwritable, long timeoutMs)
         throws InterruptedException, TimeoutException {
+      long deadlineMs = System.currentTimeMillis() + timeoutMs;
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
         try {
-          connectWithoutLocking(timeoutMs);
-          Channel channel = _channel;
-          sendRequestWithoutLocking(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
-          return channel;
+          if (_evicted) {
+            return null;
+          }
+          // The connect gets whatever the lock wait left of the budget
+          connectWithoutLocking(Math.max(0L, deadlineMs - System.currentTimeMillis()));
+          if (_evicted) {
+            // Evicted while connecting: do not leave a channel open on an entry that has left the map
+            closeChannel();
+            return null;
+          }
+          return sendRequestWithoutLocking(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes,
+              rejectIfUnwritable);
         } finally {
           _channelLock.unlock();
         }
       } else {
         throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
+      }
+    }
+
+    private void checkNotEvicted() {
+      if (_evicted) {
+        closeChannel();
+        throw new IllegalStateException("Channel to server: " + _serverRoutingInstance + " has been evicted");
       }
     }
 
@@ -278,6 +504,12 @@ public class ServerChannels {
     /// -- blocks for Netty's 30 s default, however long the caller can actually wait.
     void connectWithoutLocking(long timeoutMs)
         throws InterruptedException, TimeoutException {
+      Channel channel = _channel;
+      if (channel != null && channel == _retiredChannel) {
+        // Left open for the queries already on it, and closed once they are past their deadline (see retire())
+        LOGGER.info("Replacing retired channel to server: {} with a fresh connection", _serverRoutingInstance);
+        _channel = null;
+      }
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
         ChannelFuture connectFuture = _bootstrap.connect();
@@ -365,11 +597,43 @@ public class ServerChannels {
       }
     }
 
-    void sendRequestWithoutLocking(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes) {
-      long startTimeMs = System.currentTimeMillis();
-      // The listener runs later, by when a reconnect may have replaced _channel: on failure it closes this connection.
+    /// Returns the channel the request was written to, or `null` if this entry was evicted after it connected, in which
+    /// case the caller retries on a fresh entry. With `rejectIfUnwritable`, a request is rejected rather than queued
+    /// when the outbound queue is above the high watermark.
+    @Nullable
+    Channel sendRequestWithoutLocking(String rawTableName, AsyncQueryResponse asyncQueryResponse,
+        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, boolean rejectIfUnwritable) {
+      // Pin the channel: the completion listener must act on the channel it wrote to, not on whatever channel this
+      // entry holds by the time the write completes, or a late failure would close a healthy reconnected channel.
       Channel channel = _channel;
+      if (!channel.isWritable()) {
+        if (!channel.isActive()) {
+          if (_evicted) {
+            // Evicted since the check after the connect: retry on a fresh entry, as for the other eviction races,
+            // rather than fail the query and report the server for a close the broker made
+            return null;
+          }
+          // It went inactive after the connect above, through a server FIN. A closed channel reports unwritable too,
+          // as Netty drops its outbound buffer on close, but that is not a stalled send window, so it is not counted
+          // as an unwritable rejection.
+          throw new IllegalStateException(
+              "Channel to server: " + serverRoutingInstance + " closed before the request could be written");
+        }
+        if (rejectIfUnwritable) {
+          // The outbound queue is above the high watermark: the server stopped draining its socket, the path stopped
+          // forwarding, or a large request is still draining. Fail the query now rather than queue yet another
+          // request buffer in direct memory behind a closed send window. The rejection is backpressure, not a verdict
+          // on the server, so it does not report the server (see UnwritableChannelException); a stall that lasts is
+          // judged by the write timeout handler, which closes the channel.
+          _brokerMetrics.addMeteredValue(BrokerMeter.NETTY_CONNECTION_UNWRITABLE_REJECTIONS, 1,
+              serverRoutingInstance.getShortName());
+          throw new UnwritableChannelException(String.format(
+              "Channel to server: %s is not writable (%d more bytes must drain before it is), rejecting the request "
+                  + "instead of queueing it", serverRoutingInstance, channel.bytesBeforeWritable()));
+        }
+      }
+      asyncQueryResponse.markRequestChannel(serverRoutingInstance, channel);
+      long startTimeMs = System.currentTimeMillis();
       channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
         if (f.isSuccess()) {
           int requestSentLatencyMs = (int) (System.currentTimeMillis() - startTimeMs);
@@ -379,8 +643,9 @@ public class ServerChannels {
         } else {
           LOGGER.error("Write failure to server: {} for table: {}", serverRoutingInstance, rawTableName, f.cause());
           _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_SEND_REQUEST_FAILURES, 1);
-          if (asyncQueryResponse.markServerUnavailable(serverRoutingInstance,
-              new RuntimeException("Failed to send request to server: " + serverRoutingInstance, f.cause()))) {
+          if (asyncQueryResponse.markServerUnavailable(serverRoutingInstance, channel,
+              new RuntimeException("Failed to send request to server: " + serverRoutingInstance, f.cause()),
+              !_evicted)) {
             _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SERVER_MARKED_DOWN_SKIPPED, 1);
           }
           channel.close();
@@ -388,6 +653,7 @@ public class ServerChannels {
       });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
+      return channel;
     }
 
     /// Opens the TCP connection, as the failure detector's reconnect probe
@@ -399,8 +665,10 @@ public class ServerChannels {
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
         try {
+          checkNotEvicted();
           // The connect gets as long as the lock wait.
           connectWithoutLocking(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS);
+          checkNotEvicted();
         } finally {
           _channelLock.unlock();
         }
@@ -414,7 +682,9 @@ public class ServerChannels {
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(TRY_CONNECT_CHANNEL_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
         try {
+          checkNotEvicted();
           preConnectWithoutLocking(timeoutMs);
+          checkNotEvicted();
         } finally {
           _channelLock.unlock();
         }

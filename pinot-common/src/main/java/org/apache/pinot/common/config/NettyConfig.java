@@ -18,13 +18,56 @@
  */
 package org.apache.pinot.common.config;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /// Container object for netty configuration of pinot clients and servers (netty, grizzly, etc.)
+///
+/// Every setting is read as `<namespace>.<suffix>`, where the namespace is `pinot.broker.netty` on the broker and
+/// `pinot.server.netty` on the server. The channel liveness settings below only apply to the client side, i.e. the
+/// broker-to-server channels opened by `ServerChannels`; the server-side `QueryServer` ignores them.
 public class NettyConfig {
   private static final String NATIVE_TRANSPORTS_ENABLED = "native.transports.enabled";
+
+  /// Maximum interval without positive socket byte progress while outbound writes are pending, in milliseconds.
+  /// Bytes accepted by the kernel refresh the interval for the whole connection, so a slow progressing request and
+  /// requests queued behind it can take longer overall. On a half-open or stalled socket the peer stops acknowledging,
+  /// the send buffer fills, and `isActive()` can remain `true` for many minutes. Closing the channel fails queries fast
+  /// and lets the failure detector quarantine the server. Non-positive disables the check. Broker key:
+  /// `pinot.broker.netty.write.timeout.ms`.
+  public static final String WRITE_TIMEOUT_MS = "write.timeout.ms";
+  public static final long DEFAULT_WRITE_TIMEOUT_MS = 10_000L;
+
+  /// Linux `TCP_USER_TIMEOUT`, in milliseconds: how long transmitted data may remain unacknowledged before the
+  /// kernel closes the connection, replacing the default retransmission timeout of several minutes. Covers the
+  /// case the write timeout cannot see: small writes that the kernel accepted into a send buffer that the peer never
+  /// drains. Only applied when the broker uses the Epoll transport (`native.transports.enabled` on Linux); NIO and
+  /// KQueue have no such socket option. Non-positive leaves the kernel default. Broker key:
+  /// `pinot.broker.netty.tcp.user.timeout.ms`.
+  public static final String TCP_USER_TIMEOUT_MS = "tcp.user.timeout.ms";
+  public static final int DEFAULT_TCP_USER_TIMEOUT_MS = 10_000;
+
+  /// Netty per-channel outbound queue high watermark, in bytes. Once the bytes queued for a channel exceed it,
+  /// `Channel.isWritable()` turns `false` and `ServerChannels` rejects further requests to that server instead of
+  /// queueing them, so a closed send window costs at most this much direct memory per channel rather than growing
+  /// without bound. Requests are small, and a healthy peer drains its socket at line rate, so the queue only reaches
+  /// this depth when the peer or the path has stalled. Broker key:
+  /// `pinot.broker.netty.write.buffer.high.water.mark.bytes`.
+  public static final String WRITE_BUFFER_HIGH_WATER_MARK_BYTES = "write.buffer.high.water.mark.bytes";
+  public static final int DEFAULT_WRITE_BUFFER_HIGH_WATER_MARK_BYTES = 16 * 1024 * 1024;
+
+  /// Netty per-channel outbound queue low watermark, in bytes: once unwritable, the queue must drain below this
+  /// before the channel accepts requests again. Must not exceed the high watermark. Broker key:
+  /// `pinot.broker.netty.write.buffer.low.water.mark.bytes`.
+  public static final String WRITE_BUFFER_LOW_WATER_MARK_BYTES = "write.buffer.low.water.mark.bytes";
+  public static final int DEFAULT_WRITE_BUFFER_LOW_WATER_MARK_BYTES = 8 * 1024 * 1024;
+
   private boolean _nativeTransportsEnabled = false;
+  private long _writeTimeoutMs = DEFAULT_WRITE_TIMEOUT_MS;
+  private int _tcpUserTimeoutMs = DEFAULT_TCP_USER_TIMEOUT_MS;
+  private int _writeBufferHighWaterMarkBytes = DEFAULT_WRITE_BUFFER_HIGH_WATER_MARK_BYTES;
+  private int _writeBufferLowWaterMarkBytes = DEFAULT_WRITE_BUFFER_LOW_WATER_MARK_BYTES;
 
   private static String key(String namespace, String suffix) {
     return namespace + "." + suffix;
@@ -40,6 +83,20 @@ public class NettyConfig {
     NettyConfig nettyConfig = new NettyConfig();
     nettyConfig.setNativeTransportsEnabled(pinotConfig.getProperty(key(namespace, NATIVE_TRANSPORTS_ENABLED),
         defaultConfig.isNativeTransportsEnabled()));
+    nettyConfig.setWriteTimeoutMs(
+        pinotConfig.getProperty(key(namespace, WRITE_TIMEOUT_MS), defaultConfig.getWriteTimeoutMs()));
+    nettyConfig.setTcpUserTimeoutMs(
+        pinotConfig.getProperty(key(namespace, TCP_USER_TIMEOUT_MS), defaultConfig.getTcpUserTimeoutMs()));
+    String highWaterMarkKey = key(namespace, WRITE_BUFFER_HIGH_WATER_MARK_BYTES);
+    int highWaterMark = pinotConfig.getProperty(highWaterMarkKey, defaultConfig.getWriteBufferHighWaterMarkBytes());
+    // An operator who only lowers the high watermark should not have to know about the low one: when the high
+    // watermark is overridden, the default low watermark is pulled down to half of it if it would sit above that
+    int defaultLowWaterMark = defaultConfig.getWriteBufferLowWaterMarkBytes();
+    if (pinotConfig.containsKey(highWaterMarkKey)) {
+      defaultLowWaterMark = Math.min(defaultLowWaterMark, highWaterMark / 2);
+    }
+    int lowWaterMark = pinotConfig.getProperty(key(namespace, WRITE_BUFFER_LOW_WATER_MARK_BYTES), defaultLowWaterMark);
+    nettyConfig.setWriteBufferWaterMarks(lowWaterMark, highWaterMark);
 
     return nettyConfig;
   }
@@ -50,5 +107,42 @@ public class NettyConfig {
 
   public void setNativeTransportsEnabled(boolean nativeTransportsEnabled) {
     _nativeTransportsEnabled = nativeTransportsEnabled;
+  }
+
+  public long getWriteTimeoutMs() {
+    return _writeTimeoutMs;
+  }
+
+  public void setWriteTimeoutMs(long writeTimeoutMs) {
+    _writeTimeoutMs = writeTimeoutMs;
+  }
+
+  public int getTcpUserTimeoutMs() {
+    return _tcpUserTimeoutMs;
+  }
+
+  public void setTcpUserTimeoutMs(int tcpUserTimeoutMs) {
+    _tcpUserTimeoutMs = tcpUserTimeoutMs;
+  }
+
+  public int getWriteBufferHighWaterMarkBytes() {
+    return _writeBufferHighWaterMarkBytes;
+  }
+
+  public int getWriteBufferLowWaterMarkBytes() {
+    return _writeBufferLowWaterMarkBytes;
+  }
+
+  /// Sets both watermarks together because they constrain each other: the high watermark must be positive and the
+  /// low watermark must be between zero and the high watermark, which is also what Netty's `WriteBufferWaterMark`
+  /// enforces.
+  public void setWriteBufferWaterMarks(int lowWaterMarkBytes, int highWaterMarkBytes) {
+    Preconditions.checkArgument(highWaterMarkBytes > 0, "Write buffer high watermark must be positive, got: %s",
+        highWaterMarkBytes);
+    Preconditions.checkArgument(lowWaterMarkBytes >= 0 && lowWaterMarkBytes <= highWaterMarkBytes,
+        "Write buffer low watermark must be between 0 and the high watermark (%s), got: %s", highWaterMarkBytes,
+        lowWaterMarkBytes);
+    _writeBufferLowWaterMarkBytes = lowWaterMarkBytes;
+    _writeBufferHighWaterMarkBytes = highWaterMarkBytes;
   }
 }
