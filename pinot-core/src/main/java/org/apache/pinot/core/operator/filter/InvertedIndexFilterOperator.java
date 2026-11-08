@@ -48,7 +48,8 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
 
   InvertedIndexFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator, DataSource dataSource,
       int numDocs) {
-    super(queryContext, dataSource, numDocs);
+    super(queryContext, dataSource, numDocs,
+        FilterOperatorUtils.isNullHandlingEnabled(queryContext, predicateEvaluator));
     _predicateEvaluator = predicateEvaluator;
     @SuppressWarnings("unchecked")
     InvertedIndexReader<ImmutableRoaringBitmap> invertedIndexReader =

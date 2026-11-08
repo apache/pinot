@@ -86,21 +86,27 @@ public class FilterOperatorUtils {
     return getNullBitmap(dataSource) != null;
   }
 
+  static boolean isNullHandlingEnabled(QueryContext queryContext, PredicateEvaluator predicateEvaluator) {
+    // TEXT_MATCH filters evaluate stored default values, matching the legacy per-row TextMatchFilterOperator.
+    return queryContext.isNullHandlingEnabled() && predicateEvaluator.getPredicateType() != Predicate.Type.TEXT_MATCH;
+  }
+
   public static class DefaultImplementation implements Implementation {
     @Override
     public BaseFilterOperator getLeafFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
         DataSource dataSource, int numDocs) {
+      boolean nullHandlingEnabled = isNullHandlingEnabled(queryContext, predicateEvaluator);
       // The evaluator's verdicts are over the column's real values. With null handling enabled a null row is UNKNOWN
       // under either verdict, so it is selected by neither the predicate nor its negation: the leaf has to carry the
       // null rows for the negation to leave them out, instead of collapsing to a constant that knows nothing of them.
       if (predicateEvaluator.isAlwaysFalse()) {
-        ImmutableRoaringBitmap nullBitmap = queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource) : null;
+        ImmutableRoaringBitmap nullBitmap = nullHandlingEnabled ? getNullBitmap(dataSource) : null;
         if (nullBitmap != null) {
           return new BitmapBasedFilterOperator(new MutableRoaringBitmap(), false, numDocs, nullBitmap);
         }
         return EmptyFilterOperator.getInstance();
       } else if (predicateEvaluator.isAlwaysTrue()) {
-        ImmutableRoaringBitmap nullBitmap = queryContext.isNullHandlingEnabled() ? getNullBitmap(dataSource) : null;
+        ImmutableRoaringBitmap nullBitmap = nullHandlingEnabled ? getNullBitmap(dataSource) : null;
         if (nullBitmap != null) {
           return new BitmapBasedFilterOperator(nullBitmap, true, numDocs, nullBitmap);
         }

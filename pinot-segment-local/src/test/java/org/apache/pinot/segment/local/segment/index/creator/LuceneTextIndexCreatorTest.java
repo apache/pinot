@@ -320,7 +320,7 @@ public class LuceneTextIndexCreatorTest {
     TextIndexConfig config = new TextIndexConfigBuilder().withBuildOnDictionary(true).build();
     try (LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", INDEX_DIR, 5, config)) {
       assertFalse(reader.isBuildOnDictionary());
-      assertEquals(reader.getDocIds("clean").toArray(), new int[]{0, 4});
+      assertEquals(reader.getDocIds("clean", null).toArray(), new int[]{0, 4});
     }
 
     File combinedFile = new File(INDEX_DIR, "legacy.text");
@@ -329,7 +329,7 @@ public class LuceneTextIndexCreatorTest {
         ByteOrder.LITTLE_ENDIAN, "legacy text index test");
         LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", buffer, 5, config)) {
       assertFalse(reader.isBuildOnDictionary());
-      assertEquals(reader.getDocIds("clean").toArray(), new int[]{0, 4});
+      assertEquals(reader.getDocIds("clean", null).toArray(), new int[]{0, 4});
     }
   }
 
