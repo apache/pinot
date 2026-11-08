@@ -42,6 +42,7 @@ import org.testng.annotations.Test;
 import static org.apache.kafka.common.record.RecordBatch.NO_TIMESTAMP;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -140,22 +141,23 @@ public class KafkaPartitionLevelConsumerDataLossCheckTest {
   }
 
   /// An out-of-range reset can surface on an empty poll: the client jumps to the new log start without returning a
-  /// record, so that batch cannot be told from one that only skipped transaction markers and reports no loss. Under
-  /// read_uncommitted the empty batch reports the requested offset as the next one, so the caller asks for it again
-  /// and the loss is reported by the next poll that returns records: its first offset is past the requested one and
-  /// the log now starts above it.
+  /// record, so that batch cannot be told from one that only skipped transaction markers and reports no loss. The
+  /// empty batch reports the client position as the next one, which callers only use for consumption lag, so the
+  /// caller asks for its own offset again and the loss is reported by the next poll that returns records: its first
+  /// offset is past the requested one and the log now starts above it.
   @Test
   public void testResetSeenOnEmptyPollIsReportedOnNextDataPoll()
       throws Exception {
     Consumer<Bytes, Bytes> mockConsumer = mock(Consumer.class);
     when(mockConsumer.poll(any(Duration.class))).thenReturn(records(), records(record(150L)));
+    when(mockConsumer.position(eq(TOPIC_PARTITION), any(Duration.class))).thenReturn(150L);
     when(mockConsumer.beginningOffsets(anyCollection(), any(Duration.class)))
         .thenReturn(Map.of(TOPIC_PARTITION, 150L));
 
     try (KafkaPartitionLevelConsumer consumer = createConsumerWithMock(getStreamConfig(null), mockConsumer)) {
       KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);
       assertEquals(emptyBatch.getMessageCount(), 0);
-      assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "100");
+      assertEquals(emptyBatch.getOffsetOfNextBatch().toString(), "150");
       assertFalse(emptyBatch.hasDataLoss());
 
       KafkaMessageBatch batch = consumer.fetchMessages(new LongMsgOffset(100L), TIMEOUT_MS);

@@ -52,7 +52,8 @@ import static org.testng.Assert.assertTrue;
 /// 2. Delete offsets (advance the log start via [EmbeddedKafkaCluster#deleteRecordsBeforeOffset]) and
 ///    confirm data loss IS reported.
 /// 3. Replay the production pattern: a caught-up consumer on a low-traffic transactional topic with one
-///    record per transaction, which sees every new record one offset past where it was parked.
+///    record per transaction, which sees every new record one offset past where it was parked, and whose
+///    empty polls report the position past the commit marker (the high watermark) for the consumption lag.
 ///
 /// Speed/stability: setup uses only synchronous broker calls (createTopics().all().get(),
 /// commitTransaction()/flush(), deleteRecords().all().get()), so there are no fixed sleeps. Reads
@@ -200,9 +201,9 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
       assertEquals(firstOffset(batch), 0);
       assertFalse(batch.hasDataLoss());
 
-      // Caught up: the caller asks for offset 1, the marker. The client skips it and returns nothing.
-      KafkaMessageBatch emptyBatch = consumer.fetchMessages(new LongMsgOffset(1), FETCH_TIMEOUT_MS);
-      assertEquals(emptyBatch.getMessageCount(), 0);
+      // Caught up: the caller asks for offset 1, the marker. The client skips it and returns nothing, and the empty
+      // batch reports the client position, 2, which is the high watermark: the lag computed from it is 0.
+      KafkaMessageBatch emptyBatch = fetchUntilNextBatchOffset(consumer, 1, 2);
       assertFalse(emptyBatch.hasDataLoss());
 
       // Transaction 2: record at offset 2, marker at 3. The caller still asks for offset 1, as
@@ -237,8 +238,29 @@ public class KafkaPartitionLevelConsumerDataLossIntegrationTest {
     return batch;
   }
 
+  /// Polls repeatedly at the same startOffset until the (empty) batch reports `expectedNextBatchOffset` as the
+  /// start of the next batch, i.e. until the consumer has observed and skipped the control record(s) at/after
+  /// startOffset, or the wait budget elapses. Fails if a record shows up instead.
+  private KafkaMessageBatch fetchUntilNextBatchOffset(KafkaPartitionLevelConsumer consumer, long startOffset,
+      long expectedNextBatchOffset) {
+    long deadlineMs = System.currentTimeMillis() + FETCH_MAX_WAIT_MS;
+    KafkaMessageBatch batch = consumer.fetchMessages(new LongMsgOffset(startOffset), FETCH_TIMEOUT_MS);
+    while (batch.getMessageCount() == 0 && nextBatchOffset(batch) < expectedNextBatchOffset
+        && System.currentTimeMillis() < deadlineMs) {
+      batch = consumer.fetchMessages(new LongMsgOffset(startOffset), FETCH_TIMEOUT_MS);
+    }
+    assertEquals(batch.getMessageCount(), 0, "Expected no record at/after offset " + startOffset + " yet");
+    assertEquals(nextBatchOffset(batch), expectedNextBatchOffset,
+        "Expected the empty batch to report the consumer position past the skipped control record");
+    return batch;
+  }
+
   private static long firstOffset(KafkaMessageBatch batch) {
     return Long.parseLong(batch.getFirstMessageOffset().toString());
+  }
+
+  private static long nextBatchOffset(KafkaMessageBatch batch) {
+    return Long.parseLong(batch.getOffsetOfNextBatch().toString());
   }
 
   private StreamConfig streamConfig(String topic, String isolationLevel, String autoOffsetReset) {

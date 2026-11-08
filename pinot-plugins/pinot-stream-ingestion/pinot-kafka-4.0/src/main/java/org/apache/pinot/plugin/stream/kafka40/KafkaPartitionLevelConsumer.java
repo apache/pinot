@@ -57,10 +57,10 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
 
   // Offset the consumer is positioned to read NEXT. -1 means the consumer has not been
   // positioned for any caller-requested startOffset yet (we have not issued a seek).
-  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch under
-  // read_committed (where the batch may have been filtered as aborted), this is the
+  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch, this is the
   // consumer's actual KafkaConsumer.position(), which may have advanced past the caller's
-  // startOffset even though zero records were returned.
+  // startOffset even though zero records were returned (transaction control records under
+  // either isolation level, aborted records under read_committed).
   private long _nextReadOffset = -1;
   // The caller's startOffset on the previous fetchMessages() call. Used to distinguish
   // "caller is passing the same startOffset back because RealtimeSegmentDataManager's
@@ -107,10 +107,10 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     //       the repeated-startOffset-after-empty-fetch case described below.
     //
     // We only suppress a re-seek when the caller passed the same startOffset after the
-    // previous successful fetch returned zero records. That is the read_committed
-    // empty-poll case: RealtimeSegmentDataManager._currentOffset did not advance, but
-    // KafkaConsumer.position() may have advanced through aborted records. Seeking back to
-    // startOffset would undo that progress and wedge consumption forever.
+    // previous successful fetch returned zero records. That is the empty-poll case:
+    // RealtimeSegmentDataManager._currentOffset did not advance, but KafkaConsumer.position()
+    // may have advanced through control or aborted records. Seeking back to startOffset would
+    // undo that progress (and wedge consumption forever in an aborted region).
     //
     // If the previous poll returned records, a repeated startOffset means the caller did
     // not process them (for example, the segment time limit fired before index 0). We must
@@ -151,18 +151,18 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         }
         lastMessageMetadata = messageMetadata;
       }
-    } else if (_isReadCommitted) {
-      // No records returned. With read_committed isolation, the underlying KafkaConsumer's
-      // internal position may still have advanced past offsets filtered out as aborted
-      // transactional records, so snap _nextReadOffset to the consumer's actual position.
-      // RealtimeSegmentDataManager doesn't advance _currentOffset on empty batches and will
-      // call us again with the same startOffset; without this update the seek-check would
-      // re-seek to startOffset and undo the consumer's progress through the aborted region.
-      //
-      // For read_uncommitted (the default), empty polls can never advance the internal
-      // position past records that didn't exist, so we skip the position() call in the
-      // hot path. The call is bounded by the same timeout as poll() so a sick broker
-      // can't stall this loop unbounded.
+    } else {
+      // No records returned. The underlying KafkaConsumer's internal position may still have
+      // advanced past offsets it never delivers: transaction control records (commit/abort
+      // markers) under either isolation level, and records filtered out as aborted under
+      // read_committed. Snap _nextReadOffset to the consumer's actual position and report it as
+      // the next batch's offset. RealtimeSegmentDataManager only uses it for consumption lag
+      // and calls us again with the same startOffset, which the seek-check above does not undo.
+      // The move is not validated (it may also be an out-of-range reset), which is fine because
+      // no caller resumes from it: the next poll that returns records checks its first offset
+      // against the caller's startOffset below. The call is bounded by the same timeout as
+      // poll() so a sick broker can't stall this loop unbounded; after a poll it is normally
+      // answered locally.
       long currentPosition;
       try {
         currentPosition = _consumer.position(_topicPartition, Duration.ofMillis(timeoutMs));
