@@ -43,9 +43,10 @@ public interface MessageBatch<T> {
 
   /// Returns the start offset of the next batch.
   ///
-  /// For a batch without messages this is the requested start offset, unless the stream has moved past offsets it
-  /// will never deliver (e.g. Kafka transaction control records): it is then the offset consumption resumes from,
-  /// and the consumer adopts it. It must never point past a message that has not been delivered.
+  /// For a batch without messages this can be ahead of the requested start offset when the stream moved past offsets
+  /// it never delivers (e.g. Kafka transaction control records). Pinot only uses that value to report how far the
+  /// stream has been read (consumption lag): the next fetch still starts from the requested offset, so a value past
+  /// undelivered messages cannot skip them.
   StreamPartitionMsgOffset getOffsetOfNextBatch();
 
   /// Returns the offset of the first message (including tombstone) in the batch.

@@ -274,6 +274,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
+  // Furthest next offset reported by a batch without messages, e.g. one past a Kafka transaction marker. Only feeds
+  // consumption lag and the highest-offset gauge (see getStreamPosition()). Written by the consumer thread only.
+  @Nullable
+  private volatile StreamPartitionMsgOffset _emptyBatchStreamPosition;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
@@ -303,9 +307,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile boolean _endOfPartitionGroup = false;
   private volatile boolean _forceCommitMessageReceived = false;
   private volatile StreamPartitionMsgOffset _finalOffset; // Exclusive, used when we want to catch up to this one
-  // Whether catch-up capped a position at _finalOffset or settled on it in front of a message, i.e. reached it without
-  // a message ending there. Only accessed by the consumer thread.
-  private boolean _settledOnFinalOffset = false;
   private volatile boolean _shouldStop = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
@@ -592,21 +593,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _idleTimer.markEventConsumed();
         // we consumed something from the stream but filtered all the content out,
         // so we need to advance the offsets to avoid getting stuck
-        StreamPartitionMsgOffset nextOffset = capAtFinalOffset(messageBatch, messageBatch.getOffsetOfNextBatch());
+        StreamPartitionMsgOffset nextOffset = messageBatch.getOffsetOfNextBatch();
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("Skipped empty batch. Advancing from {} to {}", _currentOffset, nextOffset);
         }
         _currentOffset = nextOffset;
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(nextOffset);
-      } else if (adoptNextBatchOffsetOfEmptyBatch(messageBatch)) {
-        // The stream delivered nothing but reported a new position. Count it as stream activity for the idle timer.
-        // It is not a consumed row: ingestion delay and freshness are left to processStreamEvents, which already
-        // treats an empty batch as caught up.
-        _idleTimer.markEventConsumed();
-        updateHighestStreamOffsetConsumedGauge();
-        lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else {
         // We did not consume any rows.
+        if (recordStreamPositionOfEmptyBatch(messageBatch)) {
+          updateHighestStreamOffsetConsumedGauge();
+        }
         long timeSinceStreamLastCreatedOrConsumedMs = _idleTimer.getTimeSinceStreamLastCreatedOrConsumedMs();
 
         if (idleTimeoutMillis >= 0 && (timeSinceStreamLastCreatedOrConsumedMs > idleTimeoutMillis)) {
@@ -635,78 +632,44 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
   private void updateHighestStreamOffsetConsumedGauge() {
-    if (_currentOffset instanceof LongMsgOffset) {
+    StreamPartitionMsgOffset streamPosition = getStreamPosition();
+    if (streamPosition instanceof LongMsgOffset) {
       // TODO: only LongMsgOffset supplies long offset value.
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
-          ((LongMsgOffset) _currentOffset).getOffset());
+          ((LongMsgOffset) streamPosition).getOffset());
     }
   }
 
-  /// Adopts an empty batch's advanced stream position. Transaction markers and aborted records move a stream's
-  /// position without delivering rows, so adoption keeps the position and lag current. The skipped offsets are treated
-  /// like a gap between two delivered messages, which needs no further proof either: the stream reports a loss
-  /// through `hasDataLoss()`.
+  /// Records the next offset of a batch without messages when it is ahead of [#getStreamPosition()], which happens
+  /// when the stream moved past offsets it never delivers, such as Kafka transaction markers.
   ///
-  /// @return `true` if `_currentOffset` was advanced
-  private boolean adoptNextBatchOffsetOfEmptyBatch(MessageBatch messageBatch) {
+  /// @return `true` if the stream position moved
+  private boolean recordStreamPositionOfEmptyBatch(MessageBatch messageBatch) {
     StreamPartitionMsgOffset nextBatchOffset = messageBatch.getOffsetOfNextBatch();
-    if (nextBatchOffset == null || nextBatchOffset.compareTo(_currentOffset) <= 0) {
+    if (nextBatchOffset == null || nextBatchOffset.compareTo(getStreamPosition()) <= 0) {
       return false;
     }
-    nextBatchOffset = capAtFinalOffset(messageBatch, nextBatchOffset);
     if (_segmentLogger.isDebugEnabled()) {
-      _segmentLogger.debug("Empty batch moved the stream position. Advancing from {} to {}", _currentOffset,
-          nextBatchOffset);
+      _segmentLogger.debug("Empty batch moved the stream position to {} (current offset {})", nextBatchOffset,
+          _currentOffset);
     }
-    _currentOffset = nextBatchOffset;
+    _emptyBatchStreamPosition = nextBatchOffset;
     return true;
   }
 
-  /// While catching up to a final offset, caps at it the position of a batch that indexes no row (no messages, or
-  /// only filtered ones such as tombstones) when that position lies past the final offset. The final offset then lies
-  /// inside an interval no replica indexes rows from, so this replica holds exactly the rows below it. A committer can
-  /// stop at such an offset, e.g. one past a Kafka commit marker it skipped on an empty poll. A batch reporting loss is
-  /// not capped and keeps the existing overshoot handling. A capped segment is verified against the committed CRC on
-  /// KEEP.
-  @Nullable
-  private StreamPartitionMsgOffset capAtFinalOffset(MessageBatch messageBatch,
-      @Nullable StreamPartitionMsgOffset nextBatchOffset) {
-    if (nextBatchOffset != null && isCatchingUpToFinalOffset() && !messageBatch.hasDataLoss()
-        && nextBatchOffset.compareTo(_finalOffset) > 0) {
-      _settledOnFinalOffset = true;
-      return _finalOffset;
-    }
-    return nextBatchOffset;
-  }
-
-  /// While catching up to a final offset, stops before a message that starts at or past it and settles on the final
-  /// offset. This happens when the final offset is one past offsets the stream never delivers, such as a Kafka commit
-  /// marker the committer skipped on an empty poll. The offsets below the message are a gap like any other inside a
-  /// data poll, so this replica then holds exactly the rows below the final offset, unless the stream skipped messages
-  /// without reporting loss. A settled segment is therefore verified against the committed CRC on KEEP.
-  ///
-  /// The existing overshoot handling, which ends in a download, is kept for a batch reporting loss, for a message
-  /// straddling the final offset (starting below it), and for a message whose offset equals its next offset (inclusive
-  /// offsets such as Kinesis sequence numbers): with those, a message past the final offset means this replica's view
-  /// misses one the committer indexed.
-  ///
-  /// @return `true` if consumption must stop before the message
-  private boolean reachedFinalOffsetBeforeMessage(MessageBatch messageBatch, StreamPartitionMsgOffset offset,
-      StreamPartitionMsgOffset nextOffset) {
-    if (!isCatchingUpToFinalOffset() || messageBatch.hasDataLoss() || _currentOffset.compareTo(_finalOffset) >= 0
-        || offset.compareTo(_finalOffset) < 0 || offset.compareTo(nextOffset) >= 0) {
-      return false;
-    }
-    _segmentLogger.info("Next message starts at {}, at or past the final offset {}. Settling on it from {}", offset,
-        _finalOffset, _currentOffset);
-    _settledOnFinalOffset = true;
-    _currentOffset = _finalOffset;
-    return true;
-  }
-
-  /// Whether consumption must stop at `_finalOffset`: protocol catch-up or the catch-up before going ONLINE.
-  private boolean isCatchingUpToFinalOffset() {
-    return (_state == State.CATCHING_UP || _state == State.CONSUMING_TO_ONLINE) && _finalOffset != null;
+  /// Returns how far the stream has been read: `_currentOffset`, or the furthest next offset reported by a batch
+  /// without messages when that is ahead of it. A Kafka consumer moves past transaction markers without delivering
+  /// anything, so on a transactional topic a caught-up consumer sits one past the last commit marker while
+  /// `_currentOffset` stays one past the last record. This position only feeds consumption lag
+  /// ([#getConsumerPartitionState]) and [ServerGauge#HIGHEST_STREAM_OFFSET_CONSUMED]. Fetching, catch-up and the end
+  /// offset a segment commits keep using `_currentOffset`, so an empty batch's next offset never decides which records
+  /// a segment holds.
+  @VisibleForTesting
+  StreamPartitionMsgOffset getStreamPosition() {
+    StreamPartitionMsgOffset currentOffset = _currentOffset;
+    StreamPartitionMsgOffset emptyBatchStreamPosition = _emptyBatchStreamPosition;
+    return emptyBatchStreamPosition != null && emptyBatchStreamPosition.compareTo(currentOffset) > 0
+        ? emptyBatchStreamPosition : currentOffset;
   }
 
   /// @param messageBatch batch of messages to process
@@ -760,16 +723,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         throw new RuntimeException("Realtime segment full");
       }
 
+      // Decode message
       StreamMessage<?> streamMessage = messageBatch.getStreamMessage(index);
+      StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(streamMessage);
       StreamMessageMetadata metadata = streamMessage.getMetadata();
       StreamPartitionMsgOffset offset = metadata.getOffset();
       StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
-      if (reachedFinalOffsetBeforeMessage(messageBatch, offset, nextOffset)) {
-        prematureExit = true;
-        break;
-      }
-      // Decode message
-      StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(streamMessage);
       int rowSizeInBytes = metadata.getRecordSerializedSize();
       if (decodedRow.getException() != null) {
         String errorMessage = "Stopping consumption due to decode error at offset: " + offset;
@@ -1054,11 +1013,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                     "CompletionMode is DOWNLOAD but download URL is missing for segment: {} and peer download "
                         + "is disabled. Falling back to RETAINING mode", _segmentNameStr);
               }
-              // A final offset settled on is only as good as the stream's loss reporting, which some streams (e.g.
-              // Pulsar, Kafka read_committed) never do, so a replica that skipped the committer's last messages would
-              // settle too. Verify such a segment against the committed CRC.
-              SegmentZKMetadata committedSegmentZKMetadata =
-                  _settledOnFinalOffset ? _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr) : null;
               _state = State.RETAINING;
               // Lock the segment to avoid multiple threads touching the same segment.
               Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
@@ -1066,12 +1020,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
-                if (buildSegmentAndReplace(committedSegmentZKMetadata)) {
+                if (buildSegmentAndReplace()) {
                   _state = State.RETAINED;
-                } else if (committedSegmentZKMetadata != null) {
-                  _segmentLogger.warn("Could not reuse the local segment built at the settled final offset {}. "
-                      + "Downloading it on the ONLINE transition", _currentOffset);
-                  _state = State.DISCARDED;
                 } else {
                   // Could not build segment for some reason. We can only download it.
                   _state = State.ERROR;
@@ -1270,12 +1220,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _lastConsumedTimestampMs;
   }
 
-  /// Returns the [ConsumerPartitionState] for the partition group.
+  /// Returns the [ConsumerPartitionState] for the partition group. Its current offset is [#getStreamPosition()], so
+  /// the lag computed from it counts offsets the stream skipped without delivering anything as consumed.
   public Map<String, ConsumerPartitionState> getConsumerPartitionState(
       @Nullable StreamPartitionMsgOffset latestMsgOffset) {
     String partitionGroupId = String.valueOf(_partitionGroupId);
     return Map.of(partitionGroupId,
-        new ConsumerPartitionState(partitionGroupId, getCurrentOffset(), getLastConsumedTimestamp(), latestMsgOffset,
+        new ConsumerPartitionState(partitionGroupId, getStreamPosition(), getLastConsumedTimestamp(), latestMsgOffset,
             _lastRowMetadata));
   }
 
@@ -1306,8 +1257,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
     _dataLossBatchesSinceLastReport++;
-    String location = "startOffset: " + _currentOffset + " batchFirstOffset: " + messageBatch.getFirstMessageOffset()
-        + " batchNextOffset: " + messageBatch.getOffsetOfNextBatch();
+    String location = "startOffset: " + _currentOffset + " batchFirstOffset: " + messageBatch.getFirstMessageOffset();
     if (_earliestUnreportedDataLossLocation == null) {
       _earliestUnreportedDataLossLocation = location;
     }

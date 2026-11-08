@@ -79,19 +79,16 @@ import org.slf4j.LoggerFactory;
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
 ///
-/// Like `RealtimeSegmentDataManager`, the writer adopts the next offset of a batch without unfiltered messages when
-/// it is ahead of its own. A Kafka consumer, for one, moves past transaction control records without returning
-/// anything, so such a batch can report a next offset ahead of the requested one, either because only commit/abort
-/// markers were skipped (routine on a transactional topic) or because the client reset after an out-of-range fetch.
-/// The consumer validates such a move before reporting it and flags a reset as data loss, on the empty batch itself
-/// or on the next batch that returns records, and the writer fails the replay on any batch reporting data loss
-/// before anything from it is indexed. Adopting the move matters for ranges whose tail holds no records: a segment
-/// committed on an idle transactional partition ends one past the last commit marker, an offset no record's next
-/// offset produces, so a writer that waited for a record at or after the end offset would run into the caller's
-/// consumption timeout on an idle stream.
+/// A batch that reports data loss (records between the requested offset and the batch were deleted from the stream
+/// before they could be replayed) fails the replay before anything from it is indexed: the replayed segment would
+/// otherwise silently miss part of its offset range. The segment then stays in ERROR until the operator restores the
+/// range from another source or deletes the segment to accept the loss.
 ///
-/// A replay that fails on data loss leaves the segment in ERROR until the operator restores the range from another
-/// source or deletes the segment to accept the loss.
+/// A batch without unfiltered messages never moves the writer, whatever next offset it reports: the writer polls again
+/// from its own offset. A Kafka consumer reports its client position there, which can lie past transaction markers,
+/// but also past deleted records after an out-of-range reset it has not reported as loss yet. The loss check of the
+/// next batch with records then covers the whole gap. Reaching the end offset never needs that position, since the
+/// data manager only moves its own offset on fetched records.
 ///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
@@ -291,11 +288,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
               + "rebuilt from it. Restore the range from another source, or delete the segment to accept the loss",
               _currentOffset, _endOffset);
           if (messageBatch.getUnfilteredMessageCount() == 0) {
-            // Adopt a position the stream moved to without delivering anything (see the class Javadoc), else poll again
-            StreamPartitionMsgOffset nextBatchOffset = messageBatch.getOffsetOfNextBatch();
-            if (nextBatchOffset != null && nextBatchOffset.compareTo(_currentOffset) > 0) {
-              _currentOffset = nextBatchOffset;
-            }
+            // Poll again from the same offset (see the class Javadoc)
             continue;
           }
 
