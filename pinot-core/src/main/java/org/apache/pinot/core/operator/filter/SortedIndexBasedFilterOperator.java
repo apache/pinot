@@ -46,7 +46,8 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
 
   SortedIndexBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
       DataSource dataSource, int numDocs) {
-    super(queryContext, dataSource, numDocs);
+    super(queryContext, dataSource, numDocs,
+        FilterOperatorUtils.isNullHandlingEnabled(queryContext, predicateEvaluator));
     _predicateEvaluator = predicateEvaluator;
     _sortedIndexReader = (SortedIndexReader<?>) dataSource.getInvertedIndex();
   }

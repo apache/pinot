@@ -27,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -153,18 +154,79 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
 
   private ImmutableSegment buildAndLoad(String segmentName, boolean buildOnDictionary, boolean storeInSegmentFile)
       throws Exception {
-    TableConfig tableConfig = tableConfig(buildOnDictionary, storeInSegmentFile);
+    return buildAndLoad(segmentName, tableConfig(buildOnDictionary, storeInSegmentFile), createTestData());
+  }
+
+  private ImmutableSegment buildAndLoad(String segmentName, TableConfig tableConfig, List<GenericRow> rows)
+      throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(segmentName);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (RecordReader recordReader = new GenericRowRecordReader(createTestData())) {
+    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
     }
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName),
         new IndexLoadingConfig(tableConfig, SCHEMA));
+  }
+
+  @Test
+  public void dictionaryBasedTextMatchWithNullHandling()
+      throws Exception {
+    List<GenericRow> rows = new ArrayList<>();
+    String[] values = {"apple", "null", "banana", "apple"};
+    for (int i = 0; i < values.length; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue(SV_COL, values[i]);
+      row.putValue(MV_COL, new String[]{"fruit"});
+      row.putValue(INT_COL, i);
+      if (i == 1) {
+        row.putDefaultNullValue(SV_COL, values[i]);
+      }
+      rows.add(row);
+    }
+    String[] filters = {
+        "TEXT_MATCH(SV_TEXT, 'apple')", "NOT TEXT_MATCH(SV_TEXT, 'apple')",
+        "TEXT_MATCH(SV_TEXT, 'null')", "NOT TEXT_MATCH(SV_TEXT, 'null')",
+        "TEXT_MATCH(SV_TEXT, 'missing')", "NOT TEXT_MATCH(SV_TEXT, 'missing')",
+        "TEXT_MATCH(SV_TEXT, '*:*')", "NOT TEXT_MATCH(SV_TEXT, '*:*')",
+        "NOT TEXT_MATCH(SV_TEXT, 'apple') AND SV_TEXT IS NULL",
+        "NOT TEXT_MATCH(SV_TEXT, 'apple') AND SV_TEXT = 'null'",
+        "NOT (TEXT_MATCH(SV_TEXT, 'missing') AND SV_TEXT = 'apple')",
+        "NOT (TEXT_MATCH(SV_TEXT, 'apple') OR SV_TEXT IS NULL)"
+    };
+    long[] expected = {2, 2, 1, 3, 0, 4, 4, 0, 1, 0, 4, 1};
+    for (boolean invertedIndex : new boolean[]{false, true}) {
+      for (boolean buildOnDictionary : new boolean[]{false, true}) {
+        TableConfig config = tableConfig(buildOnDictionary);
+        config.getIndexingConfig().setNullHandlingEnabled(true);
+        if (invertedIndex) {
+          config.getIndexingConfig().setInvertedIndexColumns(List.of(SV_COL));
+        }
+        ImmutableSegment segment = buildAndLoad("nulls-" + invertedIndex + "-" + buildOnDictionary, config, rows);
+        _indexSegment = segment;
+        _indexSegments = List.of(segment);
+        try {
+          assertEquals(segment.getDataSource(SV_COL).getNullValueVector().getNullBitmap().getCardinality(), 1);
+          for (int i = 0; i < filters.length; i++) {
+            String query = "SET enableNullHandling = true; SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE " + filters[i];
+            assertEquals(count(query), expected[i], "inverted=" + invertedIndex + ", dictionary=" + buildOnDictionary
+                + ": " + query);
+          }
+          SelectionResultsBlock result = (SelectionResultsBlock) getOperator("SET enableNullHandling = true; SELECT "
+              + INT_COL + " FROM " + TABLE_NAME + " WHERE NOT TEXT_MATCH(SV_TEXT, 'apple') ORDER BY " + INT_COL)
+              .nextBlock();
+          assertEquals(result.getRows().size(), 2);
+          assertEquals(result.getRows().get(0)[0], 1);
+          assertEquals(result.getRows().get(1)[0], 2);
+        } finally {
+          segment.destroy();
+          _indexSegment = null;
+        }
+      }
+    }
   }
 
   private long count(String query) {
