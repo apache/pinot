@@ -1042,6 +1042,33 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     }
   }
 
+  /// Drops the cached Netty channels to a server the routing manager just enabled. Channels opened to a process that
+  /// ran before a restart are half-open if it went away without closing them, and would swallow every query routed to
+  /// the readmitted server until the kernel gives up on them minutes later. A channel that still carries queries is
+  /// retired instead: the next query opens a fresh connection, and the old one is closed once those queries are past
+  /// their deadline, so that toggling a live server lets them finish. A server seen for the first time has no cached
+  /// channel, so this is a no-op for it.
+  @Override
+  public void onServerEnabled(ServerInstance serverInstance) {
+    int numEvicted = _queryRouter.evictChannelsOfEnabledServer(serverInstance);
+    if (numEvicted > 0) {
+      LOGGER.info("Evicted {} live cached channel(s) to enabled server: {}, the next query reconnects", numEvicted,
+          serverInstance.getInstanceId());
+    }
+  }
+
+  /// Drops the cached Netty channels to a server removed from the cluster, or to the previous address of a server
+  /// that moved: nothing routes there any more, and if the server is ever added back under the same id, or moves back
+  /// to that address, it is a new process.
+  @Override
+  public void onServerRemoved(ServerInstance serverInstance) {
+    int numEvicted = _queryRouter.evictChannels(serverInstance);
+    if (numEvicted > 0) {
+      LOGGER.info("Evicted {} live cached channel(s) to server: {} at {}:{}, which left the cluster or that address",
+          numEvicted, serverInstance.getInstanceId(), serverInstance.getHostname(), serverInstance.getPort());
+    }
+  }
+
   /// Check if a server that was previously detected as unhealthy is now healthy: by pinging it when pings are enabled,
   /// otherwise by connecting to it.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
