@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -78,6 +79,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
@@ -229,6 +231,48 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
+  }
+
+  /// The broker rejects IN_PARTITIONED_SUBQUERY for a principal with row filters. A server behind an older broker,
+  /// which stamps the row filters in the query options but lets the function through, fails the query instead: the
+  /// subquery reaches it as a string literal the filters do not cover, so it would build its ID_SET from every row.
+  @Test
+  public void testInPartitionedSubqueryRejectedUnderRowFilters() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE IN_PARTITIONED_SUBQUERY(orderItemCount, "
+        + "'SELECT ID_SET(orderItemCount) FROM " + OFFLINE_TABLE_NAME + "') = 1";
+    // Without row filters the function resolves as it always has: every row's value is in the ID_SET
+    long numRows = (Long) aggregate("SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME, null);
+    assertEquals(aggregate(query, null), numRows);
+
+    // With row filters stamped for any table the query fails before the subquery runs
+    for (String table : new String[]{RAW_TABLE_NAME, "otherTable"}) {
+      Map<String, String> queryOptions = Map.of(RlsUtils.buildRlsFilterKey(table), "orderItemCount > 0");
+      String error = executeExpectingFailure(query, queryOptions);
+      assertTrue(error.contains("not allowed when row-level security filters apply"), error);
+    }
+  }
+
+  private Object aggregate(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceResponseBlock instanceResponse = execute(newInstanceRequest(query, queryOptions));
+    assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
+    assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
+    return ((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0);
+  }
+
+  /// Runs the query and returns the text of the exceptions it fails with.
+  private String executeExpectingFailure(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceResponseBlock instanceResponse = execute(newInstanceRequest(query, queryOptions));
+    assertFalse(instanceResponse.getExceptions().isEmpty(), "Expected the query to fail");
+    return String.join("\n", instanceResponse.getExceptions().values());
+  }
+
+  private InstanceRequest newInstanceRequest(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    if (queryOptions != null) {
+      instanceRequest.getQuery().getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
+    }
+    instanceRequest.setSearchSegments(_segmentNames);
+    return instanceRequest;
   }
 
   @Test

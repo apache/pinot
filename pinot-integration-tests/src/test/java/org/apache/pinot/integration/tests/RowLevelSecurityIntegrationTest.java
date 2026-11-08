@@ -41,8 +41,10 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER_USER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest {
@@ -276,6 +278,36 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
 
     assertTrue(compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER),
         queryBroker(multiStageQuery, AUTH_HEADER_USER_2)));
+  }
+
+  /// The row filters are added to the WHERE clause of the queried table, which no cross-table function reads through:
+  /// the server resolves IN_PARTITIONED_SUBQUERY by running the quoted subquery on the segments of the table, where
+  /// the filters do not reach it, so the subquery below would see the rows of every other airline. The broker rejects
+  /// every cross-table function for a principal with row filters, IN_SUBQUERY included although its nested request
+  /// is filtered on its own.
+  @Test
+  public void testCrossTableFunctionsRejectedForPrincipalWithRowFilters()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    long numRows = queryBroker("SELECT COUNT(*) FROM mytable", AUTH_HEADER).get("resultTable").get("rows").get(0)
+        .get(0).asLong();
+    for (String function : new String[]{"IN_PARTITIONED_SUBQUERY", "IN_SUBQUERY"}) {
+      String query = "SELECT COUNT(*) FROM mytable WHERE " + function + "(AirlineID - AirlineID, "
+          + "'SELECT ID_SET(AirlineID - AirlineID) FROM mytable WHERE AirlineID <> 19805') = 1";
+
+      // A principal without row filters keeps the function
+      JsonNode adminResponse = queryBroker(query, AUTH_HEADER);
+      assertFalse(adminResponse.get("rlsFiltersApplied").asBoolean(), function);
+      assertEquals(adminResponse.get("resultTable").get("rows").get(0).get(0).asLong(), numRows, function);
+
+      // A principal with row filters is rejected
+      try {
+        JsonNode response = queryBroker(query, AUTH_HEADER_USER);
+        fail("Expected " + function + " to be rejected, got: " + response);
+      } catch (IOException e) {
+        assertTrue(e.getMessage().contains("Cross-table functions are not allowed"), e.getMessage());
+      }
+    }
   }
 
   private JsonNode queryBroker(String query, Map<String, String> headers)
