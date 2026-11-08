@@ -175,7 +175,9 @@ public class StatelessRealtimeSegmentWriterTest {
       awaitDone(replay.writer());
       assertFalse(replay.writer().isSuccess());
       assertTrue(replay.writer().getConsumptionException() instanceof IllegalStateException);
-      assertTrue(replay.writer().getConsumptionException().getMessage().contains("data loss"));
+      String message = replay.writer().getConsumptionException().getMessage();
+      assertTrue(message.contains("data loss"), message);
+      assertTrue(message.contains("delete the segment to accept the loss"), message);
       assertEquals(indexedRows(replay.writer()), 100);
       assertEquals(((LongMsgOffset) field(replay.writer(), "_currentOffset")).getOffset(), 100L);
       assertEquals(replay.requestedOffsets(), List.of(0L, 100L));

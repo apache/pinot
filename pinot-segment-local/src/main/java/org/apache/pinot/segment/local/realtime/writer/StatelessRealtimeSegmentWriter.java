@@ -90,6 +90,9 @@ import org.slf4j.LoggerFactory;
 /// offset produces, so a writer that waited for a record at or after the end offset would run into the caller's
 /// consumption timeout on an idle stream.
 ///
+/// A replay that fails on data loss leaves the segment in ERROR until the operator restores the range from another
+/// source or deletes the segment to accept the loss.
+///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
 ///   2. Use a different segment impl for better performance because it doesn't need to serve queries.
@@ -283,7 +286,9 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
-          Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s",
+          Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s: "
+              + "the stream no longer holds this range (e.g. it aged out of retention), so the segment cannot be "
+              + "rebuilt from it. Restore the range from another source, or delete the segment to accept the loss",
               _currentOffset, _endOffset);
           if (messageBatch.getUnfilteredMessageCount() == 0) {
             // Adopt a position the stream moved to without delivering anything (see the class Javadoc), else poll again

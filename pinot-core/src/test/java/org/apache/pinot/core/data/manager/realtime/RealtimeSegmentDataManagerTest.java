@@ -350,6 +350,57 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  /// When one report covers several batches with loss, it names where the earliest and the most recent of them were
+  /// detected, since the earliest shows where the loss started. This holds both when the next batch with loss after the
+  /// interval reports them and when a healthy batch after the interval does.
+  @Test
+  public void testDataLossReportNamesEarliestAndLatestLocation()
+      throws Exception {
+    TimeSupplier timeSupplier = new TimeSupplier();
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        createFakeSegmentManager(false, timeSupplier, null, null, null)) {
+      RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
+      ArgumentCaptor<SegmentErrorInfo> errorCaptor = ArgumentCaptor.forClass(SegmentErrorInfo.class);
+
+      segmentDataManager.reportDataLoss(batchWithLossAt(197));
+      verify(tableDataManager, times(1)).addSegmentError(eq(SEGMENT_NAME_STR), any(SegmentErrorInfo.class));
+
+      // Two losses suppressed within the interval, then a third one after it reports all three
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(batchWithLossAt(481));
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(batchWithLossAt(602));
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(40));
+      segmentDataManager.reportDataLoss(batchWithLossAt(733));
+      verify(tableDataManager, times(2)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      String message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.matches(".*earliest startOffset: \\S+ batchFirstOffset: 481 batchNextOffset: 482, "
+          + "latest startOffset: \\S+ batchFirstOffset: 733 batchNextOffset: 734 "
+          + "\\(batches with loss since last report: 3\\)"), message);
+
+      // Two losses suppressed within the interval, then reported by a healthy batch after it
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(batchWithLossAt(850));
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(10));
+      segmentDataManager.reportDataLoss(batchWithLossAt(911));
+      timeSupplier.add(TimeUnit.SECONDS.toMillis(40));
+      segmentDataManager.reportDataLoss(mock(MessageBatch.class));
+      verify(tableDataManager, times(3)).addSegmentError(eq(SEGMENT_NAME_STR), errorCaptor.capture());
+      message = errorCaptor.getValue().getErrorMessage();
+      Assert.assertTrue(message.matches(".*earliest startOffset: \\S+ batchFirstOffset: 850 batchNextOffset: 851, "
+          + "latest startOffset: \\S+ batchFirstOffset: 911 batchNextOffset: 912 "
+          + "\\(batches with loss since last report: 2\\)"), message);
+    }
+  }
+
+  private static MessageBatch<?> batchWithLossAt(long firstOffset) {
+    MessageBatch<?> batch = mock(MessageBatch.class);
+    when(batch.hasDataLoss()).thenReturn(true);
+    when(batch.getFirstMessageOffset()).thenReturn(new LongMsgOffset(firstOffset));
+    when(batch.getOffsetOfNextBatch()).thenReturn(new LongMsgOffset(firstOffset + 1));
+    return batch;
+  }
+
   /// A loss whose report the rate limit suppressed must not be dropped when consumption stops before the interval
   /// elapses, e.g. because the segment reaches its end criteria and commits: leaving the consume loop reports it.
   @Test
