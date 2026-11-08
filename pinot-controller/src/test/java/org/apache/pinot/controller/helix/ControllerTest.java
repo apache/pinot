@@ -81,6 +81,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
+import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -315,6 +316,16 @@ public class ControllerTest {
     return properties;
   }
 
+  /// Returns the cluster configs to write to the Helix cluster before the controller starts. Can be overridden to set
+  /// cluster configs for the test.
+  ///
+  /// They are written only for keys not set in the cluster yet, the same way the controller writes its default cluster
+  /// configs. The controller then writes its defaults only for the keys still missing, so these configs take
+  /// precedence, and a key changed at runtime keeps its value across a controller restart.
+  protected Map<String, String> getInitialClusterConfigs() {
+    return Map.of();
+  }
+
   /// Can be overridden to add more properties.
   protected void overrideControllerConf(Map<String, Object> properties) {
   }
@@ -341,6 +352,10 @@ public class ControllerTest {
     runWithHelixMock(() -> {
       assertNull(_controllerStarter, "Controller is already started");
       assertTrue(_controllerPort > 0, "Controller port is not assigned");
+      Map<String, String> clusterConfigs = getInitialClusterConfigs();
+      if (!clusterConfigs.isEmpty()) {
+        HelixSetupUtils.setupHelixClusterWithDefaultConfigs(getZkUrl(), getHelixClusterName(), clusterConfigs);
+      }
       _controllerStarter = createControllerStarter();
       _controllerStarter.init(new PinotConfiguration(properties));
       _controllerStarter.start();

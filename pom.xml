@@ -201,7 +201,7 @@
     <swagger-ui.version>5.34.1</swagger-ui.version>
     <hadoop.version>3.4.3</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
-    <jsonsmart.version>2.6.0</jsonsmart.version>
+    <jsonsmart.version>2.6.1</jsonsmart.version>
     <quartz.version>2.5.2</quartz.version>
     <calcite.version>1.42.0</calcite.version>
     <joou.version>0.9.6</joou.version>
@@ -243,7 +243,7 @@
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <jsr305.version>3.0.2</jsr305.version>
     <jspecify.version>1.0.1</jspecify.version>
-    <checker-qual.version>4.3.1</checker-qual.version>
+    <checker-qual.version>4.4.0</checker-qual.version>
     <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.6.29</roaring-bitmap.version>
@@ -260,8 +260,8 @@
     <jopt-simple.version>5.0.4</jopt-simple.version>
 
     <spark3.version>3.5.9</spark3.version>
-    <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
+    <jose4j.version>0.9.7</jose4j.version>
     <confluent.version>8.2.0</confluent.version>
     <wire.version>7.1.2</wire.version>
     <pulsar.version>5.0.1</pulsar.version>
@@ -306,13 +306,13 @@
     <!-- Google Libraries -->
     <protobuf.version>4.36.2</protobuf.version>
     <grpc.version>1.85.1</grpc.version>
-    <guava.version>33.7.2-jre</guava.version>
+    <guava.version>33.8.0-jre</guava.version>
     <google.cloud.libraries.version>26.91.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.cloud.opentelemetry.version>0.36.0</google.cloud.opentelemetry.version>
     <opentelemetry.gcp.resources.version>1.61.0-alpha</opentelemetry.gcp.resources.version>
-    <google.errorprone.version>2.51.0</google.errorprone.version>
+    <google.errorprone.version>2.52.0</google.errorprone.version>
     <google.j2objc.version>3.1</google.j2objc.version>
 
     <!-- Configuration for Scala -->
@@ -345,8 +345,8 @@
     <bouncycastle.version>1.86</bouncycastle.version>
     <aircompressor.version>2.0.3</aircompressor.version>
     <jna.version>5.19.1</jna.version>
-    <jnr-ffi.version>2.3.6</jnr-ffi.version>
-    <jnr-constants.version>0.11.3</jnr-constants.version>
+    <jnr-ffi.version>2.3.7</jnr-ffi.version>
+    <jnr-constants.version>0.11.4</jnr-constants.version>
     <asm.version>9.11.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.4.21</kotlin.stdlib.version>
@@ -368,7 +368,7 @@
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.5</testcontainers.version>
     <h2.version>2.5.252</h2.version>
-    <jnr-posix.version>3.2.6</jnr-posix.version>
+    <jnr-posix.version>3.2.7</jnr-posix.version>
     <scalatest.version>3.2.20</scalatest.version>
     <assertj.version>3.27.7</assertj.version>
 
@@ -1693,30 +1693,28 @@
       <dependency>
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka-clients</artifactId>
-        <version>${kafka3.version}</version>
+        <version>${kafka4.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bitbucket.b_c</groupId>
+        <artifactId>jose4j</artifactId>
+        <version>${jose4j.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka_${scala.compat.version}</artifactId>
-        <version>${kafka3.version}</version>
+        <version>${kafka4.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.kafka</groupId>
-        <artifactId>kafka_${scala.compat.version}</artifactId>
-        <version>${kafka3.version}</version>
-        <classifier>test</classifier>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.kafka</groupId>
-        <artifactId>kafka-clients</artifactId>
-        <version>${kafka3.version}</version>
-        <classifier>test</classifier>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.kafka</groupId>
-        <artifactId>kafka-server-common</artifactId>
-        <version>${kafka3.version}</version>
-        <classifier>test</classifier>
+        <artifactId>kafka-test-common-runtime</artifactId>
+        <version>${kafka4.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <dependency>
@@ -2099,21 +2097,14 @@
       <!-- Tests are written with TestNG only (checkstyle rejects JUnit test APIs). JUnit is present as test
            infrastructure: Surefire no longer ships a native TestNG provider and runs TestNG through the JUnit
            Platform. -->
-      <!-- Runtime dependency of Kafka's KafkaClusterTestKit, the embedded broker behind EmbeddedKafkaCluster: its
-           readiness wait asserts through JUnit. Declared by the modules that start the broker. -->
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit.version}</version>
-        <scope>test</scope>
-      </dependency>
       <!-- @Suite classes that group TestNG tests into one Surefire fork (shared @BeforeSuite cluster, class order,
            TestNG groups) and OrderedTestNGSuite, which restores the declared class order. -->
       <dependency>
-        <groupId>org.junit.platform</groupId>
-        <artifactId>junit-platform-suite</artifactId>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
         <version>${junit.version}</version>
-        <scope>test</scope>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <!-- mockito bom -->

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -375,6 +376,69 @@ public class TableConfigSerDeUtilsTest {
       tunerConfigToCompare = tableConfigToCompare.getTunerConfigsList().get(0);
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
+    }
+    {
+      // With hybrid table retention strategy
+      String hybridTableRetentionStrategy = "hybridTableRetentionStrategy";
+      for (Enablement hybridTableRetentionStrategyValue : Enablement.values()) {
+        TableConfig tableConfig = tableConfigBuilder.build();
+        tableConfig.getValidationConfig().setHybridTableRetentionStrategy(hybridTableRetentionStrategyValue);
+
+        // Only serialized when not DEFAULT
+        JsonNode validationConfigJson = tableConfig.toJsonNode().get(TableConfig.VALIDATION_CONFIG_KEY);
+        if (hybridTableRetentionStrategyValue == Enablement.DEFAULT) {
+          assertFalse(validationConfigJson.has(hybridTableRetentionStrategy));
+        } else {
+          assertEquals(validationConfigJson.get(hybridTableRetentionStrategy).asText(),
+              hybridTableRetentionStrategyValue.name());
+        }
+
+        // Serialize then de-serialize
+        TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+        assertEquals(tableConfigToCompare, tableConfig);
+        assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(),
+            hybridTableRetentionStrategyValue);
+
+        tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+        assertEquals(tableConfigToCompare, tableConfig);
+        assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(),
+            hybridTableRetentionStrategyValue);
+      }
+
+      // DEFAULT and not serialized when unset
+      TableConfig tableConfig = tableConfigBuilder.build();
+      assertEquals(tableConfig.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
+      assertFalse(tableConfig.toJsonNode().get(TableConfig.VALIDATION_CONFIG_KEY).has(hybridTableRetentionStrategy));
+
+      // Explicit null deserializes to DEFAULT
+      ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
+      ((ObjectNode) tableConfigJson.get(TableConfig.VALIDATION_CONFIG_KEY)).putNull(hybridTableRetentionStrategy);
+      TableConfig tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, TableConfig.class);
+      assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
+      assertEquals(tableConfigToCompare, tableConfig);
+
+      // Omitted field deserializes to DEFAULT
+      TableConfig explicitlySetTableConfig = tableConfigBuilder.build();
+      explicitlySetTableConfig.getValidationConfig().setHybridTableRetentionStrategy(Enablement.ENABLE);
+      tableConfigJson = (ObjectNode) explicitlySetTableConfig.toJsonNode();
+      ObjectNode validationConfigJson = (ObjectNode) tableConfigJson.get(TableConfig.VALIDATION_CONFIG_KEY);
+      assertTrue(validationConfigJson.has(hybridTableRetentionStrategy));
+      validationConfigJson.remove(hybridTableRetentionStrategy);
+      tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, TableConfig.class);
+      assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
+      assertEquals(tableConfigToCompare, tableConfig);
+
+      // Explicit DEFAULT deserializes to DEFAULT and is not serialized
+      tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
+      ((ObjectNode) tableConfigJson.get(TableConfig.VALIDATION_CONFIG_KEY)).put(hybridTableRetentionStrategy,
+          Enablement.DEFAULT.name());
+      tableConfigToCompare = JsonUtils.jsonNodeToObject(tableConfigJson, TableConfig.class);
+      assertEquals(tableConfigToCompare.getValidationConfig().getHybridTableRetentionStrategy(), Enablement.DEFAULT);
+      assertFalse(
+          tableConfigToCompare.toJsonNode().get(TableConfig.VALIDATION_CONFIG_KEY).has(hybridTableRetentionStrategy));
+      assertEquals(tableConfigToCompare, tableConfig);
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfigToCompare));
+      assertEquals(tableConfigToCompare, tableConfig);
     }
   }
 
