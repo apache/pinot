@@ -41,6 +41,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.DedupContext;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
@@ -748,5 +749,49 @@ public class RealtimeTableDataManagerTest {
 
     realtimeTableDataManager.setEnforceConsumptionInOrder(false);
     Assert.assertFalse(realtimeTableDataManager.isEnforceConsumptionInOrderEnabled());
+  }
+
+  @Test
+  public void testRemovePartitionConsumingGauge() {
+    ServerMetrics.register(mock(ServerMetrics.class));
+    ServerMetrics metrics = ServerMetrics.get();
+    clearInvocations(metrics);
+    Map<String, String> streamConfigMap = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("endOfLife").setStreamConfigs(streamConfigMap).build();
+    EndOfLifeTableDataManager tableDataManager = new EndOfLifeTableDataManager(tableConfig);
+    String lastSegment = new LLCSegmentName("endOfLife", 1, 3, 0L).getSegmentName();
+    // Same key as the consuming segments of stream partition 1 use for their gauge
+    String clientId =
+        "endOfLife_REALTIME-" + new StreamConfig(tableConfig.getTableName(), streamConfigMap).getTopicName() + "-1";
+
+    // A consuming segment of the partition on this server keeps the gauge
+    RealtimeSegmentDataManager consumingSegment = mock(RealtimeSegmentDataManager.class);
+    when(consumingSegment.getSegmentName()).thenReturn(new LLCSegmentName("endOfLife", 1, 4, 0L).getSegmentName());
+    tableDataManager.putSegmentDataManager(consumingSegment);
+    tableDataManager.removePartitionConsumingGauge(lastSegment);
+    verify(metrics, never()).removeTableGauge(anyString(), eq(ServerGauge.LLC_PARTITION_CONSUMING));
+
+    tableDataManager.clearSegmentDataManagers();
+    tableDataManager.removePartitionConsumingGauge(lastSegment);
+    verify(metrics).removeTableGauge(clientId, ServerGauge.LLC_PARTITION_CONSUMING);
+  }
+
+  private static class EndOfLifeTableDataManager extends RealtimeTableDataManager {
+    EndOfLifeTableDataManager(TableConfig tableConfig) {
+      super(null);
+      _tableNameWithType = tableConfig.getTableName();
+      _cachedTableConfigAndSchema = Pair.of(tableConfig, null);
+      _segmentLocks = new SegmentLocks();
+      _logger = LoggerFactory.getLogger(EndOfLifeTableDataManager.class);
+    }
+
+    void putSegmentDataManager(SegmentDataManager segmentDataManager) {
+      _segmentDataManagerMap.put(segmentDataManager.getSegmentName(), segmentDataManager);
+    }
+
+    void clearSegmentDataManagers() {
+      _segmentDataManagerMap.clear();
+    }
   }
 }

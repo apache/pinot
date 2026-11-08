@@ -28,12 +28,23 @@ import org.apache.helix.model.Message;
 /// by the server.
 public class IngestionMetricsRemoveMessage extends Message {
   public static final String INGESTION_METRICS_REMOVE_MSG_SUB_TYPE = "INGESTION_METRICS_REMOVE";
+  private static final String END_OF_PARTITION_GROUP_KEY = "endOfPartitionGroup";
 
   public IngestionMetricsRemoveMessage() {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(INGESTION_METRICS_REMOVE_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
+  }
+
+  /// Also tells the servers that the partition reached end of life, so they stop reporting it as consuming.
+  public IngestionMetricsRemoveMessage(boolean endOfPartitionGroup) {
+    this();
+    getRecord().setBooleanField(END_OF_PARTITION_GROUP_KEY, endOfPartitionGroup);
+  }
+
+  public boolean isEndOfPartitionGroup() {
+    return getRecord().getBooleanField(END_OF_PARTITION_GROUP_KEY, false);
   }
 
   public IngestionMetricsRemoveMessage(Message message) {
