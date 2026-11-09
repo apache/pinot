@@ -77,10 +77,12 @@ run_lane() {
   mkdir -p "${log_root}" || return 1
   start_time="$(date +%s)"
   echo "[${label}] Starting profile ${profile} at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # Develocity stores listener ports in basedir/target, ignoring the per-lane build directory.
+  # Disable scan capture to prevent the lanes from overwriting each other's listener endpoint.
   (
     cd "${module_dir}" || exit 1
     LOG_ROOT="${log_root}" MAVEN_OPTS="${lane_maven_opts}" /usr/bin/time "${time_args[@]}" \
-      mvn -B -ntp test jacoco:report@report \
+      mvn -B -ntp -Ddevelocity.scan.disabled=true test jacoco:report@report \
       -P "github-actions,codecoverage,${profile}" \
       "-Dpinot.integration.test.build.directory=${build_dir}" \
       -Dpinot.integration.test.heap.min=1g \
