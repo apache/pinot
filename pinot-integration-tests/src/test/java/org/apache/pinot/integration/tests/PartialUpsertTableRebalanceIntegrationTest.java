@@ -37,6 +37,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.partition.function.MurmurPartitionFunction;
@@ -62,9 +63,6 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotGauge;
-import org.apache.pinot.spi.metrics.PinotMetric;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -444,11 +442,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   }
 
   private static boolean isWaitingForReadiness(String tableNameWithType, int partition) {
-    String metric = CommonConstants.Server.DEFAULT_METRICS_PREFIX
-        + ServerGauge.CONSUMERS_WAITING_FOR_READINESS.getGaugeName() + "." + tableNameWithType + "." + partition;
-    PinotMetric gauge = ServerMetrics.get().getMetricsRegistry().allMetrics()
-        .get(PinotMetricUtils.makePinotMetricName(ServerMetrics.class, metric));
-    return gauge instanceof PinotGauge && ((Number) ((PinotGauge<?>) gauge).getValue()).longValue() > 0;
+    return MetricValueUtils.getPartitionGaugeValue(ServerMetrics.get(), tableNameWithType, partition,
+        ServerGauge.CONSUMERS_WAITING_FOR_READINESS) > 0;
   }
 
   @Test
