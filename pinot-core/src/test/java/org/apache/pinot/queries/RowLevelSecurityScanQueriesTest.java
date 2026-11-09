@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.IntPredicate;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
+import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -347,6 +349,39 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
     assertTrue(response.getExceptions().isEmpty(), policy + ": " + response.getExceptions());
     assertEquals(((Number) response.getResultTable().getRows().get(0)[0]).longValue(),
         expectedCount * NUM_SEGMENT_COPIES, policy);
+  }
+
+  /// A full-policy override must not match only the independent policy after the broker flattened its WHERE copy.
+  @Test
+  public void testWholePolicyOverrideCannotRemoveRowFilterBarrier() {
+    useSegment(false);
+    String policy = "tenant = 'A' AND payload = '1'";
+    Map<Expression, Expression> overrides = Map.of(
+        OPTIMIZER.optimizeFilter(CalciteSqlParser.compileToExpression(policy), _schema),
+        CalciteSqlParser.compileToExpression("TRUE"));
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT COUNT(*) FROM testTable WHERE CAST(payload AS INT) > 0 AND (" + policy + ")");
+    OPTIMIZER.optimize(pinotQuery, _schema);
+    Expression whereBeforeOverrides = pinotQuery.getFilterExpression().deepCopy();
+    pinotQuery.setFilterExpression(QueryOptimizer.applyExpressionOverride(pinotQuery.getFilterExpression(), overrides));
+    assertEquals(pinotQuery.getFilterExpression(), whereBeforeOverrides,
+        "The full-policy subtree must be absent from the flattened broker WHERE");
+    pinotQuery.setQueryOptions(rlsOptions(policy, Map.of()));
+    PlanMaker planMaker = new InstancePlanMakerImplV2() {
+      @Override
+      public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
+          ExecutorService executorService) {
+        queryContext.setSchema(_schema);
+        queryContext.setRowFilterExpressionOverrideMap(overrides);
+        return super.makeInstancePlan(segmentContexts, queryContext, executorService);
+      }
+    };
+
+    BrokerResponseNative response = getBrokerResponse(pinotQuery, planMaker);
+
+    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    assertEquals(((Number) response.getResultTable().getRows().get(0)[0]).longValue(),
+        (long) (NUM_ROWS / 100) * NUM_SEGMENT_COPIES);
   }
 
   /// The plan shows the RLS filter operator above the user filter.

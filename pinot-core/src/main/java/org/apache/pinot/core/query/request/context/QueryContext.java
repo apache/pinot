@@ -83,6 +83,8 @@ public class QueryContext implements QueryScopedCache {
   private final Expression _rowFilterExpression;
   @Nullable
   private FilterContext _rowFilter;
+  @Nullable
+  private Map<Expression, Expression> _rowFilterExpressionOverrideMap;
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
   private final List<OrderByExpressionContext> _orderByExpressions;
@@ -286,6 +288,17 @@ public class QueryContext implements QueryScopedCache {
   /// See [#getRowFilter()].
   public void setRowFilter(FilterContext rowFilter) {
     _rowFilter = rowFilter;
+  }
+
+  /// Returns the physical table overrides for the independent RLS policy. The broker already applies them to the
+  /// WHERE clause; the server must apply the same overrides to its policy copy before materializing it.
+  @Nullable
+  public Map<Expression, Expression> getRowFilterExpressionOverrideMap() {
+    return _rowFilterExpressionOverrideMap;
+  }
+
+  public void setRowFilterExpressionOverrideMap(@Nullable Map<Expression, Expression> expressionOverrideMap) {
+    _rowFilterExpressionOverrideMap = expressionOverrideMap;
   }
 
   /// Adds the time spent to materialize the row-level security bitmap of one segment. Thread-safe.

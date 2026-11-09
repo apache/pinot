@@ -239,8 +239,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService) {
-    rewriteQueryContextWithHints(queryContext, segmentContexts);
     applyQueryOptions(queryContext);
+    rewriteQueryContextWithHints(queryContext, segmentContexts);
     boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
     // No ResultsBlockStreamer here, so nothing can stream. SelectionPlanNode gates the streaming leaf on this same
     // option and cannot see the streamer, so clear it for the whole plan rather than let it be half-honored.
@@ -308,8 +308,16 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
     FilterContext rowFilter;
     try {
-      rowFilter = RequestContextUtils.getFilter(
-          QUERY_OPTIMIZER.optimizeFilter(rowFilterExpression.deepCopy(), queryContext.getSchema()));
+      // Match the broker's order: optimize the policy before the physical table overrides, then optimize again.
+      // Start from the original every time, so repeated planning does not follow chains of overrides.
+      rowFilterExpression = QUERY_OPTIMIZER.optimizeFilter(rowFilterExpression.deepCopy(), queryContext.getSchema());
+      Map<Expression, Expression> expressionOverrideMap = queryContext.getRowFilterExpressionOverrideMap();
+      if (expressionOverrideMap != null) {
+        rowFilterExpression =
+            QueryOptimizer.applyExpressionOverrideToFilterOperands(rowFilterExpression, expressionOverrideMap);
+        rowFilterExpression = QUERY_OPTIMIZER.optimizeFilter(rowFilterExpression, queryContext.getSchema());
+      }
+      rowFilter = RequestContextUtils.getFilter(rowFilterExpression);
     } catch (Exception e) {
       // Do not put the filter or the error in the message: they can show the RLS policy to the user
       throw new BadQueryRequestException(
@@ -317,6 +325,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
               queryContext.getTableName()));
     }
     queryContext.setRowFilter(rowFilter);
+    queryContext.prepareForExecution(Set.of());
   }
 
   @VisibleForTesting
@@ -489,8 +498,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer) {
-    rewriteQueryContextWithHints(queryContext, segmentContexts);
     applyQueryOptions(queryContext);
+    rewriteQueryContextWithHints(queryContext, segmentContexts);
     boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
     resolveSortedSelectionMergeMode(segmentContexts, queryContext);
 
@@ -912,6 +921,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
     if (queryContext.getFilter() != null) {
       overrideWithExpressionHints(queryContext.getFilter(), hints, hintFunctionArities, changedFunctions);
+    }
+    if (queryContext.getRowFilter() != null) {
+      overrideWithExpressionHints(queryContext.getRowFilter(), hints, hintFunctionArities, changedFunctions);
     }
     if (queryContext.getHavingFilter() != null) {
       overrideWithExpressionHints(queryContext.getHavingFilter(), hints, hintFunctionArities, changedFunctions);

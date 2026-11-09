@@ -33,6 +33,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -302,6 +303,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     InstanceResponseBlock instanceResponse = null;
     try {
+      if (queryContext.getRowFilterExpression() != null && executionInfo instanceof SingleTableExecutionInfo
+          && !QueryOptionsUtils.isUseMultistageEngine(queryContext.getQueryOptions())) {
+        // SSE brokers apply physical table overrides to WHERE. Resolve the same map locally for the independent
+        // RLS policy, including requests from an older broker. MSE does not apply these table overrides to WHERE.
+        TableConfig tableConfig = ((SingleTableExecutionInfo) executionInfo).getTableDataManager()
+            .getCachedTableConfigAndSchema().getLeft();
+        queryContext.setRowFilterExpressionOverrideMap(
+            TableCache.createExpressionOverrideMap(tableNameWithType, tableConfig.getQueryConfig()));
+      }
       instanceResponse = executeInternal(executionInfo, queryContext, timerContext, executorService, streamer,
           queryRequest.isEnableStreaming(), planMakerOverride);
     } catch (Exception e) {

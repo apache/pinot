@@ -2119,15 +2119,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private static Expression handleExpressionOverride(Expression expression,
       Map<Expression, Expression> expressionOverrideMap) {
-    Expression override = expressionOverrideMap.get(expression);
-    if (override != null) {
-      return new Expression(override);
-    }
-    Function function = expression.getFunctionCall();
-    if (function != null) {
-      function.getOperands().replaceAll(o -> handleExpressionOverride(o, expressionOverrideMap));
-    }
-    return expression;
+    return QueryOptimizer.applyExpressionOverride(expression, expressionOverrideMap);
   }
 
   /// Returns `true` if the given query only contains literals, `false` otherwise.
