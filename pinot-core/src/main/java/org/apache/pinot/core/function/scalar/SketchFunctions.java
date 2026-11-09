@@ -37,9 +37,10 @@ import org.apache.datasketches.tuple.TupleIntersection;
 import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -194,7 +195,7 @@ public class SketchFunctions {
         throw new IllegalArgumentException("Unrecognised key type for Theta sketch: " + key.getClass().getSimpleName());
       }
     }
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
+    return is.compact().toByteArray();
   }
 
   @ScalarFunction
@@ -274,11 +275,11 @@ public class SketchFunctions {
   private static ThetaSketch asThetaSketch(Object sketchObj) {
     if (sketchObj instanceof String) {
       byte[] decoded = Base64.getDecoder().decode((String) sketchObj);
-      return ThetaSketch.wrap(MemorySegment.ofArray(decoded).asReadOnly());
+      return ThetaSketch.wrap(MemorySegment.ofArray(decoded));
     } else if (sketchObj instanceof ThetaSketch) {
       return (ThetaSketch) sketchObj;
     } else if (sketchObj instanceof byte[]) {
-      return ThetaSketch.wrap(MemorySegment.ofArray((byte[]) sketchObj).asReadOnly());
+      return ThetaSketch.wrap(MemorySegment.ofArray((byte[]) sketchObj));
     } else {
       throw new RuntimeException(
           "Exception occurred getting estimate from Theta Sketch, unsupported Object type: " + sketchObj.getClass());
@@ -321,7 +322,7 @@ public class SketchFunctions {
     for (Object sketchObj : sketchObjects) {
       union.union(asIntegerSketch(sketchObj));
     }
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(union.getResult().compact());
+    return union.getResult().compact().toByteArray();
   }
 
   @ScalarFunction
@@ -345,7 +346,7 @@ public class SketchFunctions {
     for (Object sketchObj : sketchObjects) {
       intersection.intersect(asIntegerSketch(sketchObj));
     }
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(intersection.getResult().compact());
+    return intersection.getResult().compact().toByteArray();
   }
 
   @ScalarFunction
@@ -353,17 +354,17 @@ public class SketchFunctions {
     TupleAnotB<IntegerSummary> diff = new TupleAnotB<>();
     diff.setA(asIntegerSketch(o1));
     diff.notB(asIntegerSketch(o2));
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(diff.getResult(false).compact());
+    return diff.getResult(false).compact().toByteArray();
   }
 
   private static TupleSketch<IntegerSummary> asIntegerSketch(Object sketchObj) {
     if (sketchObj instanceof String) {
       byte[] decoded = Base64.getDecoder().decode((String) sketchObj);
-      return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(decoded);
+      return TupleSketch.heapifySketch(MemorySegment.ofArray(decoded), new IntegerSummaryDeserializer());
     } else if (sketchObj instanceof TupleSketch) {
       return (TupleSketch<IntegerSummary>) sketchObj;
     } else if (sketchObj instanceof byte[]) {
-      return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) sketchObj);
+      return TupleSketch.heapifySketch(MemorySegment.ofArray((byte[]) sketchObj), new IntegerSummaryDeserializer());
     } else {
       throw new RuntimeException(
           "Exception occurred getting reading Tuple Sketch, unsupported Object type: " + sketchObj.getClass());
@@ -442,7 +443,7 @@ public class SketchFunctions {
             "Unrecognised input type for CPC sketch: " + input.getClass().getSimpleName());
       }
     }
-    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(sketch);
+    return sketch.toByteArray();
   }
 
   private static CpcSketch asCpcSketch(Object sketchObj) {
@@ -485,7 +486,7 @@ public class SketchFunctions {
   public static byte[] toULL(@Nullable Object input, int p) {
     UltraLogLog sketch = UltraLogLog.create(p);
     UltraLogLogUtils.hashObject(input).ifPresent(sketch::add);
-    return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(sketch);
+    return ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.serialize(sketch);
   }
 
   /// Takes a default UltraLogLog byte array and loads it into the format used in Pinot
@@ -494,6 +495,6 @@ public class SketchFunctions {
   @ScalarFunction
   public static byte[] fromULL(byte[] input) {
     UltraLogLog ull = UltraLogLog.wrap(input);
-    return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ull);
+    return ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.serialize(ull);
   }
 }

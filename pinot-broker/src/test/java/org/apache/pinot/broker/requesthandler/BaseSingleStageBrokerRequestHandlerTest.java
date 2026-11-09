@@ -24,6 +24,7 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -33,6 +34,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.api.AccessControl;
@@ -97,14 +100,18 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
@@ -868,6 +875,165 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(response.getExceptions().get(0).getErrorCode(),
         org.apache.pinot.spi.exception.QueryErrorCode.TOO_MANY_REQUESTS.getId(),
         "Expected TOO_MANY_REQUESTS error code");
+  }
+
+  @Test
+  public void testHasCrossTableFunction() {
+    String subquery = "SELECT ID_SET(col1) FROM myTable WHERE col2 = 2";
+    // The operator of a compiled call is canonical (underscores removed, lower-cased), so every spelling counts, the
+    // dotless ı (U+0131) look-alike that the server resolves too included
+    String[] spellings = {
+        "IN_PARTITIONED_SUBQUERY", "inpartitionedsubquery", "In_Partitioned_Sub_Query", "IN_PART\u0131TIONED_SUBQUERY"
+    };
+    for (String spelling : spellings) {
+      assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE " + spelling + "(col1, '" + subquery
+          + "') = 1"), spelling);
+    }
+    // Nested in other predicates and expressions, and outside the WHERE clause
+    assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE col2 = 1 AND NOT (col3 > 2 OR "
+        + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1)"));
+    assertTrue(hasCrossTableFunction("SELECT CASE WHEN IN_PARTITIONED_SUBQUERY(col1, '" + subquery
+        + "') = 1 THEN 1 ELSE 0 END FROM myTable"));
+    assertTrue(hasCrossTableFunction("SELECT col1, COUNT(*) FROM myTable GROUP BY col1 HAVING "
+        + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1"));
+    // The other cross-table functions, alone and together, a lookup() nested in a lookup() included
+    assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_SUBQUERY(col1, '" + subquery
+        + "') = 1"));
+    assertTrue(hasCrossTableFunction("SELECT lookup('dimTable', 'name', 'id', col1) FROM myTable"));
+    assertTrue(hasCrossTableFunction("SELECT UPPER(lookup('dimTable', 'name', 'id', col1)) FROM myTable"));
+    assertTrue(hasCrossTableFunction("SELECT lookup('dimTable', 'name', 'id', lookup('other', 'id', 'key', col1)) "
+        + "FROM myTable WHERE In_Sub_Query(col2, '" + subquery + "') = 1 ORDER BY LOOK_UP('third', 'v', 'k', col3)"));
+    assertTrue(hasCrossTableFunction("SELECT col1 FROM myTable ORDER BY LOOK_UP('dimTable', 'v', 'k', col1)"));
+    // Other functions, IN_ID_SET on a literal included, are not cross-table functions
+    assertFalse(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col1, 'AQ==') = 1"));
+    assertFalse(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE col1 = 1"));
+    // Under a Turkish default locale the parser lower-cases the I of the plain spelling to a dotless ı as well
+    Locale defaultLocale = Locale.getDefault();
+    Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+    try {
+      assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_PARTITIONED_SUBQUERY(col1, '" + subquery
+          + "') = 1"));
+    } finally {
+      Locale.setDefault(defaultLocale);
+    }
+  }
+
+  private static boolean hasCrossTableFunction(String sql) {
+    return BaseSingleStageBrokerRequestHandler.hasCrossTableFunction(CalciteSqlParser.compileToPinotQuery(sql));
+  }
+
+  /// The row filters are added to the WHERE clause of the queried table, which no cross-table function reads through,
+  /// so a principal with row filters is denied every one of them. `IN_SUBQUERY` runs a nested request that needs a
+  /// server response, so RowLevelSecurityIntegrationTest covers it and `testHasCrossTableFunction` its detection.
+  @Test
+  public void testCrossTableFunctionsRejectedWhenRowFiltersApply()
+      throws Exception {
+    String tableName = "myTable_OFFLINE";
+    TableCache tableCache = mock(TableCache.class);
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCache.getActualTableName(anyString())).thenReturn(tableName);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("col1", "col1"));
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("tier_BROKER", "tier_SERVER", null));
+    when(tableCache.getTableConfig(tableName)).thenReturn(tableCfg);
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(tableName)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("Server_localhost_9000")),
+            new SegmentsToQuery(List.of("segment01"), List.of())));
+    when(routingManager.getRoutingTable(any(), anyLong())).thenReturn(rt);
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    AtomicReference<List<String>> rowFilters = new AtomicReference<>(List.of("tenant = 'allowed'"));
+    AccessControl accessControl = new AccessControl() {
+      @Override
+      public AuthorizationResult authorize(RequesterIdentity identity, BrokerRequest request) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableAuthorizationResult authorize(RequesterIdentity identity, Set<String> tables) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableRowColAccessResult getRowColFilters(RequesterIdentity identity, String table) {
+        // Row filters on the queried table only: a dimension table with row filters is rejected by the lookup check
+        return new TableRowColAccessResultImpl(table.equals(tableName) ? rowFilters.get() : List.of());
+      }
+    };
+    AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
+    when(accessControlFactory.create()).thenReturn(accessControl);
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config =
+        new PinotConfiguration(Map.of(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH, "true"));
+    BrokerQueryEventListenerFactory.init(config);
+    AtomicReference<BrokerRequest> serverRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        newServerRequestCapturingHandler(config, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+            serverRequest);
+
+    Map<String, String> queries = Map.of(
+        "IN_PARTITIONED_SUBQUERY",
+        "SELECT COUNT(*) FROM myTable WHERE IN_PARTITIONED_SUBQUERY(col1, 'SELECT ID_SET(col1) FROM myTable') = 1",
+        "lookup", "SELECT lookup('dimTable', 'dimValue', 'dimKey', col1) FROM myTable");
+    for (Map.Entry<String, String> entry : queries.entrySet()) {
+      String function = entry.getKey();
+      String query = entry.getValue();
+
+      // Rejected before anything reaches a server
+      rowFilters.set(List.of("tenant = 'allowed'"));
+      serverRequest.set(null);
+      WebApplicationException e = expectThrows(WebApplicationException.class, () -> handler.handleRequest(query));
+      assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode(), function);
+      assertTrue(e.getMessage().contains("Cross-table functions are not allowed"), e.getMessage());
+      assertNull(serverRequest.get(), function);
+
+      // Allowed, and left for the server to resolve, when no row filter applies to the principal
+      rowFilters.set(List.of());
+      BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(query);
+      assertFalse(response.getRLSFiltersApplied(), function);
+      assertNotNull(serverRequest.get(), function);
+      assertTrue(BaseSingleStageBrokerRequestHandler.hasCrossTableFunction(serverRequest.get().getPinotQuery()),
+          function);
+    }
+  }
+
+  /// A handler that records the request it would send to the servers instead of sending it.
+  private static BaseSingleStageBrokerRequestHandler newServerRequestCapturingHandler(PinotConfiguration config,
+      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, AtomicReference<BrokerRequest> serverRequest) {
+    return new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
+        routingManager, accessControlFactory, queryQuotaManager, tableCache, ThreadAccountantUtils.getNoOpAccountant(),
+        null, null) {
+      @Override
+      public void start() {
+      }
+
+      @Override
+      public void shutDown() {
+      }
+
+      @Override
+      protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+          BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+          RequestContext requestContext) {
+        serverRequest.set(serverBrokerRequest);
+        return BrokerResponseNative.empty();
+      }
+
+      @Override
+      protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+          long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+          TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
+          RequestContext requestContext) {
+        throw new UnsupportedOperationException("Not implemented in test");
+      }
+    };
   }
 
   /// Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so

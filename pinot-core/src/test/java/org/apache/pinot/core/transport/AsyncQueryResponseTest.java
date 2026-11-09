@@ -18,14 +18,22 @@
  */
 package org.apache.pinot.core.transport;
 
+import io.netty.channel.Channel;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -119,5 +127,138 @@ public class AsyncQueryResponseTest {
     assertNull(response.getException());
     // The send-time skip also records the server for quarantine.
     assertEquals(response.getFailedServer(), SERVER_1);
+  }
+  /// A channel going down only affects the query written to it. A request whose channel is not known yet has not been
+  /// written, so no channel going down concerns it: its own write or connect settles it.
+  @Test
+  public void testMarkServerUnavailableIsScopedToTheRequestChannel() {
+    Channel requestChannel = mock(Channel.class);
+    Channel otherChannel = mock(Channel.class);
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 10_000L, false);
+    response.markRequestChannel(SERVER_1, requestChannel);
+    response.markRequestSubmitted(SERVER_1);
+    response.markRequestSubmitted(SERVER_2);
+
+    assertFalse(response.markServerUnavailable(SERVER_1, otherChannel, new RuntimeException("other"), true));
+    assertEquals(response.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    assertNull(response.getFailedServer());
+
+    // Unknown request channel, as for a sender still waiting for the replacement channel: left alone even when the
+    // server closed the channel
+    assertFalse(response.markServerUnavailable(SERVER_2, otherChannel, new RuntimeException("other"), true));
+    assertEquals(response.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    assertNull(response.getFailedServer());
+    // Without a channel the event concerns the whole server, as when the broker sheds load
+    response.markServerUnavailable(SERVER_2, new RuntimeException("server"));
+    assertEquals(response.getStatus(), QueryResponse.Status.FAILED);
+    assertEquals(response.getFailedServer(), SERVER_2);
+
+    response = newResponse(Set.of(SERVER_1), 10_000L, false);
+    response.markRequestChannel(SERVER_1, requestChannel);
+    response.markRequestSubmitted(SERVER_1);
+    response.markServerUnavailable(SERVER_1, requestChannel, new RuntimeException("own"), true);
+    assertEquals(response.getStatus(), QueryResponse.Status.FAILED);
+    assertEquals(response.getFailedServer(), SERVER_1);
+  }
+
+  /// A close the broker itself decided on fails or skips the query like any other, but does not record the server
+  /// for the failure detector.
+  @Test
+  public void testBrokerInitiatedCloseDoesNotBlameTheServer() {
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1), 10_000L, false);
+    response.markRequestSubmitted(SERVER_1);
+    response.markServerUnavailable(SERVER_1, null, new RuntimeException("replaced"), false);
+    assertEquals(response.getStatus(), QueryResponse.Status.FAILED);
+    assertNotNull(response.getException());
+    assertNull(response.getFailedServer());
+
+    response = newResponse(Set.of(SERVER_1, SERVER_2), 10_000L, true);
+    response.markRequestSubmitted(SERVER_1);
+    assertTrue(response.markServerUnavailable(SERVER_1, null, new RuntimeException("replaced"), false));
+    assertEquals(response.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    assertNull(response.getFailedServer());
+
+    // A request whose channel is not known yet is about to be written, possibly to the channel replacing the closed
+    // one: neither the broker's close nor the server's leaves a mark on it
+    Channel closedChannel = mock(Channel.class);
+    response = newResponse(Set.of(SERVER_1), 10_000L, false);
+    assertFalse(response.markServerUnavailable(SERVER_1, closedChannel, new RuntimeException("replaced"), false));
+    assertFalse(response.markServerUnavailable(SERVER_1, closedChannel, new RuntimeException("inactive"), true));
+    assertEquals(response.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    assertNull(response.getFailedServer());
+  }
+
+  /// A send rejected for backpressure fails the query, or skips the server, without recording the server for the
+  /// failure detector.
+  @Test
+  public void testSendFailureWithoutReportingTheServer() {
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 10_000L, false);
+    response.markQueryFailed(SERVER_1, new IllegalStateException("not writable"), false);
+    assertEquals(response.getStatus(), QueryResponse.Status.FAILED);
+    assertNotNull(response.getException());
+    assertNull(response.getFailedServer());
+
+    response = newResponse(Set.of(SERVER_1, SERVER_2), 10_000L, true);
+    response.skipServerResponse(SERVER_1, false);
+    assertEquals(response.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    assertNull(response.getFailedServer());
+    response.skipServerResponse(SERVER_2, true);
+    assertEquals(response.getFailedServer(), SERVER_2);
+  }
+
+  /// A query waits on the channel its request was written to until the server responds or is counted down.
+  @Test
+  public void testIsAwaitingResponseOn() {
+    Channel requestChannel = mock(Channel.class);
+    Channel otherChannel = mock(Channel.class);
+    AsyncQueryResponse response = newResponse(Set.of(SERVER_1, SERVER_2), 10_000L, true);
+    assertFalse(response.isAwaitingResponseOn(SERVER_1, requestChannel), "Not written yet");
+    response.markRequestChannel(SERVER_1, requestChannel);
+    response.markRequestChannel(SERVER_2, requestChannel);
+    assertTrue(response.isAwaitingResponseOn(SERVER_1, requestChannel));
+    assertFalse(response.isAwaitingResponseOn(SERVER_1, otherChannel));
+    response.receiveDataTable(SERVER_1, DataTableBuilderFactory.getEmptyDataTable(), 0, 0);
+    assertFalse(response.isAwaitingResponseOn(SERVER_1, requestChannel), "Responded");
+    response.markServerUnavailable(SERVER_2, requestChannel, new RuntimeException("inactive"), true);
+    assertFalse(response.isAwaitingResponseOn(SERVER_2, requestChannel), "Counted down");
+  }
+
+  /// A timeout hands every server the request reached but that never answered to the transport, with the time the
+  /// request was written, and blames nobody on the spot. Servers the request never reached are not handed over.
+  @Test
+  public void testTimeoutRecordsUnansweredServers()
+      throws Exception {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    long startTimeMs = System.currentTimeMillis();
+    AsyncQueryResponse response =
+        new AsyncQueryResponse(queryRouter, 1L, Set.of(SERVER_1, SERVER_2), startTimeMs, 50L,
+            mock(ServerRoutingStatsManager.class), false);
+    // SERVER_2 is never marked submitted: its send failed before anything was written
+    response.markRequestSubmitted(SERVER_1);
+
+    response.getFinalResponses();
+
+    assertEquals(response.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(response.getFailedServer());
+    assertNull(response.getException());
+    verify(queryRouter).recordServerTimeout(eq(SERVER_1), anyLong(), any());
+    verify(queryRouter, never()).recordServerTimeout(eq(SERVER_2), anyLong(), any());
+  }
+
+  @Test
+  public void testAnsweredQueryRecordsNoTimeout()
+      throws Exception {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    AsyncQueryResponse response =
+        new AsyncQueryResponse(queryRouter, 1L, Set.of(SERVER_1), System.currentTimeMillis(), 10_000L,
+            mock(ServerRoutingStatsManager.class), false);
+    response.markRequestSubmitted(SERVER_1);
+    response.receiveDataTable(SERVER_1, mock(DataTable.class), 10, 1);
+
+    response.getFinalResponses();
+
+    assertEquals(response.getStatus(), QueryResponse.Status.COMPLETED);
+    verify(queryRouter, never()).recordServerTimeout(eq(SERVER_1), anyLong(), any());
+    assertNull(response.getFailedServer());
   }
 }

@@ -265,7 +265,7 @@ public final class DataBlockUtils {
     }
 
     try {
-      return dataBlockSerde.deserialize(buffer, 0, type, finalOffsetConsumer);
+      return dataBlockSerde.deserialize(buffer, offset, type, finalOffsetConsumer);
     } catch (Exception e) {
       throw new IOException("Failed to deserialize data block with serde " + dataBlockSerde.getClass(), e);
     }

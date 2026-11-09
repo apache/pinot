@@ -25,7 +25,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -36,6 +35,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class FourthMomentAggregationFunction extends BaseSingleInputAggregationFunction<PinotFourthMoment, Double> {
+  private static final int PINOT_FOURTH_MOMENT_TYPE = 34;
 
   private final Type _type;
 
@@ -158,14 +158,13 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(PinotFourthMoment pinotFourthMoment) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.PinotFourthMoment.getValue(),
-        ObjectSerDeUtils.PINOT_FOURTH_MOMENT_OBJECT_SER_DE.serialize(pinotFourthMoment));
+  public SerializedResult serializeIntermediateResult(PinotFourthMoment pinotFourthMoment) {
+    return new SerializedBytes(PINOT_FOURTH_MOMENT_TYPE, pinotFourthMoment.serialize());
   }
 
   @Override
   public PinotFourthMoment deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.PINOT_FOURTH_MOMENT_OBJECT_SER_DE.deserialize(customObject.getBuffer());
+    return PinotFourthMoment.fromBytes(customObject.getBuffer());
   }
 
   @Override

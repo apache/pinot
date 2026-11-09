@@ -63,6 +63,13 @@ public class ZeroCopyDataBlockSerdeTest {
     byte[] bytes2 = new byte[128];
     r.nextBytes(bytes2);
 
+    // Rows (1, "a") and (2, "bb"): an INT column and a dictionary-encoded STRING column
+    DataSchema dataSchema = new DataSchema(new String[]{"id", "name"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    String[] dictionary = {"a", "bb"};
+    byte[] rowMajor = ByteBuffer.allocate(4 * Integer.BYTES).putInt(1).putInt(0).putInt(2).putInt(1).array();
+    byte[] columnMajor = ByteBuffer.allocate(4 * Integer.BYTES).putInt(1).putInt(2).putInt(0).putInt(1).array();
+
     return new Object[][]{
         {"empty error", MetadataBlock.newError(-1, -1, null, Map.of())},
         {"error with single message", MetadataBlock.newError(3, 1, "test2", Map.of(123, "error"))},
@@ -84,6 +91,11 @@ public class ZeroCopyDataBlockSerdeTest {
         {
             "error with stats", MetadataBlock.newErrorWithStats(12, 21, "fakeId", Map.of(123, "error"),
             Lists.newArrayList(PinotByteBuffer.wrap(bytes1)))
+        },
+        {"row block", new RowDataBlock(2, dataSchema, dictionary, rowMajor, new byte[0])},
+        {
+            "columnar block", new ColumnarDataBlock(2, dataSchema, dictionary, PinotByteBuffer.wrap(columnMajor),
+            PinotDataBuffer.empty())
         }
     };
   }
@@ -103,6 +115,34 @@ public class ZeroCopyDataBlockSerdeTest {
     assertEquals(deserialized.getNumberOfColumns(), block.getNumberOfColumns(), "Unexpected number of columns");
     assertEquals(deserialized.getExceptions(), block.getExceptions(), "Unexpected exceptions");
     DataBlockEquals.checkSameContent(deserialized, block, "Unexpected data");
+  }
+
+  /// Reads two copies of each block back to back from one buffer, starting past other bytes, the way a payload that
+  /// embeds data blocks is read.
+  @Test(dataProvider = "blocks")
+  void testReadFromNonZeroOffset(String desc, DataBlock block)
+      throws Exception {
+    List<ByteBuffer> serialized = DataBlockUtils.serialize(block);
+    int size = 0;
+    for (ByteBuffer part : serialized) {
+      size += part.remaining();
+    }
+    int prefix = 5;
+    ByteBuffer buffer = ByteBuffer.allocate(prefix + 2 * size);
+    buffer.position(prefix);
+    for (int copy = 0; copy < 2; copy++) {
+      for (ByteBuffer part : serialized) {
+        buffer.put(part.duplicate());
+      }
+    }
+    buffer.position(prefix);
+    for (int copy = 1; copy <= 2; copy++) {
+      DataBlock deserialized = DataBlockUtils.readFrom(buffer);
+      assertEquals(buffer.position(), prefix + copy * size, desc);
+      assertEquals(deserialized.getMetadata(), block.getMetadata(), desc);
+      assertEquals(deserialized.getExceptions(), block.getExceptions(), desc);
+      DataBlockEquals.checkSameContent(deserialized, block, desc);
+    }
   }
 
   @Test

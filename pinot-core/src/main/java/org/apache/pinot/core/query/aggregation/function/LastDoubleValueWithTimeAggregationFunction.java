@@ -22,7 +22,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
@@ -38,16 +37,23 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 /// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
 ///   Numeric column
 public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Double> {
-  private final static ValueLongPair<Double> DEFAULT_VALUE_TIME_PAIR = new DoubleLongPair(Double.NaN, Long.MIN_VALUE);
+  private static final int DOUBLE_LONG_PAIR_TYPE = 30;
+
+  private static final ValueLongPair<Double> DEFAULT_VALUE_TIME_PAIR = new DoubleLongPair(Double.NaN, Long.MIN_VALUE);
 
   public LastDoubleValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled) {
-    super(dataCol, timeCol, ObjectSerDeUtils.DOUBLE_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    super(dataCol, timeCol, nullHandlingEnabled);
   }
 
   @Override
   public ValueLongPair<Double> constructValueLongPair(Double value, long time) {
     return new DoubleLongPair(value, time);
+  }
+
+  @Override
+  public ValueLongPair<Double> deserializeValueLongPair(byte[] bytes) {
+    return DoubleLongPair.fromBytes(bytes);
   }
 
   @Override
@@ -98,14 +104,13 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Double> doubleLongPair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleLongPair.getValue(),
-        ObjectSerDeUtils.DOUBLE_LONG_PAIR_SER_DE.serialize((DoubleLongPair) doubleLongPair));
+  public SerializedResult serializeIntermediateResult(ValueLongPair<Double> doubleLongPair) {
+    return new SerializedBytes(DOUBLE_LONG_PAIR_TYPE, doubleLongPair.toBytes());
   }
 
   @Override
   public ValueLongPair<Double> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.DOUBLE_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return DoubleLongPair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

@@ -23,7 +23,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.BigDecimalLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
@@ -39,17 +38,24 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 /// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
 ///   Numeric column
 public class LastBigDecimalValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<BigDecimal> {
-  private final static ValueLongPair<BigDecimal> DEFAULT_VALUE_TIME_PAIR =
+  private static final int BIG_DECIMAL_LONG_PAIR_TYPE = 55;
+
+  private static final ValueLongPair<BigDecimal> DEFAULT_VALUE_TIME_PAIR =
       new BigDecimalLongPair(BigDecimal.ZERO, Long.MIN_VALUE);
 
   public LastBigDecimalValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled) {
-    super(dataCol, timeCol, ObjectSerDeUtils.BIG_DECIMAL_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    super(dataCol, timeCol, nullHandlingEnabled);
   }
 
   @Override
   public ValueLongPair<BigDecimal> constructValueLongPair(BigDecimal value, long time) {
     return new BigDecimalLongPair(value, time);
+  }
+
+  @Override
+  public ValueLongPair<BigDecimal> deserializeValueLongPair(byte[] bytes) {
+    return BigDecimalLongPair.fromBytes(bytes);
   }
 
   @Override
@@ -100,14 +106,13 @@ public class LastBigDecimalValueWithTimeAggregationFunction extends LastWithTime
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<BigDecimal> bigDecimalLongPair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BigDecimalLongPair.getValue(),
-        ObjectSerDeUtils.BIG_DECIMAL_LONG_PAIR_SER_DE.serialize((BigDecimalLongPair) bigDecimalLongPair));
+  public SerializedResult serializeIntermediateResult(ValueLongPair<BigDecimal> bigDecimalLongPair) {
+    return new SerializedBytes(BIG_DECIMAL_LONG_PAIR_TYPE, bigDecimalLongPair.toBytes());
   }
 
   @Override
   public ValueLongPair<BigDecimal> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.BIG_DECIMAL_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return BigDecimalLongPair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

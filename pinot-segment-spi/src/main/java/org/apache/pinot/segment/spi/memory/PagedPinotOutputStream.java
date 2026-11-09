@@ -23,27 +23,23 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.annotation.concurrent.NotThreadSafe;
 
 
-/// An implementation of [PinotOutputStream] that writes to a sequence of pages.
+/// A [PinotOutputStream] that writes to a sequence of pages of the same size, taken from a [PageAllocator]. When the
+/// current page is full, writing continues on a new page.
 ///
-/// When a page is full, a new page is allocated and writing continues there.
-/// The page size is determined by the [PageAllocator] used to create the stream.
+/// The stream suits data whose final size is not known in advance, and writers that [`seek`][#seek(long)] to an
+/// earlier or later position. A value that crosses a page boundary is written one byte at a time, which is slower than
+/// a write within a page.
 ///
-/// This class is specially useful when writing data whose final size is not known in advance or when it is needed to
-/// [`seek`]\[#seek(long)\] to a specific position in the stream.
-/// Writes that cross page boundaries are handled transparently, although a performance penalty will be paid.
+/// Smaller pages mean more allocations, but each one is cheaper, especially on the heap, where an allocation that fits
+/// in a thread-local allocation buffer is fastest. Some allocators free the pages when the stream is closed.
 ///
-/// Some [PageAllocator] implementations may support releasing pages, which can be useful to reduce memory usage.
-/// The smaller the page size, the more pages will be allocated, but the allocation is quite faster. This is specially
-/// important in the case of heap allocation, in which case allocations smaller than TLAB will be faster.
-///
-/// Data written in this stream can be retrieved as a list of [ByteBuffer] pages using [#getPages()], which
-/// can be directly read using [CompoundDataBuffer] or send to the network as using
-/// [`GRPC`][com.google.protobuf.UnsafeByteOperations#unsafeWrap(byte[])].
+/// [#getPages()] returns the written data as read-only [ByteBuffer] pages, which a [CompoundDataBuffer] reads directly
+/// and `UnsafeByteOperations.unsafeWrap(ByteBuffer)` hands to gRPC without a copy. [#asBuffer] returns the same data
+/// as one [DataBuffer].
+@NotThreadSafe
 public class PagedPinotOutputStream extends PinotOutputStream {
   private final PageAllocator _allocator;
   private final int _pageSize;
@@ -53,8 +49,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
   private int _offsetInPage;
   private long _written = 0;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(PagedPinotOutputStream.class);
-
+  /// Creates a stream that takes its pages from `allocator`, starting with one page.
   public PagedPinotOutputStream(PageAllocator allocator) {
     _pageSize = allocator.pageSize();
     _allocator = allocator;
@@ -64,24 +59,30 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     _pages.add(_currentPage);
   }
 
+  /// Creates a stream over heap pages of [PageAllocator#MIN_RECOMMENDED_PAGE_SIZE] bytes.
   public static PagedPinotOutputStream createHeap() {
     return new PagedPinotOutputStream(HeapPageAllocator.createSmall());
   }
 
   private void nextPage() {
-    moveCurrentOffset(remainingInPage());
+    seek(getCurrentOffset() + remainingInPage());
   }
 
   private int remainingInPage() {
     return _pageSize - _offsetInPage;
   }
 
-  /// Returns a read only view of the pages written so far.
+  /// Moves the position `numBytes` forward within the current page, and the end of the written data with it.
+  private void advance(int numBytes) {
+    _offsetInPage += numBytes;
+    _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+  }
+
+  /// Returns read-only views of the pages that hold the written data, each positioned at 0. Every page but the last is
+  /// limited to its capacity, and the last one to the end of the written data: the furthest position written or sought
+  /// to, even after a seek back. A trailing page that holds no written data is left out.
   ///
-  /// All pages but the last one will have its position set to 0 and the limit to their capacity.
-  /// The latest page will have its position set to 0 and its limit set to the last byte written.
-  ///
-  /// TODO: Add one option that let caller choose start and end offset.
+  /// TODO: Add an option that lets the caller choose the start and end offsets.
   public ByteBuffer[] getPages() {
     int numPages = _pages.size();
 
@@ -121,22 +122,16 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     if (newPos < 0) {
       throw new IllegalArgumentException("New position cannot be negative");
     }
-    if (newPos == 0) {
-      _currentPage = _pages.get(0);
-      _offsetInPage = 0;
-    } else {
-      int pageIdx = (int) (newPos / _pageSize);
-      if (pageIdx >= _pages.size()) {
-        _pages.ensureCapacity(pageIdx + 1);
-        while (_pages.size() <= pageIdx) {
-          _pages.add(_allocator.allocate().order(ByteOrder.BIG_ENDIAN));
-        }
+    int pageIdx = (int) (newPos / _pageSize);
+    if (pageIdx >= _pages.size()) {
+      _pages.ensureCapacity(pageIdx + 1);
+      while (_pages.size() <= pageIdx) {
+        _pages.add(_allocator.allocate().order(ByteOrder.BIG_ENDIAN));
       }
-      int offsetInPage = (int) (newPos % _pageSize);
-      _currentPage = _pages.get(pageIdx);
-      _currentPageStartOffset = pageIdx * (long) _pageSize;
-      _offsetInPage = offsetInPage;
     }
+    _currentPage = _pages.get(pageIdx);
+    _currentPageStartOffset = pageIdx * (long) _pageSize;
+    _offsetInPage = (int) (newPos % _pageSize);
     _written = Math.max(_written, newPos);
   }
 
@@ -146,8 +141,8 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     if (remainingInPage() == 0) {
       nextPage();
     }
-    _currentPage.put(_offsetInPage++, (byte) b);
-    _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+    _currentPage.put(_offsetInPage, (byte) b);
+    advance(1);
   }
 
   @Override
@@ -155,10 +150,9 @@ public class PagedPinotOutputStream extends PinotOutputStream {
       throws IOException {
     if (remainingInPage() >= Integer.BYTES) {
       _currentPage.putInt(_offsetInPage, v);
-      _offsetInPage += Integer.BYTES;
-      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+      advance(Integer.BYTES);
     } else {
-      super.writeInt(v);
+      writeAcrossPages(v, Integer.BYTES);
     }
   }
 
@@ -167,10 +161,9 @@ public class PagedPinotOutputStream extends PinotOutputStream {
       throws IOException {
     if (remainingInPage() >= Long.BYTES) {
       _currentPage.putLong(_offsetInPage, v);
-      _offsetInPage += Long.BYTES;
-      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+      advance(Long.BYTES);
     } else {
-      super.writeLong(v);
+      writeAcrossPages(v, Long.BYTES);
     }
   }
 
@@ -179,10 +172,18 @@ public class PagedPinotOutputStream extends PinotOutputStream {
       throws IOException {
     if (remainingInPage() >= Short.BYTES) {
       _currentPage.putShort(_offsetInPage, (short) v);
-      _offsetInPage += Short.BYTES;
-      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+      advance(Short.BYTES);
     } else {
-      super.writeShort(v);
+      writeAcrossPages(v, Short.BYTES);
+    }
+  }
+
+  /// Writes the low `numBytes` bytes of `v`, highest first, one byte at a time, for a value that does not fit in the
+  /// rest of the page.
+  private void writeAcrossPages(long v, int numBytes)
+      throws IOException {
+    for (int shift = (numBytes - 1) * Byte.SIZE; shift >= 0; shift -= Byte.SIZE) {
+      write((int) (v >> shift));
     }
   }
 
@@ -192,7 +193,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     if (remainingInPage() >= len) {
       _currentPage.position(_offsetInPage);
       _currentPage.put(b, off, len);
-      _offsetInPage += len;
+      advance(len);
       _currentPage.position(0);
     } else {
       int written = 0;
@@ -207,21 +208,19 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         _currentPage.put(b, off + written, toWrite);
         _currentPage.position(0);
         written += toWrite;
-        _offsetInPage += toWrite;
+        advance(toWrite);
       }
     }
-    _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
   }
 
-  /// Puts as many values as fit in the current page straight into it, then updates the page offset once. When at least
-  /// [PrimitiveArrayOutput#MIN_BULK_VALUES] values go to the page, they are copied through a big-endian typed view;
-  /// fewer values are put one by one, because the typed-view copy has a fixed cost that a few values do not pay back.
-  /// A value that does not fit in the rest of the page (the page offset depends on everything written before, so it
-  /// is not aligned to the value width) is written with [#writeInt(int)], which splits it across the two pages.
+  /// Puts as many values as fit in the rest of the current page straight into it, then continues on the next page.
+  /// When at least [PrimitiveArrays#MIN_BULK_VALUES] values go to one page, they are copied through a big-endian typed
+  /// view of it; fewer values are put one at a time, since the copy through a view has a fixed cost. The position
+  /// depends on everything written before, so a page boundary can fall inside a value: such a value is written with
+  /// [#writeInt(int)], which splits it across the two pages.
   @Override
   public void writeInts(int[] values, int offset, int length)
       throws IOException {
-    Objects.checkFromIndexSize(offset, length, values.length);
     int end = offset + length;
     int i = offset;
     while (i < end) {
@@ -230,7 +229,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         writeInt(values[i++]);
         continue;
       }
-      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+      if (numValues < PrimitiveArrays.MIN_BULK_VALUES) {
         int position = _offsetInPage;
         for (int j = i; j < i + numValues; j++, position += Integer.BYTES) {
           _currentPage.putInt(position, values[j]);
@@ -239,16 +238,14 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         currentPageView().asIntBuffer().put(values, i, numValues);
       }
       i += numValues;
-      _offsetInPage += numValues * Integer.BYTES;
-      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+      advance(numValues * Integer.BYTES);
     }
   }
 
-  /// Same as [#writeInts(int[], int, int)], for longs.
+  /// Same as [#writeInts(int[], int, int)], for longs, with [#writeLong(long)] for a value split across two pages.
   @Override
   public void writeLongs(long[] values, int offset, int length)
       throws IOException {
-    Objects.checkFromIndexSize(offset, length, values.length);
     int end = offset + length;
     int i = offset;
     while (i < end) {
@@ -257,7 +254,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         writeLong(values[i++]);
         continue;
       }
-      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+      if (numValues < PrimitiveArrays.MIN_BULK_VALUES) {
         int position = _offsetInPage;
         for (int j = i; j < i + numValues; j++, position += Long.BYTES) {
           _currentPage.putLong(position, values[j]);
@@ -266,16 +263,40 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         currentPageView().asLongBuffer().put(values, i, numValues);
       }
       i += numValues;
-      _offsetInPage += numValues * Long.BYTES;
-      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+      advance(numValues * Long.BYTES);
     }
   }
 
-  /// Same as [#writeInts(int[], int, int)], for doubles.
+  /// Same as [#writeInts(int[], int, int)], for floats written as raw bits.
+  @Override
+  public void writeFloats(float[] values, int offset, int length)
+      throws IOException {
+    int end = offset + length;
+    int i = offset;
+    while (i < end) {
+      int numValues = Math.min(end - i, remainingInPage() / Float.BYTES);
+      if (numValues == 0) {
+        // Raw bits, like the typed view (and ByteBuffer#putFloat): writeFloat() would canonicalize NaN.
+        writeInt(Float.floatToRawIntBits(values[i++]));
+        continue;
+      }
+      if (numValues < PrimitiveArrays.MIN_BULK_VALUES) {
+        int position = _offsetInPage;
+        for (int j = i; j < i + numValues; j++, position += Float.BYTES) {
+          _currentPage.putInt(position, Float.floatToRawIntBits(values[j]));
+        }
+      } else {
+        currentPageView().asFloatBuffer().put(values, i, numValues);
+      }
+      i += numValues;
+      advance(numValues * Float.BYTES);
+    }
+  }
+
+  /// Same as [#writeInts(int[], int, int)], for doubles written as raw bits.
   @Override
   public void writeDoubles(double[] values, int offset, int length)
       throws IOException {
-    Objects.checkFromIndexSize(offset, length, values.length);
     int end = offset + length;
     int i = offset;
     while (i < end) {
@@ -285,7 +306,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         writeLong(Double.doubleToRawLongBits(values[i++]));
         continue;
       }
-      if (numValues < PrimitiveArrayOutput.MIN_BULK_VALUES) {
+      if (numValues < PrimitiveArrays.MIN_BULK_VALUES) {
         int position = _offsetInPage;
         for (int j = i; j < i + numValues; j++, position += Double.BYTES) {
           _currentPage.putLong(position, Double.doubleToRawLongBits(values[j]));
@@ -294,8 +315,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         currentPageView().asDoubleBuffer().put(values, i, numValues);
       }
       i += numValues;
-      _offsetInPage += numValues * Double.BYTES;
-      _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
+      advance(numValues * Double.BYTES);
     }
   }
 
@@ -312,7 +332,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     if (remainingInPage() >= length) {
       int intLength = (int) length;
       input.copyTo(offset, _currentPage, _offsetInPage, intLength);
-      _offsetInPage += intLength;
+      advance(intLength);
     } else {
       long written = 0;
       while (written < length) {
@@ -324,18 +344,16 @@ public class PagedPinotOutputStream extends PinotOutputStream {
         int toWrite = (int) Math.min(length - written, remainingInPage);
         input.copyTo(offset + written, _currentPage, _offsetInPage, toWrite);
         written += toWrite;
-        _offsetInPage += toWrite;
+        advance(toWrite);
       }
     }
-    _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
   }
 
-  /// Returns a view of the data written so far as a [DataBuffer].
+  /// Returns the written data as one [DataBuffer] over the pages of [#getPages()], read in `order`. It reaches the end
+  /// of the written data even when the position has been moved back since. The pages stay owned by this stream, so
+  /// closing the buffer releases none of them, whatever `owner` is.
   ///
-  /// The returned DataBuffer will contain all the data being written. This is specially important when
-  /// [#getCurrentOffset()] has been moved back from the latest written position.
-  ///
-  /// TODO: Add one option that let caller choose start and end offset.
+  /// TODO: Add an option that lets the caller choose the start and end offsets.
   public DataBuffer asBuffer(ByteOrder order, boolean owner) {
     if (_written == 0) {
       return PinotDataBuffer.empty();
@@ -353,10 +371,14 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     return new CompoundDataBuffer(pages, order, owner);
   }
 
+  /// Returns the size of each page in bytes.
   public int getPageSize() {
     return _pageSize;
   }
 
+  /// Returns every page to the allocator. The stream must not be used afterwards. The views from [#getPages()] and
+  /// [#asBuffer(ByteOrder, boolean)] stay readable only while the allocator keeps the pages, as [HeapPageAllocator]
+  /// does; a [DirectPageAllocator] created with `release` set frees them.
   @Override
   public void close()
       throws IOException {
@@ -378,18 +400,26 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     }
   }
 
+  /// Allocates the pages of a [PagedPinotOutputStream], all of the same size, and releases them when the stream is
+  /// closed.
   public static abstract class PageAllocator {
+    /// Page size of the `createSmall` allocators.
     public static final int MIN_RECOMMENDED_PAGE_SIZE = 16 * 1024;
+    /// Page size of the `createLarge` allocators.
     public static final int MAX_RECOMMENDED_PAGE_SIZE = 1024 * 1024;
 
+    /// Returns the size of each page in bytes.
     public abstract int pageSize();
 
+    /// Returns a new page of [#pageSize()] bytes.
     public abstract ByteBuffer allocate();
 
+    /// Releases a page the stream no longer uses.
     public abstract void release(ByteBuffer buffer)
         throws IOException;
   }
 
+  /// Allocates heap pages, which the garbage collector reclaims.
   public static class HeapPageAllocator extends PageAllocator {
 
     private final int _pageSize;
@@ -423,6 +453,8 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     }
   }
 
+  /// Allocates direct pages. When created with `release` set, it frees each page as soon as the stream is closed, where
+  /// the JVM supports it; otherwise the garbage collector reclaims the pages.
   public static class DirectPageAllocator extends PageAllocator {
 
     private final int _pageSize;

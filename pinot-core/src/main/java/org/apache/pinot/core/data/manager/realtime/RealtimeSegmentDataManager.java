@@ -239,6 +239,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
+  // Minimum interval between the data-loss ERROR log line and segment error entry for a segment. The
+  // STREAM_DATA_LOSS gauge is still set for every batch that reports loss; only the diagnostics are throttled.
+  private static final long DATA_LOSS_REPORT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
   // 8 min max timeout for the retry policy
   private static final RetryPolicy CONSUMER_RECREATE_RETRY_POLICY =
       RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 2.0f);
@@ -273,6 +276,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
+  // Furthest next offset reported by a batch without messages, e.g. one past a Kafka transaction marker. Only feeds
+  // consumption lag and the highest-offset gauge (see getStreamPosition()). Written by the consumer thread only.
+  @Nullable
+  private volatile StreamPartitionMsgOffset _emptyBatchStreamPosition;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
@@ -338,6 +345,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private long _consumeStartTime = -1;
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
+  // Rate limiting for reportDataLoss(). Only touched by the thread running consumeLoop(): the consumer thread, or the
+  // state transition thread catching up to the final offset after stop() has joined the consumer thread.
+  private long _lastDataLossReportTimeMs = -1;
+  private int _dataLossBatchesSinceLastReport = 0;
+  // Where the earliest and the most recent batches with loss since the last report were detected; null when every
+  // batch with loss has been reported. The earliest one shows where the loss started.
+  @Nullable
+  private String _earliestUnreportedDataLossLocation;
+  @Nullable
+  private String _latestUnreportedDataLossLocation;
   private SegmentCompletionProtocol.ReasonCode _stopReasonCode = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
@@ -485,6 +502,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected boolean consumeLoop()
       throws Exception {
+    try {
+      return doConsumeLoop();
+    } finally {
+      flushDataLossReport();
+    }
+  }
+
+  private boolean doConsumeLoop()
+      throws Exception {
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
     // anymore. Remove the file if it exists.
     removeSegmentFile();
@@ -555,12 +581,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       if (_currentOffset.compareTo(lastUpdatedOffset) != 0) {
         _idleTimer.markEventConsumed();
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
-        // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
-        if (_currentOffset instanceof LongMsgOffset) {
-          // TODO: only LongMsgOffset supplies long offset value.
-          _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
-              ((LongMsgOffset) _currentOffset).getOffset());
-        }
+        updateHighestStreamOffsetConsumedGauge();
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else if (endCriteriaReached) {
         // At this point current offset has not moved because processStreamEvents() has exited before processing a
@@ -582,6 +603,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(nextOffset);
       } else {
         // We did not consume any rows.
+        if (recordStreamPositionOfEmptyBatch(messageBatch)) {
+          updateHighestStreamOffsetConsumedGauge();
+        }
         long timeSinceStreamLastCreatedOrConsumedMs = _idleTimer.getTimeSinceStreamLastCreatedOrConsumedMs();
 
         if (idleTimeoutMillis >= 0 && (timeSinceStreamLastCreatedOrConsumedMs > idleTimeoutMillis)) {
@@ -606,6 +630,48 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_DROPPED, _numBytesDropped);
     }
     return true;
+  }
+
+  // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
+  private void updateHighestStreamOffsetConsumedGauge() {
+    StreamPartitionMsgOffset streamPosition = getStreamPosition();
+    if (streamPosition instanceof LongMsgOffset) {
+      // TODO: only LongMsgOffset supplies long offset value.
+      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
+          ((LongMsgOffset) streamPosition).getOffset());
+    }
+  }
+
+  /// Records the next offset of a batch without messages when it is ahead of [#getStreamPosition()], which happens
+  /// when the stream moved past offsets it never delivers, such as Kafka transaction markers.
+  ///
+  /// @return `true` if the stream position moved
+  private boolean recordStreamPositionOfEmptyBatch(MessageBatch messageBatch) {
+    StreamPartitionMsgOffset nextBatchOffset = messageBatch.getOffsetOfNextBatch();
+    if (nextBatchOffset == null || nextBatchOffset.compareTo(getStreamPosition()) <= 0) {
+      return false;
+    }
+    if (_segmentLogger.isDebugEnabled()) {
+      _segmentLogger.debug("Empty batch moved the stream position to {} (current offset {})", nextBatchOffset,
+          _currentOffset);
+    }
+    _emptyBatchStreamPosition = nextBatchOffset;
+    return true;
+  }
+
+  /// Returns how far the stream has been read: `_currentOffset`, or the furthest next offset reported by a batch
+  /// without messages when that is ahead of it. A Kafka consumer moves past transaction markers without delivering
+  /// anything, so on a transactional topic a caught-up consumer sits one past the last commit marker while
+  /// `_currentOffset` stays one past the last record. This position only feeds consumption lag
+  /// ([#getConsumerPartitionState]) and [ServerGauge#HIGHEST_STREAM_OFFSET_CONSUMED]. Fetching, catch-up and the end
+  /// offset a segment commits keep using `_currentOffset`, so an empty batch's next offset never decides which records
+  /// a segment holds.
+  @VisibleForTesting
+  StreamPartitionMsgOffset getStreamPosition() {
+    StreamPartitionMsgOffset currentOffset = _currentOffset;
+    StreamPartitionMsgOffset emptyBatchStreamPosition = _emptyBatchStreamPosition;
+    return emptyBatchStreamPosition != null && emptyBatchStreamPosition.compareTo(currentOffset) > 0
+        ? emptyBatchStreamPosition : currentOffset;
   }
 
   /// @param messageBatch batch of messages to process
@@ -1151,27 +1217,80 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _lastConsumedTimestampMs;
   }
 
-  /// Returns the [ConsumerPartitionState] for the partition group.
+  /// Returns the [ConsumerPartitionState] for the partition group. Its current offset is [#getStreamPosition()], so
+  /// the lag computed from it counts offsets the stream skipped without delivering anything as consumed.
   public Map<String, ConsumerPartitionState> getConsumerPartitionState(
       @Nullable StreamPartitionMsgOffset latestMsgOffset) {
     String partitionGroupId = String.valueOf(_partitionGroupId);
     return Map.of(partitionGroupId,
-        new ConsumerPartitionState(partitionGroupId, getCurrentOffset(), getLastConsumedTimestamp(), latestMsgOffset,
+        new ConsumerPartitionState(partitionGroupId, getStreamPosition(), getLastConsumedTimestamp(), latestMsgOffset,
             _lastRowMetadata));
   }
 
   /// Checks and reports if the consumer is going through data loss.
   ///
+  /// The [ServerGauge#STREAM_DATA_LOSS] gauge is set for every batch that reports loss. The ERROR log line and the
+  /// segment error entry are emitted at most once per [#DATA_LOSS_REPORT_INTERVAL_MS] per segment, carrying the
+  /// number of affected batches since the previous report and where the earliest and the most recent of them were
+  /// detected, so a stream that keeps reporting loss on every poll does not flood the log or churn the segment error
+  /// cache, and the report still shows where the loss started. A batch with loss whose report was suppressed is
+  /// reported by the first batch processed after the interval has elapsed, even when that batch and every one before
+  /// it is healthy, so a loss event that the stream recovers from within the interval still reaches the log and the
+  /// segment error cache. This method runs for every fetched batch, including empty ones, so the deferred report
+  /// follows the end of the interval within one fetch. When the consume loop exits before that,
+  /// [#flushDataLossReport] reports it instead.
+  ///
   /// @param messageBatch Message batch to validate
-  private void reportDataLoss(MessageBatch messageBatch) {
-    if (messageBatch.hasDataLoss()) {
-      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
-      String message = "Message loss detected in stream partition: " + _partitionGroupId + " for table: "
-          + _tableNameWithType + " startOffset: " + _currentOffset + " batchFirstOffset: "
-          + messageBatch.getFirstMessageOffset();
-      _segmentLogger.error(message);
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
+  @VisibleForTesting
+  void reportDataLoss(MessageBatch messageBatch) {
+    if (!messageBatch.hasDataLoss()) {
+      if (_latestUnreportedDataLossLocation != null) {
+        long now = now();
+        if (now - _lastDataLossReportTimeMs >= DATA_LOSS_REPORT_INTERVAL_MS) {
+          logDataLoss(now);
+        }
+      }
+      return;
     }
+    _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS, 1L);
+    _dataLossBatchesSinceLastReport++;
+    String location = "startOffset: " + _currentOffset + " batchFirstOffset: " + messageBatch.getFirstMessageOffset();
+    if (_earliestUnreportedDataLossLocation == null) {
+      _earliestUnreportedDataLossLocation = location;
+    }
+    _latestUnreportedDataLossLocation = location;
+    long now = now();
+    if (_lastDataLossReportTimeMs < 0 || now - _lastDataLossReportTimeMs >= DATA_LOSS_REPORT_INTERVAL_MS) {
+      logDataLoss(now);
+    }
+  }
+
+  /// Reports the batches with loss whose report the rate limit suppressed, if any. Runs whenever the consume loop
+  /// exits: no further batch comes to trigger the deferred report in [#reportDataLoss] once consumption stops (the
+  /// segment may commit right after), and the [ServerGauge#STREAM_DATA_LOSS] gauge is removed with the segment, so the
+  /// loss would otherwise never reach the log or the segment error cache.
+  @VisibleForTesting
+  void flushDataLossReport() {
+    if (_latestUnreportedDataLossLocation != null) {
+      logDataLoss(now());
+    }
+  }
+
+  /// Emits the data-loss ERROR line and segment error entry for the batches with loss since the previous report,
+  /// naming where the earliest and the most recent of them were detected, and restarts the rate-limit interval.
+  private void logDataLoss(long now) {
+    String location = _earliestUnreportedDataLossLocation.equals(_latestUnreportedDataLossLocation)
+        ? _latestUnreportedDataLossLocation
+        : "earliest " + _earliestUnreportedDataLossLocation + ", latest " + _latestUnreportedDataLossLocation;
+    String message = "Message loss detected in stream partition: " + _partitionGroupId + " for table: "
+        + _tableNameWithType + " " + location + " (batches with loss since last report: "
+        + _dataLossBatchesSinceLastReport + ")";
+    _segmentLogger.error(message);
+    _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now, message, null));
+    _lastDataLossReportTimeMs = now;
+    _dataLossBatchesSinceLastReport = 0;
+    _earliestUnreportedDataLossLocation = null;
+    _latestUnreportedDataLossLocation = null;
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {

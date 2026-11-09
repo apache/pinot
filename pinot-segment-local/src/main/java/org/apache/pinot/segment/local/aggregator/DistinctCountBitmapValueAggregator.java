@@ -103,6 +103,11 @@ public class DistinctCountBitmapValueAggregator implements ValueAggregator<Objec
   }
 
   @Override
+  public boolean isMaxAggregatedValueByteSizeDerivedFromSerialization() {
+    return true;
+  }
+
+  @Override
   public int getMaxAggregatedValueByteSize() {
     return _maxByteSize;
   }

@@ -126,6 +126,9 @@ public class BrokerRoutingManagerTest {
   @Mock
   private Consumer<ServerInstance> _serverEnabledCallback;
 
+  @Mock
+  private Consumer<ServerInstance> _serverRemovedCallback;
+
   private BrokerRoutingManager _routingManager;
 
   @BeforeMethod
@@ -342,6 +345,161 @@ public class BrokerRoutingManagerTest {
         anyInt(), anyInt())).thenReturn(instanceConfigs);
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
     verify(_serverEnabledCallback, times(2)).accept(any());
+  }
+
+  /// A server removed from the cluster altogether is forgotten rather than tracked forever, the removed callback lets
+  /// listeners drop what they cached for it (the single-stage transport evicts its channels), and a server added back
+  /// under the same id is enabled like any new one. Both ways out of the enabled set are covered: disabled first, and
+  /// straight from enabled to gone.
+  @Test
+  public void testRemovedServerIsForgottenAndRemovedCallbackInvoked() {
+    _routingManager.addServerEnabledCallback(_serverEnabledCallback);
+    _routingManager.addServerRemovedCallback(_serverRemovedCallback);
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    List<ZNRecord> disabledInstanceConfigs = List.of(createDisabledServerZNRecord(SERVER_INSTANCE_ID));
+
+    // Enabled, disabled, then removed: reported once, on removal
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(1)).accept(any());
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(disabledInstanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, never()).accept(any());
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    ArgumentCaptor<ServerInstance> captor = ArgumentCaptor.forClass(ServerInstance.class);
+    verify(_serverRemovedCallback).accept(captor.capture());
+    assertEquals(captor.getValue().getInstanceId(), SERVER_INSTANCE_ID);
+    assertEquals(captor.getValue().getPort(), SERVER_PORT);
+    // A refresh with it still gone does not repeat the notification
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(1)).accept(any());
+
+    // Added back under the same id: enabled again
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    verify(_serverEnabledCallback, times(2)).accept(any());
+
+    // Straight from enabled to removed
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(2)).accept(any());
+    assertFalse(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+
+    // A disabled server enabled again before it is removed is no longer tracked: its later removal comes straight
+    // from the enabled set and is reported once
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(disabledInstanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(3)).accept(any());
+  }
+
+  /// A server back under the same id at a different address has left its previous address for good. Listeners key
+  /// what they cache by address, so the removed callback gets the instance at the previous address: otherwise the
+  /// single-stage channels to it would stay cached forever. Covered while the server stays enabled and across a
+  /// disable and re-enable; a change that keeps the address calls nothing.
+  @Test
+  public void testRemovedCallbackInvokedWithPreviousAddressWhenServerMoves() {
+    _routingManager.addServerEnabledCallback(_serverEnabledCallback);
+    _routingManager.addServerRemovedCallback(_serverRemovedCallback);
+    setInstanceConfigs(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(1)).accept(any());
+
+    // A config change that keeps the address
+    ZNRecord tagged = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    tagged.setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), List.of("DefaultTenant_OFFLINE"));
+    setInstanceConfigs(tagged);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, never()).accept(any());
+
+    // Moves to another host while it stays enabled: not a newly enabled server, but its previous address is gone
+    ZNRecord moved = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    moved.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_HOST.name(), "otherhost");
+    setInstanceConfigs(moved);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    ArgumentCaptor<ServerInstance> captor = ArgumentCaptor.forClass(ServerInstance.class);
+    verify(_serverRemovedCallback).accept(captor.capture());
+    assertEquals(captor.getValue().getHostname(), SERVER_HOST);
+    assertEquals(captor.getValue().getPort(), SERVER_PORT);
+    assertEquals(_routingManager.getEnabledServerInstanceMap().get(SERVER_INSTANCE_ID).getHostname(), "otherhost");
+    verify(_serverEnabledCallback, times(1)).accept(any());
+
+    // Disabled, then enabled again at another port: compared with the address it had when it was disabled
+    ZNRecord disabled = createDisabledServerZNRecord(SERVER_INSTANCE_ID);
+    disabled.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_HOST.name(), "otherhost");
+    setInstanceConfigs(disabled);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(1)).accept(any());
+    ZNRecord reenabled = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    reenabled.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_HOST.name(), "otherhost");
+    reenabled.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_PORT.name(), "8001");
+    setInstanceConfigs(reenabled);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(2)).accept(captor.capture());
+    assertEquals(captor.getValue().getHostname(), "otherhost");
+    assertEquals(captor.getValue().getPort(), SERVER_PORT);
+    verify(_serverEnabledCallback, times(2)).accept(any());
+  }
+
+  private void setInstanceConfigs(ZNRecord... instanceConfigs) {
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of(instanceConfigs));
+  }
+
+  /// `setServerEnabledCallback` replaces what it set before, and only that, so callbacks registered through
+  /// `addServerEnabledCallback` (the single-stage channel eviction) are never dropped by it.
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testSetServerEnabledCallbackReplacesOnlyItsOwnCallback() {
+    Consumer<ServerInstance> setCallback1 = mock(Consumer.class);
+    Consumer<ServerInstance> setCallback2 = mock(Consumer.class);
+    _routingManager.addServerEnabledCallback(_serverEnabledCallback);
+    _routingManager.setServerEnabledCallback(setCallback1);
+    _routingManager.setServerEnabledCallback(setCallback2);
+
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    verify(_serverEnabledCallback).accept(any());
+    verify(setCallback1, never()).accept(any());
+    verify(setCallback2).accept(any());
+  }
+
+  /// Several listeners share the signal (the single-stage transport drops its channels, the multi-stage engine resets
+  /// its gRPC channel), and one failing must not stop the others or the routing update.
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testAllServerEnabledCallbacksInvokedEvenIfOneThrows() {
+    Consumer<ServerInstance> failingCallback = mock(Consumer.class);
+    doThrow(new RuntimeException("callback failure")).when(failingCallback).accept(any());
+    _routingManager.addServerEnabledCallback(failingCallback);
+    _routingManager.addServerEnabledCallback(_serverEnabledCallback);
+
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    verify(failingCallback).accept(any());
+    verify(_serverEnabledCallback).accept(any());
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
   }
 
   @Test
@@ -929,6 +1087,14 @@ public class BrokerRoutingManagerTest {
     assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
         DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
     verify(_routingManager, never()).buildRouting(TEST_TABLE);
+  }
+
+  /// Creates a ZNRecord representing a disabled server instance.
+  @SuppressWarnings("deprecation") // The routing manager still reads Helix's legacy enabled flag for compatibility.
+  private ZNRecord createDisabledServerZNRecord(String instanceId) {
+    ZNRecord record = createEnabledServerZNRecord(instanceId);
+    record.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name(), "false");
+    return record;
   }
 
   /// Creates a ZNRecord representing an enabled server instance.

@@ -27,11 +27,11 @@ import org.apache.datasketches.theta.UpdatableThetaSketch;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 

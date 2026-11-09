@@ -27,6 +27,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.config.NettyConfig;
@@ -45,6 +47,7 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
@@ -75,6 +78,11 @@ public class QueryRouter {
 
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private final ConcurrentHashMap<Long, AsyncQueryResponse> _asyncQueryResponseMap = new ConcurrentHashMap<>();
+  // Told about a server that stopped answering queries on one of its channels (see ServerChannels). The request
+  // handler points it at the failure detector when pings are off and reporting is enabled; with or without it, the
+  // suspect channel is replaced by the next query to it, so recovery does not depend on the failure detector.
+  private volatile Consumer<ServerRoutingInstance> _unansweredServerReporter = serverRoutingInstance -> {
+  };
   /// Ping request ids count down from -1, so they can never collide with query request ids, which are non-negative
   /// (see `BrokerRequestIdGenerator`).
   private final AtomicLong _pingRequestIdGenerator = new AtomicLong();
@@ -89,10 +97,29 @@ public class QueryRouter {
   /// @param tlsConfig TLS config
   public QueryRouter(String brokerId, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
       ServerRoutingStatsManager serverRoutingStatsManager, ThreadAccountant threadAccountant) {
+    this(brokerId, nettyConfig, tlsConfig, serverRoutingStatsManager, threadAccountant,
+        Broker.FailureDetector.DEFAULT_UNANSWERED_QUERIES_THRESHOLD,
+        Broker.FailureDetector.DEFAULT_UNANSWERED_QUERY_GRACE_MS);
+  }
+
+  /// @param unansweredQueriesThreshold see [Broker.FailureDetector#CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD];
+  ///                                   non-positive disables the check
+  /// @param unansweredQueryGraceMs see [Broker.FailureDetector#CONFIG_OF_UNANSWERED_QUERY_GRACE_MS]
+  public QueryRouter(String brokerId, @Nullable NettyConfig nettyConfig, @Nullable TlsConfig tlsConfig,
+      ServerRoutingStatsManager serverRoutingStatsManager, ThreadAccountant threadAccountant,
+      int unansweredQueriesThreshold, long unansweredQueryGraceMs) {
     _brokerId = brokerId;
-    _serverChannels = new ServerChannels(this, nettyConfig, null, threadAccountant);
-    _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, nettyConfig, tlsConfig, threadAccountant) : null;
+    _serverChannels = new ServerChannels(this, nettyConfig, null, threadAccountant, unansweredQueriesThreshold,
+        unansweredQueryGraceMs);
+    _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, nettyConfig, tlsConfig, threadAccountant,
+        unansweredQueriesThreshold, unansweredQueryGraceMs) : null;
     _serverRoutingStatsManager = serverRoutingStatsManager;
+  }
+
+  /// Registers the consumer told about a server that stopped answering queries on one of its channels, typically the
+  /// failure detector. Called from the transport's liveness thread, never from an event loop.
+  public void setUnansweredServerReporter(Consumer<ServerRoutingInstance> unansweredServerReporter) {
+    _unansweredServerReporter = unansweredServerReporter;
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
@@ -137,14 +164,16 @@ public class QueryRouter {
         if (ServerChannels.CHANNEL_LOCK_TIMEOUT_MSG.equals(e.getMessage())) {
           _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS, 1);
         }
-        markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
+        markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e, true);
         break;
       } catch (Exception e) {
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
+        // A full outbound queue is backpressure, not evidence against the server (see UnwritableChannelException)
+        boolean reportServer = !(e instanceof ServerChannels.UnwritableChannelException);
         if (skipUnavailableServers) {
-          asyncQueryResponse.skipServerResponse(serverRoutingInstance);
+          asyncQueryResponse.skipServerResponse(serverRoutingInstance, reportServer);
         } else {
-          markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
+          markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e, reportServer);
           break;
         }
       }
@@ -164,10 +193,10 @@ public class QueryRouter {
   }
 
   private void markQueryFailed(long requestId, ServerRoutingInstance serverRoutingInstance,
-      AsyncQueryResponse asyncQueryResponse, Exception e) {
+      AsyncQueryResponse asyncQueryResponse, Exception e, boolean reportServer) {
     LOGGER.error("Caught exception while sending request {} to server: {}, marking query failed", requestId,
         serverRoutingInstance, e);
-    asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
+    asyncQueryResponse.markQueryFailed(serverRoutingInstance, e, reportServer);
   }
 
   /// Returns whether the broker has a query channel to the server, connected or not. There is one channel per table
@@ -177,18 +206,19 @@ public class QueryRouter {
     return !channelRoutingInstances(serverInstance).isEmpty();
   }
 
-  /// Connects to the given server, returns `true` if the server is successfully connected.
-  ///
-  /// This is the reachability probe the failure detector uses when pings are off, opening the OFFLINE channel with a
-  /// TCP connect only. Startup pre-connect uses [#preConnect] instead.
+  /// The reachability probe the failure detector uses when pings are off. Re-establishes every channel this broker
+  /// has queried the server over, one per table type: reconnects the ones that are down and replaces the ones marked
+  /// suspect (see [ServerChannels#recordUnansweredQuery]) with a fresh connection, so that a half-open socket that
+  /// still reports active is never vouched for. Returns `true` if every such channel is connected afterwards, which
+  /// includes the vacuous case of a server with no such channel: callers that need "reachable" must check
+  /// [#hasChannel] first, as `retryUnhealthyServer` does. It used to open the OFFLINE channel only, so on a
+  /// realtime-only cluster a handshake to a freshly restarted process passed the probe while the channel that carried
+  /// the queries was dead. Startup pre-connect uses [#preConnect] instead.
   public boolean connect(ServerInstance serverInstance) {
     try {
-      if (_serverChannelsTls != null) {
-        _serverChannelsTls.connect(
-            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY_TLS));
-      } else {
-        _serverChannels.connect(
-            serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY));
+      ServerChannels serverChannels = channels();
+      for (ServerRoutingInstance routingInstance : channelRoutingInstances(serverInstance)) {
+        serverChannels.probe(routingInstance);
       }
       return true;
     } catch (Exception e) {
@@ -292,6 +322,31 @@ public class QueryRouter {
     return routingInstances;
   }
 
+  /// Records that a query written at `submitTimeMs` to `channel` (when known) timed out unanswered; the transport
+  /// judges it after a grace period (see [ServerChannels#recordUnansweredQuery]).
+  void recordServerTimeout(ServerRoutingInstance serverRoutingInstance, long submitTimeMs, @Nullable Channel channel) {
+    serverChannelsFor(serverRoutingInstance).recordUnansweredQuery(serverRoutingInstance, submitTimeMs, channel);
+  }
+
+  /// Called by the transport once a server has left the configured number of consecutive queries unanswered on a
+  /// channel; hands the server to the registered reporter.
+  void reportUnansweredServer(ServerRoutingInstance serverRoutingInstance) {
+    try {
+      _unansweredServerReporter.accept(serverRoutingInstance);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while reporting unanswered server: {}", serverRoutingInstance, e);
+    }
+  }
+
+  @VisibleForTesting
+  int getUnansweredQueries(ServerRoutingInstance serverRoutingInstance) {
+    return serverChannelsFor(serverRoutingInstance).getUnansweredQueries(serverRoutingInstance);
+  }
+
+  private ServerChannels serverChannelsFor(ServerRoutingInstance serverRoutingInstance) {
+    return serverRoutingInstance.isTlsEnabled() && _serverChannelsTls != null ? _serverChannelsTls : _serverChannels;
+  }
+
   @VisibleForTesting
   ServerChannels getServerChannels() {
     return _serverChannels;
@@ -330,8 +385,68 @@ public class QueryRouter {
     }
   }
 
+  /// Closes and forgets every cached channel to the given server: both table types, over TLS and plaintext. Returns
+  /// the number of live connections closed (see [ServerChannels#evictChannel]).
+  ///
+  /// Called through `BrokerRequestHandler#onServerRemoved` when a server leaves the cluster or moves to another
+  /// address (with the instance at its previous address). See [ServerChannels#evictChannel] for why the cached channel
+  /// cannot be trusted at that point.
+  public int evictChannels(ServerInstance serverInstance) {
+    return countChannels(serverInstance, ServerChannels::evictChannel);
+  }
+
+  /// [#evictChannels] for a server the routing manager just enabled, which is how a restart shows up through Helix,
+  /// called through `BrokerRequestHandler#onServerEnabled`. A channel that still has queries waiting on it is retired
+  /// rather than closed: the next query opens a fresh connection, and the old one is closed once those queries are
+  /// past their deadline, see [ServerChannels#evictChannelOfEnabledServer].
+  public int evictChannelsOfEnabledServer(ServerInstance serverInstance) {
+    return countChannels(serverInstance, (serverChannels, routingInstance) ->
+        serverChannels.evictChannelOfEnabledServer(routingInstance,
+            channel -> lastDeadlineOfQueriesAwaitingResponseOn(routingInstance, channel)));
+  }
+
+  /// Applies `action` to each channel the server may have, one per table type over plaintext and, when configured,
+  /// over TLS, leaving out a transport whose port the server does not advertise. Returns how many it returned `true`
+  /// for.
+  private int countChannels(ServerInstance serverInstance,
+      BiPredicate<ServerChannels, ServerRoutingInstance> action) {
+    int count = 0;
+    for (TableType tableType : TableType.values()) {
+      if (serverInstance.getPort() > 0 && action.test(_serverChannels,
+          serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY))) {
+        count++;
+      }
+      if (_serverChannelsTls != null && serverInstance.getNettyTlsPort() > 0 && action.test(_serverChannelsTls,
+          serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.NETTY_TLS))) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /// The latest deadline of the queries still waiting for a response from the server on `channel`, or 0 if none is.
+  private long lastDeadlineOfQueriesAwaitingResponseOn(ServerRoutingInstance serverRoutingInstance, Channel channel) {
+    long lastDeadlineMs = 0;
+    for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
+      if (asyncQueryResponse.isAwaitingResponseOn(serverRoutingInstance, channel)) {
+        lastDeadlineMs = Math.max(lastDeadlineMs, asyncQueryResponse.getMaxEndTimeMs());
+      }
+    }
+    return lastDeadlineMs;
+  }
+
   public void shutDown() {
     _serverChannels.shutDown();
+    if (_serverChannelsTls != null) {
+      _serverChannelsTls.shutDown();
+    }
+  }
+
+  /// Records that a response frame arrived from the server, before it is decoded: any response proves the server and
+  /// its channel alive, whether or not the query it answers is still waiting, and whether or not it decodes (a heap
+  /// OOM while deserializing is the broker's problem, not a silent server). Called by [DataTableHandler].
+  void recordResponse(ServerRoutingInstance serverRoutingInstance) {
+    serverChannelsFor(serverRoutingInstance).recordResponse(serverRoutingInstance);
   }
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
@@ -349,8 +464,14 @@ public class QueryRouter {
   /// ([DataTableHandler]) or a request write to it fails ([ServerChannels]). Queries submitted with
   /// `skipUnavailableServers=true` degrade to partial results for this genuine unavailability; others are failed.
   void markServerUnavailable(ServerRoutingInstance serverRoutingInstance, Exception exception) {
-    for (AsyncQueryResponse asyncQueryResponse : _asyncQueryResponseMap.values()) {
-      if (asyncQueryResponse.markServerUnavailable(serverRoutingInstance, exception)) {
+    markServerUnavailable(serverRoutingInstance, null, exception, true);
+  }
+
+  /// Restricts a down event to the request channel; a broker eviction is not evidence against the server.
+  void markServerUnavailable(ServerRoutingInstance serverRoutingInstance, @Nullable Channel channel,
+      Exception exception, boolean reportServer) {
+    for (AsyncQueryResponse response : _asyncQueryResponseMap.values()) {
+      if (response.markServerUnavailable(serverRoutingInstance, channel, exception, reportServer)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SERVER_MARKED_DOWN_SKIPPED, 1);
       }
     }
