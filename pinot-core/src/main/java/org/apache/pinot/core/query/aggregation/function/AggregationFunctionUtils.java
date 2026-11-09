@@ -47,7 +47,6 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -61,6 +60,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -951,11 +951,11 @@ public class AggregationFunctionUtils {
       // Logical BYTES dictionary entries are serialized UltraLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
-        UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));
+        UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
-          ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(i)));
+          ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return ull;
       } catch (Exception e) {

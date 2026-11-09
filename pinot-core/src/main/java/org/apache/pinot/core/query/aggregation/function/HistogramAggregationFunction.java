@@ -29,12 +29,12 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.utils.DoubleVectorOpUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
@@ -44,6 +44,7 @@ import org.apache.pinot.spi.utils.ArrayCopyUtils;
 /// `Histogram(columnName, ARRAY\[0,1,10,100\])` to specify bins \[0,1), \[1,10), \[10,1000\] or
 /// `Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins \[0,100), \[100,200), ..., \[900,1000\]
 public class HistogramAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, double[]> {
+  private static final int DOUBLE_ARRAY_LIST_TYPE = 3;
 
   private static final String ARRAY_CONSTRUCTOR = "arrayvalueconstructor";
   private static final int INVALID_BIN = -1;
@@ -232,9 +233,8 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubles) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubles));
+  public SerializedResult serializeIntermediateResult(DoubleArrayList doubles) {
+    return new SerializedValue<>(DOUBLE_ARRAY_LIST_TYPE, doubles, ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE);
   }
 
   @Override

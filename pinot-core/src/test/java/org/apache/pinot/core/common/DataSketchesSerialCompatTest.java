@@ -20,13 +20,23 @@ package org.apache.pinot.core.common;
 
 import java.nio.ByteBuffer;
 import java.util.Base64;
-import org.apache.datasketches.cpc.CpcSketch;
+import java.util.List;
 import org.apache.datasketches.frequencies.FrequentItemsSketch;
 import org.apache.datasketches.frequencies.FrequentLongsSketch;
 import org.apache.datasketches.kll.KllDoublesSketch;
-import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountCPCSketchAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountThetaSketchAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.FrequentLongsSketchAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.FrequentStringsSketchAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.IntegerTupleSketchAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.PercentileKLLAggregationFunction;
+import org.apache.pinot.segment.local.aggregator.DistinctCountCPCSketchValueAggregator;
+import org.apache.pinot.segment.local.aggregator.DistinctCountThetaSketchValueAggregator;
+import org.apache.pinot.segment.local.aggregator.IntegerTupleSketchValueAggregator;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -37,12 +47,25 @@ import static org.testng.Assert.assertEquals;
 /// The Base64 fixtures below were generated with datasketches-java 6.2.0 (the version shipped before the 9.x
 /// upgrade) and represent the bytes that exist today in BYTES columns, star-tree aggregated values and
 /// intermediate query results of deployed clusters. Each test asserts that the current datasketches-java version
-/// still deserializes them correctly through the same [ObjectSerDe] instances used on the query path. Do NOT
-/// regenerate these fixtures with a newer datasketches version - that would defeat the purpose of the test.
+/// still reads them through Pinot's own entry points: the aggregation function's `deserializeIntermediateResult`,
+/// from a buffer that starts past other bytes as in a data table, and the star-tree value aggregator's
+/// `deserializeAggregatedValue` for the sketches that have one. Do NOT regenerate these fixtures with a newer
+/// datasketches version - that would defeat the purpose of the test.
 ///
 /// Fixture recipe (datasketches-java 6.2.0): 1000 distinct integer keys (0..999) per sketch;
 /// frequency sketches received keys `i % 10` / `"s" + (i % 10)`, i.e. 100 occurrences per item.
 public class DataSketchesSerialCompatTest {
+  private static final ExpressionContext COLUMN = ExpressionContext.forIdentifier("column");
+
+  // Wire type values of the intermediate results that hold these sketches
+  private static final int LIST_TYPE = 21;
+  private static final int KLL_DATA_SKETCH_TYPE = 36;
+  private static final int FREQUENT_STRINGS_SKETCH_TYPE = 38;
+  private static final int FREQUENT_LONGS_SKETCH_TYPE = 39;
+  private static final int THETA_SKETCH_ACCUMULATOR_TYPE = 47;
+  private static final int TUPLE_INT_SKETCH_ACCUMULATOR_TYPE = 48;
+  private static final int CPC_SKETCH_ACCUMULATOR_TYPE = 49;
+
   private static final String THETA_ORDERED_620 =
       "AgMDAAAazJPoAwAAAACAP9WJ7fK6dCoA3qxr4eHZZQD6dLNMFrFuAMfEgYUTf3MA/z7bSTH6lgBRZwE+7+LdAEu/fu5+QPUA5MdYEprEBgGvXx"
       + "WmSZJOAQoi27cch18BiGVXN9EKdAF7f+xm7Xh/Afs4eYkTJI8Bub+f6vqeqgF4PUbjfXzTAe+vrs9b3fQBlN7WyKB1KgLR7rWxGbSTAm3z+4hV"
@@ -473,68 +496,89 @@ public class DataSketchesSerialCompatTest {
     return byteBuffer;
   }
 
+  /// Returns the theta intermediate result holding one sketch: the `List` wire type, `[int size]`, then
+  /// `[int THETA_SKETCH_ACCUMULATOR_TYPE]` and `[int length][sketch bytes]` per sketch.
+  private static byte[] thetaIntermediateResult(byte[] sketchBytes) {
+    ByteBuffer buffer = ByteBuffer.allocate(3 * Integer.BYTES + sketchBytes.length);
+    buffer.putInt(1).putInt(THETA_SKETCH_ACCUMULATOR_TYPE).putInt(sketchBytes.length).put(sketchBytes);
+    return buffer.array();
+  }
+
   @Test
   public void testThetaSketch620() {
+    DistinctCountThetaSketchAggregationFunction function =
+        new DistinctCountThetaSketchAggregationFunction(List.of(COLUMN), false);
+    DistinctCountThetaSketchValueAggregator valueAggregator = new DistinctCountThetaSketchValueAggregator(List.of());
     for (String fixture : new String[]{THETA_ORDERED_620, THETA_UNORDERED_620}) {
       byte[] bytes = decode(fixture);
-      assertEquals(ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(bytes).getEstimate(), 1000.0);
-      assertEquals(ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(ByteBuffer.wrap(bytes)).getEstimate(),
-          1000.0);
-      assertEquals(ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(offsetBuffer(bytes)).getEstimate(), 1000.0);
-      assertEquals(CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(bytes).getEstimate(), 1000.0);
+      CustomObject intermediateResult = new CustomObject(LIST_TYPE, offsetBuffer(thetaIntermediateResult(bytes)));
+      assertEquals(function.extractFinalResult(function.deserializeIntermediateResult(intermediateResult)), 1000L);
+      assertEquals(valueAggregator.deserializeAggregatedValue(bytes).getEstimate(), 1000.0);
     }
   }
 
   @Test
   public void testIntegerTupleSketch620() {
     byte[] bytes = decode(INT_TUPLE_620);
-    TupleSketch<IntegerSummary> sketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(bytes);
-    assertEquals(sketch.getEstimate(), 1000.0);
-    assertEquals(ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(offsetBuffer(bytes)).getEstimate(),
+    IntegerTupleSketchAggregationFunction function =
+        new IntegerTupleSketchAggregationFunction(List.of(COLUMN), IntegerSummary.Mode.Sum, false);
+    IntegerTupleSketchValueAggregator valueAggregator =
+        new IntegerTupleSketchValueAggregator(List.of(), IntegerSummary.Mode.Sum);
+    assertEquals(valueAggregator.deserializeAggregatedValue(bytes).getEstimate(), 1000.0);
+    // The final result is the Base64 of the sketch the function read
+    CustomObject intermediateResult = new CustomObject(TUPLE_INT_SKETCH_ACCUMULATOR_TYPE, offsetBuffer(bytes));
+    String finalResult =
+        (String) function.extractFinalResult(function.deserializeIntermediateResult(intermediateResult));
+    assertEquals(valueAggregator.deserializeAggregatedValue(Base64.getDecoder().decode(finalResult)).getEstimate(),
         1000.0);
-    assertEquals(CustomSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(bytes).getEstimate(), 1000.0);
   }
 
   @Test
   public void testKllDoublesSketch620() {
     byte[] bytes = decode(KLL_DOUBLES_620);
-    KllDoublesSketch sketch = ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(bytes);
+    PercentileKLLAggregationFunction function = new PercentileKLLAggregationFunction(
+        List.of(COLUMN, ExpressionContext.forLiteral(Literal.doubleValue(50))), false);
+    KllDoublesSketch sketch =
+        function.deserializeIntermediateResult(new CustomObject(KLL_DATA_SKETCH_TYPE, offsetBuffer(bytes)));
     assertEquals(sketch.getN(), 1000);
     assertEquals(sketch.getMinItem(), 0.0);
     assertEquals(sketch.getMaxItem(), 999.0);
-    assertEquals(ObjectSerDeUtils.KLL_SKETCH_SER_DE.deserialize(offsetBuffer(bytes)).getN(), 1000);
   }
 
   @Test
   public void testCpcSketch620() {
     byte[] bytes = decode(CPC_620);
     // Estimate computed by datasketches-java 6.2.0 from this exact serialized image; the ICON estimator is
-    // deterministic, so the value must be stable across library versions.
-    CpcSketch sketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes);
-    assertEquals(sketch.getEstimate(), 999.378789508911, 1.0);
-    assertEquals(ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(offsetBuffer(bytes)).getEstimate(),
-        999.378789508911, 1.0);
-    assertEquals(CustomSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes).getEstimate(), 999.378789508911, 1.0);
+    // deterministic, so the value must be stable across library versions. The final result rounds it.
+    DistinctCountCPCSketchValueAggregator valueAggregator = new DistinctCountCPCSketchValueAggregator(List.of());
+    assertEquals(valueAggregator.deserializeAggregatedValue(bytes).getEstimate(), 999.378789508911, 1.0);
+    DistinctCountCPCSketchAggregationFunction function =
+        new DistinctCountCPCSketchAggregationFunction(List.of(COLUMN), false);
+    CustomObject intermediateResult = new CustomObject(CPC_SKETCH_ACCUMULATOR_TYPE, offsetBuffer(bytes));
+    assertEquals(function.extractFinalResult(function.deserializeIntermediateResult(intermediateResult)), 999L);
   }
 
   @Test
   public void testFrequentLongsSketch620() {
     byte[] bytes = decode(FREQ_LONGS_620);
-    FrequentLongsSketch sketch = ObjectSerDeUtils.FREQUENT_LONGS_SKETCH_SER_DE.deserialize(bytes);
+    FrequentLongsSketchAggregationFunction function =
+        new FrequentLongsSketchAggregationFunction(List.of(COLUMN), false);
+    FrequentLongsSketch sketch =
+        function.deserializeIntermediateResult(new CustomObject(FREQUENT_LONGS_SKETCH_TYPE, offsetBuffer(bytes)));
     for (long item = 0; item < 10; item++) {
       assertEquals(sketch.getEstimate(item), 100);
     }
-    assertEquals(ObjectSerDeUtils.FREQUENT_LONGS_SKETCH_SER_DE.deserialize(offsetBuffer(bytes)).getEstimate(0L), 100);
   }
 
   @Test
   public void testFrequentStringsSketch620() {
     byte[] bytes = decode(FREQ_STRINGS_620);
-    FrequentItemsSketch<String> sketch = ObjectSerDeUtils.FREQUENT_STRINGS_SKETCH_SER_DE.deserialize(bytes);
+    FrequentStringsSketchAggregationFunction function =
+        new FrequentStringsSketchAggregationFunction(List.of(COLUMN), false);
+    FrequentItemsSketch<String> sketch =
+        function.deserializeIntermediateResult(new CustomObject(FREQUENT_STRINGS_SKETCH_TYPE, offsetBuffer(bytes)));
     for (int item = 0; item < 10; item++) {
       assertEquals(sketch.getEstimate("s" + item), 100);
     }
-    assertEquals(ObjectSerDeUtils.FREQUENT_STRINGS_SKETCH_SER_DE.deserialize(offsetBuffer(bytes)).getEstimate("s0"),
-        100);
   }
 }

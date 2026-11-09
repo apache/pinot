@@ -19,7 +19,6 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.MinMaxRangeValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
@@ -44,8 +43,7 @@ public class PreAggregatedMinMaxRangeStarTreeV2Test extends BaseStarTreeV2Test<O
   Object getRandomRawValue(Random random) {
     long value1 = random.nextInt();
     long value2 = random.nextInt();
-    return ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE
-        .serialize(new MinMaxRangePair(Math.min(value1, value2), Math.max(value1, value2)));
+    return new MinMaxRangePair(Math.min(value1, value2), Math.max(value1, value2)).toBytes();
   }
 
   @Override

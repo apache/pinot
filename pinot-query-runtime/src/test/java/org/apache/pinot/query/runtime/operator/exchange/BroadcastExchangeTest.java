@@ -20,12 +20,13 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import java.util.List;
 import java.util.PriorityQueue;
-import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMaxStepAggregationFunction;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -39,11 +40,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class BroadcastExchangeTest {
@@ -68,7 +65,7 @@ public class BroadcastExchangeTest {
     Mockito.when(_mailbox2.isLocal()).thenReturn(true);
     Mockito.when(_mailbox1.deliversByReference()).thenReturn(true);
     Mockito.when(_mailbox2.deliversByReference()).thenReturn(true);
-    _aggFunction = mockFunnelAggFunction();
+    _aggFunction = funnelAggFunction();
   }
 
   @AfterMethod
@@ -221,7 +218,7 @@ public class BroadcastExchangeTest {
     // Given: a block with one key column and two OBJECT columns, each backed by its own aggregation function
     DataSchema schema = new DataSchema(new String[]{"key", "funnel1", "funnel2"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT, ColumnDataType.OBJECT});
-    AggregationFunction otherAggFunction = mockFunnelAggFunction();
+    AggregationFunction otherAggFunction = funnelAggFunction();
     PriorityQueue<FunnelStepEvent> stepEvents1 = stepEvents(new FunnelStepEvent(1000L, 0));
     PriorityQueue<FunnelStepEvent> stepEvents2 = stepEvents(new FunnelStepEvent(2000L, 1));
     RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"user0", stepEvents1, stepEvents2}),
@@ -269,18 +266,12 @@ public class BroadcastExchangeTest {
     assertSame(capturedBlock(_mailbox1), block);
   }
 
-  /// Mocks an aggregation function whose intermediate result serde is the funnel step event accumulator serde.
-  @SuppressWarnings({"rawtypes", "unchecked"})
-  private static AggregationFunction mockFunnelAggFunction() {
-    AggregationFunction aggFunction = Mockito.mock(AggregationFunction.class);
-    Mockito.when(aggFunction.serializeIntermediateResult(Mockito.any())).thenAnswer(
-        invocation -> new AggregationFunction.SerializedIntermediateResult(
-            ObjectSerDeUtils.ObjectType.FunnelStepEventAccumulator.getValue(),
-            ObjectSerDeUtils.FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE.serialize(invocation.getArgument(0))));
-    Mockito.when(aggFunction.deserializeIntermediateResult(Mockito.any())).thenAnswer(
-        invocation -> ObjectSerDeUtils.FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE.deserialize(
-            ((CustomObject) invocation.getArgument(0)).getBuffer()));
-    return aggFunction;
+  /// Returns a spy on an aggregation function whose intermediate result is a queue of funnel step events.
+  @SuppressWarnings("rawtypes")
+  private static AggregationFunction funnelAggFunction() {
+    return Mockito.spy(new FunnelMaxStepAggregationFunction(List.of(ExpressionContext.forIdentifier("ts"),
+        ExpressionContext.forLiteral(Literal.longValue(1000L)), ExpressionContext.forLiteral(Literal.intValue(2)),
+        ExpressionContext.forIdentifier("step0"), ExpressionContext.forIdentifier("step1")), false));
   }
 
   private static PriorityQueue<FunnelStepEvent> stepEvents(FunnelStepEvent... events) {

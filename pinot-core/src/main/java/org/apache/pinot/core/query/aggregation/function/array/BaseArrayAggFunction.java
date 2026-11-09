@@ -57,9 +57,9 @@ public abstract class BaseArrayAggFunction<I, F> extends BaseSingleInputAggregat
   }
 
   /// Returns a [ByteBuffer] positioned at the payload of a star-tree pre-aggregated arrayAgg cell, after validating
-  /// the leading element-type tag matches `expectedElementType`. The payload that follows is byte-for-byte identical
-  /// to the corresponding `ObjectSerDeUtils.*_SET_SER_DE` format, so callers deserialize it with the matching set
-  /// SerDe's `deserialize(ByteBuffer)` overload. See [ArrayAggDistinctValueAggregator] for the writer.
+  /// the leading element-type tag matches `expectedElementType`. The payload that follows was written by the
+  /// corresponding `ObjectSerDeUtils.*_SET_SER_DE` codec, so callers deserialize it with the same codec's
+  /// `deserialize(ByteBuffer)` overload. See [ArrayAggDistinctValueAggregator] for the writer.
   protected static ByteBuffer starTreeSetPayload(byte[] cell, ElementType expectedElementType) {
     ByteBuffer buffer = ByteBuffer.wrap(cell);
     ElementType elementType = ElementType.fromTag(buffer.get());

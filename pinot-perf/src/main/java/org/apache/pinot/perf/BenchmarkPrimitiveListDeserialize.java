@@ -19,12 +19,13 @@
 package org.apache.pinot.perf;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -42,7 +43,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /// Compares reading a serialized primitive array list one value at a time (`perValue`, the loop the list SerDes used
 /// before) with the ObjectSerDeUtils list SerDes (`bulk`), from a heap or a direct buffer. The SerDes read in bulk from
-/// PrimitiveArrayOutput.MIN_BULK_VALUES values up, and one value at a time below it.
+/// PrimitiveArrays.MIN_BULK_VALUES values up, and one value at a time below it.
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Fork(3)
@@ -50,7 +51,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Measurement(iterations = 5, time = 1)
 @State(Scope.Benchmark)
 public class BenchmarkPrimitiveListDeserialize {
-  @Param({"INT", "LONG", "DOUBLE"})
+  @Param({"INT", "LONG", "FLOAT", "DOUBLE"})
   private String _type;
 
   @Param({"1", "4", "16", "64", "1024", "65536", "1048576"})
@@ -72,6 +73,14 @@ public class BenchmarkPrimitiveListDeserialize {
       case "LONG":
         bytes = ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(new LongArrayList(random.longs(_size).toArray()));
         break;
+      case "FLOAT": {
+        float[] values = new float[_size];
+        for (int i = 0; i < _size; i++) {
+          values[i] = random.nextFloat();
+        }
+        bytes = ObjectSerDeUtils.FLOAT_ARRAY_LIST_SER_DE.serialize(FloatArrayList.wrap(values));
+        break;
+      }
       default:
         bytes = ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(
             new DoubleArrayList(random.doubles(_size).toArray()));
@@ -100,6 +109,13 @@ public class BenchmarkPrimitiveListDeserialize {
         }
         return list;
       }
+      case "FLOAT": {
+        FloatArrayList list = new FloatArrayList(numValues);
+        for (int i = 0; i < numValues; i++) {
+          list.add(buffer.getFloat());
+        }
+        return list;
+      }
       default: {
         DoubleArrayList list = new DoubleArrayList(numValues);
         for (int i = 0; i < numValues; i++) {
@@ -118,6 +134,8 @@ public class BenchmarkPrimitiveListDeserialize {
         return ObjectSerDeUtils.INT_ARRAY_LIST_SER_DE.deserialize(buffer);
       case "LONG":
         return ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.deserialize(buffer);
+      case "FLOAT":
+        return ObjectSerDeUtils.FLOAT_ARRAY_LIST_SER_DE.deserialize(buffer);
       default:
         return ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.deserialize(buffer);
     }

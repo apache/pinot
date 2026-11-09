@@ -24,7 +24,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
@@ -121,7 +120,7 @@ public class PercentileRawEstAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(QuantileDigest quantileDigest) {
+  public SerializedResult serializeIntermediateResult(QuantileDigest quantileDigest) {
     return _percentileEstAggregationFunction.serializeIntermediateResult(quantileDigest);
   }
 
@@ -158,6 +157,6 @@ public class PercentileRawEstAggregationFunction
   }
 
   private static QuantileDigest deserializeFinalResult(Comparable<?> finalResult) {
-    return ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) finalResult));
+    return QuantileDigest.fromBytes(BytesUtils.toBytes((String) finalResult));
   }
 }

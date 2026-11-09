@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.sun.management.ThreadMXBean;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
@@ -32,7 +31,6 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
@@ -48,19 +46,20 @@ import static org.testng.Assert.assertTrue;
 /// Checks that PERCENTILE writes its intermediate result straight into data blocks and data tables, and merges it
 /// straight from its serialized form, with the same bytes and results as the byte array based defaults.
 public class PercentileIntermediateResultSerDeTest {
+  private static final int DOUBLE_ARRAY_LIST_TYPE = 3;
+
   private static final DataSchema SCHEMA = new DataSchema(new String[]{"key", "percentile"},
       new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.OBJECT});
   /// 8 MB of doubles: a humongous object for G1 with any region size up to 16 MB.
   private static final int LARGE_SIZE = 1 << 20;
 
   private final PercentileAggregationFunction _function = newFunction();
-  /// The behavior before the change: serializes to a full byte array, and merges the deserialized value.
+  /// Serializes to a full byte array, and merges the deserialized value.
   private final PercentileAggregationFunction _byteArrayFunction =
       new PercentileAggregationFunction(ExpressionContext.forIdentifier("$1"), 50, true) {
         @Override
-        public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList values) {
-          return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-              ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(values));
+        public SerializedResult serializeIntermediateResult(DoubleArrayList values) {
+          return new SerializedBytes(DOUBLE_ARRAY_LIST_TYPE, toBytes(values));
         }
 
         @Override
@@ -83,9 +82,19 @@ public class PercentileIntermediateResultSerDeTest {
     return values;
   }
 
+  /// Returns the serialized form of `values`: the number of values, then the raw bits of each value.
+  private static byte[] toBytes(DoubleArrayList values) {
+    int size = values.size();
+    ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES + size * Double.BYTES);
+    buffer.putInt(size);
+    for (int i = 0; i < size; i++) {
+      buffer.putLong(Double.doubleToRawLongBits(values.getDouble(i)));
+    }
+    return buffer.array();
+  }
+
   private static CustomObject serialize(DoubleArrayList values) {
-    return new CustomObject(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ByteBuffer.wrap(ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(values)));
+    return new CustomObject(DOUBLE_ARRAY_LIST_TYPE, ByteBuffer.wrap(toBytes(values)));
   }
 
   @DataProvider
@@ -99,7 +108,7 @@ public class PercentileIntermediateResultSerDeTest {
         // Fills the exact capacity, then grows past it.
         {new DoubleArrayList(new double[]{1, 2}), sequence(1)},
         {sequence(1000), sequence(3000)},
-        // Both sides of PrimitiveArrayOutput.MIN_BULK_VALUES: read one value at a time, then in bulk.
+        // Both sides of PrimitiveArrays.MIN_BULK_VALUES: read one value at a time, then in bulk.
         {sequence(7), sequence(63)},
         {sequence(7), sequence(64)},
         {sequence(2), new DoubleArrayList(new double[]{Double.longBitsToDouble(0x7ff8_0000_0000_0123L), -0.0})}
@@ -115,8 +124,7 @@ public class PercentileIntermediateResultSerDeTest {
     DoubleArrayList actual = _function.mergeSerializedIntermediateResult(state, serialized);
 
     // Compares the serialized bytes, so the values must match bit for bit, NaN payloads included.
-    assertEquals(ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(actual),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(expected));
+    assertEquals(toBytes(actual), toBytes(expected));
     assertEquals(serialized.getBuffer().remaining(), 0, "Consumes the whole value");
     if (state != null) {
       assertSame(actual, state, "Merges in place");
@@ -132,24 +140,18 @@ public class PercentileIntermediateResultSerDeTest {
   @Test
   public void testSerializedIntermediateResultMatchesByteArray()
       throws IOException {
-    // A NaN with a payload must keep its raw bits, like ByteBuffer.putDouble in the byte array serializer.
+    // A NaN with a payload keeps its raw bits.
     DoubleArrayList specialValues = new DoubleArrayList(
         new double[]{Double.NaN, Double.longBitsToDouble(0x7ff8_0000_0000_0123L), -0.0, Double.NEGATIVE_INFINITY});
-    // On a DataOutputStream, 1023 values are the most that fit in one PrimitiveArrayOutput.CHUNK_SIZE chunk (written
-    // as one small array), and 1024 go through the chunked path. On a PagedPinotOutputStream, both sides of
-    // PrimitiveArrayOutput.MIN_BULK_VALUES (63 and 64) switch from per-value puts to the bulk view.
+    // Both sides of PrimitiveArrays.MIN_BULK_VALUES (63 and 64) switch from per-value puts to the bulk view.
     for (DoubleArrayList values : List.of(sequence(0), sequence(1), sequence(63), sequence(64), sequence(1000),
-        sequence(1023), sequence(1024), sequence(5000), specialValues)) {
-      AggregationFunction.SerializedIntermediateResult expected =
-          _byteArrayFunction.serializeIntermediateResult(values);
-      AggregationFunction.SerializedIntermediateResult actual = _function.serializeIntermediateResult(values);
+        sequence(5000), specialValues)) {
+      AggregationFunction.SerializedResult expected = _byteArrayFunction.serializeIntermediateResult(values);
+      AggregationFunction.SerializedResult actual = _function.serializeIntermediateResult(values);
 
       assertEquals(actual.getType(), expected.getType());
       assertEquals(actual.getSize(), expected.getBytes().length);
       assertEquals(actual.getBytes(), expected.getBytes());
-      ByteArrayOutputStream written = new ByteArrayOutputStream();
-      actual.writeTo(new DataOutputStream(written));
-      assertEquals(written.toByteArray(), expected.getBytes());
       // Small pages, so the bulk path also splits values across page boundaries.
       try (PagedPinotOutputStream paged =
           new PagedPinotOutputStream(new PagedPinotOutputStream.HeapPageAllocator(100))) {
