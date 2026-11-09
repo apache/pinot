@@ -58,7 +58,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -184,7 +183,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   protected void startController(ClusterComponents cluster)
       throws Exception {
-    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    int controllerPort = _controllerPortRange.findOpenPort(_nextControllerPort);
     _nextControllerPort = controllerPort + 1;
     Map<String, Object> controllerConfig = new HashMap<>();
     controllerConfig.put(ControllerConf.ZK_STR, cluster._zkUrl);
@@ -211,9 +210,9 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
   /// cluster is unreachable, and the OS can hand an ephemeral port to an outgoing connection in the meantime.
   private BaseBrokerStarter initBroker(ClusterComponents cluster, Map<String, String> remoteZkUrls)
       throws Exception {
-    int brokerPort = NetUtils.findOpenPort(_nextBrokerPort);
+    int brokerPort = _brokerPortRange.findOpenPort(_nextBrokerPort);
     _nextBrokerPort = brokerPort + 1;
-    int queryRunnerPort = NetUtils.findOpenPort(_nextBrokerQueryRunnerPort);
+    int queryRunnerPort = _brokerQueryRunnerPortRange.findOpenPort(_nextBrokerQueryRunnerPort);
     _nextBrokerQueryRunnerPort = queryRunnerPort + 1;
     PinotConfiguration brokerConfig = new PinotConfiguration();
     brokerConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, cluster._zkUrl);
@@ -243,11 +242,11 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     serverConfig.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, cluster._tempDir + "/segmentTar");
     serverConfig.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
     serverConfig.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
-    int adminPort = NetUtils.findOpenPort(_nextServerPort);
-    int nettyPort = NetUtils.findOpenPort(adminPort + 1);
-    int grpcPort = NetUtils.findOpenPort(nettyPort + 1);
-    int queryServerPort = NetUtils.findOpenPort(grpcPort + 1);
-    int queryRunnerPort = NetUtils.findOpenPort(queryServerPort + 1);
+    int adminPort = _serverPortRange.findOpenPort(_nextServerPort);
+    int nettyPort = _serverPortRange.findOpenPort(adminPort + 1);
+    int grpcPort = _serverPortRange.findOpenPort(nettyPort + 1);
+    int queryServerPort = _serverPortRange.findOpenPort(grpcPort + 1);
+    int queryRunnerPort = _serverPortRange.findOpenPort(queryServerPort + 1);
     _nextServerPort = queryRunnerPort + 1;
     serverConfig.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, adminPort);
     serverConfig.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, nettyPort);
