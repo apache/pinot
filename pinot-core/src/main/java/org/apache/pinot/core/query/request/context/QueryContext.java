@@ -123,6 +123,8 @@ public class QueryContext implements QueryScopedCache {
   // Time spent to materialize the row-level security bitmap, summed over the segments. The segments run on several
   // threads, so the sum is a LongAdder.
   private final LongAdder _rowFilterTimeNs = new LongAdder();
+  // Entries scanned to materialize the row-level security bitmap, summed over the segments. Kept out of the response.
+  private final LongAdder _rowFilterNumEntriesScanned = new LongAdder();
   // Whether an AND may push the document ids it has matched into its composite (AND/OR/NOT) children.
   // Resolved from the query option and the server default by InstancePlanMakerImplV2#applyQueryOptions.
   private boolean _andRestrictionPushdownEnabled;
@@ -294,6 +296,17 @@ public class QueryContext implements QueryScopedCache {
   /// Returns the time spent to materialize the row-level security bitmap, summed over the segments.
   public long getRowFilterTimeNs() {
     return _rowFilterTimeNs.sum();
+  }
+
+  /// Adds the entries scanned to materialize the row-level security bitmap of one segment. Thread-safe.
+  public void addRowFilterNumEntriesScanned(long numEntriesScanned) {
+    _rowFilterNumEntriesScanned.add(numEntriesScanned);
+  }
+
+  /// Returns the entries scanned to materialize the row-level security bitmap, summed over the segments. The server
+  /// query log and metrics count them in `numEntriesScannedInFilter`, the response does not.
+  public long getRowFilterNumEntriesScanned() {
+    return _rowFilterNumEntriesScanned.sum();
   }
 
   /// Returns a list of expressions in the GROUP-BY clause (aggregation keys), or `null` if there is no GROUP-BY

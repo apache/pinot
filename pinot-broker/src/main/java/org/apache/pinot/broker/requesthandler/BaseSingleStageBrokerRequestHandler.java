@@ -593,6 +593,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverPinotQuery.setQueryOptions(queryOptions);
           try {
             CalciteSqlParser.queryRewrite(serverPinotQuery, RlsFiltersRewriter.class);
+            // compileRequest() optimized the query before the RLS filter was in its WHERE clause. Optimize it again,
+            // as the server optimizes its copy of the RLS filter, so that both copies match the same rows.
+            _queryOptimizer.optimize(serverPinotQuery, schema);
             rlsFiltersApplied.set(true);
             _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
           } catch (Exception e) {
@@ -600,6 +603,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             // the parse error in the response, because they can show the RLS policy to the user.
             LOGGER.error("Unable to apply the RLS filter for request {} on table {}. Failing the query.", requestId,
                 rawTableName, e);
+            _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
             requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
             return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
                 "Cannot apply the row-level security filter for table: " + rawTableName);

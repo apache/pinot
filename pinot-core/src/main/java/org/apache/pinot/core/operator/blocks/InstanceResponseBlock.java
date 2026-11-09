@@ -103,8 +103,17 @@ public class InstanceResponseBlock implements Block {
     }
   }
 
-  /// Returns the response metadata plus the entries moved out of the response by [#hideMetadata(String)]. For the
-  /// server query log and metrics only.
+  /// Sets a metadata entry that the server reads and the response does not carry. It replaces the response entry with
+  /// the same key in [#getServerMetadata()].
+  public void putServerOnlyMetadata(String key, String value) {
+    if (_serverOnlyMetadata == null) {
+      _serverOnlyMetadata = new HashMap<>();
+    }
+    _serverOnlyMetadata.put(key, value);
+  }
+
+  /// Returns the response metadata plus the entries moved out of the response by [#hideMetadata(String)] or set by
+  /// [#putServerOnlyMetadata(String, String)]. For the server query log and metrics only.
   public Map<String, String> getServerMetadata() {
     if (_serverOnlyMetadata == null) {
       return _metadata;

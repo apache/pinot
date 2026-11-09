@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.query.QueryScanCostContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
@@ -96,6 +101,43 @@ public class RowLevelSecurityFilterOperatorTest {
     BlockDocIdSet docIdSet = operator.nextBlock().getBlockDocIdSet();
     assertEquals(docIdSet.getNumEntriesScannedInFilter(), 0L);
     verify(queryContext, times(1)).addRowFilterTimeNs(anyLong());
+  }
+
+  /// The entries that the RLS filter scans go to the scan cost of the query, which scan-based query killing reads, and
+  /// to the query context, for the server query log and metrics. The response does not count them.
+  @Test
+  public void testScanCost() {
+    BaseFilterOperator rowFilter = new BaseFilterOperator(NUM_DOCS, false) {
+      @Override
+      protected BlockDocIdSet getTrues() {
+        // A scan of every document
+        return BitmapDocIdSet.create(bitmap(1, 3), NUM_DOCS, NUM_DOCS);
+      }
+
+      @Override
+      @SuppressWarnings("rawtypes")
+      public List<Operator> getChildOperators() {
+        return List.of();
+      }
+
+      @Override
+      public String toExplainString() {
+        return "SCAN";
+      }
+    };
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      QueryScanCostContext scanCost = new QueryScanCostContext();
+      QueryThreadContext.get().getExecutionContext().setQueryScanCostContext(scanCost);
+      RowLevelSecurityFilterOperator operator =
+          new RowLevelSecurityFilterOperator(rowFilter, new MatchAllFilterOperator(NUM_DOCS), null, queryContext,
+              NUM_DOCS);
+      BlockDocIdSet docIdSet = operator.nextBlock().getBlockDocIdSet();
+      assertEquals(BlockDocIdSet.collect(docIdSet.iterator()), bitmap(1, 3));
+      assertEquals(docIdSet.getNumEntriesScannedInFilter(), 0L);
+      assertEquals(scanCost.getNumEntriesScannedInFilter(), NUM_DOCS);
+    }
+    assertEquals(queryContext.getRowFilterNumEntriesScanned(), NUM_DOCS);
   }
 
   private static RowLevelSecurityFilterOperator newOperator(BaseFilterOperator rowFilter,

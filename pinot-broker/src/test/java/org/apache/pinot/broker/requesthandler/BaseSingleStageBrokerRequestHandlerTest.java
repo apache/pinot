@@ -44,6 +44,7 @@ import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -1037,19 +1038,10 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     };
   }
 
-  /// Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
-  /// accessControl.getRowColFilters(requesterIdentity, tableName) fetches RLS
-  /// policy for the materialized view table instead of the base table.
-  ///
-  /// Before fix: getRowColFilters is called with the materialized view table name
-  /// "mv_baseTable_OFFLINE".
-  ///
-  /// After fix: getRowColFilters is called with the original base table
-  /// name "baseTable_OFFLINE".
-  ///
-  /// A query with an RLS filter also skips the MV rewrite, so it runs on the base table.
+  /// A query with an RLS filter skips the MV rewrite: the broker looks up the RLS filter of the base table
+  /// "baseTable_OFFLINE", and the query runs on the base table with that filter in its options.
   @Test
-  public void testMaterializedViewFullRewriteRlsLookupUsesBaseTable()
+  public void testMaterializedViewRewriteSkippedUnderRls()
       throws Exception {
     String baseOfflineTable = "baseTable_OFFLINE";
     String materializedViewOfflineTable = "mv_baseTable_OFFLINE";
@@ -1358,6 +1350,28 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(response.getExceptions().get(0).getErrorCode(), QueryErrorCode.QUERY_VALIDATION.getId());
     Assert.assertFalse(response.getExceptions().get(0).getMessage().contains("allowed"),
         "The error must not show the RLS filter: " + response.getExceptions().get(0).getMessage());
+    verify(BrokerMetrics.get()).addMeteredTableValue("faroEvents", BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1L);
+  }
+
+  /// The broker optimizes the query again after it adds the RLS filter to the WHERE clause, as the server optimizes
+  /// its copy of the RLS filter: `level = 2.0` on an INT column becomes `level = 2`.
+  @Test
+  public void testRlsFilterInWhereClauseIsOptimized()
+      throws Exception {
+    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        newRlsHandler("level = 2.0", capturedServerRequest, BrokerResponseNative.empty());
+
+    BrokerResponseNative response =
+        (BrokerResponseNative) handler.handleRequest("SELECT COUNT(*) FROM faroEvents WHERE ts = 'x'");
+
+    Assert.assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    Expression filter = capturedServerRequest.get().getPinotQuery().getFilterExpression();
+    Function policy = filter.getFunctionCall().getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(policy.getOperator(), FilterKind.EQUALS.name(), filter.toString());
+    Assert.assertEquals(policy.getOperands().get(0).getIdentifier().getName(), "level", filter.toString());
+    // The optimizer turns the decimal literal into a long literal
+    Assert.assertEquals(policy.getOperands().get(1).getLiteral().getLongValue(), 2L, filter.toString());
   }
 
   /// Under RLS, the broker hides the stats that show the layout of the whole table, also when an old server sends
@@ -1402,12 +1416,16 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName(rawTable)
         .addSingleValueDimension("ts", DataType.STRING)
+        .addSingleValueDimension("level", DataType.INT)
         .build();
 
     TableCache tableCache = mock(TableCache.class);
     when(tableCache.getActualTableName(rawTable)).thenReturn(rawTable);
     when(tableCache.getSchema(rawTable)).thenReturn(schema);
-    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts"));
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts", "level", "level"));
+    // As in production for a table without expression overrides. The broker then does not optimize the query again
+    // for the overrides.
+    when(tableCache.getExpressionOverrideMap(anyString())).thenReturn(null);
     TableConfig tableCfg = mock(TableConfig.class);
     when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
     when(tableCache.getTableConfig(offlineTable)).thenReturn(tableCfg);

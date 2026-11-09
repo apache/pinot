@@ -326,6 +326,12 @@ public class QueryExecutorTest {
     }
     // The stats of the tenant rows stay in the response
     assertTrue(userResponse.getResponseMetadata().containsKey(MetadataKey.NUM_DOCS_SCANNED.getName()));
+    // The RLS filter scans every document. The server query log and metrics count these entries, the response does not.
+    String entriesKey = MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName();
+    long responseEntries = Long.parseLong(userResponse.getResponseMetadata().get(entriesKey));
+    long serverEntries = Long.parseLong(userResponse.getServerMetadata().get(entriesKey));
+    assertEquals(serverEntries - responseEntries,
+        Long.parseLong(adminResponse.getResponseMetadata().get(MetadataKey.TOTAL_DOCS.getName())));
     verify(ServerMetrics.get(), atLeastOnce()).addTimedTableValue(eq(OFFLINE_TABLE_NAME),
         eq(ServerTimer.RLS_FILTER_TIME_MS), anyLong(), eq(TimeUnit.NANOSECONDS));
   }

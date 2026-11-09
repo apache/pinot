@@ -21,6 +21,7 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -272,6 +273,94 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
       int id = (Integer) row[0];
       assertTrue(isTenantA(id) && expected.test(id), name + ": unexpected row " + id);
     }
+  }
+
+  /// Group-by, distinct and order-by queries use the same filter plan, so they must not evaluate the expression on
+  /// hidden rows either.
+  @Test(dataProvider = "userFilters")
+  public void testGroupByDistinctAndOrderByDoNotRunOnHiddenRows(String name, String userFilter,
+      IntPredicate expected, boolean invertedIndex, Map<String, String> options) {
+    useSegment(invertedIndex);
+    long expectedCount = 0;
+    Set<Integer> expectedBuckets = new HashSet<>();
+    int expectedMinId = Integer.MAX_VALUE;
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isTenantA(i) && expected.test(i)) {
+        expectedCount++;
+        expectedBuckets.add(i % 10);
+        expectedMinId = Math.min(expectedMinId, i);
+      }
+    }
+
+    BrokerResponseNative groupBy =
+        getRlsBrokerResponse("SELECT bucket, COUNT(*) FROM testTable", userFilter + " GROUP BY bucket", options);
+    assertTrue(groupBy.getExceptions().isEmpty(), name + ": " + groupBy.getExceptions());
+    long count = 0;
+    Set<Integer> buckets = new HashSet<>();
+    for (Object[] row : groupBy.getResultTable().getRows()) {
+      buckets.add((Integer) row[0]);
+      count += ((Number) row[1]).longValue();
+    }
+    assertEquals(buckets, expectedBuckets, name);
+    assertEquals(count, expectedCount * NUM_SEGMENT_COPIES, name);
+
+    BrokerResponseNative distinct = getRlsBrokerResponse("SELECT DISTINCT bucket FROM testTable", userFilter, options);
+    assertTrue(distinct.getExceptions().isEmpty(), name + ": " + distinct.getExceptions());
+    Set<Integer> distinctBuckets = new HashSet<>();
+    for (Object[] row : distinct.getResultTable().getRows()) {
+      distinctBuckets.add((Integer) row[0]);
+    }
+    assertEquals(distinctBuckets, expectedBuckets, name);
+
+    BrokerResponseNative orderBy =
+        getRlsBrokerResponse("SELECT id FROM testTable", userFilter + " ORDER BY id LIMIT 10", options);
+    assertTrue(orderBy.getExceptions().isEmpty(), name + ": " + orderBy.getExceptions());
+    assertEquals(orderBy.getResultTable().getRows().get(0)[0], expectedMinId, name);
+  }
+
+  /// The RLS filter can be an expression, an OR, or the AND of several policies, which the broker writes as
+  /// `( f1 ) AND ( f2 )`. These shapes are not a single column predicate, so the RLS operator materializes them
+  /// through the generic filter path. Each shape matches the rows of tenant `A`.
+  @DataProvider
+  public static Object[][] policyShapes() {
+    List<Object[]> cases = new ArrayList<>();
+    for (String policy : List.of("lower(tenant) = 'a'", "tenant = 'A' OR id < 0", "( tenant = 'A' ) AND ( id >= 0 )")) {
+      for (boolean invertedIndex : new boolean[]{false, true}) {
+        cases.add(new Object[]{policy, invertedIndex});
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "policyShapes")
+  public void testPolicyShapes(String policy, boolean invertedIndex) {
+    useSegment(invertedIndex);
+    long expectedCount = 0;
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isTenantA(i) && payload(i) > 50) {
+        expectedCount++;
+      }
+    }
+    BrokerResponseNative response =
+        getBrokerResponse("SELECT COUNT(*) FROM testTable WHERE ( " + policy + " ) AND CAST(payload AS INT) > 50",
+            rlsOptions(policy, Map.of()));
+    assertTrue(response.getExceptions().isEmpty(), policy + ": " + response.getExceptions());
+    assertEquals(((Number) response.getResultTable().getRows().get(0)[0]).longValue(),
+        expectedCount * NUM_SEGMENT_COPIES, policy);
+  }
+
+  /// The plan shows the RLS filter operator above the user filter.
+  @Test
+  public void testExplainPlan() {
+    useSegment(false);
+    BrokerResponseNative response =
+        getRlsBrokerResponse("EXPLAIN PLAN FOR SELECT COUNT(*) FROM testTable", "CAST(payload AS INT) > 50", Map.of());
+    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    List<String> operators = new ArrayList<>();
+    for (Object[] row : response.getResultTable().getRows()) {
+      operators.add(row[0].toString());
+    }
+    assertTrue(operators.contains("FILTER_ROW_LEVEL_SECURITY"), operators.toString());
   }
 
   /// A filtered aggregation with an expression inside OR in its sub-filter.
@@ -530,8 +619,12 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
   }
 
   private static Map<String, String> rlsOptions(Map<String, String> options) {
+    return rlsOptions(RLS_FILTER, options);
+  }
+
+  private static Map<String, String> rlsOptions(String policy, Map<String, String> options) {
     Map<String, String> queryOptions = new HashMap<>(options);
-    queryOptions.put(RlsUtils.buildRlsFilterKey(RAW_TABLE_NAME), RLS_FILTER);
+    queryOptions.put(RlsUtils.buildRlsFilterKey(RAW_TABLE_NAME), policy);
     return queryOptions;
   }
 }

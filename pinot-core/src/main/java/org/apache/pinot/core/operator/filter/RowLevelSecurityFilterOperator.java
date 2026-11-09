@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -80,8 +81,9 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
     if (rowFilterDocIds.isEmpty()) {
       return EmptyDocIdSet.unscanned();
     }
-    // The cost of the RLS filter is not reported in numEntriesScannedInFilter: without an index it is the number of
-    // documents of the segment, which shows the size of the table to the user
+    // The cost of the RLS filter is not reported in the numEntriesScannedInFilter of the response: without an index
+    // it is the number of documents of the segment, which shows the size of the table to the user. See
+    // getRowFilterDocIds() for where it goes instead.
     BlockDocIdSet rowFilterDocIdSet = BitmapDocIdSet.create(rowFilterDocIds, _numDocs);
     if (_userFilterOperator.isResultMatchingAll()) {
       return rowFilterDocIdSet;
@@ -92,10 +94,22 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
 
   /// Returns the documents that the RLS filter matches, ANDed with the valid-document snapshot. Materializes them on
   /// the first call, and adds the time it takes to [QueryContext#addRowFilterTimeNs(long)].
+  ///
+  /// The entries scanned to materialize them go to the scan cost of the query, so that scan-based query killing sees
+  /// them, and to [QueryContext#addRowFilterNumEntriesScanned(long)], for the server query log and metrics.
   private ImmutableRoaringBitmap getRowFilterDocIds() {
     if (_rowFilterDocIds == null) {
       long startTimeNs = System.nanoTime();
-      ImmutableRoaringBitmap docIds = _rowFilterOperator.getFilteredDocIds().getDocIds();
+      FilteredDocIds filteredDocIds = _rowFilterOperator.getFilteredDocIds();
+      ImmutableRoaringBitmap docIds = filteredDocIds.getDocIds();
+      long numEntriesScanned = filteredDocIds.getNumEntriesScannedInFilter();
+      if (numEntriesScanned > 0) {
+        _queryContext.addRowFilterNumEntriesScanned(numEntriesScanned);
+        QueryScanCostContext scanCost = getScanCostContext();
+        if (scanCost != null) {
+          scanCost.addEntriesScannedInFilter(numEntriesScanned);
+        }
+      }
       assert docIds != null : "The RLS filter operator must not match all documents";
       // A mutable index can hold documents added after the plan read the number of documents. The rest of the plan
       // does not see them, so neither does the RLS filter.

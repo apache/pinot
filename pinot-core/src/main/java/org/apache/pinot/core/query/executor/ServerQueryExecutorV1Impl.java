@@ -378,6 +378,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     if (queryContext.getRowFilter() != null) {
       hideTableLayoutStats(instanceResponse);
+      addRowFilterEntriesScanned(instanceResponse, queryContext.getRowFilterNumEntriesScanned());
       _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.RLS_FILTER_TIME_MS,
           queryContext.getRowFilterTimeNs(), TimeUnit.NANOSECONDS);
     }
@@ -394,6 +395,19 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     for (MetadataKey key : TABLE_LAYOUT_STATS) {
       instanceResponse.hideMetadata(key.getName());
     }
+  }
+
+  /// Under row-level security, the response does not count the entries scanned to build the RLS bitmap (see
+  /// `RowLevelSecurityFilterOperator`). Adds them to the `numEntriesScannedInFilter` that the server query log and
+  /// metrics read.
+  private static void addRowFilterEntriesScanned(InstanceResponseBlock instanceResponse, long numEntriesScanned) {
+    if (numEntriesScanned == 0) {
+      return;
+    }
+    String key = MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName();
+    String responseValue = instanceResponse.getResponseMetadata().get(key);
+    long numEntriesScannedInFilter = (responseValue != null ? Long.parseLong(responseValue) : 0) + numEntriesScanned;
+    instanceResponse.putServerOnlyMetadata(key, Long.toString(numEntriesScannedInFilter));
   }
 
   // NOTE: This method might change indexSegments. Do not use it after calling this method.
