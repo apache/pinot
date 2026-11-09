@@ -256,16 +256,20 @@ SqlLiteral PinotRefreshEveryPeriod() :
 ///
 /// In the options-defined form the schema and table config are derived entirely from the WITH
 /// options by a pluggable handler in the DDL compiler (e.g. a handler that connects to an
-/// external catalog named by the options and infers the schema from it). The two forms are
-/// disambiguated by the token after the table name: `WITH` vs `(`.
+/// external catalog named by the options and infers the schema from it).
+///
+/// The metadata-copy form is CREATE TABLE [IF NOT EXISTS] [db.]name LIKE [db.]source
+/// [ TYPE OFFLINE | REALTIME ]. Omitting TYPE copies every physical variant of the source.
+/// The three forms are disambiguated by the token after the table name: `WITH`, `LIKE`, or `(`.
 SqlNode SqlPinotCreateTable() :
 {
     SqlParserPos pos;
     SqlIdentifier name;
+    SqlIdentifier sourceName;
     boolean ifNotExists = false;
     SqlNodeList columns;
     SqlNodeList primaryKeyColumns = null;
-    SqlLiteral tableType;
+    SqlLiteral tableType = null;
     SqlNodeList properties = null;
     SqlNodeList withOptions;
 }
@@ -275,6 +279,12 @@ SqlNode SqlPinotCreateTable() :
     [ LOOKAHEAD(3) <IF> <NOT> <EXISTS> { ifNotExists = true; } ]
     name = CompoundIdentifier()
     (
+        <LIKE> sourceName = CompoundIdentifier()
+        [ <TYPE> tableType = PinotTableTypeLiteral() ]
+        {
+            return new SqlPinotCreateTableLike(pos, name, sourceName, ifNotExists, tableType);
+        }
+    |
         <WITH> withOptions = PinotWithOptionList()
         {
             return new SqlPinotCreateTable(pos, name, ifNotExists, withOptions);

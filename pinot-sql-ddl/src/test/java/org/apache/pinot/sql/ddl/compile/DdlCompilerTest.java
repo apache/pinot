@@ -40,6 +40,54 @@ import static org.testng.Assert.expectThrows;
 /// End-to-end compiler tests: SQL → CompiledDdl → Schema + TableConfig.
 public class DdlCompilerTest {
 
+  @Test
+  public void createTableLikeCompilesWithoutSourceCatalog() {
+    CompiledCreateTableLike result = (CompiledCreateTableLike) DdlCompiler.compile(
+        "CREATE TABLE new_table LIKE old_table", DdlCompileContext.STATELESS);
+    assertEquals(result.getOperation(), DdlOperation.CREATE_TABLE_LIKE);
+    assertEquals(result.getRawTableName(), "new_table");
+    assertEquals(result.getSourceRawTableName(), "old_table");
+    assertNull(result.getDatabaseName());
+    assertNull(result.getSourceDatabaseName());
+    assertNull(result.getTableType());
+    assertFalse(result.isIfNotExists());
+  }
+
+  @Test
+  public void createTableLikePreservesIndependentQualifiedNamesAndSelection() {
+    CompiledCreateTableLike result = (CompiledCreateTableLike) DdlCompiler.compile(
+        "CREATE TABLE IF NOT EXISTS \"Destination\".\"NewTable\" "
+            + "LIKE \"Source\".\"OldTable\" TYPE REALTIME", DdlCompileContext.STATELESS);
+    assertEquals(result.getDatabaseName(), "Destination");
+    assertEquals(result.getRawTableName(), "NewTable");
+    assertEquals(result.getSourceDatabaseName(), "Source");
+    assertEquals(result.getSourceRawTableName(), "OldTable");
+    assertEquals(result.getTableType(), TableType.REALTIME);
+    assertTrue(result.isIfNotExists());
+  }
+
+  @Test
+  public void createTableLikeDoesNotDefaultEitherDatabaseFromTheOtherReference() {
+    CompiledCreateTableLike qualifiedTarget = (CompiledCreateTableLike) DdlCompiler.compile(
+        "CREATE TABLE destination.new_table LIKE old_table TYPE OFFLINE", DdlCompileContext.STATELESS);
+    assertEquals(qualifiedTarget.getDatabaseName(), "destination");
+    assertNull(qualifiedTarget.getSourceDatabaseName());
+    assertEquals(qualifiedTarget.getTableType(), TableType.OFFLINE);
+
+    CompiledCreateTableLike qualifiedSource = (CompiledCreateTableLike) DdlCompiler.compile(
+        "CREATE TABLE new_table LIKE source.old_table", DdlCompileContext.STATELESS);
+    assertNull(qualifiedSource.getDatabaseName());
+    assertEquals(qualifiedSource.getSourceDatabaseName(), "source");
+  }
+
+  @Test
+  public void createTableLikeRejectsCatalogQualifiedReferences() {
+    expectThrows(DdlCompilationException.class,
+        () -> DdlCompiler.compile("CREATE TABLE catalog.db.new_table LIKE old_table", DdlCompileContext.STATELESS));
+    expectThrows(DdlCompilationException.class,
+        () -> DdlCompiler.compile("CREATE TABLE new_table LIKE catalog.db.old_table", DdlCompileContext.STATELESS));
+  }
+
   // -------------------------------------------------------------------------------------------
   // CREATE TABLE: schema mapping
   // -------------------------------------------------------------------------------------------

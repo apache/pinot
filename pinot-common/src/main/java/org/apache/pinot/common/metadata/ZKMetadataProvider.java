@@ -481,6 +481,20 @@ public class ZKMetadataProvider {
         AccessOption.PERSISTENT), replaceVariables, applyDecorator);
   }
 
+  /// Reads the persisted table definition without variable substitution or config decorators.
+  /// Returns `null` only when the property store returns no record. Deserialization and storage failures propagate
+  /// so callers can distinguish an unreadable definition from an absent table config.
+  ///
+  /// @param tableNameWithType table name including its OFFLINE or REALTIME suffix
+  /// @throws IOException if the persisted config cannot be deserialized
+  @Nullable
+  public static TableConfig getRawTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType)
+      throws IOException {
+    ZNRecord record = propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), null,
+        AccessOption.PERSISTENT);
+    return record == null ? null : TableConfigSerDeUtils.fromZNRecord(record);
+  }
+
   @Nullable
   public static ImmutablePair<TableConfig, Stat> getTableConfigWithStat(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {

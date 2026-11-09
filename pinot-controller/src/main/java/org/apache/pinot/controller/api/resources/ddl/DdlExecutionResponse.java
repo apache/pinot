@@ -31,6 +31,9 @@ import org.apache.pinot.sql.ddl.compile.DdlOperation;
 /// the wire payload focused on the fields that actually apply to the operation that ran.
 ///
 /// - CREATE_TABLE: `tableName, tableType, schema, tableConfig, ifNotExists, warnings, dryRun`
+/// - CREATE_TABLE_LIKE: `tableName, sourceTableName, tableConfigs, createdTables, ifNotExists, dryRun`.
+///   `tableConfigs` is omitted for an existing-target no-op; `createdTables` records completed
+///   variant creations, including on a partial failure.
 /// - CREATE_MATERIALIZED_VIEW: same as CREATE_TABLE; `tableType` is always `OFFLINE`.
 /// - DROP_TABLE: `tableName, tableType, deletedTables, ifExists, dryRun`
 /// - SHOW_TABLES: `tableNames` (raw names of every OFFLINE/REALTIME table in scope, including
@@ -57,6 +60,9 @@ public class DdlExecutionResponse {
   private Boolean _ifExists;
   private JsonNode _schema;
   private JsonNode _tableConfig;
+  private String _sourceTableName;
+  private JsonNode _tableConfigs;
+  private List<String> _createdTables;
   private List<String> _warnings;
   private List<String> _deletedTables;
   private List<String> _tableNames;
@@ -148,6 +154,36 @@ public class DdlExecutionResponse {
 
   public DdlExecutionResponse setTableConfig(@Nullable JsonNode tableConfig) {
     _tableConfig = tableConfig;
+    return this;
+  }
+
+  @Nullable
+  public String getSourceTableName() {
+    return _sourceTableName;
+  }
+
+  public DdlExecutionResponse setSourceTableName(@Nullable String sourceTableName) {
+    _sourceTableName = sourceTableName;
+    return this;
+  }
+
+  @Nullable
+  public JsonNode getTableConfigs() {
+    return _tableConfigs;
+  }
+
+  public DdlExecutionResponse setTableConfigs(@Nullable JsonNode tableConfigs) {
+    _tableConfigs = tableConfigs;
+    return this;
+  }
+
+  @Nullable
+  public List<String> getCreatedTables() {
+    return _createdTables;
+  }
+
+  public DdlExecutionResponse setCreatedTables(@Nullable List<String> createdTables) {
+    _createdTables = createdTables;
     return this;
   }
 
