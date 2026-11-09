@@ -233,6 +233,13 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
     return new ByteArray(GeometrySerializer.serialize(geometry));
   }
 
+  @Override
+  public ByteArray mergeFinalResult(ByteArray finalResult1, ByteArray finalResult2) {
+    Geometry geometry1 = GeometrySerializer.deserialize(finalResult1.getBytes());
+    Geometry geometry2 = GeometrySerializer.deserialize(finalResult2.getBytes());
+    return new ByteArray(GeometrySerializer.serialize(merge(geometry1, geometry2)));
+  }
+
   /// Returns the union of the supplied geometries.
   ///
   /// When either operand is a `GeometryCollection`, [Geometry#union(Geometry)] can produce invalid

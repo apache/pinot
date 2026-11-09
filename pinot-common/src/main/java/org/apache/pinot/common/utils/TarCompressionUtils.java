@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -42,6 +43,7 @@ import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.compression.Lz4CompressorStreamProvider;
 
 
 /// Utility class to compress/de-compress tar files compressed using various compressors.
@@ -76,7 +78,7 @@ public class TarCompressionUtils {
   public static final String TAR_ZST_FILE_EXTENSION = ".tar.zst";
   public static final Map<String, String> COMPRESSOR_NAME_BY_FILE_EXTENSIONS =
       Map.of(TAR_GZ_FILE_EXTENSION, CompressorStreamFactory.GZIP, TAR_LZ4_FILE_EXTENSION,
-          CompressorStreamFactory.LZ4_FRAMED, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
+          Lz4CompressorStreamProvider.LZ4_FAST, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
   private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = CompressorStreamFactory.getSingleton();
   private static final char ENTRY_NAME_SEPARATOR = '/';
   private static String _defaultCompressorName = CompressorStreamFactory.GZIP;
@@ -98,14 +100,26 @@ public class TarCompressionUtils {
   /// a supported file extension such as "tar.gz" or "tar.zst"
   public static void createCompressedTarFile(File[] inputFiles, File outputFile)
       throws IOException {
+    createCompressedTarFile(inputFiles, outputFile, file -> true);
+  }
+
+  /// Creates a compressed tar file while excluding files rejected by the predicate. Directory entries are retained
+  /// only when accepted, and their children are filtered recursively.
+  public static void createFilteredCompressedTarFile(File inputFile, File outputFile, Predicate<File> includeFile)
+      throws IOException {
+    createCompressedTarFile(new File[]{inputFile}, outputFile, includeFile);
+  }
+
+  private static void createCompressedTarFile(File[] inputFiles, File outputFile, Predicate<File> includeFile)
+      throws IOException {
     if (outputFile.getName().endsWith(TAR_COMPRESSED_FILE_EXTENSION)) {
-      createCompressedTarFile(inputFiles, outputFile, _defaultCompressorName);
+      createCompressedTarFile(inputFiles, outputFile, _defaultCompressorName, includeFile);
     } else {
       String compressorName = null;
       for (String supportedCompressorExtension : COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
         if (outputFile.getName().endsWith(supportedCompressorExtension)) {
           compressorName = COMPRESSOR_NAME_BY_FILE_EXTENSIONS.get(supportedCompressorExtension);
-          createCompressedTarFile(inputFiles, outputFile, compressorName);
+          createCompressedTarFile(inputFiles, outputFile, compressorName, includeFile);
           return;
         }
       }
@@ -121,15 +135,22 @@ public class TarCompressionUtils {
 
   public static void createCompressedTarFile(File[] inputFiles, File outputFile, String compressorName)
       throws IOException {
+    createCompressedTarFile(inputFiles, outputFile, compressorName, file -> true);
+  }
+
+  private static void createCompressedTarFile(File[] inputFiles, File outputFile, String compressorName,
+      Predicate<File> includeFile)
+      throws IOException {
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
-        OutputStream compressorOut = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName,
-            bufferedOut); TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
+        OutputStream compressorOut =
+            COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, bufferedOut);
+        TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
       tarOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
       tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
       for (File inputFile : inputFiles) {
-        addFileToCompressedTar(tarOut, inputFile, "");
+        addFileToCompressedTar(tarOut, inputFile, "", includeFile);
       }
     } catch (CompressorException e) {
       throw new IOException(e);
@@ -138,8 +159,12 @@ public class TarCompressionUtils {
 
   /// Helper method to write a file into the compressed tar file output stream. The base entry name is the relative
   /// path of the file to the root directory.
-  private static void addFileToCompressedTar(ArchiveOutputStream tarOut, File file, String baseEntryName)
+  private static void addFileToCompressedTar(ArchiveOutputStream tarOut, File file, String baseEntryName,
+      Predicate<File> includeFile)
       throws IOException {
+    if (!includeFile.test(file)) {
+      return;
+    }
     String entryName = baseEntryName + file.getName();
     TarArchiveEntry entry = new TarArchiveEntry(file, entryName);
     tarOut.putArchiveEntry(entry);
@@ -155,7 +180,7 @@ public class TarCompressionUtils {
       assert children != null;
       String baseEntryNameForChildren = entryName + ENTRY_NAME_SEPARATOR;
       for (File child : children) {
-        addFileToCompressedTar(tarOut, child, baseEntryNameForChildren);
+        addFileToCompressedTar(tarOut, child, baseEntryNameForChildren, includeFile);
       }
     }
   }
@@ -230,7 +255,9 @@ public class TarCompressionUtils {
             if (maxStreamRateInByte != NO_DISK_WRITE_RATE_LIMIT) {
               copyWithRateLimiter(tarIn, out, maxStreamRateInByte);
             } else {
-              IOUtils.copy(tarIn, out);
+              try (OutputStream bufferedOut = new BufferedOutputStream(out)) {
+                IOUtils.copy(tarIn, bufferedOut);
+              }
             }
           }
         }
@@ -255,7 +282,7 @@ public class TarCompressionUtils {
           String entryName = entry.getName();
           String[] parts = StringUtils.split(entryName, ENTRY_NAME_SEPARATOR);
           if (parts.length > 0 && parts[parts.length - 1].equals(fileName)) {
-            try (OutputStream out = Files.newOutputStream(outputFile.toPath())) {
+            try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(outputFile.toPath()))) {
               IOUtils.copy(tarIn, out);
             }
             return;

@@ -54,6 +54,8 @@ public class SelectionDataTableReducer implements DataTableReducer {
     }
     if (_queryContext.getOrderByExpressions() == null) {
       // Selection only
+      // TODO: Honor OFFSET without ORDER BY, as MSE does. SSE currently ignores it. This requires servers to retain
+      //       LIMIT + OFFSET rows and the broker to skip OFFSET rows.
       List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit,
           _queryContext.isNullHandlingEnabled());
       brokerResponseNative.setResultTable(

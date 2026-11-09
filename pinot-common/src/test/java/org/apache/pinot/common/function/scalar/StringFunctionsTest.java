@@ -381,6 +381,12 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.suffixesWithSuffix(input, length, "$"), expectedSuffixWithRegexChar);
   }
 
+  @Test
+  public void testPrefixAndSuffixWithNullInput() {
+    assertNull(StringFunctions.prefixesWithPrefix(null, 3, "^"));
+    assertNull(StringFunctions.suffixesWithSuffix(null, 3, "$"));
+  }
+
   @Test(dataProvider = "initcapTestCases")
   public void testInitcap(String input, String expected) {
     assertEquals(StringFunctions.initcap(input), expected);

@@ -569,9 +569,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         "Legacy raw forward index for column=%s returned null ChunkCompressionType", column);
     ChunkCompressionType newCompressionType = newConfig.getChunkCompressionType();
 
-    // Note that default compression type (PASS_THROUGH for metric and LZ4 for dimension) is not considered if the
-    // compressionType is not explicitly provided in tableConfig. This is to avoid incorrectly rewriting all the
-    // forward indexes during segmentReload when the default compressionType changes.
+    // Note that the default compression type (PASS_THROUGH for metric, and otherwise whatever
+    // ForwardIndexConfig#getDefaultCompressionType() is set to) is not considered if the compressionType is not
+    // explicitly provided in tableConfig. This is to avoid incorrectly rewriting all the forward indexes during
+    // segmentReload when the default compressionType changes.
     return newCompressionType != null && existingCompressionType != newCompressionType;
   }
 
@@ -1423,12 +1424,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           case STRING:
             if (singleValue) {
               String value = forwardIndex.getString(docId, context);
-              rowLength = Utf8Utils.encodedLengthWithReplacement(value);
+              rowLength = Utf8Utils.encodedLength(value);
               stats.addElement(rowLength, isAscii(value));
             } else {
               int numValues = forwardIndex.getStringMV(docId, stringBuffer, context);
               for (int i = 0; i < numValues; i++) {
-                int valueLength = Utf8Utils.encodedLengthWithReplacement(stringBuffer[i]);
+                int valueLength = Utf8Utils.encodedLength(stringBuffer[i]);
                 rowLength += valueLength;
                 stats.addElement(valueLength, isAscii(stringBuffer[i]));
               }

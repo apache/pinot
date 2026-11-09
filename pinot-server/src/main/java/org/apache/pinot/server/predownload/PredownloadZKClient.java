@@ -41,6 +41,7 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.factory.SharedZkClientFactory;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -71,6 +72,7 @@ public class PredownloadZKClient implements AutoCloseable {
   }
 
   public void start() {
+    ZooKeeperSslContextSupplier.initialize();
     RealmAwareZkClient.RealmAwareZkClientConfig config = new RealmAwareZkClient.RealmAwareZkClientConfig();
     config.setConnectInitTimeout(ZK_CONNECTION_TIMEOUT_MS);
     config.setZkSerializer(new ZNRecordSerializer());

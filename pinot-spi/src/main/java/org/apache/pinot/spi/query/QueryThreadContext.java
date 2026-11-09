@@ -61,12 +61,15 @@ public class QueryThreadContext implements AutoCloseable {
   @Nullable
   private final MseWorkerInfo _mseWorkerInfo;
   private final ThreadAccountant _accountant;
+  // The stats of the query execution served by this thread, replaced by the query executor per execution
+  private RemoteAccessStats _remoteAccessStats;
 
   private QueryThreadContext(QueryExecutionContext executionContext, @Nullable MseWorkerInfo mseWorkerInfo,
-      ThreadAccountant accountant) {
+      ThreadAccountant accountant, RemoteAccessStats remoteAccessStats) {
     _executionContext = executionContext;
     _mseWorkerInfo = mseWorkerInfo;
     _accountant = accountant;
+    _remoteAccessStats = remoteAccessStats;
     LoggerConstants.REQUEST_ID_KEY.registerInMdc(Long.toString(executionContext.getRequestId()));
     LoggerConstants.CORRELATION_ID_KEY.registerInMdc(executionContext.getCid());
     String queryHash = executionContext.getQueryHash();
@@ -101,6 +104,18 @@ public class QueryThreadContext implements AutoCloseable {
   @JsonIgnore
   public ThreadAccountant getAccountant() {
     return _accountant;
+  }
+
+  /// Returns the [RemoteAccessStats] of the query execution served by the current thread.
+  public RemoteAccessStats getRemoteAccessStats() {
+    return _remoteAccessStats;
+  }
+
+  /// Sets the [RemoteAccessStats] of the query execution served by the current thread. Tasks submitted afterwards to a
+  /// [#contextAwareExecutorService] share the same instance, so a query executor sets fresh stats when it starts an
+  /// execution and every thread serving it reports into them through [#addRemoteAccesses].
+  public void setRemoteAccessStats(RemoteAccessStats remoteAccessStats) {
+    _remoteAccessStats = remoteAccessStats;
   }
 
   private void sampleUsageInternal() {
@@ -198,7 +213,13 @@ public class QueryThreadContext implements AutoCloseable {
   /// Opens a new [QueryThreadContext] for the current thread and add it to the thread-local storage.
   public static QueryThreadContext open(QueryExecutionContext executionContext, @Nullable MseWorkerInfo mseWorkerInfo,
       ThreadAccountant accountant) {
-    QueryThreadContext threadContext = new QueryThreadContext(executionContext, mseWorkerInfo, accountant);
+    return open(executionContext, mseWorkerInfo, accountant, new RemoteAccessStats());
+  }
+
+  private static QueryThreadContext open(QueryExecutionContext executionContext, @Nullable MseWorkerInfo mseWorkerInfo,
+      ThreadAccountant accountant, RemoteAccessStats remoteAccessStats) {
+    QueryThreadContext threadContext =
+        new QueryThreadContext(executionContext, mseWorkerInfo, accountant, remoteAccessStats);
     THREAD_LOCAL.set(threadContext);
     accountant.setupTask(threadContext);
     return threadContext;
@@ -258,17 +279,48 @@ public class QueryThreadContext implements AutoCloseable {
     }
   }
 
+  /// Records remote accesses (local cache misses) and the bytes they read on the [RemoteAccessStats] of the query
+  /// execution served by the current thread. No-op when the current thread has no [QueryThreadContext], e.g. when the
+  /// remote data is read to load a segment.
+  public static void addRemoteAccesses(long numRemoteAccesses, long remoteAccessBytes) {
+    QueryThreadContext threadContext = THREAD_LOCAL.get();
+    if (threadContext != null) {
+      threadContext._remoteAccessStats.addRemoteAccesses(numRemoteAccesses, remoteAccessBytes);
+    }
+  }
+
+  /// Records direct remote accesses, i.e. reads that went to the remote storage tier directly instead of through the
+  /// buffers fetched for the query, and the bytes they read on the [RemoteAccessStats] of the query execution served
+  /// by the current thread. No-op when the current thread has no [QueryThreadContext].
+  public static void addDirectRemoteAccesses(long numDirectRemoteAccesses, long directRemoteAccessBytes) {
+    QueryThreadContext threadContext = THREAD_LOCAL.get();
+    if (threadContext != null) {
+      threadContext._remoteAccessStats.addDirectRemoteAccesses(numDirectRemoteAccesses, directRemoteAccessBytes);
+    }
+  }
+
+  /// Merges the given stats, e.g. the ones of a released fetch, into the [RemoteAccessStats] of the query execution
+  /// served by the current thread. No-op when the current thread has no [QueryThreadContext].
+  public static void mergeRemoteAccessStats(RemoteAccessStats remoteAccessStats) {
+    QueryThreadContext threadContext = THREAD_LOCAL.get();
+    if (threadContext != null) {
+      threadContext._remoteAccessStats.merge(remoteAccessStats);
+    }
+  }
+
   /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
-  /// state of the thread submitting the tasks. Tasks are registered for cancellation when the query is terminated.
+  /// state of the thread submitting the tasks. The [Future] of each task passed to `submit()` is registered for
+  /// cancellation when the query is terminated. Tasks passed to `execute()` are not registered.
   public static ExecutorService contextAwareExecutorService(ExecutorService executorService) {
     return contextAwareExecutorService(executorService, true);
   }
 
   /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
   /// state of the thread submitting the tasks.
-  /// @param registerTaskForCancellation If true, tasks are registered with QueryExecutionContext.addTask() and will
-  ///                                    be cancelled (via Thread.interrupt()) when the query is terminated. Set to
-  ///                                    false for executors where interrupt could cause corruption
+  /// @param registerTaskForCancellation If true, tasks passed to `submit()` are registered with
+  ///                                    QueryExecutionContext.addTask() and will be cancelled (via Thread.interrupt())
+  ///                                    when the query is terminated. Set to false for executors where interrupt could
+  ///                                    cause corruption
   public static ExecutorService contextAwareExecutorService(ExecutorService executorService,
       boolean registerTaskForCancellation) {
     Consumer<Future<?>> onSubmit = registerTaskForCancellation
@@ -281,9 +333,11 @@ public class QueryThreadContext implements AutoCloseable {
         //       the thread context might not be set up.
         QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
         if (parentThreadContext != null) {
+          // Captured at submission, so that the task reports into the execution that submitted it
+          RemoteAccessStats remoteAccessStats = parentThreadContext._remoteAccessStats;
           return () -> {
             try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
-                parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
+                parentThreadContext._mseWorkerInfo, parentThreadContext._accountant, remoteAccessStats)) {
               return task.call();
             }
           };
@@ -298,9 +352,11 @@ public class QueryThreadContext implements AutoCloseable {
         //       the thread context might not be set up.
         QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
         if (parentThreadContext != null) {
+          // Captured at submission, so that the task reports into the execution that submitted it
+          RemoteAccessStats remoteAccessStats = parentThreadContext._remoteAccessStats;
           return () -> {
             try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
-                parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
+                parentThreadContext._mseWorkerInfo, parentThreadContext._accountant, remoteAccessStats)) {
               task.run();
             }
           };

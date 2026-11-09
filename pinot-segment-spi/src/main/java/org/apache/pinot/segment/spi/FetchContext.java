@@ -23,21 +23,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.spi.query.RemoteAccessStats;
 
 
 /// The context for fetching buffers of a segment during query.
-///
-/// It also accumulates the remote accesses (local cache misses) performed to serve the fetch and the bytes they read.
-/// A segment directory backed by a remote storage tier records them here, typically when the fetched buffers are
-/// released, so that they can be reported in the query stats.
 public class FetchContext {
   private final UUID _fetchId;
   private final String _segmentName;
   private final Map<String, List<IndexType<?, ?, ?>>> _columnToIndexList;
-  private final AtomicLong _numRemoteAccesses = new AtomicLong();
-  private final AtomicLong _remoteAccessBytes = new AtomicLong();
+  private final RemoteAccessStats _remoteAccessStats = new RemoteAccessStats();
 
   /// Create a new FetchRequest for this segment, to fetch all buffers of the given columns
   /// @param fetchId unique fetch id
@@ -83,19 +78,10 @@ public class FetchContext {
     return _columnToIndexList.isEmpty();
   }
 
-  /// Records remote accesses (local cache misses) performed to serve this fetch and the bytes they read.
-  public void addRemoteAccesses(long numRemoteAccesses, long remoteAccessBytes) {
-    _numRemoteAccesses.addAndGet(numRemoteAccesses);
-    _remoteAccessBytes.addAndGet(remoteAccessBytes);
-  }
-
-  /// Returns the number of remote accesses (local cache misses) recorded for this fetch.
-  public long getNumRemoteAccesses() {
-    return _numRemoteAccesses.get();
-  }
-
-  /// Returns the number of bytes read by the remote accesses recorded for this fetch.
-  public long getRemoteAccessBytes() {
-    return _remoteAccessBytes.get();
+  /// Returns the remote accesses (local cache misses) performed to serve this fetch and the bytes they read. A segment
+  /// directory backed by a remote storage tier records them, typically when the fetched buffers are released, and the
+  /// owner of the fetch reports them to the query execution afterwards, so that they end up in the query stats.
+  public RemoteAccessStats getRemoteAccessStats() {
+    return _remoteAccessStats;
   }
 }

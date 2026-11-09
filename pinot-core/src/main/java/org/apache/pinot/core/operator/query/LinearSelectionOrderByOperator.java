@@ -22,29 +22,42 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
+import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -55,11 +68,11 @@ import org.roaringbitmap.RoaringBitmap;
 /// or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
 /// but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
 ///
-/// Operators that derives from this class are going to have an almost linear cost instead of the usual NlogN when
-/// actual sorting must be done, where N is the number of rows in the segment. There is a degraded scenario when the
-/// cost is actually NlogL (where L is the limit of the query) when all the first L rows have the exact same value for
-/// the prefix of the sorted columns. Even in that case, L should be quite smaller than N, so this implementation is
-/// algorithmically better than the normal solution.
+/// Only order-by expressions are fetched during selection. Any remaining output expressions are fetched for the
+/// surviving rows after selection, as in [SelectionOrderByOperator].
+///
+/// These operators reuse the segment's sorted prefix. Rows tied on that prefix are ordered by the remaining
+/// expressions.
 public abstract class LinearSelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
   protected final IndexSegment _indexSegment;
   protected final QueryContext _queryContext;
@@ -70,11 +83,11 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   protected final List<ExpressionContext> _toSort;
 
   protected final BaseProjectOperator<?> _projectOperator;
-  protected final List<OrderByExpressionContext> _orderByExpressions;
   protected final ColumnContext[] _columnContexts;
-  protected final int _numRowsToKeep;
   protected final Comparator<Object[]> _comparator;
   protected final Supplier<ListBuilder> _listBuilderSupplier;
+  protected final int _numOrderByExpressions;
+  private long _numEntriesScannedPostFilterLate;
 
   /// @param expressions          Order-by expressions must be at the head of the list.
   /// @param numSortedExpressions Number of expressions in the order-by expressions that are sorted.
@@ -86,32 +99,33 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     _expressions = expressions;
     _projectOperator = projectOperator;
 
-    _orderByExpressions = queryContext.getOrderByExpressions();
-    assert _orderByExpressions != null;
-    int numOrderByExpressions = _orderByExpressions.size();
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    assert orderByExpressions != null;
+    _numOrderByExpressions = orderByExpressions.size();
 
     _alreadySorted = expressions.subList(0, numSortedExpressions);
-    _toSort = expressions.subList(numSortedExpressions, numOrderByExpressions);
+    _toSort = expressions.subList(numSortedExpressions, _numOrderByExpressions);
 
-    _columnContexts = new ColumnContext[_expressions.size()];
+    // Only order-by expressions are projected during selection; the remaining expressions are fetched afterwards.
+    _columnContexts = new ColumnContext[_numOrderByExpressions];
     for (int i = 0; i < _columnContexts.length; i++) {
       ExpressionContext expression = _expressions.get(i);
       _columnContexts[i] = _projectOperator.getResultColumnContext(expression);
     }
 
-    _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
-    _comparator = OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled);
+    int numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
+    _comparator = OrderByComparatorFactory.getComparator(orderByExpressions, _columnContexts, _nullHandlingEnabled);
 
     if (_toSort.isEmpty()) {
-      _listBuilderSupplier = () -> new TotallySortedListBuilder(_numRowsToKeep);
+      _listBuilderSupplier = () -> new TotallySortedListBuilder(numRowsToKeep);
     } else {
       Comparator<Object[]> sortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled, 0,
+          OrderByComparatorFactory.getComparator(orderByExpressions, _columnContexts, _nullHandlingEnabled, 0,
               numSortedExpressions);
       Comparator<Object[]> unsortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled,
-              numSortedExpressions, numOrderByExpressions);
-      _listBuilderSupplier = () -> new PartiallySortedListBuilder(_numRowsToKeep, sortedComparator, unsortedComparator);
+          OrderByComparatorFactory.getComparator(orderByExpressions, _columnContexts, _nullHandlingEnabled,
+              numSortedExpressions, _numOrderByExpressions);
+      _listBuilderSupplier = () -> new PartiallySortedListBuilder(numRowsToKeep, sortedComparator, unsortedComparator);
     }
   }
 
@@ -124,37 +138,62 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     int numDocsScanned = getNumDocsScanned();
-    long numEntriesScannedPostFilter = (long) numDocsScanned * _projectOperator.getNumColumnsProjected();
+    long numEntriesScannedPostFilter =
+        (long) numDocsScanned * _projectOperator.getNumColumnsProjected() + _numEntriesScannedPostFilterLate;
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         numTotalDocs);
   }
 
   protected IntFunction<Object[]> fetchBlock(ValueBlock valueBlock, BlockValSet[] blockValSets) {
-    int numExpressions = _expressions.size();
-
-    for (int i = 0; i < numExpressions; i++) {
+    for (int i = 0; i < _numOrderByExpressions; i++) {
       ExpressionContext expression = _expressions.get(i);
       blockValSets[i] = valueBlock.getBlockValueSet(expression);
     }
     RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
 
-    if (!_nullHandlingEnabled) {
-      return blockValueFetcher::getRow;
-    }
-    RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
-    for (int i = 0; i < numExpressions; i++) {
-      nullBitmaps[i] = blockValSets[i].getNullBitmap();
-    }
-    return (docId) -> {
-      Object[] row = blockValueFetcher.getRow(docId);
-      for (int colId = 0; colId < nullBitmaps.length; colId++) {
-        if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(docId)) {
-          row[colId] = null;
-        }
+    RoaringBitmap[] nullBitmaps;
+    if (_nullHandlingEnabled) {
+      nullBitmaps = new RoaringBitmap[_numOrderByExpressions];
+      for (int i = 0; i < _numOrderByExpressions; i++) {
+        nullBitmaps[i] = blockValSets[i].getNullBitmap();
       }
+    } else {
+      nullBitmaps = null;
+    }
+
+    if (_expressions.size() == _numOrderByExpressions) {
+      if (nullBitmaps == null) {
+        return blockValueFetcher::getRow;
+      }
+      return (rowIdInBlock) -> {
+        Object[] row = blockValueFetcher.getRow(rowIdInBlock);
+        applyNulls(row, nullBitmaps, rowIdInBlock, 0);
+        return row;
+      };
+    }
+
+    // Leave room for the expressions fetched after the limit is applied, and carry the doc id in the first of those
+    // slots so the fetch knows which documents to read. That slot is overwritten by the first fetched value.
+    int numExpressions = _expressions.size();
+    int[] docIds = valueBlock.getDocIds();
+    return (rowIdInBlock) -> {
+      Object[] row = new Object[numExpressions];
+      blockValueFetcher.getRow(rowIdInBlock, row, 0);
+      if (nullBitmaps != null) {
+        applyNulls(row, nullBitmaps, rowIdInBlock, 0);
+      }
+      row[_numOrderByExpressions] = docIds[rowIdInBlock];
       return row;
     };
+  }
+
+  private static void applyNulls(Object[] row, RoaringBitmap[] nullBitmaps, int rowIdInBlock, int columnOffset) {
+    for (int colId = 0; colId < nullBitmaps.length; colId++) {
+      if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowIdInBlock)) {
+        row[columnOffset + colId] = null;
+      }
+    }
   }
 
   protected abstract int getNumDocsScanned();
@@ -188,7 +227,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, getUpperCaseExplainName());
   }
 
-  // remember this ist he single-stage explain string
+  // Used by the single-stage explain string.
   @Override
   public String toExplainString() {
     StringBuilder sb = new StringBuilder(getUpperCaseExplainName());
@@ -200,7 +239,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     concatList(sb, _toSort);
 
     sb.append(", rest: ");
-    concatList(sb, _expressions.subList(_alreadySorted.size() + _toSort.size(), _expressions.size()));
+    concatList(sb, _expressions.subList(_numOrderByExpressions, _expressions.size()));
 
     sb.append(')');
     return sb.toString();
@@ -209,7 +248,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
     super.explainAttributes(attributeBuilder);
-    List<ExpressionContext> rest = _expressions.subList(_alreadySorted.size() + _toSort.size(), _expressions.size());
+    List<ExpressionContext> rest = _expressions.subList(_numOrderByExpressions, _expressions.size());
 
     List<String> sortedList = _alreadySorted.stream().map(ExpressionContext::toString).collect(Collectors.toList());
     List<String> toSort = _toSort.stream().map(ExpressionContext::toString).collect(Collectors.toList());
@@ -234,21 +273,94 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
   @Override
   protected SelectionResultsBlock getNextBlock() {
-    return new SelectionResultsBlock(createDataSchema(), fetch(_listBuilderSupplier), _comparator, _queryContext);
+    List<Object[]> rows = fetch(_listBuilderSupplier);
+    if (_expressions.size() == _numOrderByExpressions) {
+      return new SelectionResultsBlock(createDataSchema(null), rows, _comparator, _queryContext);
+    }
+    return fetchRemainingExpressions(rows);
   }
 
-  protected DataSchema createDataSchema() {
-    int numExpressions = _expressions.size();
+  /// Fills the output expressions that were not projected during the scan, for the rows that survived the limit.
+  ///
+  /// The rows are visited in doc-id order because that is the order [BitmapDocIdSetOperator#ascending] returns, while
+  /// `rows` keeps the result order. Both views hold the same row arrays, so filling one fills the other.
+  private SelectionResultsBlock fetchRemainingExpressions(List<Object[]> rows) {
+    List<ExpressionContext> nonOrderByExpressions = _expressions.subList(_numOrderByExpressions, _expressions.size());
+    int numNonOrderByExpressions = nonOrderByExpressions.size();
 
-    // Create the data schema
-    String[] columnNames = new String[numExpressions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
-    for (int i = 0; i < columnNames.length; i++) {
-      columnNames[i] = _expressions.get(i).toString();
+    int numRows = rows.size();
+    Object[][] rowsByDocId = rows.toArray(new Object[numRows][]);
+    Arrays.sort(rowsByDocId, Comparator.comparingInt(row -> (int) row[_numOrderByExpressions]));
+    RoaringBitmap docIds = new RoaringBitmap();
+    for (Object[] row : rowsByDocId) {
+      docIds.add((int) row[_numOrderByExpressions]);
     }
+    // Surviving doc ids must be unique so the bitmap and rowsByDocId stay aligned.
+    int numDocIds = docIds.getCardinality();
+    Preconditions.checkState(numDocIds == numRows,
+        "Expected one distinct doc id per surviving row, got %s doc ids for %s rows", numDocIds, numRows);
+
+    Set<String> columns = new HashSet<>();
+    for (ExpressionContext expression : nonOrderByExpressions) {
+      expression.getColumns(columns);
+    }
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
+    for (String column : columns) {
+      dataSourceMap.put(column, _indexSegment.getDataSource(column, _queryContext.getSchema()));
+    }
+    // The scan count includes columns reread from the order-by pass.
+    int numColumns = columns.size();
+
+    BitmapDocIdSetOperator docIdSetOperator = BitmapDocIdSetOperator.ascending(docIds, numRows);
+    try (ProjectionOperator projectionOperator =
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator, _queryContext)) {
+      TransformOperator transformOperator =
+          new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
+
+      BlockValSet[] blockValSets = new BlockValSet[numNonOrderByExpressions];
+      int rowBaseId = 0;
+      ValueBlock valueBlock;
+      while ((valueBlock = transformOperator.nextBlock()) != null) {
+        for (int i = 0; i < numNonOrderByExpressions; i++) {
+          blockValSets[i] = valueBlock.getBlockValueSet(nonOrderByExpressions.get(i));
+        }
+        RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+        int numDocsFetched = valueBlock.getNumDocs();
+        for (int i = 0; i < numDocsFetched; i++) {
+          blockValueFetcher.getRow(i, rowsByDocId[rowBaseId + i], _numOrderByExpressions);
+        }
+        if (_nullHandlingEnabled) {
+          RoaringBitmap[] nullBitmaps = new RoaringBitmap[numNonOrderByExpressions];
+          for (int i = 0; i < numNonOrderByExpressions; i++) {
+            nullBitmaps[i] = blockValSets[i].getNullBitmap();
+          }
+          for (int i = 0; i < numDocsFetched; i++) {
+            applyNulls(rowsByDocId[rowBaseId + i], nullBitmaps, i, _numOrderByExpressions);
+          }
+        }
+        long entriesScanned = (long) numDocsFetched * numColumns;
+        _numEntriesScannedPostFilterLate += entriesScanned;
+        QueryScanCostContext scanCost = getScanCostContext();
+        if (scanCost != null) {
+          scanCost.addEntriesScannedPostFilter(entriesScanned);
+        }
+        rowBaseId += numDocsFetched;
+      }
+      return new SelectionResultsBlock(createDataSchema(transformOperator), rows, _comparator, _queryContext);
+    }
+  }
+
+  /// Resolves order-by types from the initial projection and remaining types from the late transform operator.
+  private DataSchema createDataSchema(@Nullable TransformOperator lateTransformOperator) {
+    int numExpressions = _expressions.size();
+    String[] columnNames = new String[numExpressions];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
-      columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(_columnContexts[i].getDataType(), _columnContexts[i].isSingleValue());
+      columnNames[i] = _expressions.get(i).toString();
+      ColumnContext columnContext = i < _numOrderByExpressions
+          ? _columnContexts[i]
+          : lateTransformOperator.getResultColumnContext(_expressions.get(i));
+      columnDataTypes[i] = ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
     return new DataSchema(columnNames, columnDataTypes);
   }

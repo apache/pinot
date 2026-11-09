@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -130,6 +131,17 @@ public class ServerReloadJobStatusCache implements PinotClusterConfigChangeListe
                 .setStacktrace(ExceptionUtils.getStackTrace(exception)))
             .setFailedAtMs(System.currentTimeMillis()));
       }
+    }
+  }
+
+  /// Records segments that an only-if-needed reload skipped because their loaded copy was already up to date.
+  ///
+  /// @param jobId reload job ID (UUID)
+  /// @param skippedSegments names of the skipped segments
+  public void recordSkipped(String jobId, Collection<String> skippedSegments) {
+    requireNonNull(jobId, "jobId cannot be null");
+    if (!skippedSegments.isEmpty()) {
+      getOrCreate(jobId).addSkippedSegments(skippedSegments);
     }
   }
 

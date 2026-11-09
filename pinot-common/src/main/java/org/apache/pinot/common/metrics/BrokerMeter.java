@@ -43,10 +43,6 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   /// At this moment this counter does not include queries executed in multi-stage mode.
   public static final BrokerMeter QUERIES = create("QUERIES", "queries", false);
 
-  /// Queries in which the broker rewrote at least one exact aggregation into its approximate counterpart, because
-  /// `pinot.broker.use.approximate.function` was on. The results of those queries are approximate.
-  public static final BrokerMeter APPROXIMATE_FUNCTION_OVERRIDES =
-      create("APPROXIMATE_FUNCTION_OVERRIDES", "queries", false);
   /// Number of single-stage queries that have been started.
   ///
   /// Unlike [#QUERIES], this metric is global and not attached to a particular table.
@@ -167,6 +163,11 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED = create(
       "BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED", "badResponses", false);
 
+  // This metric tracks the number of broker responses with an approximated result: a function that can answer exactly,
+  // such as a SMART function past its conversion threshold, returned an approximate result.
+  public static final BrokerMeter BROKER_RESPONSES_WITH_APPROXIMATED_RESULT = create(
+      "BROKER_RESPONSES_WITH_APPROXIMATED_RESULT", "badResponses", false);
+
   public static final BrokerMeter BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED = create(
       "BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED", "badResponses", false);
 
@@ -201,6 +202,21 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter SERVER_MISSING_FOR_ROUTING = create(
       "SERVER_MISSING_FOR_ROUTING", "badResponses", false);
 
+  /// Number of times the broker updated the routing of a table after a change to its ideal state or external view.
+  /// Failed updates are counted in [#ROUTING_TABLE_UPDATE_FAILURE] instead.
+  ///
+  /// This metric is not global and is attached to a particular table.
+  public static final BrokerMeter ROUTING_TABLE_UPDATE_SUCCESS =
+      create("ROUTING_TABLE_UPDATE_SUCCESS", "updates", false);
+
+  /// Number of times the broker failed to update the routing of a table after a change to its ideal state or external
+  /// view. The broker retries the update on the next change. Failed updates are not counted in
+  /// [#ROUTING_TABLE_UPDATE_SUCCESS].
+  ///
+  /// This metric is not global and is attached to a particular table.
+  public static final BrokerMeter ROUTING_TABLE_UPDATE_FAILURE =
+      create("ROUTING_TABLE_UPDATE_FAILURE", "failures", false);
+
   // Netty connection metrics
   public static final BrokerMeter NETTY_CONNECTION_REQUESTS_SENT = create(
       "NETTY_CONNECTION_REQUESTS_SENT", "nettyConnection", true);
@@ -216,6 +232,27 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "NETTY_CONNECTION_CHANNEL_ACTIVE", "nettyConnection", false);
   public static final BrokerMeter NETTY_CONNECTION_CHANNEL_INACTIVE = create(
       "NETTY_CONNECTION_CHANNEL_INACTIVE", "nettyConnection", false);
+  // The three meters below are tagged with the server's short name, like NETTY_CONNECTION_CHANNEL_INACTIVE.
+  // Queries rejected because the channel's outbound queue was above its high watermark, i.e. the send window to the
+  // server is closed (see NettyConfig.WRITE_BUFFER_HIGH_WATER_MARK_BYTES). Each one is a query failed fast instead of
+  // being queued in direct memory behind a stalled socket.
+  public static final BrokerMeter NETTY_CONNECTION_UNWRITABLE_REJECTIONS = create(
+      "NETTY_CONNECTION_UNWRITABLE_REJECTIONS", "nettyConnection", false);
+  // Connections closed after pending writes made no positive socket byte progress for NettyConfig.WRITE_TIMEOUT_MS.
+  // Progressing requests can take longer overall; a stalled or half-open socket can still report isActive().
+  public static final BrokerMeter NETTY_CONNECTION_WRITE_TIMEOUTS = create(
+      "NETTY_CONNECTION_WRITE_TIMEOUTS", "nettyConnection", false);
+  // Live cached channels closed and dropped because the routing manager enabled their server again, which usually
+  // means the server was restarted and the cached channel points at the old process, or because the server left the
+  // cluster or moved to another address. Entries whose channel had already closed are dropped without being counted.
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_EVICTIONS = create(
+      "NETTY_CONNECTION_CHANNEL_EVICTIONS", "nettyConnection", false);
+  // Channels marked suspect because the server left the configured number of consecutive queries unanswered on them
+  // (see CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD); the next query replaces each.
+  // With CONFIG_OF_REPORT_UNANSWERED_SERVERS on and pings off, each is also a report to the failure detector. Tagged
+  // with the server's short name.
+  public static final BrokerMeter NETTY_CONNECTION_SUSPECT_CHANNELS = create(
+      "NETTY_CONNECTION_SUSPECT_CHANNELS", "nettyConnection", false);
 
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
       "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);

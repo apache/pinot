@@ -26,6 +26,8 @@ import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
@@ -37,6 +39,7 @@ import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.service.dispatch.streaming.StreamingDispatchObserver;
 import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /// Dispatches a query plan to given a [QueryServerInstance]. Each [DispatchClient] has its own gRPC Channel
@@ -48,14 +51,14 @@ class DispatchClient {
   /// Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
   /// Using a static allocator allows for better memory pooling across all DispatchClient instances.
   private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
-  /// Max size of an inbound message on the broker's dispatch channel. The default gRPC limit is 4 MB, but a single
-  /// `SubmitWithStream` `OpChainComplete` can carry a large [Worker.MultiStageStatsTree] (wide/deep
-  /// plans, large STRING stats), and exceeding the limit fails the whole query with `RESOURCE_EXHAUSTED` even
-  /// though the query results are already in hand. Matches the server's inbound limit (`QueryServer`).
-  private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
+
+  /// The channel is refreshed at most once in this interval, see [#refreshChannel].
+  private static final long MIN_REFRESH_INTERVAL_NS = TimeUnit.SECONDS.toNanos(1);
 
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
+  /// When the channel was last refreshed, from [System#nanoTime()], see [#refreshChannel].
+  private final AtomicLong _lastRefreshTimeNs = new AtomicLong(System.nanoTime() - MIN_REFRESH_INTERVAL_NS);
 
   public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig) {
     this(host, port, tlsConfig, null, GrpcKeepAliveConfig.DISABLED);
@@ -67,11 +70,21 @@ class DispatchClient {
 
   DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext,
       GrpcKeepAliveConfig keepAliveConfig) {
+    this(host, port, tlsConfig, sslContext, keepAliveConfig,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+  }
+
+  /// @param maxInboundMessageSizeBytes Max size of an inbound message on the broker's dispatch channel. The default
+  ///     gRPC limit is 4 MB, but a single `SubmitWithStream` `OpChainComplete` can carry a large
+  ///     [Worker.MultiStageStatsTree] (wide/deep plans, large STRING stats), and the plans servers return for
+  ///     `EXPLAIN` carry the query's literals. Exceeding the limit fails the whole query with `RESOURCE_EXHAUSTED`.
+  DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext,
+      GrpcKeepAliveConfig keepAliveConfig, int maxInboundMessageSizeBytes) {
     // Always use NettyChannelBuilder to allow setting Netty-specific channel options like the buffer allocator.
     // This ensures we can explicitly configure direct (off-heap) buffers for better performance.
     NettyChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(host, port)
         .withOption(ChannelOption.ALLOCATOR, BUF_ALLOCATOR)
-        .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE);
+        .maxInboundMessageSize(maxInboundMessageSizeBytes);
     if (tlsConfig == null) {
       channelBuilder.usePlaintext();
     } else {
@@ -91,6 +104,20 @@ class DispatchClient {
   public void submit(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncResponse<Worker.QueryResponse>> callback) {
     _dispatchStub.withDeadline(deadline).submit(request, new LastValueDispatchObserver<>(virtualServer, callback));
+  }
+
+  /// Makes the channel resolve the server's hostname again and open a new connection, without reconnect backoff, for
+  /// the next request. Requests in flight finish on the old connection. Does nothing, and returns false, if the
+  /// channel was refreshed less than a second ago: each refresh drops the connection that the previous one opened.
+  public boolean refreshChannel() {
+    long nowNs = System.nanoTime();
+    long lastRefreshTimeNs = _lastRefreshTimeNs.get();
+    if (nowNs - lastRefreshTimeNs < MIN_REFRESH_INTERVAL_NS
+        || !_lastRefreshTimeNs.compareAndSet(lastRefreshTimeNs, nowNs)) {
+      return false;
+    }
+    _channel.enterIdle();
+    return true;
   }
 
   /// Opens a `SubmitWithStream` bidi RPC for one server, sends the initial `submit`, and registers the

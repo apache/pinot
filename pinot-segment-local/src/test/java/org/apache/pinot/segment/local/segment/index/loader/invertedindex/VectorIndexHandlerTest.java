@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorIndexCombined;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -268,12 +269,12 @@ public class VectorIndexHandlerTest {
     File indexDir = createEmptyV3SegmentDir();
     try {
       File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
-      // Build a real combined HNSW payload from a fake source dir (the extract copies bytes; it does
-      // not need a valid Lucene index for this test). Capture the bytes, then drop the scratch files.
-      File srcDir = new File(v3Dir, "src-hnsw");
-      assertTrue(srcDir.mkdirs());
-      Files.write(new File(srcDir, "_0.cfe").toPath(), "lucene-file-one".getBytes(StandardCharsets.UTF_8));
-      Files.write(new File(srcDir, "segments_1").toPath(), "lucene-file-two".getBytes(StandardCharsets.UTF_8));
+      // Use a readable HNSW index so the format check permits extraction without a rebuild.
+      File srcDir = new File(v3Dir, COLUMN + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+      try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator(COLUMN, v3Dir, vectorIndexConfig("HNSW"))) {
+        creator.add(new float[]{1, 0, 0, 0});
+        creator.seal();
+      }
       File scratchCombined = new File(v3Dir, COLUMN + ".vector.hnsw.scratch");
       HnswVectorIndexCombined.combineHnswIndexFiles(srcDir, scratchCombined.getAbsolutePath(), null, null);
       byte[] combinedBytes = Files.readAllBytes(scratchCombined.toPath());

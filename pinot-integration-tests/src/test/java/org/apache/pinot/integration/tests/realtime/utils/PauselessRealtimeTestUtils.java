@@ -55,19 +55,25 @@ public class PauselessRealtimeTestUtils {
   /// `CONSUMING -> ONLINE` transition would make the one-shot repair permanently miss the segment.
   public static void waitForExternalViewToConverge(PinotHelixResourceManager helixResourceManager,
       String tableNameWithType, long timeoutMs) {
-    TestUtils.waitForCondition(aVoid -> {
-      IdealState idealState = helixResourceManager.getTableIdealState(tableNameWithType);
-      ExternalView externalView = helixResourceManager.getTableExternalView(tableNameWithType);
-      if (idealState == null || externalView == null) {
+    TestUtils.waitForCondition(aVoid -> isExternalViewConverged(helixResourceManager, tableNameWithType), 1000,
+        timeoutMs, "External view failed to converge to ideal state for table: " + tableNameWithType);
+  }
+
+  /// Returns whether every instance of every segment in the ideal state of the given table is in its prescribed state
+  /// in the external view.
+  public static boolean isExternalViewConverged(PinotHelixResourceManager helixResourceManager,
+      String tableNameWithType) {
+    IdealState idealState = helixResourceManager.getTableIdealState(tableNameWithType);
+    ExternalView externalView = helixResourceManager.getTableExternalView(tableNameWithType);
+    if (idealState == null || externalView == null) {
+      return false;
+    }
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      if (!entry.getValue().equals(externalView.getStateMap(entry.getKey()))) {
         return false;
       }
-      for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
-        if (!entry.getValue().equals(externalView.getStateMap(entry.getKey()))) {
-          return false;
-        }
-      }
-      return true;
-    }, 1000, timeoutMs, "External view failed to converge to ideal state for table: " + tableNameWithType);
+    }
+    return true;
   }
 
   /// Marks all current segments of the given table as exceeding the max segment completion time, making them

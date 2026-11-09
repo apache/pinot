@@ -81,34 +81,39 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public MutableRoaringBitmap applyAnd(BatchIterator docIdIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
-    if (!docIdIterator.hasNext()) {
-      return new MutableRoaringBitmap();
-    }
-    RoaringBitmapWriter<MutableRoaringBitmap> result;
-    if (firstDoc.isPresent() && lastDoc.isPresent()) {
-      result = RoaringBitmapWriter.bufferWriter()
-          .expectedRange(firstDoc.getAsInt(), lastDoc.getAsInt())
-          .runCompress(false)
-          .get();
-    } else {
-      result = RoaringBitmapWriter.bufferWriter()
-          .runCompress(false)
-          .get();
-    }
-    int[] buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
-    while (docIdIterator.hasNext()) {
-      int limit = docIdIterator.nextBatch(buffer);
-      for (int i = 0; i < limit; i++) {
-        int nextDocId = buffer[i];
-        // TODO: The performance can be improved by batching the docID lookups similar to how it's done in
-        //       SVScanDocIdIterator
-        boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId);
-        if (doesValueMatch) {
-          result.add(nextDocId);
+    // NOTE: Close the reader context once the candidates are consumed: unlike next(), this path never reaches EOF
+    try {
+      if (!docIdIterator.hasNext()) {
+        return new MutableRoaringBitmap();
+      }
+      RoaringBitmapWriter<MutableRoaringBitmap> result;
+      if (firstDoc.isPresent() && lastDoc.isPresent()) {
+        result = RoaringBitmapWriter.bufferWriter()
+            .expectedRange(firstDoc.getAsInt(), lastDoc.getAsInt())
+            .runCompress(false)
+            .get();
+      } else {
+        result = RoaringBitmapWriter.bufferWriter()
+            .runCompress(false)
+            .get();
+      }
+      int[] buffer = new int[OPTIMAL_ITERATOR_BATCH_SIZE];
+      while (docIdIterator.hasNext()) {
+        int limit = docIdIterator.nextBatch(buffer);
+        for (int i = 0; i < limit; i++) {
+          int nextDocId = buffer[i];
+          // TODO: The performance can be improved by batching the docID lookups similar to how it's done in
+          //       SVScanDocIdIterator
+          boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId);
+          if (doesValueMatch) {
+            result.add(nextDocId);
+          }
         }
       }
+      return result.get();
+    } finally {
+      close();
     }
-    return result.get();
   }
 
   @Override

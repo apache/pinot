@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -53,6 +55,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -66,8 +69,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+
 
 /// Base class for multi-cluster integration tests. Contains common setup/teardown logic,
 /// utility methods, and helper functions for managing multi-cluster test environments.
@@ -78,8 +83,6 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
   protected static final String TIME_COLUMN = "DaysSinceEpoch";
   protected static final String CLUSTER_1_NAME = "DualIsolatedCluster1";
   protected static final String CLUSTER_2_NAME = "DualIsolatedCluster2";
-  protected static final ClusterConfig CLUSTER_1_CONFIG = new ClusterConfig(CLUSTER_1_NAME, 30000);
-  protected static final ClusterConfig CLUSTER_2_CONFIG = new ClusterConfig(CLUSTER_2_NAME, 40000);
   protected static final String DEFAULT_TENANT = "DefaultTenant";
   protected static final int TABLE_SIZE_CLUSTER_1 = 1500;
   protected static final int TABLE_SIZE_CLUSTER_2 = 1000;
@@ -90,17 +93,18 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   protected ClusterComponents _cluster1;
   protected ClusterComponents _cluster2;
-  protected ClusterComponents _brokerWithUnavailableCluster;
+  protected BaseBrokerStarter _brokerWithUnavailableCluster;
   protected List<File> _cluster1AvroFiles;
   protected List<File> _cluster2AvroFiles;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     LOGGER.info("Setting up BaseMultiClusterIntegrationTest");
 
     // Initialize cluster components
-    _cluster1 = new ClusterComponents();
-    _cluster2 = new ClusterComponents();
+    _cluster1 = new ClusterComponents(CLUSTER_1_NAME);
+    _cluster2 = new ClusterComponents(CLUSTER_2_NAME);
 
     // Setup directories
     setupDirectories();
@@ -110,43 +114,21 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     startZookeeper(_cluster2);
 
     // Start controllers for both clusters
-    startControllerInit(_cluster1, CLUSTER_1_CONFIG);
-    startControllerInit(_cluster2, CLUSTER_2_CONFIG);
+    startController(_cluster1);
+    startController(_cluster2);
 
     // Start brokers and servers for both clusters
-    startCluster(_cluster1, _cluster2, CLUSTER_1_CONFIG);
-    startCluster(_cluster2, _cluster1, CLUSTER_2_CONFIG);
+    startCluster(_cluster1, _cluster2);
+    startCluster(_cluster2, _cluster1);
 
     // Start an alternate broker with one valid and one unavailable remote cluster
-    startBrokerWithUnavailableCluster();
+    _brokerWithUnavailableCluster = initBroker(_cluster1, Map.of(
+        CLUSTER_2_NAME, _cluster2._zkUrl,
+        UNAVAILABLE_CLUSTER_NAME, UNAVAILABLE_ZK_ADDRESS
+    ));
+    _brokerWithUnavailableCluster.start();
 
     LOGGER.info("BaseMultiClusterIntegrationTest setup complete");
-  }
-
-  /// Starts a broker configured with cluster2 (valid) and an unavailable cluster (invalid ZK).
-  private void startBrokerWithUnavailableCluster() throws Exception {
-    _brokerWithUnavailableCluster = new ClusterComponents();
-    _brokerWithUnavailableCluster._brokerPort = findAvailablePort(55000);
-
-    PinotConfiguration brokerConfig = new PinotConfiguration();
-    brokerConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, _cluster1._zkUrl);
-    brokerConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, CLUSTER_1_NAME);
-    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, ControllerTest.LOCAL_HOST);
-    brokerConfig.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, _brokerWithUnavailableCluster._brokerPort);
-    brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-    brokerConfig.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
-    brokerConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
-    brokerConfig.setProperty(Helix.CONFIG_OF_REMOTE_CLUSTER_NAMES,
-        CLUSTER_2_NAME + "," + UNAVAILABLE_CLUSTER_NAME);
-    brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, CLUSTER_2_NAME),
-        _cluster2._zkUrl);
-    brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, UNAVAILABLE_CLUSTER_NAME),
-        UNAVAILABLE_ZK_ADDRESS);
-
-    _brokerWithUnavailableCluster._brokerStarter = createBrokerStarter();
-    _brokerWithUnavailableCluster._brokerStarter.init(brokerConfig);
-    _brokerWithUnavailableCluster._brokerStarter.start();
-    LOGGER.info("Started broker with unavailable cluster on port {}", _brokerWithUnavailableCluster._brokerPort);
   }
 
   @Override
@@ -154,69 +136,61 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     return new MultiClusterHelixBrokerStarter();
   }
 
-  protected static class ClusterConfig {
-    final String _name;
-    final int _basePort;
-
-    ClusterConfig(String name, int basePort) {
-      _name = name;
-      _basePort = basePort;
-    }
-  }
-
   protected static class ClusterComponents {
+    final String _clusterName;
     ZkStarter.ZookeeperInstance _zkInstance;
     BaseControllerStarter _controllerStarter;
     BaseBrokerStarter _brokerStarter;
     BaseServerStarter _serverStarter;
-    int _controllerPort;
-    int _brokerPort;
-    int _serverPort;
     String _zkUrl;
     String _controllerBaseApiUrl;
     File _tempDir;
     File _segmentDir;
     File _tarDir;
+
+    ClusterComponents(String clusterName) {
+      _clusterName = clusterName;
+    }
   }
 
   // ========== Cluster Setup Methods ==========
 
-  protected void setupDirectories() throws Exception {
+  protected void setupDirectories()
+      throws Exception {
     setupClusterDirectories(_cluster1, "cluster1");
     setupClusterDirectories(_cluster2, "cluster2");
   }
 
-  private void setupClusterDirectories(ClusterComponents cluster, String clusterPrefix) throws Exception {
+  private void setupClusterDirectories(ClusterComponents cluster, String clusterPrefix)
+      throws Exception {
     cluster._tempDir = new File(FileUtils.getTempDirectory(), clusterPrefix + "_" + getClass().getSimpleName());
     cluster._segmentDir = new File(cluster._tempDir, "segmentDir");
     cluster._tarDir = new File(cluster._tempDir, "tarDir");
     TestUtils.ensureDirectoriesExistAndEmpty(cluster._tempDir, cluster._segmentDir, cluster._tarDir);
   }
 
-  protected void startZookeeper(ClusterComponents cluster) throws Exception {
+  protected void startZookeeper(ClusterComponents cluster)
+      throws Exception {
     cluster._zkInstance = ZkStarter.startLocalZkServer();
     cluster._zkUrl = cluster._zkInstance.getZkUrl();
   }
 
-  protected void startControllerInit(ClusterComponents cluster, ClusterConfig config) throws Exception {
-    cluster._controllerPort = findAvailablePort(config._basePort);
-    startController(cluster, config);
+  protected void startCluster(ClusterComponents cluster, ClusterComponents remoteCluster)
+      throws Exception {
+    cluster._brokerStarter = initBroker(cluster, Map.of(remoteCluster._clusterName, remoteCluster._zkUrl));
+    cluster._brokerStarter.start();
+    startServerWithMSE(cluster);
   }
 
-  protected void startCluster(ClusterComponents cluster, ClusterComponents remoteCluster,
-      ClusterConfig config) throws Exception {
-    cluster._brokerPort = findAvailablePort(cluster._controllerPort + 1000);
-    startBroker(cluster, remoteCluster, config);
-    cluster._serverPort = findAvailablePort(cluster._brokerPort + 1000);
-    startServerWithMSE(cluster, config);
-  }
-
-  protected void startController(ClusterComponents cluster, ClusterConfig config) throws Exception {
+  protected void startController(ClusterComponents cluster)
+      throws Exception {
+    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    _nextControllerPort = controllerPort + 1;
     Map<String, Object> controllerConfig = new HashMap<>();
     controllerConfig.put(ControllerConf.ZK_STR, cluster._zkUrl);
-    controllerConfig.put(ControllerConf.HELIX_CLUSTER_NAME, config._name);
+    controllerConfig.put(ControllerConf.HELIX_CLUSTER_NAME, cluster._clusterName);
     controllerConfig.put(ControllerConf.CONTROLLER_HOST, ControllerTest.LOCAL_HOST);
-    controllerConfig.put(ControllerConf.CONTROLLER_PORT, cluster._controllerPort);
+    controllerConfig.put(ControllerConf.CONTROLLER_PORT, controllerPort);
     controllerConfig.put(ControllerConf.DATA_DIR, cluster._tempDir.getAbsolutePath());
     controllerConfig.put(ControllerConf.LOCAL_TEMP_DIR, cluster._tempDir.getAbsolutePath());
     controllerConfig.put(ControllerConf.DISABLE_GROOVY, false);
@@ -226,40 +200,60 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     cluster._controllerStarter = createControllerStarter();
     cluster._controllerStarter.init(new PinotConfiguration(controllerConfig));
     cluster._controllerStarter.start();
-    cluster._controllerBaseApiUrl = "http://localhost:" + cluster._controllerPort;
+    cluster._controllerBaseApiUrl = "http://localhost:" + controllerPort;
   }
 
-  protected void startBroker(ClusterComponents cluster, ClusterComponents remoteCluster,
-      ClusterConfig config) throws Exception {
+  /// Returns an initialized, not yet started broker in `cluster` that federates the given remote clusters, keyed by
+  /// cluster name to ZK address.
+  ///
+  /// Ports are taken from the per-fork range of [ControllerTest] rather than an OS-ephemeral or fixed high port:
+  /// a broker binds them only at the end of its startup, which takes a full ZK connection timeout when a remote
+  /// cluster is unreachable, and the OS can hand an ephemeral port to an outgoing connection in the meantime.
+  private BaseBrokerStarter initBroker(ClusterComponents cluster, Map<String, String> remoteZkUrls)
+      throws Exception {
+    int brokerPort = NetUtils.findOpenPort(_nextBrokerPort);
+    _nextBrokerPort = brokerPort + 1;
+    int queryRunnerPort = NetUtils.findOpenPort(_nextBrokerQueryRunnerPort);
+    _nextBrokerQueryRunnerPort = queryRunnerPort + 1;
     PinotConfiguration brokerConfig = new PinotConfiguration();
     brokerConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, cluster._zkUrl);
-    String remoteClusterName = CLUSTER_1_NAME.equalsIgnoreCase(config._name) ? CLUSTER_2_NAME : CLUSTER_1_NAME;
-    brokerConfig.setProperty(Helix.CONFIG_OF_REMOTE_CLUSTER_NAMES, remoteClusterName);
-    brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, remoteClusterName),
-        remoteCluster._zkUrl);
-    brokerConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, config._name);
+    brokerConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, cluster._clusterName);
+    brokerConfig.setProperty(Helix.CONFIG_OF_REMOTE_CLUSTER_NAMES, String.join(",", remoteZkUrls.keySet()));
+    remoteZkUrls.forEach((clusterName, zkUrl) ->
+        brokerConfig.setProperty(String.format(Helix.CONFIG_OF_REMOTE_ZOOKEEPER_SERVERS, clusterName), zkUrl));
     brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, ControllerTest.LOCAL_HOST);
-    brokerConfig.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, cluster._brokerPort);
+    brokerConfig.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort);
+    brokerConfig.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, queryRunnerPort);
     brokerConfig.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
     brokerConfig.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     brokerConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
-    cluster._brokerStarter = createBrokerStarter();
-    cluster._brokerStarter.init(brokerConfig);
-    cluster._brokerStarter.start();
+
+    BaseBrokerStarter brokerStarter = createBrokerStarter();
+    brokerStarter.init(brokerConfig);
+    return brokerStarter;
   }
 
-  protected void startServerWithMSE(ClusterComponents cluster, ClusterConfig config) throws Exception {
+  protected void startServerWithMSE(ClusterComponents cluster)
+      throws Exception {
     PinotConfiguration serverConfig = new PinotConfiguration();
     serverConfig.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, cluster._zkUrl);
-    serverConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, config._name);
+    serverConfig.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, cluster._clusterName);
     serverConfig.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, ControllerTest.LOCAL_HOST);
     serverConfig.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, cluster._tempDir + "/dataDir");
     serverConfig.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, cluster._tempDir + "/segmentTar");
     serverConfig.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
     serverConfig.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
-    serverConfig.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, findAvailablePort(cluster._serverPort));
-    serverConfig.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, findAvailablePort(cluster._serverPort + 1));
-    serverConfig.setProperty(Server.CONFIG_OF_GRPC_PORT, findAvailablePort(cluster._serverPort + 2));
+    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    int nettyPort = NetUtils.findOpenPort(adminPort + 1);
+    int grpcPort = NetUtils.findOpenPort(nettyPort + 1);
+    int queryServerPort = NetUtils.findOpenPort(grpcPort + 1);
+    int queryRunnerPort = NetUtils.findOpenPort(queryServerPort + 1);
+    _nextServerPort = queryRunnerPort + 1;
+    serverConfig.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, adminPort);
+    serverConfig.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, nettyPort);
+    serverConfig.setProperty(Server.CONFIG_OF_GRPC_PORT, grpcPort);
+    serverConfig.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, queryServerPort);
+    serverConfig.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, queryRunnerPort);
     serverConfig.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     serverConfig.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     serverConfig.setProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
@@ -269,17 +263,10 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     cluster._serverStarter.start();
   }
 
-  protected int findAvailablePort(int basePort) {
-    try {
-      return NetUtils.findOpenPort(basePort);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to find available port starting from " + basePort, e);
-    }
-  }
-
   // ========== Data Generation Methods ==========
 
-  protected List<File> createAvroData(int dataSize, int clusterId) throws Exception {
+  protected List<File> createAvroData(int dataSize, int clusterId)
+      throws Exception {
     return createAvroDataMultipleSegments(dataSize, clusterId, 1);
   }
 
@@ -299,8 +286,8 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
         for (int i = start; i < end; i++) {
           GenericData.Record record = new GenericData.Record(avroSchema);
           for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-            record.put(fieldSpec.getName(), generateFieldValue(fieldSpec.getName(), i, clusterId,
-                fieldSpec.getDataType()));
+            String fieldName = fieldSpec.getName();
+            record.put(fieldName, generateFieldValue(fieldName, i, clusterId, fieldSpec.getDataType()));
           }
           writer.append(record);
         }
@@ -312,38 +299,37 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   private org.apache.avro.Schema createAvroSchema(Schema schema) {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    List<org.apache.avro.Schema.Field> fields = new ArrayList<>();
+    List<Field> fields = new ArrayList<>();
 
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      org.apache.avro.Schema.Type avroType = getAvroType(fieldSpec.getDataType());
-      fields.add(new org.apache.avro.Schema.Field(fieldSpec.getName(),
-          org.apache.avro.Schema.create(avroType), null, null));
+      Type avroType = getAvroType(fieldSpec.getDataType());
+      fields.add(new Field(fieldSpec.getName(), org.apache.avro.Schema.create(avroType), null, null));
     }
     avroSchema.setFields(fields);
     return avroSchema;
   }
 
-  private org.apache.avro.Schema.Type getAvroType(FieldSpec.DataType type) {
-    switch (type) {
-      case INT: return org.apache.avro.Schema.Type.INT;
-      case LONG: return org.apache.avro.Schema.Type.LONG;
-      case FLOAT: return org.apache.avro.Schema.Type.FLOAT;
-      case DOUBLE: return org.apache.avro.Schema.Type.DOUBLE;
-      case BOOLEAN: return org.apache.avro.Schema.Type.BOOLEAN;
-      default: return org.apache.avro.Schema.Type.STRING;
-    }
+  private Type getAvroType(FieldSpec.DataType type) {
+    return switch (type) {
+      case INT -> Type.INT;
+      case LONG -> Type.LONG;
+      case FLOAT -> Type.FLOAT;
+      case DOUBLE -> Type.DOUBLE;
+      case BOOLEAN -> Type.BOOLEAN;
+      default -> Type.STRING;
+    };
   }
 
   private Object generateFieldValue(String fieldName, int index, int clusterId, FieldSpec.DataType dataType) {
     int baseValue = index + (clusterId * 10000);
-    switch (dataType) {
-      case INT: return index + 10000;
-      case LONG: return (long) baseValue;
-      case FLOAT: return (float) (baseValue + 0.1);
-      case DOUBLE: return (double) (baseValue + 0.1);
-      case BOOLEAN: return (baseValue % 2) == 0;
-      default: return "cluster_" + fieldName + "_" + index;
-    }
+    return switch (dataType) {
+      case INT -> index + 10000;
+      case LONG -> (long) baseValue;
+      case FLOAT -> (float) (baseValue + 0.1);
+      case DOUBLE -> baseValue + 0.1;
+      case BOOLEAN -> (baseValue % 2) == 0;
+      default -> "cluster_" + fieldName + "_" + index;
+    };
   }
 
   // ========== Data Loading Methods ==========
@@ -357,8 +343,8 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
         .setTableName(tableName)
         .setTimeColumnName(TIME_COLUMN)
         .build();
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0,
-        cluster._segmentDir, cluster._tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, cluster._segmentDir,
+        cluster._tarDir);
     uploadSegmentsToCluster(tableName, cluster._tarDir, cluster._controllerBaseApiUrl);
     Thread.sleep(2000);
   }
@@ -373,7 +359,8 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  protected void uploadSegmentsToCluster(String tableName, File tarDir, String controllerBaseApiUrl) throws Exception {
+  protected void uploadSegmentsToCluster(String tableName, File tarDir, String controllerBaseApiUrl)
+      throws Exception {
     File[] segmentTarFiles = tarDir.listFiles();
     assertNotNull(segmentTarFiles);
     assertTrue(segmentTarFiles.length > 0);
@@ -382,9 +369,9 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       for (File segmentTarFile : segmentTarFiles) {
-        int status = fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI,
-                segmentTarFile.getName(), segmentTarFile, List.of(), tableName, TableType.OFFLINE)
-            .getStatusCode();
+        int status =
+            fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
+                List.of(), tableName, TableType.OFFLINE).getStatusCode();
         assertEquals(status, HttpStatus.SC_OK);
       }
     }
@@ -394,7 +381,8 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   // ========== Schema and Table Management Methods ==========
 
-  protected void createSchemaAndTableForCluster(String tableName, String controllerBaseApiUrl) throws IOException {
+  protected void createSchemaAndTableForCluster(String tableName, String controllerBaseApiUrl)
+      throws IOException {
     Schema schema = createSchema(SCHEMA_FILE);
     schema.setSchemaName(tableName);
     addSchemaToCluster(schema, controllerBaseApiUrl);
@@ -405,7 +393,8 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     addTableConfigToCluster(tableConfig, controllerBaseApiUrl);
   }
 
-  protected void createSchemaAndTableOnBothClusters(String tableName) throws Exception {
+  protected void createSchemaAndTableOnBothClusters(String tableName)
+      throws Exception {
     dropTableAndSchemaIfExists(tableName, _cluster1._controllerBaseApiUrl);
     dropTableAndSchemaIfExists(tableName, _cluster2._controllerBaseApiUrl);
     createSchemaAndTableForCluster(tableName, _cluster1._controllerBaseApiUrl);
@@ -425,14 +414,16 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  protected void addSchemaToCluster(Schema schema, String controllerBaseApiUrl) throws IOException {
+  protected void addSchemaToCluster(Schema schema, String controllerBaseApiUrl)
+      throws IOException {
     String url = controllerBaseApiUrl + "/schemas";
     String schemaJson = schema.toPrettyJsonString();
     String response = ControllerTest.sendPostRequest(url, schemaJson);
     assertNotNull(response);
   }
 
-  protected void addTableConfigToCluster(TableConfig tableConfig, String controllerBaseApiUrl) throws IOException {
+  protected void addTableConfigToCluster(TableConfig tableConfig, String controllerBaseApiUrl)
+      throws IOException {
     String url = controllerBaseApiUrl + "/tables";
     String tableConfigJson = JsonUtils.objectToPrettyString(tableConfig);
     String response = ControllerTest.sendPostRequest(url, tableConfigJson);
@@ -441,9 +432,10 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   // ========== Logical Table Management Methods ==========
 
-  protected void createLogicalTable(String schemaFile,
-      Map<String, PhysicalTableConfig> physicalTableConfigMap, String brokerTenant, String controllerBaseApiUrl,
-      String logicalTable, String refOfflineTable, String refRealtimeTable) throws IOException {
+  protected void createLogicalTable(String schemaFile, Map<String, PhysicalTableConfig> physicalTableConfigMap,
+      String brokerTenant, String controllerBaseApiUrl, String logicalTable, String refOfflineTable,
+      String refRealtimeTable)
+      throws IOException {
     ControllerRequestURLBuilder urlBuilder = ControllerRequestURLBuilder.baseUrl(controllerBaseApiUrl);
     Schema schema = createSchema(schemaFile);
     schema.setSchemaName(logicalTable);
@@ -455,10 +447,10 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
         .setRefRealtimeTableName(refRealtimeTable)
         .setPhysicalTableConfigMap(physicalTableConfigMap)
         .build();
-    String response = ControllerTest.sendPostRequest(urlBuilder.forLogicalTableCreate(),
-        config.toSingleLineJsonString(), Map.of());
-    assertEquals(response, "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTable
-        + " logical table successfully added.\"}");
+    String response =
+        ControllerTest.sendPostRequest(urlBuilder.forLogicalTableCreate(), config.toSingleLineJsonString(), Map.of());
+    assertEquals(response,
+        "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTable + " logical table successfully added.\"}");
   }
 
   protected void dropLogicalTableIfExists(String logicalTableName, String controllerBaseApiUrl) {
@@ -467,11 +459,13 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   // ========== Query Execution Methods ==========
 
-  protected String executeQuery(String query, ClusterComponents cluster) throws Exception {
-    return executeQueryOnBrokerPort(query, cluster._brokerPort);
+  protected String executeQuery(String query, ClusterComponents cluster)
+      throws Exception {
+    return executeQueryOnBrokerPort(query, cluster._brokerStarter.getPort());
   }
 
-  protected String executeQueryOnBrokerPort(String query, int brokerPort) throws Exception {
+  protected String executeQueryOnBrokerPort(String query, int brokerPort)
+      throws Exception {
     Map<String, Object> payload = Map.of("sql", query);
     String url = "http://localhost:" + brokerPort + "/query/sql";
     return ControllerTest.sendPostRequest(url, JsonUtils.objectToPrettyString(payload));
@@ -479,8 +473,8 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   protected long getCount(String tableName, ClusterComponents cluster, boolean enableMultiClusterRouting)
       throws Exception {
-    String query = "SET enableMultiClusterRouting=" + enableMultiClusterRouting + "; SELECT COUNT(*) as count FROM "
-        + tableName;
+    String query =
+        "SET enableMultiClusterRouting=" + enableMultiClusterRouting + "; SELECT COUNT(*) as count FROM " + tableName;
     return parseCountResult(executeQuery(query, cluster));
   }
 
@@ -489,7 +483,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
   /// Helper to verify physical table validation error when enableMultiClusterRouting=true is used.
   protected void assertPhysicalTableValidationError(JsonNode exceptions) {
     assertNotNull(exceptions, "Expected validation error for physical table with enableMultiClusterRouting=true");
-    assertTrue(exceptions.size() > 0, "Expected validation error exceptions");
+    assertFalse(exceptions.isEmpty(), "Expected validation error exceptions");
 
     boolean foundValidationError = false;
     for (JsonNode ex : exceptions) {
@@ -507,7 +501,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
 
   /// Helper to verify no federation-related exceptions are present.
   protected void assertNoFederationExceptions(JsonNode exceptions) {
-    if (exceptions != null && exceptions.size() > 0) {
+    if (exceptions != null && !exceptions.isEmpty()) {
       for (JsonNode ex : exceptions) {
         String message = ex.get("message").asText();
         assertTrue(!message.toLowerCase().contains("remote") && !message.toLowerCase().contains("federation"),
@@ -516,7 +510,8 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  protected void verifyUnavailableClusterException(String result, boolean expectException) throws Exception {
+  protected void verifyUnavailableClusterException(String result, boolean expectException)
+      throws Exception {
     if (expectException) {
       assertTrue(result.contains(UNAVAILABLE_CLUSTER_NAME),
           "Response should mention unavailable cluster: " + UNAVAILABLE_CLUSTER_NAME);
@@ -525,8 +520,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
       assertNotNull(exceptions, "Exceptions array should exist");
       boolean found = false;
       for (JsonNode ex : exceptions) {
-        if (ex.get("errorCode").asInt() == 510
-            && ex.get("message").asText().contains(UNAVAILABLE_CLUSTER_NAME)) {
+        if (ex.get("errorCode").asInt() == 510 && ex.get("message").asText().contains(UNAVAILABLE_CLUSTER_NAME)) {
           found = true;
           break;
         }
@@ -538,9 +532,9 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
   protected long parseCountResult(String result) {
     try {
       JsonNode rows = JsonMapper.builder().build().readTree(result).path("resultTable").path("rows");
-      if (rows.isArray() && rows.size() > 0) {
+      if (rows.isArray() && !rows.isEmpty()) {
         JsonNode firstRow = rows.get(0);
-        if (firstRow.isArray() && firstRow.size() > 0) {
+        if (firstRow.isArray() && !firstRow.isEmpty()) {
           return Long.parseLong(firstRow.get(0).asText());
         }
       }
@@ -550,7 +544,8 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     return 0;
   }
 
-  protected void assertResultRows(String resultJson) throws Exception {
+  protected void assertResultRows(String resultJson)
+      throws Exception {
     JsonNode rows = JsonMapper.builder().build().readTree(resultJson).get("resultTable").get("rows");
     assertNotNull(rows);
     for (JsonNode row : rows) {
@@ -564,7 +559,8 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  protected Schema createSchema(String schemaFileName) throws IOException {
+  protected Schema createSchema(String schemaFileName)
+      throws IOException {
     InputStream schemaInputStream = getClass().getClassLoader().getResourceAsStream(schemaFileName);
     assertNotNull(schemaInputStream, "Schema file not found: " + schemaFileName);
     return Schema.fromInputStream(schemaInputStream);
@@ -601,9 +597,10 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
   /// @param expectValidationError Whether to expect a validation error
   /// @param testName Test name for logging
   protected void verifyPhysicalTableLocalOnly(String physicalTableName, String queryOptions, int brokerPort,
-      boolean expectValidationError, String testName) throws Exception {
-    LOGGER.info("Running {} on broker port {} - physical tables should always query local cluster only",
-        testName, brokerPort);
+      boolean expectValidationError, String testName)
+      throws Exception {
+    LOGGER.info("Running {} on broker port {} - physical tables should always query local cluster only", testName,
+        brokerPort);
 
     String countQuery = queryOptions + "SELECT COUNT(*) as count FROM " + physicalTableName;
     String countResult = executeQueryOnBrokerPort(countQuery, brokerPort);
@@ -615,16 +612,10 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
       assertPhysicalTableValidationError(exceptions);
       LOGGER.info("Verified {} correctly rejected physical table query with enableMultiClusterRouting=true", testName);
     } else {
-      long expectedLocalCount = TABLE_SIZE_CLUSTER_1;
       long actualCount = parseCountResult(countResult);
-
-      assertEquals(actualCount, expectedLocalCount,
-          "Physical table should always return local cluster count");
-
+      assertEquals(actualCount, TABLE_SIZE_CLUSTER_1, "Physical table should always return local cluster count");
       assertNoFederationExceptions(exceptions);
-
-      LOGGER.info("Verified {} returned only local cluster data for physical table (count={})",
-          testName, actualCount);
+      LOGGER.info("Verified {} returned only local cluster data for physical table (count={})", testName, actualCount);
     }
   }
 
@@ -634,15 +625,12 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     cleanDirectories(_cluster1._segmentDir, _cluster1._tarDir, _cluster2._segmentDir, _cluster2._tarDir);
   }
 
-  @AfterClass
-  public void tearDown() throws Exception {
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Exception {
     // Stop the alternate broker with unavailable cluster
-    if (_brokerWithUnavailableCluster != null && _brokerWithUnavailableCluster._brokerStarter != null) {
-      try {
-        _brokerWithUnavailableCluster._brokerStarter.stop();
-      } catch (Exception e) {
-        LOGGER.warn("Error stopping broker with unavailable cluster", e);
-      }
+    if (_brokerWithUnavailableCluster != null) {
+      stopQuietly("broker with unavailable cluster", _brokerWithUnavailableCluster::stop);
     }
     stopCluster(_cluster1);
     stopCluster(_cluster2);
@@ -652,22 +640,28 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
     if (cluster == null) {
       return;
     }
+    if (cluster._serverStarter != null) {
+      stopQuietly("server of " + cluster._clusterName, cluster._serverStarter::stop);
+    }
+    if (cluster._brokerStarter != null) {
+      stopQuietly("broker of " + cluster._clusterName, cluster._brokerStarter::stop);
+    }
+    if (cluster._controllerStarter != null) {
+      stopQuietly("controller of " + cluster._clusterName, cluster._controllerStarter::stop);
+    }
+    if (cluster._zkInstance != null) {
+      stopQuietly("ZooKeeper of " + cluster._clusterName, () -> ZkStarter.stopLocalZkServer(cluster._zkInstance));
+    }
+    FileUtils.deleteQuietly(cluster._tempDir);
+  }
+
+  /// Runs `stopAction` and logs instead of propagating a failure, so a component left half-started by a failed setup
+  /// does not prevent the remaining components from being stopped.
+  private static void stopQuietly(String component, Runnable stopAction) {
     try {
-      if (cluster._serverStarter != null) {
-        cluster._serverStarter.stop();
-      }
-      if (cluster._brokerStarter != null) {
-        cluster._brokerStarter.stop();
-      }
-      if (cluster._controllerStarter != null) {
-        cluster._controllerStarter.stop();
-      }
-      if (cluster._zkInstance != null) {
-        ZkStarter.stopLocalZkServer(cluster._zkInstance);
-      }
-      FileUtils.deleteQuietly(cluster._tempDir);
+      stopAction.run();
     } catch (Exception e) {
-      LOGGER.warn("Error stopping cluster", e);
+      LOGGER.warn("Error stopping {}", component, e);
     }
   }
 }

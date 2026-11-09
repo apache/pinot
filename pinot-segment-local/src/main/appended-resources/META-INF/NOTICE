@@ -1,0 +1,3 @@
+This product includes code adapted from t-digest 3.3
+(https://github.com/tdunning/t-digest).
+The code for the t-digest was originally authored by Ted Dunning

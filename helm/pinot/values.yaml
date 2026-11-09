@@ -82,6 +82,16 @@ pinotAuth:
   #  - access.control.principals.user.password=secret
   #  - access.control.principals.user.tables=baseballStats,otherstuff
   #  - access.control.principals.user.permissions=READ
+  # Setting `tables` (or `excludeTables`) scopes a principal to those tables and, on the controller, withholds every
+  # endpoint that names no table: cluster configs, instances, users, and cluster-wide listings such as GET /tables.
+  # That also includes realtime segment-completion callbacks (/segmentConsumed, /segmentCommitStart, and the rest of
+  # LLCSegmentCompletionHandlers) and minion task callbacks that carry no tableName, so a table-scoped server or
+  # minion token will 403 and stall ingestion. The deprecated GET /auth/verify probe, called without tableName, now
+  # answers false for a scoped principal (the UI uses /auth/verify/v2 and is unaffected).
+  # `admin` above is unscoped and keeps that access. Give an operator both: a scoped principal for table work and an
+  # unscoped one for cluster work. Grant the unscoped principal before rolling controllers; during the mixed-version
+  # window the same request answers 200 or 403 depending on which controller serves it. Widening `tables` to restore
+  # cluster access would also widen table access.
 
 # ------------------------------------------------------------------------------
 # Pinot Controller:

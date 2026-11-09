@@ -45,6 +45,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.postaggregation.PostAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.StoredValueComparator;
 
 
 /// Helper class for trimming and sorting records in the IndexedTable, based on the order by information
@@ -53,8 +54,9 @@ public class TableResizer {
   private final DataSchema _dataSchema;
   private final boolean _hasFinalInput;
   private final int _numGroupByExpressions;
-  /// Number of key columns preceding the aggregation columns in a record: the group-by (union) columns plus
-  /// the synthetic $groupingId column for grouping-set queries. Equals _numGroupByExpressions otherwise.
+  /// Number of key columns preceding the aggregation columns in a record, derived from the schema (total
+  /// columns minus aggregation columns). Includes the synthetic $groupingId column for grouping-set records
+  /// that carry it; equals the union-column count for base-aggregation combine records that omit it.
   private final int _numKeyColumns;
   /// Per grouping set (in ordinal order), the participating union-column indexes; null when the query has no
   /// grouping sets. Read by the GROUPING()/GROUPING_ID() ORDER BY extractor.
@@ -81,7 +83,6 @@ public class TableResizer {
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
     _numGroupByExpressions = groupByExpressions.size();
-    _numKeyColumns = queryContext.getNumGroupByKeyColumns();
     _groupingSets = queryContext.getGroupingSets();
     _groupByExpressionIndexMap = new HashMap<>();
     for (int i = 0; i < _numGroupByExpressions; i++) {
@@ -90,6 +91,11 @@ public class TableResizer {
 
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
+    // Derive the key-column count from the schema (total columns minus aggregation columns) so it always matches
+    // the record layout being resized, exactly like IndexedTable. Using queryContext.getNumGroupByKeyColumns()
+    // here would be wrong for the base-aggregation grouping-set combine table, whose records omit the synthetic
+    // $groupingId column.
+    _numKeyColumns = dataSchema.size() - _aggregationFunctions.length;
     _filteredAggregationIndexMap = queryContext.getFilteredAggregationsIndexMap();
     assert _filteredAggregationIndexMap != null;
 
@@ -99,16 +105,23 @@ public class TableResizer {
     _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
     Comparator[] comparators = new Comparator[_numOrderByExpressions];
     int[] nullComparisonResults = new int[_numOrderByExpressions];
-    for (int i = 0; i < _numOrderByExpressions; i++) {
-      OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
-      _orderByValueExtractors[i] = getOrderByValueExtractor(orderByExpression.getExpression());
-      comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
-      nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
-    }
     /// Grouping-set queries produce genuine null group-key values for rolled-up columns regardless of the
     /// user's null-handling option, so ORDER BY over a grouping column must use the null-safe comparator.
-    boolean nullHandlingEnabled = queryContext.requiresNullAwareKeyEvaluation();
-    if (nullHandlingEnabled) {
+    boolean nullAwareComparison = queryContext.requiresNullAwareKeyEvaluation();
+    for (int i = 0; i < _numOrderByExpressions; i++) {
+      OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
+      ExpressionContext expression = orderByExpression.getExpression();
+      _orderByValueExtractors[i] = getOrderByValueExtractor(expression);
+      comparators[i] =
+          orderByExpression.isAsc() ? StoredValueComparator.INSTANCE : StoredValueComparator.INSTANCE.reversed();
+      nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
+      // Aggregation results can be null with null handling disabled too, e.g. MINSTRING over an empty group.
+      if (expression.getType() != ExpressionContext.Type.LITERAL && !_groupByExpressionIndexMap.containsKey(
+          expression)) {
+        nullAwareComparison = true;
+      }
+    }
+    if (nullAwareComparison) {
       _intermediateRecordComparator = (o1, o2) -> {
         for (int i = 0; i < _numOrderByExpressions; i++) {
           Object v1 = o1._values[i];
@@ -185,7 +198,7 @@ public class TableResizer {
 
   /// Constructs an IntermediateRecord by extracting the order-by values from the record.
   private IntermediateRecord getIntermediateRecord(Key key, Record record) {
-    Comparable[] orderByValues = new Comparable[_numOrderByExpressions];
+    Object[] orderByValues = new Object[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
       orderByValues[i] = _orderByValueExtractors[i].extract(record);
     }
@@ -422,6 +435,38 @@ public class TableResizer {
     return result;
   }
 
+  /// Per-set bucketed trim over a FINISHED [IndexedTable]'s records (the base-aggregation server derive produces
+  /// a full grouping-set table, then trims it). Keeps the top `perSetSize` records WITHIN each grouping set,
+  /// bucketed by the `discriminatorColumnIndex` ($groupingId) value, with the same across-set anti-starvation
+  /// guarantee and approximation caveats as [#trimInSegmentResultsByGroupingSet]. The table's records carry the
+  /// key columns in front, so the [Key] is reconstructed from the leading `_numKeyColumns` values.
+  public List<IntermediateRecord> trimTableByGroupingSet(IndexedTable table, int perSetSize,
+      int discriminatorColumnIndex) {
+    Comparator<IntermediateRecord> worstFirst = _intermediateRecordComparator.reversed();
+    Map<Integer, PriorityQueue<IntermediateRecord>> bucketsByGroupingId = new HashMap<>();
+    Iterator<Record> iterator = table.iterator();
+    while (iterator.hasNext()) {
+      Record record = iterator.next();
+      Object[] values = record.getValues();
+      IntermediateRecord withValues =
+          getIntermediateRecord(new Key(Arrays.copyOf(values, _numKeyColumns)), record);
+      int groupingId = ((Number) values[discriminatorColumnIndex]).intValue();
+      PriorityQueue<IntermediateRecord> heap =
+          bucketsByGroupingId.computeIfAbsent(groupingId, k -> new PriorityQueue<>(worstFirst));
+      if (heap.size() < perSetSize) {
+        heap.offer(withValues);
+      } else if (_intermediateRecordComparator.compare(withValues, heap.peek()) < 0) {
+        heap.poll();
+        heap.offer(withValues);
+      }
+    }
+    List<IntermediateRecord> result = new ArrayList<>();
+    for (PriorityQueue<IntermediateRecord> heap : bucketsByGroupingId.values()) {
+      result.addAll(heap);
+    }
+    return result;
+  }
+
   /// Constructs an IntermediateRecord for the given group.
   private IntermediateRecord getIntermediateRecord(GroupKeyGenerator.GroupKey groupKey,
       GroupByResultHolder[] groupByResultHolders) {
@@ -444,7 +489,7 @@ public class TableResizer {
     ColumnDataType getValueType();
 
     /// Extracts the value from the given Record.
-    Comparable extract(Record record);
+    Object extract(Record record);
   }
 
   /// Extractor for a literal.
@@ -480,8 +525,8 @@ public class TableResizer {
     }
 
     @Override
-    public Comparable extract(Record record) {
-      return (Comparable) record.getValues()[_index];
+    public Object extract(Record record) {
+      return record.getValues()[_index];
     }
   }
 
@@ -503,7 +548,7 @@ public class TableResizer {
     }
 
     @Override
-    public Comparable extract(Record record) {
+    public Object extract(Record record) {
       return _aggregationFunction.extractFinalResult(record.getValues()[_index]);
     }
   }
@@ -541,7 +586,7 @@ public class TableResizer {
     }
 
     @Override
-    public Comparable extract(Record record) {
+    public Object extract(Record record) {
       if (_discriminatorIndex < 0 || _valuesByOrdinal == null) {
         return 0;
       }
@@ -578,17 +623,13 @@ public class TableResizer {
     }
 
     @Override
-    public Comparable extract(Record record) {
+    public Object extract(Record record) {
       int numArguments = _arguments.length;
       for (int i = 0; i < numArguments; i++) {
         _arguments[i] = _argumentExtractors[i].extract(record);
       }
       Object result = _postAggregationFunction.invoke(_arguments);
-      if (_postAggregationFunction.getResultType() == ColumnDataType.BYTES) {
-        return new ByteArray((byte[]) result);
-      } else {
-        return (Comparable) result;
-      }
+      return _postAggregationFunction.getResultType() == ColumnDataType.BYTES ? new ByteArray((byte[]) result) : result;
     }
   }
 }

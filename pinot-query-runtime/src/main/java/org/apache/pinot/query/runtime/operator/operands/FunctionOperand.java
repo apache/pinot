@@ -19,24 +19,28 @@
 package org.apache.pinot.query.runtime.operator.operands;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/*
- * FunctionOperands are generated from {@link RexExpression}s.
- */
+/// Evaluates scalar function calls generated from [RexExpression]s. Immutable and stable calls on literal arguments
+/// cache their result on first use, including null. Like [LiteralOperand], cached results are shared and must not be
+/// mutated. Instances are scoped to one query and operator chain and are not thread-safe.
 public class FunctionOperand implements TransformOperand {
   private final ColumnDataType _resultType;
   private final QueryFunctionInvoker _functionInvoker;
@@ -44,8 +48,19 @@ public class FunctionOperand implements TransformOperand {
   private final boolean _needsConversion;
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
+  private final boolean _replaceNullJsonOperands;
+  @Nullable
+  private final Object _jsonNullDefault;
+  private final boolean _cacheable;
+  private boolean _resultCached;
+  private Object _cachedResult;
 
   public FunctionOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
+    this(functionCall, dataSchema, false);
+  }
+
+  public FunctionOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema,
+      boolean nullHandlingEnabled) {
     _resultType = functionCall.getDataType();
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numOperands = operands.size();
@@ -65,6 +80,7 @@ public class FunctionOperand implements TransformOperand {
     }
     String functionName = functionCall.getFunctionName();
     String canonicalName = FunctionRegistry.canonicalize(functionName);
+    _replaceNullJsonOperands = !nullHandlingEnabled && TransformFunctionType.isJsonExtractScalar(canonicalName);
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null) {
       if (FunctionRegistry.contains(canonicalName)) {
@@ -103,9 +119,13 @@ public class FunctionOperand implements TransformOperand {
     _functionInvokerResultType = functionInvokerResultType != null ? functionInvokerResultType : ColumnDataType.STRING;
     _operands = new ArrayList<>(numOperands);
     for (RexExpression operand : operands) {
-      _operands.add(TransformOperandFactory.getTransformOperand(operand, dataSchema));
+      _operands.add(TransformOperandFactory.getTransformOperand(operand, dataSchema, nullHandlingEnabled));
     }
+    _jsonNullDefault = _replaceNullJsonOperands && numOperands == 4
+        ? getJsonNullDefault(((RexExpression.Literal) operands.get(2)).getValue()) : null;
     _reusableOperandHolder = new Object[numOperands];
+    _cacheable = functionInfo.getVolatility() != FunctionVolatility.VOLATILE
+        && _operands.stream().allMatch(LiteralOperand.class::isInstance);
   }
 
   @Override
@@ -116,10 +136,25 @@ public class FunctionOperand implements TransformOperand {
   @Nullable
   @Override
   public Object apply(List<Object> row) {
+    if (_resultCached) {
+      return _cachedResult;
+    }
     for (int i = 0; i < _operands.size(); i++) {
       TransformOperand operand = _operands.get(i);
       Object value = operand.apply(row);
       _reusableOperandHolder[i] = value != null ? operand.getResultType().toExternal(value) : null;
+    }
+    if (_replaceNullJsonOperands) {
+      if (_reusableOperandHolder[0] == null) {
+        ColumnDataType inputType = _operands.get(0).getResultType();
+        Object nullPlaceholder = inputType.getNullPlaceholder();
+        // An untyped SQL NULL has UNKNOWN type and therefore no generic placeholder. The leaf transform reads every
+        // non-BYTES JSON input through transformToStringValuesSV(), whose NULL literal value is the empty string.
+        _reusableOperandHolder[0] = nullPlaceholder != null ? inputType.toExternal(nullPlaceholder) : "";
+      }
+      if (_reusableOperandHolder.length == 4 && _reusableOperandHolder[3] == null) {
+        _reusableOperandHolder[3] = _jsonNullDefault;
+      }
     }
     Object result;
     if (_functionInvoker.getMethod().isVarArgs()) {
@@ -130,7 +165,44 @@ public class FunctionOperand implements TransformOperand {
       }
       result = _functionInvoker.invoke(_reusableOperandHolder);
     }
-    return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
+    Object convertedResult = result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
         _resultType.getStoredType()) : null;
+    if (_cacheable) {
+      _cachedResult = convertedResult;
+      _resultCached = true;
+    }
+    return convertedResult;
+  }
+
+  @Nullable
+  private static Object getJsonNullDefault(@Nullable Object resultsType) {
+    if (resultsType == null) {
+      return null;
+    }
+    String baseType = resultsType.toString().toUpperCase(Locale.ROOT);
+    if (baseType.endsWith("_ARRAY")) {
+      baseType = baseType.substring(0, baseType.length() - 6);
+    }
+    switch (baseType) {
+      case "INT":
+      case "BOOLEAN":
+        return 0;
+      case "LONG":
+      case "TIMESTAMP":
+        return 0L;
+      case "FLOAT":
+        return 0F;
+      case "DOUBLE":
+        return 0D;
+      case "BIG_DECIMAL":
+        return BigDecimal.ZERO;
+      case "STRING":
+      case "JSON":
+        return "";
+      case "BYTES":
+        return new byte[0];
+      default:
+        return null;
+    }
   }
 }

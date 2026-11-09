@@ -20,22 +20,17 @@ package org.apache.pinot.controller.api.upload;
 
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
@@ -76,7 +71,7 @@ public class SegmentValidationUtils {
     }
 
     String partitionColumn = getPartitionColumn(tableConfig);
-    if (StringUtils.isEmpty(partitionColumn)) {
+    if (partitionColumn == null) {
       return;
     }
 
@@ -90,44 +85,22 @@ public class SegmentValidationUtils {
     }
   }
 
+  /// Returns the partition column configured for segment assignment, falling back to the single column of the segment
+  /// partition config, or `null` if neither is available.
+  @Nullable
   private static String getPartitionColumn(TableConfig tableConfig) {
-    if (!MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
-      InstanceAssignmentConfig instanceAssignmentConfig =
-          tableConfig.getInstanceAssignmentConfigMap().get(InstancePartitionsType.OFFLINE.name());
-      String partitionColumn = getPartitionColumn(instanceAssignmentConfig);
-      if (StringUtils.isNotEmpty(partitionColumn)) {
-        return partitionColumn;
-      }
-    }
-
-    //noinspection deprecation
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
-        validationConfig != null ? validationConfig.getReplicaGroupStrategyConfig() : null;
-    String partitionColumn =
-        replicaGroupStrategyConfig != null ? replicaGroupStrategyConfig.getPartitionColumn() : null;
-    if (StringUtils.isNotEmpty(partitionColumn)) {
+    String partitionColumn = TableConfigUtils.getPartitionColumn(tableConfig);
+    if (partitionColumn != null) {
       return partitionColumn;
     }
-
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    SegmentPartitionConfig segmentPartitionConfig =
-        indexingConfig != null ? indexingConfig.getSegmentPartitionConfig() : null;
-    Map<String, ?> columnPartitionMap =
-        segmentPartitionConfig != null ? segmentPartitionConfig.getColumnPartitionMap() : null;
-    if (MapUtils.isNotEmpty(columnPartitionMap) && columnPartitionMap.size() == 1) {
-      return columnPartitionMap.keySet().iterator().next();
+    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (segmentPartitionConfig != null) {
+      Map<String, ?> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+      if (columnPartitionMap.size() == 1) {
+        return columnPartitionMap.keySet().iterator().next();
+      }
     }
     return null;
-  }
-
-  private static String getPartitionColumn(InstanceAssignmentConfig instanceAssignmentConfig) {
-    if (instanceAssignmentConfig == null) {
-      return null;
-    }
-    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
-        instanceAssignmentConfig.getReplicaGroupPartitionConfig();
-    return replicaGroupPartitionConfig != null ? replicaGroupPartitionConfig.getPartitionColumn() : null;
   }
 
   public static void checkStorageQuota(String segmentName, long tarSegmentSizeInBytes, long untarredSegmentSizeInBytes,
@@ -143,6 +116,12 @@ public class SegmentValidationUtils {
               tableConfig.getTableName()), Response.Status.INTERNAL_SERVER_ERROR);
     }
     if (!response._isSegmentWithinQuota) {
+      QuotaEnforcementMode enforcementMode = quotaChecker.getEnforcementMode(tableConfig);
+      if (enforcementMode != QuotaEnforcementMode.ENFORCED) {
+        LOGGER.warn("Storage quota check failed for segment: {} of table: {} in {} mode, reason: {}", segmentName,
+            tableConfig.getTableName(), enforcementMode, response._reason);
+        return;
+      }
       throw new ControllerApplicationException(LOGGER,
           String.format("Storage quota check failed for segment: %s of table: %s, reason: %s", segmentName,
               tableConfig.getTableName(), response._reason), Response.Status.FORBIDDEN);

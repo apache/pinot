@@ -193,6 +193,7 @@ public class MailboxService {
   public void shutdown() {
     LOGGER.info("Shutting down GrpcMailboxServer");
     _grpcMailboxServer.shutdown();
+    _channelManager.shutdown();
   }
 
   public String getHostname() {
@@ -232,11 +233,18 @@ public class MailboxService {
     }
   }
 
-  /// Resets the GRPC connection backoff for the channel to the given server.
-  /// @see ChannelManager#resetConnectBackoff(String, int)
-  /// @return true if the channel was in TRANSIENT_FAILURE and backoff was reset
-  public boolean resetConnectBackoff(String hostname, int port) {
-    return _channelManager.resetConnectBackoff(hostname, port);
+  /// Makes the channel to the given server resolve its hostname again before the next send.
+  /// @see ChannelManager#refreshChannel(String, int)
+  /// @return false if there is no channel to the server, or it was just refreshed
+  public boolean refreshChannel(String hostname, int port) {
+    return _channelManager.refreshChannel(hostname, port);
+  }
+
+  /// Shuts down the channel to an address that is no longer used.
+  /// @see ChannelManager#retireChannel(String, int)
+  /// @return false if there is no channel to the address
+  public boolean retireChannel(String hostname, int port) {
+    return _channelManager.retireChannel(hostname, port);
   }
 
   /// Current value of [BrokerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] /

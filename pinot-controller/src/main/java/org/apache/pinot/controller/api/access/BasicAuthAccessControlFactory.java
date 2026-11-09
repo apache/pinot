@@ -42,6 +42,10 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 /// controller.admin.access.control.principals.user456.tables=stuff,lessImportantStuff
 /// controller.admin.access.control.principals.user456.permissions=read,update
 /// ```
+///
+/// Setting `tables` or `excludeTables` scopes a principal to those tables and withholds every endpoint that names no
+/// table, because such a request is cluster-wide. `*` means unrestricted, as does omitting the key. A principal used
+/// as a service identity — realtime segment completion, minion task callbacks — must therefore be left unrestricted.
 public class BasicAuthAccessControlFactory implements AccessControlFactory {
   private static final String PREFIX = "controller.admin.access.control.principals";
 

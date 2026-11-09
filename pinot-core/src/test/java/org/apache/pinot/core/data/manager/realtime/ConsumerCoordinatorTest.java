@@ -28,6 +28,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
@@ -420,6 +421,30 @@ public class ConsumerCoordinatorTest {
     consumerCoordinator.release();
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
     Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
+  }
+
+  @Test
+  public void testUnsealedRelease()
+      throws Exception {
+    RealtimeTableDataManager realtimeTableDataManager = Mockito.mock(RealtimeTableDataManager.class);
+    Mockito.when(realtimeTableDataManager.getTableName()).thenReturn("tableTest_REALTIME");
+    ConsumerCoordinator consumerCoordinator = new ConsumerCoordinator(false, realtimeTableDataManager);
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(getSegmentName(101));
+    Assert.assertNotNull(llcSegmentName);
+    consumerCoordinator.acquire(llcSegmentName);
+
+    consumerCoordinator.releaseUnsealed(getSegmentName(101), new LongMsgOffset(250));
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
+    ConsumerCoordinator.UnsealedRelease unsealedRelease = consumerCoordinator.getUnsealedRelease();
+    Assert.assertNotNull(unsealedRelease);
+    Assert.assertEquals(unsealedRelease.segmentName(), getSegmentName(101));
+    Assert.assertEquals(unsealedRelease.stoppedAtOffset().toString(), "250");
+
+    // Only the segment that recorded the release can clear it.
+    consumerCoordinator.clearUnsealedRelease(getSegmentName(100));
+    Assert.assertNotNull(consumerCoordinator.getUnsealedRelease());
+    consumerCoordinator.clearUnsealedRelease(getSegmentName(101));
+    Assert.assertNull(consumerCoordinator.getUnsealedRelease());
   }
 
   @Test

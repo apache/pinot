@@ -72,11 +72,11 @@ public class SanitizationTransformer implements RecordTransformer {
       SanitizedColumnInfo info = entry.getValue();
       Object value = record.getValue(columnName);
       SanitizationResult result = SanitizationTransformerUtils.sanitizeValue(info, value);
-      if (result != null) {
+      // An unsanitized value is unchanged (multi-value arrays are updated in place), so it is not written back, which
+      // would also drop a parsed JSON value cached for the column.
+      if (result != null && result.isSanitized()) {
         record.putValue(columnName, result.getValue());
-        if (result.isSanitized()) {
-          record.markSanitized();
-        }
+        record.markSanitized();
       }
     }
   }

@@ -449,9 +449,14 @@ public class StringFunctions {
   /// @param input an input string for prefix strings generations.
   /// @param maxlength the max length of the prefix strings for the string.
   /// @param prefix the prefix to be prepended to prefix strings generated. e.g. '^' for regex matching
-  /// @return generate an array of prefix matchers of the string that are shorter than the specified length.
+  /// @return generate an array of prefix matchers of the string that are shorter than the specified length, or `null`
+  ///         if the input is `null`.
+  @Nullable
   @ScalarFunction(nullableParameters = true)
-  public static String[] prefixesWithPrefix(String input, int maxlength, @Nullable String prefix) {
+  public static String[] prefixesWithPrefix(@Nullable String input, int maxlength, @Nullable String prefix) {
+    if (input == null) {
+      return null;
+    }
     if (prefix == null) {
       return prefixes(input, maxlength);
     }
@@ -479,9 +484,14 @@ public class StringFunctions {
   /// @param input an input string for suffix strings generations.
   /// @param maxlength the max length of the suffix strings for the string.
   /// @param suffix the suffix string to be appended for suffix strings generated. e.g. '$' for regex matching.
-  /// @return generate an array of suffix matchers of the string that are shorter than the specified length.
+  /// @return generate an array of suffix matchers of the string that are shorter than the specified length, or `null`
+  ///         if the input is `null`.
+  @Nullable
   @ScalarFunction(nullableParameters = true)
-  public static String[] suffixesWithSuffix(String input, int maxlength, @Nullable String suffix) {
+  public static String[] suffixesWithSuffix(@Nullable String input, int maxlength, @Nullable String suffix) {
+    if (input == null) {
+      return null;
+    }
     if (suffix == null) {
       return suffixes(input, maxlength);
     }
@@ -952,7 +962,7 @@ public class StringFunctions {
   /// @param delimiter the delimiter to search for
   /// @param count occurrence count (positive = from left, negative = from right)
   /// @return the substring, or the entire input if the delimiter does not occur enough times
-  @ScalarFunction(names = {"substringIndex", "substring_index"})
+  @ScalarFunction
   public static String substringIndex(String input, String delimiter, int count) {
     if (count == 0 || delimiter.isEmpty()) {
       return "";
@@ -1020,7 +1030,7 @@ public class StringFunctions {
   ///
   /// @param input the input string
   /// @return byte length of the UTF-8 encoded string
-  @ScalarFunction(names = {"octetLength", "octet_length"})
+  @ScalarFunction
   public static int octetLength(String input) {
     return input.getBytes(StandardCharsets.UTF_8).length;
   }
@@ -1029,7 +1039,7 @@ public class StringFunctions {
   ///
   /// @param input the input string
   /// @return bit length of the UTF-8 encoded string
-  @ScalarFunction(names = {"bitLength", "bit_length"})
+  @ScalarFunction
   public static int bitLength(String input) {
     return octetLength(input) * 8;
   }
@@ -1039,7 +1049,7 @@ public class StringFunctions {
   ///
   /// @param input the input string
   /// @return number of Unicode codepoints
-  @ScalarFunction(names = {"charLength", "char_length", "characterLength", "character_length"})
+  @ScalarFunction(names = {"charLength", "characterLength"})
   public static int charLength(String input) {
     return input.codePointCount(0, input.length());
   }
@@ -1052,7 +1062,7 @@ public class StringFunctions {
   /// @param input the input string
   /// @param regexp the regular expression pattern
   /// @return count of non-overlapping matches
-  @ScalarFunction(names = {"regexpCount", "regexp_count"})
+  @ScalarFunction
   public static int regexpCount(String input, String regexp) {
     Matcher matcher = Pattern.compile(regexp).matcher(input);
     int count = 0;
@@ -1071,7 +1081,7 @@ public class StringFunctions {
   /// @param regexp the regular expression pattern
   /// @return the first matching substring, or null if no match
   @Nullable
-  @ScalarFunction(names = {"regexpSubstr", "regexp_substr"})
+  @ScalarFunction
   public static String regexpSubstr(String input, String regexp) {
     Matcher matcher = Pattern.compile(regexp).matcher(input);
     return matcher.find() ? matcher.group() : null;

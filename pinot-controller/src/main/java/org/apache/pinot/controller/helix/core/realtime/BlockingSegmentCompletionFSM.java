@@ -141,15 +141,14 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
     _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
 
-    // NOTE: If segment ZK status is COMMITTING, The current behaviour expects the segment protocol calls to fail and
-    // abort leaving it to realtime segment validation job to fix it.
+    // NOTE: If segment ZK status is COMMITTING, a pauseless commit start with the same end offset resumes the commit
+    // (see PinotLLCRealtimeSegmentManager). Otherwise the segment protocol calls fail and abort, leaving it to realtime
+    // segment validation job to fix it.
     if (segmentMetadata.getStatus().isCompleted()) {
       _state = BlockingSegmentCompletionFSMState.COMMITTED;
-      StreamPartitionMsgOffsetFactory factory =
-          _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
       String endOffset = segmentMetadata.getEndOffset();
       Preconditions.checkState(endOffset != null, "Failed to find end offset for segment: %s", segmentName);
-      _winningOffset = factory.create(endOffset);
+      _winningOffset = _streamPartitionMsgOffsetFactory.create(endOffset);
       _winner = "UNKNOWN";
     }
   }
@@ -190,6 +189,11 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   public boolean isImmutableSegmentCreated() {
     return _state.equals(BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING) || _state.equals(
         BlockingSegmentCompletionFSMState.COMMITTING) || _state.equals(BlockingSegmentCompletionFSMState.COMMITTED);
+  }
+
+  @Override
+  public StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory() {
+    return _streamPartitionMsgOffsetFactory;
   }
 
   /*

@@ -136,7 +136,8 @@ public class SegmentPreloadUtils {
     try {
       File indexDir = tableDataManager.getSegmentDataDir(segmentName, segmentTier, tableConfig);
       File snapshotFile =
-          new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+          new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir),
+              V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
       return snapshotFile.exists();
     } catch (Exception e) {
       return false;

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import java.util.Map;
 import java.util.Set;
@@ -37,7 +36,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 /// `ByteArray` so content-based equality works for the distinct case and the element type stays consistent with
 /// the DataTable/wire layer.
 public abstract class BaseArrayAggBytesFunction<I extends ObjectCollection<ByteArray>>
-    extends BaseArrayAggFunction<I, ObjectArrayList<ByteArray>> {
+    extends BaseArrayAggFunction<I, ByteArray[]> {
   public BaseArrayAggBytesFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }

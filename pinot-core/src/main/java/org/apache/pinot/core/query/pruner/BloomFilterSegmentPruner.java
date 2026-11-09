@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /// Prunes segments using bloom filters for EQ and IN predicates, with optional prefetch.
@@ -88,22 +89,24 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     int numSegments = segments.size();
     FetchContext[] fetchContexts = new FetchContext[numSegments];
     try {
-      // Prefetch bloom filter for columns within the EQ/IN predicate if exists
+      // Prefetch bloom filter for columns within the EQ/IN predicate if exists. The planner returns null for a segment
+      // that needs no fetch, which is then pruned without the fetch lifecycle.
       for (int i = 0; i < numSegments; i++) {
         IndexSegment segment = segments.get(i);
         FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query);
-        if (!fetchContext.isEmpty()) {
+        if (fetchContext != null && !fetchContext.isEmpty()) {
           segment.prefetch(fetchContext);
           fetchContexts[i] = fetchContext;
         }
       }
       return pruneFunc.apply(fetchContexts);
     } finally {
-      // Release the prefetched bloom filters
+      // Release the prefetched bloom filters, and report their remote accesses to the query execution
       for (int i = 0; i < numSegments; i++) {
         FetchContext fetchContext = fetchContexts[i];
         if (fetchContext != null) {
           segments.get(i).release(fetchContext);
+          QueryThreadContext.mergeRemoteAccessStats(fetchContext.getRemoteAccessStats());
         }
       }
     }

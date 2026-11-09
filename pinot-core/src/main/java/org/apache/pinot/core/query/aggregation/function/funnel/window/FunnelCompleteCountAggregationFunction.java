@@ -51,6 +51,7 @@ public class FunnelCompleteCountAggregationFunction extends FunnelBaseAggregatio
     if (stepEvents == null || stepEvents.isEmpty()) {
       return totalCompletedRounds;
     }
+    stepEvents = new PriorityQueue<>(stepEvents);
     ArrayDeque<FunnelStepEvent> slidingWindow = new ArrayDeque<>();
     while (!stepEvents.isEmpty()) {
       fillWindow(stepEvents, slidingWindow);

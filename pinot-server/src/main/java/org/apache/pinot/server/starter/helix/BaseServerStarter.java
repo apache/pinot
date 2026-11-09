@@ -111,6 +111,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.api.resources.ReingestionConsumptionTimeout;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -186,6 +187,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected volatile boolean _isServerReadyToServeQueries = false;
   protected ScheduledExecutorService _helixMessageCountScheduler;
   protected ServerReloadJobStatusCache _reloadJobStatusCache;
+  protected ReingestionConsumptionTimeout _reingestionConsumptionTimeout;
   // Override this to provide custom thread pool for Helix state transitions. Null means using Helix's default
   @Nullable
   protected StateTransitionThreadPoolManager _transitionThreadPoolManager;
@@ -678,6 +680,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_reloadJobStatusCache);
     LOGGER.info("Registered ServerReloadJobStatusCache as cluster config listener");
 
+    // Register re-ingestion consumption timeout as cluster config listener for dynamic config updates
+    _reingestionConsumptionTimeout = new ReingestionConsumptionTimeout(_serverConf);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_reingestionConsumptionTimeout);
+
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_serverConf, Server.SERVER_TLS_PREFIX);
     if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils.isNotBlank(
@@ -847,19 +853,19 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    // Register handler to reset GRPC mailbox channel backoff when servers come online
+    // Register handler to refresh the GRPC mailbox channels to servers when they come online
     WorkerQueryServer workerQueryServer = _serverInstance.getWorkerQueryServer();
     if (workerQueryServer != null) {
       MailboxService mailboxService = workerQueryServer.getQueryRunner().getMailboxService();
-      LOGGER.info("Registering ServerGrpcChannelBackoffResetHandler");
+      LOGGER.info("Registering ServerMailboxChannelRefreshHandler");
       try {
         _helixManager.addInstanceConfigChangeListener(
-            new ServerGrpcChannelBackoffResetHandler(_helixAdmin, _helixClusterName, _instanceId, mailboxService));
+            new ServerMailboxChannelRefreshHandler(_helixAdmin, _helixClusterName, _instanceId, mailboxService));
       } catch (Exception e) {
-        LOGGER.error("Failed to register ServerGrpcChannelBackoffResetHandler", e);
+        LOGGER.error("Failed to register ServerMailboxChannelRefreshHandler", e);
       }
     } else {
-      LOGGER.info("Multi-stage query engine not enabled, skipping ServerGrpcChannelBackoffResetHandler registration");
+      LOGGER.info("Multi-stage query engine not enabled, skipping ServerMailboxChannelRefreshHandler registration");
     }
 
     // Start restlet server for admin API endpoint
@@ -1280,7 +1286,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   protected AdminApiApplication createServerAdminApp() {
-    return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
+    return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache,
+        _reingestionConsumptionTimeout, _serverConf);
   }
 
   /// Creates the [SegmentMessageHandlerFactory] used to handle user-defined Helix messages for segments.

@@ -59,7 +59,7 @@ public class OpenStructIndexType
   public static final String INDEX_DISPLAY_NAME = "open_struct";
   private static final List<String> EXTENSIONS = List.of(".open_struct.idx");
   private static final String FIXED_FORWARD_INDEX =
-      "materialized keys always use a dictionary-encoded or LZ4 raw forward index";
+      "the splitter fixes materialized keys to a dictionary-encoded or LZ4 raw forward index";
   private static final String KEY_ENCODING_RULE = "a key is dictionary-encoded when its encodingType is "
       + "DICTIONARY, or indexes.dictionary enables one, or its inverted index is enabled, and raw with LZ4 "
       + "otherwise";
@@ -164,6 +164,8 @@ public class OpenStructIndexType
     JsonNode forwardIndex = indexes.get(StandardIndexes.forward().getPrettyName());
     // The OPEN_STRUCT splitter builds its own per-key forward-index configs (dict-vs-raw decision plus a
     // fixed LZ4 raw compression), so a per-key codecSpec would be silently discarded. Reject it explicitly.
+    // The LZ4 pin is the splitter's: a key rebuilt by a dictionary-to-raw conversion on reload instead takes
+    // the reloading component's default compression codec.
     Preconditions.checkState(forwardIndex == null || !forwardIndex.hasNonNull("codecSpec"),
         "OPEN_STRUCT column '%s': codecSpec is not supported for %s; " + FIXED_FORWARD_INDEX, column, target);
     Iterator<String> indexNames = indexes.fieldNames();
@@ -192,7 +194,8 @@ public class OpenStructIndexType
   }
 
   /// The splitter replaces a key's forward-index config with a dictionary-encoded or LZ4 raw one, so
-  /// `indexes.forward` may only restate that encoding or keep the index enabled.
+  /// `indexes.forward` may only restate that encoding or keep the index enabled. The LZ4 here is what the
+  /// splitter writes; a dictionary-to-raw conversion on reload uses the configured default codec instead.
   private static void validatePerKeyForwardIndex(JsonNode forwardIndex, boolean dictionaryEncoded, String column,
       String target) {
     Preconditions.checkState(forwardIndex.isObject(), "OPEN_STRUCT column '%s': indexes.forward of %s must be a JSON "

@@ -103,6 +103,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_BUILD_WITH_CRC_MISMATCH("segments", false),
   SEGMENT_BUILD_FAILURE("segments", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
@@ -180,6 +181,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   /// It is increased in one by each worker that reaches the limit within the stage.
   /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
+  /// Number of times a grouping-set query's combine derived the grouping sets from BASE (union) groups, i.e. the
+  /// opt-in `groupingSetsBaseAggregation` optimization actually ran on this server (at least one segment emitted
+  /// base-layout groups). Lets users who opt in verify the optimization applied.
+  GROUPING_SETS_BASE_AGGREGATION("times", true),
   /// The number of blocks that have been sent to the next stage without being serialized.
   /// This is the sum of all blocks sent by all workers in the stage.
   MULTI_STAGE_IN_MEMORY_MESSAGES("messages", true),

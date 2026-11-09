@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Throwables;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -53,6 +54,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class WindowAggregateOperatorTest {
@@ -258,10 +260,8 @@ public class WindowAggregateOperatorTest {
         Integer.MIN_VALUE, Integer.MAX_VALUE, input);
   }
 
-  @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Failed to instantiate "
-      + "WindowFunction for function: NTILE.*")
-  public void testShouldThrowOnUnknownRankAggFunction() {
-    // TODO: Remove this test when support is added for NTILE function
+  @Test
+  public void testShouldThrowOnNtileWithoutOperand() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
     MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema).buildWithEos();
@@ -271,8 +271,12 @@ public class WindowAggregateOperatorTest {
         List.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.NTILE.name(), List.of()));
 
     // When:
-    getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-        Integer.MIN_VALUE, Integer.MAX_VALUE, input);
+    RuntimeException exception = expectThrows(RuntimeException.class,
+        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input));
+    Throwable rootCause = Throwables.getRootCause(exception);
+    assertEquals(rootCause.getClass(), IllegalArgumentException.class);
+    assertEquals(rootCause.getMessage(), "NTILE function must have exactly 1 operand");
   }
 
   @Test

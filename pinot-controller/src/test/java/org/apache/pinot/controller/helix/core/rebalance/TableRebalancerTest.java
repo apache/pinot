@@ -17,6 +17,8 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
+
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,29 +29,21 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
-import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.helix.core.assignment.segment.BaseSegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.controller.helix.core.assignment.segment.TableAssignment;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class TableRebalancerTest {
-
-  private static final TableRebalancer.PartitionIdFetcher DUMMY_PARTITION_FETCHER = segmentName -> 0;
-  private static final TableRebalancer.PartitionIdFetcher SIMPLE_PARTITION_FETCHER = segmentName -> {
-    LLCSegmentName name = LLCSegmentName.of(segmentName);
-    return name == null ? -1 : name.getPartitionGroupId();
-  };
 
   private static final TableRebalancer.DataLossRiskAssessor DEFAULT_DATA_LOSS_RISK_ASSESSOR =
       new TableRebalancer.NoOpRiskAssessor();
@@ -668,8 +662,7 @@ public class TableRebalancerTest {
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -756,8 +749,7 @@ public class TableRebalancerTest {
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
@@ -765,8 +757,7 @@ public class TableRebalancerTest {
 
       nextAssignment =
           TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -820,8 +811,7 @@ public class TableRebalancerTest {
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target assignment
     Map<String, Map<String, String>> nextAssignment =
         TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, false, false,
-            RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-            DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+            RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment, targetAssignment);
 
     // Next assignment with 2 minimum available replicas with strict replica-group should finish in 2 steps:
@@ -854,15 +844,13 @@ public class TableRebalancerTest {
     //
     // The second assignment should reach the target assignment
     nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true, false,
-        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-        DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
     assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
     nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, false,
-        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-        DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment, targetAssignment);
   }
 
@@ -980,8 +968,7 @@ public class TableRebalancerTest {
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
-              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
@@ -989,8 +976,7 @@ public class TableRebalancerTest {
 
       nextAssignment =
           TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
-              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -1118,8 +1104,7 @@ public class TableRebalancerTest {
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
-              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host2")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host2")));
@@ -1127,8 +1112,7 @@ public class TableRebalancerTest {
 
       nextAssignment =
           TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
-              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
@@ -1136,8 +1120,7 @@ public class TableRebalancerTest {
 
       nextAssignment =
           TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
-              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
       assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host4", "host5")));
       assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host2", "host4")));
@@ -1145,8 +1128,7 @@ public class TableRebalancerTest {
 
       nextAssignment =
           TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, true,
-              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-              DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -1223,16 +1205,14 @@ public class TableRebalancerTest {
     // The second assignment should reach the target assignment
     Map<String, Map<String, String>> nextAssignment =
         TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, false, true,
-            RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-            DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+            RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
     assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
     assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
     assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
 
     nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, false, true,
-        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-        DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment, targetAssignment);
 
     // Next assignment with 2 minimum available replicas with strict replica-group should finish in 3 steps:
@@ -1284,24 +1264,21 @@ public class TableRebalancerTest {
     //
     // The third assignment should reach the target assignment
     nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true, true,
-        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-        DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
     assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
     assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3")));
     assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
 
     nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, true,
-        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-        DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment.get("segment1").keySet(), new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     assertEquals(nextAssignment.get("segment2").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
     assertEquals(nextAssignment.get("segment3").keySet(), new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     assertEquals(nextAssignment.get("segment4").keySet(), new TreeSet<>(Arrays.asList("host3", "host4")));
 
     nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, true,
-        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, new Object2IntOpenHashMap<>(), DUMMY_PARTITION_FETCHER,
-        DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment, targetAssignment);
   }
 
@@ -1593,10 +1570,9 @@ public class TableRebalancerTest {
     // Next assignment with 2 minimum available replicas with or without strict replica-group should reach the target
     // assignment after two steps. Batch size = 1, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
-      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       Map<String, Map<String, String>> nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertNotEquals(nextAssignment, targetAssignment);
       assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
           new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
@@ -1608,17 +1584,16 @@ public class TableRebalancerTest {
           new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
       nextAssignment =
           TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment, targetAssignment);
     }
 
     // Next assignment with 2 minimum available replicas with our without strict replica-group should reach the target
     // assignment after one steps. Batch size = 2, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
-      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       Map<String, Map<String, String>> nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment, targetAssignment);
     }
 
@@ -1776,7 +1751,7 @@ public class TableRebalancerTest {
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Map<String, Map<String, String>> nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
           new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
       assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
@@ -1788,7 +1763,7 @@ public class TableRebalancerTest {
 
       nextAssignment =
           TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       if (!enableStrictReplicaGroup) {
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
@@ -1800,7 +1775,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       } else {
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
@@ -1812,7 +1787,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host2", "host4")));
         assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
@@ -1823,7 +1798,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host4", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       }
       assertEquals(nextAssignment, targetAssignment);
     }
@@ -1879,7 +1854,7 @@ public class TableRebalancerTest {
     // in 1 step using batchSizePerServer = 2
     Map<String, Map<String, String>> nextAssignment =
         TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, false, false,
-            2, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+            2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment, targetAssignment);
 
     // Next assignment with 2 minimum available replicas with strict replica-group should finish in 2 steps even with
@@ -1913,7 +1888,7 @@ public class TableRebalancerTest {
     //
     // The second assignment should reach the target assignment
     nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, true, false,
-        2, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+        2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
         new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
     assertEquals(nextAssignment.get("segment__2__0__98347869999L").keySet(),
@@ -1923,7 +1898,7 @@ public class TableRebalancerTest {
     assertEquals(nextAssignment.get("segment__4__0__98347869999L").keySet(),
         new TreeSet<>(Arrays.asList("host1", "host3", "host4")));
     nextAssignment = TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, true, false,
-        2, new Object2IntOpenHashMap<>(), SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+        2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
     assertEquals(nextAssignment, targetAssignment);
 
     // Try assignment with overlapping partitions across segments, especially for strict replica group based.
@@ -2018,10 +1993,9 @@ public class TableRebalancerTest {
     // the full partition must be selected for movement for a given Pair(currentInstance, targetInstances).
     // Batch size = 1, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
-      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       if (!enableStrictReplicaGroup) {
         // Nothing should change, since we don't select based on partitions for non-strict replica groups
         assertNotEquals(nextAssignment, targetAssignment);
@@ -2035,7 +2009,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       }
       assertEquals(nextAssignment, targetAssignment);
     }
@@ -2097,10 +2071,9 @@ public class TableRebalancerTest {
     // the full partition must be selected for movement for a given Pair(currentInstance, targetInstances).
     // Batch size = 1, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
-      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       if (!enableStrictReplicaGroup) {
         // Nothing should change, since we don't select based on partitions for non-strict replica groups
         assertNotEquals(nextAssignment, targetAssignment);
@@ -2114,7 +2087,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host2", "host3", "host4")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host2", "host4", "host6")));
@@ -2126,7 +2099,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       } else {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
@@ -2139,7 +2112,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host2", "host4", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       }
       assertEquals(nextAssignment, targetAssignment);
     }
@@ -2265,10 +2238,9 @@ public class TableRebalancerTest {
     // the full partition must be selected for movement for a given Pair(currentInstance, targetInstances).
     // Batch size = 1, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
-      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       if (!enableStrictReplicaGroup) {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
@@ -2285,7 +2257,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
@@ -2301,7 +2273,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
@@ -2317,7 +2289,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       } else {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
@@ -2334,7 +2306,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host2", "host3")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                1, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       }
       assertEquals(nextAssignment, targetAssignment);
     }
@@ -2504,10 +2476,9 @@ public class TableRebalancerTest {
     // though the full Pair(currentAssignment, targetAssignment) + partitionId moves as a block, it can take longer
     // to move since this can be a smaller granularity. Batch size = 2, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
-      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       if (!enableStrictReplicaGroup) {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
@@ -2530,7 +2501,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
@@ -2552,7 +2523,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       } else {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
@@ -2575,7 +2546,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
@@ -2597,7 +2568,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       }
       assertEquals(nextAssignment, targetAssignment);
     }
@@ -2605,10 +2576,9 @@ public class TableRebalancerTest {
     // Next assignment with 2 minimum available replicas without strict replica-group should reach the target
     // assignment after two steps if strict replica group is disabled or enabled. Batch size = 5, unique partitionIds
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
-      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       nextAssignment =
           TableRebalancer.getNextAssignment(currentAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-              5, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+              5, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       if (!enableStrictReplicaGroup) {
         assertNotEquals(nextAssignment, targetAssignment);
         assertEquals(nextAssignment.get("segment__1__0__98347869999L").keySet(),
@@ -2632,7 +2602,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host3", "host6")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       } else {
         // This would have completed in a single step for batchSizePerServer = 5 if we did not have an additional check
         // to only add segments that exceed the batchSizePerServer if no prior segments were already assigned to a
@@ -2658,7 +2628,7 @@ public class TableRebalancerTest {
             new TreeSet<>(Arrays.asList("host1", "host3", "host5")));
         nextAssignment =
             TableRebalancer.getNextAssignment(nextAssignment, targetAssignment, 2, enableStrictReplicaGroup, false,
-                2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+                2, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
       }
       assertEquals(nextAssignment, targetAssignment);
     }
@@ -2699,10 +2669,205 @@ public class TableRebalancerTest {
 
     // The DataLossRiskAssessor returns true, so we expect an exception to be thrown
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
-      Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       assertThrows(IllegalStateException.class, () -> TableRebalancer.getNextAssignment(currentAssignment,
-          targetAssignment, 2, enableStrictReplicaGroup, false, 2, segmentToPartitionIdMap, SIMPLE_PARTITION_FETCHER,
-          ALWAYS_TRUE_DATA_LOSS_RISK_ASSESSOR));
+          targetAssignment, 2, enableStrictReplicaGroup, false, 2, ALWAYS_TRUE_DATA_LOSS_RISK_ASSESSOR));
     }
+  }
+
+  @Test
+  public void testNextAssignmentWithPartitionAssignment() {
+    // Partition 1 and 2 have one segment each, partition 3 has no segment, partition 4 is dropped from the target, and
+    // partition 5 has no segment and its instances host no segment
+    String segment1 = "segment__1__0__98347869999L";
+    String segment2 = "segment__2__0__98347869999L";
+    List<String> currentInstances = List.of("host1", "host2", "host3");
+    List<String> targetInstances = List.of("host4", "host5", "host6");
+    List<String> emptyCurrentInstances = List.of("host7", "host8", "host9");
+    List<String> emptyTargetInstances = List.of("host10", "host11", "host12");
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    currentAssignment.put(segment1, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, ONLINE));
+    currentAssignment.put(segment2, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, CONSUMING));
+    Map<String, Map<String, String>> targetAssignment = new TreeMap<>();
+    targetAssignment.put(segment1, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, ONLINE));
+    targetAssignment.put(segment2, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, CONSUMING));
+    Map<Integer, List<String>> currentPartitionAssignment =
+        Map.of(1, currentInstances, 2, currentInstances, 3, currentInstances, 4, List.of("host13"), 5,
+            emptyCurrentInstances);
+    Map<Integer, List<String>> targetPartitionAssignment =
+        Map.of(1, targetInstances, 2, targetInstances, 3, targetInstances, 5, emptyTargetInstances);
+    TableAssignment target = new TableAssignment(targetAssignment, targetPartitionAssignment);
+    List<String> step1Instances = List.of("host1", "host2", "host4");
+    List<String> step2Instances = List.of("host1", "host4", "host5");
+    List<String> emptyStep1Instances = List.of("host10", "host7", "host8");
+    List<String> emptyStep2Instances = List.of("host10", "host11", "host7");
+
+    // Without batching, the partitions take the same steps as the segments with the same current and target
+    // instances, and reach the target in 3 steps with 2 minimum available replicas
+    TableAssignment nextAssignment =
+        TableRebalancer.getNextAssignment(currentAssignment, currentPartitionAssignment, target, 2, true, false,
+            RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment1).keySet(), new TreeSet<>(step1Instances));
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment2).keySet(), new TreeSet<>(step1Instances));
+    assertEquals(nextAssignment.getPartitionAssignment(),
+        Map.of(1, step1Instances, 2, step1Instances, 3, step1Instances, 5, emptyStep1Instances));
+
+    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment.getSegmentAssignment(),
+        nextAssignment.getPartitionAssignment(), target, 2, true, false,
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment1).keySet(), new TreeSet<>(step2Instances));
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment2).keySet(), new TreeSet<>(step2Instances));
+    assertEquals(nextAssignment.getPartitionAssignment(),
+        Map.of(1, step2Instances, 2, step2Instances, 3, step2Instances, 5, emptyStep2Instances));
+
+    nextAssignment = TableRebalancer.getNextAssignment(nextAssignment.getSegmentAssignment(),
+        nextAssignment.getPartitionAssignment(), target, 2, true, false,
+        RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+    assertEquals(nextAssignment.getSegmentAssignment(), targetAssignment);
+    assertEquals(nextAssignment.getPartitionAssignment(), targetPartitionAssignment);
+
+    // With batch size 1, a partition moves exactly when its segments move: partition 1 moves with its segment in the
+    // first step, while partition 2 (whose segment exhausts the batch size) and partition 3 (without segment) wait
+    // for the next steps. Partition 5 moves alone since its instances host no segment.
+    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, currentPartitionAssignment, target, 2, true,
+        false, 1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment1).keySet(), new TreeSet<>(step1Instances));
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment2), currentAssignment.get(segment2));
+    assertEquals(nextAssignment.getPartitionAssignment(),
+        Map.of(1, step1Instances, 2, currentInstances, 3, currentInstances, 5, emptyStep1Instances));
+
+    // Without strict replica-group, the partition assignment is not moved
+    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, currentPartitionAssignment, target, 2, false,
+        false, 1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment1).keySet(), new TreeSet<>(step1Instances));
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment2), currentAssignment.get(segment2));
+    assertEquals(nextAssignment.getPartitionAssignment(), Map.of());
+  }
+
+  /// With strict replica-group, the segments whose name does not carry a partition id are batched by the partition
+  /// ids of the target, resolved from their ZK metadata by the segment assignment.
+  @Test
+  public void testNextAssignmentWithSegmentPartitionIds() {
+    String segment1 = "segment_a";
+    String segment2 = "segment_b";
+    List<String> currentInstances = List.of("host1", "host2", "host3");
+    List<String> targetInstances = List.of("host4", "host5", "host6");
+    Map<String, Map<String, String>> currentAssignment = Map.of(
+        segment1, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, ONLINE),
+        segment2, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, ONLINE)
+    );
+    Map<String, Map<String, String>> targetAssignment = Map.of(
+        segment1, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, ONLINE),
+        segment2, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, ONLINE)
+    );
+    Set<String> step1Instances = new TreeSet<>(List.of("host1", "host2", "host4"));
+
+    // Segments of the same partition move together although the batch size is 1
+    TableAssignment nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, Map.of(),
+        new TableAssignment(targetAssignment, Map.of(), toSegmentPartitionIds(Map.of(segment1, 1, segment2, 1))),
+        2, true, false, 1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment1).keySet(), step1Instances);
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment2).keySet(), step1Instances);
+
+    // Segments of different partitions move in different batches
+    nextAssignment = TableRebalancer.getNextAssignment(currentAssignment, Map.of(),
+        new TableAssignment(targetAssignment, Map.of(), toSegmentPartitionIds(Map.of(segment1, 1, segment2, 2))),
+        2, true, false, 1, DEFAULT_DATA_LOSS_RISK_ASSESSOR);
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment1).keySet(), step1Instances);
+    assertEquals(nextAssignment.getSegmentAssignment().get(segment2), currentAssignment.get(segment2));
+  }
+
+  @Test
+  public void testTargetAssignmentForNewIdealState() {
+    String movedSegment = "segment__1__0__98347869999L";
+    String newCompletedSegment = "segment__1__1__98347869999L";
+    String newConsumingSegment = "segment__1__2__98347869999L";
+    String newRelocatedSegment = "segment__2__0__98347869999L";
+    String newOfflineSegment = "segment__2__1__98347869999L";
+    String newSegmentOfDroppedPartition = "segment__3__0__98347869999L";
+    String newSegmentOfPartitionWithoutEntry = "segment__4__0__98347869999L";
+    String newSegmentWithoutPartitionId = "uploadedSegment";
+    List<String> currentInstances = List.of("host1", "host2", "host3");
+    List<String> targetInstances = List.of("host4", "host5", "host6");
+    List<String> otherInstances = List.of("host7", "host8", "host9");
+    // Partition 3 is dropped by the target, partition 5 was added while waiting
+    Map<Integer, List<String>> oldPartitionAssignment =
+        Map.of(1, currentInstances, 2, currentInstances, 3, otherInstances);
+    Map<Integer, List<String>> currentPartitionAssignment =
+        Map.of(1, currentInstances, 2, currentInstances, 3, otherInstances, 5, otherInstances);
+    Object2IntMap<String> targetSegmentPartitionIds = toSegmentPartitionIds(Map.of(movedSegment, 1));
+    TableAssignment target =
+        new TableAssignment(Map.of(movedSegment, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, ONLINE)),
+            Map.of(1, targetInstances, 2, targetInstances), targetSegmentPartitionIds);
+    Map<Integer, List<String>> expectedPartitionAssignment =
+        Map.of(1, targetInstances, 2, targetInstances, 5, otherInstances);
+    List<String> segmentsToMove = List.of(movedSegment);
+    Logger logger = LoggerFactory.getLogger(TableRebalancerTest.class);
+    // The new ideal state has a new completed segment and a new CONSUMING segment of partition 1 on the current
+    // instances of the partition, a new segment of partition 2 relocated to other instances, and a new OFFLINE
+    // segment of partition 2
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    currentAssignment.put(movedSegment, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, ONLINE));
+    currentAssignment.put(newCompletedSegment, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, ONLINE));
+    currentAssignment.put(newConsumingSegment,
+        SegmentAssignmentUtils.getInstanceStateMap(currentInstances, CONSUMING));
+    currentAssignment.put(newRelocatedSegment, SegmentAssignmentUtils.getInstanceStateMap(otherInstances, ONLINE));
+    currentAssignment.put(newOfflineSegment, SegmentAssignmentUtils.getInstanceStateMap(currentInstances, OFFLINE));
+
+    // Without stepping the partition assignment, once the entries are at the target (partition 3 dropped, partition
+    // 5 added while waiting), only the segments to move are re-targeted
+    TableAssignment newTargetAssignment =
+        TableRebalancer.getTargetAssignmentForNewIdealState(currentAssignment, oldPartitionAssignment,
+            expectedPartitionAssignment, target, segmentsToMove, false, false, logger);
+    Map<String, Map<String, String>> expectedAssignment = new TreeMap<>(currentAssignment);
+    expectedAssignment.put(movedSegment, target.getSegmentAssignment().get(movedSegment));
+    assertEquals(newTargetAssignment.getSegmentAssignment(), expectedAssignment);
+    assertEquals(newTargetAssignment.getPartitionAssignment(), expectedPartitionAssignment);
+    assertEquals(newTargetAssignment.getSegmentPartitionIds(), targetSegmentPartitionIds);
+
+    // Until then, a segment added while waiting requires a full recalculation, which keeps the CONSUMING segments as
+    // they are when they are excluded
+    assertNull(TableRebalancer.getTargetAssignmentForNewIdealState(currentAssignment, oldPartitionAssignment,
+        currentPartitionAssignment, target, segmentsToMove, false, false, logger));
+
+    // When the partition assignment is stepped, the new completed and CONSUMING segments follow their partition,
+    // while the relocated and OFFLINE segments are kept
+    expectedAssignment.put(newCompletedSegment, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, ONLINE));
+    expectedAssignment.put(newConsumingSegment, SegmentAssignmentUtils.getInstanceStateMap(targetInstances, CONSUMING));
+    newTargetAssignment = TableRebalancer.getTargetAssignmentForNewIdealState(currentAssignment,
+        oldPartitionAssignment, currentPartitionAssignment, target, segmentsToMove, true, false, logger);
+    assertEquals(newTargetAssignment.getSegmentAssignment(), expectedAssignment);
+    assertEquals(newTargetAssignment.getPartitionAssignment(), expectedPartitionAssignment);
+
+    // A new completed segment of a table relocating completed segments requires a full recalculation
+    assertNull(TableRebalancer.getTargetAssignmentForNewIdealState(currentAssignment, oldPartitionAssignment,
+        currentPartitionAssignment, target, segmentsToMove, true, true, logger));
+
+    // A new segment of a partition dropped by the target, which had no segment when the target was computed, requires
+    // a full recalculation
+    Map<String, Map<String, String>> assignmentWithDroppedPartition = new TreeMap<>(currentAssignment);
+    assignmentWithDroppedPartition.put(newSegmentOfDroppedPartition,
+        SegmentAssignmentUtils.getInstanceStateMap(otherInstances, CONSUMING));
+    assertNull(TableRebalancer.getTargetAssignmentForNewIdealState(assignmentWithDroppedPartition,
+        oldPartitionAssignment, currentPartitionAssignment, target, segmentsToMove, true, false, logger));
+
+    // A new segment of a partition without entry requires a full recalculation
+    Map<String, Map<String, String>> assignmentWithNewPartition = new TreeMap<>(currentAssignment);
+    assignmentWithNewPartition.put(newSegmentOfPartitionWithoutEntry,
+        SegmentAssignmentUtils.getInstanceStateMap(otherInstances, CONSUMING));
+    assertNull(TableRebalancer.getTargetAssignmentForNewIdealState(assignmentWithNewPartition,
+        oldPartitionAssignment, currentPartitionAssignment, target, segmentsToMove, true, false, logger));
+
+    // A new segment without partition id in its name requires a full recalculation
+    Map<String, Map<String, String>> assignmentWithUploadedSegment = new TreeMap<>(currentAssignment);
+    assignmentWithUploadedSegment.put(newSegmentWithoutPartitionId,
+        SegmentAssignmentUtils.getInstanceStateMap(currentInstances, ONLINE));
+    assertNull(TableRebalancer.getTargetAssignmentForNewIdealState(assignmentWithUploadedSegment,
+        oldPartitionAssignment, currentPartitionAssignment, target, segmentsToMove, true, false, logger));
+  }
+
+  private static Object2IntMap<String> toSegmentPartitionIds(Map<String, Integer> partitionIds) {
+    Object2IntOpenHashMap<String> segmentPartitionIds = new Object2IntOpenHashMap<>(partitionIds);
+    segmentPartitionIds.defaultReturnValue(BaseSegmentAssignment.SEGMENT_NOT_FOUND);
+    return segmentPartitionIds;
   }
 }

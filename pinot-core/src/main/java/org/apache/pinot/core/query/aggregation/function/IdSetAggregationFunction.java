@@ -658,6 +658,15 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
     }
   }
 
+  @Override
+  public String mergeFinalResult(String finalResult1, String finalResult2) {
+    try {
+      return merge(IdSets.fromBase64String(finalResult1), IdSets.fromBase64String(finalResult2)).toBase64String();
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while merging IdSets", e);
+    }
+  }
+
   /// Returns the IdSet from the result holder or creates a new one if it does not exist.
   private IdSet getIdSet(AggregationResultHolder aggregationResultHolder, DataType valueType) {
     IdSet idSet = aggregationResultHolder.getResult();

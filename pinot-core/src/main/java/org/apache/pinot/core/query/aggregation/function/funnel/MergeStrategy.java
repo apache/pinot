@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import javax.annotation.concurrent.ThreadSafe;
 
 
@@ -31,5 +30,12 @@ import javax.annotation.concurrent.ThreadSafe;
 interface MergeStrategy<I> {
   I merge(I intermediateResult1, I intermediateResult2);
 
-  LongArrayList extractFinalResult(I intermediateResult);
+  /// Whether [#merge] is valid for intermediates of DIFFERENT groups (see
+  /// [org.apache.pinot.core.query.aggregation.function.AggregationFunction#canMergeIntermediatesAcrossGroups]).
+  /// Partitioned strategies keep per-segment-final counts and must only merge the same group across segments.
+  default boolean isMergeableAcrossGroups() {
+    return true;
+  }
+
+  long[] extractFinalResult(I intermediateResult);
 }

@@ -29,7 +29,6 @@ import org.apache.pinot.query.runtime.operator.ErrorOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /// Extension point for alternative plan-to-[OpChain] converters. The active implementation is chosen by
@@ -57,7 +56,8 @@ public interface OpChainConverter {
   ///                can keep track of this mapping.
   OpChain convert(PlanNode node, OpChainExecutionContext context, BiConsumer<PlanNode, MultiStageOperator> tracker);
 
-  /// Builds a minimal op-chain that sends an already-detected stage error to downstream receivers.
+  /// Builds a minimal op-chain that sends an already-detected stage error, with its error code, to downstream
+  /// receivers.
   ///
   /// This is used, for example, when a pipeline breaker detects an error and needs to propagate it to downstream
   /// stages.
@@ -71,7 +71,7 @@ public interface OpChainConverter {
     }
     MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
     String message = extractErrorMessage(errorBlock);
-    MultiStageOperator errorOp = new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, message);
+    MultiStageOperator errorOp = new ErrorOperator(context, errorBlock.getMainErrorCode(), message);
     MultiStageOperator sendOp = new MailboxSendOperator(context, errorOp, rootNode);
     return new OpChain(context, sendOp);
   }

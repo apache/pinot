@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -59,8 +60,9 @@ public class UnnestOperator extends MultiStageOperator {
     _input = input;
     List<RexExpression> arrayExprs = node.getArrayExprs();
     _arrayExprOperands = new ArrayList<>(arrayExprs.size());
+    boolean nullHandlingEnabled = QueryOptionsUtils.isNullHandlingEnabled(context.getOpChainMetadata());
     for (RexExpression arrayExpr : arrayExprs) {
-      _arrayExprOperands.add(TransformOperandFactory.getTransformOperand(arrayExpr, inputSchema));
+      _arrayExprOperands.add(TransformOperandFactory.getTransformOperand(arrayExpr, inputSchema, nullHandlingEnabled));
     }
     _resultSchema = node.getDataSchema();
     _withOrdinality = node.isWithOrdinality();

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.util;
 
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.segment.local.utils.TableConfigUtils.ValidationType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -89,6 +91,20 @@ public class TaskConfigUtilsTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(tableTaskConfig).build();
     TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, null);
+  }
+
+  @Test
+  public void testValidateTableTaskConfigsSkipped() {
+    TableTaskConfig tableTaskConfig =
+        new TableTaskConfig(Map.of(TEST_TASK_TYPE, Map.of("schedule", "0 */10 * ? * * *")));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(tableTaskConfig).build();
+    // The task generator rejects every task config, so these pass only because the task validation is skipped
+    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, EnumSet.of(ValidationType.TASK));
+    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager,
+        EnumSet.of(ValidationType.UPSERT, ValidationType.TASK));
+    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, EnumSet.of(ValidationType.ALL));
+    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), null, null);
   }
 
   @Test

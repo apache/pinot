@@ -248,7 +248,7 @@ public class IpAddressFunctions {
   /// @param ipString IP address string (e.g., "192.168.1.1" or "2001:db8::1")
   /// @return 4 or 6
   /// @throws IllegalArgumentException if the string is not a valid IP address
-  @ScalarFunction(names = {"ipFamily", "ip_family"})
+  @ScalarFunction
   public static int ipFamily(String ipString) {
     IPAddress addr = getAddress(ipString);
     return addr.isIPv4() ? 4 : 6;
@@ -259,7 +259,7 @@ public class IpAddressFunctions {
   /// @param cidr CIDR string (e.g., "192.168.1.0/24" or "2001:db8::/32")
   /// @return the prefix length (e.g., 24)
   /// @throws IllegalArgumentException if the input is not a valid CIDR prefix
-  @ScalarFunction(names = {"ipMaskLen", "ip_mask_len"})
+  @ScalarFunction
   public static int ipMaskLen(String cidr) {
     IPAddress prefix = getPrefix(cidr);
     return prefix.getNetworkPrefixLength();
@@ -300,7 +300,7 @@ public class IpAddressFunctions {
   /// @param cidr CIDR string (e.g., "192.168.1.0/24")
   /// @return network mask string (e.g., "255.255.255.0")
   /// @throws IllegalArgumentException if the input is not a valid CIDR prefix
-  @ScalarFunction(names = {"ipNetmask", "ip_netmask"})
+  @ScalarFunction
   public static String ipNetmask(String cidr) {
     return buildMask(getPrefix(cidr), false);
   }
@@ -310,7 +310,7 @@ public class IpAddressFunctions {
   /// @param cidr CIDR string (e.g., "192.168.1.0/24")
   /// @return host mask string (e.g., "0.0.0.255")
   /// @throws IllegalArgumentException if the input is not a valid CIDR prefix
-  @ScalarFunction(names = {"ipHostmask", "ip_hostmask"})
+  @ScalarFunction
   public static String ipHostmask(String cidr) {
     return buildMask(getPrefix(cidr), true);
   }
@@ -329,7 +329,7 @@ public class IpAddressFunctions {
   /// @param ipString IP address string without a prefix length (e.g., `"192.168.1.1"`)
   /// @return `true` if the address is private or reserved
   /// @throws IllegalArgumentException if the string is not a valid non-prefixed IP address
-  @ScalarFunction(names = {"isPrivateIp", "is_private_ip"})
+  @ScalarFunction
   public static boolean isPrivateIp(String ipString) {
     IPAddress ip = getAddress(ipString);
     if (ip.isPrefixed()) {

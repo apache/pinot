@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.writer;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
 import java.io.File;
 import java.time.Duration;
@@ -78,6 +79,17 @@ import org.slf4j.LoggerFactory;
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
 ///
+/// A batch that reports data loss (records between the requested offset and the batch were deleted from the stream
+/// before they could be replayed) fails the replay before anything from it is indexed: the replayed segment would
+/// otherwise silently miss part of its offset range. The segment then stays in ERROR until the operator restores the
+/// range from another source or deletes the segment to accept the loss.
+///
+/// A batch without unfiltered messages never moves the writer, whatever next offset it reports: the writer polls again
+/// from its own offset. A Kafka consumer reports its client position there, which can lie past transaction markers,
+/// but also past deleted records after an out-of-range reset it has not reported as loss yet. The loss check of the
+/// next batch with records then covers the whole gap. Reaching the end offset never needs that position, since the
+/// data manager only moves its own offset on fetched records.
+///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
 ///   2. Use a different segment impl for better performance because it doesn't need to serve queries.
@@ -114,6 +126,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   private final TransformPipeline _transformPipeline;
   private volatile boolean _isSuccess = false;
   private volatile Throwable _consumptionException;
+  // Set by stopConsumption() to end the consumption at the next batch, even if the stream ignores the interrupt
+  private volatile boolean _shouldStop;
 
   public StatelessRealtimeSegmentWriter(SegmentZKMetadata segmentZKMetadata, IndexLoadingConfig indexLoadingConfig,
       @Nullable Semaphore segBuildSemaphore)
@@ -259,8 +273,24 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
         while (_currentOffset.compareTo(_endOffset) < 0) {
+          if (_shouldStop) {
+            _consumptionException = new IllegalStateException(
+                "Consumption stopped at offset: " + _currentOffset + " before reaching end offset: " + _endOffset);
+            _logger.info("Stopped consumption at offset: {} before reaching end offset: {}", _currentOffset,
+                _endOffset);
+            return;
+          }
+
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
+          Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s: "
+              + "the stream no longer holds this range (e.g. it aged out of retention), so the segment cannot be "
+              + "rebuilt from it. Restore the range from another source, or delete the segment to accept the loss",
+              _currentOffset, _endOffset);
+          if (messageBatch.getUnfilteredMessageCount() == 0) {
+            // Poll again from the same offset (see the class Javadoc)
+            continue;
+          }
 
           int messageCount = messageBatch.getMessageCount();
 
@@ -306,13 +336,11 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   }
 
   public void stopConsumption() {
+    _shouldStop = true;
     if (_consumerThread.isAlive()) {
       _consumerThread.interrupt();
-      try {
-        _consumerThread.join();
-      } catch (InterruptedException e) {
-        _logger.warn("Interrupted while waiting for consumer thread to finish");
-      }
+      // Wait even if interrupted, so that the segment is not destroyed while the consumer thread is still indexing
+      Uninterruptibles.joinUninterruptibly(_consumerThread);
     }
   }
 
@@ -324,6 +352,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     return _isSuccess;
   }
 
+  @Nullable
   public Throwable getConsumptionException() {
     return _consumptionException;
   }

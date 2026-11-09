@@ -19,21 +19,27 @@
 package org.apache.pinot.integration.tests.realtime.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.FailureInjectionUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 public class FailureInjectingPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   private final Map<String, String> _failureConfig;
   private final Set<String> _forceExpiredSegments = ConcurrentHashMap.newKeySet();
+  // Non-null while table config reads are blocked, see blockTableConfigReads()
+  private volatile CountDownLatch _tableConfigReadLatch;
 
   public FailureInjectingPinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
@@ -57,6 +63,30 @@ public class FailureInjectingPinotLLCRealtimeSegmentManager extends PinotLLCReal
 
   public void clearForceExpiredSegments() {
     _forceExpiredSegments.clear();
+  }
+
+  /// Makes table config reads wait until [#unblockTableConfigReads()] is called, like reads that queue behind a burst
+  /// of other requests on the controller's ZooKeeper session.
+  public void blockTableConfigReads() {
+    _tableConfigReadLatch = new CountDownLatch(1);
+  }
+
+  public void unblockTableConfigReads() {
+    CountDownLatch latch = _tableConfigReadLatch;
+    if (latch != null) {
+      _tableConfigReadLatch = null;
+      latch.countDown();
+    }
+  }
+
+  @Override
+  public TableConfig getTableConfig(String realtimeTableName) {
+    CountDownLatch latch = _tableConfigReadLatch;
+    if (latch != null) {
+      // Wait longer than the server's request timeout, but not forever in case a test does not unblock the reads
+      Uninterruptibles.awaitUninterruptibly(latch, 1, TimeUnit.MINUTES);
+    }
+    return super.getTableConfig(realtimeTableName);
   }
 
   @VisibleForTesting

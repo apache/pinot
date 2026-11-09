@@ -36,5 +36,38 @@
         ]
       }
     ]
+  },
+  "literal_function_evaluation": {
+    "comments": "The planner evaluates a function call on literals. It must pass the literals as the Java values that the runtime passes for the same values, e.g. an Integer for an INT literal rather than the BigDecimal that Calcite stores, or functions that dispatch on the value class return other results. Each query compares a call on a literal with the same call on column values, which runs above the leaf stage because of the GROUP BY.",
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          [1, 10000000001, 1.25],
+          [5, 10000000005, 1.5]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Sketches of an INT literal",
+        "sql": "SELECT intCol, toBase64(toThetaSketch(5)) = toBase64(toThetaSketch(intCol)), toBase64(toHLL(5)) = toBase64(toHLL(intCol)), toBase64(toCpcSketch(5)) = toBase64(toCpcSketch(intCol)), toBase64(toULL(5)) = toBase64(toULL(intCol)), toBase64(toIntegerSumTupleSketch(5, 1)) = toBase64(toIntegerSumTupleSketch(intCol, 1)) FROM (SELECT intCol FROM {tbl} GROUP BY intCol) t",
+        "h2Sql": "SELECT intCol, intCol = 5, intCol = 5, intCol = 5, intCol = 5, intCol = 5 FROM (SELECT intCol FROM {tbl} GROUP BY intCol) t"
+      },
+      {
+        "description": "Sketch of a BIGINT literal",
+        "sql": "SELECT longCol, toBase64(toThetaSketch(10000000005)) = toBase64(toThetaSketch(longCol)) FROM (SELECT longCol FROM {tbl} GROUP BY longCol) t",
+        "h2Sql": "SELECT longCol, longCol = 10000000005 FROM (SELECT longCol FROM {tbl} GROUP BY longCol) t"
+      },
+      {
+        "description": "Sketch of a DECIMAL literal, which the runtime reads as a DOUBLE",
+        "sql": "SELECT doubleCol, toBase64(toThetaSketch(1.5)) = toBase64(toThetaSketch(doubleCol)) FROM (SELECT doubleCol FROM {tbl} GROUP BY doubleCol) t",
+        "h2Sql": "SELECT doubleCol, doubleCol = 1.5 FROM (SELECT doubleCol FROM {tbl} GROUP BY doubleCol) t"
+      }
+    ]
   }
 }

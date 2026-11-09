@@ -40,8 +40,11 @@ import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.PinotClientTransport;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -284,6 +287,50 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @Test
+  public void testShadowModeTableQueryQuota()
+      throws Exception {
+    // Cluster default is ENFORCED; the table opts into SHADOW
+    int shadowQps = 5;
+    addQueryQuotaToTableConfig(shadowQps, QuotaEnforcementMode.SHADOW);
+    verifyQuotaUpdate(shadowQps);
+    long breachesBefore = queryQuotaBreachCount();
+    runQueries(shadowQps * 4, false);
+    Assert.assertTrue(queryQuotaBreachCount() > breachesBefore,
+        "SHADOW mode must still meter QUERY_QUOTA_EXCEEDED when the quota is breached");
+
+    // Flip to ENFORCED (different QPS so verifyQuotaUpdate waits for propagation): same load is now rejected
+    int enforcedQps = 6;
+    addQueryQuotaToTableConfig(enforcedQps, QuotaEnforcementMode.ENFORCED);
+    verifyQuotaUpdate(enforcedQps);
+    runQueries(enforcedQps * 4, true);
+
+    // Flip back to SHADOW: no rejections again
+    addQueryQuotaToTableConfig(shadowQps, QuotaEnforcementMode.SHADOW);
+    verifyQuotaUpdate(shadowQps);
+    runQueries(shadowQps * 4, false);
+  }
+
+  @Test
+  public void testDisabledModeTableQueryQuota()
+      throws Exception {
+    int maxQps = 5;
+    addQueryQuotaToTableConfig(maxQps, QuotaEnforcementMode.DISABLED);
+    verifyQuotaUpdate(maxQps);
+    long breachesBefore = queryQuotaBreachCount();
+    runQueries(maxQps * 4, false);
+    Assert.assertEquals(queryQuotaBreachCount(), breachesBefore, "DISABLED mode must not meter breaches");
+  }
+
+  @Test
+  public void testUnsetModeBehavesAsEnforced()
+      throws Exception {
+    int maxQps = 5;
+    addQueryQuotaToTableConfig(maxQps);
+    verifyQuotaUpdate(maxQps);
+    runQueries(maxQps * 4, true);
+  }
+
+  @Test
   public void testLogicalTableQueryQuota()
       throws Exception {
     int maxQps = 10;
@@ -510,6 +557,18 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     } else {
       Assert.assertEquals(failCount, 0, "Expected 0 failures for qps: " + qps);
     }
+  }
+
+  private long queryQuotaBreachCount() {
+    return BrokerMetrics.get().getMeteredTableValue(getTableName(), BrokerMeter.QUERY_QUOTA_EXCEEDED).count();
+  }
+
+  public void addQueryQuotaToTableConfig(Integer maxQps, QuotaEnforcementMode queryMode)
+      throws Exception {
+    TableConfig tableConfig = getOfflineTableConfig();
+    QuotaConfig quotaConfig = new QuotaConfig(null, maxQps == null ? null : maxQps.toString(), null, queryMode);
+    tableConfig.setQuotaConfig(quotaConfig);
+    updateTableConfig(tableConfig);
   }
 
   public void addQueryQuotaToTableConfig(Integer maxQps)

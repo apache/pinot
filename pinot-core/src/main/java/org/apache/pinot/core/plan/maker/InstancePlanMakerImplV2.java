@@ -21,15 +21,23 @@ package org.apache.pinot.core.plan.maker;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -53,9 +61,18 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,41 +82,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final int DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT = 1;
   public static final int DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT = 10_000;
 
-  // The following fields are deprecated and will be removed after 1.4 release
-  // Use CommonConstants.Server.* instead
-  @Deprecated
-  public static final String MAX_EXECUTION_THREADS_KEY = Server.MAX_EXECUTION_THREADS;
-  @Deprecated
-  public static final int DEFAULT_MAX_EXECUTION_THREADS = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
-  @Deprecated
-  public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY = Server.MAX_INITIAL_RESULT_HOLDER_CAPACITY;
-  @Deprecated
-  public static final int DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
-      Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
-  @Deprecated
-  public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY_KEY = Server.MIN_INITIAL_INDEXED_TABLE_CAPACITY;
-  @Deprecated
-  public static final int DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
-      Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
-  @Deprecated
-  public static final String NUM_GROUPS_LIMIT_KEY = Server.NUM_GROUPS_LIMIT;
-  @Deprecated
-  public static final int DEFAULT_NUM_GROUPS_LIMIT = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
-  @Deprecated
-  public static final String MIN_SEGMENT_GROUP_TRIM_SIZE_KEY = Server.MIN_SEGMENT_GROUP_TRIM_SIZE;
-  @Deprecated
-  public static final int DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE =
-      Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
-  @Deprecated
-  public static final String MIN_SERVER_GROUP_TRIM_SIZE_KEY = Server.MIN_SERVER_GROUP_TRIM_SIZE;
-  @Deprecated
-  public static final int DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
-  @Deprecated
-  public static final String GROUPBY_TRIM_THRESHOLD_KEY = Server.GROUPBY_TRIM_THRESHOLD;
-  @Deprecated
-  public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
-
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
+  // Cap planning work independently of the query's configurable group limit.
+  private static final int MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES = 1 << 20;
 
   private final FetchPlanner _fetchPlanner = FetchPlannerRegistry.getPlanner();
   private int _maxExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
@@ -114,6 +99,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int _minSegmentGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
   private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
   private int _groupByTrimThreshold = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
+  private AndRestrictionPushdownMode _andRestrictionPushdownMode =
+      Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE;
+  // Server-wide defaults for the streaming selection ORDER BY merge; the query options override them
+  private double _sortedSelectionMergeAutoMinSortedRatio = Server.DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO;
+  private int _sortedSelectionMergeBlockSize = Server.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE;
 
   @Override
   public void init(PinotConfiguration queryExecutorConfig) {
@@ -142,13 +132,29 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE);
     _groupByTrimThreshold = queryExecutorConfig.getProperty(Server.GROUPBY_TRIM_THRESHOLD,
         Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD);
+    _andRestrictionPushdownMode = QueryOptionsUtils.parseAndRestrictionPushdownMode(
+        Server.AND_RESTRICTION_PUSHDOWN_MODE, queryExecutorConfig.getProperty(Server.AND_RESTRICTION_PUSHDOWN_MODE,
+            Server.DEFAULT_QUERY_EXECUTOR_AND_RESTRICTION_PUSHDOWN_MODE.name()));
     Preconditions.checkState(_groupByTrimThreshold > 0,
         "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
+    _sortedSelectionMergeAutoMinSortedRatio =
+        queryExecutorConfig.getProperty(Server.SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO,
+            Server.DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO);
+    Preconditions.checkState(
+        _sortedSelectionMergeAutoMinSortedRatio >= 0 && _sortedSelectionMergeAutoMinSortedRatio <= 1,
+        "Invalid configuration: sortedSelectionMergeAutoMinSortedRatio: %s must be in [0, 1]",
+        _sortedSelectionMergeAutoMinSortedRatio);
+    _sortedSelectionMergeBlockSize = queryExecutorConfig.getProperty(Server.SORTED_SELECTION_MERGE_BLOCK_SIZE,
+        Server.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE);
+    Preconditions.checkState(_sortedSelectionMergeBlockSize > 0,
+        "Invalid configuration: sortedSelectionMergeBlockSize: %s must be positive", _sortedSelectionMergeBlockSize);
     LOGGER.info("Initialized plan maker with maxExecutionThreads: {}, defaultExecutionThreads: {}, "
             + "maxInitialResultHolderCapacity: {}, numGroupsLimit: {}, minSegmentGroupTrimSize: {}, "
-            + "minServerGroupTrimSize: {}, groupByTrimThreshold: {}",
+            + "minServerGroupTrimSize: {}, groupByTrimThreshold: {}, sortedSelectionMergeAutoMinSortedRatio: {}, "
+            + "sortedSelectionMergeBlockSize: {}",
         _maxExecutionThreads, _defaultExecutionThreads, _maxInitialResultHolderCapacity, _numGroupsLimit,
-        _minSegmentGroupTrimSize, _minServerGroupTrimSize, _groupByTrimThreshold);
+        _minSegmentGroupTrimSize, _minServerGroupTrimSize, _groupByTrimThreshold,
+        _sortedSelectionMergeAutoMinSortedRatio, _sortedSelectionMergeBlockSize);
   }
 
   @VisibleForTesting
@@ -201,34 +207,86 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _groupByTrimThreshold = groupByTrimThreshold;
   }
 
+  /// Adds one plan node per segment to `planNodes`. With prefetch enabled, a segment for which the [FetchPlanner]
+  /// plans a [FetchContext] gets a plan node that acquires and releases its buffers around execution, and is added to
+  /// `fetchSegmentContexts` with its context added to `fetchContexts` at the same position. A segment for which the
+  /// planner returns null (it needs no fetch) gets the plain plan node, as without prefetch. The fetch lists are only
+  /// written with prefetch enabled, so they can be immutable empty lists otherwise.
+  private void addSegmentPlanNodes(List<SegmentContext> segmentContexts, QueryContext queryContext,
+      Function<SegmentContext, PlanNode> segmentPlanNodeMaker, List<PlanNode> planNodes,
+      List<SegmentContext> fetchSegmentContexts, List<FetchContext> fetchContexts) {
+    boolean enablePrefetch = queryContext.isEnablePrefetch();
+    for (SegmentContext segmentContext : segmentContexts) {
+      FetchContext fetchContext =
+          enablePrefetch ? _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext) : null;
+      if (fetchContext != null) {
+        fetchSegmentContexts.add(segmentContext);
+        fetchContexts.add(fetchContext);
+        planNodes.add(new AcquireReleaseColumnsSegmentPlanNode(segmentPlanNodeMaker.apply(segmentContext),
+            segmentContext, fetchContext));
+      } else {
+        planNodes.add(segmentPlanNodeMaker.apply(segmentContext));
+      }
+    }
+  }
+
   @Override
   public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService) {
+    rewriteQueryContextWithHints(queryContext, segmentContexts);
     applyQueryOptions(queryContext);
+    boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
+    // No ResultsBlockStreamer here, so nothing can stream. SelectionPlanNode gates the streaming leaf on this same
+    // option and cannot see the streamer, so clear it for the whole plan rather than let it be half-honored.
+    // Read the mode directly rather than isSortedSelectionMergeEnabled(): this (non-streaming) plan never resolves
+    // AUTO at all, and that accessor would warn and fall back to OFF on an unresolved AUTO. Reading the mode
+    // directly avoids the spurious warning and is precise about intent here.
+    if (queryContext.getSortedSelectionMergeMode() != SortedSelectionMergeMode.OFF) {
+      LOGGER.debug("Ignoring {}={} for a non-streaming query: the merge requires a streaming-capable path",
+          QueryOptionKey.SORTED_SELECTION_MERGE_MODE, queryContext.getSortedSelectionMergeMode());
+      queryContext.setSortedSelectionMergeMode(SortedSelectionMergeMode.OFF);
+    }
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
-    List<FetchContext> fetchContexts;
-    if (queryContext.isEnablePrefetch()) {
-      fetchContexts = new ArrayList<>(numSegments);
-      for (SegmentContext segmentContext : segmentContexts) {
-        FetchContext fetchContext =
-            _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext);
-        fetchContexts.add(fetchContext);
-        planNodes.add(
-            new AcquireReleaseColumnsSegmentPlanNode(makeSegmentPlanNode(segmentContext, queryContext), segmentContext,
-                fetchContext));
-      }
-    } else {
-      fetchContexts = List.of();
-      for (SegmentContext segmentContext : segmentContexts) {
-        planNodes.add(makeSegmentPlanNode(segmentContext, queryContext));
-      }
-    }
+    boolean enablePrefetch = queryContext.isEnablePrefetch();
+    List<SegmentContext> fetchSegmentContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    List<FetchContext> fetchContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    addSegmentPlanNodes(segmentContexts, queryContext, segmentContext -> makeSegmentPlanNode(segmentContext,
+        queryContext), planNodes, fetchSegmentContexts, fetchContexts);
 
     CombinePlanNode combinePlanNode = createCombinePlanNode(planNodes, queryContext, executorService, null);
     return new GlobalPlanImplV0(
-        new InstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext));
+        new InstanceResponsePlanNode(combinePlanNode, fetchSegmentContexts, fetchContexts, queryContext));
+  }
+
+  /// Resolves [AndRestrictionPushdownMode] for a query.
+  ///
+  /// The push-down materializes the filter result instead of streaming it, so under AUTO it is only applied to a
+  /// query that is going to read every matching document anyway. That is exactly the aggregation and group-by
+  /// queries:
+  ///
+  /// - a selection query without ORDER BY stops as soon as it has LIMIT rows;
+  /// - a DISTINCT query without ORDER BY stops the same way, in `DistinctOperator#getNextBlock`;
+  /// - whether a selection query *with* ORDER BY can stop early is decided per segment, because
+  ///   [org.apache.pinot.core.plan.SelectionPlanNode] picks `SelectionPartiallyOrderedBy*` from the segment's sorted
+  ///   column, so it cannot be ruled out here and is excluded conservatively;
+  /// - LIMIT 0 reads nothing at all.
+  ///
+  /// Use ALWAYS to push down on a workload known not to terminate early.
+  private static boolean isAndRestrictionPushdownEnabled(AndRestrictionPushdownMode mode, QueryContext queryContext) {
+    switch (mode) {
+      case ALWAYS:
+        return true;
+      case NEVER:
+        return false;
+      case AUTO:
+        // NOTE: DISTINCT is modelled as an aggregation function, so it has to be excluded explicitly
+        return queryContext.getLimit() > 0 && QueryContextUtils.isAggregationQuery(queryContext)
+            && !QueryContextUtils.isDistinctQuery(queryContext);
+      default:
+        throw new IllegalStateException("Unsupported AND restriction push-down mode: " + mode);
+    }
   }
 
   @VisibleForTesting
@@ -247,6 +305,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
     // Set skipScanFilterReorder
     queryContext.setSkipScanFilterReorder(QueryOptionsUtils.isSkipScanFilterReorder(queryOptions));
+
+    // Set andRestrictionPushdown, letting the query option override the server default
+    AndRestrictionPushdownMode andRestrictionPushdownMode =
+        QueryOptionsUtils.getAndRestrictionPushdownMode(queryOptions);
+    queryContext.setAndRestrictionPushdownEnabled(isAndRestrictionPushdownEnabled(
+        andRestrictionPushdownMode != null ? andRestrictionPushdownMode : _andRestrictionPushdownMode, queryContext));
 
     queryContext.setSkipIndexes(QueryOptionsUtils.getSkipIndexes(queryOptions));
 
@@ -269,6 +333,25 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       maxExecutionThreads = _maxExecutionThreads;
     }
     queryContext.setMaxExecutionThreads(maxExecutionThreads);
+
+    // Set streaming selection order-by options (opt-in; gated on selection queries to prevent accidental routing
+    // if a downstream guard is ever missed)
+    if (QueryContextUtils.isSelectionQuery(queryContext)) {
+      SortedSelectionMergeMode sortedSelectionMergeMode = QueryOptionsUtils.getSortedSelectionMergeMode(queryOptions);
+      if (sortedSelectionMergeMode != null) {
+        queryContext.setSortedSelectionMergeMode(sortedSelectionMergeMode);
+      }
+      Double sortedSelectionMergeAutoMinSortedRatio =
+          QueryOptionsUtils.getSortedSelectionMergeAutoMinSortedRatio(queryOptions);
+      queryContext.setSortedSelectionMergeAutoMinSortedRatio(sortedSelectionMergeAutoMinSortedRatio != null
+          ? sortedSelectionMergeAutoMinSortedRatio
+          : _sortedSelectionMergeAutoMinSortedRatio);
+      Integer sortedSelectionMergeBlockSize =
+          QueryOptionsUtils.getSortedSelectionMergeBlockSize(queryOptions);
+      queryContext.setSortedSelectionMergeBlockSize(sortedSelectionMergeBlockSize != null
+          ? sortedSelectionMergeBlockSize
+          : _sortedSelectionMergeBlockSize);
+    }
 
     // Set group-by query options
     if (QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getGroupByExpressions() != null) {
@@ -353,7 +436,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   @Override
   public PlanNode makeSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
-    rewriteQueryContextWithHints(queryContext, segmentContext.getIndexSegment());
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
@@ -374,38 +456,117 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer) {
+    rewriteQueryContextWithHints(queryContext, segmentContexts);
     applyQueryOptions(queryContext);
+    boundGroupingSetsBaseAggregation(segmentContexts, queryContext);
+    resolveSortedSelectionMergeMode(segmentContexts, queryContext);
 
     int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
-    List<FetchContext> fetchContexts;
-    if (queryContext.isEnablePrefetch()) {
-      fetchContexts = new ArrayList<>(numSegments);
-      for (SegmentContext segmentContext : segmentContexts) {
-        FetchContext fetchContext =
-            _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext);
-        fetchContexts.add(fetchContext);
-        planNodes.add(
-            new AcquireReleaseColumnsSegmentPlanNode(makeStreamingSegmentPlanNode(segmentContext, queryContext),
-                segmentContext, fetchContext));
-      }
-    } else {
-      fetchContexts = List.of();
-      for (SegmentContext segmentContext : segmentContexts) {
-        planNodes.add(makeStreamingSegmentPlanNode(segmentContext, queryContext));
-      }
-    }
+    boolean enablePrefetch = queryContext.isEnablePrefetch();
+    List<SegmentContext> fetchSegmentContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    List<FetchContext> fetchContexts = enablePrefetch ? new ArrayList<>(numSegments) : List.of();
+    addSegmentPlanNodes(segmentContexts, queryContext, segmentContext -> makeStreamingSegmentPlanNode(segmentContext,
+        queryContext), planNodes, fetchSegmentContexts, fetchContexts);
 
     CombinePlanNode combinePlanNode = createCombinePlanNode(planNodes, queryContext, executorService, streamer);
-    return new GlobalPlanImplV0(
-        new StreamingInstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext, streamer));
+    return new GlobalPlanImplV0(new StreamingInstanceResponsePlanNode(combinePlanNode, fetchSegmentContexts,
+        fetchContexts, queryContext, streamer));
+  }
+
+  /// Resolves [SortedSelectionMergeMode#AUTO] to `ON` or `OFF` from segment metadata alone, before any plan node is
+  /// built. `ON` and `OFF` pass through untouched.
+  ///
+  /// This has to happen here rather than in the plan-node gates. [CombinePlanNode] builds every leaf operator before
+  /// it evaluates its own gate, so a decision taken there would arrive too late to stop streaming leaves from being
+  /// built underneath a non-streaming combine -- the half-honored pairing that
+  /// [org.apache.pinot.core.operator.combine.StreamingSelectionOrderByCombineOperator] exists to avoid. Deciding once
+  /// here leaves both gates reading a single settled value.
+  ///
+  /// The heuristic is the fraction of queried segments physically sorted on the leading ORDER BY column, compared
+  /// against [QueryContext#getSortedSelectionMergeAutoMinSortedRatio()]. A DESC leading expression additionally
+  /// requires `allowReverseOrder`, without which no leaf can stream in the query's direction. An unsorted child
+  /// forces a full scan plus top-K synchronously on the consumer thread, so it is the unsorted segments that cost
+  /// the query its `maxExecutionThreads` worth of parallelism. Reading
+  /// [org.apache.pinot.segment.spi.datasource.DataSourceMetadata] does not touch column buffers, so no segment is
+  /// acquired.
+  private void resolveSortedSelectionMergeMode(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    if (queryContext.getSortedSelectionMergeMode() != SortedSelectionMergeMode.AUTO) {
+      return;
+    }
+    queryContext.setSortedSelectionMergeMode(
+        isSortedEnoughForStreamingMerge(segmentContexts, queryContext) ? SortedSelectionMergeMode.ON
+            : SortedSelectionMergeMode.OFF);
+  }
+
+  private boolean isSortedEnoughForStreamingMerge(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    int numSegments = segmentContexts.size();
+    if (numSegments == 0) {
+      return false;
+    }
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    if (orderByExpressions == null || orderByExpressions.isEmpty()) {
+      return false;
+    }
+    ExpressionContext firstOrderByExpression = orderByExpressions.get(0).getExpression();
+    if (firstOrderByExpression.getType() != ExpressionContext.Type.IDENTIFIER) {
+      // Sortedness is only defined for a physical column. Forcing the merge over an expression is what ON is for.
+      LOGGER.debug("Not using {} for a non-identifier leading ORDER BY expression: {}",
+          QueryOptionKey.SORTED_SELECTION_MERGE_MODE, firstOrderByExpression);
+      return false;
+    }
+    if (!orderByExpressions.get(0).isAsc() && !QueryOptionsUtils.isReverseOrderAllowed(
+        queryContext.getQueryOptions())) {
+      // DataSourceMetadata.isSorted() reports ascending physical order, so a DESC query can only stream when the
+      // project operator's docId scan is reversed, and SelectionPlanNode.getSortedByProject() only attempts that
+      // under allowReverseOrder. Without it every leaf falls back to the materialized
+      // SelectionPartiallyOrderedByDescOperation, and resolving to ON here would install the streaming combine over
+      // children that each materialize their top-K serially on the consumer thread -- losing both the MinMax
+      // combine's parallelism and its min/max segment pruning, in exchange for nothing.
+      //
+      // allowReverseOrder stays the user's lever rather than being implied here: ReverseDocIdSetOperator buffers the
+      // whole matching docId set into a RoaringBitmap before emitting its first block, which would trade away the
+      // bounded memory this merge exists to provide.
+      //
+      // TODO: allowReverseOrder=true still does not guarantee streaming leaves. getSortedByProject() swallows the
+      //       failure when a docId set cannot be reversed and returns the unreversed operator, so the leaf gate then
+      //       declines and AUTO has resolved ON over materialized children.
+      //       See https://github.com/apache/pinot/issues/19923 (item A3)
+      LOGGER.debug("Not using {} for a DESC leading ORDER BY expression without {}: {}",
+          QueryOptionKey.SORTED_SELECTION_MERGE_MODE, QueryOptionKey.ALLOW_REVERSE_ORDER, firstOrderByExpression);
+      return false;
+    }
+    String column = firstOrderByExpression.getIdentifier();
+    boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    int numSorted = 0;
+    for (SegmentContext segmentContext : segmentContexts) {
+      // Physical sortedness is metadata. SelectionPlanNode.isColumnSorted() also rejects a null-bearing column, but
+      // that reads the null value vector, a mapped buffer, and this runs before any segment is acquired. Use
+      // SelectionPlanNode.isColumnFlaggedNonNull() instead. It is one-sided (false means nulls or unknown) and
+      // stricter than the leaf, which can see an empty bitmap after acquire: an old segment with no flag resolves OFF
+      // rather than streaming over a materialized child.
+      IndexSegment segment = segmentContext.getIndexSegment();
+      if (!SelectionPlanNode.isColumnPhysicallySorted(segment, queryContext, column)) {
+        continue;
+      }
+      if (nullHandlingEnabled && !SelectionPlanNode.isColumnFlaggedNonNull(segment, column)) {
+        continue;
+      }
+      numSorted++;
+    }
+    double sortedRatio = (double) numSorted / numSegments;
+    double minSortedRatio = queryContext.getSortedSelectionMergeAutoMinSortedRatio();
+    boolean enabled = sortedRatio >= minSortedRatio;
+    LOGGER.debug("{}=AUTO resolved to {}: {}/{} segments sorted on '{}' (ratio {}, threshold {})",
+        QueryOptionKey.SORTED_SELECTION_MERGE_MODE, enabled ? "ON" : "OFF", numSorted, numSegments, column,
+        sortedRatio, minSortedRatio);
+    return enabled;
   }
 
   @Override
   public PlanNode makeStreamingSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     if (QueryContextUtils.isSelectionOnlyQuery(queryContext) && queryContext.getLimit() != 0) {
       // Use streaming operator only for non-empty selection-only query
-      rewriteQueryContextWithHints(queryContext, segmentContext.getIndexSegment());
       return new StreamingSelectionPlanNode(segmentContext, queryContext);
     } else {
       return makeSegmentPlanNode(segmentContext, queryContext);
@@ -422,86 +583,372 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     return new CombinePlanNode(planNodes, queryContext, executorService, streamer);
   }
 
-  /// In-place rewrite QueryContext based on the information from local IndexSegment.
-  ///
-  /// @param queryContext
-  /// @param indexSegment
+  /// Only emit BASE records when every local BASE key and every derived grouping-set key can fit the combine
+  /// table. Summing each segment's dictionary product is conservative even when keys overlap across segments.
+  /// Unknown, raw, transformed and multi-value columns use the per-row expansion path, and so does any mutable
+  /// segment: a consuming segment keeps indexing between planning and execution, so a bound computed from its
+  /// current dictionaries can be stale by the time the combine runs. This also makes a larger
+  /// `groupingSetsBaseAggregationMaxGroups` option unable to bypass the actual `numGroupsLimit` memory guard.
   @VisibleForTesting
-  public static void rewriteQueryContextWithHints(QueryContext queryContext, IndexSegment indexSegment) {
-    Map<ExpressionContext, ExpressionContext> expressionOverrideHints = queryContext.getExpressionOverrideHints();
-    if (MapUtils.isEmpty(expressionOverrideHints)) {
-      return;
+  static void boundGroupingSetsBaseAggregation(List<SegmentContext> segmentContexts, QueryContext queryContext) {
+    if (queryContext.isGroupingSetsBaseAggregation()) {
+      queryContext.setGroupingSetsBaseAggregationAllowed(
+          fitsGroupingSetsBaseAggregationLimit(segmentContexts, queryContext));
     }
+  }
 
-    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-    selectExpressions.replaceAll(
-        expression -> overrideWithExpressionHints(expression, indexSegment, expressionOverrideHints));
-
-    List<Pair<AggregationFunction, FilterContext>> filtAggrFuns = queryContext.getFilteredAggregationFunctions();
-    if (filtAggrFuns != null) {
-      for (Pair<AggregationFunction, FilterContext> filteredAggregationFunction : filtAggrFuns) {
-        FilterContext right = filteredAggregationFunction.getRight();
-        if (right != null) {
-          overrideWithExpressionHints(right, indexSegment, expressionOverrideHints);
+  @VisibleForTesting
+  static boolean fitsGroupingSetsBaseAggregationLimit(List<SegmentContext> segmentContexts,
+      QueryContext queryContext) {
+    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
+    List<int[]> groupingSets = queryContext.getGroupingSets();
+    int limit = queryContext.getNumGroupsLimit();
+    if (groupByExpressions == null || groupingSets == null || limit <= 0) {
+      return false;
+    }
+    int numColumns = groupByExpressions.size();
+    for (int[] groupingSet : groupingSets) {
+      for (int columnIndex : groupingSet) {
+        if (columnIndex < 0 || columnIndex >= numColumns) {
+          return false;
         }
       }
     }
 
+    // Collect every nonempty segment's dictionaries once; each eligibility rule must hold for all of them.
+    List<Dictionary[]> segmentDictionaries = new ArrayList<>();
+    List<long[]> segmentCardinalities = new ArrayList<>();
+    List<IndexSegment> segments = new ArrayList<>();
+    boolean[] columnMayBeNull = new boolean[numColumns];
+    for (SegmentContext segmentContext : segmentContexts) {
+      IndexSegment segment = segmentContext.getIndexSegment();
+      if (segment instanceof MutableSegment) {
+        // Mutable dictionaries grow until FilterPlanNode.run() snapshots the doc count, so neither this bound
+        // nor the zero-doc skip below holds at execution time.
+        return false;
+      }
+      if (segment.getSegmentMetadata().getTotalDocs() == 0) {
+        continue;
+      }
+      Dictionary[] dictionaries = new Dictionary[numColumns];
+      long[] cardinalities = new long[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        ExpressionContext expression = groupByExpressions.get(i);
+        if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
+          return false;
+        }
+        DataSource dataSource = segment.getDataSourceNullable(expression.getIdentifier());
+        if (dataSource == null || !dataSource.getDataSourceMetadata().isSingleValue()) {
+          return false;
+        }
+        Dictionary dictionary = dataSource.getDictionary();
+        ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
+        if (dictionary == null || forwardIndex == null || !forwardIndex.isDictionaryEncoded()) {
+          return false;
+        }
+        long cardinality = dictionary.length();
+        if (queryContext.isNullHandlingEnabled() && dataSource.getNullValueVector() != null) {
+          cardinality++;
+          columnMayBeNull[i] = true;
+        }
+        if (cardinality == 0) {
+          return false;
+        }
+        dictionaries[i] = dictionary;
+        cardinalities[i] = cardinality;
+      }
+      segmentDictionaries.add(dictionaries);
+      segmentCardinalities.add(cardinalities);
+      segments.add(segment);
+    }
+
+    // Cheap proof first: sum each segment's dictionary-cardinality products without reading any values. This
+    // multiple-counts keys shared across segments, so when it fails, fall through to the tighter (but costlier)
+    // proof over the per-column UNION of dictionary values.
+    if (fitsBySegmentCardinalityProducts(segmentCardinalities, groupingSets, limit)) {
+      return true;
+    }
+    long[] maxCardinalities = new long[numColumns];
+    long totalEntries = 0;
+    for (int segmentIndex = 0; segmentIndex < segments.size(); segmentIndex++) {
+      for (int i = 0; i < numColumns; i++) {
+        maxCardinalities[i] = Math.max(maxCardinalities[i], segmentCardinalities.get(segmentIndex)[i]);
+        totalEntries += segmentDictionaries.get(segmentIndex)[i].length();
+      }
+    }
+    // Each union contains at least the largest segment dictionary. Reject impossible proofs and excessive scan
+    // work before acquiring buffers or reading values.
+    return totalEntries <= MAX_GROUPING_SETS_DICTIONARY_SCAN_ENTRIES
+        && fitsBySegmentCardinalityProducts(List.of(maxCardinalities), groupingSets, limit)
+        && fitsByColumnUnionCardinalities(segments, segmentDictionaries, columnMayBeNull, groupByExpressions,
+            groupingSets, maxCardinalities, limit, queryContext.getEndTimeMs());
+  }
+
+  /// Sums each segment's per-column dictionary-cardinality product, for the BASE grouping and for every derived
+  /// set, against separate `numGroupsLimit` budgets (the base table and the derived table are each capped at the
+  /// limit). Conservative when segments share key values, since the same key is counted once per segment.
+  private static boolean fitsBySegmentCardinalityProducts(List<long[]> segmentCardinalities,
+      List<int[]> groupingSets, int limit) {
+    long remainingBase = limit;
+    long remainingDerived = limit;
+    for (long[] cardinalities : segmentCardinalities) {
+      long baseGroups = 1;
+      for (long cardinality : cardinalities) {
+        if (baseGroups > remainingBase / cardinality) {
+          return false;
+        }
+        baseGroups *= cardinality;
+      }
+      if (baseGroups > remainingBase) {
+        return false;
+      }
+      remainingBase -= baseGroups;
+
+      for (int[] groupingSet : groupingSets) {
+        long derivedGroups = 1;
+        for (int columnIndex : groupingSet) {
+          if (derivedGroups > remainingDerived / cardinalities[columnIndex]) {
+            return false;
+          }
+          derivedGroups *= cardinalities[columnIndex];
+        }
+        // An empty grouping set (the grand total) skips the loop above, so re-check the final product.
+        if (derivedGroups > remainingDerived) {
+          return false;
+        }
+        remainingDerived -= derivedGroups;
+      }
+    }
+    return true;
+  }
+
+  /// Bounds the groups by the per-column UNION of dictionary values across segments: every BASE key is a
+  /// combination of per-column union values, so the product of union cardinalities bounds the base groups (and
+  /// each set's product bounds that set) WITHOUT counting keys shared across segments once per segment. Reading
+  /// dictionary values is bounded, cancellable plan-time work. Acquire only the dictionary being scanned, and
+  /// release it even when the proof fails or the query is terminated. Unscanned columns retain their maximum
+  /// segment cardinality as a lower bound, allowing early rejection after each column.
+  private static boolean fitsByColumnUnionCardinalities(List<IndexSegment> segments,
+      List<Dictionary[]> segmentDictionaries, boolean[] columnMayBeNull, List<ExpressionContext> groupByExpressions,
+      List<int[]> groupingSets, long[] unionCardinalities, int limit, long deadlineMs) {
+    for (int i = 0; i < unionCardinalities.length; i++) {
+      Set<Object> union = new HashSet<>();
+      for (int segmentIndex = 0; segmentIndex < segments.size(); segmentIndex++) {
+        QueryThreadContext.checkTerminationAndSampleUsage("grouping-set dictionary union", deadlineMs);
+        IndexSegment segment = segments.get(segmentIndex);
+        Dictionary dictionary = segmentDictionaries.get(segmentIndex)[i];
+        FetchContext fetchContext = new FetchContext(UUID.randomUUID(), segment.getSegmentName(),
+            Map.of(groupByExpressions.get(i).getIdentifier(), List.of(StandardIndexes.dictionary())));
+        try {
+          segment.prefetch(fetchContext);
+          segment.acquire(fetchContext);
+          int length = dictionary.length();
+          for (int dictId = 0; dictId < length; dictId++) {
+            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId, "grouping-set dictionary union",
+                deadlineMs);
+            // getInternal: BYTES values come back as ByteArray, which supports value-based hashing.
+            union.add(dictionary.getInternal(dictId));
+            if (union.size() + (columnMayBeNull[i] ? 1L : 0L) > limit) {
+              return false;
+            }
+          }
+        } finally {
+          segment.release(fetchContext);
+        }
+      }
+      unionCardinalities[i] = union.size() + (columnMayBeNull[i] ? 1 : 0);
+      if (!fitsBySegmentCardinalityProducts(List.of(unionCardinalities), groupingSets, limit)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Rewrites the shared context before fetch planning, using only columns available on every selected segment.
+  /// A partially reloaded timestamp index must leave the original expression executable on all segments.
+  /// Rewriting per segment would mutate the expressions shared by already constructed segment plans.
+  @VisibleForTesting
+  static void rewriteQueryContextWithHints(QueryContext queryContext, List<SegmentContext> segmentContexts) {
+    Map<ExpressionContext, ExpressionContext> hints = queryContext.getExpressionOverrideHints();
+    if (MapUtils.isEmpty(hints) || segmentContexts.isEmpty()) {
+      return;
+    }
+    Map<ExpressionContext, ExpressionContext> applicableHints = getApplicableHints(hints, segmentContexts);
+    if (!applicableHints.isEmpty()) {
+      rewriteQueryContextWithHints(queryContext, applicableHints);
+    }
+  }
+
+  /// Keeps availability checks local to this segment set without changing the broker-provided hints.
+  private static Map<ExpressionContext, ExpressionContext> getApplicableHints(
+      Map<ExpressionContext, ExpressionContext> hints, List<SegmentContext> segmentContexts) {
+    if (hints.isEmpty()) {
+      return Map.of();
+    }
+    if (hints.size() == 1) {
+      Map.Entry<ExpressionContext, ExpressionContext> hint = hints.entrySet().iterator().next();
+      String column = getOverrideColumn(hint.getValue());
+      for (SegmentContext segmentContext : segmentContexts) {
+        if (!segmentContext.getIndexSegment().getColumnNames().contains(column)) {
+          return Map.of();
+        }
+      }
+      // The single-entry map uses equality directly, avoiding recursive hashing of unrelated expression trees.
+      return Map.of(hint.getKey(), hint.getValue());
+    }
+    Set<String> availableColumns = new HashSet<>();
+    for (ExpressionContext target : hints.values()) {
+      availableColumns.add(getOverrideColumn(target));
+    }
+    int numTargets = availableColumns.size();
+    for (SegmentContext segmentContext : segmentContexts) {
+      Set<String> columns = segmentContext.getIndexSegment().getColumnNames();
+      availableColumns.removeIf(column -> !columns.contains(column));
+      if (availableColumns.isEmpty()) {
+        return Map.of();
+      }
+    }
+    if (availableColumns.size() == numTargets) {
+      return hints;
+    }
+    Map<ExpressionContext, ExpressionContext> applicableHints = new HashMap<>();
+    for (Map.Entry<ExpressionContext, ExpressionContext> hint : hints.entrySet()) {
+      if (availableColumns.contains(hint.getValue().getIdentifier())) {
+        applicableHints.put(hint.getKey(), hint.getValue());
+      }
+    }
+    if (applicableHints.size() == 1) {
+      Map.Entry<ExpressionContext, ExpressionContext> hint = applicableHints.entrySet().iterator().next();
+      return Map.of(hint.getKey(), hint.getValue());
+    }
+    return applicableHints;
+  }
+
+  private static String getOverrideColumn(ExpressionContext target) {
+    Preconditions.checkArgument(target.getType() == ExpressionContext.Type.IDENTIFIER,
+        "Expression override target must be an identifier");
+    return target.getIdentifier();
+  }
+
+  /// Gates structural hashing by function name and arity; expression hashes cannot be cached across mutations.
+  @Nullable
+  private static Map<String, Set<Integer>> getHintFunctionArities(Map<ExpressionContext, ExpressionContext> hints) {
+    if (hints.size() <= 1) {
+      return null;
+    }
+    Map<String, Set<Integer>> arities = new HashMap<>();
+    for (ExpressionContext expression : hints.keySet()) {
+      FunctionContext function = expression.getFunction();
+      if (function != null) {
+        arities.computeIfAbsent(function.getFunctionName(), key -> new HashSet<>()).add(function.getArguments().size());
+      }
+    }
+    return arities;
+  }
+
+  private static void rewriteQueryContextWithHints(QueryContext queryContext,
+      Map<ExpressionContext, ExpressionContext> hints) {
+    Set<FunctionContext> changedFunctions = Collections.newSetFromMap(new IdentityHashMap<>());
+    Map<String, Set<Integer>> hintFunctionArities = getHintFunctionArities(hints);
+    // FILTER predicates have separate contexts; aggregation inputs are visited through SELECT/HAVING/ORDER-BY.
+    if (queryContext.hasFilteredAggregations()) {
+      List<Pair<AggregationFunction, FilterContext>> filteredAggregations =
+          queryContext.getFilteredAggregationFunctions();
+      for (Pair<AggregationFunction, FilterContext> aggregation : filteredAggregations) {
+        if (aggregation.getRight() != null) {
+          overrideWithExpressionHints(aggregation.getRight(), hints, hintFunctionArities, changedFunctions);
+        }
+      }
+    }
+    queryContext.getSelectExpressions().replaceAll(
+        expression -> overrideWithExpressionHints(expression, hints, hintFunctionArities, changedFunctions));
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (CollectionUtils.isNotEmpty(groupByExpressions)) {
       groupByExpressions.replaceAll(
-          expression -> overrideWithExpressionHints(expression, indexSegment, expressionOverrideHints));
+          expression -> overrideWithExpressionHints(expression, hints, hintFunctionArities, changedFunctions));
     }
-
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     if (CollectionUtils.isNotEmpty(orderByExpressions)) {
-      orderByExpressions.replaceAll(expression -> new OrderByExpressionContext(
-          overrideWithExpressionHints(expression.getExpression(), indexSegment, expressionOverrideHints),
-          expression.isAsc()));
+      orderByExpressions.replaceAll(orderBy -> {
+        ExpressionContext expression = orderBy.getExpression();
+        ExpressionContext rewritten =
+            overrideWithExpressionHints(expression, hints, hintFunctionArities, changedFunctions);
+        return rewritten == expression ? orderBy
+            : new OrderByExpressionContext(rewritten, orderBy.isAsc(), orderBy.isNullsLast());
+      });
     }
-
-    // In-place override
-    FilterContext filter = queryContext.getFilter();
-    if (filter != null) {
-      overrideWithExpressionHints(filter, indexSegment, expressionOverrideHints);
+    if (queryContext.getFilter() != null) {
+      overrideWithExpressionHints(queryContext.getFilter(), hints, hintFunctionArities, changedFunctions);
     }
-
-    // In-place override
-    FilterContext havingFilter = queryContext.getHavingFilter();
-    if (havingFilter != null) {
-      overrideWithExpressionHints(havingFilter, indexSegment, expressionOverrideHints);
+    if (queryContext.getHavingFilter() != null) {
+      overrideWithExpressionHints(queryContext.getHavingFilter(), hints, hintFunctionArities, changedFunctions);
+    }
+    if (!changedFunctions.isEmpty()) {
+      queryContext.prepareForExecution(changedFunctions);
     }
   }
 
   @VisibleForTesting
   public static void overrideWithExpressionHints(FilterContext filter, IndexSegment indexSegment,
       Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
+    Map<ExpressionContext, ExpressionContext> hints =
+        getApplicableHints(expressionOverrideHints, List.of(new SegmentContext(indexSegment)));
+    overrideWithExpressionHints(filter, hints, getHintFunctionArities(hints),
+        Collections.newSetFromMap(new IdentityHashMap<>()));
+  }
+
+  private static void overrideWithExpressionHints(FilterContext filter,
+      Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
+      @Nullable Map<String, Set<Integer>> hintFunctionArities, Set<FunctionContext> changedFunctions) {
+    if (filter.isConstant()) {
+      return;
+    }
     if (filter.getChildren() != null) {
-      // AND, OR, NOT
       for (FilterContext child : filter.getChildren()) {
-        overrideWithExpressionHints(child, indexSegment, expressionOverrideHints);
+        overrideWithExpressionHints(child, expressionOverrideHints, hintFunctionArities, changedFunctions);
       }
     } else {
-      // PREDICATE
       Predicate predicate = filter.getPredicate();
-      predicate.setLhs(overrideWithExpressionHints(predicate.getLhs(), indexSegment, expressionOverrideHints));
+      ExpressionContext rewritten = overrideWithExpressionHints(predicate.getLhs(), expressionOverrideHints,
+          hintFunctionArities, changedFunctions);
+      predicate.setLhs(rewritten);
     }
   }
 
   @VisibleForTesting
   public static ExpressionContext overrideWithExpressionHints(ExpressionContext expression, IndexSegment indexSegment,
       Map<ExpressionContext, ExpressionContext> expressionOverrideHints) {
+    Map<ExpressionContext, ExpressionContext> hints =
+        getApplicableHints(expressionOverrideHints, List.of(new SegmentContext(indexSegment)));
+    return overrideWithExpressionHints(expression, hints, getHintFunctionArities(hints),
+        Collections.newSetFromMap(new IdentityHashMap<>()));
+  }
+
+  private static ExpressionContext overrideWithExpressionHints(ExpressionContext expression,
+      Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
+      @Nullable Map<String, Set<Integer>> hintFunctionArities, Set<FunctionContext> changedFunctions) {
     if (expression.getType() != ExpressionContext.Type.FUNCTION) {
       return expression;
     }
-    ExpressionContext overrideExpression = expressionOverrideHints.get(expression);
-    if (overrideExpression != null && overrideExpression.getIdentifier() != null && indexSegment.getColumnNames()
-        .contains(overrideExpression.getIdentifier())) {
-      return overrideExpression;
+    FunctionContext function = expression.getFunction();
+    List<ExpressionContext> arguments = function.getArguments();
+    Set<Integer> arities = hintFunctionArities != null ? hintFunctionArities.get(function.getFunctionName()) : null;
+    if (hintFunctionArities == null || arities != null && arities.contains(arguments.size())) {
+      ExpressionContext overrideExpression = expressionOverrideHints.get(expression);
+      if (overrideExpression != null) {
+        changedFunctions.add(function);
+        return overrideExpression;
+      }
     }
-    expression.getFunction()
-        .getArguments()
-        .replaceAll(argument -> overrideWithExpressionHints(argument, indexSegment, expressionOverrideHints));
+    for (int i = 0; i < arguments.size(); i++) {
+      ExpressionContext argument = arguments.get(i);
+      ExpressionContext rewritten =
+          overrideWithExpressionHints(argument, expressionOverrideHints, hintFunctionArities, changedFunctions);
+      if (rewritten != argument || changedFunctions.contains(argument.getFunction())) {
+        changedFunctions.add(function);
+      }
+      arguments.set(i, rewritten);
+    }
     return expression;
   }
 }

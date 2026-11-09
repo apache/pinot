@@ -74,6 +74,7 @@ public class TableConfigBuilder {
   private String _timeType;
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  private String _retentionSize;
   private String _deletedSegmentsRetentionPeriod = DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD;
   private String _replacedSegmentsRetentionPeriod;
   private String _lineageEntryCleanupRetentionPeriod;
@@ -84,7 +85,7 @@ public class TableConfigBuilder {
   @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   private String _peerSegmentDownloadScheme;
-  @Deprecated
+  @Deprecated(since = "1.3.0", forRemoval = true)
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -203,6 +204,13 @@ public class TableConfigBuilder {
     return this;
   }
 
+  /// Sets the compressed segment archive size retention limit described by
+  /// [SegmentsValidationAndRetentionConfig#getRetentionSize()].
+  public TableConfigBuilder setRetentionSize(String retentionSize) {
+    _retentionSize = retentionSize;
+    return this;
+  }
+
   public TableConfigBuilder setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
     _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
     return this;
@@ -234,6 +242,7 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public TableConfigBuilder setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
     return this;
@@ -522,6 +531,7 @@ public class TableConfigBuilder {
     validationConfig.setTimeType(_timeType);
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
+    validationConfig.setRetentionSize(_retentionSize);
     validationConfig.setDeletedSegmentsRetentionPeriod(_deletedSegmentsRetentionPeriod);
     validationConfig.setReplacedSegmentsRetentionPeriod(_replacedSegmentsRetentionPeriod);
     validationConfig.setLineageEntryCleanupRetentionPeriod(_lineageEntryCleanupRetentionPeriod);

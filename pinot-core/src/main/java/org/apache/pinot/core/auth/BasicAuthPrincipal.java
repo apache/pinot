@@ -18,11 +18,15 @@
  */
 package org.apache.pinot.core.auth;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /// Container object for basic auth principal
@@ -44,10 +48,19 @@ public class BasicAuthPrincipal {
       Set<String> permissions, Map<String, List<String>> rlsFilters) {
     _name = name;
     _token = token;
-    _tables = tables;
-    _excludeTables = excludeTables;
+    // Copied because hasUnrestrictedTableAccess() gates cluster-level authorization off these sets: a caller that
+    // retained and later cleared its own set would silently widen this principal to unrestricted scope. Copied
+    // permissively rather than with Set.copyOf, which rejects null elements — a user record stored in ZooKeeper can
+    // carry a null table name, and the broker and server rebuild every principal on each request, so one malformed
+    // record would otherwise fail authentication for every user.
+    _tables = copyOfNullable(tables);
+    _excludeTables = copyOfNullable(excludeTables);
     _permissions = permissions.stream().map(s -> s.toLowerCase()).collect(Collectors.toSet());
     _rlsFilters = rlsFilters;
+  }
+
+  private static Set<String> copyOfNullable(@Nullable Set<String> values) {
+    return values == null ? Set.of() : Collections.unmodifiableSet(new HashSet<>(values));
   }
 
   public String getName() {
@@ -62,12 +75,40 @@ public class BasicAuthPrincipal {
     return isTableIncluded(tableName) && isTableNotExcluded(tableName);
   }
 
+  /// Returns whether this principal is scoped to every table, i.e. it carries neither an allow-list nor an
+  /// exclude-list. Access control implementations use this to decide requests that name no table, so the return value
+  /// must satisfy: `true` implies [#hasTable(String)] holds for every table name. A subclass that narrows table scope
+  /// by any other means — in particular by overriding [#hasTable(String)] — must override this method to match, or it
+  /// will report unrestricted scope while denying individual tables.
+  ///
+  /// Table lists are the signal rather than [ZkBasicAuthPrincipal]'s `RoleType`. The static factory has no role, both
+  /// controller factories share this check, and an ADMIN that also carries an allow-list is still scoped. Granting
+  /// cluster access by role would let that principal reach cluster state outside the list. The bootstrapped admin
+  /// is bootstrapped with a null `UserConfig#getTables()`, which normalizes to an empty set here, so
+  /// `RoleType.ADMIN` without a table list still passes.
+  public boolean hasUnrestrictedTableAccess() {
+    return _tables.isEmpty() && _excludeTables.isEmpty();
+  }
+
   private boolean isTableIncluded(String tableName) {
     return _tables.isEmpty() || _tables.contains(tableName);
   }
 
+  /// The `excludeTables` list holds raw table names, so a name with a type suffix is also checked by its raw name:
+  /// with `excludeTables=[t]`, `t_OFFLINE` is excluded as `t` is, and a type suffix cannot bypass an excluded table.
+  /// The raw-name lookup only runs for a typed name: a principal without exclusions returns at once, and a raw name
+  /// is already covered by the first lookup, so neither pays for the suffix strip or the second lookup.
   private boolean isTableNotExcluded(String tableName) {
-    return !_excludeTables.contains(tableName);
+    if (_excludeTables.isEmpty()) {
+      return true;
+    }
+    if (_excludeTables.contains(tableName)) {
+      return false;
+    }
+    // extractRawTableName returns the name itself when it carries no type suffix, so the second lookup is skipped for
+    // raw names without an extra suffix scan
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    return rawTableName.equals(tableName) || !_excludeTables.contains(rawTableName);
   }
 
   public boolean hasPermission(String permission) {

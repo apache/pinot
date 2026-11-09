@@ -32,11 +32,14 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -48,6 +51,8 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.timeseries.TimeSeriesOperatorUtils;
+import org.apache.pinot.core.plan.Plan;
+import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.TimeSeriesAggregationFunction;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -74,6 +79,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
@@ -85,6 +91,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -224,6 +231,126 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
+  }
+
+  /// The broker rejects IN_PARTITIONED_SUBQUERY for a principal with row filters. A server behind an older broker,
+  /// which stamps the row filters in the query options but lets the function through, fails the query instead: the
+  /// subquery reaches it as a string literal the filters do not cover, so it would build its ID_SET from every row.
+  @Test
+  public void testInPartitionedSubqueryRejectedUnderRowFilters() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME + " WHERE IN_PARTITIONED_SUBQUERY(orderItemCount, "
+        + "'SELECT ID_SET(orderItemCount) FROM " + OFFLINE_TABLE_NAME + "') = 1";
+    // Without row filters the function resolves as it always has: every row's value is in the ID_SET
+    long numRows = (Long) aggregate("SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME, null);
+    assertEquals(aggregate(query, null), numRows);
+
+    // With row filters stamped for any table the query fails before the subquery runs
+    for (String table : new String[]{RAW_TABLE_NAME, "otherTable"}) {
+      Map<String, String> queryOptions = Map.of(RlsUtils.buildRlsFilterKey(table), "orderItemCount > 0");
+      String error = executeExpectingFailure(query, queryOptions);
+      assertTrue(error.contains("not allowed when row-level security filters apply"), error);
+    }
+  }
+
+  private Object aggregate(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceResponseBlock instanceResponse = execute(newInstanceRequest(query, queryOptions));
+    assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
+    assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
+    return ((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0);
+  }
+
+  /// Runs the query and returns the text of the exceptions it fails with.
+  private String executeExpectingFailure(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceResponseBlock instanceResponse = execute(newInstanceRequest(query, queryOptions));
+    assertFalse(instanceResponse.getExceptions().isEmpty(), "Expected the query to fail");
+    return String.join("\n", instanceResponse.getExceptions().values());
+  }
+
+  private InstanceRequest newInstanceRequest(String query, @Nullable Map<String, String> queryOptions) {
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    if (queryOptions != null) {
+      instanceRequest.getQuery().getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
+    }
+    instanceRequest.setSearchSegments(_segmentNames);
+    return instanceRequest;
+  }
+
+  @Test
+  public void testNoRemoteAccessStatsWithoutRemoteAccesses() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    Map<String, String> responseMetadata = execute(instanceRequest).getResponseMetadata();
+    assertFalse(responseMetadata.containsKey(MetadataKey.NUM_REMOTE_ACCESSES.getName()));
+    assertFalse(responseMetadata.containsKey(MetadataKey.REMOTE_ACCESS_BYTES.getName()));
+    assertFalse(responseMetadata.containsKey(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()));
+    assertFalse(responseMetadata.containsKey(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()));
+  }
+
+  /// The remote accesses reported while the plan executes, from the query thread and the ones it spawns, are reported
+  /// in the response metadata, with the direct ones counted in the totals and reported on their own.
+  @Test
+  public void testRemoteAccessStatsReportedForTheExecution()
+      throws Exception {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    ServerQueryRequest queryRequest =
+        new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
+    Plan plan = mock(Plan.class);
+    when(plan.execute()).thenAnswer(_ -> {
+      QueryThreadContext.addRemoteAccesses(1, 10);
+      QUERY_RUNNERS.submit(() -> QueryThreadContext.addDirectRemoteAccesses(2, 20)).get();
+      return new InstanceResponseBlock();
+    });
+    PlanMaker planMaker = mock(PlanMaker.class);
+    when(planMaker.makeInstancePlan(any(), any(), any())).thenReturn(plan);
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      Map<String, String> responseMetadata =
+          _queryExecutor.execute(queryRequest, QUERY_RUNNERS, null, planMaker).getResponseMetadata();
+      assertEquals(responseMetadata.get(MetadataKey.NUM_REMOTE_ACCESSES.getName()), "3");
+      assertEquals(responseMetadata.get(MetadataKey.REMOTE_ACCESS_BYTES.getName()), "30");
+      assertEquals(responseMetadata.get(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()), "2");
+      assertEquals(responseMetadata.get(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()), "20");
+    }
+  }
+
+  /// Executions spawned from one thread context, like the two of a hybrid table, each report their own remote
+  /// accesses.
+  @Test
+  public void testExecutionsSpawnedFromOneThreadContextReportTheirOwnRemoteAccesses()
+      throws Exception {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    Plan plan = mock(Plan.class);
+    when(plan.execute()).thenAnswer(_ -> {
+      QueryThreadContext.addRemoteAccesses(1, 10);
+      return new InstanceResponseBlock();
+    });
+    PlanMaker planMaker = mock(PlanMaker.class);
+    when(planMaker.makeInstancePlan(any(), any(), any())).thenReturn(plan);
+    ExecutorService executor = QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      List<Future<Map<String, String>>> futures = new ArrayList<>();
+      for (int i = 0; i < 2; i++) {
+        futures.add(executor.submit(() -> {
+          ServerQueryRequest queryRequest =
+              new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
+          return _queryExecutor.execute(queryRequest, QUERY_RUNNERS, null, planMaker).getResponseMetadata();
+        }));
+      }
+      for (Future<Map<String, String>> future : futures) {
+        Map<String, String> responseMetadata = future.get();
+        assertEquals(responseMetadata.get(MetadataKey.NUM_REMOTE_ACCESSES.getName()), "1");
+        assertEquals(responseMetadata.get(MetadataKey.REMOTE_ACCESS_BYTES.getName()), "10");
+        // Reported only when a direct remote access happened
+        assertFalse(responseMetadata.containsKey(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()));
+        assertFalse(responseMetadata.containsKey(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()));
+      }
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @Test

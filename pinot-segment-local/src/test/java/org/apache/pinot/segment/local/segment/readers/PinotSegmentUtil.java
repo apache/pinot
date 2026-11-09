@@ -113,6 +113,10 @@ public class PinotSegmentUtil {
           return Math.abs(random.nextDouble());
         case STRING:
           return RandomStringUtils.secure().nextAlphabetic(DEFAULT_STRING_VALUE_LENGTH);
+        case BYTES:
+          byte[] randomBytes = new byte[16];
+          random.nextBytes(randomBytes);
+          return randomBytes;
         default:
           throw new IllegalStateException("Unsupported data type: " + storedType);
       }

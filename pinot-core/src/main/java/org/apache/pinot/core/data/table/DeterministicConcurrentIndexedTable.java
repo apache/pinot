@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.table;
 
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -36,17 +37,19 @@ public class DeterministicConcurrentIndexedTable extends IndexedTable {
   /// Thread safe implementation of upsert for inserting [Record] into [Table]
   @Override
   public boolean upsert(Key key, Record record) {
-    upsertWithoutOrderBy(key, record);
+    upsertWithoutOrderBy(key, record, null);
     return true;
   }
 
-  protected void upsertWithoutOrderBy(Key key, Record record) {
+  @Override
+  protected synchronized void upsertWithoutOrderBy(Key key, @Nullable Record record, @Nullable Object result) {
+    // ConcurrentSkipListMap.compute can retry its callback; protect in-place mutable aggregation updates and eviction.
     ConcurrentSkipListMap<Key, Record> map = (ConcurrentSkipListMap<Key, Record>) _lookupMap;
 
     if (map.size() < _resultSize || map.containsKey(key)) {
-      addOrUpdateRecord(key, record);
+      addOrUpdateRecord(key, record, result);
     } else if (!map.isEmpty() && key.compareTo(map.lastKey()) < 0) {
-      addOrUpdateRecord(key, record);
+      addOrUpdateRecord(key, record, result);
       map.pollLastEntry(); // evict the largest key after insertion
     }
   }

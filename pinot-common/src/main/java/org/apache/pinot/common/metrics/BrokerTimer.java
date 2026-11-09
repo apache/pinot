@@ -23,6 +23,9 @@ import org.apache.pinot.common.Utils;
 
 /// Enumeration containing all the timers exposed by the Pinot broker.
 public enum BrokerTimer implements AbstractMetrics.Timer {
+  /// Time the broker spends to update the routing of a table after a change to its ideal state or external view.
+  /// Includes reading both znodes and rebuilding the routing components. Emitted per table and globally, only for
+  /// successful updates.
   ROUTING_TABLE_UPDATE_TIME(true),
   CLUSTER_CHANGE_QUEUE_TIME(true), // metric tracking the freshness lag for consuming segments
   FRESHNESS_LAG_MS(false),

@@ -24,8 +24,13 @@ import java.util.Map;
 import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.query.utils.rewriter.ParentAggregationResultRewriter;
+import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter;
+import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertTrue;
@@ -165,6 +170,58 @@ public class QueryValidationTest {
         CalciteSqlParser.compileToPinotQuery("SET numReplicaGroupsToQuery='illegal'; SELECT COUNT(*) FROM MY_TABLE");
     Assert.assertThrows(IllegalArgumentException.class,
         () -> BaseSingleStageBrokerRequestHandler.validateRequest(pinotQuery, 10));
+  }
+
+  /// Restores the default query and result rewriters, which the EXPR_MIN/EXPR_MAX tests change.
+  @AfterMethod
+  public void resetRewriters() {
+    QueryRewriterFactory.init(null);
+    ResultRewriterFactory.init(null);
+  }
+
+  @Test
+  public void testExprMinMaxWithoutRewriters() {
+    testUnsupportedQuery("SELECT EXPR_MIN(a, b) FROM testTable",
+        "EXPR_MIN is not enabled on this broker. To enable it, add '" + ExprMinMaxRewriter.class.getName()
+            + "' to 'pinot.broker.query.rewriter.class.names' and '" + ParentAggregationResultRewriter.class.getName()
+            + "' to 'pinot.broker.result.rewriter.class.names'");
+  }
+
+  @Test
+  public void testExprMinMaxWithRewriters() {
+    enableExprMinMaxQueryRewriter();
+    ResultRewriterFactory.init(ParentAggregationResultRewriter.class.getName());
+    validQuery("SELECT EXPR_MIN(a, b), EXPR_MAX(c, b, d), COUNT(*) FROM testTable");
+    testUnsupportedExprMinMaxPosition("SELECT COUNT(*), EXPR_MIN(a, b) AS minA FROM testTable", "EXPR_MIN");
+    testUnsupportedExprMinMaxPosition("SELECT EXPR_MAX(a, b) + 1 FROM testTable", "EXPR_MAX");
+    testUnsupportedExprMinMaxPosition("SELECT COUNT(*) FROM testTable WHERE EXPR_MIN(a, b) > 1", "EXPR_MIN");
+    testUnsupportedExprMinMaxPosition("SELECT c, COUNT(*) FROM testTable GROUP BY c HAVING EXPR_MAX(a, b) > 1",
+        "EXPR_MAX");
+    testUnsupportedExprMinMaxPosition("SELECT c, COUNT(*) FROM testTable GROUP BY c ORDER BY EXPR_MIN(a, b)",
+        "EXPR_MIN");
+  }
+
+  @Test
+  public void testExprMinMaxWithoutResultRewriter() {
+    enableExprMinMaxQueryRewriter();
+    testUnsupportedQuery("SELECT EXPR_MIN(a, b) FROM testTable",
+        "EXPR_MIN and EXPR_MAX require the result rewriter '" + ParentAggregationResultRewriter.class.getName()
+            + "'. To enable it, add it to 'pinot.broker.result.rewriter.class.names'");
+  }
+
+  private void testUnsupportedExprMinMaxPosition(String query, String functionName) {
+    testUnsupportedQuery(query, functionName + " is only supported as a top-level expression in the select list, "
+        + "without an alias. It is not supported in other expressions or in the WHERE, GROUP BY, HAVING or ORDER BY "
+        + "clauses");
+  }
+
+  private static void enableExprMinMaxQueryRewriter() {
+    QueryRewriterFactory.init(String.join(",", QueryRewriterFactory.DEFAULT_QUERY_REWRITERS_CLASS_NAMES) + ","
+        + ExprMinMaxRewriter.class.getName());
+  }
+
+  private static void validQuery(String query) {
+    BaseSingleStageBrokerRequestHandler.validateRequest(CalciteSqlParser.compileToPinotQuery(query), 1000);
   }
 
   private void testValidateGroovyQuery(String query, boolean queryContainsGroovy) {

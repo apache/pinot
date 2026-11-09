@@ -475,7 +475,7 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
             @Override
             public Status needsField(FieldInfo fieldInfo) {
               // assume doc id is the only stored document
-              assert LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME.equals(fieldInfo.name);
+              assert LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME.equals(fieldInfo.name);
               return Status.YES;
             }
 
@@ -521,7 +521,7 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
         } else {
           for (int i = 0; i < numDocs; i++) {
             Document document = indexSearcher.storedFields().document(i);
-            IndexableField field = document.getField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
+            IndexableField field = document.getField(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME);
             int pinotDocId = Integer.parseInt(field.stringValue());
             buffer.putInt(i * Integer.BYTES, pinotDocId);
           }

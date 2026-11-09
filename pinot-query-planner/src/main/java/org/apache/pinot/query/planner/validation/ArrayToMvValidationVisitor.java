@@ -115,7 +115,8 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
     if (containsArrayToMv(node.getProjects())) {
       throw new QueryException(QueryErrorCode.QUERY_PLANNING,
           "Function 'ArrayToMv' is not supported in PROJECT " + (isIntermediateStage ? "Intermediate Stage"
-              : "Leaf Stage"));
+              : "Leaf Stage") + ". To get one row for each value of a multi-value column, use "
+              + "'CROSS JOIN UNNEST(mvCol) AS t(val)' instead");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
     return null;

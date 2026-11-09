@@ -68,26 +68,6 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
     };
   }
 
-  @DataProvider
-  public static Object[][] nativeJsonColumns() {
-    return new Object[][]{
-        {JSON_COLUMN},
-        {RAW_JSON_COLUMN},
-        {JSON_COLUMN_WITHOUT_INDEX},
-    };
-  }
-
-  @DataProvider
-  public static Object[][] nonNativeJsonColumns() {
-    // columns where we should be able to extract JSON with a function, but can't use all the literal features
-    return new Object[][]{
-        {RAW_BYTES_COLUMN},
-        {DICTIONARY_BYTES_COLUMN},
-        {RAW_STRING_COLUMN},
-        {DICTIONARY_STRING_COLUMN},
-    };
-  }
-
   protected IndexSegment _indexSegment;
   protected List<IndexSegment> _indexSegments;
 

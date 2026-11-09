@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,9 +43,11 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.plan.ExplainInfo;
@@ -394,6 +395,9 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
         case LITE_MODE_LEAF_STAGE_LIMIT_REACHED:
           _statMap.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
           break;
+        case APPROXIMATED_RESULT:
+          _statMap.merge(StatKey.APPROXIMATED_RESULT, Boolean.parseBoolean(entry.getValue()));
+          break;
         case TIME_USED_MS:
           _statMap.merge(StatKey.SSE_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
           break;
@@ -441,6 +445,12 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
           break;
         case REMOTE_ACCESS_BYTES:
           _statMap.merge(StatKey.REMOTE_ACCESS_BYTES, Long.parseLong(entry.getValue()));
+          break;
+        case NUM_DIRECT_REMOTE_ACCESSES:
+          _statMap.merge(StatKey.NUM_DIRECT_REMOTE_ACCESSES, Long.parseLong(entry.getValue()));
+          break;
+        case DIRECT_REMOTE_ACCESS_BYTES:
+          _statMap.merge(StatKey.DIRECT_REMOTE_ACCESS_BYTES, Long.parseLong(entry.getValue()));
           break;
         case EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS:
           LOGGER.debug("Skipping empty filter segments: {}", entry.getValue());
@@ -723,22 +733,44 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     assert resultRows != null && inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
     ColumnDataType[] outputStoredTypes = _dataSchema.getStoredColumnDataTypes();
-    if (!Arrays.equals(inputStoredTypes, outputStoredTypes)) {
-      for (Object[] row : resultRows) {
-        convertRow(row, inputStoredTypes, outputStoredTypes);
+    QueryContext queryContext = _requests.get(0).getQueryContext();
+    // Convert the columns whose stored types differ, and the STRING final aggregation results, which can be objects
+    // stored as their strings, e.g. raw sketches
+    int numColumns = outputStoredTypes.length;
+    int firstFinalResultColId = getFirstFinalResultColId(block, queryContext, numColumns);
+    int[] colIdsToConvert = new int[numColumns];
+    int numColumnsToConvert = 0;
+    for (int colId = 0; colId < numColumns; colId++) {
+      if (inputStoredTypes[colId] != outputStoredTypes[colId]
+          || (colId >= firstFinalResultColId && outputStoredTypes[colId] == ColumnDataType.STRING)) {
+        colIdsToConvert[numColumnsToConvert++] = colId;
       }
     }
-    return new RowHeapDataBlock(resultRows, _dataSchema, _requests.get(0).getQueryContext().getAggregationFunctions());
+    if (numColumnsToConvert > 0) {
+      for (Object[] row : resultRows) {
+        for (int i = 0; i < numColumnsToConvert; i++) {
+          int colId = colIdsToConvert[i];
+          Object value = row[colId];
+          if (value != null) {
+            row[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
+          }
+        }
+      }
+    }
+    return new RowHeapDataBlock(resultRows, _dataSchema, queryContext.getAggregationFunctions());
   }
 
-  public static void convertRow(Object[] row, ColumnDataType[] inputStoredTypes, ColumnDataType[] outputStoredTypes) {
-    int numColumns = row.length;
-    for (int colId = 0; colId < numColumns; colId++) {
-      Object value = row[colId];
-      if (value != null && inputStoredTypes[colId] != outputStoredTypes[colId]) {
-        row[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
-      }
+  /// Returns the index of the first final aggregation result column of the block, or `numColumns` when the block does
+  /// not hold final aggregation results, which the server returns when the query asks for them.
+  private static int getFirstFinalResultColId(BaseResultsBlock block, QueryContext queryContext, int numColumns) {
+    if (block instanceof AggregationResultsBlock && queryContext.isServerReturnFinalResult()) {
+      return 0;
     }
+    if (block instanceof GroupByResultsBlock && (queryContext.isServerReturnFinalResult()
+        || queryContext.isServerReturnFinalResultKeyUnpartitioned())) {
+      return queryContext.getNumGroupByKeyColumns();
+    }
+    return numColumns;
   }
 
   public enum StatKey implements StatMap.Key {
@@ -808,7 +840,14 @@ public class LeafOperator extends MultiStageOperator implements ExplainableOpera
     /// Number of remote accesses (local cache misses) made to read segment data from a remote storage tier.
     NUM_REMOTE_ACCESSES(StatMap.Type.LONG),
     /// Number of bytes read by the remote accesses.
-    REMOTE_ACCESS_BYTES(StatMap.Type.LONG);
+    REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    /// Number of remote accesses made directly, i.e. outside the buffers fetched for the query.
+    NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG),
+    /// Number of bytes read by the direct remote accesses.
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    /// Whether a function that can answer exactly returned an approximate final result, when the leaf returns final
+    /// results.
+    APPROXIMATED_RESULT(StatMap.Type.BOOLEAN);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will

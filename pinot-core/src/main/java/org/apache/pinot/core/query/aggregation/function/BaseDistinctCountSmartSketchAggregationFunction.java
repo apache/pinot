@@ -52,9 +52,24 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
   // Use empty IntOpenHashSet as a placeholder for empty result
   protected static final IntSet EMPTY_PLACEHOLDER = new IntOpenHashSet();
 
+  /// Set by `extractFinalResult` when it reads a sketch, see [AggregationFunction#hasApproximatedResult()].
+  protected volatile boolean _approximatedResult;
+
   protected BaseDistinctCountSmartSketchAggregationFunction(ExpressionContext expression,
       boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
+  }
+
+  @Override
+  public boolean hasApproximatedResult() {
+    return _approximatedResult;
+  }
+
+  /// Reads before it writes, so that the threads that extract many groups share the field instead of contending on it.
+  protected void markApproximatedResult() {
+    if (!_approximatedResult) {
+      _approximatedResult = true;
+    }
   }
 
   protected abstract int getThreshold();

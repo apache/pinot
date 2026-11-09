@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,6 +47,7 @@ import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -554,6 +557,8 @@ public class LeafOperatorTest {
     InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
     metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.NUM_REMOTE_ACCESSES.getName(), "7");
     metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.REMOTE_ACCESS_BYTES.getName(), "700");
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName(), "2");
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName(), "20");
     QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
     LeafOperator operator =
         new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
@@ -567,15 +572,45 @@ public class LeafOperatorTest {
     StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
     assertEquals(leafStats.getLong(LeafOperator.StatKey.NUM_REMOTE_ACCESSES), 7L);
     assertEquals(leafStats.getLong(LeafOperator.StatKey.REMOTE_ACCESS_BYTES), 700L);
+    assertEquals(leafStats.getLong(LeafOperator.StatKey.NUM_DIRECT_REMOTE_ACCESSES), 2L);
+    assertEquals(leafStats.getLong(LeafOperator.StatKey.DIRECT_REMOTE_ACCESS_BYTES), 20L);
 
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
     assertEquals(brokerResponse.getNumRemoteAccesses(), 7L);
     assertEquals(brokerResponse.getRemoteAccessBytes(), 700L);
+    assertEquals(brokerResponse.getNumDirectRemoteAccesses(), 2L);
+    assertEquals(brokerResponse.getDirectRemoteAccessBytes(), 20L);
     JsonNode responseJson = JsonUtils.objectToJsonNode(brokerResponse);
     assertEquals(responseJson.path("numRemoteAccesses").asLong(), 7L);
     assertEquals(responseJson.path("remoteAccessBytes").asLong(), 700L);
+    assertEquals(responseJson.path("numDirectRemoteAccesses").asLong(), 2L);
+    assertEquals(responseJson.path("directRemoteAccessBytes").asLong(), 20L);
 
+    operator.close();
+  }
+
+  /// A leaf that returns final results reports a function that returned an approximate result.
+  @Test
+  public void shouldPropagateApproximatedResult() {
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.APPROXIMATED_RESULT.getName(), "true");
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertTrue(leafStats.getBoolean(LeafOperator.StatKey.APPROXIMATED_RESULT));
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertTrue(brokerResponse.isApproximatedResult());
+    assertTrue(JsonUtils.objectToJsonNode(brokerResponse).path("approximatedResult").asBoolean());
     operator.close();
   }
 
@@ -687,6 +722,70 @@ public class LeafOperatorTest {
     assertEquals(rows.get(0), new Object[]{"a", 3L});
     assertEquals(rows.get(1), new Object[]{"b", 5L});
     assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the group-by block");
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldSerializeAggregationArrayFinalResult() {
+    // Given:
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT FUNNELMATCHSTEP(tsCol, 1000, 1, stepCol) FROM tbl");
+    queryContext.setServerReturnFinalResult(true);
+    AggregationFunction[] aggFunctions = queryContext.getAggregationFunctions();
+    PriorityQueue<FunnelStepEvent> stepEvents = new PriorityQueue<>(List.of(new FunnelStepEvent(1L, 0)));
+    AggregationResultsBlock aggBlock = new AggregationResultsBlock(aggFunctions, List.of(stepEvents), queryContext);
+    DataSchema schema = aggBlock.getDataSchema();
+    List<BaseResultsBlock> dataBlocks = List.of(aggBlock);
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    ServerQueryRequest queryRequest = mock(ServerQueryRequest.class);
+    when(queryRequest.getQueryContext()).thenReturn(queryContext);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), List.of(queryRequest), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    MseBlock resultBlock = operator.nextBlock();
+
+    // Then:
+    List<Object[]> rows = ((MseBlock.Data) resultBlock).asSerialized().asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{new int[]{1}});
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the aggregation block");
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldSerializeAggregationRawSketchFinalResult() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCTCOUNTRAWHLL(col) FROM tbl");
+    queryContext.setServerReturnFinalResult(true);
+    AggregationFunction[] aggFunctions = queryContext.getAggregationFunctions();
+    HyperLogLog hyperLogLog = new HyperLogLog(12);
+    hyperLogLog.offer(1);
+    AggregationResultsBlock aggBlock = new AggregationResultsBlock(aggFunctions, List.of(hyperLogLog), queryContext);
+    DataSchema schema = aggBlock.getDataSchema();
+    List<BaseResultsBlock> dataBlocks = List.of(aggBlock);
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    ServerQueryRequest queryRequest = mock(ServerQueryRequest.class);
+    when(queryRequest.getQueryContext()).thenReturn(queryContext);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), List.of(queryRequest), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    MseBlock resultBlock = operator.nextBlock();
+
+    // Then: the raw sketch final result is stored as the serialized sketch
+    List<Object[]> rows = ((MseBlock.Data) resultBlock).asSerialized().asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], aggFunctions[0].extractFinalResult(hyperLogLog).toString());
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the aggregation block");
 
     operator.close();
   }

@@ -352,7 +352,8 @@ public class UpsertConfig extends BaseJsonConfig {
     _metadataManagerConfigs = metadataManagerConfigs;
   }
 
-  @Deprecated
+  /// @deprecated Use `upsertConfig.snapshot` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isEnableSnapshot() {
     return _enableSnapshot;
   }
@@ -365,7 +366,8 @@ public class UpsertConfig extends BaseJsonConfig {
     }
   }
 
-  @Deprecated
+  /// @deprecated Use `upsertConfig.preload` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isEnablePreload() {
     return _enablePreload;
   }
@@ -378,7 +380,8 @@ public class UpsertConfig extends BaseJsonConfig {
     }
   }
 
-  @Deprecated
+  /// @deprecated Use `ingestionConfig.streamIngestionConfig.parallelSegmentConsumptionPolicy` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isAllowPartialUpsertConsumptionDuringCommit() {
     return _allowPartialUpsertConsumptionDuringCommit;
   }

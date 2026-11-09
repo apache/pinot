@@ -35,6 +35,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class ArrayLiteralTransformFunctionTest {
@@ -68,6 +69,34 @@ public class ArrayLiteralTransformFunctionTest {
     Assert.assertEquals(intArray.getIntArrayLiteral(), new int[]{
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9
     });
+  }
+
+  @Test
+  public void testBooleanArrayLiteralTransformFunction() {
+    List<ExpressionContext> arrayExpressions = List.of(
+        ExpressionContext.forLiteral(DataType.BOOLEAN, true),
+        ExpressionContext.forLiteral(DataType.BOOLEAN, false));
+
+    ArrayLiteralTransformFunction booleanArray = new ArrayLiteralTransformFunction(arrayExpressions);
+    assertEquals(booleanArray.getResultMetadata().getDataType(), DataType.BOOLEAN);
+    assertEquals(booleanArray.getIntArrayLiteral(), new int[]{1, 0});
+    int[][] ints = booleanArray.transformToIntValuesMV(_projectionBlock);
+    long[][] longs = booleanArray.transformToLongValuesMV(_projectionBlock);
+    float[][] floats = booleanArray.transformToFloatValuesMV(_projectionBlock);
+    double[][] doubles = booleanArray.transformToDoubleValuesMV(_projectionBlock);
+    String[][] strings = booleanArray.transformToStringValuesMV(_projectionBlock);
+    assertEquals(ints.length, NUM_DOCS);
+    assertEquals(longs.length, NUM_DOCS);
+    assertEquals(floats.length, NUM_DOCS);
+    assertEquals(doubles.length, NUM_DOCS);
+    assertEquals(strings.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(ints[i], new int[]{1, 0});
+      assertEquals(longs[i], new long[]{1, 0});
+      assertEquals(floats[i], new float[]{1, 0});
+      assertEquals(doubles[i], new double[]{1, 0});
+      assertEquals(strings[i], new String[]{"true", "false"});
+    }
   }
 
   @Test

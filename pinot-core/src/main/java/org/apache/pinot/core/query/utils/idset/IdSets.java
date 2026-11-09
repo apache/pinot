@@ -21,6 +21,11 @@ package org.apache.pinot.core.query.utils.idset;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Base64;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.pinot.segment.spi.memory.DataBufferPinotInputStream;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
+import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.longlong.LongIterator;
@@ -37,6 +42,10 @@ public class IdSets {
   // NOTE: With default expectedInsertions and fpp, the BloomFilter will be around 4.35MB.
   public static final int DEFAULT_EXPECTED_INSERTIONS = 5_000_000;
   public static final double DEFAULT_FPP = 0.03;
+
+  // Stored types whose values can be looked up in an IdSet
+  private static final List<DataType> LOOKUP_VALUE_TYPES =
+      List.of(DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.STRING, DataType.BYTES);
 
   /// Creates an IdSet.
   ///
@@ -76,6 +85,40 @@ public class IdSets {
   /// Returns an EmptyIdSet.
   public static EmptyIdSet emptyIdSet() {
     return EmptyIdSet.INSTANCE;
+  }
+
+  /// Validates that values of the given stored type can be looked up in the given IdSet. Rejects e.g. LONG values
+  /// in an IdSet built from INT values, where every lookup would otherwise throw or hash to the wrong bits. An empty
+  /// IdSet accepts every lookup type, as it records no value type.
+  ///
+  /// @throws IllegalArgumentException if values of the stored type cannot be looked up in the IdSet
+  public static void validateValueType(IdSet idSet, DataType storedType) {
+    if (!LOOKUP_VALUE_TYPES.contains(storedType)) {
+      throw new IllegalArgumentException(
+          String.format("Cannot look up %s values in an IdSet, supported value types: %s", storedType,
+              LOOKUP_VALUE_TYPES));
+    }
+    List<DataType> valueTypes;
+    switch (idSet.getType()) {
+      case EMPTY:
+        return;
+      case ROARING_BITMAP:
+        valueTypes = List.of(DataType.INT);
+        break;
+      case ROARING_64_NAVIGABLE_MAP:
+        valueTypes = List.of(DataType.LONG);
+        break;
+      case BLOOM_FILTER:
+        valueTypes = ((BloomFilterIdSet) idSet).getValueTypes();
+        break;
+      default:
+        throw new IllegalStateException("Unsupported IdSet type: " + idSet.getType());
+    }
+    if (!valueTypes.contains(storedType)) {
+      throw new IllegalArgumentException(
+          String.format("Cannot look up %s values in an IdSet built from %s values", storedType,
+              valueTypes.stream().map(DataType::name).collect(Collectors.joining(" or "))));
+    }
   }
 
   /// Merges 2 IdSets, converts to BloomFilterIdSet if the size exceeds the size threshold.
@@ -187,7 +230,7 @@ public class IdSets {
     return fromByteBuffer(ByteBuffer.wrap(bytes));
   }
 
-  /// Deserializes the IdSet from a ByteBuffer.
+  /// Deserializes the IdSet from a ByteBuffer, which may be read-only or direct (e.g. a multi-stage mailbox payload).
   public static IdSet fromByteBuffer(ByteBuffer byteBuffer)
       throws IOException {
     byte typeId = byteBuffer.get();
@@ -201,7 +244,7 @@ public class IdSets {
       case 3:
         return BloomFilterIdSet.fromByteBuffer(byteBuffer);
       default:
-        throw new IllegalStateException();
+        throw new IllegalStateException("Unsupported IdSet type id: " + typeId);
     }
   }
 
@@ -211,5 +254,11 @@ public class IdSets {
   public static IdSet fromBase64String(String base64String)
       throws IOException {
     return fromBytes(Base64.getDecoder().decode(base64String));
+  }
+
+  /// Returns a [PinotInputStream] over the remaining bytes of the given buffer, without moving its position. It reads
+  /// heap, direct and read-only buffers the same way, and its `DataInput` methods read big-endian values.
+  static PinotInputStream toInputStream(ByteBuffer byteBuffer) {
+    return new DataBufferPinotInputStream(PinotByteBuffer.slice(byteBuffer));
   }
 }

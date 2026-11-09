@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,6 +42,8 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction.Seri
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -195,16 +195,16 @@ public class IndexedTableTest {
       Assert.assertEquals(result.getMin(), 0.0);
       Assert.assertEquals(result.getMax(), expectedSize - 1.0);
 
-      long centroidWeight = 0L;
+      double centroidWeight = 0.0;
       double previousMean = Double.NEGATIVE_INFINITY;
       for (Centroid centroid : result.centroids()) {
         Assert.assertTrue(Double.isFinite(centroid.mean()));
-        Assert.assertTrue(centroid.count() > 0);
+        Assert.assertTrue(centroid.weight() > 0);
         Assert.assertTrue(centroid.mean() + 1e-12 >= previousMean);
-        centroidWeight += centroid.count();
+        centroidWeight += centroid.weight();
         previousMean = centroid.mean();
       }
-      Assert.assertEquals(centroidWeight, expectedSize);
+      Assert.assertEquals(centroidWeight, (double) expectedSize, 1e-9);
 
       double previousQuantile = Double.NEGATIVE_INFINITY;
       for (double quantile : new double[]{0.0, 0.5, 0.75, 0.95, 0.99, 1.0}) {

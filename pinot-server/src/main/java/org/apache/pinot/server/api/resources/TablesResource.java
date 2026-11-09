@@ -21,7 +21,6 @@ package org.apache.pinot.server.api.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -104,9 +103,13 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.SnapshotPass;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -128,6 +131,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -262,13 +266,13 @@ public class TablesResource {
 
             // Column stats are scoped to the caller's column filter.
             for (String column : columnSet) {
-              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
               int columnLength = columnMetadata.getLengthOfLongestElement();
               if (columnLength < 0) {
                 // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
                 Comparable<?> maxValue = columnMetadata.getMaxValue();
                 if (maxValue instanceof String) {
-                  columnLength = Utf8.encodedLength((String) maxValue);
+                  columnLength = Utf8Utils.encodedLength((String) maxValue);
                 } else if (maxValue instanceof ByteArray) {
                   columnLength = ((ByteArray) maxValue).length();
                 } else if (maxValue instanceof BigDecimal) {
@@ -393,11 +397,18 @@ public class TablesResource {
   static int addColumnContributions(int currentCount, ImmutableSegment segment,
       @Nullable Set<String> columnFilter) {
     int additionalCount = 0;
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    Set<String> physicalColumns = segmentMetadata instanceof SegmentMetadataImpl
+        ? segment.getPhysicalColumnNames()
+        : null;
     if (columnFilter == null) {
-      additionalCount = segment.getSegmentMetadata().getColumnMetadataMap().size();
+      additionalCount = physicalColumns != null
+          ? physicalColumns.size()
+          : segmentMetadata.getColumnMetadataMap().size();
     } else {
       for (String column : columnFilter) {
-        if (segment.getSegmentMetadata().getColumnMetadataMap().containsKey(column)) {
+        if (physicalColumns != null ? physicalColumns.contains(column)
+            : segmentMetadata.getColumnMetadataMap().containsKey(column)) {
           additionalCount++;
         }
       }
@@ -608,8 +619,7 @@ public class TablesResource {
           tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
           "Invalid table / segment name: %s , %s", tableNameWithType, segmentName);
 
-      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-          segmentTarFile);
+      createSegmentTransferTarFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
         try {
@@ -662,10 +672,11 @@ public class TablesResource {
       }
       ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
 
-      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
+      final Pair<ValidDocIdsType, DocIdsSnapshot> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
       ValidDocIdsType finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
-      MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
+      MutableRoaringBitmap validDocIdSnapshot =
+          validDocIdsSnapshotPair.getRight() != null ? validDocIdsSnapshotPair.getRight().docIds() : null;
 
       if (validDocIdSnapshot == null) {
         String msg = String.format(
@@ -745,10 +756,11 @@ public class TablesResource {
           continue;
         }
 
-        final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
+        final Pair<ValidDocIdsType, DocIdsSnapshot> validDocIdSnapshotPair =
             getValidDocIds(indexSegment, validDocIdsType);
         String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
-        MutableRoaringBitmap validDocIdsSnapshot = validDocIdSnapshotPair.getRight();
+        DocIdsSnapshot snapshot = validDocIdSnapshotPair.getRight();
+        MutableRoaringBitmap validDocIdsSnapshot = snapshot != null ? snapshot.docIds() : null;
         if (validDocIdsSnapshot == null) {
           if (LOGGER.isDebugEnabled()) {
             String msg = String.format(
@@ -762,6 +774,9 @@ public class TablesResource {
         }
 
         Map<String, Object> validDocIdsMetadata = new HashMap<>();
+        if (snapshot.metadata() != null) {
+          validDocIdsMetadata.put("diagnostics", snapshot.metadata().toResponse(System.currentTimeMillis()));
+        }
         int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         int totalValidDocs = validDocIdsSnapshot.getCardinality();
         int totalInvalidDocs = totalDocs - totalValidDocs;
@@ -782,6 +797,20 @@ public class TablesResource {
               ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
         }
         validDocIdsMetadata.put("segmentCreationTimeMillis", indexSegment.getSegmentMetadata().getIndexCreationTime());
+        ValidDocIdsType resolvedValidDocIdsType = validDocIdSnapshotPair.getLeft();
+        if (resolvedValidDocIdsType == ValidDocIdsType.SNAPSHOT
+            || resolvedValidDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
+          // Lets a caller tell whether two replicas' snapshot files of this partition can be compared
+          PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+              ((ImmutableSegmentImpl) indexSegment).getPartitionUpsertMetadataManager();
+          SnapshotPass snapshotPass =
+              partitionUpsertMetadataManager != null ? partitionUpsertMetadataManager.getLastSnapshotPass() : null;
+          if (snapshotPass != null) {
+            validDocIdsMetadata.put("snapshotPass", Map.of("segmentsCrc", snapshotPass.segmentsCrc(),
+                "numSegments", snapshotPass.numSegments(), "consistent", snapshotPass.consistent(), "finishedAtMs",
+                snapshotPass.finishedAtMs()));
+          }
+        }
         allValidDocIdsMetadata.add(validDocIdsMetadata);
       }
       if (nonImmutableSegmentCount > 0) {
@@ -807,32 +836,36 @@ public class TablesResource {
     return dataCrc >= 0 ? Long.toString(dataCrc) : null;
   }
 
-  private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
+  private Pair<ValidDocIdsType, DocIdsSnapshot> getValidDocIds(IndexSegment indexSegment,
       String validDocIdsTypeStr) {
     if (validDocIdsTypeStr == null) {
       // By default, we read the valid doc ids from snapshot.
       return Pair.of(ValidDocIdsType.SNAPSHOT,
-          ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+          ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
     }
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     switch (validDocIdsType) {
       case SNAPSHOT:
         return Pair.of(validDocIdsType,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(
+                V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
       case SNAPSHOT_WITH_DELETE:
         return Pair.of(validDocIdsType,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(
-                V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(
+                V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
       case IN_MEMORY:
-        return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
+        return Pair.of(validDocIdsType,
+            new DocIdsSnapshot(indexSegment.getValidDocIds().getMutableRoaringBitmap(), null));
       case IN_MEMORY_WITH_DELETE:
-        return Pair.of(validDocIdsType, indexSegment.getQueryableDocIds().getMutableRoaringBitmap());
+        return Pair.of(validDocIdsType,
+            new DocIdsSnapshot(indexSegment.getQueryableDocIds().getMutableRoaringBitmap(), null));
       default:
         // By default, we read the valid doc ids from snapshot.
         LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
             ValidDocIdsType.SNAPSHOT);
         return Pair.of(ValidDocIdsType.SNAPSHOT,
-            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsSnapshot(
+                V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
     }
   }
 
@@ -1077,9 +1110,19 @@ public class TablesResource {
     File segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
         tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
         "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
-    TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-        segmentTarFile);
+    createSegmentTransferTarFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
     return segmentTarFile;
+  }
+
+  private static void createSegmentTransferTarFile(File segmentDir, File segmentTarFile)
+      throws IOException {
+    TarCompressionUtils.createFilteredCompressedTarFile(segmentDir, segmentTarFile, file -> {
+      if (!segmentDir.equals(file.getParentFile())) {
+        return true;
+      }
+      // Local serving artifacts are rebuilt from metadata.properties on the receiving server.
+      return !SegmentMetadataImpl.isMappedMetadataSidecarFileName(file.getName());
+    });
   }
 
   /// Uploads a segment tar file to the segment store and returns the segment download url.

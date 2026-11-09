@@ -59,7 +59,8 @@ public class SegmentAssignmentStrategyFactoryTest {
   public void testSegmentAssignmentStrategyFromTableConfig() {
     // Set segment assignment config map in table config for balanced num segment assignment strategy
     Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = new HashMap<>();
-    segmentAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.toString(), new SegmentAssignmentConfig("Balanced"));
+    segmentAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.toString(),
+        new SegmentAssignmentConfig("Balanced", null));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
         .setSegmentAssignmentConfigMap(segmentAssignmentConfigMap).build();
 
@@ -119,10 +120,10 @@ public class SegmentAssignmentStrategyFactoryTest {
         new ReplicaGroupStrategyConfig(PARTITION_COLUMN, numInstancesPerPartition);
     Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = new HashMap<>();
     segmentAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.toString(),
-        new SegmentAssignmentConfig("ReplicaGroup"));
+        new SegmentAssignmentConfig("ReplicaGroup", null));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
-        .setNumReplicas(NUM_REPLICAS).setSegmentAssignmentConfigMap(segmentAssignmentConfigMap)
-        .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig).build();
+        .setNumReplicas(NUM_REPLICAS).setSegmentAssignmentConfigMap(segmentAssignmentConfigMap).build();
+    tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
 
     // {
     //   0_0=[instance_0, instance_1], 1_0=[instance_2, instance_3], 2_0=[instance_4, instance_5],

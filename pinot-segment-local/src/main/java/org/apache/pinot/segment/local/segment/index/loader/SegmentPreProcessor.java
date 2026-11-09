@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -28,8 +27,6 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -39,6 +36,8 @@ import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.Default
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.LegacyRawValueInvertedIndexCleanup;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.VectorIndexHandler;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
@@ -50,15 +49,9 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
-import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
-import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -154,6 +147,16 @@ public class SegmentPreProcessor implements AutoCloseable {
     removeInvertedIndexTempFiles(indexDir);
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
+      // Recovery must use retained forward values. Other handlers can reconstruct multi-value forward indexes from
+      // dictionary/inverted indexes, losing ordering and duplicates, or drop the original source altogether.
+      Map<String, FieldIndexConfigs> recoveryConfigs = _indexLoadingConfig.getFieldIndexConfigByColName();
+      new TextIndexHandler(_segmentDirectory, recoveryConfigs, _tableConfig, _schema)
+          .validateRecoverySources(segmentWriter);
+      new VectorIndexHandler(_segmentDirectory, recoveryConfigs, _tableConfig, _schema)
+          .validateRecoverySources(segmentWriter);
+      new MultiColumnTextIndexHandler(_segmentDirectory, _indexLoadingConfig,
+          _indexLoadingConfig.getMultiColTextIndexConfig()).validateRecoverySources(segmentWriter);
+
       // Backward-compat shim: invalidate any legacy raw-value embedded-dictionary inverted indexes left over from
       // PR #17060 (reverted by PR #18410) so the standard handlers can rebuild them in the dict-id format. Must
       // run before any handler that may try to read the inverted-index buffer. Safe to delete after Pinot 1.7;
@@ -163,7 +166,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       // Update default columns according to the schema.
       DefaultColumnHandler defaultColumnHandler =
           DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, segmentMetadata, _indexLoadingConfig,
-              segmentWriter);
+              segmentWriter, _segmentDirectory);
       defaultColumnHandler.updateDefaultColumns();
       _segmentDirectory.reloadMetadata();
 
@@ -228,7 +231,7 @@ public class SegmentPreProcessor implements AutoCloseable {
         segmentWriter.save();
       }
       // Create/modify/remove multi-col text index if required.
-      if (processMultiColTextIndex(indexDir, segmentWriter, segmentOperationsThrottlerSet)) {
+      if (processMultiColTextIndex(segmentWriter, segmentOperationsThrottlerSet)) {
         // NOTE: When adding new steps after this, un-comment the next line.
         //_segmentDirectory.reloadMetadata();
         segmentWriter.save();
@@ -256,7 +259,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       if (_schema.hasColumn(column) || !configsByCol.containsKey(column)) {
         continue;
       }
-      if (!(entry.getValue() instanceof ColumnMetadataImpl columnMetadata) || !columnMetadata.isMaterializedChild()) {
+      if (!entry.getValue().isMaterializedChild()) {
         continue;
       }
       if (augmented == null) {
@@ -266,7 +269,7 @@ public class SegmentPreProcessor implements AutoCloseable {
           augmented.addField(fieldSpec);
         }
       }
-      augmented.addField(columnMetadata.getFieldSpec());
+      augmented.addField(entry.getValue().getFieldSpec());
     }
     return augmented == null ? _schema : augmented;
   }
@@ -308,7 +311,7 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       // Check if there is need to create/modify/remove multi-col text index
-      if (needProcessMultiColumnTextIndex()) {
+      if (needProcessMultiColumnTextIndex(segmentReader)) {
         LOGGER.info("Found multi-column text index needs updates in segment: {}", segmentName);
         return true;
       }
@@ -358,83 +361,31 @@ public class SegmentPreProcessor implements AutoCloseable {
     return !starTreeBuilderConfigs.isEmpty();
   }
 
-  private boolean needProcessMultiColumnTextIndex() {
-    MultiColumnTextIndexConfig newConfig = _indexLoadingConfig.getMultiColTextIndexConfig();
-    MultiColumnTextMetadata oldConfig = _segmentDirectory.getSegmentMetadata().getMultiColumnTextMetadata();
-    return MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig);
+  private boolean needProcessMultiColumnTextIndex(SegmentDirectory.Reader segmentReader) {
+    return new MultiColumnTextIndexHandler(_segmentDirectory, _indexLoadingConfig,
+        _indexLoadingConfig.getMultiColTextIndexConfig()).needUpdateIndices(segmentReader);
   }
 
-  private boolean processMultiColTextIndex(File indexDir, SegmentDirectory.Writer segmentWriter,
+  private boolean processMultiColTextIndex(SegmentDirectory.Writer segmentWriter,
       @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet)
       throws Exception {
-    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
-    String segmentName = segmentMetadata.getName();
-    MultiColumnTextMetadata oldConfig = segmentMetadata.getMultiColumnTextMetadata();
-    MultiColumnTextIndexConfig newConfig = _indexLoadingConfig.getMultiColTextIndexConfig();
-    boolean remove = false;
-    boolean create = newConfig != null;
-
-    if (oldConfig != null) {
-      if (newConfig == null) {
-        remove = true;
-      } else {
-        if (MultiColumnTextIndexHandler.shouldModifyMultiColTextIndex(newConfig, oldConfig)) {
-          LOGGER.info("Change detected in multi-column text index for segment: {}", segmentName);
-        } else {
-          create = false;
-        }
-      }
-    }
-    if (!remove && !create) {
-      LOGGER.info("No change detected in multi-column text index for segment: {}", segmentName);
+    MultiColumnTextIndexHandler handler = new MultiColumnTextIndexHandler(_segmentDirectory, _indexLoadingConfig,
+        _indexLoadingConfig.getMultiColTextIndexConfig());
+    if (!handler.needUpdateIndices(segmentWriter)) {
       return false;
     }
-
     if (segmentOperationsThrottlerSet != null) {
       segmentOperationsThrottlerSet.getSegmentMultiColTextIndexPreprocessThrottler().acquire();
     }
     try {
-      if (remove) {
-        LOGGER.info("Removing multi-column text index from segment: {}", segmentName);
-        removeMultiColumnTextIndex(indexDir);
-      } else if (create) {
-        if (oldConfig != null) {
-          // Drop existing multi-column text index before creating a new one
-          // TODO: check if it's possible to only add/remove select columns
-          removeMultiColumnTextIndex(indexDir);
-        }
-        MultiColumnTextIndexHandler handler =
-            new MultiColumnTextIndexHandler(_segmentDirectory, _indexLoadingConfig, newConfig);
-        handler.updateIndices(segmentWriter);
-        handler.postUpdateIndicesCleanup(segmentWriter);
-      }
+      handler.updateIndices(segmentWriter);
+      handler.postUpdateIndicesCleanup(segmentWriter);
     } finally {
       if (segmentOperationsThrottlerSet != null) {
         segmentOperationsThrottlerSet.getSegmentMultiColTextIndexPreprocessThrottler().release();
       }
     }
     return true;
-  }
-
-  private void removeMultiColumnTextIndex(File indexDir)
-      throws ConfigurationException, IOException {
-    // Remove the multi-col text index metadata
-    PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
-    metadataProperties.subset(MultiColumnTextIndexConstants.MetadataKey.ROOT_SUBSET).clear();
-    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
-
-    // Remove the index file and index map file
-    File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-    File textIdxDir =
-        SegmentDirectoryPaths.findTextIndexIndexFile(segmentDirectory, MultiColumnTextIndexConstants.INDEX_DIR_NAME);
-
-    if (textIdxDir != null && textIdxDir.exists()) {
-      FileUtils.forceDelete(textIdxDir);
-    }
-    File mappingFile = new File(segmentDirectory, MultiColumnTextIndexConstants.DOCID_MAPPING_FILE_NAME);
-    if (mappingFile.exists()) {
-      FileUtils.forceDelete(mappingFile);
-    }
   }
 
   private boolean processStarTrees(File indexDir,

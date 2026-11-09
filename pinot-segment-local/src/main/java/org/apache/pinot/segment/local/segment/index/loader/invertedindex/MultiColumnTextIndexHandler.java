@@ -26,10 +26,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.utils.LuceneIndexCompatibilityUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
@@ -37,6 +39,7 @@ import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -92,8 +95,12 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     String segmentName = segmentMetadata.getName();
     MultiColumnTextMetadata oldConfig = segmentMetadata.getMultiColumnTextMetadata();
 
-    boolean needUpdate = shouldModifyMultiColTextIndex(_textIndexConfig, oldConfig);
+    boolean needUpdate = shouldModifyMultiColTextIndex(_textIndexConfig, oldConfig)
+        || isBuildInProgress() || isIncompatible();
     if (needUpdate) {
+      if (_textIndexConfig == null) {
+        return true;
+      }
       List<String> newColumns = _textIndexConfig.getColumns();
       TableConfigUtils.checkForDuplicates(newColumns);
       for (String column : newColumns) {
@@ -110,6 +117,73 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     } else {
       LOGGER.info("Segment: {} does not required (re)building multi column text index", segmentName);
       return false;
+    }
+  }
+
+  /// Verify existing source columns before other handlers can replace their original forward values.
+  /// Newly added default columns are checked with all other sources immediately before recovery.
+  public void validateRecoverySources(SegmentDirectory.Reader segmentReader)
+      throws IOException {
+    validateRecoverySources(segmentReader, true);
+  }
+
+  private void validateRecoverySources(SegmentDirectory.Reader segmentReader, boolean existingColumnsOnly)
+      throws IOException {
+    if (_textIndexConfig != null && (isBuildInProgress() || isIncompatible())) {
+      for (String column : _textIndexConfig.getColumns()) {
+        // DefaultColumnHandler creates newly added columns after the early source validation.
+        if (existingColumnsOnly && _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column) == null) {
+          continue;
+        }
+        if (!segmentReader.hasIndexFor(column, StandardIndexes.forward())
+            || _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).isDisabled()) {
+          throw new IllegalStateException("Cannot rebuild multi-column Lucene text index for column: " + column
+              + ". Original forward index must be retained; restore a compatible segment or refresh it from source"
+              + " data");
+        }
+      }
+    }
+  }
+
+  private File getBuildMarker() {
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    return indexDir == null
+        ? null
+        : new File(indexDir, MultiColumnTextIndexConstants.INDEX_DIR_NAME + ".text.inprogress");
+  }
+
+  private boolean isBuildInProgress() {
+    File marker = getBuildMarker();
+    if (marker == null) {
+      return false;
+    }
+    // Older preprocessing removed metadata before building and wrote no marker. A leftover shared directory
+    // without its metadata is also an unfinished build; it must never be appended to on retry.
+    if (marker.exists()) {
+      return true;
+    }
+    return _textIndexConfig != null && _segmentDirectory.getSegmentMetadata().getMultiColumnTextMetadata() == null
+        && SegmentDirectoryPaths.findTextIndexIndexFile(_segmentDirectory.getSegmentMetadata().getIndexDir(),
+            MultiColumnTextIndexConstants.INDEX_DIR_NAME) != null;
+  }
+
+  private boolean isIncompatible() {
+    if (_segmentDirectory.getSegmentMetadata().getMultiColumnTextMetadata() == null || _textIndexConfig == null) {
+      return false;
+    }
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    if (indexDir == null) {
+      return false;
+    }
+    File luceneDirectory =
+        SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, MultiColumnTextIndexConstants.INDEX_DIR_NAME);
+    if (luceneDirectory == null) {
+      return false;
+    }
+    try {
+      return LuceneIndexCompatibilityUtils.isIncompatible(luceneDirectory);
+    } catch (IOException e) {
+      throw new IllegalStateException("Cannot inspect multi-column Lucene text index in: " + luceneDirectory, e);
     }
   }
 
@@ -153,30 +227,56 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
   @Override
   public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
+    validateRecoverySources(segmentWriter, false);
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
 
-    TableConfigUtils.checkForDuplicates(_textIndexConfig.getColumns());
-
-    BooleanList columnsSV = new BooleanArrayList(_textIndexConfig.getColumns().size());
-    for (String column : _textIndexConfig.getColumns()) {
-      ColumnMetadata metadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-      validate(metadata.getFieldSpec().getDataType(), column);
-      columnsSV.add(metadata.isSingleValue());
+    BooleanList columnsSV = new BooleanArrayList();
+    if (_textIndexConfig != null) {
+      TableConfigUtils.checkForDuplicates(_textIndexConfig.getColumns());
+      for (String column : _textIndexConfig.getColumns()) {
+        ColumnMetadata metadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        validate(metadata.getFieldSpec().getDataType(), column);
+        columnsSV.add(metadata.isSingleValue());
+      }
     }
 
-    try (MultiColumnLuceneTextIndexCreator creator =
-        new MultiColumnLuceneTextIndexCreator(_textIndexConfig.getColumns(), columnsSV, segmentDirectory, true, false,
-            null, null, _textIndexConfig)) {
-      createMultiColumnTextIndex(segmentWriter, creator);
-      creator.seal();
+    File marker = getBuildMarker();
+    FileUtils.touch(marker);
+    removeMultiColumnTextIndex(indexDir, segmentDirectory);
 
-      // Write the metadata for multi-column text index
-      PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
-      MultiColumnTextMetadata.writeMetadata(metadataProperties, MultiColumnTextMetadata.VERSION_1,
-          _textIndexConfig.getColumns(), _textIndexConfig.getProperties(), _textIndexConfig.getPerColumnProperties());
-      SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
+    if (_textIndexConfig != null) {
+      try (MultiColumnLuceneTextIndexCreator creator =
+          new MultiColumnLuceneTextIndexCreator(_textIndexConfig.getColumns(), columnsSV, segmentDirectory, true, false,
+              null, null, _textIndexConfig)) {
+        createMultiColumnTextIndex(segmentWriter, creator);
+        creator.seal();
+
+        // Write the metadata for multi-column text index
+        PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
+        MultiColumnTextMetadata.writeMetadata(metadataProperties, MultiColumnTextMetadata.VERSION_1,
+            _textIndexConfig.getColumns(), _textIndexConfig.getProperties(), _textIndexConfig.getPerColumnProperties());
+        SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
+      }
+    }
+    FileUtils.forceDelete(marker);
+  }
+
+  private void removeMultiColumnTextIndex(File indexDir, File segmentDirectory)
+      throws Exception {
+    PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
+    metadataProperties.subset(MultiColumnTextIndexConstants.MetadataKey.ROOT_SUBSET).clear();
+    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
+
+    File existing =
+        SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, MultiColumnTextIndexConstants.INDEX_DIR_NAME);
+    if (existing != null) {
+      FileUtils.forceDelete(existing);
+    }
+    File mapping = new File(segmentDirectory, MultiColumnTextIndexConstants.DOCID_MAPPING_FILE_NAME);
+    if (mapping.exists()) {
+      FileUtils.forceDelete(mapping);
     }
   }
 

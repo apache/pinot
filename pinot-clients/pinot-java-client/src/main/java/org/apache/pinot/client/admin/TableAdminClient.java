@@ -878,7 +878,7 @@ public class TableAdminClient extends BaseServiceAdminClient {
   /// Creates TableConfigs (schema + table configs). Supports skipping validations and ignoring active tasks.
   ///
   /// @param tableConfigsJson TableConfigs JSON payload
-  /// @param validationTypesToSkip Optional comma-separated validation types to skip (ALL|TASK|UPSERT)
+  /// @param validationTypesToSkip Optional comma-separated validation types to skip
   /// @param ignoreActiveTasks Optional flag to ignore active tasks during creation
   public String createTableConfigs(String tableConfigsJson, @Nullable String validationTypesToSkip,
       @Nullable Boolean ignoreActiveTasks)
@@ -902,7 +902,7 @@ public class TableAdminClient extends BaseServiceAdminClient {
   ///
   /// @param tableName Raw table name
   /// @param tableConfigsJson Updated TableConfigs JSON payload
-  /// @param validationTypesToSkip Optional comma-separated validation types to skip (ALL|TASK|UPSERT)
+  /// @param validationTypesToSkip Optional comma-separated validation types to skip
   /// @param reload Whether to reload the table if schema change is backward compatible
   /// @param forceTableSchemaUpdate Whether to force schema update
   public String updateTableConfigs(String tableName, String tableConfigsJson, @Nullable String validationTypesToSkip,
@@ -937,7 +937,7 @@ public class TableAdminClient extends BaseServiceAdminClient {
   /// Validates a TableConfigs payload without applying it.
   ///
   /// @param tableConfigsJson TableConfigs JSON payload
-  /// @param validationTypesToSkip Optional comma-separated validation types to skip (ALL|TASK|UPSERT)
+  /// @param validationTypesToSkip Optional comma-separated validation types to skip
   public String validateTableConfigs(String tableConfigsJson, @Nullable String validationTypesToSkip)
       throws PinotAdminException {
     return validateTableConfigs(tableConfigsJson, validationTypesToSkip, null);

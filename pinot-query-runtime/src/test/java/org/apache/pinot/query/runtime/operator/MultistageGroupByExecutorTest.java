@@ -22,19 +22,23 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -132,6 +136,49 @@ public class MultistageGroupByExecutorTest {
     }
     assertEquals(asMap(executor.getResult(100), numKeys), expected);
     assertEquals(executor.getNumGroups(), expected.size());
+  }
+
+  @Test
+  public void testOrderedIntermediateGroupsReuseSortEntries() {
+    DataSchema schema = new DataSchema(new String[]{"group", "avg"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.OBJECT});
+    AvgAggregationFunction function =
+        new AvgAggregationFunction(List.of(ExpressionContext.forIdentifier("$1")), true);
+    MultistageGroupByExecutor executor = new MultistageGroupByExecutor(new int[]{0},
+        new AggregationFunction[]{function}, new int[]{-1}, -1, AggType.INTERMEDIATE, false, schema, Map.of(), null);
+    Double[] averages = {null, 10.0, 0.0, 30.0, 5.0, 30.0, null, 20.0, 40.0, 1.0, 40.0, 0.0};
+    AvgPair[] pairs = new AvgPair[averages.length];
+    Object[][] rows = new Object[averages.length][];
+    for (int i = 0; i < averages.length; i++) {
+      pairs[i] = averages[i] == null ? null : new AvgPair(averages[i] * (i + 1), i + 1);
+      rows[i] = new Object[]{i, pairs[i]};
+    }
+    executor.processBlock(OperatorTestUtil.block(schema, rows));
+
+    // More than top-K + 1 candidates exercise reuse of both rejected and evicted entries, with ties and null keys.
+    List<List<RelFieldCollation>> orders = List.of(
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING, RelFieldCollation.NullDirection.LAST),
+            new RelFieldCollation(0)),
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.FIRST),
+            new RelFieldCollation(0)));
+    int[][] expectedGroups = {{8, 10, 3}, {0, 6, 2}};
+    for (int repeat = 0; repeat < 2; repeat++) {
+      for (int order = 0; order < orders.size(); order++) {
+        List<Object[]> result = executor.getResult(orders.get(order), 3);
+        assertEquals(result.size(), 3);
+        for (int i = 0; i < result.size(); i++) {
+          int group = expectedGroups[order][i];
+          assertEquals(result.get(i)[0], group);
+          assertSame(result.get(i)[1], pairs[group]);
+        }
+      }
+    }
+    for (int i = 0; i < pairs.length; i++) {
+      if (pairs[i] != null) {
+        assertEquals(pairs[i].getSum(), averages[i] * (i + 1));
+        assertEquals(pairs[i].getCount(), i + 1);
+      }
+    }
   }
 
   private static MultistageGroupByExecutor newExecutor(int numKeys, boolean leafReturnFinalResult, int groupLimit) {

@@ -39,6 +39,7 @@ import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -48,6 +49,7 @@ import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.Contro
 import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.Request;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class SegmentCompletionTest {
@@ -201,6 +203,53 @@ public class SegmentCompletionTest {
 
     // And the FSM should be removed.
     Assert.assertFalse(_fsmMap.containsKey(_segmentNameStr));
+  }
+
+  /// Requests for a segment whose FSM exists must not read the table config, which is in ZooKeeper, so that a slow
+  /// ZooKeeper cannot delay them past the server's request timeout.
+  @Test
+  public void testRequestsForExistingFsmDoNotReadTableConfig() {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    // s1 sends offset of 20, gets HOLD at t = 5s. This creates the FSM, which reads the table config.
+    _segmentCompletionMgr._seconds = 5;
+    params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
+
+    // Table config reads fail from now on
+    _segmentManager._failTableConfigReads = true;
+
+    // s2 sends offset of 40, gets HOLD
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
+        .withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
+    // s3 stops consuming at offset 30
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_3).withStreamPartitionMsgOffset(_s3Offset.toString())
+        .withSegmentName(_segmentNameStr).withReason("IAmLazy");
+    response = _segmentCompletionMgr.segmentStoppedConsuming(params);
+    assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
+    // s2 is asked to commit
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
+        .withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT);
+    // s2 extends its build time, and then starts the commit
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
+        .withSegmentName(_segmentNameStr).withExtraTimeSec(20);
+    response = _segmentCompletionMgr.extendBuildTime(params);
+    assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
+        .withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentCommitStart(params);
+    assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT_CONTINUE);
   }
 
   @Test
@@ -1365,6 +1414,8 @@ public class SegmentCompletionTest {
     public LLCSegmentName _stoppedSegmentName;
     public String _stoppedInstance;
     public HelixManager _helixManager = mock(HelixManager.class);
+    // When set, table config reads fail, as they do when ZooKeeper is unavailable
+    public boolean _failTableConfigReads;
 
     protected MockPinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
       this(pinotHelixResourceManager, new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
@@ -1401,6 +1452,7 @@ public class SegmentCompletionTest {
 
     @Override
     public TableConfig getTableConfig(String realtimeTableName) {
+      Preconditions.checkState(!_failTableConfigReads, "Failed to read table config");
       return mock(TableConfig.class);
     }
 
@@ -1412,6 +1464,7 @@ public class SegmentCompletionTest {
   }
 
   public static class MockSegmentCompletionManager extends SegmentCompletionManager {
+    private final PinotLLCRealtimeSegmentManager _realtimeSegmentManager;
     private final boolean _isLeader;
     public long _seconds;
 
@@ -1431,11 +1484,15 @@ public class SegmentCompletionTest {
           new LeadControllerManager("localhost_1234", helixManager, controllerMetrics),
           SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds(),
           new SegmentCompletionConfig(new PinotConfiguration()));
+      _realtimeSegmentManager = segmentManager;
       _isLeader = isLeader;
     }
 
     @Override
     protected StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(LLCSegmentName llcSegmentName) {
+      // Read the table config like the overridden method does, so that tests can make the read fail
+      _realtimeSegmentManager.getTableConfig(
+          TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName()));
       return new LongMsgOffsetFactory();
     }
 

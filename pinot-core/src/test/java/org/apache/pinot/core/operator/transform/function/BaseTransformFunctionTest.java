@@ -168,8 +168,9 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       _intSVValues[i] = RANDOM.nextInt();
       _longSVValues[i] = RANDOM.nextLong();
-      _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
-      _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
+      // Match ingestion's signed-zero normalization before these arrays are used as expected values.
+      _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat() + 0.0f;
+      _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble() + 0.0d;
       _bigDecimalSVValues[i] =
           BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(_intSVValues[i])).stripTrailingZeros();
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());

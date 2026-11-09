@@ -82,7 +82,14 @@ public class QueryServerEnclosure {
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadataMap) {
-    QueryExecutionContext executionContext = QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId");
+    return processQuery(workerMetadata, stagePlan, requestMetadataMap,
+        QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId"));
+  }
+
+  /// Like [#processQuery(WorkerMetadata, StagePlan, Map)], but runs the stage in the given execution context. Like the
+  /// query server, callers can share one context between all the stages of a query on this server.
+  public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> requestMetadataMap, QueryExecutionContext executionContext) {
     QueryThreadContext.MseWorkerInfo mseWorkerInfo =
         new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,

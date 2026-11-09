@@ -24,9 +24,11 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -35,6 +37,7 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +62,13 @@ public class ConsumerCoordinator {
   private final AtomicBoolean _firstTransitionProcessed = new AtomicBoolean(false);
 
   private volatile int _maxSequenceNumberRegistered = -1;
+
+  // Set when a consuming segment releases the semaphore before it is sealed, so its rows are still in the partition
+  // metadata when the next consumer starts. Cleared when that segment is offloaded.
+  private final AtomicReference<UnsealedRelease> _unsealedRelease = new AtomicReference<>();
+
+  public record UnsealedRelease(String segmentName, StreamPartitionMsgOffset stoppedAtOffset) {
+  }
 
   public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
@@ -108,6 +118,23 @@ public class ConsumerCoordinator {
 
   public void release() {
     _semaphore.release();
+  }
+
+  /// Releases the semaphore while the segment is still mutable, recording the offset it stopped at (exclusive).
+  public void releaseUnsealed(String segmentName, StreamPartitionMsgOffset stoppedAtOffset) {
+    _unsealedRelease.set(new UnsealedRelease(segmentName, stoppedAtOffset));
+    _semaphore.release();
+  }
+
+  /// Clears the unsealed release recorded by the given segment, once that segment is offloaded.
+  public void clearUnsealedRelease(String segmentName) {
+    _unsealedRelease.updateAndGet(
+        release -> release != null && release.segmentName().equals(segmentName) ? null : release);
+  }
+
+  @Nullable
+  public UnsealedRelease getUnsealedRelease() {
+    return _unsealedRelease.get();
   }
 
   @VisibleForTesting

@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.sql.Timestamp;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -38,6 +40,8 @@ import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.io.InputFile;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.Type;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
@@ -52,6 +56,8 @@ public class ParquetUtils {
   /// Number of days from the Julian day epoch (4713-01-01 BC) to the Unix day epoch (1970-01-01).
   public static final long JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH = 2440588;
 
+  private static final long SECONDS_PER_DAY = TimeUnit.DAYS.toSeconds(1);
+  private static final long NANOS_PER_SECOND = TimeUnit.SECONDS.toNanos(1);
   private static final long NANOS_PER_DAY = TimeUnit.DAYS.toNanos(1);
 
   /// Returns a ParquetReader with the given path.
@@ -79,6 +85,36 @@ public class ParquetUtils {
         MessageType parquetSchema = reader.getFileMetaData().getSchema();
         return new AvroSchemaConverter().convert(parquetSchema);
       }
+    }
+  }
+
+  /// Returns `true` if the given field is a primitive `INT32` annotated as an unsigned 32-bit integer
+  /// (`INTEGER(32, false)` / legacy `UINT_32`). Such values can exceed `Integer.MAX_VALUE` and must be widened to
+  /// `Long` via [Integer#toUnsignedLong]; narrower unsigned widths always fit in a signed `int`.
+  public static boolean isUnsignedInt32(Type type) {
+    if (!type.isPrimitive()
+        || type.asPrimitiveType().getPrimitiveTypeName() != PrimitiveType.PrimitiveTypeName.INT32) {
+      return false;
+    }
+    LogicalTypeAnnotation logicalTypeAnnotation = type.getLogicalTypeAnnotation();
+    return logicalTypeAnnotation instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation
+        && ((LogicalTypeAnnotation.IntLogicalTypeAnnotation) logicalTypeAnnotation).getBitWidth() == 32
+        && !((LogicalTypeAnnotation.IntLogicalTypeAnnotation) logicalTypeAnnotation).isSigned();
+  }
+
+  /// Returns the names of the top-level, non-repeated unsigned 32-bit integer fields in the given Parquet file
+  /// (see [#isUnsignedInt32]).
+  public static Set<String> getUnsignedInt32FieldNames(Path path)
+      throws IOException {
+    InputFile inputFile = HadoopInputFile.fromPath(path, getParquetHadoopConfiguration());
+    try (ParquetFileReader reader = ParquetFileReader.open(inputFile)) {
+      Set<String> fieldNames = new HashSet<>();
+      for (Type field : reader.getFileMetaData().getSchema().getFields()) {
+        if (!field.isRepetition(Type.Repetition.REPEATED) && isUnsignedInt32(field)) {
+          fieldNames.add(field.getName());
+        }
+      }
+      return fieldNames;
     }
   }
 
@@ -125,14 +161,38 @@ public class ParquetUtils {
     }
   }
 
-  /// Converts a 12-byte INT96 timestamp to `Long` epoch nanos. INT96 stores the timestamp split as bytes
-  /// 0..7 (nanos within the day, long, little-endian) and bytes 8..11 (Julian day number, int, little-endian).
-  /// Nanos is INT96's natural unit since this physical encoding carries nanosecond precision; pair with
-  /// [TimestampUtils#fromNanosSinceEpoch] for a [Timestamp].
+  /// Converts a 12-byte INT96 timestamp to [Timestamp] without narrowing it to signed epoch nanoseconds.
+  /// INT96 stores bytes 0..7 as nanoseconds within the day and bytes 8..11 as the Julian day, little-endian.
+  /// This also preserves instants outside the approximately 1677–2262 range of signed epoch nanoseconds.
+  public static Timestamp convertInt96ToTimestamp(byte[] int96Bytes) {
+    ByteBuffer buffer = ByteBuffer.wrap(int96Bytes).order(ByteOrder.LITTLE_ENDIAN);
+    long days = buffer.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH;
+    long nanosOfDay = buffer.getLong(0);
+    long epochSeconds = days * SECONDS_PER_DAY + Math.floorDiv(nanosOfDay, NANOS_PER_SECOND);
+    Timestamp timestamp = new Timestamp(epochSeconds * 1_000L);
+    timestamp.setNanos((int) Math.floorMod(nanosOfDay, NANOS_PER_SECOND));
+    return timestamp;
+  }
+
+  /// Converts a 12-byte INT96 timestamp to signed `Long` epoch nanoseconds.
+  ///
+  /// @throws IllegalArgumentException if the exact value does not fit in a signed `long`; logical extraction
+  ///         should use [#convertInt96ToTimestamp(byte\[\])] instead
   public static long convertInt96ToEpochNanos(byte[] int96Bytes) {
-    ByteBuffer buf = ByteBuffer.wrap(int96Bytes).order(ByteOrder.LITTLE_ENDIAN);
-    long days = buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH;
-    long nanosOfDay = buf.getLong(0);
-    return days * NANOS_PER_DAY + nanosOfDay;
+    ByteBuffer buffer = ByteBuffer.wrap(int96Bytes).order(ByteOrder.LITTLE_ENDIAN);
+    long days = buffer.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH;
+    long nanosOfDay = buffer.getLong(0);
+    // Evaluate the complete sum in 128 bits. At Long.MIN_VALUE, the day product alone underflows, but adding
+    // the positive day fraction brings the sum back into range, so multiplyExact followed by addExact is wrong.
+    long product = days * NANOS_PER_DAY;
+    long nanos = product + nanosOfDay;
+    // Unsigned low-word overflow produces a carry; nanosOfDay >> 63 sign-extends the addend into the high word.
+    long carry = Long.compareUnsigned(nanos, product) < 0 ? 1 : 0;
+    long high = Math.multiplyHigh(days, NANOS_PER_DAY) + (nanosOfDay >> 63) + carry;
+    if (high != (nanos >> 63)) {
+      throw new IllegalArgumentException("INT96 timestamp " + convertInt96ToTimestamp(int96Bytes).toInstant()
+          + " is outside the signed epoch-nanosecond interval and cannot be returned as raw epoch nanoseconds");
+    }
+    return nanos;
   }
 }

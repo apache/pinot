@@ -29,8 +29,17 @@ import org.slf4j.LoggerFactory;
 
 
 /// An Executor that allows a maximum of tasks running at the same time, rejecting immediately any excess.
+///
+/// The limit is checked once, synchronously, when the task is submitted. A task that passes that check is always
+/// run. The running counter is incremented when the task starts and decremented when it finishes, so the number of
+/// running tasks can exceed the limit by the number of tasks that were accepted but had not started yet when a new
+/// task was checked. The overshoot is negligible only when accepted tasks start promptly, as on a cached thread pool.
+/// On a fixed thread pool, accepted tasks can wait in the queue, so the overshoot can be as large as that backlog.
+///
+/// The limit is deliberately not re-checked when the task starts. A task that is accepted and then rejected at start
+/// time never runs and never completes its future. Callers that discard the future (for example a scheduler that
+/// relies on a completion callback) would never learn about the rejection and would leak the task's resources.
 public class HardLimitExecutor extends DecoratorExecutorService {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(HardLimitExecutor.class);
 
   private final AtomicInteger _running;
@@ -74,6 +83,7 @@ public class HardLimitExecutor extends DecoratorExecutorService {
     }
   }
 
+  /// Checks the limit on the submitting thread. This is the only place where a task can be rejected.
   protected void checkTaskAllowed() {
     if (_running.get() >= _max) {
       if (_exceedStrategy == QueryThreadExceedStrategy.LOG) {
@@ -92,7 +102,6 @@ public class HardLimitExecutor extends DecoratorExecutorService {
   protected <T> Callable<T> decorate(Callable<T> task) {
     checkTaskAllowed();
     return () -> {
-      checkTaskAllowed();
       _running.getAndIncrement();
       try {
         return task.call();
@@ -106,7 +115,6 @@ public class HardLimitExecutor extends DecoratorExecutorService {
   protected Runnable decorate(Runnable task) {
     checkTaskAllowed();
     return () -> {
-      checkTaskAllowed();
       _running.getAndIncrement();
       try {
         task.run();

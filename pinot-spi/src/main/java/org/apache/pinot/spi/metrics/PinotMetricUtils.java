@@ -68,13 +68,10 @@ public class PinotMetricUtils {
   /// @param metricsConfiguration The subset of the configuration containing the metrics-related keys
   private static void initializePinotMetricsFactory(PinotConfiguration metricsConfiguration) {
     Set<Class<?>> classes = getPinotMetricsFactoryClasses();
-    if (classes.size() > 1) {
-      LOGGER.warn("More than one PinotMetricsFactory was found: {}", classes);
-    }
-
     String metricsFactoryClassName = metricsConfiguration.getProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
         DEFAULT_METRICS_FACTORY_CLASS_NAME);
-    LOGGER.info("{} will be initialized as the PinotMetricsFactory", metricsFactoryClassName);
+    LOGGER.info("{} will be initialized as the PinotMetricsFactory out of the found classes: {}",
+        metricsFactoryClassName, classes);
 
     Optional<Class<?>> clazzFound = classes.stream().filter(c -> c.getName().equals(metricsFactoryClassName))
         .findFirst();

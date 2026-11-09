@@ -37,6 +37,7 @@ import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.server.api.resources.ReingestionConsumptionTimeout;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -64,7 +65,7 @@ public class AdminApiApplication extends ResourceConfig {
 
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
-      ServerReloadJobStatusCache reloadJobStatusCache,
+      ServerReloadJobStatusCache reloadJobStatusCache, ReingestionConsumptionTimeout reingestionConsumptionTimeout,
       PinotConfiguration serverConf) {
     _serverInstance = instance;
     _accessControlFactory = accessControlFactory;
@@ -84,6 +85,7 @@ public class AdminApiApplication extends ResourceConfig {
         bind(_serverInstance.getServerMetrics()).to(ServerMetrics.class);
         bind(_accessControlFactory).to(AccessControlFactory.class);
         bind(reloadJobStatusCache).to(ServerReloadJobStatusCache.class);
+        bind(reingestionConsumptionTimeout).to(ReingestionConsumptionTimeout.class);
 
         bind(serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID)).named(SERVER_INSTANCE_ID);
         String loggerRootDir = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_LOGGER_ROOT_DIR);

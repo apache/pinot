@@ -772,4 +772,12 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     assert result instanceof Collection;
     return ((Collection<?>) result).size();
   }
+
+  /// The per-segment count is final for one segment and one group; merging counts of two groups of the same
+  /// segment double-counts values present in both, so the grouping-sets base-aggregation derive must not merge
+  /// this function's intermediates across groups.
+  @Override
+  public boolean canMergeIntermediatesAcrossGroups() {
+    return false;
+  }
 }

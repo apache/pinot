@@ -19,7 +19,6 @@
 package org.apache.pinot.common.metrics.prometheus;
 
 import com.google.common.base.Objects;
-import com.google.common.io.Resources;
 import io.prometheus.jmx.JmxCollector;
 import io.prometheus.jmx.JmxCollector.Mode;
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
@@ -30,8 +29,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -291,15 +288,6 @@ public abstract class PinotPrometheusMetricsTest {
       _port = port;
       _file = file;
       _socket = socket;
-    }
-  }
-
-  private String loadResourceAsString(String resourceFileName) {
-    URL url = Resources.getResource(resourceFileName);
-    try {
-      return Resources.toString(url, StandardCharsets.UTF_8);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
   }
 

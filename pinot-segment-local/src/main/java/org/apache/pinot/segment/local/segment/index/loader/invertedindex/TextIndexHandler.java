@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -29,6 +30,7 @@ import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexTy
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
+import org.apache.pinot.segment.local.utils.LuceneIndexCompatibilityUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -42,6 +44,7 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
@@ -91,13 +94,15 @@ public class TextIndexHandler extends BaseIndexHandler {
           legacyNativeColumns);
       return true;
     }
-    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
+    Set<String> existingColumns = getExistingColumns(segmentReader);
     // Check if any existing index need to be removed.
     // Check if existing indexes need configuration updates based on storeInSegmentFile
     for (String column : existingColumns) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       try {
-        if (columnMetadata != null && hasTextIndexConfigurationChanged(column, segmentReader)) {
+        if (columnsToAddIdx.contains(column) && columnMetadata != null
+            && (isBuildInProgress(column) || hasTextIndexConfigurationChanged(column, segmentReader)
+            || isIncompatible(column, segmentReader))) {
           LOGGER.info("Need to update text index configuration for segment: {}, column: {}", segmentName, column);
           return true;
         }
@@ -131,34 +136,139 @@ public class TextIndexHandler extends BaseIndexHandler {
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     for (String column : getColumnsWithLegacyNativeTextIndex()) {
       LOGGER.info("Removing legacy native text index file from segment: {}, column: {}", segmentName, column);
-      segmentWriter.removeIndex(column, StandardIndexes.text());
+      removeTextIndex(segmentWriter, column);
     }
-    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
-    // Handle configuration changes for existing indexes
-    for (String column : existingColumns) {
-      if (!columnsToAddIdx.contains(column)) {
-        continue;
-      }
-      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-      if (columnMetadata != null && hasTextIndexConfigurationChanged(column, segmentWriter)) {
-        LOGGER.info("Updating text index configuration for segment: {}, column: {}", segmentName, column);
-        // Remove existing index and recreate with new configuration
-        segmentWriter.removeIndex(column, StandardIndexes.text());
-        createTextIndexForColumn(segmentWriter, columnMetadata);
-        columnsToAddIdx.remove(column);
-      }
-    }
+    Set<String> existingColumns = getExistingColumns(segmentWriter);
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing text index from segment: {}, column: {}", segmentName, column);
-        segmentWriter.removeIndex(column, StandardIndexes.text());
-        LOGGER.info("Removed existing text index from segment: {}, column: {}", segmentName, column);
+        removeTextIndex(segmentWriter, column);
+        FileUtils.deleteQuietly(getBuildMarker(column));
+        continue;
+      }
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      if (columnMetadata != null) {
+        // An interrupted build can contain a readable partial commit, or no commit at all. Its marker takes
+        // precedence over compatibility probes and requires a full restart from the original values.
+        boolean recovery = isBuildInProgress(column) || isIncompatible(column, segmentWriter);
+        if (recovery) {
+          validateRecoverySource(segmentWriter, column);
+        }
+        if (recovery || hasTextIndexConfigurationChanged(column, segmentWriter)) {
+          LOGGER.info("Rebuilding text index for segment: {}, column: {}, recovering Lucene index: {}", segmentName,
+              column, recovery);
+          FileUtils.touch(getBuildMarker(column));
+          removeTextIndex(segmentWriter, column);
+          createTextIndexForColumn(segmentWriter, columnMetadata);
+        }
       }
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateTextIndex(columnMetadata)) {
         createTextIndexForColumn(segmentWriter, columnMetadata);
+      }
+    }
+  }
+
+  /// Verify original source values before any preprocessing handler can remove or regenerate them.
+  public void validateRecoverySources(SegmentDirectory.Reader segmentReader)
+      throws IOException {
+    for (String column : getExistingColumns(segmentReader)) {
+      if (_columnsToAddIdx.contains(column)
+          && (isBuildInProgress(column) || isIncompatible(column, segmentReader))) {
+        validateRecoverySource(segmentReader, column);
+      }
+    }
+  }
+
+  private Set<String> getExistingColumns(SegmentDirectory.Reader segmentReader) {
+    Set<String> columns =
+        new HashSet<>(segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text()));
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    if (indexDir != null) {
+      File segmentDirectory =
+          SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
+      for (String column : _segmentDirectory.getSegmentMetadata().getAllColumns()) {
+        File combined = new File(segmentDirectory,
+            column + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+        if (combined.exists() || isBuildInProgress(column)) {
+          columns.add(column);
+        }
+      }
+    }
+    return columns;
+  }
+
+  private void validateRecoverySource(SegmentDirectory.Reader segmentReader, String column) {
+    if (!segmentReader.hasIndexFor(column, StandardIndexes.forward())) {
+      throw new IllegalStateException("Cannot rebuild Lucene text index for column: " + column
+          + ". Original forward index must be retained; restore a compatible segment or refresh it from source data");
+    }
+  }
+
+  private File getBuildMarker(String column) {
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    return indexDir == null ? null : new File(indexDir, column + ".text.inprogress");
+  }
+
+  private boolean isBuildInProgress(String column) {
+    File marker = getBuildMarker(column);
+    return marker != null && marker.exists();
+  }
+
+  private boolean isIncompatible(String column, SegmentDirectory.Reader segmentReader)
+      throws IOException {
+    boolean hasLocalRepresentation = false;
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    if (indexDir != null) {
+      File luceneDirectory = SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, column);
+      if (luceneDirectory != null) {
+        hasLocalRepresentation = true;
+        if (LuceneIndexCompatibilityUtils.isIncompatible(luceneDirectory)) {
+          return true;
+        }
+      }
+      File segmentDirectory =
+          SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
+      File combined = new File(segmentDirectory, column + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+      if (combined.exists()) {
+        hasLocalRepresentation = true;
+        try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(combined, true, 0, combined.length(),
+            ByteOrder.BIG_ENDIAN, "Lucene text compatibility check")) {
+          if (LuceneIndexCompatibilityUtils.isIncompatible(buffer, column)) {
+            return true;
+          }
+        }
+      }
+    }
+    if (hasLocalRepresentation && _segmentDirectory.getSegmentMetadata().getVersion() != SegmentVersion.v3) {
+      return false;
+    }
+    // A v3 packed entry can coexist with a directory or sidecar after an interrupted conversion. Check it too:
+    // the reader selected by the table config may use the packed entry rather than the compatible local directory.
+    PinotDataBuffer packed = _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3
+        ? TextIndexUtils.getConsolidatedTextEntry(segmentReader, column)
+        : segmentReader.getIndexFor(column, StandardIndexes.text());
+    if (packed == null) {
+      if (hasLocalRepresentation) {
+        return false;
+      }
+      throw new IOException("Existing text index has no readable representation for column: " + column);
+    }
+    return LuceneIndexCompatibilityUtils.isIncompatible(packed, column);
+  }
+
+  private void removeTextIndex(SegmentDirectory.Writer segmentWriter, String column)
+      throws IOException {
+    segmentWriter.removeIndex(column, StandardIndexes.text());
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    if (indexDir != null) {
+      File segmentDirectory =
+          SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
+      File combined = new File(segmentDirectory, column + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+      if (combined.exists()) {
+        FileUtils.forceDelete(combined);
       }
     }
   }
@@ -208,17 +318,9 @@ public class TextIndexHandler extends BaseIndexHandler {
     LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}, storeInSegmentFile: {}",
         columnName, segmentName, hasDictionary, storeInSegmentFile);
 
-    // Create in-progress marker file for recovery
-    File inProgress = new File(indexDir, columnName + ".text.inprogress");
-    if (!inProgress.exists()) {
-      // Marker file does not exist, which means last run ended normally.
-      // Create a marker file.
-      FileUtils.touch(inProgress);
-    } else {
-      // Marker file exists, which means last run was interrupted.
-      // Clean up any existing text index files
-      cleanupExistingTextIndexFiles(indexDir, columnName);
-    }
+    // Preserve the marker until the rebuilt index, including its packed representation, is complete.
+    File inProgress = getBuildMarker(columnName);
+    FileUtils.touch(inProgress);
 
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
@@ -251,7 +353,7 @@ public class TextIndexHandler extends BaseIndexHandler {
     }
 
     // Delete the marker file.
-    FileUtils.deleteQuietly(inProgress);
+    FileUtils.forceDelete(inProgress);
 
     LOGGER.info("Created text index for column: {} in segment: {}", columnName, segmentName);
   }
@@ -334,25 +436,6 @@ public class TextIndexHandler extends BaseIndexHandler {
 
     // If the expected format doesn't match the existing format, we need an update
     return expectedFormat != currentFormat;
-  }
-
-  /// Clean up existing text index files for recovery purposes.
-  ///
-  /// @param indexDir the index directory
-  /// @param columnName the column name
-  private void cleanupExistingTextIndexFiles(File indexDir, String columnName) {
-    // Remove any existing text index files for this column
-    File[] textIndexFiles = indexDir.listFiles((dir, name) -> {
-      // Look for text index files for this column
-      return name.startsWith(columnName) && (name.endsWith(V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION)
-          || name.endsWith(".text.inprogress"));
-    });
-
-    if (textIndexFiles != null) {
-      for (File file : textIndexFiles) {
-        FileUtils.deleteQuietly(file);
-      }
-    }
   }
 
   /// Convert text index to V3 combined format by merging into columns.psf.

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -40,9 +41,20 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 public class LastLongValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Long> {
   private final static ValueLongPair<Long> DEFAULT_VALUE_TIME_PAIR = new LongLongPair(Long.MIN_VALUE, Long.MIN_VALUE);
 
+  private final ColumnDataType _resultType;
+
   public LastLongValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled) {
+    this(dataCol, timeCol, nullHandlingEnabled, ColumnDataType.LONG);
+  }
+
+  /// The result type is LONG or TIMESTAMP; both are stored as long values.
+  public LastLongValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled, ColumnDataType resultType) {
     super(dataCol, timeCol, ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    Preconditions.checkArgument(resultType == ColumnDataType.LONG || resultType == ColumnDataType.TIMESTAMP,
+        "Unsupported result type: %s", resultType);
+    _resultType = resultType;
   }
 
   @Override
@@ -94,7 +106,7 @@ public class LastLongValueWithTimeAggregationFunction extends LastWithTimeAggreg
 
   @Override
   public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'LONG')";
+    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'" + _resultType + "')";
   }
 
   @Override
@@ -110,6 +122,6 @@ public class LastLongValueWithTimeAggregationFunction extends LastWithTimeAggreg
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
-    return ColumnDataType.LONG;
+    return _resultType;
   }
 }

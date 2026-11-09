@@ -25,8 +25,17 @@ public class V1Constants {
   public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String INDEX_MAP_FILE_NAME = "index_map";
   public static final String INDEX_FILE_NAME = "columns.psf";
-  public static final String VALID_DOC_IDS_SNAPSHOT_FILE_NAME = "validdocids.bitmap.snapshot";
-  public static final String QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME = "queryabledocids.bitmap.snapshot";
+  /// The upsert validDocIds bitmap persisted next to the segment. The file name is unchanged, so existing files load.
+  public static final String VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME = "validdocids.bitmap.snapshot";
+  /// The upsert queryableDocIds bitmap persisted next to the segment. The file name is unchanged, so existing files
+  /// load.
+  public static final String QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME = "queryabledocids.bitmap.snapshot";
+  /// @deprecated Use [#VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME]. Kept so plugins built against it still compile.
+  @Deprecated
+  public static final String VALID_DOC_IDS_SNAPSHOT_FILE_NAME = VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME;
+  /// @deprecated Use [#QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME]. Kept so plugins built against it still compile.
+  @Deprecated
+  public static final String QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME = QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME;
   public static final String TTL_WATERMARK_TABLE_PARTITION = "ttl.watermark.partition.";
 
   public static class Str {

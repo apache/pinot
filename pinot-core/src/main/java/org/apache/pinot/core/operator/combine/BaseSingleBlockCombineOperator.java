@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -146,7 +145,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
       if (waitTimeMs <= 0) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }
-      BaseResultsBlock blockToMerge = _blockingQueue.poll(waitTimeMs, TimeUnit.MILLISECONDS);
+      BaseResultsBlock blockToMerge = pollResultsBlock(_blockingQueue, endTimeMs);
       if (blockToMerge == null) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }

@@ -25,6 +25,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -123,6 +124,13 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         requestContext.setErrorCode(errorCode);
         return new BrokerResponseNative(errorCode, e.getMessage());
       }
+    }
+
+    // gRPC and custom containers can call this handler directly, bypassing the REST DELETE authorization path.
+    if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
+          "DELETE is only supported by the broker SQL endpoint.");
     }
 
     BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;

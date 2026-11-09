@@ -32,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.segment.local.utils.HyperLogLogPlusUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -349,6 +350,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
       return 0;
     }
     if (intermediateResult instanceof HyperLogLogPlus) {
+      markApproximatedResult();
       return (int) ((HyperLogLogPlus) intermediateResult).cardinality();
     } else {
       return ((Set) intermediateResult).size();
@@ -442,6 +444,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
             break;
           case SP_KEY:
             _sp = Integer.parseInt(value);
+            HyperLogLogPlusUtils.validateSp(_sp);
             break;
           default:
             throw new IllegalArgumentException("Invalid parameter key: " + key);

@@ -737,6 +737,24 @@
         ]
       },
       {
+        "description": "window function (PARTITION BY ... ORDER BY) sorts each partition on every window-stage worker; the Sort over the hash exchange is not a final sort, so the stage is not collapsed to a singleton",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT col1, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col3 DESC) FROM a",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)",
+          "\n├── [1]@localhost:2|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)",
+          "\n└── [1]@localhost:1|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}",
+          "\n    └── [1]@localhost:1|[0] PROJECT",
+          "\n        └── [1]@localhost:1|[0] WINDOW",
+          "\n            └── [1]@localhost:1|[0] SORT",
+          "\n                └── [1]@localhost:1|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)",
+          "\n                    ├── [2]@localhost:2|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[0],[1]@localhost:2|[1]} (Subtree Omitted)",
+          "\n                    └── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[0],[1]@localhost:2|[1]}",
+          "\n                        └── [2]@localhost:1|[0] PROJECT",
+          "\n                            └── [2]@localhost:1|[0] TABLE SCAN (a) null",
+          "\n"
+        ]
+      },
+      {
         "description": "set op (UNION ALL) uses a local (SINGLETON) exchange on every input: it only concatenates, so no redistribution is needed and each sender is wired 1-to-1 to the union worker on its own server",
         "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT col3 FROM a UNION ALL SELECT col3 FROM a",
         "output": [

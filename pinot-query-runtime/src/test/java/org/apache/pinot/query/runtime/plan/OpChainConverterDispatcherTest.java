@@ -86,7 +86,8 @@ public class OpChainConverterDispatcherTest {
         new OpChainExecutionContext(mailboxService, 123L, "cid-123", System.currentTimeMillis() + 60_000,
             System.currentTimeMillis() + 60_000, "broker", Map.of(), stageMetadata, workerMetadata, null, false, false);
     StagePlan stagePlan = new StagePlan(createMailboxSendNode(schema, stageId, receiverStageId), stageMetadata);
-    ErrorMseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.QUERY_EXECUTION, "simulated pipeline failure");
+    ErrorMseBlock errorBlock =
+        ErrorMseBlock.fromError(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "simulated pipeline failure");
 
     OpChain opChain = OpChainConverterDispatcher.sendEarlyError(context, stagePlan, errorBlock);
     try {
@@ -98,7 +99,7 @@ public class OpChainConverterDispatcherTest {
       Assert.assertTrue(block instanceof ErrorMseBlock);
       ErrorMseBlock emittedError = (ErrorMseBlock) block;
       QueryErrorCode mainErrorCode = emittedError.getMainErrorCode();
-      Assert.assertEquals(mainErrorCode, QueryErrorCode.QUERY_EXECUTION);
+      Assert.assertEquals(mainErrorCode, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
       String message = emittedError.getErrorMessages().get(mainErrorCode);
       Assert.assertTrue(message.contains("simulated pipeline failure"),
           "Unexpected error message from early-error opchain: " + message);

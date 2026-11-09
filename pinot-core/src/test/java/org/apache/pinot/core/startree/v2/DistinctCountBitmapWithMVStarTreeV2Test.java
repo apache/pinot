@@ -19,18 +19,19 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
+import org.apache.pinot.common.utils.RoaringBitmapUnion;
 import org.apache.pinot.segment.local.aggregator.DistinctCountBitmapValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.RoaringBitmap;
 
 import static org.testng.Assert.assertEquals;
 
 
-public class DistinctCountBitmapWithMVStarTreeV2Test extends BaseStarTreeV2Test<Object, RoaringBitmap> {
+public class DistinctCountBitmapWithMVStarTreeV2Test extends BaseStarTreeV2Test<Object, RoaringBitmapUnion> {
 
   @Override
-  ValueAggregator<Object, RoaringBitmap> getValueAggregator() {
+  ValueAggregator<Object, RoaringBitmapUnion> getValueAggregator() {
     return new DistinctCountBitmapValueAggregator();
   }
 
@@ -45,8 +46,14 @@ public class DistinctCountBitmapWithMVStarTreeV2Test extends BaseStarTreeV2Test<
   }
 
   @Override
-  void assertAggregatedValue(RoaringBitmap starTreeResult, RoaringBitmap nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult);
+  MultipleTreesBuilder.BuildMode getBuildMode() {
+    // Pin the off-heap builder so its path is always covered: it serializes every record when it is appended
+    return MultipleTreesBuilder.BuildMode.OFF_HEAP;
+  }
+
+  @Override
+  void assertAggregatedValue(RoaringBitmapUnion starTreeResult, RoaringBitmapUnion nonStarTreeResult) {
+    assertEquals(starTreeResult.get(), nonStarTreeResult.get());
   }
 
   @Override

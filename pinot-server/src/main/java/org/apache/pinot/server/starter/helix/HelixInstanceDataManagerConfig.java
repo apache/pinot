@@ -199,6 +199,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     return _serverConfig.getProperty(INSTANCE_DATA_DIR, DEFAULT_INSTANCE_DATA_DIR);
   }
 
+  public boolean shouldFailOnMissingInstanceDataDir() {
+    return _serverConfig.getProperty(INSTANCE_DATA_DIR_FAIL_ON_MISSING, DEFAULT_INSTANCE_DATA_DIR_FAIL_ON_MISSING);
+  }
+
   @Override
   public String getConsumerDir() {
     return _serverConfig.getProperty(CONSUMER_DIR);

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
 import java.io.File;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -32,6 +33,12 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
   public V1DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
       IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
     super(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter);
+  }
+
+  public V1DefaultColumnHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
+      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter,
+      @Nullable SegmentDirectory segmentDirectory) {
+    super(indexDir, segmentMetadata, indexLoadingConfig, segmentWriter, segmentDirectory);
   }
 
   @Override

@@ -35,12 +35,39 @@ import org.slf4j.LoggerFactory;
 /// [Broker#CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE]. Changes apply live, and a removed key restores the
 /// default; the broker instance config is not consulted. An invalid value is logged and the current mode kept, so
 /// that a typo can neither break query parsing nor the other listeners.
+///
+/// The broker applies both configs with [#QueryOptionConfigListener()]. The controller applies the legacy syntax
+/// mode only, with [#legacySyntaxModeOnly()]: the broker validates every query the controller forwards, and the
+/// `REJECT` validation mode checks the option keys against an allowlist that is per JVM (broker plugins register
+/// their keys with `QueryOptionsUtils.registerSqlQueryOptionKey` in the broker, not in the controller), so applying
+/// it in the controller would reject the options of queries the broker accepts.
+///
+/// Thread-safe: it holds no mutable state.
 public class QueryOptionConfigListener implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryOptionConfigListener.class);
 
+  private final boolean _applyValidationMode;
+
+  /// A listener that applies both the validation mode and the legacy syntax mode.
+  public QueryOptionConfigListener() {
+    this(true);
+  }
+
+  private QueryOptionConfigListener(boolean applyValidationMode) {
+    _applyValidationMode = applyValidationMode;
+  }
+
+  /// A listener that applies [Broker#CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE] only and ignores
+  /// [Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE], for the controller: the statements it executes itself
+  /// (e.g. `DELETE`) need the legacy syntax mode, while the broker validates the query options of every query it
+  /// forwards.
+  public static QueryOptionConfigListener legacySyntaxModeOnly() {
+    return new QueryOptionConfigListener(false);
+  }
+
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (changedConfigs.contains(Broker.CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE)) {
+    if (_applyValidationMode && changedConfigs.contains(Broker.CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE)) {
       applyValidationMode(clusterConfigs);
     }
     if (changedConfigs.contains(Broker.CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE)) {

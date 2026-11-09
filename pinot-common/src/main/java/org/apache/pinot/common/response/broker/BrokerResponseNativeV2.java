@@ -47,15 +47,16 @@ import org.apache.pinot.common.response.ProcessingException;
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
     "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "numRemoteAccesses", "remoteAccessBytes", "brokerReduceTimeMs",
-    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
-    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "numSegmentsPrunedByValue", "numRemoteAccesses", "remoteAccessBytes", "numDirectRemoteAccesses",
+    "directRemoteAccessBytes", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
-    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes", "pools",
-    "rlsFiltersApplied", "approximateFunctionApplied", "groupsTrimmed", "mseLiteLeafStageLimitReached",
-    "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied", "responseMetadata"
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
+    "totalMemAllocatedBytes", "pools", "rlsFiltersApplied", "approximatedResult", "groupsTrimmed",
+    "mseLiteLeafStageLimitReached", "mseLiteLeafStageEffectiveLimit", "mseLiteFanOutAdjustedLimitApplied",
+    "responseMetadata"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -81,6 +82,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   /// virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of
   /// rows in the table.
   private long _maxRowsInOperator;
+  private long _totalMemAllocatedBytes;
   private String _requestId;
   private String _clientRequestId;
   private String _brokerId;
@@ -91,7 +93,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
-  private boolean _approximateFunctionApplied = false;
   @Nullable
   private Integer _mseLiteLeafStageEffectiveLimit;
   @Nullable
@@ -124,7 +125,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public boolean isPartialResult() {
     return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
-        || isMaxRowsInJoinReached() || isMseLiteLeafStageLimitReached();
+        || isMaxRowsInJoinReached() || isMaxRowsInWindowReached() || isMseLiteLeafStageLimitReached();
   }
 
   @Override
@@ -181,6 +182,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached) {
     _brokerStats.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, mseLiteLeafStageLimitReached);
+  }
+
+  /// Merged from the stats that the operators of every stage report.
+  @JsonProperty("approximatedResult")
+  @Override
+  public boolean isApproximatedResult() {
+    return _brokerStats.getBoolean(StatKey.APPROXIMATED_RESULT);
+  }
+
+  public void mergeApproximatedResult(boolean approximatedResult) {
+    _brokerStats.merge(StatKey.APPROXIMATED_RESULT, approximatedResult);
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -270,6 +282,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeMaxRowsInOperator(long maxRows) {
     _maxRowsInOperator = Math.max(_maxRowsInOperator, maxRows);
+  }
+
+  /// Returns the heap bytes allocated by the query across all its stages and workers, as reported in the stage stats.
+  /// This is the total allocated (including short-lived objects), not the peak heap used. It is 0 unless thread
+  /// allocated bytes measurement is enabled on the brokers and servers.
+  public long getTotalMemAllocatedBytes() {
+    return _totalMemAllocatedBytes;
+  }
+
+  public void addTotalMemAllocatedBytes(long bytes) {
+    _totalMemAllocatedBytes += bytes;
   }
 
   @Override
@@ -409,14 +432,28 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
   }
 
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   @Override
   public long getNumRemoteAccesses() {
     return _brokerStats.getLong(StatKey.NUM_REMOTE_ACCESSES);
   }
 
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   @Override
   public long getRemoteAccessBytes() {
     return _brokerStats.getLong(StatKey.REMOTE_ACCESS_BYTES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumDirectRemoteAccesses() {
+    return _brokerStats.getLong(StatKey.NUM_DIRECT_REMOTE_ACCESSES);
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getDirectRemoteAccessBytes() {
+    return _brokerStats.getLong(StatKey.DIRECT_REMOTE_ACCESS_BYTES);
   }
 
   @Override
@@ -531,18 +568,6 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return _rlsFiltersApplied;
   }
 
-  @JsonProperty("approximateFunctionApplied")
-  @Override
-  public void setApproximateFunctionApplied(boolean approximateFunctionApplied) {
-    _approximateFunctionApplied = approximateFunctionApplied;
-  }
-
-  @JsonProperty("approximateFunctionApplied")
-  @Override
-  public boolean isApproximateFunctionApplied() {
-    return _approximateFunctionApplied;
-  }
-
   public void addBrokerStats(StatMap<StatKey> brokerStats) {
     _brokerStats.merge(brokerStats);
   }
@@ -582,7 +607,10 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
     LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_REMOTE_ACCESSES(StatMap.Type.LONG),
-    REMOTE_ACCESS_BYTES(StatMap.Type.LONG);
+    REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG),
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    APPROXIMATED_RESULT(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

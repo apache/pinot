@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.IntSupplier;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +53,16 @@ public class SegmentPrunerFactory {
 
   public static List<SegmentPruner> getSegmentPruners(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    return getSegmentPruners(tableConfig, propertyStore, Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+  }
+
+  public static List<SegmentPruner> getSegmentPruners(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, int defaultPartitionPruningPreparationThreshold) {
+    return getSegmentPruners(tableConfig, propertyStore, () -> defaultPartitionPruningPreparationThreshold);
+  }
+
+  public static List<SegmentPruner> getSegmentPruners(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, IntSupplier defaultPreparationThreshold) {
     List<SegmentPruner> segmentPruners = new ArrayList<>();
     boolean needsEmptySegment = TableConfigUtils.needsEmptySegmentPruner(tableConfig);
     if (needsEmptySegment) {
@@ -65,7 +77,8 @@ public class SegmentPrunerFactory {
         List<SegmentPruner> configuredSegmentPruners = new ArrayList<>(segmentPrunerTypes.size());
         for (String segmentPrunerType : segmentPrunerTypes) {
           if (RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
-            SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig);
+            SegmentPruner partitionSegmentPruner =
+                getPartitionSegmentPruner(tableConfig, defaultPreparationThreshold);
             if (partitionSegmentPruner != null) {
               configuredSegmentPruners.add(partitionSegmentPruner);
             }
@@ -88,7 +101,8 @@ public class SegmentPrunerFactory {
         if ((tableType == TableType.OFFLINE && LEGACY_PARTITION_AWARE_OFFLINE_ROUTING.equalsIgnoreCase(
             routingTableBuilderName)) || (tableType == TableType.REALTIME
             && LEGACY_PARTITION_AWARE_REALTIME_ROUTING.equalsIgnoreCase(routingTableBuilderName))) {
-          SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig);
+          SegmentPruner partitionSegmentPruner =
+              getPartitionSegmentPruner(tableConfig, defaultPreparationThreshold);
           if (partitionSegmentPruner != null) {
             segmentPruners.add(partitionSegmentPruner);
           }
@@ -99,7 +113,8 @@ public class SegmentPrunerFactory {
   }
 
   @Nullable
-  private static SegmentPruner getPartitionSegmentPruner(TableConfig tableConfig) {
+  private static SegmentPruner getPartitionSegmentPruner(TableConfig tableConfig,
+      IntSupplier defaultPreparationThreshold) {
     String tableNameWithType = tableConfig.getTableName();
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (segmentPartitionConfig == null) {
@@ -114,8 +129,12 @@ public class SegmentPrunerFactory {
     Set<String> partitionColumns = columnPartitionMap.keySet();
     LOGGER.info("Using PartitionSegmentPruner on partition columns: {} for table: {}", partitionColumns,
         tableNameWithType);
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    Integer tableMinSegments = routingConfig != null ? routingConfig.getPartitionPruningPreparationThreshold() : null;
+    IntSupplier preparationThreshold =
+        tableMinSegments != null ? () -> tableMinSegments : defaultPreparationThreshold;
     return partitionColumns.size() == 1 ? new SinglePartitionColumnSegmentPruner(tableNameWithType,
-        partitionColumns.iterator().next())
+        partitionColumns.iterator().next(), preparationThreshold)
         : new MultiPartitionColumnsSegmentPruner(tableNameWithType, partitionColumns);
   }
 

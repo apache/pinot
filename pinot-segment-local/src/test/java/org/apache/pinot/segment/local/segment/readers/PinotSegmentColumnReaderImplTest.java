@@ -25,6 +25,11 @@ import java.util.function.Function;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.ColumnarSegmentBuildingTestBase;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -38,8 +43,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -128,6 +136,31 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
     assertEquals(reader.getTotalDocs(), _dictEncodedSegment.getSegmentMetadata().getTotalDocs());
 
     reader.close();
+  }
+
+  @Test
+  public void testConsumingSegmentUsesSchemaWhenColumnMetadataIsAbsent()
+      throws Exception {
+    String column = "consumingInt";
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("consuming")
+        .addSingleValueDimension(column, DataType.INT).build();
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl("table", "segment", schema, 0);
+    assertNull(metadata.getColumnMetadataFor(column));
+
+    IndexSegment segment = mock(IndexSegment.class);
+    DataSource dataSource = mock(DataSource.class);
+    ForwardIndexReader forwardIndex = mock(ForwardIndexReader.class);
+    ForwardIndexReaderContext context = mock(ForwardIndexReaderContext.class);
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(segment.getDataSource(column)).thenReturn(dataSource);
+    when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
+    when(forwardIndex.createContext()).thenReturn(context);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    when(forwardIndex.getStoredType()).thenReturn(DataType.INT);
+
+    try (PinotSegmentColumnReaderImpl reader = new PinotSegmentColumnReaderImpl(segment, column)) {
+      assertEquals(reader.getValueType(), ColumnReader.toValueType(DataType.INT, true));
+    }
   }
 
   /// Helper method to get the appropriate segment and schema based on IndexType.

@@ -64,6 +64,12 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
 
   public abstract ValueLongPair<V> getDefaultValueTimePair();
 
+  /// Whether the data input holds serialized value-time pairs, as a pre-aggregated BYTES column does, rather than data
+  /// values.
+  protected boolean isSerializedPairInput(BlockValSet blockValSet) {
+    return blockValSet.getValueType() == DataType.BYTES;
+  }
+
   public abstract V readCell(BlockValSet block, int docId);
 
   public abstract void aggregateGroupResultWithRawDataSv(int length,
@@ -99,7 +105,7 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet blockTimeSet = blockValSetMap.get(_timeCol);
-    if (blockValSet.getValueType() != DataType.BYTES) {
+    if (!isSerializedPairInput(blockValSet)) {
       IntLongPair defaultPair = new IntLongPair(Integer.MIN_VALUE, Long.MAX_VALUE);
       long[] timeValues = blockTimeSet.getLongValuesSV();
 
@@ -154,7 +160,7 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet timeValSet = blockValSetMap.get(_timeCol);
-    if (blockValSet.getValueType() != DataType.BYTES) {
+    if (!isSerializedPairInput(blockValSet)) {
       aggregateGroupResultWithRawDataSv(length, groupKeyArray, groupByResultHolder,
           blockValSet, timeValSet);
     } else {
@@ -177,7 +183,7 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet timeValSet = blockValSetMap.get(_timeCol);
-    if (blockValSet.getValueType() != DataType.BYTES) {
+    if (!isSerializedPairInput(blockValSet)) {
       aggregateGroupResultWithRawDataMv(length, groupKeysArray, groupByResultHolder, blockValSet, timeValSet);
     } else {
       // Serialized ValueTimePair

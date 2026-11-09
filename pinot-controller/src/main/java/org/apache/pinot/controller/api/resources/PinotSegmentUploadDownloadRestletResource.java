@@ -910,7 +910,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/segments")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT, tableScopeParam = "tableName")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   @ApiResponses(value = {
@@ -953,7 +953,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT, tableScopeParam = "tableName")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   @ApiResponses(value = {

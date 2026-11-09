@@ -39,6 +39,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +69,7 @@ public class QueryOptionsUtils {
   public enum SqlOptionsMode {
     /// The options are applied. Default.
     ALLOW,
-    /// The options are dropped.
+    /// The options are dropped, except that a DELETE statement carrying any fails, since its options configure it.
     IGNORE,
     /// The statement fails.
     REJECT
@@ -342,6 +344,26 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
   }
 
+  /// Per-query override of [AndRestrictionPushdownMode], or `null` when the query does not set one, in which case
+  /// the server default applies.
+  @Nullable
+  public static AndRestrictionPushdownMode getAndRestrictionPushdownMode(Map<String, String> queryOptions) {
+    String mode = queryOptions.get(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE);
+    return mode != null ? parseAndRestrictionPushdownMode(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, mode) : null;
+  }
+
+  /// Parses an [AndRestrictionPushdownMode], naming the offending key and the legal values on failure. The option
+  /// reads like a toggle, so `true`/`false` is a likely mistake and the message has to say so.
+  public static AndRestrictionPushdownMode parseAndRestrictionPushdownMode(String key, String value) {
+    try {
+      return AndRestrictionPushdownMode.valueOf(value.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid value for %s: '%s'. Expected one of: %s (this option is a mode, not a boolean toggle)",
+              key, value, Arrays.toString(AndRestrictionPushdownMode.values())));
+    }
+  }
+
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
@@ -351,6 +373,14 @@ public class QueryOptionsUtils {
   public static Integer getInPredicatePruningThreshold(Map<String, String> queryOptions) {
     return uncheckedParseInt(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD,
         queryOptions.get(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD));
+  }
+
+  /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+  /// A negative value disables preparation.
+  @Nullable
+  public static Integer getPartitionPruningPreparationThreshold(@Nullable Map<String, String> queryOptions) {
+    return queryOptions != null ? uncheckedParseInt(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD,
+        queryOptions.get(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD)) : null;
   }
 
   /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
@@ -363,6 +393,11 @@ public class QueryOptionsUtils {
     }
     String value = queryOptions.get(QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE);
     return value == null || Boolean.parseBoolean(value);
+  }
+
+  /// Returns whether ANY_VALUE(expr) is rewritten to take the data type of `expr`. Defaults to `false`.
+  public static boolean isInferAnyValueType(@Nullable Map<String, String> queryOptions) {
+    return queryOptions != null && Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_ANY_VALUE_TYPE));
   }
 
   public static boolean isSkipUpsertView(Map<String, String> queryOptions) {
@@ -556,6 +591,22 @@ public class QueryOptionsUtils {
     return uncheckedParseInt(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, minServerGroupTrimSizeString);
   }
 
+  /// Maximum estimated base-group count for which grouping-set base aggregation is used; `null` lets the
+  /// caller fall back to its default (`numGroupsLimit`). Must be a positive integer when set.
+  @Nullable
+  public static Integer getGroupingSetsBaseAggregationMaxGroups(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS);
+    return checkedParseIntPositive(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS, value);
+  }
+
+  @Nullable
+  public static Integer getGroupingSetsMinServerTrimSize(Map<String, String> queryOptions) {
+    String groupingSetsMinServerTrimSizeString =
+        queryOptions.get(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE);
+    // NOTE: Non-positive value means turning off the per-set server trim for grouping-set base aggregation
+    return uncheckedParseInt(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE, groupingSetsMinServerTrimSizeString);
+  }
+
   @Nullable
   public static Integer getMinBrokerGroupTrimSize(Map<String, String> queryOptions) {
     String minBrokerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE);
@@ -600,6 +651,36 @@ public class QueryOptionsUtils {
   public static Integer getStreamingDistinctFlushThreshold(Map<String, String> queryOptions) {
     String value = queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD);
     return checkedParseIntNonNegative(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, value);
+  }
+
+  /// Returns the streaming selection ORDER BY merge mode, or null if not set. Accepts the enum constant names in
+  /// any case (`on` / `off` / `auto`).
+  @Nullable
+  public static SortedSelectionMergeMode getSortedSelectionMergeMode(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_MODE);
+    if (value == null) {
+      return null;
+    }
+    try {
+      return SortedSelectionMergeMode.valueOf(value.trim().toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("%s must be one of %s, got: %s", QueryOptionKey.SORTED_SELECTION_MERGE_MODE,
+              Arrays.toString(SortedSelectionMergeMode.values()), value));
+    }
+  }
+
+  /// Returns the minimum sorted-segment fraction for [SortedSelectionMergeMode#AUTO], or null if not set.
+  @Nullable
+  public static Double getSortedSelectionMergeAutoMinSortedRatio(Map<String, String> queryOptions) {
+    return checkedParseRatio(QueryOptionKey.SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO,
+        queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO));
+  }
+
+  @Nullable
+  public static Integer getSortedSelectionMergeBlockSize(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_BLOCK_SIZE);
+    return checkedParseIntPositive(QueryOptionKey.SORTED_SELECTION_MERGE_BLOCK_SIZE, value);
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
@@ -885,6 +966,29 @@ public class QueryOptionsUtils {
           String.format("%s must be a non-negative number, got: %s", optionName, optionValue));
     }
     return value;
+  }
+
+  /// Parses a fraction in the closed range [0, 1].
+  @Nullable
+  private static Double checkedParseRatio(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    double value;
+    try {
+      value = Double.parseDouble(optionValue.trim());
+    } catch (NumberFormatException nfe) {
+      throw ratioParseException(optionName, optionValue);
+    }
+    if (!Double.isFinite(value) || value < 0 || value > 1) {
+      throw ratioParseException(optionName, optionValue);
+    }
+    return value;
+  }
+
+  private static IllegalArgumentException ratioParseException(String optionName, String optionValue) {
+    return new IllegalArgumentException(
+        String.format("%s must be a number between 0 and 1, got: %s", optionName, optionValue));
   }
 
   @Nullable

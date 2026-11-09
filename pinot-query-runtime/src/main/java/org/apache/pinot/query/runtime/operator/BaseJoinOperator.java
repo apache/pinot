@@ -95,8 +95,10 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     _resultColumnSize = _resultSchema.size();
     List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
+    boolean nullHandlingEnabled = QueryOptionsUtils.isNullHandlingEnabled(context.getOpChainMetadata());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
-      _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema));
+      _nonEquiEvaluators.add(
+          TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema, nullHandlingEnabled));
     }
     Map<String, String> metadata = context.getOpChainMetadata();
     PlanNode.NodeHint nodeHint = node.getNodeHint();
@@ -116,8 +118,10 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     _resultColumnSize = _resultSchema.size();
     List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
+    boolean nullHandlingEnabled = QueryOptionsUtils.isNullHandlingEnabled(context.getOpChainMetadata());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
-      _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, nonEquiEvaluationSchema));
+      _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, nonEquiEvaluationSchema,
+          nullHandlingEnabled));
     }
     Map<String, String> metadata = context.getOpChainMetadata();
     PlanNode.NodeHint nodeHint = node.getNodeHint();

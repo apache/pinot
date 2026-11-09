@@ -54,6 +54,10 @@ public class ArrayFunctionsTest {
     row.putValue("longArray", new long[]{3L, 2L, 10L, 6L, 1L, 12L});
     row.putValue("stringArray", new String[]{"3", "2", "10", "6", "1", "12"});
     row.putValue("stringArrayWithNulls", new String[]{"3", "2", "10", "6", "1", "12", "", null});
+    row.putValue("nullIntArray", null);
+    row.putValue("nullStringArray", null);
+    row.putValue("nullInt", null);
+    row.putValue("nullString", null);
 
     inputs.add(new Object[]{
         "array_reverse_int(intArray)", List.of("intArray"), row, new int[]{12, 1, 6, 10, 2, 3}
@@ -169,6 +173,29 @@ public class ArrayFunctionsTest {
         "array_union_string(stringArray, stringArray)", Lists.newArrayList("stringArray", "stringArray"), row,
         new String[]{"3", "2", "10", "6", "1", "12"}
     });
+    inputs.add(new Object[]{
+        "array_union_int_ignore_nulls(array_concat_int(intArray, intArray), nullIntArray)",
+        List.of("intArray", "intArray", "nullIntArray"), row, new int[]{3, 2, 10, 6, 1, 12}
+    });
+    inputs.add(new Object[]{
+        "array_union_int_ignore_nulls(nullIntArray, intArray)", List.of("nullIntArray", "intArray"), row,
+        new int[]{3, 2, 10, 6, 1, 12}
+    });
+    inputs.add(new Object[]{
+        "array_union_int_ignore_nulls(nullIntArray, nullIntArray)", List.of("nullIntArray", "nullIntArray"), row, null
+    });
+    inputs.add(new Object[]{
+        "array_union_string_ignore_nulls(array_concat_string(stringArray, stringArray), nullStringArray)",
+        List.of("stringArray", "stringArray", "nullStringArray"), row, new String[]{"3", "2", "10", "6", "1", "12"}
+    });
+    inputs.add(new Object[]{
+        "array_union_string_ignore_nulls(nullStringArray, stringArray)", List.of("nullStringArray", "stringArray"),
+        row, new String[]{"3", "2", "10", "6", "1", "12"}
+    });
+    inputs.add(new Object[]{
+        "array_union_string_ignore_nulls(nullStringArray, nullStringArray)",
+        List.of("nullStringArray", "nullStringArray"), row, null
+    });
 
     inputs.add(new Object[]{
         "array_concat_int(intArray, intArray)", Lists.newArrayList("intArray", "intArray"), row,
@@ -183,6 +210,29 @@ public class ArrayFunctionsTest {
         new String[]{"3", "2", "10", "6", "1", "12", "3", "2", "10", "6", "1", "12"}
     });
     inputs.add(new Object[]{
+        "array_concat_int_ignore_nulls(intArray, nullIntArray)", List.of("intArray", "nullIntArray"), row,
+        new int[]{3, 2, 10, 6, 1, 12}
+    });
+    inputs.add(new Object[]{
+        "array_concat_int_ignore_nulls(nullIntArray, intArray)", List.of("nullIntArray", "intArray"), row,
+        new int[]{3, 2, 10, 6, 1, 12}
+    });
+    inputs.add(new Object[]{
+        "array_concat_int_ignore_nulls(nullIntArray, nullIntArray)", List.of("nullIntArray", "nullIntArray"), row, null
+    });
+    inputs.add(new Object[]{
+        "array_concat_string_ignore_nulls(stringArray, nullStringArray)", List.of("stringArray", "nullStringArray"),
+        row, new String[]{"3", "2", "10", "6", "1", "12"}
+    });
+    inputs.add(new Object[]{
+        "array_concat_string_ignore_nulls(nullStringArray, stringArray)", List.of("nullStringArray", "stringArray"),
+        row, new String[]{"3", "2", "10", "6", "1", "12"}
+    });
+    inputs.add(new Object[]{
+        "array_concat_string_ignore_nulls(nullStringArray, nullStringArray)",
+        List.of("nullStringArray", "nullStringArray"), row, null
+    });
+    inputs.add(new Object[]{
         "array_push_back_int(intArray, 7)", List.of("intArray"), row,
         new int[]{3, 2, 10, 6, 1, 12, 7}
     });
@@ -191,12 +241,54 @@ public class ArrayFunctionsTest {
         new String[]{"3", "2", "10", "6", "1", "12", "x"}
     });
     inputs.add(new Object[]{
+        "array_push_back_int_ignore_nulls(intArray, nullInt)", List.of("intArray", "nullInt"), row,
+        new int[]{3, 2, 10, 6, 1, 12}
+    });
+    inputs.add(new Object[]{
+        "array_push_back_int_ignore_nulls(nullIntArray, 7)", List.of("nullIntArray"), row, new int[]{7}
+    });
+    inputs.add(new Object[]{
+        "array_push_back_int_ignore_nulls(nullIntArray, nullInt)", List.of("nullIntArray", "nullInt"), row, null
+    });
+    inputs.add(new Object[]{
+        "array_push_back_string_ignore_nulls(stringArray, nullString)", List.of("stringArray", "nullString"), row,
+        new String[]{"3", "2", "10", "6", "1", "12"}
+    });
+    inputs.add(new Object[]{
+        "array_push_back_string_ignore_nulls(nullStringArray, 'x')", List.of("nullStringArray"), row, new String[]{"x"}
+    });
+    inputs.add(new Object[]{
+        "array_push_back_string_ignore_nulls(nullStringArray, nullString)", List.of("nullStringArray", "nullString"),
+        row, null
+    });
+    inputs.add(new Object[]{
         "array_push_front_int(intArray, 7)", List.of("intArray"), row,
         new int[]{7, 3, 2, 10, 6, 1, 12}
     });
     inputs.add(new Object[]{
         "array_push_front_string(stringArray, 'x')", List.of("stringArray"), row,
         new String[]{"x", "3", "2", "10", "6", "1", "12"}
+    });
+    inputs.add(new Object[]{
+        "array_push_front_int_ignore_nulls(intArray, nullInt)", List.of("intArray", "nullInt"), row,
+        new int[]{3, 2, 10, 6, 1, 12}
+    });
+    inputs.add(new Object[]{
+        "array_push_front_int_ignore_nulls(nullIntArray, 7)", List.of("nullIntArray"), row, new int[]{7}
+    });
+    inputs.add(new Object[]{
+        "array_push_front_int_ignore_nulls(nullIntArray, nullInt)", List.of("nullIntArray", "nullInt"), row, null
+    });
+    inputs.add(new Object[]{
+        "array_push_front_string_ignore_nulls(stringArray, nullString)", List.of("stringArray", "nullString"), row,
+        new String[]{"3", "2", "10", "6", "1", "12"}
+    });
+    inputs.add(new Object[]{
+        "array_push_front_string_ignore_nulls(nullStringArray, 'x')", List.of("nullStringArray"), row, new String[]{"x"}
+    });
+    inputs.add(new Object[]{
+        "array_push_front_string_ignore_nulls(nullStringArray, nullString)", List.of("nullStringArray", "nullString"),
+        row, null
     });
     inputs.add(new Object[]{
         "array_to_string(stringArray, '::')", List.of("stringArray"), row,

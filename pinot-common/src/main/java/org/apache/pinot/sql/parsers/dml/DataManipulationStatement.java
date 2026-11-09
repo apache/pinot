@@ -25,25 +25,36 @@ import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 
 /// DML Statement
 public interface DataManipulationStatement {
-  /// The method to execute this Statement, e.g. MINION or HTTP.
+  /// The method to execute this Statement, e.g. MINION, HTTP or EXECUTOR. It tells which of the other methods apply
+  /// to the statement, see [ExecutionType].
   /// @return
   ExecutionType getExecutionType();
 
   /// Generate minion task config for this statement.
+  /// Only used for the [ExecutionType#MINION] ExecutionType.
   /// @return Adhoc minion task config
   AdhocTaskConfig generateAdhocTaskConfig();
 
   /// Execute the statement and format response to response row format.
-  /// Not used for Minion ExecutionType.
+  /// Only used for the [ExecutionType#HTTP] ExecutionType.
   /// @return Result rows
   List<Object[]> execute();
 
+  /// Not used for the [ExecutionType#EXECUTOR] ExecutionType.
   /// @return Result schema for response
   DataSchema getResultSchema();
 
   /// Execution method for this SQL statement.
   enum ExecutionType {
+    /// Executed in-process with [#execute()], which returns the rows of the response, described by
+    /// [#getResultSchema()].
     HTTP,
-    MINION
+    /// Executed as a minion task, configured with [#generateAdhocTaskConfig()]; the response lists the submitted
+    /// tasks, described by [#getResultSchema()].
+    MINION,
+    /// Executed by the `SqlQueryExecutor` of the role that received the statement, through a statement-specific hook
+    /// such as `SqlQueryExecutor#executeDelete`. [#generateAdhocTaskConfig()], [#execute()] and
+    /// [#getResultSchema()] do not apply to such a statement and throw [UnsupportedOperationException].
+    EXECUTOR
   }
 }

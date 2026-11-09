@@ -117,7 +117,22 @@ public class SegmentCompletionManager {
   }
 
   private SegmentCompletionFSM lookupOrCreateFsm(LLCSegmentName llcSegmentName, String msgType) {
-    return _fsmMap.computeIfAbsent(llcSegmentName.getSegmentName(), k -> createFsm(llcSegmentName, msgType));
+    String segmentName = llcSegmentName.getSegmentName();
+    // Look up without locking first. computeIfAbsent() can lock the hash bin even when the key is present, so it can
+    // wait for the creation of another segment's FSM, which reads ZooKeeper.
+    SegmentCompletionFSM fsm = _fsmMap.get(segmentName);
+    return fsm != null ? fsm : _fsmMap.computeIfAbsent(segmentName, k -> createFsm(llcSegmentName, msgType));
+  }
+
+  /// Parses an offset reported for the segment with the offset factory of its FSM, so that a request for an existing
+  /// FSM does not read the table config from ZooKeeper.
+  private StreamPartitionMsgOffset parseOffset(SegmentCompletionFSM fsm, LLCSegmentName llcSegmentName,
+      String offset) {
+    StreamPartitionMsgOffsetFactory factory = fsm.getStreamPartitionMsgOffsetFactory();
+    if (factory == null) {
+      factory = getStreamPartitionMsgOffsetFactory(llcSegmentName);
+    }
+    return factory.create(offset);
   }
 
   private SegmentCompletionFSM createFsm(LLCSegmentName llcSegmentName, String msgType) {
@@ -158,13 +173,12 @@ public class SegmentCompletionManager {
     }
     final String instanceId = reqParams.getInstanceId();
     final String stopReason = reqParams.getReason();
-    final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
-    final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
 
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     SegmentCompletionFSM fsm = null;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
+      StreamPartitionMsgOffset offset = parseOffset(fsm, segmentName, reqParams.getStreamPartitionMsgOffset());
       response = fsm.segmentConsumed(instanceId, offset, stopReason);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentConsumed for segment {}", segmentNameStr, e);
@@ -193,9 +207,6 @@ public class SegmentCompletionManager {
     if (!isLeader(tableName) || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
-    final String instanceId = reqParams.getInstanceId();
-    final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
-    final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
@@ -219,13 +230,12 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
-    final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
-    final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
     final int extTimeSec = reqParams.getExtraTimeSec();
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
+      StreamPartitionMsgOffset offset = parseOffset(fsm, segmentName, reqParams.getStreamPartitionMsgOffset());
       response = fsm.extendBuildTime(instanceId, offset, extTimeSec);
     } catch (Exception e) {
       LOGGER.error("Caught exception in extendBuildTime for segment {}", segmentNameStr, e);
@@ -263,13 +273,12 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String instanceId = reqParams.getInstanceId();
-    final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
-    final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
     final String reason = reqParams.getReason();
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING);
+      StreamPartitionMsgOffset offset = parseOffset(fsm, segmentName, reqParams.getStreamPartitionMsgOffset());
       response = fsm.stoppedConsuming(instanceId, offset, reason);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentStoppedConsuming for segment {}", segmentNameStr, e);

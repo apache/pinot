@@ -24,6 +24,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.calcite.sql.SqlDelete;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -41,6 +44,9 @@ import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 /// Some tests for the SQL compiler.
@@ -2822,6 +2828,20 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testLegacyCompileTimeInvokerPreservesJsonExtractScalarResultType() {
+    for (String expressionString : List.of(
+        "jsonExtractScalar('{\"v\":true}', '$.v', 'BOOLEAN')",
+        "jsonExtractScalar('{\"v\":[1514805173000]}', '$.v', 'TIMESTAMP_ARRAY')",
+        "jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY')",
+        "jsonExtractScalar('{\"v\":[1.5]}', '$.v', 'BIG_DECIMAL_ARRAY')")) {
+      Expression expression = compileToExpression(expressionString);
+      expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+      assertNotNull(expression.getFunctionCall(), expressionString);
+      assertEquals(expression.getFunctionCall().getOperator(), "jsonextractscalar");
+    }
+  }
+
+  @Test
   public void testLiteralExpressionCheck() {
     Assert.assertTrue(CalciteSqlParser.isLiteralOnlyExpression(compileToExpression("1123")));
     Assert.assertTrue(CalciteSqlParser.isLiteralOnlyExpression(compileToExpression("'ab'")));
@@ -3377,6 +3397,51 @@ public class CalciteSqlCompilerTest {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(customSql);
     Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlInsertFromFile);
     Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+  }
+
+  @Test
+  public void testDeleteStatementIsClassifiedAsDml() {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SET taskName = 'purge-1'; DELETE FROM db.tbl WHERE col1 = 'a' AND col2 > 10");
+    Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlDelete);
+    Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("taskName"), "purge-1");
+    SqlDelete sqlDelete = (SqlDelete) sqlNodeAndOptions.getSqlNode();
+    Assert.assertEquals(((SqlIdentifier) sqlDelete.getTargetTable()).names, List.of("db", "tbl"));
+    Assert.assertNotNull(sqlDelete.getCondition());
+
+    // A DELETE is an executable DML statement, so it cannot be combined with a query
+    SqlCompilationException e = Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToSqlNodeAndOptions("DELETE FROM tbl WHERE col1 = 1; SELECT * FROM tbl"));
+    Assert.assertTrue(e.getMessage().contains("executable statement already exist with type: DML"), e.getMessage());
+  }
+
+  @Test
+  public void testExplainDeleteIsRejected() {
+    // EXPLAIN PLAN FOR accepts a DELETE, which has no query plan: rejected at parse time rather than classified as a
+    // query, which fails with a cast error when its plan is compiled
+    SqlCompilationException e = Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToSqlNodeAndOptions("EXPLAIN PLAN FOR DELETE FROM myTable WHERE a = 1"));
+    Assert.assertTrue(e.getMessage().contains("EXPLAIN is not supported for DELETE"), e.getMessage());
+  }
+
+  @Test
+  public void testCompileToExpressionFromSqlNodeNormalizesLikeFromString()
+      throws Exception {
+    // Both overloads apply the PostgreSQL cast rewrite, so a node parsed by the caller compiles like its SQL text
+    String expression = "bytesCol = '\\x0102'::bytea";
+    SqlNode sqlNode = CalciteSqlParser.newSqlParser(expression).parseSqlExpressionEof();
+    Expression fromSqlNode = CalciteSqlParser.compileToExpression(sqlNode);
+    Assert.assertEquals(fromSqlNode, CalciteSqlParser.compileToExpression(expression));
+    Assert.assertEquals(fromSqlNode.getFunctionCall().getOperands().get(1).getLiteral().getBinaryValue(),
+        new byte[]{1, 2});
+    // Applied a second time, on the rewritten node, it is a no-op
+    Assert.assertEquals(CalciteSqlParser.compileToExpression(sqlNode), fromSqlNode);
+    // Every other :: cast is rejected by both overloads
+    SqlNode castNode = CalciteSqlParser.newSqlParser("intCol::double > 1").parseSqlExpressionEof();
+    Assert.expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToExpression(castNode));
+    Assert.expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToExpression("intCol::double > 1"));
   }
 
   @Test

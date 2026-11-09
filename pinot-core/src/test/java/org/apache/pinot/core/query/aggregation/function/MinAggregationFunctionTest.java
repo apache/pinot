@@ -18,16 +18,121 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
+
 
 public class MinAggregationFunctionTest extends AbstractAggregationFunctionTest {
+
+  /// MIN only supports numeric columns (see https://github.com/apache/pinot/issues/19603); applying it to a
+  /// non-numeric (e.g. STRING) column must fail with a clear, actionable message instead of an opaque
+  /// `NumberFormatException`.
+  @Test
+  public void testNonNumericColumnExceptionInAggregateMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MinAggregationFunction function = new MinAggregationFunction(List.of(expression), false);
+
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(mockBlockValSet.isSingleValue()).thenReturn(true);
+    blockValSetMap.put(expression, mockBlockValSet);
+
+    try {
+      function.aggregate(10, resultHolder, blockValSetMap);
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("Cannot compute min for non-numeric type"));
+      assertTrue(e.getMessage().contains("MINSTRING"));
+      assertTrue(e.getMessage().contains("autoRewriteAggregationType"));
+    }
+  }
+
+  @Test
+  public void testNonNumericColumnExceptionInAggregateGroupBySVMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MinAggregationFunction function = new MinAggregationFunction(List.of(expression), false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(mockBlockValSet.isSingleValue()).thenReturn(true);
+    when(mockBlockValSet.getDoubleValuesSV()).thenThrow(new NumberFormatException("For input string: \"abc\""));
+    blockValSetMap.put(expression, mockBlockValSet);
+
+    try {
+      function.aggregateGroupBySV(10, new int[10], groupByResultHolder, blockValSetMap);
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("Cannot compute min for non-numeric value"));
+      assertTrue(e.getMessage().contains("MINSTRING"));
+      assertTrue(e.getMessage().contains("autoRewriteAggregationType"));
+    }
+  }
+
+  @Test
+  public void testNonNumericColumnExceptionInAggregateGroupByMVMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MinAggregationFunction function = new MinAggregationFunction(List.of(expression), false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(mockBlockValSet.isSingleValue()).thenReturn(true);
+    when(mockBlockValSet.getDoubleValuesSV()).thenThrow(new NumberFormatException("For input string: \"abc\""));
+    blockValSetMap.put(expression, mockBlockValSet);
+
+    try {
+      function.aggregateGroupByMV(10, new int[10][], groupByResultHolder, blockValSetMap);
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("Cannot compute min for non-numeric value"));
+      assertTrue(e.getMessage().contains("MINSTRING"));
+      assertTrue(e.getMessage().contains("autoRewriteAggregationType"));
+    }
+  }
+
+  /// A STRING column holding numeric values keeps working on the group-by path, since `getDoubleValuesSV()` parses
+  /// them; only values that cannot be parsed are reported with the new message.
+  @Test
+  public void testNumericStringColumnStillAggregatesInGroupBy() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MinAggregationFunction function = new MinAggregationFunction(List.of(expression), false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(mockBlockValSet.isSingleValue()).thenReturn(true);
+    when(mockBlockValSet.getDoubleValuesSV()).thenReturn(new double[]{2, 10});
+    blockValSetMap.put(expression, mockBlockValSet);
+
+    function.aggregateGroupBySV(2, new int[]{0, 0}, groupByResultHolder, blockValSetMap);
+    assertEquals(groupByResultHolder.getDoubleResult(0), 2.0);
+  }
 
   @DataProvider(name = "scenarios")
   Object[] scenarios() {

@@ -101,6 +101,18 @@ public class PipelineBreakerOperator extends MultiStageOperator {
     return _errorBlock;
   }
 
+  /// Keeps the cancellation reason as the error, so that a pipeline breaker cancelled before it collected its results
+  /// (e.g. the query was terminated before it started) does not look like it collected no rows.
+  @Override
+  public void cancel(Throwable e) {
+    if (_errorBlock == null) {
+      // Not only an Exception: the scheduler also cancels an op chain that failed with an Error, e.g. an
+      // OutOfMemoryError while the pipeline breaker collects its results
+      _errorBlock = ErrorMseBlock.fromException(e instanceof Exception ? (Exception) e : new RuntimeException(e));
+    }
+    super.cancel(e);
+  }
+
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;

@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -74,6 +73,7 @@ import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -562,12 +562,17 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     // below discards any per-key codecSpec, so refuse to silently drop one that slipped past validation.
     ForwardIndexConfig configuredForwardIndex = configsForDecision.getConfig(StandardIndexes.forward());
     Preconditions.checkState(configuredForwardIndex.getCodecSpec() == null,
-        "OPEN_STRUCT column '%s': codecSpec is not supported for key '%s'; materialized keys always use a "
-            + "dictionary-encoded or LZ4 raw forward index", _columnName, key);
+        "OPEN_STRUCT column '%s': codecSpec is not supported for key '%s'; the splitter fixes materialized "
+            + "keys to a dictionary-encoded or LZ4 raw forward index", _columnName, key);
 
     // Reconcile dictionary + forward encoding with the final decision (mirrors BaseSegmentCreator.adaptConfig);
     // ForwardIndexCreatorFactory selects dict-vs-raw from the forward config's EncodingType. A compression codec
-    // applies only to the raw forward format (LZ4 preserves the dense child's current on-disk layout); attaching
+    // applies only to the raw forward format (LZ4 preserves the dense child's current on-disk layout, and is
+    // pinned here regardless of the cluster-wide default compression codec). Note the pin covers this build
+    // path only: a materialized key with no explicit indexes.forward node resolves through
+    // ForwardIndexConfig.getDefault(RAW) with a null codec, so a dictionary-to-raw conversion on reload
+    // writes the reloading component's default instead, and the same key can end up with different codecs
+    // across segments. Attaching
     // one to a dictionary-encoded forward is rejected by ForwardIndexType.validate.
     ForwardIndexConfig.Builder forwardBuilder = new ForwardIndexConfig.Builder(
         useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW);
@@ -743,7 +748,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         try {
           String json = JsonUtils.objectToString(sparseEntries);
           jsonPerDoc[docId] = json;
-          maxLen = Math.max(maxLen, Utf8.encodedLength(json));
+          maxLen = Math.max(maxLen, Utf8Utils.encodedLength(json));
         } catch (IOException e) {
           throw new RuntimeException("Failed to serialize sparse entries for docId " + docId, e);
         }

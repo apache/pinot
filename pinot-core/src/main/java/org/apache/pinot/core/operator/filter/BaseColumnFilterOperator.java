@@ -105,8 +105,11 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
     BlockDocIdSet nonNulls = BitmapDocIdSet.create(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) _numDocs),
         _numDocs);
     if (nonNulls instanceof EmptyDocIdSet) {
+      // The match is never evaluated, so a scan-based one will not close its own iterator
+      blockDocIdSet.release();
       return new EmptyDocIdSet(blockDocIdSet.getNumEntriesScannedInFilter());
     }
-    return new AndDocIdSet(List.of(blockDocIdSet, nonNulls), _queryContext.getQueryOptions());
+    return new AndDocIdSet(List.of(blockDocIdSet, nonNulls), _queryContext.getQueryOptions(),
+        _queryContext.isAndRestrictionPushdownEnabled());
   }
 }

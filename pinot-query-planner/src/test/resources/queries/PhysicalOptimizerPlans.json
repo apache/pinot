@@ -264,6 +264,21 @@
   "physical_opt_join_planning_tests": {
     "queries": [
       {
+        "description": "Inner join with an IN_ID_SET filter on one table, which is pushed into the leaf stage",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE IN_ID_SET(a.col3, 'ATowAAABAAAAAAACABAAAAACAAQABgA=') = 1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalJoin(condition=[=($0, $10)], joinType=[inner])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n      PhysicalFilter(condition=[INIDSET($2, _UTF-8'ATowAAABAAAAAAACABAAAAACAAQABgA=')])",
+          "\n        PhysicalTableScan(table=[[default, a]])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[1]])",
+          "\n      PhysicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Inner join with order by",
         "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 ORDER BY a.col1",
         "output": [

@@ -27,6 +27,10 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
@@ -331,6 +335,30 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     // Likewise through a disjunction whose other branch is false on the null row
     assertEquals(getRows(String.format("SELECT COUNT(*) FROM testTable WHERE NOT (add(%s, 0) IS NOT NULL OR %s = 2)",
         COLUMN1, COLUMN2)).get(0)[0], (long) NUM_OF_SEGMENT_COPIES);
+  }
+
+  /// A scalar function that accepts null arguments gets null for the null row, and returns its default value there,
+  /// also when nested inside another function.
+  @Test
+  public void testScalarFunctionWithNullableParameters()
+      throws Exception {
+    initializeRows();
+    insertRow("{\"a\":\"x\",\"b\":1}");
+    insertRow(null);
+    Schema schema = schemaBuilder().addSingleValueDimension(COLUMN1, DataType.STRING).build();
+    setUpSegments(TABLE_CONFIG, schema);
+
+    List<Object[]> rows = getRows(String.format(
+        "SELECT jsonPathString(%s, '$.a', 'none'), COUNT(*) FROM testTable GROUP BY 1 ORDER BY 1", COLUMN1));
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0), new Object[]{"none", (long) NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(1), new Object[]{"x", (long) NUM_OF_SEGMENT_COPIES});
+
+    rows = getRows(String.format(
+        "SELECT jsonPathLong(%s, '$.b', 5) + 0, COUNT(*) FROM testTable GROUP BY 1 ORDER BY 1", COLUMN1));
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0), new Object[]{1.0, (long) NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(1), new Object[]{5.0, (long) NUM_OF_SEGMENT_COPIES});
   }
 
   /// A multi-value column's null row is stored as a single default value, and its posting lists overlap across values,
@@ -2077,5 +2105,70 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   @AfterMethod
   public void destroySegments() {
     _indexSegment.destroy();
+  }
+
+  @DataProvider
+  public Object[][] sortedOrderByDirections() {
+    return new Object[][]{{true, false}, {false, false}, {false, true}};
+  }
+
+  @Test(dataProvider = "sortedOrderByDirections")
+  public void testLateMaterializationPreservesNullsInDeferredColumns(boolean ascending, boolean allowReverseOrder)
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(2, 20);
+    insertRowWithTwoColumns(3, null);
+    insertRowWithTwoColumns(4, 40);
+    Schema schema = schemaBuilder()
+        .addSingleValueDimension(COLUMN1, DataType.INT)
+        .addSingleValueDimension(COLUMN2, DataType.INT)
+        .build();
+    setUpSegments(TABLE_CONFIG_WITH_SORTED_COLUMN, schema);
+
+    String direction = ascending ? "ASC" : "DESC";
+    String query = String.format(
+        "SET allowReverseOrder = %s; SELECT %s, %s FROM testTable ORDER BY %s %s LIMIT 8 OFFSET 4",
+        allowReverseOrder, COLUMN1, COLUMN2, COLUMN1, direction);
+    List<Object[]> rows = getRows(query);
+    assertEquals(rows.size(), 8);
+    for (int i = 0; i < rows.size(); i++) {
+      int value = ascending ? 2 + i / NUM_OF_SEGMENT_COPIES : 3 - i / NUM_OF_SEGMENT_COPIES;
+      assertEquals(rows.get(i), new Object[]{value, value == 2 ? 20 : null});
+    }
+  }
+
+  @Test
+  public void testLateMaterializationAcrossBlocksWithSparseDocIds()
+      throws Exception {
+    initializeRows();
+    for (int i = 0; i < 22010; i++) {
+      insertRowWithTwoColumns(i, i % 3 == 0 ? null : i * 10);
+    }
+    Schema schema = schemaBuilder()
+        .addSingleValueDimension(COLUMN1, DataType.INT)
+        .addSingleValueDimension(COLUMN2, DataType.INT)
+        .build();
+    setUpSegments(TABLE_CONFIG_WITH_SORTED_COLUMN, schema);
+
+    BaseOperator<SelectionResultsBlock> operator = getOperator(
+        "SET enableNullHandling = true; SET allowReverseOrder = false; "
+            + "SELECT column1, column2, ADD(column2, 1) FROM testTable WHERE MOD(column1, 2) = 0 "
+            + "ORDER BY column1 DESC LIMIT 10001 OFFSET 3");
+    assertTrue(operator instanceof SelectionPartiallyOrderedByDescOperation);
+    SelectionResultsBlock block = operator.nextBlock();
+    assertEquals(block.getDataSchema().getColumnNames(), new String[]{"column1", "column2", "add(column2,'1')"});
+    assertEquals(block.getDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<Object[]> rows = block.getRows();
+    // Both the initial scan and the deferred fetch span the 10000-document block boundary.
+    assertEquals(rows.size(), 10004);
+    for (int i = 0; i < rows.size(); i++) {
+      int value = 22008 - 2 * i;
+      assertEquals(rows.get(i),
+          new Object[]{value, value % 3 == 0 ? null : value * 10, value % 3 == 0 ? null : value * 10.0 + 1});
+    }
+    assertEquals(operator.getExecutionStatistics().getNumDocsScanned(), 11005L);
+    assertEquals(operator.getExecutionStatistics().getNumEntriesScannedPostFilter(), 11005L + 10004L);
   }
 }

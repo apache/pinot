@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +36,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.MultiDocValues;
+import org.apache.lucene.index.NumericDocValues;
+import org.apache.lucene.index.StoredFieldVisitor;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -43,7 +50,10 @@ import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyz
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -85,6 +95,68 @@ public class TextIndexUtils {
     }
   }
 
+  /// Reads the actual Pinot ids after Lucene merges and sorting, optionally remapping mutable ids during conversion.
+  /// Doc values avoid stored-field decompression. Mutable indexes contain only the stored field; older immutable
+  /// indexes and documents without doc values also use the per-document stored-field fallback.
+  /// Returns whether the final mapping is the identity mapping.
+  public static boolean fillDocIdMapping(IndexReader indexReader, PinotDataBuffer buffer, int numDocs,
+      @Nullable int[] mutableToImmutableDocIdMap)
+      throws IOException {
+    NumericDocValues pinotDocIdValues =
+        MultiDocValues.getNumericValues(indexReader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
+    if (pinotDocIdValues == null) {
+      // A TEXT column named PinotDocID uses the alternate numeric field to avoid a field-schema collision.
+      pinotDocIdValues =
+          MultiDocValues.getNumericValues(indexReader, LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME);
+    }
+    PinotDocIdVisitor visitor = new PinotDocIdVisitor();
+    StoredFields storedFields = null;
+    boolean isIdentityMapping = true;
+    for (int luceneDocId = 0; luceneDocId < numDocs; luceneDocId++) {
+      int pinotDocId;
+      if (pinotDocIdValues != null && pinotDocIdValues.advanceExact(luceneDocId)) {
+        pinotDocId = Math.toIntExact(pinotDocIdValues.longValue());
+      } else {
+        if (storedFields == null) {
+          storedFields = indexReader.storedFields();
+        }
+        visitor._pinotDocId = Integer.MIN_VALUE;
+        storedFields.document(luceneDocId, visitor);
+        pinotDocId = visitor._pinotDocId;
+        if (pinotDocId == Integer.MIN_VALUE) {
+          throw new IOException("Missing Pinot document id for Lucene document: " + luceneDocId);
+        }
+      }
+      if (mutableToImmutableDocIdMap != null) {
+        // Conversion can reorder Pinot rows independently of Lucene's own document order.
+        pinotDocId = mutableToImmutableDocIdMap[pinotDocId];
+      }
+      isIdentityMapping &= luceneDocId == pinotDocId;
+      buffer.putInt((long) luceneDocId * Integer.BYTES, pinotDocId);
+    }
+    return isIdentityMapping;
+  }
+
+  /// Visits only the stored Pinot document id. Each mapping operation owns its visitor.
+  private static class PinotDocIdVisitor extends StoredFieldVisitor {
+    private int _pinotDocId;
+
+    @Override
+    public Status needsField(FieldInfo fieldInfo) {
+      return LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME.equals(fieldInfo.name) ? Status.YES : Status.NO;
+    }
+
+    @Override
+    public void intField(FieldInfo fieldInfo, int value) {
+      _pinotDocId = value;
+    }
+
+    @Override
+    public void stringField(FieldInfo fieldInfo, String value) {
+      _pinotDocId = Integer.parseInt(value);
+    }
+  }
+
   public static void cleanupTextIndex(File segDir, String column) {
     // Remove the lucene index file and potentially the docId mapping file.
     File luceneIndexFile = new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
@@ -112,6 +184,22 @@ public class TextIndexUtils {
         || new File(segDir, column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists();
     //@formatter:on
+  }
+
+  /// Returns a v3 packed text entry, or null only when the store reports that the entry is absent.
+  /// Other store failures propagate. The returned buffer remains owned by the segment directory.
+  @Nullable
+  public static PinotDataBuffer getConsolidatedTextEntry(SegmentDirectory.Reader reader, String column)
+      throws IOException {
+    try {
+      return reader.getIndexFor(column, StandardIndexes.text());
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith(SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX)) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   /// Bulk form of [#hasTextIndex]: which of `columns` have a Lucene text index in `segDir`.

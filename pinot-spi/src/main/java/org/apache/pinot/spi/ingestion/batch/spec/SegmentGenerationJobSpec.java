@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.ingestion.batch.spec;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.List;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -57,6 +58,9 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   /// Segment creation job parallelism.
   private int _segmentCreationJobParallelism;
+
+  /// Codec for segment archives: `gzip` (default) or `zstd`. Metadata sidecars always use gzip.
+  private String _segmentTarCompressionCodec = Constants.DEFAULT_SEGMENT_COMPRESSION_CODEC;
 
   /// Should overwrite output segments if existed.
   private boolean _overwriteOutput;
@@ -226,6 +230,22 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   public void setSegmentCreationJobParallelism(int segmentCreationJobParallelism) {
     _segmentCreationJobParallelism = segmentCreationJobParallelism;
+  }
+
+  public String getSegmentTarCompressionCodec() {
+    return _segmentTarCompressionCodec == null
+        ? Constants.DEFAULT_SEGMENT_COMPRESSION_CODEC
+        : _segmentTarCompressionCodec;
+  }
+
+  /// Selects the archive codec for standalone, Spark, and Hadoop segment generation jobs.
+  /// Generation accepts `gzip` and `zstd`; archive discovery also consumes existing LZ4 archives.
+  public void setSegmentTarCompressionCodec(String segmentTarCompressionCodec) {
+    Preconditions.checkArgument(Constants.SEGMENT_COMPRESSION_CODEC_GZIP.equals(segmentTarCompressionCodec)
+            || Constants.SEGMENT_COMPRESSION_CODEC_ZSTD.equals(segmentTarCompressionCodec),
+        "Unsupported segmentTarCompressionCodec: %s; supported codecs: %s, %s", segmentTarCompressionCodec,
+        Constants.SEGMENT_COMPRESSION_CODEC_GZIP, Constants.SEGMENT_COMPRESSION_CODEC_ZSTD);
+    _segmentTarCompressionCodec = segmentTarCompressionCodec;
   }
 
   public void setCleanUpOutputDir(boolean cleanUpOutputDir) {

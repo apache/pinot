@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +47,14 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   protected long _threadCpuTimeNs;
   protected long _threadMemAllocatedBytes;
   protected long _systemActivitiesCpuTimeNs;
+
+  // Main thread usage summed over every getBaseBlock() call. A streaming response calls it once per streamed block,
+  // and a combine that runs on the main thread does its work in those calls, not only in the last one. The wall clock
+  // excludes the time spent sending blocks between calls, while worker threads may keep running then, so the derived
+  // system activities time can only be under-reported (it is clamped at 0).
+  private long _mainThreadCpuTimeNs;
+  private long _mainThreadMemAllocatedBytes;
+  private long _mainThreadWallClockTimeNs;
 
   public InstanceResponseOperator(BaseCombineOperator<?> combineOperator, List<SegmentContext> segmentContexts,
       List<FetchContext> fetchContexts, QueryContext queryContext) {
@@ -99,16 +108,6 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
         String.valueOf(_threadMemAllocatedBytes));
     instanceResponseBlock.addMetadata(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
         String.valueOf(_systemActivitiesCpuTimeNs));
-    long numRemoteAccesses = 0;
-    long remoteAccessBytes = 0;
-    for (FetchContext fetchContext : _fetchContexts) {
-      numRemoteAccesses += fetchContext.getNumRemoteAccesses();
-      remoteAccessBytes += fetchContext.getRemoteAccessBytes();
-    }
-    if (numRemoteAccesses > 0) {
-      instanceResponseBlock.addMetadata(MetadataKey.NUM_REMOTE_ACCESSES.getName(), Long.toString(numRemoteAccesses));
-      instanceResponseBlock.addMetadata(MetadataKey.REMOTE_ACCESS_BYTES.getName(), Long.toString(remoteAccessBytes));
-    }
     Integer implicitLimit = QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(
         _queryContext.getQueryOptions());
     // false-positive when table has exactly implicitLimit rows
@@ -125,14 +124,14 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
     BaseResultsBlock resultsBlock = getCombinedResults();
 
-    long mainThreadCpuTimeNs = resourceSnapshot.getCpuTimeNs();
-    long mainThreadMemAllocatedBytes = resourceSnapshot.getAllocatedBytes();
+    _mainThreadCpuTimeNs += resourceSnapshot.getCpuTimeNs();
+    _mainThreadMemAllocatedBytes += resourceSnapshot.getAllocatedBytes();
+    _mainThreadWallClockTimeNs += System.nanoTime() - startWallClockTimeNs;
 
-    long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
-
+    // The worker totals are not summed: they are running totals for the whole query, complete on the last block.
     calculateResourceUsage(resultsBlock.getNumServerThreads(), resultsBlock.getExecutionThreadCpuTimeNs(),
-        mainThreadCpuTimeNs, resultsBlock.getExecutionThreadMemAllocatedBytes(), mainThreadMemAllocatedBytes,
-        totalWallClockTimeNs);
+        _mainThreadCpuTimeNs, resultsBlock.getExecutionThreadMemAllocatedBytes(), _mainThreadMemAllocatedBytes,
+        _mainThreadWallClockTimeNs);
 
     return resultsBlock;
   }
@@ -162,9 +161,12 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
     }
   }
 
+  /// Releases the fetched buffers of all the segments, and reports their remote accesses to the query execution.
   public void releaseAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
-      _segmentContexts.get(i).getIndexSegment().release(_fetchContexts.get(i));
+      FetchContext fetchContext = _fetchContexts.get(i);
+      _segmentContexts.get(i).getIndexSegment().release(fetchContext);
+      QueryThreadContext.mergeRemoteAccessStats(fetchContext.getRemoteAccessStats());
     }
   }
 

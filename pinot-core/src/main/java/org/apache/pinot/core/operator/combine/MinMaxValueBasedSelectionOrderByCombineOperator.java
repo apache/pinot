@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.combine;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -259,8 +258,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
     int numBlocksMerged = 0;
     long endTimeMs = _queryContext.getEndTimeMs();
     while (numBlocksMerged < _numOperators) {
-      BaseResultsBlock blockToMerge =
-          _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      BaseResultsBlock blockToMerge = pollResultsBlock(_blockingQueue, endTimeMs);
       if (blockToMerge == null) {
         // Query times out, skip merging the remaining results blocks
         String logMsg = "Timed out while polling results block, numBlocksMerged: " + numBlocksMerged + " (query: "

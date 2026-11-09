@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.utils.MutableRoaringBitmapUnion;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -145,11 +146,13 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
               _invertedIndexReader.getDocIds(dictIds[1]));
           break;
         default:
-          MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+          // Union lazily and finalize once at the end: the fold still materializes the union, but skips per-union
+          // cardinality maintenance
+          MutableRoaringBitmapUnion union = new MutableRoaringBitmapUnion();
           for (int dictId : dictIds) {
-            bitmap.or(_invertedIndexReader.getDocIds(dictId));
+            union.add(_invertedIndexReader.getDocIds(dictId));
           }
-          count = bitmap.getCardinality();
+          count = union.get().getCardinality();
           break;
       }
     }

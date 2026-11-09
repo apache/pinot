@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import java.util.HashMap;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
+import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityPoolInstanceSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
-import org.apache.pinot.common.metrics.BrokerMeter;
-import org.apache.pinot.common.metrics.BrokerMetrics;
+
 
 /// Instance selector to balance the number of segments served by each selected server instance.
 ///
@@ -45,49 +41,56 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   @Override
-  public InstanceMapping select(List<String> segments, int requestId,
-      SegmentStates segmentStates, Map<String, String> queryOptions) {
-    Map<String, String> segmentToSelectedInstanceMap = new Object2ObjectOpenHashMap<>(segments.size());
-    // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
-    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
+  public SelectionResult select(Collection<String> segments, int requestId, SegmentStates segmentStates,
+      Map<String, String> queryOptions) {
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
-    Int2IntOpenHashMap poolToSegmentCount = new Int2IntOpenHashMap(2);
+    SelectionCollector collector;
+    if (_priorityPoolInstanceSelector != null) {
+      collector = selectAdaptive(segments, segmentStates, ctx);
+    } else if (ctx.isUseFixedReplica()) {
+      collector = selectSameCandidateIndex(segments, segmentStates, _tableNameHashForFixedReplicaRouting);
+    } else {
+      collector = selectRoundRobin(segments, requestId, segmentStates);
+    }
+    collector.emitPoolSegQueries(_brokerMetrics, queryOptions);
+    return collector.build();
+  }
 
+  /// Selects the best server for each segment, from the server stats at the time the segment is processed.
+  private SelectionCollector selectAdaptive(Collection<String> segments, SegmentStates segmentStates,
+      ServerSelectionContext ctx) {
+    PriorityPoolInstanceSelector.QuerySelector querySelector = _priorityPoolInstanceSelector.forQuery(ctx);
+    // Not spread: most segments of a group are selected on the same candidate, the best one when they are processed
+    SelectionCollector collector = new SelectionCollector(segmentStates, segments.size(), false);
     for (String segment : segments) {
-      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
-      // NOTE: candidates can be null when there are no enabled instances for the segment, or the instance selector has
-      // not been updated (we update all components for routing in sequence)
-      if (candidates == null) {
-        continue;
-      }
-      SegmentInstanceCandidate selectedCandidate;
-
-      if (_priorityPoolInstanceSelector != null) {
-        // Adaptive server selection is enabled
-        selectedCandidate = _priorityPoolInstanceSelector.select(ctx, candidates);
-        // If candidates is not null, candidates is always non-empty because segments with no enabled online servers
-        // are placed in segmentStates.getUnavailableSegments()
-        assert selectedCandidate != null;
-      } else if (ctx.isUseFixedReplica()) {
-        // candidates array is always sorted
-        selectedCandidate = candidates.get(_tableNameHashForFixedReplicaRouting % candidates.size());
-      } else {
-        selectedCandidate = candidates.get(requestId++ % candidates.size());
-      }
-      poolToSegmentCount.addTo(selectedCandidate.getPool(), 1);
-      // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
-      // broker or server can skip it upon any issue to process it.
-      if (selectedCandidate.isOnline()) {
-        segmentToSelectedInstanceMap.put(segment, selectedCandidate.getInstance());
-      } else {
-        optionalSegmentToInstanceMap.put(segment, selectedCandidate.getInstance());
+      GroupRouting routing = collector.resolveRouting(segment);
+      if (routing != null) {
+        collector.add(routing, querySelector.select(routing.getCandidates()), segment);
       }
     }
+    return collector;
+  }
 
-    for (Int2IntMap.Entry entry : poolToSegmentCount.int2IntEntrySet()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getIntValue(),
-          BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getIntKey()));
+  /// Selects, for the i-th routable segment, the candidate at index `(requestId + i) % numCandidates`, so that
+  /// consecutive segments are selected on different candidates.
+  private SelectionCollector selectRoundRobin(Collection<String> segments, int requestId, SegmentStates segmentStates) {
+    SelectionCollector collector = new SelectionCollector(segmentStates, segments.size(), true);
+    int numCandidates = 0;
+    int candidateIndex = 0;
+    for (String segment : segments) {
+      GroupRouting routing = collector.resolveRouting(segment);
+      if (routing != null) {
+        if (routing.getNumCandidates() != numCandidates) {
+          numCandidates = routing.getNumCandidates();
+          candidateIndex = requestId % numCandidates;
+        }
+        collector.add(routing, candidateIndex, segment);
+        requestId++;
+        if (++candidateIndex == numCandidates) {
+          candidateIndex = 0;
+        }
+      }
     }
-    return new InstanceMapping(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
+    return collector;
   }
 }

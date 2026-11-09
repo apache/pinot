@@ -42,7 +42,6 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -317,7 +316,6 @@ public class VectorUpsertTableTest extends CustomDataQueryClusterIntegrationTest
             RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(
             Map.of(ENTITY_ID_COLUMN, new ColumnPartitionConfig("Murmur", NUM_PARTITIONS))))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(ENTITY_ID_COLUMN, 1))
         .build();
   }
 

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.readers;
 import java.io.IOException;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.ColumnReader;
@@ -61,8 +62,14 @@ public class PinotSegmentColumnReaderImpl implements ColumnReader {
       boolean skipDefaultNullValues) {
     this(new PinotSegmentColumnReader(indexSegment, columnName), columnName,
         indexSegment.getSegmentMetadata().getTotalDocs(),
-        indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(columnName).getDataType(),
+        getDataType(indexSegment, columnName),
         skipDefaultNullValues);
+  }
+
+  private static DataType getDataType(IndexSegment indexSegment, String columnName) {
+    ColumnMetadata columnMetadata = indexSegment.getSegmentMetadata().getColumnMetadataFor(columnName);
+    return columnMetadata != null ? columnMetadata.getFieldSpec().getDataType()
+        : indexSegment.getSegmentMetadata().getSchema().getFieldSpecFor(columnName).getDataType();
   }
 
   /// Constructor for subclasses that need to provide their own PinotSegmentColumnReader.
