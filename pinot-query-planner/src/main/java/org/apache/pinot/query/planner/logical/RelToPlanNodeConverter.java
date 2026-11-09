@@ -587,8 +587,14 @@ public final class RelToPlanNodeConverter {
       if (_tracker != null) {
         _tracker.trackCreation(merge.getInput(), senderSort);
       }
+      Boolean mergePrePartitioned = merge.getPrePartitioned();
+      if (mergePrePartitioned == null) {
+        mergePrePartitioned = distributionType == RelDistribution.Type.HASH_DISTRIBUTED
+            && distribution.equals(node.getInput().getTraitSet().getDistribution());
+      }
       return ExchangeNode.kWayMerge(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), inputs, distributionType,
-          distribution.getKeys(), merge.getCollation().getFieldCollations(), _hashFunction);
+          distribution.getKeys(), mergePrePartitioned, merge.getCollation().getFieldCollations(), merge.getFetch(),
+          merge.getOffset(), _hashFunction);
     }
     if (node instanceof PinotLogicalSortExchange) {
       PinotLogicalSortExchange sortExchange = (PinotLogicalSortExchange) node;

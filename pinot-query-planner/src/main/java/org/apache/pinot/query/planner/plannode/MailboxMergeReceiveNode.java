@@ -32,22 +32,41 @@ import org.apache.pinot.common.utils.DataSchema;
 /// Stage wiring is confined to query planning; instances are not thread-safe.
 public class MailboxMergeReceiveNode extends BaseMailboxReceiveNode {
   private final List<RelFieldCollation> _collations;
+  private final int _fetch;
+  private final int _offset;
 
   public MailboxMergeReceiveNode(int stageId, DataSchema schema, int senderStageId,
       PinotRelExchangeType exchangeType, RelDistribution.Type distribution, @Nullable List<Integer> keys,
       List<RelFieldCollation> collations, @Nullable MailboxSendNode sender) {
+    this(stageId, schema, senderStageId, exchangeType, distribution, keys, collations, -1, -1, sender);
+  }
+
+  public MailboxMergeReceiveNode(int stageId, DataSchema schema, int senderStageId,
+      PinotRelExchangeType exchangeType, RelDistribution.Type distribution, @Nullable List<Integer> keys,
+      List<RelFieldCollation> collations, int fetch, int offset, @Nullable MailboxSendNode sender) {
     super(stageId, schema, senderStageId, exchangeType, distribution, keys, sender);
     _collations = collations;
+    _fetch = fetch;
+    _offset = offset;
   }
 
   public List<RelFieldCollation> getCollations() {
     return _collations;
   }
 
+  /// Returns the global merge limit, or -1 for an unbounded merge. Zero deliberately emits no rows.
+  public int getFetch() {
+    return _fetch;
+  }
+
+  public int getOffset() {
+    return _offset;
+  }
+
   @Override
   public MailboxMergeReceiveNode withSender(MailboxSendNode sender) {
     return new MailboxMergeReceiveNode(getStageId(), getDataSchema(), sender.getStageId(), getExchangeType(),
-        getDistributionType(), getKeys(), _collations, sender);
+        getDistributionType(), getKeys(), _collations, _fetch, _offset, sender);
   }
 
   @Override
@@ -57,17 +76,20 @@ public class MailboxMergeReceiveNode extends BaseMailboxReceiveNode {
 
   @Override
   public String explain() {
-    return "MAIL_MERGE_RECEIVE(" + getDistributionType() + ")";
+    return "MAIL_MERGE_RECEIVE(" + getDistributionType() + ")" + (_fetch >= 0 ? " LIMIT " + _fetch : "")
+        + (_offset > 0 ? " OFFSET " + _offset : "");
   }
 
   @Override
   public boolean equals(Object other) {
     return other instanceof MailboxMergeReceiveNode && super.equals(other)
-        && _collations.equals(((MailboxMergeReceiveNode) other)._collations);
+        && _collations.equals(((MailboxMergeReceiveNode) other)._collations)
+        && _fetch == ((MailboxMergeReceiveNode) other)._fetch
+        && _offset == ((MailboxMergeReceiveNode) other)._offset;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _collations);
+    return Objects.hash(super.hashCode(), _collations, _fetch, _offset);
   }
 }

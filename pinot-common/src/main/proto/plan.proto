@@ -210,6 +210,9 @@ message MailboxMergeReceiveNode {
   DistributionType distributionType = 3;
   repeated int32 keys = 4;
   repeated Collation collations = 5;
+  // Presence distinguishes an unbounded merge from an explicit LIMIT 0.
+  optional int32 fetch = 6;
+  optional int32 offset = 7;
 }
 
 message MailboxSendNode {

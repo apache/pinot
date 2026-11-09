@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.plan.server;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -28,13 +29,18 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests the boundary between the V1 leaf request and the MSE operator chain.
@@ -66,6 +72,41 @@ public class ServerPlanRequestVisitorTest {
     assertNull(context.getPinotQuery().getOrderByList(),
         "The explicit sender sort must not be pushed independently into each physical leaf request");
     assertSame(sortNode.getInputs().get(0), context.getLeafStageBoundaryNode());
+  }
+
+  @Test
+  public void shouldPushSinglePhysicalSelectionSortIntoLeaf() {
+    TableScanNode scan = new TableScanNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(),
+        "testTable", List.of("orderKey"));
+    SortNode sort = new SortNode(STAGE_ID, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(scan), COLLATIONS, 10, -1)
+        .requiringSingleRun();
+    MailboxSendNode send = new MailboxSendNode(STAGE_ID, DATA_SCHEMA, List.of(sort), 2,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED, List.of(), false, List.of(), false,
+        null);
+    WorkerMetadata offline = new WorkerMetadata(0, Map.of());
+    offline.setTableSegmentsMap(Map.of("OFFLINE", List.of("segment")));
+    ServerPlanRequestContext context = new ServerPlanRequestContext(
+        new StagePlan(send, new StageMetadata(STAGE_ID, List.of(offline, mock(WorkerMetadata.class)), Map.of())),
+        null, null, null, offline);
+    assertTrue(context.isSinglePhysicalTable(), "Unrelated workers cannot interleave this mailbox stream");
+    ServerPlanRequestVisitor.walkPlanNode(send, context);
+    assertSame(context.getLeafStageBoundaryNode(), sort);
+    assertNotNull(context.getPinotQuery().getOrderByList());
+
+    offline.setTableSegmentsMap(Map.of("OFFLINE", List.of("segment"), "REALTIME", List.of("segment")));
+    context = new ServerPlanRequestContext(context.getStagePlan(), null, null, null, offline);
+    assertFalse(context.isSinglePhysicalTable());
+    ServerPlanRequestVisitor.walkPlanNode(send, context);
+    assertSame(context.getLeafStageBoundaryNode(), scan);
+    assertNull(context.getPinotQuery().getOrderByList());
+
+    offline.setTableSegmentsMap(Map.of("OFFLINE", List.of("segment")));
+    offline.setLogicalTableSegmentsMap(Map.of("physical_OFFLINE", List.of("segment")));
+    assertFalse(context.isSinglePhysicalTable());
+    context = new ServerPlanRequestContext(context.getStagePlan(), null, null, null, offline);
+    ServerPlanRequestVisitor.walkPlanNode(send, context);
+    assertSame(context.getLeafStageBoundaryNode(), scan);
+    assertNull(context.getPinotQuery().getOrderByList());
   }
 
   /// An ordinary receiver-sorted exchange does not establish sender ordering. Its SortNode remains eligible for V1
