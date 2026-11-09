@@ -69,6 +69,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.assignment.ReplicateModeAssignmentUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
@@ -790,10 +791,6 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     String segmentName = committingSegmentDescriptor.getSegmentName();
     Stat stat = new Stat();
     SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-    Preconditions.checkState(segmentZKMetadata.getStatus() == expectedStatus,
-        "Segment status for segment: %s should be %s, found: %s", segmentName, expectedStatus,
-        segmentZKMetadata.getStatus());
-
     // Update segment ZK metadata per committing descriptor
     SegmentMetadataImpl segmentMetadata = committingSegmentDescriptor.getSegmentMetadata();
     Preconditions.checkState(segmentMetadata != null, "Failed to find segment metadata from descriptor for segment: %s",
@@ -803,6 +800,19 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     String downloadUrl = isPeerUrl(segmentLocation)
         ? CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD
         : segmentLocation;
+    // A pauseless replicate-mode commit may have persisted DONE before its IdealState expansion failed. Resume
+    // that operation without rewriting the artifact metadata or accepting a different artifact/end offset.
+    if (expectedStatus == Status.COMMITTING && segmentZKMetadata.isReplicateMode()
+        && segmentZKMetadata.getStatus() == Status.DONE) {
+      Preconditions.checkState(committingSegmentDescriptor.getNextOffset().equals(segmentZKMetadata.getEndOffset())
+              && segmentZKMetadata.getCrc() == segmentMetadata.getCrc()
+              && downloadUrl.equals(segmentZKMetadata.getDownloadUrl()),
+          "Completed segment: %s does not match the retried commit", segmentName);
+      return segmentZKMetadata;
+    }
+    Preconditions.checkState(segmentZKMetadata.getStatus() == expectedStatus,
+        "Segment status for segment: %s should be %s, found: %s", segmentName, expectedStatus,
+        segmentZKMetadata.getStatus());
     SegmentZKMetadataUtils.updateCommittingSegmentZKMetadata(realtimeTableName, segmentZKMetadata, segmentMetadata,
         downloadUrl, committingSegmentDescriptor.getSegmentSizeBytes(), committingSegmentDescriptor.getNextOffset());
     persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, stat.getVersion());
@@ -1101,8 +1111,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   ///
   /// This method performs the following actions:
   /// 1. Updates CRC, download URL, etc. in the segment ZK metadata.
-  /// 2. Removes the segment from the committing segment list.
-  /// 3. Updates the flush threshold updater.
+  /// 2. Assigns replicate-mode followers ONLINE, now that the artifact is available.
+  /// 3. Removes the segment from the committing segment list.
+  /// 4. Updates the flush threshold updater.
   public void commitSegmentMetadataToDone(String realtimeTableName,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
@@ -1123,7 +1134,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
       // complete, after which the segment is eligible for repairs by the
       // {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
-      if (isExceededMaxSegmentCompletionTime(realtimeTableName, segmentName, getCurrentTimeMs())) {
+      SegmentZKMetadata existingMetadata = getSegmentZKMetadata(realtimeTableName, segmentName);
+      boolean resumeExpansion = existingMetadata.isReplicateMode() && existingMetadata.getStatus() == Status.DONE;
+      if (!resumeExpansion && isExceededMaxSegmentCompletionTime(realtimeTableName, segmentName, getCurrentTimeMs())) {
         LOGGER.error("Exceeded max segment completion time. Skipping ZK Metadata update for segment: {}", segmentName);
         throw new HelixHelper.PermanentUpdaterException(
             "Exceeded max segment completion time for segment " + segmentName);
@@ -1132,6 +1145,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       SegmentZKMetadata committingSegmentZKMetadata =
           updateSegmentZKMetadataToDone(realtimeTableName, committingSegmentDescriptor, Status.COMMITTING);
       LOGGER.info("Successfully updated segment metadata for segment: {}", segmentName);
+      if (committingSegmentZKMetadata.isReplicateMode()) {
+        updateIdealStateForCompletedReplicateModeSegments(realtimeTableName, Set.of(segmentName));
+      }
       // remove the segment from the committing segment list
       LOGGER.info("Removing segment: {} from committing segment list", segmentName);
       if (!updateCommittingSegmentsList(realtimeTableName,
@@ -1716,6 +1732,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       // A previous attempt might have been applied even though it was reported as failed, e.g. when the write
       // succeeded but the ZK connection was lost before the response arrived
       if (isSegmentCompletionApplied(idealState, committingSegmentName, newSegmentName)) {
+        expandCompletedReplicateModeSegment(idealState,
+            getSegmentZKMetadata(realtimeTableName, committingSegmentName));
         LOGGER.info("IdealState of table: {} already reflects the completion of segment: {}, skipping the update",
             realtimeTableName, committingSegmentName);
         return idealState;
@@ -1809,6 +1827,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       Set<String> instances = committingSegmentInstanceStateMap.keySet();
       instanceStatesMap.put(committingSegmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instances, SegmentStateModel.ONLINE));
+      // COMMITTING is already ONLINE for pauseless consumption, but followers must wait until the file is ready.
+      expandCompletedReplicateModeSegment(idealState,
+          getSegmentZKMetadata(idealState.getResourceName(), committingSegmentName));
       LOGGER.info("Updating segment: {} to ONLINE state", committingSegmentName);
     }
 
@@ -1839,11 +1860,89 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
         }
       }
       // Assign instances to the new segment and add instances as state CONSUMING
+      SegmentZKMetadata newSegmentZKMetadata =
+          getSegmentZKMetadata(idealState.getResourceName(), newSegmentName, null);
       List<String> instancesAssigned =
-          segmentAssignment.assignSegment(newSegmentName, idealState, instancePartitionsMap);
+          segmentAssignment.assignConsumingSegment(newSegmentZKMetadata, idealState, instancePartitionsMap);
       instanceStatesMap.put(newSegmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
       LOGGER.info("Adding new CONSUMING segment: {} to instances: {}", newSegmentName, instancesAssigned);
+    }
+  }
+
+  /// Fills missing ONLINE assignments from the recorded partition candidates, retaining existing hosts. DONE is
+  /// required because pauseless ingestion marks the leader ONLINE before building/uploading the artifact. Full
+  /// assignments are left alone, including those relocated by a completed-segment rebalance or tier assignment.
+  private void expandCompletedReplicateModeSegment(IdealState idealState, SegmentZKMetadata metadata) {
+    if (!metadata.isReplicateMode() || metadata.getStatus() != Status.DONE) {
+      return;
+    }
+    String segmentName = metadata.getSegmentName();
+    Map<String, String> current = idealState.getInstanceStateMap(segmentName);
+    if (current == null || current.isEmpty() || current.size() >= metadata.getNumReplicas()
+        || !current.values().stream().allMatch(SegmentStateModel.ONLINE::equals)) {
+      return;
+    }
+    int partitionId = new LLCSegmentName(segmentName).getPartitionGroupId();
+    Map<String, String> expanded = new HashMap<>(current);
+    for (String instance : ReplicateModeAssignmentUtils.getReplicas(idealState, partitionId)) {
+      expanded.putIfAbsent(instance, SegmentStateModel.ONLINE);
+      if (expanded.size() == metadata.getNumReplicas()) {
+        break;
+      }
+    }
+    Preconditions.checkState(expanded.size() == metadata.getNumReplicas(),
+        "Insufficient replica candidates to expand completed segment: %s to %s replicas", segmentName,
+        metadata.getNumReplicas());
+    idealState.getRecord().setMapField(segmentName, expanded);
+    LOGGER.info("Expanded completed replicate-mode segment: {} to ONLINE instances: {}", segmentName,
+        expanded.keySet());
+  }
+
+  /// Repairs the DONE-to-IdealState crash window, including historical segments whose next segment is already
+  /// consuming. Reads metadata only for potentially under-replicated ONLINE segments. Runs even when ingestion is
+  /// paused or replicate mode has since been disabled in the table config. Deleted segments are never re-added.
+  public void repairCompletedReplicateModeSegments(String realtimeTableName) {
+    IdealState idealState = getIdealState(realtimeTableName);
+    if (idealState == null || ReplicateModeAssignmentUtils.getLeaders(idealState).isEmpty()) {
+      return;
+    }
+    Map<Integer, Integer> replicaCounts = new HashMap<>();
+    Set<String> segmentsToCheck = new HashSet<>();
+    idealState.getRecord().getMapFields().forEach((segment, assignment) -> {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
+      if (llcSegmentName == null || assignment.isEmpty()
+          || !assignment.values().stream().allMatch(SegmentStateModel.ONLINE::equals)) {
+        return;
+      }
+      int replicas = replicaCounts.computeIfAbsent(llcSegmentName.getPartitionGroupId(),
+          id -> ReplicateModeAssignmentUtils.getReplicas(idealState, id).size());
+      // Full assignments must not follow later partition movements.
+      if (assignment.size() < replicas) {
+        segmentsToCheck.add(segment);
+      }
+    });
+    if (!segmentsToCheck.isEmpty()) {
+      updateIdealStateForCompletedReplicateModeSegments(realtimeTableName, segmentsToCheck);
+    }
+  }
+
+  private void updateIdealStateForCompletedReplicateModeSegments(String realtimeTableName, Set<String> segmentNames) {
+    Function<IdealState, IdealState> updater = idealState -> {
+      Preconditions.checkState(idealState != null, "Missing IdealState for table: %s", realtimeTableName);
+      for (String segmentName : segmentNames) {
+        if (idealState.getInstanceStateMap(segmentName) != null) {
+          // Re-read inside the CAS callback: the segment may have been reset or reassigned after the metadata scan.
+          expandCompletedReplicateModeSegment(idealState,
+              getSegmentZKMetadata(realtimeTableName, segmentName));
+        }
+      }
+      return idealState;
+    };
+    if (_controllerConf.getSegmentCompletionGroupCommitEnabled()) {
+      HelixHelper.updateIdealState(_helixManager, realtimeTableName, updater, DEFAULT_RETRY_POLICY);
+    } else {
+      IdealStateSingleCommit.updateIdealState(_helixManager, realtimeTableName, updater, DEFAULT_RETRY_POLICY, false);
     }
   }
 
