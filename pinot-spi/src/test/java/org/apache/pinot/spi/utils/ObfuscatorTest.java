@@ -26,6 +26,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -114,6 +119,83 @@ public class ObfuscatorTest {
     Assert.assertFalse(output.contains(VALUE));
     Assert.assertTrue(output.contains("verycustomized"));
     Assert.assertTrue(output.contains(SECRET));
+  }
+
+  @Test
+  public void testSaslJaasConfig() {
+    // Kafka accepts double-quoted, single-quoted and unquoted values, and escaped quotes inside a quoted value. The
+    // whole value must be masked regardless of the quoting form.
+    String[] jaasConfigs = {
+        "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"user1\" password=\"pass1\";",
+        "org.apache.kafka.common.security.plain.PlainLoginModule required username='user1' password='pass1';",
+        "org.apache.kafka.common.security.plain.PlainLoginModule required username=user1 password=pass1;",
+        "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"user1\" "
+            + "password=\"prefix\\\"secret-tail\";"
+    };
+    for (String jaasConfig : jaasConfigs) {
+      Map<String, String> map = new HashMap<>();
+      map.put("sasl.jaas.config", jaasConfig);
+      map.put("sasl.mechanism", "PLAIN");
+
+      String output = _obfuscator.toJsonString(map);
+
+      Assert.assertFalse(output.contains("user1"), output);
+      Assert.assertFalse(output.contains("pass1"), output);
+      Assert.assertFalse(output.contains("secret-tail"), output);
+      Assert.assertFalse(output.contains("PlainLoginModule"), output);
+      Assert.assertTrue(output.contains("\"sasl.jaas.config\":\"*****\""), output);
+      Assert.assertTrue(output.contains("\"sasl.mechanism\":\"PLAIN\""), output);
+    }
+  }
+
+  @Test
+  public void testSaslJaasConfigPrefixedAndCaseInsensitiveKeys() {
+    Map<String, String> map = new HashMap<>();
+    map.put("stream.kafka.consumer.prop.sasl.jaas.config", "username=\"user1\" password=\"pass1\"");
+    map.put("listener.name.sasl_ssl.plain.sasl.jaas.config", "username=\"user2\" password=\"pass2\"");
+    map.put("SASL.JAAS.CONFIG", "username=\"user3\" password=\"pass3\"");
+    map.put("sasl.jaas.config.other", "not-a-secret");
+
+    String output = _obfuscator.toJsonString(map);
+
+    Assert.assertFalse(output.contains("user1") || output.contains("user2") || output.contains("user3"), output);
+    Assert.assertFalse(output.contains("pass1") || output.contains("pass2") || output.contains("pass3"), output);
+    Assert.assertTrue(output.contains("not-a-secret"), output);
+  }
+
+  @Test
+  public void testCustomPatternDoesNotApplyDefaultSaslJaasConfig() {
+    // The custom-pattern constructor keeps its contract that the defaults do not apply
+    Obfuscator obfuscator = new Obfuscator("masked", List.of(Pattern.compile("^value$")));
+    String output = obfuscator.toJsonString(Map.of("sasl.jaas.config", "username=\"user1\""));
+    Assert.assertTrue(output.contains("user1"), output);
+  }
+
+  @Test
+  public void testTableConfigWithStreamCredentials() {
+    String jaas = "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"user1\" "
+        + "password=\"pass1\";";
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", "kafka");
+    streamConfigMap.put("stream.kafka.topic.name", "myTopic");
+    streamConfigMap.put("sasl.jaas.config", jaas);
+    streamConfigMap.put("ssl.keystore.password", SECRET);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigMap)));
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable").setIngestionConfig(ingestionConfig).build();
+
+    String output = _obfuscator.toJsonString(tableConfig);
+
+    Assert.assertTrue(output.contains("myTopic"), output);
+    Assert.assertFalse(output.contains("user1"), output);
+    Assert.assertFalse(output.contains("pass1"), output);
+    Assert.assertFalse(output.contains(SECRET), output);
+    // The table config itself must keep the real values
+    Map<String, String> actual =
+        tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().get(0);
+    Assert.assertEquals(actual.get("sasl.jaas.config"), jaas);
+    Assert.assertEquals(actual.get("ssl.keystore.password"), SECRET);
   }
 
   @Test

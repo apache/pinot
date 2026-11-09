@@ -60,15 +60,15 @@ public final class Obfuscator {
   private static final String DEFAULT_MASKED_VALUE = "*****";
   private static final List<Pattern> DEFAULT_PATTERNS =
       Stream.of("(?i).*secret$", "(?i).*secret[\\s_-]*key$", "(?i).*api[\\s_-]*key$", "(?i).*password$",
-              "(?i).*keytab$", "(?i).*token$")
+              "(?i).*keytab$", "(?i).*token$", "(?i).*sasl\\.jaas\\.config$")
           .map(Pattern::compile).collect(Collectors.toList());
   public static final Obfuscator DEFAULT = new Obfuscator();
 
   private final String _maskedValue;
   private final List<Pattern> _patterns;
 
-  /// Obfuscator with default behavior matching (ignore case) "secret", "password", and "token" suffixes. Masks any
-  /// values with '\*\*\*\*\*'
+  /// Obfuscator with default behavior matching (ignore case) "secret", "password", "token", and "sasl.jaas.config"
+  /// suffixes. Masks any values with '\*\*\*\*\*'
   public Obfuscator() {
     this(DEFAULT_MASKED_VALUE, DEFAULT_PATTERNS);
   }
