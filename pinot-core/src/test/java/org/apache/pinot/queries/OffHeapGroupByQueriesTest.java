@@ -32,7 +32,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
@@ -303,7 +303,7 @@ public class OffHeapGroupByQueriesTest extends BaseQueriesTest {
       for (int j = 0; j < numValues; j++) {
         UltraLogLogUtils.hashObject((long) random.nextInt(2000)).ifPresent(ull::add);
       }
-      record.putValue(ST_ULL_BYTES, ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ull));
+      record.putValue(ST_ULL_BYTES, ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.serialize(ull));
       records.add(record);
     }
     buildSegment(tableConfig, schema, records, ST_SEGMENT_NAME, false);
