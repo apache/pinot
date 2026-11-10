@@ -18,7 +18,11 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.util.Set;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -34,19 +38,34 @@ public class TextMatchDictIdPredicateEvaluatorFactory {
   }
 
   /// Creates a predicate evaluator that matches the TEXT_MATCH query using the dictionary-based text index.
+  /// Uses raw string membership when no allowed index can resolve dictionary ids over a raw forward index.
   ///
   /// @param textMatchPredicate TEXT_MATCH predicate to evaluate
   /// @param textIndexReader dictionary-based text index reader
-  /// @param dictionary dictionary for the column
+  /// @param dataSource data source for the column
+  /// @param queryContext query context, including which indexes may be used
   /// @return predicate evaluator
-  public static BaseDictionaryBasedPredicateEvaluator newDictIdBasedEvaluator(TextMatchPredicate textMatchPredicate,
-      TextIndexReader textIndexReader, Dictionary dictionary) {
-    return new TextMatchDictIdPredicateEvaluator(textMatchPredicate, textIndexReader, dictionary);
+  public static PredicateEvaluator newPredicateEvaluator(TextMatchPredicate textMatchPredicate,
+      TextIndexReader textIndexReader, DataSource dataSource, QueryContext queryContext) {
+    Dictionary dictionary = dataSource.getDictionary();
+    PredicateEvaluator evaluator =
+        new TextMatchDictIdPredicateEvaluator(textMatchPredicate, textIndexReader, dictionary);
+    if (!evaluator.isAlwaysTrue() && !evaluator.isAlwaysFalse()
+        && PredicateEvaluatorProvider.getDictionaryUsableForFiltering(dataSource, queryContext, textMatchPredicate)
+        == null) {
+      return newRawValueBasedEvaluator(evaluator, dictionary);
+    }
+    return evaluator;
   }
 
   /// Adapts dictionary matches to a scan over raw forward values when the column has a standalone dictionary.
-  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(PredicateEvaluator dictionaryEvaluator,
+  private static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(PredicateEvaluator dictionaryEvaluator,
       Dictionary dictionary) {
+    int[] matchingDictIds = dictionaryEvaluator.getMatchingDictIds();
+    Set<String> matchingValues = new ObjectOpenHashSet<>(matchingDictIds.length);
+    for (int dictId : matchingDictIds) {
+      matchingValues.add(dictionary.getStringValue(dictId));
+    }
     return new BaseRawValueBasedPredicateEvaluator(dictionaryEvaluator.getPredicate()) {
       @Override
       public DataType getDataType() {
@@ -55,8 +74,7 @@ public class TextMatchDictIdPredicateEvaluatorFactory {
 
       @Override
       public boolean applySV(String value) {
-        int dictId = dictionary.indexOf(value);
-        return dictId >= 0 && dictionaryEvaluator.applySV(dictId);
+        return matchingValues.contains(value);
       }
     };
   }
@@ -67,7 +85,8 @@ public class TextMatchDictIdPredicateEvaluatorFactory {
     public TextMatchDictIdPredicateEvaluator(TextMatchPredicate textMatchPredicate, TextIndexReader textIndexReader,
         Dictionary dictionary) {
       super(textMatchPredicate, dictionary);
-      _matchingDictIdBitmap = textIndexReader.getDictIds(textMatchPredicate.getValue());
+      _matchingDictIdBitmap =
+          textIndexReader.getDictIds(textMatchPredicate.getValue(), textMatchPredicate.getOptions());
       int numMatchingDictIds = _matchingDictIdBitmap.getCardinality();
       if (numMatchingDictIds == 0) {
         _alwaysFalse = true;

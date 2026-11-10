@@ -46,8 +46,7 @@ public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
 
   public ScanBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
       DataSource dataSource, int numDocs, int batchSize) {
-    super(queryContext, dataSource, numDocs,
-        FilterOperatorUtils.isNullHandlingEnabled(queryContext, predicateEvaluator));
+    super(queryContext, dataSource, numDocs);
     _predicateEvaluator = predicateEvaluator;
     Preconditions.checkState(_dataSource.getForwardIndex() != null,
         "Forward index disabled for column: %s, scan based filtering not supported!",

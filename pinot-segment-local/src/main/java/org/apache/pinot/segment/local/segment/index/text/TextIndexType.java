@@ -118,7 +118,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
           "buildOnDictionary TEXT index requires a single-value column: %s", context.getFieldSpec().getName());
       Preconditions.checkState(context.hasDictionary(),
           "buildOnDictionary TEXT index requires a dictionary-encoded column: %s", context.getFieldSpec().getName());
-      LuceneTextIndexCreator creator = new LuceneTextIndexCreator(context, indexConfig);
       // Columnar segment-creation / realtime-conversion path: build one Lucene document per distinct dictionary value
       // (the stored id is the dictId). On the reload path ColumnStatistics is null and TextIndexHandler feeds the
       // dictionary values via add(String) instead.
@@ -128,11 +127,17 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
         Preconditions.checkState(uniqueValues instanceof String[],
             "Expected String[] dictionary values for dictionary-based TEXT index on column: %s",
             context.getFieldSpec().getName());
-        for (String value : (String[]) uniqueValues) {
+        String[] dictionaryValues = (String[]) uniqueValues;
+        Preconditions.checkState(dictionaryValues.length == context.getCardinality(),
+            "Dictionary cardinality mismatch for TEXT index on column: %s: expected %s values, got %s",
+            context.getFieldSpec().getName(), context.getCardinality(), dictionaryValues.length);
+        // BaseSegmentCreator builds the dictionary from this same sorted array, so array offsets are dictionary ids.
+        LuceneTextIndexCreator creator = new LuceneTextIndexCreator(context, indexConfig);
+        for (String value : dictionaryValues) {
           creator.add(value);
         }
+        return creator;
       }
-      return creator;
     }
     return new LuceneTextIndexCreator(context, indexConfig);
   }

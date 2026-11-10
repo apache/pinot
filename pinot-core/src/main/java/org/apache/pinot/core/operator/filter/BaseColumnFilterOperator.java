@@ -37,12 +37,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
   private final ImmutableRoaringBitmap _nullBitmap;
 
   protected BaseColumnFilterOperator(QueryContext queryContext, DataSource dataSource, int numDocs) {
-    this(queryContext, dataSource, numDocs, queryContext.isNullHandlingEnabled());
-  }
-
-  protected BaseColumnFilterOperator(QueryContext queryContext, DataSource dataSource, int numDocs,
-      boolean nullHandlingEnabled) {
-    super(numDocs, nullHandlingEnabled);
+    super(numDocs, queryContext.isNullHandlingEnabled());
     _queryContext = queryContext;
     _dataSource = dataSource;
     _nullBitmap = _nullHandlingEnabled ? FilterOperatorUtils.getNullBitmap(dataSource) : null;

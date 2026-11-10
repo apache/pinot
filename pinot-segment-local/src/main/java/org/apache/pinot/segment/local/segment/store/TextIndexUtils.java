@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -45,6 +47,7 @@ import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexBufferReader;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
@@ -547,7 +550,7 @@ public class TextIndexUtils {
   /// @return updated TextIndexConfig
   public static TextIndexConfig getUpdatedConfigFromPropertiesFile(File file, TextIndexConfig config)
       throws ConfigurationException {
-    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(file);
+    Configuration properties = readTextIndexProperties(file);
     List<String> luceneAnalyzerClassArgs =
         properties.getList(String.class, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS);
     List<String> luceneAnalyzerClassArgTypes =
@@ -572,7 +575,24 @@ public class TextIndexUtils {
         // The build mode is intrinsic to the segment: default to false when the property is absent (segments written
         // before this feature are always per-row). Must NOT fall back to the live table config, otherwise a per-row
         // segment could be misread as dictionary-based after the flag is flipped on.
-        .withBuildOnDictionary(properties.getBoolean(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, false))
+        .withBuildOnDictionary(isBuildOnDictionary(properties))
         .build();
+  }
+
+  /// Reads persisted properties from a directory-based text index's properties file.
+  public static Configuration readTextIndexProperties(File propertiesFile)
+      throws ConfigurationException {
+    return CommonsConfigurationUtils.fromFile(propertiesFile);
+  }
+
+  /// Reads persisted properties from a packed text index. The caller retains ownership of the buffer.
+  public static Configuration readTextIndexProperties(PinotDataBuffer buffer, String column)
+      throws IOException {
+    return new MapConfiguration(LuceneTextIndexBufferReader.extractProperties(buffer, column));
+  }
+
+  /// The persisted build mode defaults to per-row for indexes written before the property existed.
+  public static boolean isBuildOnDictionary(Configuration properties) {
+    return properties.getBoolean(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, false);
   }
 }

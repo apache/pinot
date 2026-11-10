@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -197,7 +198,9 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
         "NOT (TEXT_MATCH(SV_TEXT, 'missing') AND SV_TEXT = 'apple')",
         "NOT (TEXT_MATCH(SV_TEXT, 'apple') OR SV_TEXT IS NULL)"
     };
-    long[] expected = {2, 2, 1, 3, 0, 4, 4, 0, 1, 0, 4, 1};
+    long[] perRowExpected = {2, 2, 1, 3, 0, 4, 4, 0, 1, 0, 4, 1};
+    // Dictionary predicates honor query null handling; the legacy per-row TEXT filter evaluates stored defaults.
+    long[] dictionaryExpected = {2, 1, 0, 3, 0, 3, 3, 0, 0, 0, 3, 1};
     for (boolean invertedIndex : new boolean[]{false, true}) {
       for (boolean buildOnDictionary : new boolean[]{false, true}) {
         TableConfig config = tableConfig(buildOnDictionary);
@@ -212,15 +215,18 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
           assertEquals(segment.getDataSource(SV_COL).getNullValueVector().getNullBitmap().getCardinality(), 1);
           for (int i = 0; i < filters.length; i++) {
             String query = "SET enableNullHandling = true; SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE " + filters[i];
-            assertEquals(count(query), expected[i], "inverted=" + invertedIndex + ", dictionary=" + buildOnDictionary
+            assertEquals(count(query), (buildOnDictionary ? dictionaryExpected : perRowExpected)[i],
+                "inverted=" + invertedIndex + ", dictionary=" + buildOnDictionary
                 + ": " + query);
           }
           SelectionResultsBlock result = (SelectionResultsBlock) getOperator("SET enableNullHandling = true; SELECT "
               + INT_COL + " FROM " + TABLE_NAME + " WHERE NOT TEXT_MATCH(SV_TEXT, 'apple') ORDER BY " + INT_COL)
               .nextBlock();
-          assertEquals(result.getRows().size(), 2);
-          assertEquals(result.getRows().get(0)[0], 1);
-          assertEquals(result.getRows().get(1)[0], 2);
+          assertEquals(result.getRows().size(), buildOnDictionary ? 1 : 2);
+          assertEquals(result.getRows().get(0)[0], buildOnDictionary ? 2 : 1);
+          if (!buildOnDictionary) {
+            assertEquals(result.getRows().get(1)[0], 2);
+          }
         } finally {
           segment.destroy();
           _indexSegment = null;
@@ -358,6 +364,25 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
       _indexSegment = null;
     }
 
+    rawForwardConfig.getIndexingConfig().setInvertedIndexColumns(List.of(SV_COL));
+    ImmutableSegment rawWithInverted =
+        ImmutableSegmentLoader.load(segmentDir, new IndexLoadingConfig(rawForwardConfig, SCHEMA));
+    _indexSegment = rawWithInverted;
+    _indexSegments = List.of(rawWithInverted, rawWithInverted);
+    try {
+      String query = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple')";
+      BrokerResponseNative indexed = getBrokerResponse(query);
+      BrokerResponseNative scanned = getBrokerResponse("SET skipIndexes = 'SV_TEXT=inverted'; " + query);
+      assertEquals(((Number) indexed.getResultTable().getRows().get(0)[0]).longValue(),
+          4L * NUM_ROWS / SV_TOKENS.length);
+      assertEquals(scanned.getResultTable().getRows().get(0), indexed.getResultTable().getRows().get(0));
+      assertEquals(indexed.getNumEntriesScannedInFilter(), 0L);
+      assertTrue(scanned.getNumEntriesScannedInFilter() > 0);
+    } finally {
+      rawWithInverted.destroy();
+      _indexSegment = null;
+    }
+
     // Turning the feature off while removing the dictionary must also replace the old dictId-based text index.
     TableConfig perRowConfig = tableConfig(false, storeInSegmentFile);
     perRowConfig.getIndexingConfig().setNoDictionaryColumns(List.of(SV_COL));
@@ -404,26 +429,34 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
     }
   }
 
-  @Test
-  public void dictionaryBasedTextMatchRejectsOptions()
+  @Test(dataProvider = "storageFormats")
+  public void dictionaryBasedTextMatchWithOptions(boolean storeInSegmentFile)
       throws Exception {
-    ImmutableSegment dictBased = buildAndLoad("dictOptions", true);
+    ImmutableSegment perRow = buildAndLoad("perRowOptions-" + storeInSegmentFile, false, storeInSegmentFile);
+    ImmutableSegment dictBased = buildAndLoad("dictOptions-" + storeInSegmentFile, true, storeInSegmentFile);
     _indexSegment = dictBased;
-    _indexSegments = List.of(dictBased);
+    _indexSegments = List.of(perRow, dictBased);
     try {
-      // TEXT_MATCH options are not supported by the dictionary-based path (getDictIds takes only the query value).
-      for (String query : List.of(
-          "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple', 'parser=CLASSIC')",
-          "SELECT SUM(TEXT_MATCH(" + SV_COL + ", 'apple', 'parser=CLASSIC')) FROM " + TABLE_NAME)) {
-        try {
-          getOperator(query);
-          fail("Expected TEXT_MATCH with options to be rejected for a dictionary-based text index");
-        } catch (Exception e) {
-          assertTrue(ExceptionUtils.getStackTrace(e).contains("options are not supported"),
-              "Expected an options-not-supported failure, got: " + e);
+      String[] arguments = {
+          "'apple banana', 'parser=CLASSIC,defaultOperator=OR'",
+          "'apple banana', 'parser=CLASSIC,defaultOperator=AND'",
+          "'*pple', 'parser=CLASSIC,allowLeadingWildcard=true'",
+          "'apple', 'parser=MATCHPHRASE'"
+      };
+      long[] expected = {2L * NUM_ROWS / SV_TOKENS.length, 0, NUM_ROWS / SV_TOKENS.length, NUM_ROWS / SV_TOKENS.length};
+      for (int i = 0; i < arguments.length; i++) {
+        String expression = "TEXT_MATCH(" + SV_COL + ", " + arguments[i] + ")";
+        for (String query : List.of("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE " + expression,
+            "SELECT SUM(" + expression + ") FROM " + TABLE_NAME)) {
+          assertEquals(count(query), expected[i], query);
+          // The two instances each query both a per-row and a dictionary-mode segment during gradual conversion.
+          BrokerResponseNative response = getBrokerResponse(query);
+          assertTrue(response.getExceptions().isEmpty(), query);
+          assertEquals(((Number) response.getResultTable().getRows().get(0)[0]).longValue(), expected[i] * 4, query);
         }
       }
     } finally {
+      perRow.destroy();
       dictBased.destroy();
       _indexSegment = null;
     }
