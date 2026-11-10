@@ -911,7 +911,9 @@ public class PinotHelixTaskResourceManager {
       String worker = entry.getKey();
       String resp = entry.getValue();
       LOGGER.debug("Got resp: {} from worker: {}", resp, worker);
-      minionWorkerIdSubtaskProgressMap.put(minionWorkerUrlToWorkerIdMap.get(worker),
+      // Response keys are "<url>__<count>" when multiRequestPerServer is true
+      minionWorkerIdSubtaskProgressMap.put(
+          minionWorkerUrlToWorkerIdMap.get(StringUtils.substringBeforeLast(worker, "__")),
           JsonUtils.stringToObject(resp, Map.class));
     }
     if (serviceResponse._failedResponseCount > 0) {
