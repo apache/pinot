@@ -143,6 +143,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // The TTL watermark last persisted to disk. A segment out of TTL against it has an up-to-date snapshot on disk, see
   // getWatermarkToPersist().
   private volatile double _persistedWatermark;
+  // Whether the persisted watermark was loaded from a file written before the watermark got capped
+  private volatile boolean _persistedWatermarkUncapped;
 
   // The following variables are always accessed within synchronized block
   private boolean _stopped;
@@ -214,19 +216,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _largestSeenComparisonValue = new AtomicDouble(TTL_WATERMARK_NOT_SET);
       WatermarkUtils.deleteWatermark(getWatermarkFile());
     }
-    _persistedWatermark = loadPersistedWatermark();
+    _persistedWatermark = _largestSeenComparisonValue.get();
+    _persistedWatermarkUncapped = _metadataTTL > 0 && _persistedWatermark != TTL_WATERMARK_NOT_SET
+        && WatermarkUtils.loadWatermarkVersion(getWatermarkFile()) != WatermarkUtils.CAPPED_WATERMARK_VERSION;
   }
 
-  /// A watermark file without the capped version was written before the watermark got capped, so it can be ahead of
-  /// segments with stale snapshots. Don't skip any segment against it until the next snapshot persists a capped one.
-  private double loadPersistedWatermark() {
-    double watermark = _largestSeenComparisonValue.get();
-    if (_metadataTTL > 0 && watermark != TTL_WATERMARK_NOT_SET
-        && WatermarkUtils.loadWatermarkVersion(getWatermarkFile()) != WatermarkUtils.CAPPED_WATERMARK_VERSION) {
-      _logger.info("Not skipping segments out of TTL on load because watermark: {} was persisted uncapped", watermark);
-      return TTL_WATERMARK_NOT_SET;
+  /// A watermark persisted before capping can be ahead of a segment whose snapshot the previous version missed, so
+  /// skipping that segment keeps its stale validDocIds. Report it, as finding out for sure needs reading all its keys.
+  private void reportSkippedWithUncappedWatermark(String segmentName) {
+    if (_persistedWatermarkUncapped) {
+      _logger.warn("Skipped segment: {} as out of TTL against watermark: {} persisted before capping, its validDocIds "
+          + "snapshot may be stale", segmentName, _persistedWatermark);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
+          ServerMeter.UPSERT_SEGMENTS_SKIPPED_WITH_UNCAPPED_WATERMARK, 1L);
     }
-    return watermark;
   }
 
   @Override
@@ -395,6 +398,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected boolean skipAddSegmentOutOfTTL(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
+    reportSkippedWithUncappedWatermark(segmentName);
     MutableRoaringBitmap validDocIdsOnDiskBitmap =
         segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     if (validDocIdsOnDiskBitmap != null) {
@@ -413,6 +417,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       MutableRoaringBitmap validDocIdsOnDiskBitmap) {
     String segmentName = segment.getSegmentName();
     _logger.info("Skip preloading segment: {} because it's out of TTL", segmentName);
+    reportSkippedWithUncappedWatermark(segmentName);
     MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsOnDiskBitmap);
     segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsOnDiskBitmap),
         queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
@@ -1223,6 +1228,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       WatermarkUtils.persistWatermark(watermark, getWatermarkFile(),
           _metadataTTL > 0 ? WatermarkUtils.CAPPED_WATERMARK_VERSION : WatermarkUtils.NO_WATERMARK_VERSION);
       _persistedWatermark = watermark;
+      _persistedWatermarkUncapped = false;
     }
     updateSnapshotMetrics(numImmutableSegments, numPrimaryKeysInSnapshot, numQueryableDocIdsInSnapshot,
         numTrackedSegments, numConsumingSegments, numUnchangedSegments);

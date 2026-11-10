@@ -73,6 +73,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   METADATA_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("segments", false),
+  UPSERT_SEGMENTS_SKIPPED_WITH_UNCAPPED_WATERMARK("segments", false,
+      "Segments skipped as out of TTL against a watermark persisted before it was capped. Their validDocIds snapshot "
+          + "may be stale if the previous version missed taking it before the restart."),
   UPSERT_PRELOAD_FAILURE("count", false),
   UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD("segments", false),
   ROWS_WITH_ERRORS("rows", false),

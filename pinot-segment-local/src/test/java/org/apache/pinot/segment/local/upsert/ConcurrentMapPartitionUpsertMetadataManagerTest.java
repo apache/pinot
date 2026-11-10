@@ -333,31 +333,49 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testUncappedWatermarkIsNotTrustedToSkipSegments()
+  public void testSkipWithUncappedWatermarkIsReported()
       throws IOException {
     _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
     File watermarkFile = new File(INDEX_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0);
+    ServerMetrics originalMetrics = ServerMetrics.get();
+    ServerMetrics metrics = mock(ServerMetrics.class);
+    ServerMetrics.deregister();
+    ServerMetrics.register(metrics);
+    try {
+      // A segment skipped against a watermark persisted before capping is reported, as its snapshot may be stale
+      WatermarkUtils.persistWatermark(290, watermarkFile, WatermarkUtils.NO_WATERMARK_VERSION);
+      assertEquals(addOutOfTTLSegment(), 290.0);
+      verify(metrics).addMeteredTableValue(REALTIME_TABLE_NAME, "0",
+          ServerMeter.UPSERT_SEGMENTS_SKIPPED_WITH_UNCAPPED_WATERMARK, 1L);
 
-    // A watermark persisted before capping keeps expiring keys, but no segment is skipped against it on load
-    WatermarkUtils.persistWatermark(290, watermarkFile, WatermarkUtils.NO_WATERMARK_VERSION);
+      // A segment skipped against a capped watermark is not reported
+      WatermarkUtils.persistWatermark(290, watermarkFile, WatermarkUtils.CAPPED_WATERMARK_VERSION);
+      assertEquals(WatermarkUtils.loadWatermark(watermarkFile, -1), 290.0);
+      assertEquals(addOutOfTTLSegment(), 290.0);
+      verify(metrics, times(1)).addMeteredTableValue(REALTIME_TABLE_NAME, "0",
+          ServerMeter.UPSERT_SEGMENTS_SKIPPED_WITH_UNCAPPED_WATERMARK, 1L);
+    } finally {
+      ServerMetrics.deregister();
+      ServerMetrics.register(originalMetrics);
+    }
+  }
+
+  /// Adds a segment out of TTL against the persisted watermark, and returns the persisted watermark.
+  private double addOutOfTTLSegment()
+      throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
-    assertEquals(upsertMetadataManager.getWatermark(), 290.0);
-    assertEquals(upsertMetadataManager.getPersistedWatermark(),
-        BasePartitionUpsertMetadataManager.TTL_WATERMARK_NOT_SET);
-    assertFalse(upsertMetadataManager.canSkipSegmentOutOfTTL(100));
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+    MutableRoaringBitmap snapshot = new MutableRoaringBitmap();
+    snapshot.add(0, 1);
+    ImmutableSegmentImpl segment = mockImmutableSegmentWithEndTime(1, validDocIds, null,
+        getPrimaryKeyList(2, new int[]{0, 1}), COMPARISON_COLUMNS, 100, snapshot);
+    upsertMetadataManager.addSegment(segment);
+    assertTrue(upsertMetadataManager._primaryKeyToRecordLocationMap.isEmpty(), "Out of TTL segment must be skipped");
+    double persistedWatermark = upsertMetadataManager.getPersistedWatermark();
     upsertMetadataManager.stop();
     upsertMetadataManager.close();
-
-    // A capped watermark is trusted
-    WatermarkUtils.persistWatermark(290, watermarkFile, WatermarkUtils.CAPPED_WATERMARK_VERSION);
-    assertEquals(WatermarkUtils.loadWatermark(watermarkFile, -1), 290.0);
-    upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
-    assertEquals(upsertMetadataManager.getPersistedWatermark(), 290.0);
-    assertTrue(upsertMetadataManager.canSkipSegmentOutOfTTL(100));
-    upsertMetadataManager.stop();
-    upsertMetadataManager.close();
+    return persistedWatermark;
   }
 
   @Test
