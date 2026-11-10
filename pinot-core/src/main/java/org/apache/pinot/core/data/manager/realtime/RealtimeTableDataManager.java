@@ -296,8 +296,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doShutdown() {
     // Make sure we do metric cleanup when we shut down the table.
-    // Do this first, so we do not show ingestion lag during shutdown.
-    _ingestionDelayTracker.shutdown();
+    // Do this first, so we do not show ingestion lag during shutdown. A failure here must not skip releasing the
+    // segments below, which is what stops the table's consumers.
+    try {
+      _ingestionDelayTracker.shutdown();
+    } catch (Exception e) {
+      _logger.error("Caught exception while shutting down the ingestion delay tracker", e);
+    }
     if (_tableUpsertMetadataManager != null || _tableDedupMetadataManager != null) {
       // Stop the upsert metadata manager first to prevent removing metadata when destroying segments
       if (_tableUpsertMetadataManager != null) {
