@@ -30,7 +30,6 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
@@ -134,7 +133,7 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
     properties.put(CONTROLLER_HOST, "HOST");
     properties.put(CONTROLLER_PORT, "PORT");
 
-    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    int controllerPort = _controllerPortRange.findOpenPort(_nextControllerPort);
     properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
     if (_controllerPort == 0) {
       _controllerPort = controllerPort;
@@ -190,7 +189,7 @@ public class ControllerStarterDynamicEnvTest extends ControllerTest {
   }
 
   private int findControllerPortInForkRange() {
-    _controllerPortOverride = NetUtils.findOpenPort(_nextControllerPort);
+    _controllerPortOverride = _controllerPortRange.findOpenPort(_nextControllerPort);
     return _controllerPortOverride;
   }
 }
