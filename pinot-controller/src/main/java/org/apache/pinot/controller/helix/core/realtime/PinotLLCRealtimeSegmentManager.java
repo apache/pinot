@@ -3144,7 +3144,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   /// [#allowRepairOfCommittingSegments] allows it, such tables skip re-ingestion and, when pauseless, every reset.
   /// Reloading a segment is unsafe on them too: a pauseless server can keep consuming the segments after a failed one
   /// without the failed segment's keys, so reloading it can put a replica that holds wrong rows back into routing.
-  /// Non-pauseless tables still reset the replicas of segments that reload.
+  /// Allowing the repair forces these resets; it does not correct the later segments. Non-pauseless tables share the
+  /// hazard but are not gated here: they still reset the replicas of segments that reload.
   ///
   /// Segments counted as unrecoverable are those this pass cannot repair or cannot issue a repair for: skipped by the
   /// policy above, with no replica left consuming, with nothing but a possible local copy to load from, with no server
@@ -3288,13 +3289,15 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       }
 
       // A reset either re-consumes the segment or reloads it. On a pauseless dedup or partial upsert table, the server
-      // may have consumed the later segments without this one's keys, so neither is safe there without the override.
+      // may have consumed the later segments without this one's keys, so neither is safe there. The override forces the
+      // reset anyway; it does not correct those later segments.
       if (isPauselessTable && !repairCommittingSegments.get()) {
         unrecoverableSegments.add(segmentName);
         LOGGER.warn(
-            "Segment: {} in table: {} has replicas in ERROR state. Skipping their reset, because repair is disabled "
-                + "for pauseless dedup and partial upsert tables. Set disasterRecoveryMode=ALWAYS or run the "
-                + "validation task with repairErrorSegmentsForPartialUpsertOrDedup=true to repair it.",
+            "Segment: {} in table: {} has replicas in ERROR state. Skipping their reset, because it is disabled for "
+                + "pauseless dedup and partial upsert tables: it does not correct later segments that a server "
+                + "consumed without this segment's keys. To force it, set disasterRecoveryMode=ALWAYS or run the "
+                + "validation task with repairErrorSegmentsForPartialUpsertOrDedup=true.",
             segmentName, realtimeTableName);
         continue;
       }
