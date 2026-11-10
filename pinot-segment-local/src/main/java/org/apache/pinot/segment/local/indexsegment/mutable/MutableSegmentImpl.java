@@ -187,14 +187,10 @@ public class MutableSegmentImpl implements MutableSegment {
   private final String _upsertOutOfOrderRecordColumn;
   private final UpsertConfig.ConsistencyMode _upsertConsistencyMode;
 
-  // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
-  // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
-  //    ids for the consuming segment.
-  // 2. During the segment commitment, when loading the immutable version of this segment, in order to keep the result
-  //    correct, the valid doc ids should not be changed, only the record location should be changed.
-  // FIXME: There is a corner case for this approach which could cause inconsistency. When there is segment load during
-  //        consumption with newer timestamp (late event in consuming segment), the record location will be updated, but
-  //        the valid doc ids won't be updated.
+  // Maintained by the upsert metadata manager (via getValidDocIds() / getQueryableDocIds()) as records are indexed and
+  // as segments are loaded or replaced in the partition. During segment commitment (ConsistencyMode.NONE),
+  // replaceSegment() works on a snapshot copy of _validDocIds so the consuming segment's bitmap stays intact for
+  // concurrent queries until the immutable replacement is swapped in.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ThreadSafeMutableRoaringBitmap _queryableDocIds;
   private boolean _indexCapacityThresholdBreached;
@@ -297,7 +293,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _logger =
         LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
 
-    // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
+    // Metric aggregation can be enabled only if config is specified, all dimensions and metrics are single-valued,
     // and no metrics have dictionary. If not enabled, the map returned is null.
     _recordIdMap = enableMetricsAggregationIfPossible(config);
 
@@ -1550,12 +1546,11 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     int i = 0;
-    // Dimension and time columns form the aggregation key. They are always dictionary encoded in the consuming
-    // segment (isNoDictionaryColumn forces a dictionary on them when aggregation is enabled), so the _dictId read
-    // below is always valid. Keep this set of columns in sync with the field types forced there.
+    // Dimension and time columns form the aggregation key. They are always single-valued (enforced in
+    // enableMetricsAggregationIfPossible; see https://github.com/apache/pinot/issues/3867) and dictionary encoded in
+    // the consuming segment (isNoDictionaryColumn forces a dictionary on them when aggregation is enabled), so the
+    // _dictId read below is always valid. Keep this set of columns in sync with the field types forced there.
     int[] dictIds = new int[_numKeyColumns]; // dimensions + date time columns + time column.
-
-    // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/pinot/issues/3867
     for (FieldSpec fieldSpec : _physicalDimensionFieldSpecs) {
       dictIds[i++] = _indexContainerMap.get(fieldSpec.getName())._dictId;
     }
