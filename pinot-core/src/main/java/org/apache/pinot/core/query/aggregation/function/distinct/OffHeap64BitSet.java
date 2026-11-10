@@ -143,7 +143,7 @@ public class OffHeap64BitSet extends BaseOffHeapSet {
   @Override
   public byte[] serialize() {
     int size = size();
-    byte[] bytes = new byte[Integer.BYTES + size << 3];
+    byte[] bytes = new byte[Integer.BYTES + (size << 3)];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     byteBuffer.putInt(size);
     LongIterator iterator = iterator();
