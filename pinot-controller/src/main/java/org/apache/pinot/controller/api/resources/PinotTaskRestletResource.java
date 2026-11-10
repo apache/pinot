@@ -820,7 +820,8 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_TASK, tableScopeParam = "tableName")
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
-  @ApiOperation("Schedule tasks and return a map from task type to task name scheduled. If task type is missing, "
+  @ApiOperation("Schedule tasks and return a map from task type to task name scheduled; a task type that created "
+      + "no task is left out. If task type is missing, "
       + "schedules all tasks. If table name is missing, schedules tasks for all tables in the database. If database "
       + "is missing in headers, uses default.")
   @ManagedAsync
@@ -850,8 +851,11 @@ public class PinotTaskRestletResource {
       }
       Map<String, TaskSchedulingInfo> allTaskInfos = _pinotTaskManager.scheduleTasks(context);
       allTaskInfos.forEach((key, value) -> {
-        if (value.getScheduledTaskNames() != null) {
-          response.put(key, String.join(",", value.getScheduledTaskNames()));
+        // A generator that ran but created no task has an empty list: leave the task type out rather than return an
+        // empty task name, which callers would then poll as a task and fail on
+        List<String> scheduledTaskNames = value.getScheduledTaskNames();
+        if (scheduledTaskNames != null && !scheduledTaskNames.isEmpty()) {
+          response.put(key, String.join(",", scheduledTaskNames));
         }
         generationErrors.addAll(value.getGenerationErrors());
         schedulingErrors.addAll(value.getSchedulingErrors());
