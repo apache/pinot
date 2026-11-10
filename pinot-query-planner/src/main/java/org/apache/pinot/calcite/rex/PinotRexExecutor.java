@@ -89,9 +89,9 @@ public final class PinotRexExecutor implements RexExecutor {
         if (isNumericToApproximateCast(expression)) {
           // CAST(<numeric literal> AS DOUBLE/FLOAT/REAL), e.g. every element of a query vector: round the value the
           // way the cast would, without generating code
-          // Like the string path, keep a nullable target's type with a cast
-          literals.add(rexBuilder.makeLiteral(new BigDecimal(approximateValue((RexCall) expression)),
-              expression.getType(), true));
+          // Like the string path, keep a nullable target's type with a cast. The double goes in as is: a BigDecimal
+          // would drop the sign of a negative zero, and infinity has no BigDecimal form.
+          literals.add(rexBuilder.makeLiteral(approximateValue((RexCall) expression), expression.getType(), true));
           continue;
         }
         RexLiteral operand = (RexLiteral) ((RexCall) expression).getOperands().get(0);
@@ -124,9 +124,9 @@ public final class PinotRexExecutor implements RexExecutor {
   }
 
   /// Returns whether the expression casts a non-null exact numeric literal (integer or DECIMAL) to an approximate type
-  /// (DOUBLE, FLOAT, REAL) and the result is finite. Overflow to infinity is left to the fallback, which decides how to
-  /// represent it. Approximate sources are left to the fallback too: reading them as a BigDecimal rounds to 16 digits,
-  /// and NaN or infinity cannot be read that way at all.
+  /// (DOUBLE, FLOAT, REAL). Overflow and underflow are folded too: the literal holds the resulting infinity or signed
+  /// zero, as the cast would. Approximate sources are left to the fallback: reading them as a BigDecimal rounds to 16
+  /// digits, and NaN or infinity cannot be read that way at all.
   @VisibleForTesting
   static boolean isNumericToApproximateCast(RexNode expression) {
     if (!(expression instanceof RexCall)) {
@@ -139,7 +139,7 @@ public final class PinotRexExecutor implements RexExecutor {
     }
     RexNode operand = call.getOperands().get(0);
     return operand instanceof RexLiteral && !((RexLiteral) operand).isNull()
-        && SqlTypeUtil.isExactNumeric(operand.getType()) && Double.isFinite(approximateValue(call));
+        && SqlTypeUtil.isExactNumeric(operand.getType());
   }
 
   /// The value of `CAST(<numeric literal> AS <approximate type>)`: REAL rounds to single precision, while FLOAT and

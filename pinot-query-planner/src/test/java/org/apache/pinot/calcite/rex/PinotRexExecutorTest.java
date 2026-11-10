@@ -282,21 +282,25 @@ public class PinotRexExecutorTest {
   public Object[][] numericLiterals() {
     List<Object[]> cases = new ArrayList<>();
     for (SqlTypeName target : List.of(SqlTypeName.FLOAT, SqlTypeName.REAL, SqlTypeName.DOUBLE)) {
+      // Exact DECIMAL sources, including values that overflow to infinity or underflow to a signed zero
       for (String value : new String[]{"0", "1", "-7", "0.1", "-2.5", "0.123456789123", "3.4028235E38", "1E39",
-          "1E308"}) {
-        cases.add(new Object[]{target, value});
+          "-1E39", "1E308", "1E400", "-1E400", "1E-50", "-1E-50", "1E-400", "-1E-400"}) {
+        cases.add(new Object[]{target, value, true});
+      }
+      // Approximate (DOUBLE) sources, as SQL writes a literal in exponent notation
+      for (String value : new String[]{"3.4028235E38", "1E39", "1E308"}) {
+        cases.add(new Object[]{target, value, false});
       }
     }
     return cases.toArray(new Object[0][]);
   }
 
   @Test(dataProvider = "numericLiterals")
-  public void testNumericToApproximateCastsMatchCalcite(SqlTypeName targetType, String value) {
+  public void testNumericToApproximateCastsMatchCalcite(SqlTypeName targetType, String value, boolean exactSource) {
     LiteralRexBuilder builder = new LiteralRexBuilder();
     RelDataType target = builder.getTypeFactory().createSqlType(targetType);
-    // Large values are DOUBLE literals in SQL, since they do not fit the exact (DECIMAL) literal precision
-    BigDecimal number = new BigDecimal(value);
-    RexNode literal = value.contains("E") ? builder.makeApproxLiteral(number) : builder.makeExactLiteral(number);
+    RexNode literal = exactSource ? exactLiteral(builder, new BigDecimal(value))
+        : builder.makeApproxLiteral(new BigDecimal(value));
     RexNode expression = builder.makeAbstractCast(target, literal, false);
     List<RexNode> input = List.of(expression);
     CountingFallback fallback = new CountingFallback(CALCITE_EXECUTOR);
@@ -304,9 +308,32 @@ public class PinotRexExecutorTest {
     List<RexNode> actual = reduce(new PinotRexExecutor(fallback), builder, input);
     assertEquals(actual, expected);
     assertEquals(actual.get(0).getType(), expected.get(0).getType());
-    // Approximate sources, and casts that overflow to infinity, are left to the fallback
-    double converted = targetType == SqlTypeName.REAL ? Float.parseFloat(value) : Double.parseDouble(value);
-    assertEquals(fallback._calls.get(), value.contains("E") || !Double.isFinite(converted) ? 1 : 0);
+    // Only approximate sources are left to the fallback
+    assertEquals(fallback._calls.get(), exactSource ? 0 : 1);
+  }
+
+  @Test
+  public void testNegativeUnderflowKeepsSign() {
+    LiteralRexBuilder builder = new LiteralRexBuilder();
+    // Each value is below the smallest positive value of its target type
+    for (Map.Entry<SqlTypeName, String> entry : Map.of(SqlTypeName.REAL, "-1E-50", SqlTypeName.DOUBLE, "-1E-400")
+        .entrySet()) {
+      SqlTypeName targetType = entry.getKey();
+      RexNode expression = builder.makeAbstractCast(builder.getTypeFactory().createSqlType(targetType),
+          exactLiteral(builder, new BigDecimal(entry.getValue())), false);
+      RexLiteral actual = (RexLiteral) reduce(new PinotRexExecutor(FAILING_FALLBACK), builder, List.of(expression))
+          .get(0);
+      assertEquals(Double.doubleToRawLongBits(actual.getValueAs(Double.class)), Double.doubleToRawLongBits(-0.0),
+          "CAST(-1E-50 AS " + targetType + ") must be negative zero");
+    }
+  }
+
+  /// An exact DECIMAL literal typed to hold `value` exactly, however large or small its exponent.
+  private static RexLiteral exactLiteral(RexBuilder builder, BigDecimal value) {
+    int scale = Math.max(value.scale(), 0);
+    int precision = Math.max(value.precision() - value.scale(), 1) + scale;
+    RelDataType type = builder.getTypeFactory().createSqlType(SqlTypeName.DECIMAL, precision, scale);
+    return builder.makeExactLiteral(value.setScale(scale), type);
   }
 
   @Test
@@ -340,13 +367,12 @@ public class PinotRexExecutorTest {
   public void testQueryVectorIsReducedWithoutFallback() {
     LiteralRexBuilder builder = new LiteralRexBuilder();
     RelDataType real = builder.getTypeFactory().createSqlType(SqlTypeName.REAL);
-    List<RexNode> elements = new ArrayList<>();
     List<RexNode> casts = new ArrayList<>();
     for (int i = 0; i < 768; i++) {
-      RexNode cast = builder.makeAbstractCast(real, builder.makeExactLiteral(new BigDecimal("0.0" + i)), false);
-      casts.add(cast);
-      elements.add(reduce(CALCITE_EXECUTOR, builder, List.of(cast)).get(0));
+      casts.add(builder.makeAbstractCast(real, builder.makeExactLiteral(new BigDecimal("0.0" + i)), false));
     }
+    // One reference batch: a compilation per element would dominate the test's run time
+    List<RexNode> elements = reduce(CALCITE_EXECUTOR, builder, casts);
     // A vector of literals arrives either as its element casts or as an array of already reduced literals
     assertEquals(reduce(new PinotRexExecutor(FAILING_FALLBACK), builder, casts), elements);
     RexNode array = builder.makeCall(SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR, elements);
