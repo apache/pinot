@@ -70,12 +70,8 @@ public class WatermarkUtils {
     return NO_WATERMARK_VERSION;
   }
 
-  /// Persists watermark to the file.
-  public static void persistWatermark(double watermark, File watermarkFile) {
-    persistWatermark(watermark, watermarkFile, NO_WATERMARK_VERSION);
-  }
-
-  /// Persists watermark to the file, followed by the version unless it's NO_WATERMARK_VERSION.
+  /// Persists watermark to the file, followed by the version unless it's NO_WATERMARK_VERSION. Pass
+  /// CAPPED_WATERMARK_VERSION only when the watermark is capped to keep segments with stale snapshots within TTL.
   public static void persistWatermark(double watermark, File watermarkFile, int version) {
     try {
       if (watermarkFile.exists()) {

@@ -312,7 +312,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
 
     double currentTimeMs = System.currentTimeMillis();
-    WatermarkUtils.persistWatermark(currentTimeMs, upsertMetadataManager.getWatermarkFile());
+    WatermarkUtils.persistWatermark(currentTimeMs, upsertMetadataManager.getWatermarkFile(),
+        WatermarkUtils.CAPPED_WATERMARK_VERSION);
     assertTrue(new File(INDEX_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0).exists());
 
     double watermark = WatermarkUtils.loadWatermark(upsertMetadataManager.getWatermarkFile(), -1);
@@ -338,7 +339,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     File watermarkFile = new File(INDEX_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0);
 
     // A watermark persisted before capping keeps expiring keys, but no segment is skipped against it on load
-    WatermarkUtils.persistWatermark(290, watermarkFile);
+    WatermarkUtils.persistWatermark(290, watermarkFile, WatermarkUtils.NO_WATERMARK_VERSION);
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
     assertEquals(upsertMetadataManager.getWatermark(), 290.0);

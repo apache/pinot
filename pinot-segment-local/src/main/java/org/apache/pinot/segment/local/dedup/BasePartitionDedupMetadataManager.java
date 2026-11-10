@@ -349,7 +349,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     try {
       long startTime = System.currentTimeMillis();
       doRemoveExpiredPrimaryKeys();
-      WatermarkUtils.persistWatermark(_largestSeenTime.get(), getWatermarkFile());
+      WatermarkUtils.persistWatermark(_largestSeenTime.get(), getWatermarkFile(), WatermarkUtils.NO_WATERMARK_VERSION);
       long duration = System.currentTimeMillis() - startTime;
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.DEDUP_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS,
           duration, TimeUnit.MILLISECONDS);
