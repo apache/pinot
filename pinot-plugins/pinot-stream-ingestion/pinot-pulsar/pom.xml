@@ -37,9 +37,11 @@
   </properties>
 
   <dependencies>
+    <!-- pulsar-client-all embeds an old Guava; this patched copy replaces it. See
+         pinot-dependency-patches/pom.xml. -->
     <dependency>
-      <groupId>org.apache.pulsar</groupId>
-      <artifactId>pulsar-client-all</artifactId>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-patched-pulsar-client-all</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>

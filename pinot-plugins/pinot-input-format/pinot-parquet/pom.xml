@@ -42,11 +42,27 @@
     <dependency>
       <groupId>org.apache.parquet</groupId>
       <artifactId>parquet-avro</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.parquet</groupId>
+          <artifactId>parquet-jackson</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop.thirdparty</groupId>
+          <artifactId>hadoop-shaded-guava</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.curator</groupId>
+          <artifactId>curator-client</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -66,6 +82,32 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-mapreduce-client-core</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop.thirdparty</groupId>
+          <artifactId>hadoop-shaded-guava</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- hadoop-shaded-guava embeds an old Guava. The dependencies that bring it in exclude it, and
+         this patched copy replaces it; see pinot-dependency-patches/pom.xml. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-patched-hadoop-shaded-guava</artifactId>
+      <scope>${hadoop.dependencies.scope}</scope>
+    </dependency>
+    <!-- curator-client embeds an old Guava. The dependencies that bring it in exclude it, and this
+         patched copy replaces it; see pinot-dependency-patches/pom.xml. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-patched-curator-client</artifactId>
+      <scope>${hadoop.dependencies.scope}</scope>
+    </dependency>
+    <!-- parquet-jackson embeds an old Jackson. The dependencies that bring it in exclude it, and
+         this patched copy replaces it; see pinot-dependency-patches/pom.xml. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-patched-parquet-jackson</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>

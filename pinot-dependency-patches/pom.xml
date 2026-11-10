@@ -1,0 +1,180 @@
+<?xml version="1.0"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<!--
+  Patched copies of third-party jars that embed their own (shaded) copy of Guava or Jackson, or that
+  ship code Pinot must not ship.
+
+  Each child module rebuilds exactly one third-party jar: it drops the embedded copy and puts the
+  version Pinot manages in its place, relocated into the same package the original used. The
+  third-party code is not modified, so it keeps working against its private namespace. Plugins
+  exclude the original artifact and depend on the patched one instead.
+
+  Before this, the only fix was the filters and relocations of the shared maven-shade-plugin
+  configuration in the root pom, applied when each plugin was shaded into a fat jar. That does not
+  happen for jars that are not shaded, such as the plugins built with the thin-plugins profile. The
+  patched artifacts fix the jar itself, so the result no longer depends on how the plugin is
+  packaged. A plugin that is still shaded gives the same result as before: the shared shade
+  configuration drops and relocates the patched packages exactly as it did the original ones.
+
+  How a child module is built. Each step uses its own phase, because the order of executions from
+  different plugins in one phase depends on the order in which the poms declare the plugins.
+  1. process-classes: default-jar writes an empty main artifact to target/main/.
+     maven-shade-plugin refuses to run without a main artifact. This step cannot run earlier: at
+     compile, Maven points the main artifact to target/classes.
+  2. generate-test-sources: maven-shade-plugin writes the patched jar to target/patched/.
+  3. process-test-sources: maven-antrun-plugin copies the patched jar over the empty main artifact,
+     and unpacks it into target/classes.
+  From step 3 on, both places that a reactor build can resolve a sibling module to hold the patched
+  classes. Maven 4 resolves it to the main artifact. Maven 3 resolves it to target/classes until
+  the module is packaged (for example in `mvn test`). A build that stops before step 3 (for example
+  `mvn compile`) sees no patched classes.
+
+  Each child module declares:
+  - the original artifact and the managed library as optional dependencies, so consumers do not get
+    them transitively;
+  - the other runtime dependencies of the original artifact, so consumers keep them;
+  - an execution with id patch-dependency for maven-shade-plugin, with the artifactSet, filters and
+    relocations of the patch. filters and relocations use combine.self="override" to drop the
+    plugin-level configuration that the root pom applies to every module.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pinot</artifactId>
+    <groupId>org.apache.pinot</groupId>
+    <version>1.7.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>pinot-dependency-patches</artifactId>
+  <packaging>pom</packaging>
+  <name>Pinot Dependency Patches</name>
+  <url>https://pinot.apache.org/</url>
+  <properties>
+    <pinot.root>${basedir}/..</pinot.root>
+    <patched.jar>${project.build.directory}/patched/${project.build.finalName}.jar</patched.jar>
+    <main.jar>${project.build.directory}/main/${project.build.finalName}.jar</main.jar>
+  </properties>
+
+  <modules>
+    <module>pinot-patched-third-party-jackson-core</module>
+    <module>pinot-patched-hadoop-shaded-guava</module>
+    <module>pinot-patched-curator-client</module>
+    <module>pinot-patched-parquet-jackson</module>
+    <module>pinot-patched-pulsar-client-all</module>
+    <module>pinot-patched-reactor-netty-http</module>
+  </modules>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <executions>
+            <execution>
+              <!-- Step 1 -->
+              <id>default-jar</id>
+              <phase>process-classes</phase>
+              <configuration>
+                <outputDirectory>${project.build.directory}/main</outputDirectory>
+                <excludes>
+                  <exclude>**</exclude>
+                </excludes>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <executions>
+            <execution>
+              <!-- Step 2 -->
+              <id>patch-dependency</id>
+              <phase>generate-test-sources</phase>
+              <goals>
+                <goal>shade</goal>
+              </goals>
+              <configuration>
+                <outputFile>${patched.jar}</outputFile>
+                <transformers combine.self="override">
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                  <!-- Without this attribute the JVM ignores META-INF/versions/, which jackson-core uses -->
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                    <manifestEntries>
+                      <Multi-Release>true</Multi-Release>
+                    </manifestEntries>
+                  </transformer>
+                </transformers>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-antrun-plugin</artifactId>
+          <executions>
+            <execution>
+              <!-- Step 3 -->
+              <id>unpack-patched-jar</id>
+              <phase>process-test-sources</phase>
+              <goals>
+                <goal>run</goal>
+              </goals>
+              <configuration>
+                <target>
+                  <!-- maven-shade-plugin relocates class content but not the paths of multi-release
+                       entries, so child modules relocate META-INF/versions/<N>/... explicitly. Fail when
+                       a multi-release entry was left in the original package: it would be a class of
+                       the managed library in its real package, and could shadow the one Pinot ships. -->
+                  <fail message="${patched.jar} has multi-release entries that were not relocated">
+                    <condition>
+                      <resourcecount when="greater" count="0">
+                        <zipfileset src="${patched.jar}" includes="META-INF/versions/*/com/fasterxml/**,META-INF/versions/*/com/google/common/**" />
+                      </resourcecount>
+                    </condition>
+                  </fail>
+                  <copy file="${patched.jar}" tofile="${main.jar}" overwrite="true" />
+                  <unzip src="${patched.jar}" dest="${project.build.outputDirectory}" overwrite="true" />
+                </target>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <!-- The root pom declares maven-shade-plugin for every module, so the execution above also
+             applies to this pom. Turn it off here only. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>patch-dependency</id>
+            <phase>none</phase>
+            <inherited>false</inherited>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

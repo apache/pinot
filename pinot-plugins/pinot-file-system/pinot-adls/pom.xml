@@ -37,10 +37,23 @@
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-storage-file-datalake</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>io.projectreactor.netty</groupId>
+          <artifactId>reactor-netty-http</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-identity</artifactId>
+    </dependency>
+    <!-- reactor-netty-http contains the reactor.netty.http.server package, which has known
+         vulnerabilities. The dependencies that bring it in exclude it, and this patched copy
+         replaces it; see pinot-dependency-patches/pom.xml. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-patched-reactor-netty-http</artifactId>
     </dependency>
   </dependencies>
 

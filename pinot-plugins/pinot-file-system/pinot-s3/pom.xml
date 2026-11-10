@@ -42,6 +42,12 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>third-party-jackson-core</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
@@ -52,6 +58,12 @@
       <artifactId>apache-client</artifactId>
     </dependency>
 
+    <!-- third-party-jackson-core embeds an old jackson-core. The dependencies that bring it in
+         exclude it, and this patched copy replaces it; see pinot-dependency-patches/pom.xml. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-patched-third-party-jackson-core</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers</artifactId>

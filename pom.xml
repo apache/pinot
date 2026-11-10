@@ -40,6 +40,7 @@
   <modules>
     <module>pinot-bom</module>
     <module>pinot-dependency-verifier</module>
+    <module>pinot-dependency-patches</module>
     <module>pinot-spi</module>
     <module>pinot-segment-spi</module>
     <module>pinot-broker</module>
@@ -271,6 +272,8 @@
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.7</snakeyaml.version>
     <hadoop-shaded-protobuf_3_25.version>1.6.0</hadoop-shaded-protobuf_3_25.version>
+    <!-- Keep at the version hadoop-common declares; pinot-patched-hadoop-shaded-guava rebuilds it. -->
+    <hadoop-shaded-guava.version>1.5.0</hadoop-shaded-guava.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
     <datasketches-java.version>9.0.0</datasketches-java.version>
     <picocli.version>4.7.7</picocli.version>
@@ -283,6 +286,10 @@
     <confluent.version>8.2.0</confluent.version>
     <wire.version>7.1.2</wire.version>
     <pulsar.version>5.0.1</pulsar.version>
+    <!-- Runtime dependencies of pulsar-client-all that no imported BOM manages. pinot-patched-pulsar-client-all
+         declares them again: keep them at the versions pulsar-client-all declares. -->
+    <pulsar.slog.version>0.10.1</pulsar.slog.version>
+    <pulsar.opentelemetry-api-incubator.version>1.66.0-alpha</pulsar.opentelemetry-api-incubator.version>
     <flink.version>2.3.0</flink.version>
 
     <!-- Apache Commons Libraries -->
@@ -906,6 +913,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.parquet</groupId>
+        <artifactId>parquet-jackson</artifactId>
+        <version>${parquet.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.parquet</groupId>
         <artifactId>parquet-column</artifactId>
         <version>${parquet.version}</version>
       </dependency>
@@ -1482,6 +1494,11 @@
         <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
         <version>${hadoop-shaded-protobuf_3_25.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop.thirdparty</groupId>
+        <artifactId>hadoop-shaded-guava</artifactId>
+        <version>${hadoop-shaded-guava.version}</version>
+      </dependency>
 
       <!-- Metrics -->
       <dependency>
@@ -1799,6 +1816,49 @@
         <groupId>com.squareup.wire</groupId>
         <artifactId>wire-runtime-jvm</artifactId>
         <version>${wire.version}</version>
+      </dependency>
+
+      <!-- Patched third-party jars, see pinot-dependency-patches/pom.xml -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-third-party-jackson-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-hadoop-shaded-guava</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-curator-client</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-parquet-jackson</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-pulsar-client-all</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-reactor-netty-http</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>io.github.merlimat.slog</groupId>
+        <artifactId>slog</artifactId>
+        <version>${pulsar.slog.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-api-incubator</artifactId>
+        <version>${pulsar.opentelemetry-api-incubator.version}</version>
       </dependency>
 
       <!-- pulsar bom -->
