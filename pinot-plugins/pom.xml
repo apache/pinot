@@ -35,8 +35,20 @@
     <plugin.type />
     <hadoop.dependencies.scope>compile</hadoop.dependencies.scope>
     <!-- Set to true by plugins that stay fat jars under thin-plugins, so they skip collecting
-         their dependencies into plugin-libs/. -->
+         their dependencies into plugin-libs/ and the thin-plugin-dependencies check. -->
     <plugin.libs.skip>false</plugin.libs.skip>
+    <!--
+      Platform libraries: libraries that lib/pinot-all.jar always contains, so that thin-plugins does not
+      copy them into plugin-libs/ or list them in pinot-plugin.classpath. Every plugin then uses the copy
+      in lib/pinot-all.jar, which is what happens today anyway: all jars share one flat classpath and
+      lib/pinot-all.jar comes first.
+
+      This must change when plugins get their own class loader (realms). Each plugin must then decide
+      which libraries it takes from Pinot and which it brings, so a plugin can use a version of Netty or
+      Jackson that differs from the one of Pinot.
+    -->
+    <plugin.platform.groupIds>io.netty,com.google.guava</plugin.platform.groupIds>
+    <plugin.platform.artifactIds>jackson-annotations,jackson-core,jackson-databind,jackson-datatype-jsr310,slf4j-api</plugin.platform.artifactIds>
   </properties>
 
   <modules>
@@ -142,6 +154,8 @@
                   <!-- compile + runtime: `provided` dependencies such as pinot-spi are already in
                        lib/pinot-all.jar -->
                   <includeScope>runtime</includeScope>
+                  <excludeGroupIds>${plugin.platform.groupIds}</excludeGroupIds>
+                  <excludeArtifactIds>${plugin.platform.artifactIds}</excludeArtifactIds>
                 </configuration>
               </execution>
               <execution>
@@ -154,6 +168,8 @@
                   <skip>${plugin.libs.skip}</skip>
                   <outputFile>${project.build.directory}/pinot-plugin.classpath</outputFile>
                   <includeScope>runtime</includeScope>
+                  <excludeGroupIds>${plugin.platform.groupIds}</excludeGroupIds>
+                  <excludeArtifactIds>${plugin.platform.artifactIds}</excludeArtifactIds>
                   <prefix>plugin-libs</prefix>
                   <pathSeparator>&#10;</pathSeparator>
                 </configuration>

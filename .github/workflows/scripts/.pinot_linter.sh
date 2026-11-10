@@ -31,3 +31,5 @@ mvn -B -ntp -T1C checkstyle:check || exit 1
 mvn -B -ntp -T1C spotless:check || exit 1
 mvn -B -ntp -T1C enforcer:enforce || exit 1
 mvn -B -ntp -T1C enforcer:enforce -Pdependency-verifier || exit 1
+# Plugins built with thin-plugins must not bundle the third-party jars that pinot-dependency-patches replaces
+mvn -B -ntp -T1C enforcer:enforce@thin-plugin-dependencies -Pthin-plugins || exit 1

@@ -196,6 +196,8 @@
       by a profile in a parent pom.
     -->
     <plugin.shade.phase>package</plugin.shade.phase>
+    <!-- true outside pinot-plugins: only plugin modules are packaged as thin plugins. -->
+    <plugin.libs.skip>true</plugin.libs.skip>
     <!-- Keep these enabled by default; fastdev can disable them for incremental builds. -->
     <pinot.skip.buildnumber>false</pinot.skip.buildnumber>
     <package.info.phase>generate-sources</package.info.phase>
@@ -478,6 +480,53 @@
         <shade.guava.prefix>com.google.common</shade.guava.prefix>
         <shade.scala.prefix>org.scala-lang</shade.scala.prefix>
       </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <!--
+              A thin plugin ships every jar it depends on as is, so nothing filters what they contain.
+              This check fails the build when a plugin bundles one of the third-party jars that
+              pinot-dependency-patches replaces. Exclude the original from the dependencies that bring
+              it in, and depend on the patched copy instead. CI runs the check on every pull request
+              (.github/workflows/scripts/.pinot_linter.sh). It runs only where plugin.libs.skip is
+              false: in pinot-plugins, except for the plugins that stay fat jars.
+            -->
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>thin-plugin-dependencies</id>
+                <phase>validate</phase>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <skip>${plugin.libs.skip}</skip>
+                  <rules>
+                    <bannedDependencies>
+                      <message>Use the pinot-patched-* artifact instead, see pinot-dependency-patches/pom.xml</message>
+                      <excludes>
+                        <exclude>software.amazon.awssdk:third-party-jackson-core:*:*:compile</exclude>
+                        <exclude>software.amazon.awssdk:third-party-jackson-core:*:*:runtime</exclude>
+                        <exclude>org.apache.hadoop.thirdparty:hadoop-shaded-guava:*:*:compile</exclude>
+                        <exclude>org.apache.hadoop.thirdparty:hadoop-shaded-guava:*:*:runtime</exclude>
+                        <exclude>org.apache.curator:curator-client:*:*:compile</exclude>
+                        <exclude>org.apache.curator:curator-client:*:*:runtime</exclude>
+                        <exclude>org.apache.parquet:parquet-jackson:*:*:compile</exclude>
+                        <exclude>org.apache.parquet:parquet-jackson:*:*:runtime</exclude>
+                        <exclude>org.apache.pulsar:pulsar-client-all:*:*:compile</exclude>
+                        <exclude>org.apache.pulsar:pulsar-client-all:*:*:runtime</exclude>
+                        <exclude>io.projectreactor.netty:reactor-netty-http:*:*:compile</exclude>
+                        <exclude>io.projectreactor.netty:reactor-netty-http:*:*:runtime</exclude>
+                      </excludes>
+                    </bannedDependencies>
+                  </rules>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
     <!-- OS detection profiles: set os.detected.classifier for protoc/grpc binary resolution -->
     <profile>
