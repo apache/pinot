@@ -20,7 +20,11 @@ package org.apache.pinot.core.query.executor;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +45,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -107,6 +112,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED, MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
       MetadataKey.NUM_SEGMENTS_PRUNED_INVALID, MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT,
       MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
+  /// The table expression overrides for the RLS filter, parsed once per table config instead of once per query. An
+  /// empty map means that the table config has no override. The weak keys compare table configs by identity, so a
+  /// refreshed table config gets a new entry and the replaced one can be garbage collected. Queries share the cached
+  /// maps, so they are unmodifiable.
+  private static final LoadingCache<TableConfig, Map<Expression, Expression>> ROW_FILTER_EXPRESSION_OVERRIDE_MAPS =
+      CacheBuilder.newBuilder().weakKeys().build(CacheLoader.from(tableConfig -> {
+        Map<Expression, Expression> expressionOverrideMap =
+            TableCache.createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
+        return expressionOverrideMap != null ? Collections.unmodifiableMap(expressionOverrideMap) : Map.of();
+      }));
 
   public static final String ENABLE_PREFETCH = "enable.prefetch";
 
@@ -309,8 +324,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         // RLS policy, including requests from an older broker. MSE does not apply these table overrides to WHERE.
         TableConfig tableConfig = ((SingleTableExecutionInfo) executionInfo).getTableDataManager()
             .getCachedTableConfigAndSchema().getLeft();
-        queryContext.setRowFilterExpressionOverrideMap(
-            TableCache.createExpressionOverrideMap(tableNameWithType, tableConfig.getQueryConfig()));
+        queryContext.setRowFilterExpressionOverrideMap(getRowFilterExpressionOverrideMap(tableConfig));
       }
       instanceResponse = executeInternal(executionInfo, queryContext, timerContext, executorService, streamer,
           queryRequest.isEnableStreaming(), planMakerOverride);
@@ -503,6 +517,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     return operatorDepthToRowDataMap;
+  }
+
+  /// Returns the table expression overrides to apply to the RLS filter, or `null` if the table config has none.
+  @VisibleForTesting
+  @Nullable
+  static Map<Expression, Expression> getRowFilterExpressionOverrideMap(TableConfig tableConfig) {
+    Map<Expression, Expression> expressionOverrideMap = ROW_FILTER_EXPRESSION_OVERRIDE_MAPS.getUnchecked(tableConfig);
+    return expressionOverrideMap.isEmpty() ? null : expressionOverrideMap;
   }
 
   @VisibleForTesting

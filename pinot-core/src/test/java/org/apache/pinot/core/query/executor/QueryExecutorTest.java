@@ -43,6 +43,7 @@ import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -69,6 +70,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.IngestionSchemaValidator;
@@ -81,6 +83,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
@@ -102,7 +105,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -291,6 +297,43 @@ public class QueryExecutorTest {
     assertFalse(responseMetadata.containsKey(MetadataKey.REMOTE_ACCESS_BYTES.getName()));
     assertFalse(responseMetadata.containsKey(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()));
     assertFalse(responseMetadata.containsKey(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()));
+  }
+
+  /// The server parses the expression overrides for the RLS filter once per table config, not once per query. A
+  /// refreshed table config is a new object, so it gets its own overrides.
+  @Test
+  public void testRowFilterExpressionOverrideMapIsCachedPerTableConfig() {
+    TableConfig noOverrides = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    assertNull(ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(noOverrides));
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setQueryConfig(new QueryConfig(null, null, null, Map.of("lower(rawTenant)", "tenantLower"), null, null))
+        .build();
+    Map<Expression, Expression> expressionOverrideMap =
+        ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(tableConfig);
+    assertEquals(expressionOverrideMap, Map.of(CalciteSqlParser.compileToExpression("lower(rawTenant)"),
+        CalciteSqlParser.compileToExpression("tenantLower")));
+    assertSame(ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(tableConfig), expressionOverrideMap);
+    assertThrows(UnsupportedOperationException.class, () -> expressionOverrideMap.clear());
+
+    // The cache compares table configs by identity: an equal but refreshed config gets its own entry
+    TableConfig equalTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setQueryConfig(new QueryConfig(null, null, null, Map.of("lower(rawTenant)", "tenantLower"), null, null))
+        .build();
+    assertEquals(equalTableConfig, tableConfig);
+    Map<Expression, Expression> equalExpressionOverrideMap =
+        ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(equalTableConfig);
+    assertNotSame(equalExpressionOverrideMap, expressionOverrideMap);
+    assertEquals(equalExpressionOverrideMap, expressionOverrideMap);
+
+    TableConfig refreshedTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setQueryConfig(new QueryConfig(null, null, null, Map.of("lower(rawTenant)", "tenantLower2"), null, null))
+        .build();
+    Map<Expression, Expression> refreshedExpressionOverrideMap =
+        ServerQueryExecutorV1Impl.getRowFilterExpressionOverrideMap(refreshedTableConfig);
+    assertNotSame(refreshedExpressionOverrideMap, expressionOverrideMap);
+    assertEquals(refreshedExpressionOverrideMap, Map.of(CalciteSqlParser.compileToExpression("lower(rawTenant)"),
+        CalciteSqlParser.compileToExpression("tenantLower2")));
   }
 
   /// Under row-level security, the server leaves out of the response the stats that show the layout of the whole
