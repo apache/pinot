@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -52,11 +53,15 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -170,7 +175,8 @@ public class IngestionDelayTrackerTest {
   @Test
   public void testShutdownClosesProviderOnlyAfterInFlightFetchStops()
       throws Exception {
-    IngestionDelayTracker tracker = new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME,
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
+    IngestionDelayTracker tracker = new IngestionDelayTracker(serverMetrics, REALTIME_TABLE_NAME,
         REALTIME_TABLE_DATA_MANAGER, 60_000, 5, () -> true);
     AtomicBoolean inFetch = new AtomicBoolean();
     AtomicBoolean closedDuringFetch = new AtomicBoolean();
@@ -198,7 +204,11 @@ public class IngestionDelayTrackerTest {
 
     assertTrue(fetchStarted.await(10, TimeUnit.SECONDS), "The tracking task should start a fetch");
     tracker.shutdown();
+    verify(provider).close();
     assertFalse(closedDuringFetch.get(), "The provider was closed while a fetch was still running on it");
+    // The fetch that shutdown interrupts is not counted as a fetch error, which would trip alerts on table deletes
+    verify(serverMetrics, never()).addMeteredTableValue(any(),
+        eq(ServerMeter.INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS), anyLong());
   }
 
   /// A provider that fails to close with a runtime exception must not make shutdown throw, which would skip stopping

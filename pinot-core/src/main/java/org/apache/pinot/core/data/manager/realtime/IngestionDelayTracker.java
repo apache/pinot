@@ -149,6 +149,8 @@ public class IngestionDelayTracker {
   private final ScheduledExecutorService _ingestionDelayTrackingScheduler;
 
   private Clock _clock = Clock.systemUTC();
+  // Set when the table is shutting down, so the fetch that shutdown interrupts is not reported as an error
+  private volatile boolean _shuttingDown;
 
   protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
   protected volatile ConcurrentHashMap<Integer, Boolean> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
@@ -301,6 +303,11 @@ public class IngestionDelayTracker {
             _partitionIdToLatestOffset.putAll(streamPartitionIdToLatestOffset);
           }
         } catch (Exception e) {
+          if (_shuttingDown) {
+            // Shutdown interrupts the in-flight fetch on purpose; a routine table delete is not a fetch error
+            LOGGER.debug("Stopped fetching latest stream offsets for partitions: {} on shutdown", streamPartitionIds);
+            return;
+          }
           _serverMetrics.addMeteredTableValue(_realTimeTableDataManager.getTableName(),
               ServerMeter.INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS, 1);
           LOGGER.error("Failed to update latest stream offsets for partitions: {}", streamPartitionIds, e);
@@ -646,6 +653,7 @@ public class IngestionDelayTracker {
   /// We use this method to clean up when a table is being removed. It does not throw, so the caller can go on to stop
   /// the table's consumers.
   public void shutdown() {
+    _shuttingDown = true;
     // Now that segments can't report metric, destroy metric for this table
     _metricsRemovalScheduler.shutdown(); // ScheduledExecutor is installed in constructor so must always be cancelled
     if (_ingestionDelayTrackingScheduler != null) {
