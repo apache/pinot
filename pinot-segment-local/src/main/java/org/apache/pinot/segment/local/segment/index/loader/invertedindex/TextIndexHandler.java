@@ -29,7 +29,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexBufferReader;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneIndexCompatibilityUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -48,12 +47,10 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -440,20 +437,19 @@ public class TextIndexHandler extends BaseIndexHandler {
       if (combined.exists()) {
         try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(combined, true, 0, combined.length(),
             ByteOrder.BIG_ENDIAN, "Lucene text build-mode check")) {
-          buildOnDictionary = Boolean.parseBoolean(LuceneTextIndexBufferReader.extractProperties(buffer, columnName)
-              .getProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, "false"));
+          buildOnDictionary = TextIndexUtils.isBuildOnDictionary(
+              TextIndexUtils.readTextIndexProperties(buffer, columnName));
         }
       } else {
         PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, StandardIndexes.text());
-        buildOnDictionary = Boolean.parseBoolean(LuceneTextIndexBufferReader.extractProperties(buffer, columnName)
-            .getProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, "false"));
+        buildOnDictionary = TextIndexUtils.isBuildOnDictionary(
+            TextIndexUtils.readTextIndexProperties(buffer, columnName));
       }
     } else {
       File luceneDirectory = SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, columnName);
       File propertiesFile = new File(luceneDirectory, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
       if (propertiesFile.exists()) {
-        buildOnDictionary = CommonsConfigurationUtils.fromFile(propertiesFile)
-            .getBoolean(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, false);
+        buildOnDictionary = TextIndexUtils.isBuildOnDictionary(TextIndexUtils.readTextIndexProperties(propertiesFile));
       }
     }
     // Older segments without the property were always built per row.

@@ -75,8 +75,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
   @SuppressWarnings("unchecked")
   public RangeIndexBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
       DataSource dataSource, int numDocs) {
-    super(queryContext, dataSource, numDocs,
-        FilterOperatorUtils.isNullHandlingEnabled(queryContext, predicateEvaluator));
+    super(queryContext, dataSource, numDocs);
     _predicateEvaluator = predicateEvaluator;
     _rangeIndexReader = (RangeIndexReader<ImmutableRoaringBitmap>) dataSource.getRangeIndex();
     _parameterType = predicateEvaluator.isDictionaryBased() ? FieldSpec.DataType.INT : predicateEvaluator.getDataType();

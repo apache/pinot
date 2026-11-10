@@ -144,7 +144,7 @@ public class PredicateEvaluatorProvider {
   ///   dict-encoded forward index, so it cannot apply here.) Furthermore, the range index must be exact —
   ///   non-exact (legacy) range readers fall back to `ScanBasedFilterOperator` for partial matches, which feeds
   ///   raw forward-index values into the predicate evaluator and breaks if the evaluator is dict-based.
-  /// - `REGEXP_LIKE / NOT_EQ / IN / NOT_IN`: only the inverted-index path consumes the dictionary on a RAW
+  /// - `REGEXP_LIKE / TEXT_MATCH / NOT_EQ / IN / NOT_IN`: only the inverted-index path consumes the dictionary on a RAW
   ///   column. FST/IFST handle their own evaluators upstream of this method.
   /// - `EQ`: inverted index, plus exact range index (see `RangeIndexBasedFilterOperator#canEvaluate`).
   ///
@@ -176,6 +176,7 @@ public class PredicateEvaluatorProvider {
       case EQ:
         return (invertedAvailable || exactRangeAvailable) ? dictionary : null;
       case REGEXP_LIKE:
+      case TEXT_MATCH:
       case NOT_EQ:
       case IN:
       case NOT_IN:

@@ -26,8 +26,8 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.Configuration;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -155,7 +155,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       Directory indexDirectory = LuceneTextIndexBufferReader.createLuceneDirectory(indexBuffer, column);
 
       // Extract properties from buffer
-      Properties properties = LuceneTextIndexBufferReader.extractProperties(indexBuffer, column);
+      Configuration properties = TextIndexUtils.readTextIndexProperties(indexBuffer, column);
       config = updateConfigFromProperties(properties, config);
 
       // Initialize from components
@@ -227,9 +227,14 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
+    return getDictIds(searchQuery, null);
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDictIds(String searchQuery, @Nullable String optionsString) {
     if (_buildOnDictionary) {
       // The translator resolves Lucene document IDs to the original dictionary IDs, including after merges.
-      return getDocIds(searchQuery, null, null);
+      return getDocIds(searchQuery, optionsString, null);
     }
     throw new UnsupportedOperationException(
         "getDictIds is only supported when the text index is built on the dictionary for column: " + _column);
@@ -431,33 +436,34 @@ public class LuceneTextIndexReader implements TextIndexReader {
     _analyzer.close();
   }
 
-  /// Updates TextIndexConfig from Properties object
-  private TextIndexConfig updateConfigFromProperties(Properties properties, TextIndexConfig config) {
+  /// Updates TextIndexConfig from the persisted properties.
+  private TextIndexConfig updateConfigFromProperties(Configuration properties, TextIndexConfig config) {
     TextIndexConfigBuilder builder = new TextIndexConfigBuilder(config);
 
-    String analyzerClass = properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS);
+    // Preserve literal packed-property values without configuration interpolation.
+    String analyzerClass = (String) properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS);
     if (analyzerClass != null) {
       builder.withLuceneAnalyzerClass(analyzerClass);
     }
 
-    String analyzerArgs = properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS);
+    String analyzerArgs = (String) properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS);
     if (analyzerArgs != null) {
       List<String> args = Arrays.asList(analyzerArgs.split(","));
       builder.withLuceneAnalyzerClassArgs(args);
     }
 
-    String analyzerArgTypes = properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES);
+    String analyzerArgTypes = (String) properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES);
     if (analyzerArgTypes != null) {
       List<String> argTypes = Arrays.asList(analyzerArgTypes.split(","));
       builder.withLuceneAnalyzerClassArgTypes(argTypes);
     }
 
-    String queryParserClass = properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS);
+    String queryParserClass = (String) properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS);
     if (queryParserClass != null) {
       builder.withLuceneQueryParserClass(queryParserClass);
     }
 
-    String docIdTranslatorMode = properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE);
+    String docIdTranslatorMode = (String) properties.getProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE);
     if (docIdTranslatorMode != null) {
       builder.withDocIdTranslatorMode(docIdTranslatorMode);
     }
@@ -465,8 +471,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
     // The build mode is intrinsic to the segment: default to false when the property is absent (segments written
     // before this feature are always per-row). Must NOT keep the live table-config value, otherwise a per-row segment
     // could be misread as dictionary-based after the flag is flipped on.
-    builder.withBuildOnDictionary(
-        Boolean.parseBoolean(properties.getProperty(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY)));
+    builder.withBuildOnDictionary(TextIndexUtils.isBuildOnDictionary(properties));
 
     return builder.build();
   }

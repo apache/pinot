@@ -49,15 +49,22 @@ import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndex
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -255,6 +262,22 @@ public class LuceneTextIndexCreatorTest {
         {false, null, 5}, {true, null, 5},
         {false, DocIdTranslatorMode.Skip, 1}, {true, DocIdTranslatorMode.Skip, 1}
     };
+  }
+
+  @Test
+  public void testDictionaryTextIndexRejectsMismatchedCardinality() {
+    ColumnStatistics statistics = mock(ColumnStatistics.class);
+    when(statistics.getUniqueValuesSet()).thenReturn(new String[]{"alpha", "beta"});
+    IndexCreationContext context = mock(IndexCreationContext.class);
+    when(context.getFieldSpec()).thenReturn(new DimensionFieldSpec("dictionary", DataType.STRING, true));
+    when(context.hasDictionary()).thenReturn(true);
+    when(context.getColumnStatistics()).thenReturn(statistics);
+    when(context.getCardinality()).thenReturn(3);
+    TextIndexConfig config = new TextIndexConfigBuilder().withBuildOnDictionary(true).build();
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> StandardIndexes.text().createIndexCreator(context, config));
+    assertEquals(exception.getMessage(),
+        "Dictionary cardinality mismatch for TEXT index on column: dictionary: expected 3 values, got 2");
   }
 
   @Test(dataProvider = "dictionaryMappingModes")

@@ -47,7 +47,6 @@ import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.RowLevelSecurityFilterOperator;
-import org.apache.pinot.core.operator.filter.ScanBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
 import org.apache.pinot.core.operator.filter.VectorRadiusFilterOperator;
@@ -340,20 +339,11 @@ public class FilterPlanNode implements PlanNode {
                 // Dictionary-based text index: search returns matching dictIds, resolved to docIds by the standard
                 // dictionary-based filter operators (inverted index / scan), exactly like FST/REGEXP_LIKE.
                 TextMatchPredicate textMatchPredicate = (TextMatchPredicate) predicate;
-                Preconditions.checkState(textMatchPredicate.getOptions() == null,
-                    "TEXT_MATCH options are not supported for a dictionary-based text index on column: %s", column);
-                predicateEvaluator = TextMatchDictIdPredicateEvaluatorFactory.newDictIdBasedEvaluator(
-                    textMatchPredicate, textIndexReader, dataSource.getDictionary());
-                BaseFilterOperator filterOperator =
-                    FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
-                if (filterOperator instanceof ScanBasedFilterOperator && dataSource.getForwardIndex() != null
-                    && !dataSource.getForwardIndex().isDictionaryEncoded()) {
-                  predicateEvaluator = TextMatchDictIdPredicateEvaluatorFactory.newRawValueBasedEvaluator(
-                      predicateEvaluator, dataSource.getDictionary());
-                  filterOperator = new ScanBasedFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
-                }
+                predicateEvaluator = TextMatchDictIdPredicateEvaluatorFactory.newPredicateEvaluator(
+                    textMatchPredicate, textIndexReader, dataSource, _queryContext);
                 _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
-                return filterOperator;
+                return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource,
+                    numDocs);
               }
 
               if (textIndexReader.isMultiColumn()) {

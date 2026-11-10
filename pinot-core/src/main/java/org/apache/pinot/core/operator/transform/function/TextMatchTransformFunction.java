@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -41,6 +43,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
   private TextIndexReader _textIndexReader;
   private TransformFunction _columnArg;
   private Dictionary _dictionary;
+  private Set<String> _matchingRawValues;
   private String _column;
 
   @Override
@@ -108,13 +111,10 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
       _options = null;
     }
 
-    if (indexReader.isBuildOnDictionary() && _options != null) {
-      throw new IllegalArgumentException(
-          "TEXT_MATCH options are not supported for a dictionary-based text index on column: " + columnName);
-    }
     _textIndexReader = indexReader;
     _columnArg = columnArg;
     _dictionary = dataSource.getDictionary();
+    _matchingRawValues = null;
   }
 
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
@@ -124,17 +124,24 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     int[] ids;
     ImmutableRoaringBitmap matchingIds;
     if (_textIndexReader.isBuildOnDictionary()) {
-      matchingIds = _textIndexReader.getDictIds(_predicate);
       if (_columnArg.getDictionary() == null) {
         // A standalone dictionary can coexist with a raw forward index.
+        if (_matchingRawValues == null) {
+          matchingIds = _textIndexReader.getDictIds(_predicate, _options);
+          _matchingRawValues = new ObjectOpenHashSet<>(matchingIds.getCardinality());
+          for (int dictId : matchingIds.toArray()) {
+            _matchingRawValues.add(_dictionary.getStringValue(dictId));
+          }
+        }
         String[] values = _columnArg.transformToStringValuesSV(valueBlock);
         for (int i = 0; i < length; i++) {
-          if (matchingIds.contains(_dictionary.indexOf(values[i]))) {
+          if (_matchingRawValues.contains(values[i])) {
             _intValuesSV[i] = 1;
           }
         }
         return _intValuesSV;
       }
+      matchingIds = _textIndexReader.getDictIds(_predicate, _options);
       ids = _columnArg.transformToDictIdsSV(valueBlock);
     } else {
       ids = valueBlock.getDocIds();

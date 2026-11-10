@@ -43,7 +43,8 @@ public class TextIndexUtilsTest {
             .withLuceneAnalyzerClassArgs(
                 Arrays.asList(" \\,.\n\t()[]{}\"':=-_$\\?@&|#+/", "\\,.()[]{}\"':=-_$\\?@&|#+"))
             .withLuceneAnalyzerClassArgTypes(Arrays.asList("java.lang.String", "java.lang.String"))
-            .withLuceneQueryParserClass("org.apache.pinot.utils.lucene.queryparser.FakeQueryParser").build();
+            .withLuceneQueryParserClass("org.apache.pinot.utils.lucene.queryparser.FakeQueryParser")
+            .withBuildOnDictionary(true).build();
 
     TextIndexUtils.writeConfigToPropertiesFile(TEMP_DIR, config);
     TextIndexConfig readConfig = TextIndexUtils.getUpdatedConfigFromPropertiesFile(
