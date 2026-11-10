@@ -41,7 +41,8 @@ public class QuickstartServerHeapTest {
   @DataProvider
   public Object[][] heapSizes() {
     return new Object[][]{
-        {null, null, "128m", "1g", 1024L * 1024 * 1024},
+        {null, null, "1g", "1g", 1024L * 1024 * 1024},
+        {null, "512m", "512m", "512m", 512L * 1024 * 1024},
         {"64m", "192m", "64m", "192m", 192L * 1024 * 1024}
     };
   }

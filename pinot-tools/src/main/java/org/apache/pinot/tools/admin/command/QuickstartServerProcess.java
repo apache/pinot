@@ -47,7 +47,6 @@ final class QuickstartServerProcess {
   static final String STARTED_FILE_NAME = "server.started";
   static final String INITIAL_HEAP_PROPERTY = "pinot.quickstart.server.xms";
   static final String MAX_HEAP_PROPERTY = "pinot.quickstart.server.xmx";
-  private static final String DEFAULT_INITIAL_HEAP = "128m";
   private static final String DEFAULT_MAX_HEAP = "1g";
   private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(2);
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30;
@@ -89,8 +88,9 @@ final class QuickstartServerProcess {
     List<String> command = new ArrayList<>();
     File javaExecutable = new File(System.getProperty("java.home"), "bin/java");
     command.add(javaExecutable.getAbsolutePath());
-    command.add("-Xms" + System.getProperty(INITIAL_HEAP_PROPERTY, DEFAULT_INITIAL_HEAP));
-    command.add("-Xmx" + System.getProperty(MAX_HEAP_PROPERTY, DEFAULT_MAX_HEAP));
+    String maxHeap = System.getProperty(MAX_HEAP_PROPERTY, DEFAULT_MAX_HEAP);
+    command.add("-Xms" + System.getProperty(INITIAL_HEAP_PROPERTY, maxHeap));
+    command.add("-Xmx" + maxHeap);
     Iterator<String> parentArguments = ManagementFactory.getRuntimeMXBean().getInputArguments().iterator();
     while (parentArguments.hasNext()) {
       String argument = parentArguments.next();

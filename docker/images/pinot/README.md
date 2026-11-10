@@ -139,12 +139,14 @@ Quickstarts that fork their servers run a parent JVM for the other services and 
 `JAVA_OPTS` sets the parent JVM's options. Its heap options are not copied to the server JVMs. Set these system properties
 in the parent's `JAVA_OPTS` to configure each server's heap:
 
-| System property | Default | Child JVM option |
+| System property | Default | Child JVM option with defaults |
 | --- | --- | --- |
-| `pinot.quickstart.server.xms` | `128m` | `-Xms128m` |
 | `pinot.quickstart.server.xmx` | `1g` | `-Xmx1g` |
+| `pinot.quickstart.server.xms` | Resolved `pinot.quickstart.server.xmx` value | `-Xms1g` |
 
 Values use Java heap-size syntax, such as `256m` or `2g`. The initial heap must not exceed the maximum heap.
+By default, each server uses equal initial and maximum heaps. Setting only `pinot.quickstart.server.xmx=512m` gives
+each child `-Xms512m -Xmx512m`. Set `pinot.quickstart.server.xms` explicitly to use a different initial heap.
 These properties affect forked quickstart servers only; they do not configure separately launched `StartServer` commands.
 
 The Docker image defaults the parent JVM to `-Xms4G -Xmx4G`. With the default child heap limits, the two-server BATCH
@@ -153,12 +155,12 @@ A four-server quickstart has a combined maximum heap of **8 GiB**. Allocate addi
 buffers, memory-mapped segment pages, metaspace, thread stacks, and other native memory; these heap totals are not
 container memory limits or estimates of current memory usage.
 
-For example, configure a 2 GiB maximum parent heap and a 2 GiB maximum heap for each server:
+For example, configure equal 2 GiB initial and maximum heaps for both the parent and each server:
 
 ```SHELL
 docker run --rm --name pinot-quickstart \
   -p 127.0.0.1:9000:9000 \
-  -e JAVA_OPTS="-Xms512m -Xmx2g -Dpinot.admin.system.exit=true -Dpinot.quickstart.server.xms=256m -Dpinot.quickstart.server.xmx=2g" \
+  -e JAVA_OPTS="-Xms2g -Xmx2g -Dpinot.admin.system.exit=true -Dpinot.quickstart.server.xmx=2g" \
   pinot:latest QuickStart -type batch
 ```
 
