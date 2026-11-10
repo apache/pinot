@@ -214,7 +214,19 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _largestSeenComparisonValue = new AtomicDouble(TTL_WATERMARK_NOT_SET);
       WatermarkUtils.deleteWatermark(getWatermarkFile());
     }
-    _persistedWatermark = _largestSeenComparisonValue.get();
+    _persistedWatermark = loadPersistedWatermark();
+  }
+
+  /// A watermark file without the capped version was written before the watermark got capped, so it can be ahead of
+  /// segments with stale snapshots. Don't skip any segment against it until the next snapshot persists a capped one.
+  private double loadPersistedWatermark() {
+    double watermark = _largestSeenComparisonValue.get();
+    if (_metadataTTL > 0 && watermark != TTL_WATERMARK_NOT_SET
+        && WatermarkUtils.loadWatermarkVersion(getWatermarkFile()) != WatermarkUtils.CAPPED_WATERMARK_VERSION) {
+      _logger.info("Not skipping segments out of TTL on load because watermark: {} was persisted uncapped", watermark);
+      return TTL_WATERMARK_NOT_SET;
+    }
+    return watermark;
   }
 
   @Override
@@ -1208,7 +1220,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // stale bitmaps or even no bitmap snapshots to use.
     if (isTTLEnabled()) {
       double watermark = getWatermarkToPersist();
-      WatermarkUtils.persistWatermark(watermark, getWatermarkFile());
+      WatermarkUtils.persistWatermark(watermark, getWatermarkFile(),
+          _metadataTTL > 0 ? WatermarkUtils.CAPPED_WATERMARK_VERSION : WatermarkUtils.NO_WATERMARK_VERSION);
       _persistedWatermark = watermark;
     }
     updateSnapshotMetrics(numImmutableSegments, numPrimaryKeysInSnapshot, numQueryableDocIdsInSnapshot,

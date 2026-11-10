@@ -332,6 +332,34 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testUncappedWatermarkIsNotTrustedToSkipSegments()
+      throws IOException {
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
+    File watermarkFile = new File(INDEX_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0);
+
+    // A watermark persisted before capping keeps expiring keys, but no segment is skipped against it on load
+    WatermarkUtils.persistWatermark(290, watermarkFile);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+    assertEquals(upsertMetadataManager.getWatermark(), 290.0);
+    assertEquals(upsertMetadataManager.getPersistedWatermark(),
+        BasePartitionUpsertMetadataManager.TTL_WATERMARK_NOT_SET);
+    assertFalse(upsertMetadataManager.canSkipSegmentOutOfTTL(100));
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+
+    // A capped watermark is trusted
+    WatermarkUtils.persistWatermark(290, watermarkFile, WatermarkUtils.CAPPED_WATERMARK_VERSION);
+    assertEquals(WatermarkUtils.loadWatermark(watermarkFile, -1), 290.0);
+    upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+    assertEquals(upsertMetadataManager.getPersistedWatermark(), 290.0);
+    assertTrue(upsertMetadataManager.canSkipSegmentOutOfTTL(100));
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
+  @Test
   public void testReplaceSegmentOnReloadRebuildsFromSnapshot()
       throws Exception {
     // Upsert + metadata TTL with snapshots enabled: a reload must rebuild upsert metadata from the validDocIds
