@@ -560,7 +560,7 @@
           <plugin>
             <groupId>io.tesseracta</groupId>
             <artifactId>tesseracta-maven-plugin</artifactId>
-            <version>0.1.24</version>
+            <version>0.1.25</version>
             <configuration>
               <orgName>demo</orgName>
               <teamName>pinot</teamName>
