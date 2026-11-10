@@ -45,9 +45,14 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 /// [#stop] is synchronized and can be called repeatedly or concurrently with waiting for readiness.
 final class QuickstartServerProcess {
   static final String STARTED_FILE_NAME = "server.started";
+  static final String INITIAL_HEAP_PROPERTY = "pinot.quickstart.server.xms";
+  static final String MAX_HEAP_PROPERTY = "pinot.quickstart.server.xmx";
+  private static final String DEFAULT_INITIAL_HEAP = "128m";
+  private static final String DEFAULT_MAX_HEAP = "1g";
   private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(2);
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30;
   private static final long FORCED_SHUTDOWN_TIMEOUT_SECONDS = 10;
+  private static final long PARENT_LOSS_SHUTDOWN_TIMEOUT_SECONDS = 5;
 
   private final Process _process;
   private final File _logFile;
@@ -84,8 +89,8 @@ final class QuickstartServerProcess {
     List<String> command = new ArrayList<>();
     File javaExecutable = new File(System.getProperty("java.home"), "bin/java");
     command.add(javaExecutable.getAbsolutePath());
-    command.add("-Xms128m");
-    command.add("-Xmx1g");
+    command.add("-Xms" + System.getProperty(INITIAL_HEAP_PROPERTY, DEFAULT_INITIAL_HEAP));
+    command.add("-Xmx" + System.getProperty(MAX_HEAP_PROPERTY, DEFAULT_MAX_HEAP));
     Iterator<String> parentArguments = ManagementFactory.getRuntimeMXBean().getInputArguments().iterator();
     while (parentArguments.hasNext()) {
       String argument = parentArguments.next();
@@ -232,7 +237,8 @@ final class QuickstartServerProcess {
     if (!_process.isAlive()) {
       return;
     }
-    _process.destroy();
+    // Process.destroy() also closes stdin, which would trigger the shorter parent-loss deadline during normal stop.
+    _process.toHandle().destroy();
     try {
       if (!_process.waitFor(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
         _process.destroyForcibly();
@@ -259,11 +265,25 @@ final class QuickstartServerProcess {
         while (System.in.read() != -1) {
           // The parent keeps this pipe open for the lifetime of the server.
         }
-        System.exit(0);
+        exitAfterParentLoss(0);
       } catch (IOException e) {
-        System.exit(1);
+        exitAfterParentLoss(1);
       }
     });
+  }
+
+  private static void exitAfterParentLoss(int exitCode) {
+    // Embedded ZooKeeper may have died with the parent. Server shutdown hooks can then block on Helix retries,
+    // including if shutdown is already in progress, so enforce the deadline independently of System.exit().
+    Thread.ofPlatform().daemon().name("quickstart-parent-loss-halt").start(() -> {
+      try {
+        TimeUnit.SECONDS.sleep(PARENT_LOSS_SHUTDOWN_TIMEOUT_SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      Runtime.getRuntime().halt(exitCode);
+    });
+    System.exit(exitCode);
   }
 
   public static void main(String[] args) {

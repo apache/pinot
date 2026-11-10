@@ -301,12 +301,11 @@ public class QuickstartRunner {
 
     // TODO: Stop Minion
     StopProcessCommand stopper = new StopProcessCommand(false);
-    stopper.stopController().stopBroker();
     if (_zkExternalAddress == null) {
-      stopper.stopZookeeper();
-    }
-    if (!_forkServers) {
-      stopper.stopServer();
+      stopper.stopController().stopBroker().stopZookeeper();
+      if (!_forkServers) {
+        stopper.stopServer();
+      }
     }
     stopper.execute();
     if (_deleteExistingData) {

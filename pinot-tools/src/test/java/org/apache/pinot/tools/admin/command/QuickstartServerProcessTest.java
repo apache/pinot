@@ -38,6 +38,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -160,6 +161,55 @@ public class QuickstartServerProcessTest {
     }
   }
 
+  @DataProvider
+  public Object[][] shutdownStates() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(timeOut = 30_000)
+  public void testNormalStopPreservesGracefulShutdownDeadline()
+      throws Exception {
+    int port = availablePort();
+    QuickstartServerProcess server = QuickstartServerProcess.start(childCommand("watch-parent-slow-shutdown", port),
+        _processDir.toFile(), port, Duration.ofSeconds(15));
+    try {
+      server.stop();
+      assertTrue(Files.exists(_processDir.resolve("shutdown-completed")),
+          "Normal stop must allow hooks longer than the parent-loss deadline to finish");
+    } finally {
+      server.getProcess().destroyForcibly();
+      assertTrue(server.getProcess().waitFor(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test(dataProvider = "shutdownStates", timeOut = 40_000)
+  public void testParentPipeClosureStopsChildWithBlockingShutdownHook(boolean shutdownAlreadyStarted)
+      throws Exception {
+    int port = availablePort();
+    QuickstartServerProcess server = QuickstartServerProcess.start(childCommand("watch-parent-blocking-shutdown", port),
+        _processDir.toFile(), port, Duration.ofSeconds(15));
+    try {
+      if (shutdownAlreadyStarted) {
+        server.getProcess().toHandle().destroy();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!Files.exists(_processDir.resolve("shutdown-started")) && System.nanoTime() < deadline) {
+          Thread.sleep(20);
+        }
+        assertTrue(Files.exists(_processDir.resolve("shutdown-started")), "Shutdown hook must have started before EOF");
+        assertTrue(server.getProcess().isAlive(), "The shutdown hook must still be blocked");
+      }
+      server.getProcess().getOutputStream().close();
+      assertTrue(server.getProcess().waitFor(10, TimeUnit.SECONDS),
+          "A blocking shutdown hook must not leave the child alive after its parent disappears");
+      assertTrue(Files.exists(_processDir.resolve("shutdown-started")), "Graceful shutdown must be attempted first");
+      assertEquals(server.getProcess().exitValue(), 0);
+    } finally {
+      // Force cleanup on assertion failure: the deliberately blocked hook cannot finish a graceful stop.
+      server.getProcess().destroyForcibly();
+      assertTrue(server.getProcess().waitFor(10, TimeUnit.SECONDS));
+    }
+  }
+
   @Test
   public void testConfigRoundTrip()
       throws Exception {
@@ -212,10 +262,25 @@ public class QuickstartServerProcessTest {
     public static void main(String[] args)
         throws Exception {
       String mode = args[0];
-      if (mode.equals("watch-parent")) {
+      Path pidFile = Path.of(args[2]);
+      if (mode.equals("watch-parent-blocking-shutdown") || mode.equals("watch-parent-slow-shutdown")) {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+          try {
+            Files.writeString(pidFile.resolveSibling("shutdown-started"), "started");
+            if (mode.equals("watch-parent-blocking-shutdown")) {
+              new CountDownLatch(1).await();
+            } else {
+              TimeUnit.SECONDS.sleep(7);
+              Files.writeString(pidFile.resolveSibling("shutdown-completed"), "completed");
+            }
+          } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+          }
+        }));
+      }
+      if (mode.startsWith("watch-parent")) {
         QuickstartServerProcess.watchParent();
       }
-      Path pidFile = Path.of(args[2]);
       Files.writeString(pidFile, Long.toString(ProcessHandle.current().pid()));
       Files.write(pidFile.resolveSibling("jvm-arguments"), ManagementFactory.getRuntimeMXBean().getInputArguments());
       if (mode.equals("exit")) {
