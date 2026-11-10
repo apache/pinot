@@ -144,6 +144,18 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     createLogicalTable(logicalTableConfig, getHeaders());
   }
 
+  @Test(expectedExceptions = IOException.class,
+      expectedExceptionsMessageRegExp =
+          ".*Reason: 'quota.maxPrimaryKeysPerPartition' should not be set for logical table.*")
+  public void testLogicalTablePrimaryKeyQuotaValidation()
+      throws IOException {
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_9"));
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+    logicalTableConfig.setQuotaConfig(new QuotaConfig(null, "999", null, null, 1000L, null));
+    createLogicalTable(logicalTableConfig, getHeaders());
+  }
+
   @Test
   public void testLogicalTableReferenceTableValidation()
       throws IOException {

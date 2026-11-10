@@ -50,6 +50,13 @@ import org.slf4j.LoggerFactory;
 /// returns `partitionId -> {serverId -> primaryKeyCount}` with one count per replica. Servers that fail to respond are
 /// silently left out of that map, so a missing server can only hide a breach, never cause one.
 ///
+/// The check therefore fails closed: unless every server hosting the table (non-OFFLINE in the IdealState) reports its
+/// counts, a check that finds no breach returns [Status#UNDETERMINED] rather than [Status#WITHIN_QUOTA]. A table
+/// already paused by this quota stays paused, even after its cap is raised, while any of those servers is down or has
+/// not loaded its upsert partitions yet. Resuming consumption through the admin API
+/// (`/tables/{tableName}/resumeConsumption`) overrides this: the table keeps consuming while the status is
+/// undetermined, and is paused again only if a later check sees a breach.
+///
 /// Note: a pause triggered by this quota is sticky. Primary key counts do not drop while consumption is paused, and
 /// `metadataTTL` does not help either: the TTL is measured against the largest comparison value consumed, which stops
 /// moving when consumption stops, and expired keys are only swept when a new consuming segment starts. The count only
