@@ -1428,7 +1428,7 @@ public class PinotTableRestletResource {
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints,
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints.inverse(),
             _pinotHelixResourceManager.getServerAdminAuthProvider());
 
     List<String> serverUrls = new ArrayList<>();
@@ -1597,7 +1597,7 @@ public class PinotTableRestletResource {
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints,
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints.inverse(),
             _pinotHelixResourceManager.getServerAdminAuthProvider());
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();

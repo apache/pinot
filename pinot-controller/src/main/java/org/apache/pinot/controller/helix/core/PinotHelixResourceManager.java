@@ -4519,7 +4519,7 @@ public class PinotHelixResourceManager {
   /// server instances. With BiMap, both mappings are easily available
   public BiMap<String, String> getDataInstanceAdminEndpoints(Set<String> instances)
       throws InvalidConfigException {
-    BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
+    BiMap<String, String> instanceToEndpoint = HashBiMap.create(instances.size());
     for (String instance : instances) {
       String instanceAdminEndpoint;
       try {
@@ -4531,9 +4531,9 @@ public class PinotHelixResourceManager {
         LOGGER.error(errorMessage, e);
         throw new InvalidConfigException(errorMessage);
       }
-      endpointToInstance.put(instance, instanceAdminEndpoint);
+      instanceToEndpoint.put(instance, instanceAdminEndpoint);
     }
-    return endpointToInstance;
+    return instanceToEndpoint;
   }
 
   /// Returns the service identity provider used for outbound Server admin API requests.

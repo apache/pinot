@@ -203,7 +203,7 @@ public class TableMetadataReader {
     try {
       List<String> tableUrls = buildTableLevelUrls(serverToSegs, endpoints,
           tableNameWithType, columns, segments, reader);
-      return fetchAndAggregateMetadata(tableUrls, endpoints, /*perSegmentJson=*/false,
+      return fetchAndAggregateMetadata(tableUrls, endpoints.inverse(), /*perSegmentJson=*/false,
           tableNameWithType, timeoutMs);
     } catch (RuntimeException e) {
       log.warn("Failed to fetch table metadata for table {} using new server endpoint, falling back to legacy "
