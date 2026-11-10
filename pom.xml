@@ -177,6 +177,24 @@
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
+    <!--
+      Where the shared shade configuration relocates Jackson, Guava and Scala, including the copies
+      that third-party jars embed under their own packages. The thin-plugins profile points them
+      back at the real packages, which turns those relocations into no-ops and makes the embedded
+      copies resolve to the managed libraries. Modules whose jars run in a JVM Pinot does not
+      control (clients, Spark and Hadoop jobs) pin these to ${shade.prefix} in their own pom, so
+      they keep relocating in both modes.
+    -->
+    <shade.jackson.prefix>${shade.prefix}.com.fasterxml.jackson</shade.jackson.prefix>
+    <shade.guava.prefix>${shade.prefix}.com.google.common</shade.guava.prefix>
+    <shade.scala.prefix>${shade.prefix}.org.scala-lang</shade.scala.prefix>
+    <!--
+      Phase at which plugin modules build their fat jar. Plugin modules set
+      shade.phase.prop to this property instead of to `package`, so that the thin-plugins profile
+      can turn plugin fat jars off from here; a property a module sets itself cannot be overridden
+      by a profile in a parent pom.
+    -->
+    <plugin.shade.phase>package</plugin.shade.phase>
     <!-- Keep these enabled by default; fastdev can disable them for incremental builds. -->
     <pinot.skip.buildnumber>false</pinot.skip.buildnumber>
     <package.info.phase>generate-sources</package.info.phase>
@@ -432,6 +450,26 @@
         <pinot.skip.buildnumber>true</pinot.skip.buildnumber>
         <package.info.phase>none</package.info.phase>
         <pinot.skip.remote.resources>true</pinot.skip.remote.resources>
+      </properties>
+    </profile>
+    <profile>
+      <!--
+        Opt-in thin plugin layout. Plugins stop building fat jars, the binary distribution ships each
+        plugin as its own jar plus a pinot-plugin.classpath index into a shared plugin-libs/ store,
+        and nothing is relocated, because plugins and lib/pinot-all.jar must agree on the class
+        names of the libraries they exchange (a JsonNode returned by pinot-spi is the same class in
+        both, or the plugin fails to link).
+
+        The default build is unchanged: fat plugin jars, relocated libraries, and the same
+        `shaded` classifiers are published. Other modules add to this profile under the same id:
+        pinot-plugins and pinot-distribution.
+      -->
+      <id>thin-plugins</id>
+      <properties>
+        <plugin.shade.phase>none</plugin.shade.phase>
+        <shade.jackson.prefix>com.fasterxml.jackson</shade.jackson.prefix>
+        <shade.guava.prefix>com.google.common</shade.guava.prefix>
+        <shade.scala.prefix>org.scala-lang</shade.scala.prefix>
       </properties>
     </profile>
     <!-- OS detection profiles: set os.detected.classifier for protoc/grpc binary resolution -->
@@ -880,6 +918,20 @@
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
         <version>${orc.version}</version>
+        <exclusions>
+          <!-- ORC pulls hadoop-client-api, which is the API half of Hadoop's shaded client pair:
+               its bytecode references third-party classes relocated under
+               org.apache.hadoop.shaded, and those live only in hadoop-client-runtime. Pinot uses
+               the unshaded hadoop-common instead, so hadoop-client-api would put a second, and
+               incompatible, copy of org.apache.hadoop.conf.Configuration on the classpath. Which
+               one wins is decided by classpath order, and when hadoop-client-api wins, loading a
+               Configuration fails with NoClassDefFoundError on the relocated Woodstox it expects
+               hadoop-client-runtime to supply. Exclude it so Hadoop comes from one flavour only. -->
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-client-api</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.orc</groupId>
@@ -3083,23 +3135,23 @@
           <relocations>
             <relocation>
               <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.core</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.core</shadedPattern>
+              <shadedPattern>${shade.jackson.prefix}.core</shadedPattern>
             </relocation>
             <relocation>
               <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.databind</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.databind</shadedPattern>
+              <shadedPattern>${shade.jackson.prefix}.databind</shadedPattern>
             </relocation>
             <relocation>
               <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.annotation</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.annotation</shadedPattern>
+              <shadedPattern>${shade.jackson.prefix}.annotation</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.facebook.presto.jdbc.internal.jackson</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+              <shadedPattern>${shade.jackson.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>software.amazon.awssdk.thirdparty.jackson.core</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.core</shadedPattern>
+              <shadedPattern>${shade.jackson.prefix}.core</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.facebook.presto.jdbc.internal.joda.time</pattern>
@@ -3107,51 +3159,51 @@
             </relocation>
             <relocation>
               <pattern>shaded.parquet.com.fasterxml.jackson</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+              <shadedPattern>${shade.jackson.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.fasterxml.jackson</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+              <shadedPattern>${shade.jackson.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>org.apache.hadoop.thirdparty.com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+              <shadedPattern>${shade.guava.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>org.apache.hadoop.shaded.com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+              <shadedPattern>${shade.guava.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>org.apache.hadoop.shaded.org.apache.curator.shaded.com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+              <shadedPattern>${shade.guava.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>org.apache.curator.shaded.com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+              <shadedPattern>${shade.guava.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>org.apache.iceberg.relocated.com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+              <shadedPattern>${shade.guava.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>org.apache.pulsar.shade.com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+              <shadedPattern>${shade.guava.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.facebook.presto.jdbc.internal.guava</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+              <shadedPattern>${shade.guava.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>net.snowflake.client.jdbc.internal.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+              <shadedPattern>${shade.guava.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+              <shadedPattern>${shade.guava.prefix}</shadedPattern>
             </relocation>
             <relocation>
               <pattern>org.scala-lang</pattern>
-              <shadedPattern>${shade.prefix}.org.scala-lang</shadedPattern>
+              <shadedPattern>${shade.scala.prefix}</shadedPattern>
             </relocation>
           </relocations>
         </configuration>

@@ -73,7 +73,7 @@
         </property>
       </activation>
       <properties>
-        <shade.phase.prop>package</shade.phase.prop>
+        <shade.phase.prop>${plugin.shade.phase}</shade.phase.prop>
       </properties>
     </profile>
     <profile>

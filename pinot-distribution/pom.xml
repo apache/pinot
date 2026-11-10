@@ -33,6 +33,7 @@
     <pinot.root>${basedir}/..</pinot.root>
     <maven.build.timestamp.format>yyyy-MM-dd'T'HHmmss'Z'</maven.build.timestamp.format>
     <shade.phase.prop>package</shade.phase.prop>
+    <bin.dist.descriptor>pinot-assembly.xml</bin.dist.descriptor>
   </properties>
   <dependencies>
     <dependency>
@@ -122,7 +123,7 @@
                   <finalName>apache-pinot-${project.version}-bin</finalName>
                   <appendAssemblyId>false</appendAssemblyId>
                   <descriptors>
-                    <descriptor>pinot-assembly.xml</descriptor>
+                    <descriptor>${bin.dist.descriptor}</descriptor>
                   </descriptors>
                 </configuration>
               </execution>
@@ -166,6 +167,90 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <profile>
+      <!--
+        Thin plugin layout; see the thin-plugins profile in the root pom. Builds the binary
+        distribution from pinot-assembly-thin.xml, which ships each plugin as its own jar plus a
+        pinot-plugin.classpath index into the shared plugin-libs/ store.
+
+        It also keeps plugins out of lib/pinot-all.jar. pinot-tools depends on plugin modules, so
+        without these exclusions the uber-jar would carry each of them a second time, and that copy
+        would win on the classpath over the one under plugins/. Only plugins pinot-tools never
+        references at compile time are excluded: it imports classes from pinot-avro, pinot-json,
+        pinot-parquet and pinot-minion-builtin-tasks, so those stay. A plugin may only be excluded
+        here if pinot-assembly-thin.xml ships it under plugins/, otherwise it disappears from the
+        distribution instead of moving; that is why pinot-compound-metrics stays.
+
+        Declaring these dependencies `provided` in pinot-tools would keep the list next to what it
+        describes, but `provided` is not on the runtime classpath, so quickstarts launched from
+        Maven or an IDE, where there is no plugins/ directory, would lose these plugins.
+      -->
+      <id>thin-plugins</id>
+      <properties>
+        <bin.dist.descriptor>pinot-assembly-thin.xml</bin.dist.descriptor>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-tools</artifactId>
+          <exclusions>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-kafka-4.0</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-kinesis</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-pulsar</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-batch-ingestion-standalone</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-s3</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-confluent-avro</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-csv</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-protobuf</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-bson</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-orc</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-thrift</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-yammer</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-dropwizard</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
     </profile>
 
     <profile>
