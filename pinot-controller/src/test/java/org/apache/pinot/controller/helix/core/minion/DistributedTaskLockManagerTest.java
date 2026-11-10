@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -43,6 +44,58 @@ import static org.testng.Assert.assertTrue;
 
 
 public class DistributedTaskLockManagerTest {
+
+  /// A property store whose create stores the lock node but then reports NODE_EXISTS or throws, as a create retried
+  /// after a ZK ConnectionLoss does when its first try had already created the node.
+  private static ZkHelixPropertyStore<ZNRecord> storeWhoseCreateIsNotReported(AtomicReference<ZNRecord> node,
+      boolean throwOnCreate) {
+    ZkHelixPropertyStore<ZNRecord> store = mock(ZkHelixPropertyStore.class);
+    when(store.get(anyString(), any(), eq(AccessOption.EPHEMERAL))).thenAnswer(invocation -> node.get());
+    when(store.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL))).thenAnswer(invocation -> {
+      node.set(invocation.getArgument(1));
+      if (throwOnCreate) {
+        throw new RuntimeException("ConnectionLoss");
+      }
+      return false;
+    });
+    return store;
+  }
+
+  @Test
+  public void testLockTakenWhenCreateReportsNodeExistsForItsOwnNode() {
+    AtomicReference<ZNRecord> node = new AtomicReference<>();
+    DistributedTaskLockManager lockManager =
+        new DistributedTaskLockManager(storeWhoseCreateIsNotReported(node, false), "controller1");
+    DistributedTaskLockManager.TaskLock lock = lockManager.acquireLock("testTable");
+    Assert.assertNotNull(lock, "The node this attempt created must be taken as its lock");
+    assertEquals(lock.getOwner(), "controller1");
+    assertEquals(lock.getLockZNodePath(), "/MINION_TASK_METADATA/testTable-Lock");
+  }
+
+  @Test
+  public void testLockTakenWhenCreateThrowsAfterCreatingItsNode() {
+    AtomicReference<ZNRecord> node = new AtomicReference<>();
+    DistributedTaskLockManager lockManager =
+        new DistributedTaskLockManager(storeWhoseCreateIsNotReported(node, true), "controller1");
+    Assert.assertNotNull(lockManager.acquireLock("testTable"));
+  }
+
+  @Test
+  public void testLockNotTakenWhenTheNodeBelongsToAnotherAttempt() {
+    // Another attempt of the same controller (e.g. a concurrent scheduling thread) created the node first
+    AtomicReference<ZNRecord> node = new AtomicReference<>();
+    ZkHelixPropertyStore<ZNRecord> store = mock(ZkHelixPropertyStore.class);
+    when(store.get(anyString(), any(), eq(AccessOption.EPHEMERAL))).thenAnswer(invocation -> node.get());
+    when(store.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL))).thenAnswer(invocation -> {
+      ZNRecord other = new ZNRecord("controller1");
+      other.setSimpleField("lockOwner", "controller1");
+      other.setSimpleField("lockId", "another-attempt");
+      node.set(other);
+      return false;
+    });
+    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(store, "controller1");
+    Assert.assertNull(lockManager.tryAcquireSessionBasedLock("testTable"));
+  }
 
   @Test
   public void testEphemeralLockAcquisitionAndRelease() {

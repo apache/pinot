@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
@@ -45,6 +46,10 @@ import org.slf4j.LoggerFactory;
 /// - If the propertyStore::create() call returns true, that means the lock node was successfully created and the
 ///   lock belongs to the current controller, otherwise it was not. If the lock node already exists, this will return
 ///   false. No clean-up of the lock node is needed if the propertyStore::create() call returns false.
+/// - Each attempt writes a random lock id into the node. If create() reports a failure or throws, the node is read
+///   back and the lock is taken when it carries this attempt's id: a create retried after a ZK ConnectionLoss can
+///   report NODE_EXISTS for the node its own first try created, which would otherwise hold the lock until the
+///   session ends with no owner able to release it.
 /// - The locks are EPHEMERAL in nature, meaning that once the session with ZK is lost, the lock is automatically
 ///   cleaned up. Scenarios when the ZK session can be lost: a) controller shutdown, b) controller crash, c) ZK
 ///   session expiry (e.g. long GC pauses can cause this). This property helps ensure that the lock is released under
@@ -55,6 +60,7 @@ public class DistributedTaskLockManager {
   // Lock paths are constructed using ZKMetadataProvider
   private static final String LOCK_OWNER_KEY = "lockOwner";
   private static final String LOCK_CREATION_TIME_MS = "lockCreationTimeMs";
+  private static final String LOCK_ID_KEY = "lockId";
 
   // Retry constants
   private static final int MAX_RETRIES = 3;
@@ -270,11 +276,27 @@ public class DistributedTaskLockManager {
       ZNRecord lockRecord = new ZNRecord(_controllerInstanceId);
       lockRecord.setSimpleField(LOCK_OWNER_KEY, _controllerInstanceId);
       lockRecord.setSimpleField(LOCK_CREATION_TIME_MS, String.valueOf(currentTimeMs));
+      // Unique per attempt, not per controller: another thread of this controller must not claim this node
+      String lockId = UUID.randomUUID().toString();
+      lockRecord.setSimpleField(LOCK_ID_KEY, lockId);
 
-      boolean created = _propertyStore.create(lockPath, lockRecord, AccessOption.EPHEMERAL);
+      boolean created;
+      try {
+        created = _propertyStore.create(lockPath, lockRecord, AccessOption.EPHEMERAL);
+      } catch (Exception e) {
+        LOGGER.warn("Error creating lock under path: {}, for controller: {}, for table: {}; checking whether the node "
+            + "was created", lockPath, _controllerInstanceId, tableNameWithType, e);
+        created = false;
+      }
 
       if (created) {
         LOGGER.info("Successfully created lock node at path: {}, for controller: {}, for table: {}", lockPath,
+            _controllerInstanceId, tableNameWithType);
+        return new TaskLock(tableNameWithType, _controllerInstanceId, currentTimeMs, lockPath);
+      }
+      if (isCreatedByThisAttempt(lockPath, lockId)) {
+        LOGGER.info("Lock node at path: {} was created by this attempt although create did not report it (e.g. a retry "
+            + "after ZK ConnectionLoss), taking the lock for controller: {}, for table: {}", lockPath,
             _controllerInstanceId, tableNameWithType);
         return new TaskLock(tableNameWithType, _controllerInstanceId, currentTimeMs, lockPath);
       }
@@ -288,6 +310,17 @@ public class DistributedTaskLockManager {
     }
 
     return null;
+  }
+
+  /// Whether the lock node exists and carries the given lock id, i.e. this attempt's create did go through.
+  private boolean isCreatedByThisAttempt(String lockPath, String lockId) {
+    try {
+      ZNRecord record = _propertyStore.get(lockPath, null, AccessOption.EPHEMERAL);
+      return record != null && lockId.equals(record.getSimpleField(LOCK_ID_KEY));
+    } catch (Exception e) {
+      LOGGER.error("Could not read lock node at path: {} to check its owner", lockPath, e);
+      return false;
+    }
   }
 
   /// Represents a session-based distributed lock for task generation.
