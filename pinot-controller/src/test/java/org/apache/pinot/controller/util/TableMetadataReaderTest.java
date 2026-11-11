@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -57,7 +56,6 @@ public class TableMetadataReaderTest {
   private final ExecutorService _executor = Executors.newFixedThreadPool(4);
   private final PoolingHttpClientConnectionManager _connectionManager = new PoolingHttpClientConnectionManager();
   private final List<HttpServer> _httpServers = new ArrayList<>();
-  private final AtomicInteger _legacyRequestCount = new AtomicInteger();
 
   @BeforeClass
   public void setUp() {
@@ -68,7 +66,6 @@ public class TableMetadataReaderTest {
   public void stopServers() {
     _httpServers.forEach(server -> server.stop(0));
     _httpServers.clear();
-    _legacyRequestCount.set(0);
   }
 
   @AfterClass
@@ -89,7 +86,6 @@ public class TableMetadataReaderTest {
     JsonNode metadata = getSegmentsMetadata(serverToSegments);
 
     assertEquals(segmentNames(metadata), Set.of("seg0", "seg1", "seg2"));
-    assertEquals(_legacyRequestCount.get(), 0);
   }
 
   /// 4 servers with replication 2: each server holds only half of the segments, so every server's response is needed.
@@ -105,7 +101,6 @@ public class TableMetadataReaderTest {
     JsonNode metadata = getSegmentsMetadata(serverToSegments);
 
     assertEquals(segmentNames(metadata), Set.of("seg0", "seg1", "seg2", "seg3"));
-    assertEquals(_legacyRequestCount.get(), 0);
   }
 
   /// Each server holds a distinct segment, so dropping any server's response loses its segment.
@@ -120,7 +115,6 @@ public class TableMetadataReaderTest {
     JsonNode metadata = getSegmentsMetadata(serverToSegments);
 
     assertEquals(segmentNames(metadata), Set.of("seg0", "seg1", "seg2"));
-    assertEquals(_legacyRequestCount.get(), 0);
   }
 
   private JsonNode getSegmentsMetadata(Map<String, List<String>> serverToSegments)
@@ -139,8 +133,7 @@ public class TableMetadataReaderTest {
     return reader.getSegmentsMetadata(TABLE_NAME, null, null, TIMEOUT_MS);
   }
 
-  /// Starts a fake server whose table-level endpoint returns metadata for the given segments. The legacy per-segment
-  /// endpoint returns 404, so tests can assert that the table-level path was used.
+  /// Starts a fake server whose table-level endpoint returns metadata for the given segments.
   private HttpServer startServer(List<String> segments)
       throws IOException {
     ObjectNode tableLevelResponse = JsonUtils.newObjectNode();
@@ -150,17 +143,10 @@ public class TableMetadataReaderTest {
     byte[] tableLevelBody = JsonUtils.objectToString(tableLevelResponse).getBytes(StandardCharsets.UTF_8);
 
     HttpServer httpServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
-    httpServer.createContext("/tables/", exchange -> {
-      String path = exchange.getRequestURI().getPath();
-      if (path.equals("/tables/" + TABLE_NAME + "/segments/metadata")) {
-        exchange.sendResponseHeaders(200, tableLevelBody.length);
-        try (OutputStream out = exchange.getResponseBody()) {
-          out.write(tableLevelBody);
-        }
-      } else {
-        _legacyRequestCount.incrementAndGet();
-        exchange.sendResponseHeaders(404, -1);
-        exchange.close();
+    httpServer.createContext("/tables/" + TABLE_NAME + "/segments/metadata", exchange -> {
+      exchange.sendResponseHeaders(200, tableLevelBody.length);
+      try (OutputStream out = exchange.getResponseBody()) {
+        out.write(tableLevelBody);
       }
     });
     httpServer.start();
