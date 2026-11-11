@@ -22,12 +22,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -106,6 +115,50 @@ public class RestrictedScanDocIdIteratorTest {
         new CountingScanDocIdIterator(matching), CHUNK_SIZE));
 
     assertEquals(docIds, new int[]{1500, 1501, 1502});
+  }
+
+  /// The value matchers of [SVScanDocIdIterator] read the values into buffers of its batch size, so a larger chunk
+  /// must be matched one batch at a time.
+  @Test
+  public void testChunkLargerThanTheScanBatchSize() {
+    int chunkSize = 4 * BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE + 17;
+    ImmutableRoaringBitmap candidates = range(0, 5000);
+
+    SVScanDocIdIterator scan = new SVScanDocIdIterator(dictIdModuloPredicate(3), dictIdModuloReader(3), NUM_DOCS);
+    int[] docIds = drain(new RestrictedScanDocIdIterator(new RangelessBitmapDocIdIterator(candidates), scan,
+        chunkSize));
+
+    int[] expected = new int[5000 / 3 + 1];
+    for (int i = 0; i < expected.length; i++) {
+      expected[i] = 3 * i;
+    }
+    assertEquals(docIds, expected);
+    assertEquals(scan.getNumEntriesScanned(), 5000L);
+  }
+
+  /// A dictionary-encoded column whose dictionary id is the document id modulo `modulo`.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static ForwardIndexReader dictIdModuloReader(int modulo) {
+    ForwardIndexReader reader = mock(ForwardIndexReader.class);
+    when(reader.isDictionaryEncoded()).thenReturn(true);
+    doAnswer(invocation -> {
+      int[] docIds = invocation.getArgument(0);
+      int length = invocation.getArgument(1);
+      int[] dictIdBuffer = invocation.getArgument(2);
+      for (int i = 0; i < length; i++) {
+        dictIdBuffer[i] = docIds[i] % modulo;
+      }
+      return null;
+    }).when(reader).readDictIds(any(int[].class), anyInt(), any(int[].class), any());
+    return reader;
+  }
+
+  /// Matches the dictionary id 0, so with [#dictIdModuloReader] it matches the multiples of `modulo`.
+  private static PredicateEvaluator dictIdModuloPredicate(int modulo) {
+    PredicateEvaluator predicateEvaluator = mock(PredicateEvaluator.class, CALLS_REAL_METHODS);
+    doReturn(true).when(predicateEvaluator).isDictionaryBased();
+    doAnswer(invocation -> (int) invocation.getArgument(0) == 0).when(predicateEvaluator).applySV(anyInt());
+    return predicateEvaluator;
   }
 
   private static int[] drain(BlockDocIdIterator iterator) {
