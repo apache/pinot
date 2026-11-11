@@ -36,6 +36,7 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -161,6 +162,16 @@ public class StagesTestBase {
         inputs.add(inputBuilder.build(stageId));
       }
       return new SetOpNode(stageId, mySchema, myHints, inputs, setOpType, true);
+    };
+  }
+
+  /// Creates a filter node with the given condition over the given child.
+  public SimpleChildBuilder<FilterNode> filter(SimpleChildBuilder<? extends PlanNode> childBuilder,
+      RexExpression condition) {
+    return (stageId, mySchema, myHints) -> {
+      PlanNode input = childBuilder.build(stageId);
+      DataSchema schema = mySchema != null ? mySchema : input.getDataSchema();
+      return new FilterNode(stageId, schema, myHints, List.of(input), condition);
     };
   }
 
