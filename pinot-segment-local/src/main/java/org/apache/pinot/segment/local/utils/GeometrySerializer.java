@@ -62,6 +62,14 @@ public final class GeometrySerializer {
     return readGeometry(bytes);
   }
 
+  /// Deserializes a geometry object from the big-endian buffer, starting at its position. A geometry collection is
+  /// read up to the buffer limit, so the buffer must end where the serialized geometry ends.
+  /// @param buffer the buffer holding the serialized geometry
+  /// @return the deserialized object
+  public static Geometry deserialize(ByteBuffer buffer) {
+    return readGeometry(buffer);
+  }
+
   private static byte[] writeGeometry(Geometry geometry) {
     byte[] bytes = new byte[getByteSize(geometry)];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);

@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.aggregator;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -75,12 +74,12 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
 
   @Override
   public byte[] serializeAggregatedValue(MinMaxRangePair value) {
-    return CustomSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(value);
+    return value.toBytes();
   }
 
   @Override
   public MinMaxRangePair deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytes);
+    return MinMaxRangePair.fromBytes(bytes);
   }
 
   protected MinMaxRangePair processRawValue(Object rawValue) {

@@ -26,10 +26,10 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.SerializedHLLPlus;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -109,7 +109,7 @@ public class DistinctCountRawHLLPlusAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(HyperLogLogPlus hyperLogLogPlus) {
+  public SerializedResult serializeIntermediateResult(HyperLogLogPlus hyperLogLogPlus) {
     return _distinctCountHLLPlusAggregationFunction.serializeIntermediateResult(hyperLogLogPlus);
   }
 

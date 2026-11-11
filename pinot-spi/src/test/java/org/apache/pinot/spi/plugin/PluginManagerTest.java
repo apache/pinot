@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
@@ -38,6 +39,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 
 public class PluginManagerTest {
 
@@ -107,6 +112,48 @@ public class PluginManagerTest {
     expectedPluginNamesAndPaths.put("p3", _p3.getParentFile().getAbsolutePath());
 
     Assert.assertEquals(actualPluginNamesAndPaths, expectedPluginNamesAndPaths);
+  }
+
+  @Test
+  public void testLegacyKafkaPluginIncludes()
+      throws IOException {
+    File pluginJar = new File(_tempDir, "kafka-plugins/pinot-kafka-4.0/kafka.jar");
+    FileUtils.touch(pluginJar);
+    for (String oldName : List.of("pinot-kafka-2.0", "pinot-kafka-3.0")) {
+      assertEquals(PluginManager.get().getPluginsToLoad(pluginJar.getParentFile().getParent(), oldName),
+          Map.of("pinot-kafka-4.0", pluginJar.getParentFile()));
+    }
+  }
+
+  @Test
+  public void testLatePluginAliasRegistration()
+      throws Exception {
+    File pluginJar = new File(_tempDir, "renamed-plugins/current-plugin/plugin.jar");
+    FileUtils.touch(pluginJar);
+    String oldDirectories = System.getProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME);
+    String oldIncludes = System.getProperty(PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME);
+    PluginManager manager;
+    try {
+      System.setProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME, pluginJar.getParentFile().getParent());
+      System.setProperty(PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME, "legacy-plugin");
+      manager = new PluginManager();
+    } finally {
+      restoreProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME, oldDirectories);
+      restoreProperty(PluginManager.PLUGINS_INCLUDE_PROPERTY_NAME, oldIncludes);
+    }
+    assertThrows(RuntimeException.class, () -> manager.loadClass("current-plugin", String.class.getName()));
+    manager.registerBackwardCompatiblePluginName("legacy-plugin", "current-plugin");
+    manager.registerBackwardCompatiblePluginName("legacy-plugin", "current-plugin");
+    assertSame(manager.loadClass("legacy-plugin", String.class.getName()), String.class);
+    assertEquals(manager.<String>createInstance("legacy-plugin:" + String.class.getName()), "");
+  }
+
+  private static void restoreProperty(String name, String value) {
+    if (value == null) {
+      System.clearProperty(name);
+    } else {
+      System.setProperty(name, value);
+    }
   }
 
   @Test
@@ -194,10 +241,10 @@ public class PluginManagerTest {
     // StreamConsumerFactory
     Assert.assertEquals(PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory"),
-        "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+        "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
     Assert.assertEquals(PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory"),
-        "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+        "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
   }
 
   @DataProvider(name = "recordReaderClassNames")

@@ -225,7 +225,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   }
 
   @Override
-  public void setColumn(int colId, AggregationFunction.SerializedIntermediateResult value)
+  public void setColumn(int colId, AggregationFunction.SerializedResult value)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(variableSizeDataOffset());

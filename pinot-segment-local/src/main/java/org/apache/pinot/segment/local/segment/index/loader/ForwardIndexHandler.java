@@ -1424,12 +1424,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           case STRING:
             if (singleValue) {
               String value = forwardIndex.getString(docId, context);
-              rowLength = Utf8Utils.encodedLengthWithReplacement(value);
+              rowLength = Utf8Utils.encodedLength(value);
               stats.addElement(rowLength, isAscii(value));
             } else {
               int numValues = forwardIndex.getStringMV(docId, stringBuffer, context);
               for (int i = 0; i < numValues; i++) {
-                int valueLength = Utf8Utils.encodedLengthWithReplacement(stringBuffer[i]);
+                int valueLength = Utf8Utils.encodedLength(stringBuffer[i]);
                 rowLength += valueLength;
                 stats.addElement(valueLength, isAscii(stringBuffer[i]));
               }

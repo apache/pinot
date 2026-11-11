@@ -35,7 +35,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
+import org.apache.pinot.segment.local.columntransformer.NullValueColumnTransformer;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
@@ -48,6 +50,7 @@ import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -465,6 +468,92 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       testSegment(rows, indexDir, tableConfig, segmentMetadata);
     } finally {
       mutableSegmentImpl.destroy();
+    }
+  }
+
+  @DataProvider
+  public Object[][] mvFloatDefaults() {
+    List<Object[]> cases = new ArrayList<>();
+    for (boolean columnMajor : new boolean[]{false, true}) {
+      for (boolean raw : new boolean[]{false, true}) {
+        for (boolean finiteDefault : new boolean[]{false, true}) {
+          for (String input : List.of("omitted", "infinity", "finite")) {
+            for (int rows : new int[]{1, 257}) {
+              cases.add(new Object[]{columnMajor, raw, finiteDefault, input, rows});
+            }
+          }
+        }
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  /// Ordinary conversion and reopen must preserve the schema default and explicit FLOAT values without any upsert.
+  @Test(dataProvider = "mvFloatDefaults")
+  public void testMvFloatDefaultsSurviveOrdinarySeal(boolean columnMajor, boolean raw, boolean finiteDefault,
+      String input, int rows)
+      throws Exception {
+    String caseName = "floatDefaults-" + columnMajor + "-" + raw + "-" + finiteDefault + "-" + input + "-" + rows;
+    File tmp = new File(TMP_DIR, caseName);
+    FileUtils.forceMkdir(tmp);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("floatDefaults")
+        .addMultiValueDimension("v", DataType.FLOAT)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    if (finiteDefault) {
+      schema.getFieldSpecFor("v").setDefaultNullValue(7.25f);
+    }
+    TableConfig table = new TableConfigBuilder(TableType.REALTIME).setTableName("floatDefaults")
+        .setTimeColumnName("ts").setColumnMajorSegmentBuilderEnabled(columnMajor)
+        .setNoDictionaryColumns(raw ? List.of("v") : List.of()).build();
+    String segmentName = "floatDefaults__0__0__123456";
+    RealtimeSegmentConfig.Builder builder = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(table.getTableName()).setSegmentName(segmentName).setStreamName(table.getTableName())
+        .setSchema(schema).setTimeColumnName("ts").setCapacity(1000).setAvgNumMultiValues(2)
+        .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmp, "stats")))
+        .setConsumerDir(new File(tmp, "consumer").getAbsolutePath());
+    if (raw) {
+      builder.setIndex(Set.of("v"), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+          .setIndex(Set.of("v"), StandardIndexes.forward(),
+              ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW));
+    }
+    MutableSegmentImpl mutable = new MutableSegmentImpl(builder.build(), null);
+    try {
+      float expected = input.equals("finite")
+          ? 3.5f
+          : input.equals("omitted") && finiteDefault ? 7.25f : Float.NEGATIVE_INFINITY;
+      GenericRow row = new GenericRow();
+      row.putValue("ts", 1793750400000L);
+      if (input.equals("omitted")) {
+        Object defaultValue =
+            new NullValueColumnTransformer(table, schema.getFieldSpecFor("v"), schema).transform(null);
+        row.putDefaultNullValue("v", defaultValue);
+      } else {
+        row.putValue("v", new Object[]{expected});
+      }
+      for (int i = 0; i < rows; i++) {
+        mutable.index(row, null);
+      }
+      GenericRow before = mutable.getRecord(rows - 1, new GenericRow());
+      assertEquals(((Number) ((Object[]) before.getValue("v"))[0]).floatValue(), expected, "mutable " + caseName);
+      File output = new File(tmp, "output");
+      RealtimeSegmentConverter converter = new RealtimeSegmentConverter(mutable, new SegmentZKPropsConfig(),
+          output.getAbsolutePath(), schema, table.getTableName(), table, segmentName, false);
+      converter.build(SegmentVersion.v3);
+      for (int reopen = 0; reopen < 2; reopen++) {
+        ImmutableSegment immutable = ImmutableSegmentLoader.load(new File(output, segmentName),
+            new IndexLoadingConfig(table, schema));
+        try {
+          GenericRow after = immutable.getRecord(rows - 1, new GenericRow());
+          float actual = ((Number) ((Object[]) after.getValue("v"))[0]).floatValue();
+          assertEquals(actual, expected, "ordinary seal/reopen " + reopen + " " + caseName);
+        } finally {
+          immutable.destroy();
+        }
+      }
+    } finally {
+      mutable.destroy();
     }
   }
 

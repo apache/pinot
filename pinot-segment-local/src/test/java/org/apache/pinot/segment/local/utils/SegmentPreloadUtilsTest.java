@@ -131,7 +131,7 @@ public class SegmentPreloadUtilsTest {
 
     File seg02IdxDir = new File(tableDataDir, seg02Name);
     FileUtils.forceMkdir(seg02IdxDir);
-    FileUtils.touch(new File(new File(seg02IdxDir, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(new File(seg02IdxDir, "v3"), V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
     when(tableDataManager.getSegmentDataDir(seg02Name, null, tableConfig)).thenReturn(seg02IdxDir);
 
     try {

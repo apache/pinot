@@ -79,7 +79,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 import org.testng.SkipException;
@@ -180,7 +179,7 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     brokerConf.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, LOCAL_HOST);
-    int brokerPort = NetUtils.findOpenPort(_nextBrokerPort);
+    int brokerPort = _brokerPortRange.findOpenPort(_nextBrokerPort);
     brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort);
     _brokerPorts.add(brokerPort);
     if (_brokerBaseApiUrl == null) {
@@ -191,13 +190,13 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     brokerConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
 
-    int brokerGrpcPort = NetUtils.findOpenPort(_nextBrokerGrpcPort);
+    int brokerGrpcPort = _brokerGrpcPortRange.findOpenPort(_nextBrokerGrpcPort);
     brokerConf.setProperty(Broker.Grpc.KEY_OF_GRPC_PORT, brokerGrpcPort);
     if (_brokerGrpcEndpoint == null) {
       _brokerGrpcEndpoint = "localhost:" + brokerGrpcPort;
     }
     _nextBrokerGrpcPort = brokerGrpcPort + 1;
-    int brokerQueryRunnerPort = NetUtils.findOpenPort(_nextBrokerQueryRunnerPort);
+    int brokerQueryRunnerPort = _brokerQueryRunnerPortRange.findOpenPort(_nextBrokerQueryRunnerPort);
     brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, brokerQueryRunnerPort);
     _nextBrokerQueryRunnerPort = brokerQueryRunnerPort + 1;
     overrideBrokerConf(brokerConf);
@@ -253,19 +252,19 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
     serverConf.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
 
-    int serverAdminApiPort = NetUtils.findOpenPort(_nextServerPort);
+    int serverAdminApiPort = _serverPortRange.findOpenPort(_nextServerPort);
     serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, serverAdminApiPort);
-    int serverNettyPort = NetUtils.findOpenPort(serverAdminApiPort + 1);
+    int serverNettyPort = _serverPortRange.findOpenPort(serverAdminApiPort + 1);
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, serverNettyPort);
-    int serverGrpcPort = NetUtils.findOpenPort(serverNettyPort + 1);
+    int serverGrpcPort = _serverPortRange.findOpenPort(serverNettyPort + 1);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, serverGrpcPort);
     // Assign the multi-stage query engine ports explicitly using the incremental findOpenPort pattern so that
     // rapid back-to-back server starts in the same JVM don't collide on OS-ephemeral ports. Otherwise
     // BaseServerStarter.init() falls back to NetUtils.findOpenPort() which probes and releases a ServerSocket(0)
     // before the gRPC server binds, opening a window where the same port can be handed to a later caller.
-    int queryServerPort = NetUtils.findOpenPort(serverGrpcPort + 1);
+    int queryServerPort = _serverPortRange.findOpenPort(serverGrpcPort + 1);
     serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, queryServerPort);
-    int queryRunnerPort = NetUtils.findOpenPort(queryServerPort + 1);
+    int queryRunnerPort = _serverPortRange.findOpenPort(queryServerPort + 1);
     serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, queryRunnerPort);
     if (_serverAdminApiPort == 0) {
       _serverAdminApiPort = serverAdminApiPort;
@@ -333,7 +332,7 @@ public abstract class ClusterTest extends ControllerTest {
     minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     minionConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     minionConf.setProperty(Helix.KEY_OF_MINION_HOST, LOCAL_HOST);
-    int minionPort = NetUtils.findOpenPort(_nextMinionPort);
+    int minionPort = _minionPortRange.findOpenPort(_nextMinionPort);
     minionConf.setProperty(Helix.KEY_OF_MINION_PORT, minionPort);
     if (_minionBaseApiUrl == null) {
       _minionBaseApiUrl = "http://localhost:" + minionPort;

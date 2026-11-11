@@ -1425,6 +1425,33 @@ public class CommonConstants {
       /// stop-the-world GC pause expected on a server, or a pause will briefly take that server out of routing.
       public static final String CONFIG_OF_PING_TIMEOUT_MS = "pinot.broker.failure.detector.ping.timeout.ms";
       public static final long DEFAULT_PING_TIMEOUT_MS = 5_000L;
+
+      /// Single-stage queries a server leaves unanswered are also counted per channel, with or without pings. A query
+      /// counts once its timeout has passed and, a further grace period later, the server has still sent nothing on
+      /// the channel since the query was written to it. The grace lets the server's own late timeout response through,
+      /// so a burst of slow queries or a broker pause does not look like a dead channel; a half-open channel answers
+      /// nothing, ever. At the threshold the channel is marked suspect, so the next query to it (or the failure
+      /// detector's retry) replaces it with a fresh connection. That never takes the server out of routing; see
+      /// [#CONFIG_OF_REPORT_UNANSWERED_SERVERS] for that. Any response from the server, decodable or not, resets the
+      /// count. A non-positive threshold disables the check.
+      public static final String CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD =
+          "pinot.broker.failure.detector.unanswered.queries.threshold";
+      public static final int DEFAULT_UNANSWERED_QUERIES_THRESHOLD = 5;
+      public static final String CONFIG_OF_UNANSWERED_QUERY_GRACE_MS =
+          "pinot.broker.failure.detector.unanswered.query.grace.ms";
+      public static final long DEFAULT_UNANSWERED_QUERY_GRACE_MS = 2_000L;
+
+      /// With pings disabled, whether a server that crosses [#CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD] on a channel is
+      /// also reported to the failure detector, which with the `CONNECTION` detector takes it out of routing until the
+      /// retry probe re-establishes its channels. Off by default: a tenant whose heavy queries routinely overrun their
+      /// timeout, or a long GC pause, can cross the threshold on a healthy server. Without pings the retry probe is a
+      /// TCP connect, which a frozen JVM's kernel still completes, so such a server is readmitted at every retry and
+      /// can leave up to the threshold of queries per channel unanswered again before it is reported once more;
+      /// enabling pings, where every server supports them, is the better way to catch it. With pings enabled this
+      /// setting has no effect: the ping that follows every timeout decides.
+      public static final String CONFIG_OF_REPORT_UNANSWERED_SERVERS =
+          "pinot.broker.failure.detector.report.unanswered.servers";
+      public static final boolean DEFAULT_REPORT_UNANSWERED_SERVERS = false;
     }
 
     // Configs related to AdaptiveServerSelection.

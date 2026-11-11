@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -136,7 +135,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{1, 9, 90, 900, 1000});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{1, 9, 90, 900, 1000});
 
     // Inner Segment ARRAY-specified edges with Infinity
     query = "SELECT HISTOGRAM(intColumn,ARRAY[\"-Infinity\",1,10,100,1000,\"Infinity\"]) FROM testTable";
@@ -148,7 +147,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{1, 9, 90, 900, 1000});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{1, 9, 90, 900, 1000});
 
     // Inner Segment with filter
     operator = getOperatorWithFilter(query);
@@ -158,7 +157,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{0, 0, 0, 500, 1000});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{0, 0, 0, 500, 1000});
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
@@ -187,8 +186,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
-        new double[]{100, 100, 100, 100, 100, 100, 100, 100, 100, 101});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{100, 100, 100, 100, 100, 100, 100, 100, 100, 101});
 
     operator = getOperatorWithFilter(query);
     assertTrue(operator instanceof AggregationOperator);
@@ -197,8 +195,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
-        new double[]{0, 0, 0, 0, 0, 100, 100, 100, 100, 101});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{0, 0, 0, 0, 0, 100, 100, 100, 100, 101});
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
@@ -220,17 +217,17 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS * 2, NUM_RECORDS);
     List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
     assertNotNull(resultRecords);
-    assertEquals(((DoubleArrayList) resultRecords.get(0)._record.getValues()[1]).elements(),
+    assertEquals((double[]) resultRecords.get(0)._record.getValues()[1],
         new double[]{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [0]
-    assertEquals(((DoubleArrayList) resultRecords.get(1)._record.getValues()[1]).elements(),
+    assertEquals((double[]) resultRecords.get(1)._record.getValues()[1],
         new double[]{99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [1-400]
-    assertEquals(((DoubleArrayList) resultRecords.get(2)._record.getValues()[1]).elements(),
+    assertEquals((double[]) resultRecords.get(2)._record.getValues()[1],
         new double[]{0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [401-800]
-    assertEquals(((DoubleArrayList) resultRecords.get(3)._record.getValues()[1]).elements(),
+    assertEquals((double[]) resultRecords.get(3)._record.getValues()[1],
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0}); // [801-1200]
-    assertEquals(((DoubleArrayList) resultRecords.get(4)._record.getValues()[1]).elements(),
+    assertEquals((double[]) resultRecords.get(4)._record.getValues()[1],
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0}); // [1201-1600]
-    assertEquals(((DoubleArrayList) resultRecords.get(5)._record.getValues()[1]).elements(),
+    assertEquals((double[]) resultRecords.get(5)._record.getValues()[1],
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100}); // [1601-2000]
 
     // Inter segment
@@ -257,7 +254,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         2 * NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
+    assertEquals((double[]) aggregationResult.get(0),
         new double[]{50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 51});
 
     query = "SELECT HISTOGRAM(ADD(intColumn,doubleColumn),0,2000,20) FROM testTable";
@@ -268,7 +265,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
+    assertEquals((double[]) aggregationResult.get(0),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50, 50, 50, 50, 50, 50, 50, 50, 50, 51});
 
     // Inter segment
@@ -363,8 +360,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
-        new double[]{12, 11, 11, 11, 11, 11, 11, 11, 12});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{12, 11, 11, 11, 11, 11, 11, 11, 12});
     // [0, 11], [12, 22], [23, 33], [34, 44], [45, 55], [56,66], [67, 77], [78, 88], [89, 100]
 
     query = "SELECT HISTOGRAM(intColumn,ARRAY[0,1]) FROM testTable";
@@ -375,7 +371,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{2});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{2});
 
     query = "SELECT HISTOGRAM(intColumn,ARRAY[1999,2000]) FROM testTable";
     operator = getOperator(query);
@@ -385,7 +381,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{1});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{1});
 
     query = "SELECT HISTOGRAM(longColumn,ARRAY[\"-Infinity\", -999, -800, -500, 500, 600, 800, \"Infinity\"]) FROM "
         + "testTable";
@@ -396,8 +392,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
-        new double[]{1, 199, 300, 1000, 100, 200, 200});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{1, 199, 300, 1000, 100, 200, 200});
 
     query = "SELECT HISTOGRAM(longColumn,-999.5, 500.5, 15) FROM testTable";
     operator = getOperator(query);
@@ -407,7 +402,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
+    assertEquals((double[]) aggregationResult.get(0),
         new double[]{100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100});
 
     query = "SELECT HISTOGRAM(longColumn, -1000, 500, 15) FROM testTable";
@@ -418,7 +413,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(),
+    assertEquals((double[]) aggregationResult.get(0),
         new double[]{100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 101});
 
     query = "SELECT HISTOGRAM(floatColumn, ARRAY[0.5,1.5,2.5,3.5,4.5,5.5]) FROM testTable";
@@ -429,7 +424,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{2, 2, 2, 2, 3});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{2, 2, 2, 2, 3});
     // {0.5, 1} {1.5, 2}, {2.5, 3}, {3.5,4}, {4.5, 5, 5.5}
 
     query = "SELECT HISTOGRAM(doubleColumn, ARRAY[-1, 0, 1, 2, 3, 4]) FROM testTable";
@@ -440,7 +435,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{0, 1, 1, 1, 2});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{0, 1, 1, 1, 2});
 
     query = "SELECT HISTOGRAM(longColumn, ARRAY[-1, 0, 1, 2, 3, 4]) FROM testTable";
     operator = getOperator(query);
@@ -450,7 +445,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{1, 1, 1, 1, 2});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{1, 1, 1, 1, 2});
 
     query = "SELECT HISTOGRAM(longColumn, ARRAY[-900, -850, -800, 1]) FROM testTable WHERE "
         + "longColumn BETWEEN -1000 AND -950 OR longColumn BETWEEN -900 AND 2 OR longColumn BETWEEN 900 AND 950";
@@ -461,7 +456,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{50, 50, 802});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{50, 50, 802});
 
     query = "SELECT HISTOGRAM(longColumn, ARRAY[-900, -850, -800, 1]) FROM testTable WHERE "
         + "longColumn BETWEEN -1000 AND -950 OR longColumn BETWEEN -900 AND 2 OR longColumn BETWEEN 900 AND 950";
@@ -472,7 +467,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{50, 50, 802});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{50, 50, 802});
 
     query = "SELECT HISTOGRAM(longColumn, ARRAY[-1004,-1003,-1002,-1001,-1000,-999]) FROM testTable";
     operator = getOperator(query);
@@ -482,7 +477,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{0, 0, 0, 0, 2});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{0, 0, 0, 0, 2});
 
     query = "SELECT HISTOGRAM(floatColumn, ARRAY[995,996,997,998,999,1000,1001,1002]) FROM testTable";
     operator = getOperator(query);
@@ -492,7 +487,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
         NUM_RECORDS, NUM_RECORDS);
     aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    assertEquals(((DoubleArrayList) aggregationResult.get(0)).elements(), new double[]{2, 2, 2, 2, 2, 0, 0});
+    assertEquals((double[]) aggregationResult.get(0), new double[]{2, 2, 2, 2, 2, 0, 0});
   }
 
   @AfterClass

@@ -37,6 +37,9 @@ public class InstanceResponseBlock implements Block {
   private final BaseResultsBlock _resultsBlock;
   private final Map<Integer, String> _exceptions;
   private final Map<String, String> _metadata;
+  // Metadata kept on the server (query log and metrics) and never sent in the response. Created on first use.
+  @Nullable
+  private Map<String, String> _serverOnlyMetadata;
 
   public InstanceResponseBlock(BaseResultsBlock resultsBlock) {
     _resultsBlock = resultsBlock;
@@ -86,6 +89,38 @@ public class InstanceResponseBlock implements Block {
 
   public Map<String, String> getResponseMetadata() {
     return _metadata;
+  }
+
+  /// Moves the metadata entry with the given key out of the response. The entry stays readable on the server through
+  /// [#getServerMetadata()], but [#toDataTable()] and [#toMetadataOnlyDataTable()] do not send it.
+  public void hideMetadata(String key) {
+    String value = _metadata.remove(key);
+    if (value != null) {
+      if (_serverOnlyMetadata == null) {
+        _serverOnlyMetadata = new HashMap<>();
+      }
+      _serverOnlyMetadata.put(key, value);
+    }
+  }
+
+  /// Sets a metadata entry that the server reads and the response does not carry. It replaces the response entry with
+  /// the same key in [#getServerMetadata()].
+  public void putServerOnlyMetadata(String key, String value) {
+    if (_serverOnlyMetadata == null) {
+      _serverOnlyMetadata = new HashMap<>();
+    }
+    _serverOnlyMetadata.put(key, value);
+  }
+
+  /// Returns the response metadata plus the entries moved out of the response by [#hideMetadata(String)] or set by
+  /// [#putServerOnlyMetadata(String, String)]. For the server query log and metrics only.
+  public Map<String, String> getServerMetadata() {
+    if (_serverOnlyMetadata == null) {
+      return _metadata;
+    }
+    Map<String, String> serverMetadata = new HashMap<>(_metadata);
+    serverMetadata.putAll(_serverOnlyMetadata);
+    return serverMetadata;
   }
 
   @Nullable

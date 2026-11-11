@@ -32,6 +32,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.utils.SampleQueries;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// The basic Batch/Offline Quickstart.
@@ -40,6 +42,7 @@ import org.apache.pinot.tools.utils.SampleQueries;
 /// a dedicated quickstart each: the multi-stage engine, JSON indexes, complex type handling, timestamp indexes,
 /// lookup joins and vector similarity. The types those quickstarts used to own are kept as deprecated aliases.
 public class Quickstart extends QuickStartBase {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Quickstart.class);
   protected static final Map<String, String> OPTIONS_TO_USE_MSE = Map.of("queryOptions",
       CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
 
@@ -112,10 +115,9 @@ public class Quickstart extends QuickStartBase {
         new QuickstartRunner(quickstartTableRequests, 1, 1, getNumQuickstartRunnerServers(), 1, quickstartRunnerDir,
             true, getAuthProvider(),
             getConfigOverrides(), _zkExternalAddress, true, getClusterConfigOverrides(),
-            this::getIndividualBrokerConfigOverridesFunction, this::getIndividualServerConfigOverridesFunction);
+            this::getIndividualBrokerConfigOverridesFunction, this::getIndividualServerConfigOverridesFunction)
+            .setForkServers(getNumQuickstartRunnerServers() > 1);
 
-    printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker, server and minion *****");
-    runner.startAll();
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
         printStatus(Color.GREEN, "***** Shutting down quick start *****");
@@ -125,6 +127,18 @@ public class Quickstart extends QuickStartBase {
         e.printStackTrace();
       }
     }));
+    printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker, server and minion *****");
+    try {
+      runner.startAll();
+    } catch (Exception e) {
+      LOGGER.error("Failed to start quickstart", e);
+      try {
+        runner.stop();
+      } catch (Exception cleanupException) {
+        e.addSuppressed(cleanupException);
+      }
+      throw e;
+    }
 
     if (!CollectionUtils.isEmpty(quickstartTableRequests)) {
       printStatus(Color.CYAN, "***** Bootstrap tables *****");
@@ -144,13 +158,12 @@ public class Quickstart extends QuickStartBase {
             QuickstartRunner.DEFAULT_CONTROLLER_PORT));
   }
 
-  /// Three servers so that the multi-stage sample queries below actually exercise a cross-server exchange, which is
-  /// what the merged MULTI_STAGE and JOIN quickstarts used to set up.
+  /// Two servers in separate JVMs exercise cross-server exchanges without sharing server-local static state.
   ///
   /// This is the default for every quickstart extending this class, not just `-type BATCH`. Subclasses that do not
   /// need distributed execution can override it; [TPCHQuickStart] for instance runs on a single server.
   protected int getNumQuickstartRunnerServers() {
-    return 3;
+    return 2;
   }
 
   @Override

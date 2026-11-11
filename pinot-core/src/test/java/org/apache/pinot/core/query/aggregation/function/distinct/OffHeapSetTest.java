@@ -65,7 +65,9 @@ public class OffHeapSetTest {
       }
       verify(offHeapSet, onHeapSet);
 
-      try (OffHeap32BitSet offHeapSet2 = OffHeap32BitSet.deserialize(ByteBuffer.wrap(offHeapSet.serialize()))) {
+      byte[] bytes = offHeapSet.serialize();
+      assertEquals(bytes.length, Integer.BYTES + offHeapSet.size() * Integer.BYTES);
+      try (OffHeap32BitSet offHeapSet2 = OffHeap32BitSet.deserialize(ByteBuffer.wrap(bytes))) {
         verify(offHeapSet2, onHeapSet);
       }
 
@@ -115,7 +117,9 @@ public class OffHeapSetTest {
       }
       verify(offHeapSet, onHeapSet);
 
-      try (OffHeap64BitSet offHeapSet2 = OffHeap64BitSet.deserialize(ByteBuffer.wrap(offHeapSet.serialize()))) {
+      byte[] bytes = offHeapSet.serialize();
+      assertEquals(bytes.length, Integer.BYTES + offHeapSet.size() * Long.BYTES);
+      try (OffHeap64BitSet offHeapSet2 = OffHeap64BitSet.deserialize(ByteBuffer.wrap(bytes))) {
         verify(offHeapSet2, onHeapSet);
       }
 
@@ -167,7 +171,9 @@ public class OffHeapSetTest {
       }
       verify(offHeapSet, onHeapSet);
 
-      try (OffHeap128BitSet offHeapSet2 = OffHeap128BitSet.deserialize(ByteBuffer.wrap(offHeapSet.serialize()))) {
+      byte[] bytes = offHeapSet.serialize();
+      assertEquals(bytes.length, Integer.BYTES + offHeapSet.size() * 2 * Long.BYTES);
+      try (OffHeap128BitSet offHeapSet2 = OffHeap128BitSet.deserialize(ByteBuffer.wrap(bytes))) {
         verify(offHeapSet2, onHeapSet);
       }
 

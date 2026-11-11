@@ -24,6 +24,7 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -33,6 +34,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.api.AccessControl;
@@ -41,6 +44,7 @@ import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -89,6 +93,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.slf4j.MDC;
@@ -97,14 +102,18 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class BaseSingleStageBrokerRequestHandlerTest {
@@ -870,17 +879,169 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "Expected TOO_MANY_REQUESTS error code");
   }
 
-  /// Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
-  /// accessControl.getRowColFilters(requesterIdentity, tableName) fetches RLS
-  /// policy for the materialized view table instead of the base table.
-  ///
-  /// Before fix: getRowColFilters is called with the materialized view table name
-  /// "mv_baseTable_OFFLINE".
-  ///
-  /// After fix: getRowColFilters is called with the original base table
-  /// name "baseTable_OFFLINE".
   @Test
-  public void testMaterializedViewFullRewriteRlsLookupUsesBaseTable()
+  public void testHasCrossTableFunction() {
+    String subquery = "SELECT ID_SET(col1) FROM myTable WHERE col2 = 2";
+    // The operator of a compiled call is canonical (underscores removed, lower-cased), so every spelling counts, the
+    // dotless ı (U+0131) look-alike that the server resolves too included
+    String[] spellings = {
+        "IN_PARTITIONED_SUBQUERY", "inpartitionedsubquery", "In_Partitioned_Sub_Query", "IN_PART\u0131TIONED_SUBQUERY"
+    };
+    for (String spelling : spellings) {
+      assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE " + spelling + "(col1, '" + subquery
+          + "') = 1"), spelling);
+    }
+    // Nested in other predicates and expressions, and outside the WHERE clause
+    assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE col2 = 1 AND NOT (col3 > 2 OR "
+        + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1)"));
+    assertTrue(hasCrossTableFunction("SELECT CASE WHEN IN_PARTITIONED_SUBQUERY(col1, '" + subquery
+        + "') = 1 THEN 1 ELSE 0 END FROM myTable"));
+    assertTrue(hasCrossTableFunction("SELECT col1, COUNT(*) FROM myTable GROUP BY col1 HAVING "
+        + "IN_PARTITIONED_SUBQUERY(col1, '" + subquery + "') = 1"));
+    // The other cross-table functions, alone and together, a lookup() nested in a lookup() included
+    assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_SUBQUERY(col1, '" + subquery
+        + "') = 1"));
+    assertTrue(hasCrossTableFunction("SELECT lookup('dimTable', 'name', 'id', col1) FROM myTable"));
+    assertTrue(hasCrossTableFunction("SELECT UPPER(lookup('dimTable', 'name', 'id', col1)) FROM myTable"));
+    assertTrue(hasCrossTableFunction("SELECT lookup('dimTable', 'name', 'id', lookup('other', 'id', 'key', col1)) "
+        + "FROM myTable WHERE In_Sub_Query(col2, '" + subquery + "') = 1 ORDER BY LOOK_UP('third', 'v', 'k', col3)"));
+    assertTrue(hasCrossTableFunction("SELECT col1 FROM myTable ORDER BY LOOK_UP('dimTable', 'v', 'k', col1)"));
+    // Other functions, IN_ID_SET on a literal included, are not cross-table functions
+    assertFalse(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_ID_SET(col1, 'AQ==') = 1"));
+    assertFalse(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE col1 = 1"));
+    // Under a Turkish default locale the parser lower-cases the I of the plain spelling to a dotless ı as well
+    Locale defaultLocale = Locale.getDefault();
+    Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+    try {
+      assertTrue(hasCrossTableFunction("SELECT COUNT(*) FROM myTable WHERE IN_PARTITIONED_SUBQUERY(col1, '" + subquery
+          + "') = 1"));
+    } finally {
+      Locale.setDefault(defaultLocale);
+    }
+  }
+
+  private static boolean hasCrossTableFunction(String sql) {
+    return BaseSingleStageBrokerRequestHandler.hasCrossTableFunction(CalciteSqlParser.compileToPinotQuery(sql));
+  }
+
+  /// The row filters are added to the WHERE clause of the queried table, which no cross-table function reads through,
+  /// so a principal with row filters is denied every one of them. `IN_SUBQUERY` runs a nested request that needs a
+  /// server response, so RowLevelSecurityIntegrationTest covers it and `testHasCrossTableFunction` its detection.
+  @Test
+  public void testCrossTableFunctionsRejectedWhenRowFiltersApply()
+      throws Exception {
+    String tableName = "myTable_OFFLINE";
+    TableCache tableCache = mock(TableCache.class);
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCache.getActualTableName(anyString())).thenReturn(tableName);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("col1", "col1"));
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("tier_BROKER", "tier_SERVER", null));
+    when(tableCache.getTableConfig(tableName)).thenReturn(tableCfg);
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(tableName)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("Server_localhost_9000")),
+            new SegmentsToQuery(List.of("segment01"), List.of())));
+    when(routingManager.getRoutingTable(any(), anyLong())).thenReturn(rt);
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    AtomicReference<List<String>> rowFilters = new AtomicReference<>(List.of("tenant = 'allowed'"));
+    AccessControl accessControl = new AccessControl() {
+      @Override
+      public AuthorizationResult authorize(RequesterIdentity identity, BrokerRequest request) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableAuthorizationResult authorize(RequesterIdentity identity, Set<String> tables) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableRowColAccessResult getRowColFilters(RequesterIdentity identity, String table) {
+        // Row filters on the queried table only: a dimension table with row filters is rejected by the lookup check
+        return new TableRowColAccessResultImpl(table.equals(tableName) ? rowFilters.get() : List.of());
+      }
+    };
+    AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
+    when(accessControlFactory.create()).thenReturn(accessControl);
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config =
+        new PinotConfiguration(Map.of(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH, "true"));
+    BrokerQueryEventListenerFactory.init(config);
+    AtomicReference<BrokerRequest> serverRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        newServerRequestCapturingHandler(config, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+            serverRequest);
+
+    Map<String, String> queries = Map.of(
+        "IN_PARTITIONED_SUBQUERY",
+        "SELECT COUNT(*) FROM myTable WHERE IN_PARTITIONED_SUBQUERY(col1, 'SELECT ID_SET(col1) FROM myTable') = 1",
+        "lookup", "SELECT lookup('dimTable', 'dimValue', 'dimKey', col1) FROM myTable");
+    for (Map.Entry<String, String> entry : queries.entrySet()) {
+      String function = entry.getKey();
+      String query = entry.getValue();
+
+      // Rejected before anything reaches a server
+      rowFilters.set(List.of("tenant = 'allowed'"));
+      serverRequest.set(null);
+      WebApplicationException e = expectThrows(WebApplicationException.class, () -> handler.handleRequest(query));
+      assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode(), function);
+      assertTrue(e.getMessage().contains("Cross-table functions are not allowed"), e.getMessage());
+      assertNull(serverRequest.get(), function);
+
+      // Allowed, and left for the server to resolve, when no row filter applies to the principal
+      rowFilters.set(List.of());
+      BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(query);
+      assertFalse(response.getRLSFiltersApplied(), function);
+      assertNotNull(serverRequest.get(), function);
+      assertTrue(BaseSingleStageBrokerRequestHandler.hasCrossTableFunction(serverRequest.get().getPinotQuery()),
+          function);
+    }
+  }
+
+  /// A handler that records the request it would send to the servers instead of sending it.
+  private static BaseSingleStageBrokerRequestHandler newServerRequestCapturingHandler(PinotConfiguration config,
+      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, AtomicReference<BrokerRequest> serverRequest) {
+    return new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
+        routingManager, accessControlFactory, queryQuotaManager, tableCache, ThreadAccountantUtils.getNoOpAccountant(),
+        null, null) {
+      @Override
+      public void start() {
+      }
+
+      @Override
+      public void shutDown() {
+      }
+
+      @Override
+      protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+          BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+          RequestContext requestContext) {
+        serverRequest.set(serverBrokerRequest);
+        return BrokerResponseNative.empty();
+      }
+
+      @Override
+      protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+          long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+          TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
+          RequestContext requestContext) {
+        throw new UnsupportedOperationException("Not implemented in test");
+      }
+    };
+  }
+
+  /// A query with an RLS filter skips the MV rewrite: the broker looks up the RLS filter of the base table
+  /// "baseTable_OFFLINE", and the query runs on the base table with that filter in its options.
+  @Test
+  public void testMaterializedViewRewriteSkippedUnderRls()
       throws Exception {
     String baseOfflineTable = "baseTable_OFFLINE";
     String materializedViewOfflineTable = "mv_baseTable_OFFLINE";
@@ -935,6 +1096,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
             new SegmentsToQuery(List.of("seg01"), List.of())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
 
+    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
     QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
     when(quotaManager.acquire(anyString())).thenReturn(true);
     when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
@@ -991,6 +1153,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
               BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
               TableRouteInfo route, long timeoutMs, ServerStats serverStats,
               RequestContext requestContext) {
+            capturedServerRequest.set(serverBrokerRequest);
             return BrokerResponseNative.empty();
           }
 
@@ -1018,11 +1181,13 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "RLS filter lookup must use base table '" + baseRawTable
             + "' not materialized view table, but got: " + rlsTable);
     Assert.assertTrue(response.getRLSFiltersApplied(), "response should report that RLS filters were applied");
-    PinotQuery rewriteInput = querySeenByMaterializedViewRewrite.get();
-    Assert.assertNotNull(rewriteInput, "MV rewrite should see the server query after RLS rewrite");
-    Assert.assertNotNull(rewriteInput.getFilterExpression(), "MV rewrite input must carry the base-table RLS filter");
-    Assert.assertTrue(rewriteInput.getFilterExpression().toString().contains("allowed"),
-        "MV rewrite input must include the RLS predicate, got: " + rewriteInput.getFilterExpression());
+    /// The server applies the RLS filter from the `rlsFilters-<rawTableName>` query option, so a query with an RLS
+    /// filter must not be rewritten onto the MV: it runs on the base table, with the option of the base table.
+    Assert.assertNull(querySeenByMaterializedViewRewrite.get(), "A query with an RLS filter must skip the MV rewrite");
+    PinotQuery serverQuery = capturedServerRequest.get().getPinotQuery();
+    Assert.assertEquals(serverQuery.getDataSource().getTableName(), baseOfflineTable);
+    Assert.assertEquals(serverQuery.getQueryOptions().get(RlsUtils.buildRlsFilterKey(baseRawTable)),
+        "( ts = 'allowed' )");
   }
 
   /// The split-mode time-boundary filter attach helpers moved to
@@ -1167,6 +1332,284 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "combined filter must include the RLS predicate, got literals: " + literalValues);
     Assert.assertTrue(literalValues.contains("x"),
         "combined filter must retain the original WHERE clause, got literals: " + literalValues);
+  }
+
+  /// The broker fails the query when it cannot apply the RLS filter, instead of running it without the filter.
+  @Test
+  public void testRlsRewriteFailureFailsTheQuery()
+      throws Exception {
+    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        newRlsHandler("ts = = 'allowed'", capturedServerRequest, BrokerResponseNative.empty());
+
+    BrokerResponseNative response =
+        (BrokerResponseNative) handler.handleRequest("SELECT COUNT(*) FROM faroEvents WHERE ts = 'x'");
+
+    Assert.assertNull(capturedServerRequest.get(), "The query must not reach the servers without its RLS filter");
+    Assert.assertEquals(response.getExceptions().size(), 1, response.getExceptions().toString());
+    Assert.assertEquals(response.getExceptions().get(0).getErrorCode(), QueryErrorCode.QUERY_VALIDATION.getId());
+    Assert.assertFalse(response.getExceptions().get(0).getMessage().contains("allowed"),
+        "The error must not show the RLS filter: " + response.getExceptions().get(0).getMessage());
+    verify(BrokerMetrics.get()).addMeteredTableValue("faroEvents", BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1L);
+  }
+
+  /// The broker optimizes the query again after it adds the RLS filter to the WHERE clause, as the server optimizes
+  /// its copy of the RLS filter: `level = 2.0` on an INT column becomes `level = 2`.
+  @Test
+  public void testRlsFilterInWhereClauseIsOptimized()
+      throws Exception {
+    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        newRlsHandler("level = 2.0", capturedServerRequest, BrokerResponseNative.empty());
+
+    BrokerResponseNative response =
+        (BrokerResponseNative) handler.handleRequest("SELECT COUNT(*) FROM faroEvents WHERE ts = 'x'");
+
+    Assert.assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    Expression filter = capturedServerRequest.get().getPinotQuery().getFilterExpression();
+    Function policy = filter.getFunctionCall().getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(policy.getOperator(), FilterKind.EQUALS.name(), filter.toString());
+    Assert.assertEquals(policy.getOperands().get(0).getIdentifier().getName(), "level", filter.toString());
+    // The optimizer turns the decimal literal into a long literal
+    Assert.assertEquals(policy.getOperands().get(1).getLiteral().getLongValue(), 2L, filter.toString());
+  }
+
+  /// Under RLS, the broker hides the stats that show the layout of the whole table, also when an old server sends
+  /// them.
+  @Test
+  public void testRlsHidesTableLayoutStats()
+      throws Exception {
+    BrokerResponseNative serverResponse = BrokerResponseNative.empty();
+    serverResponse.setTotalDocs(1000);
+    serverResponse.setNumSegmentsQueried(10);
+    serverResponse.setNumSegmentsProcessed(8);
+    serverResponse.setNumSegmentsMatched(5);
+    serverResponse.setNumConsumingSegmentsQueried(2);
+    serverResponse.setNumSegmentsPrunedByServer(2);
+    serverResponse.setNumSegmentsPrunedByValue(1);
+    serverResponse.setNumDocsScanned(42);
+    BaseSingleStageBrokerRequestHandler handler =
+        newRlsHandler("ts = 'allowed'", new AtomicReference<>(), serverResponse);
+
+    BrokerResponseNative response =
+        (BrokerResponseNative) handler.handleRequest("SELECT COUNT(*) FROM faroEvents WHERE ts = 'x'");
+
+    Assert.assertTrue(response.getRLSFiltersApplied());
+    Assert.assertEquals(response.getTotalDocs(), 0L);
+    Assert.assertEquals(response.getNumSegmentsQueried(), 0L);
+    Assert.assertEquals(response.getNumSegmentsProcessed(), 0L);
+    Assert.assertEquals(response.getNumSegmentsMatched(), 0L);
+    Assert.assertEquals(response.getNumConsumingSegmentsQueried(), 0L);
+    Assert.assertEquals(response.getNumSegmentsPrunedByServer(), 0L);
+    Assert.assertEquals(response.getNumSegmentsPrunedByValue(), 0L);
+    // numDocsScanned only counts the rows of the tenant, so it stays
+    Assert.assertEquals(response.getNumDocsScanned(), 42L);
+  }
+
+  /// Builds a single-stage handler for the offline table `faroEvents` with row-level auth on. The access control
+  /// returns `rlsFilter` for the table. The servers are not called: the handler captures the server request and
+  /// returns `serverResponse`.
+  private static BaseSingleStageBrokerRequestHandler newRlsHandler(String rlsFilter,
+      AtomicReference<BrokerRequest> capturedServerRequest, BrokerResponseNative serverResponse) {
+    String rawTable = "faroEvents";
+    String offlineTable = "faroEvents_OFFLINE";
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(rawTable)
+        .addSingleValueDimension("ts", DataType.STRING)
+        .addSingleValueDimension("level", DataType.INT)
+        .build();
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(rawTable)).thenReturn(rawTable);
+    when(tableCache.getSchema(rawTable)).thenReturn(schema);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts", "level", "level"));
+    // As in production for a table without expression overrides. The broker then does not optimize the query again
+    // for the overrides.
+    when(tableCache.getExpressionOverrideMap(anyString())).thenReturn(null);
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
+    when(tableCache.getTableConfig(offlineTable)).thenReturn(tableCfg);
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(offlineTable)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    AccessControl accessControl = new AccessControl() {
+      @Override
+      public AuthorizationResult authorize(RequesterIdentity identity, BrokerRequest request) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableAuthorizationResult authorize(RequesterIdentity identity, Set<String> tables) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableRowColAccessResult getRowColFilters(RequesterIdentity identity, String tableWithType) {
+        return new TableRowColAccessResultImpl(List.of(rlsFilter));
+      }
+    };
+    AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
+    when(accessControlFactory.create()).thenReturn(accessControl);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration(
+        Map.of(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH, "true"));
+    BrokerQueryEventListenerFactory.init(config);
+
+    return new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+        routingManager, accessControlFactory, quotaManager, tableCache,
+        ThreadAccountantUtils.getNoOpAccountant(), null) {
+      @Override
+      public void start() {
+      }
+
+      @Override
+      public void shutDown() {
+      }
+
+      @Override
+      protected BrokerResponseNative processBrokerRequest(long requestId,
+          BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+          TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+          RequestContext requestContext) {
+        capturedServerRequest.set(serverBrokerRequest);
+        return serverResponse;
+      }
+    };
+  }
+
+  /// When an expression override rewrites a nested predicate to a literal (e.g. `REGEXP_LIKE(foo, '.*') -> TRUE`),
+  /// the broker re-runs the query optimizer for offline-only and realtime-only tables so that the literal is removed
+  /// before routing, as it already does for hybrid tables. The override is applied after the initial optimization, and
+  /// a leftover `TRUE` operand would reach the broker segment pruners, which expect every filter node to be a function
+  /// call (e.g. `TimeSegmentPruner.getFilterTimeIntervals` would throw a `NullPointerException`).
+  @Test
+  public void testExpressionOverrideToLiteralIsOptimizedAwayForNonHybridTables()
+      throws Exception {
+    for (String tableNameWithType : List.of("mytable_OFFLINE", "mytable_REALTIME")) {
+      AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+      handleRequestWithExpressionOverride(tableNameWithType, "TRUE",
+          "SELECT COUNT(*) FROM mytable WHERE ts >= 1000 AND REGEXP_LIKE(foo, '.*')", capturedServerRequest);
+      BrokerRequest serverRequest = capturedServerRequest.get();
+      Assert.assertNotNull(serverRequest, tableNameWithType + ": server query should have been captured");
+      Expression filter = serverRequest.getPinotQuery().getFilterExpression();
+      Assert.assertNotNull(filter, tableNameWithType + ": time predicate must be retained");
+      Function filterFunction = filter.getFunctionCall();
+      Assert.assertNotNull(filterFunction, tableNameWithType + ": filter must be a function");
+      Assert.assertEquals(filterFunction.getOperator(), FilterKind.AND.name());
+      for (Expression operand : filterFunction.getOperands()) {
+        Assert.assertNotNull(operand.getFunctionCall(),
+            tableNameWithType + ": overridden TRUE literal must be optimized away, got filter: " + filter);
+      }
+    }
+  }
+
+  /// When an expression override rewrites a predicate under an AND to `FALSE`, the re-optimized filter collapses to
+  /// `FALSE` and the broker returns an empty response without querying any server.
+  @Test
+  public void testExpressionOverrideToFalseSkipsServersForNonHybridTables()
+      throws Exception {
+    for (String tableNameWithType : List.of("mytable_OFFLINE", "mytable_REALTIME")) {
+      AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+      BrokerResponse response = handleRequestWithExpressionOverride(tableNameWithType, "FALSE",
+          "SELECT COUNT(*) FROM mytable WHERE ts >= 1000 AND REGEXP_LIKE(foo, '.*')", capturedServerRequest);
+      Assert.assertNull(capturedServerRequest.get(),
+          tableNameWithType + ": always-false filter must not be sent to servers");
+      Assert.assertTrue(response.getExceptions().isEmpty(),
+          tableNameWithType + ": unexpected exceptions: " + response.getExceptions());
+    }
+  }
+
+  /// When an expression override rewrites a predicate under an OR to `TRUE`, the re-optimized filter collapses to
+  /// `TRUE` and the broker drops the filter entirely.
+  @Test
+  public void testExpressionOverrideToTrueUnderOrDropsFilterForNonHybridTables()
+      throws Exception {
+    for (String tableNameWithType : List.of("mytable_OFFLINE", "mytable_REALTIME")) {
+      AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+      handleRequestWithExpressionOverride(tableNameWithType, "TRUE",
+          "SELECT COUNT(*) FROM mytable WHERE ts >= 1000 OR REGEXP_LIKE(foo, '.*')", capturedServerRequest);
+      BrokerRequest serverRequest = capturedServerRequest.get();
+      Assert.assertNotNull(serverRequest, tableNameWithType + ": server query should have been captured");
+      Assert.assertNull(serverRequest.getPinotQuery().getFilterExpression(),
+          tableNameWithType + ": always-true filter must be dropped");
+    }
+  }
+
+  private static BrokerResponse handleRequestWithExpressionOverride(String tableNameWithType, String overrideValue,
+      String sql, AtomicReference<BrokerRequest> capturedServerRequest)
+      throws Exception {
+    String rawTable = "mytable";
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(rawTable)
+        .addSingleValueDimension("foo", DataType.STRING)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(rawTable)).thenReturn(rawTable);
+    when(tableCache.getSchema(rawTable)).thenReturn(schema);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("foo", "foo", "ts", "ts"));
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
+    when(tableCache.getTableConfig(tableNameWithType)).thenReturn(tableCfg);
+    when(tableCache.getExpressionOverrideMap(tableNameWithType)).thenReturn(
+        Map.of(CalciteSqlParser.compileToExpression("REGEXP_LIKE(foo, '.*')"),
+            CalciteSqlParser.compileToExpression(overrideValue)));
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(tableNameWithType)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+            routingManager, new AllowAllAccessControlFactory(), quotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId,
+              BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+              TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            capturedServerRequest.set(serverBrokerRequest);
+            return BrokerResponseNative.empty();
+          }
+        };
+
+    return handler.handleRequest(sql);
   }
 
   /// Pins the security-style defense that a user-supplied `materializedViewRewrite=true` query

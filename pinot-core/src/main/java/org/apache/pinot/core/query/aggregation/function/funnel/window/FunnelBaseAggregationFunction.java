@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function.funnel.window;
 
 import com.google.common.base.Preconditions;
+import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,7 +32,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.BaseAggregationFunction;
@@ -49,6 +49,8 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// ignores a row whose input is null.
 public abstract class FunnelBaseAggregationFunction<F>
     extends BaseAggregationFunction<PriorityQueue<FunnelStepEvent>, F> {
+  private static final int FUNNEL_STEP_EVENT_ACCUMULATOR_TYPE = 51;
+
   protected final ExpressionContext _timestampExpression;
   protected final long _windowSize;
   protected final List<ExpressionContext> _stepExpressions;
@@ -262,14 +264,31 @@ public abstract class FunnelBaseAggregationFunction<F>
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(PriorityQueue<FunnelStepEvent> funnelStepEvents) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FunnelStepEventAccumulator.getValue(),
-        ObjectSerDeUtils.FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE.serialize(funnelStepEvents));
+  public SerializedResult serializeIntermediateResult(PriorityQueue<FunnelStepEvent> funnelStepEvents) {
+    int numEvents = funnelStepEvents.size();
+    byte[] bytes = new byte[Math.addExact(Integer.BYTES, Math.multiplyExact(numEvents, FunnelStepEvent.SIZE_IN_BYTES))];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    byteBuffer.putInt(numEvents);
+    for (FunnelStepEvent funnelStepEvent : funnelStepEvents) {
+      byteBuffer.put(funnelStepEvent.getBytes());
+    }
+    return new SerializedBytes(FUNNEL_STEP_EVENT_ACCUMULATOR_TYPE, bytes);
   }
 
   @Override
   public PriorityQueue<FunnelStepEvent> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE.deserialize(customObject.getBuffer());
+    ByteBuffer byteBuffer = customObject.getBuffer();
+    int numEvents = byteBuffer.getInt();
+    if (numEvents == 0) {
+      return new PriorityQueue<>();
+    }
+    PriorityQueue<FunnelStepEvent> funnelStepEvents = new PriorityQueue<>(numEvents);
+    byte[] bytes = new byte[FunnelStepEvent.SIZE_IN_BYTES];
+    for (int i = 0; i < numEvents; i++) {
+      byteBuffer.get(bytes);
+      funnelStepEvents.add(new FunnelStepEvent(bytes));
+    }
+    return funnelStepEvents;
   }
 
   /// Fill the sliding window with the events that fall into the window.
