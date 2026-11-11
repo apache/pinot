@@ -416,4 +416,56 @@ public class RealtimeSegmentValidationManagerTest {
     verify(_llcRealtimeSegmentManager, never()).updatePauseStateInIdealState(eq(tableName), eq(false),
         any(PauseState.ReasonCode.class), anyString());
   }
+
+  /// A storage-paused table whose storage is back within limits stays paused while an enforced primary key quota cannot
+  /// be determined, since it may still be exceeded. Resuming would only re-pause it (and force-commit again) once the
+  /// counts are readable.
+  @Test
+  public void testPrimaryKeyUndeterminedLeavesStoragePausedTablePaused() {
+    String tableName = "testTable_REALTIME";
+    TableConfig tableConfig = setupForPkTests(tableName, true, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
+    // storage now within limits (default from helper), PK undetermined
+    when(_primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig))
+        .thenReturn(PrimaryKeyQuotaChecker.Status.UNDETERMINED);
+    when(_primaryKeyQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.ENFORCED);
+
+    boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);
+
+    Assert.assertFalse(result);
+    verify(_llcRealtimeSegmentManager, never()).updatePauseStateInIdealState(eq(tableName), anyBoolean(),
+        any(PauseState.ReasonCode.class), anyString());
+  }
+
+  /// In SHADOW mode the primary key quota never holds consumption, so an undetermined status does not keep a table
+  /// paused, e.g. after the mode was switched from ENFORCED to SHADOW to release a primary-key-paused table.
+  @Test
+  public void testPrimaryKeyUndeterminedInShadowModeResumesPkPausedTable() {
+    String tableName = "testTable_REALTIME";
+    TableConfig tableConfig = setupForPkTests(tableName, true, PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED);
+    when(_primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig))
+        .thenReturn(PrimaryKeyQuotaChecker.Status.UNDETERMINED);
+    when(_primaryKeyQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.SHADOW);
+
+    boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);
+
+    Assert.assertTrue(result);
+    verify(_llcRealtimeSegmentManager).updatePauseStateInIdealState(eq(tableName), eq(false),
+        eq(PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED), anyString());
+  }
+
+  /// An undetermined primary key quota never pauses a table that is consuming; only a breach does.
+  @Test
+  public void testPrimaryKeyUndeterminedDoesNotPauseConsumingTable() {
+    String tableName = "testTable_REALTIME";
+    TableConfig tableConfig = setupForPkTests(tableName, false, null);
+    when(_primaryKeyQuotaChecker.checkPrimaryKeyQuota(tableConfig))
+        .thenReturn(PrimaryKeyQuotaChecker.Status.UNDETERMINED);
+    when(_primaryKeyQuotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.ENFORCED);
+
+    boolean result = _realtimeSegmentValidationManager.shouldEnsureConsuming(tableName);
+
+    Assert.assertTrue(result);
+    verify(_llcRealtimeSegmentManager, never()).pauseConsumption(anyString(), any(PauseState.ReasonCode.class),
+        anyString());
+  }
 }

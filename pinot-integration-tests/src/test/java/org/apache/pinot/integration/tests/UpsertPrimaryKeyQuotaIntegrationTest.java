@@ -49,7 +49,8 @@ import static org.testng.Assert.assertTrue;
 /// always breached regardless of the hash distribution. This makes the breach deterministic.
 ///
 /// SHADOW: the breach meter fires but consumption is not paused. ENFORCED: the table is paused with reason
-/// [org.apache.pinot.spi.config.table.PauseState.ReasonCode#PRIMARY_KEY_QUOTA_EXCEEDED].
+/// [org.apache.pinot.spi.config.table.PauseState.ReasonCode#PRIMARY_KEY_QUOTA_EXCEEDED], and resumes consuming once
+/// the cap is raised above the current count.
 public class UpsertPrimaryKeyQuotaIntegrationTest extends BaseClusterIntegrationTest {
   private static final String INPUT_DATA_LARGE_TAR_FILE = "gameScores_large_csv.tar.gz";
   private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";
@@ -160,11 +161,12 @@ public class UpsertPrimaryKeyQuotaIntegrationTest extends BaseClusterIntegration
   }
 
   @Test
-  public void testPrimaryKeyQuotaEnforcedModePausesConsumption()
+  public void testPrimaryKeyQuotaEnforcedModePausesAndResumesConsumption()
       throws Exception {
     String tableName = "gameScoresPkQuotaEnforced";
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    setUpTableWithPkQuota(tableName, getKafkaTopic() + "-pk-quota-enforced", QuotaEnforcementMode.ENFORCED);
+    TableConfig tableConfig =
+        setUpTableWithPkQuota(tableName, getKafkaTopic() + "-pk-quota-enforced", QuotaEnforcementMode.ENFORCED);
     waitForThreeDistinctKeys(realtimeTableName);
 
     _controllerStarter.getRealtimeSegmentValidationManager().run();
@@ -180,6 +182,21 @@ public class UpsertPrimaryKeyQuotaIntegrationTest extends BaseClusterIntegration
     }, 1000L, 60_000L, "Table should be paused with PRIMARY_KEY_QUOTA_EXCEEDED in ENFORCED mode");
 
     assertTrue(breachMeterCount(realtimeTableName) > 0);
+
+    // Raising the cap above the current count is the documented way out of this pause. The pause force-committed the
+    // consuming segments, so the check can stay undetermined until they are ONLINE everywhere: keep running the
+    // validation manager until it resumes the table and recreates the consuming segments.
+    tableConfig.setQuotaConfig(new QuotaConfig(null, null, null, null, 1000L, QuotaEnforcementMode.ENFORCED));
+    updateTableConfig(tableConfig);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        _controllerStarter.getRealtimeSegmentValidationManager().run();
+        PauseStatusDetails pauseStatus = getPauseStatus(realtimeTableName);
+        return !pauseStatus.getPauseFlag() && !pauseStatus.getConsumingSegments().isEmpty();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000L, 60_000L, "Table should resume consuming once the primary key cap is raised above the current count");
 
     dropRealtimeTable(realtimeTableName);
   }

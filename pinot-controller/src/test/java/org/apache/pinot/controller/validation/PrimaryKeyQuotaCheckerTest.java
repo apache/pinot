@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
@@ -34,7 +35,9 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -69,9 +72,28 @@ public class PrimaryKeyQuotaCheckerTest {
     when(_controllerConf.getServerAdminRequestTimeoutSeconds()).thenReturn(1);
     when(_controllerConf.getEnablePrimaryKeyQuotaCheck()).thenReturn(true);
 
-    when(_helix.getServerToSegmentsMap(TABLE_NAME)).thenReturn(Collections.singletonMap("Server_0", null));
+    assignSegments("Server_0");
     when(_helix.getDataInstanceAdminEndpoints(any())).thenReturn(HashBiMap.create());
     when(_helix.getNumReplicas(any())).thenReturn(NUM_REPLICAS);
+  }
+
+  /// Assigns one segment per server in the IdealState and marks it ONLINE in the ExternalView. Returns the ExternalView
+  /// so a test can change a segment's state.
+  private ExternalView assignSegments(String... servers) {
+    Map<String, List<String>> serverToSegments = new HashMap<>();
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    for (String server : servers) {
+      String segment = segmentOf(server);
+      serverToSegments.put(server, List.of(segment));
+      externalView.setState(segment, server, SegmentStateModel.ONLINE);
+    }
+    when(_helix.getServerToSegmentsMap(TABLE_NAME)).thenReturn(serverToSegments);
+    when(_helix.getTableExternalView(TABLE_NAME)).thenReturn(externalView);
+    return externalView;
+  }
+
+  private static String segmentOf(String server) {
+    return "segment_on_" + server;
   }
 
   private PrimaryKeyQuotaChecker newChecker() {
@@ -159,6 +181,7 @@ public class PrimaryKeyQuotaCheckerTest {
   @Test
   public void testMaxAcrossReplicasNotSum() {
     // Two replicas of partition 0 at 60 and 70; sum (130) exceeds cap 100 but max (70) does not -> within quota
+    assignSegments("Server_0", "Server_1");
     Map<String, Long> partition0 = new HashMap<>();
     partition0.put("Server_0", 60L);
     partition0.put("Server_1", 70L);
@@ -206,7 +229,7 @@ public class PrimaryKeyQuotaCheckerTest {
   @Test
   public void testPartialResponseWithoutBreachIsUndetermined() {
     // Server_1 hosts the table but did not respond; it may hold the partition that is over the cap
-    when(_helix.getServerToSegmentsMap(TABLE_NAME)).thenReturn(Map.of("Server_0", List.of(), "Server_1", List.of()));
+    assignSegments("Server_0", "Server_1");
     mockServerCounts(Map.of(0, Map.of("Server_0", 50L)));
     TableConfig tableConfig = upsertTableConfig(100L, QuotaEnforcementMode.ENFORCED);
     PrimaryKeyQuotaChecker checker = newChecker();
@@ -218,10 +241,60 @@ public class PrimaryKeyQuotaCheckerTest {
   @Test
   public void testPartialResponseWithBreachIsExceeded() {
     // A missing server can only hide a breach, so one seen in a partial response is real
-    when(_helix.getServerToSegmentsMap(TABLE_NAME)).thenReturn(Map.of("Server_0", List.of(), "Server_1", List.of()));
+    assignSegments("Server_0", "Server_1");
     mockServerCounts(Map.of(0, Map.of("Server_0", 150L)));
     TableConfig tableConfig = upsertTableConfig(100L, QuotaEnforcementMode.ENFORCED);
     assertEquals(newChecker().checkPrimaryKeyQuota(tableConfig), PrimaryKeyQuotaChecker.Status.EXCEEDED);
+  }
+
+  @DataProvider
+  public Object[][] notLoadedSegmentStates() {
+    // null: the segment is not in the ExternalView for the server yet, as right after a restart
+    return new Object[][]{{null}, {SegmentStateModel.OFFLINE}, {SegmentStateModel.ERROR}};
+  }
+
+  @Test(dataProvider = "notLoadedSegmentStates")
+  public void testServerStillLoadingIsUndetermined(@Nullable String segmentState) {
+    // RF=1 server restarting: it already answers with the partitions loaded so far, so its count (50) can be below the
+    // real one. It must not count as complete until all of its segments are loaded.
+    ExternalView externalView = assignSegments("Server_0");
+    externalView.getStateMap(segmentOf("Server_0")).remove("Server_0");
+    if (segmentState != null) {
+      externalView.setState(segmentOf("Server_0"), "Server_0", segmentState);
+    }
+    mockServerCounts(Map.of(0, Map.of("Server_0", 50L)));
+    TableConfig tableConfig = upsertTableConfig(100L, QuotaEnforcementMode.ENFORCED);
+    PrimaryKeyQuotaChecker checker = newChecker();
+    long before = breachCount();
+    assertEquals(checker.checkPrimaryKeyQuota(tableConfig), PrimaryKeyQuotaChecker.Status.UNDETERMINED);
+    assertEquals(breachCount(), before);
+  }
+
+  @Test
+  public void testServerStillLoadingWithBreachIsExceeded() {
+    // A breach is visible even before the server finishes loading
+    ExternalView externalView = assignSegments("Server_0");
+    externalView.setState(segmentOf("Server_0"), "Server_0", SegmentStateModel.OFFLINE);
+    mockServerCounts(Map.of(0, Map.of("Server_0", 150L)));
+    TableConfig tableConfig = upsertTableConfig(100L, QuotaEnforcementMode.ENFORCED);
+    assertEquals(newChecker().checkPrimaryKeyQuota(tableConfig), PrimaryKeyQuotaChecker.Status.EXCEEDED);
+  }
+
+  @Test
+  public void testConsumingSegmentCountsAsLoaded() {
+    ExternalView externalView = assignSegments("Server_0");
+    externalView.setState(segmentOf("Server_0"), "Server_0", SegmentStateModel.CONSUMING);
+    mockServerCounts(Map.of(0, Map.of("Server_0", 50L)));
+    TableConfig tableConfig = upsertTableConfig(100L, QuotaEnforcementMode.ENFORCED);
+    assertEquals(newChecker().checkPrimaryKeyQuota(tableConfig), PrimaryKeyQuotaChecker.Status.WITHIN_QUOTA);
+  }
+
+  @Test
+  public void testMissingExternalViewIsUndetermined() {
+    when(_helix.getTableExternalView(TABLE_NAME)).thenReturn(null);
+    mockServerCounts(Map.of(0, Map.of("Server_0", 50L)));
+    TableConfig tableConfig = upsertTableConfig(100L, QuotaEnforcementMode.ENFORCED);
+    assertEquals(newChecker().checkPrimaryKeyQuota(tableConfig), PrimaryKeyQuotaChecker.Status.UNDETERMINED);
   }
 
   @Test

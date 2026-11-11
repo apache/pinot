@@ -234,11 +234,13 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         : pkExceeded ? PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED : null;
 
     if (desiredReason == null) {
-      // No quota is effectively exceeded. Don't resume a PK-paused table when the PK status couldn't be determined.
-      if (currentReason == PauseState.ReasonCode.PRIMARY_KEY_QUOTA_EXCEEDED
+      // No quota is known to be exceeded, but an enforced primary key quota that couldn't be determined may still be.
+      // Leave a quota-paused table paused whichever quota it was paused for: resuming it would only re-pause it (with
+      // another force-commit) once the counts are readable again.
+      if (pausedByQuota && pkMode == QuotaEnforcementMode.ENFORCED
           && pkStatus == PrimaryKeyQuotaChecker.Status.UNDETERMINED) {
-        LOGGER.warn("Primary key quota could not be determined for table: {}, and it is paused, leave it as paused",
-            tableNameWithType);
+        LOGGER.warn("Primary key quota could not be determined for table: {}, and it is paused for: {}, leave it as "
+            + "paused", tableNameWithType, currentReason);
         return false;
       }
       if (pausedByQuota) {
