@@ -681,8 +681,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _partitionRateLimiter.throttle(messageBatch);
     _serverRateLimiter.throttle(messageBatch);
 
-    // One local per meter: addMeteredTableValue() marks the meter it is passed, so sharing a local between two meters
-    // would count one meter's rows on the other
+    // One local per meter: addMeteredTableValue() marks the reused meter it is passed, whichever meter is named
     PinotMeter realtimeBytesIngestedMeter = null;
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;

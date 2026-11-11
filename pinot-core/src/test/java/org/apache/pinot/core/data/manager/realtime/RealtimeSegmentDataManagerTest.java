@@ -136,7 +136,6 @@ public class RealtimeSegmentDataManagerTest {
   private static final String SEGMENT_NAME_STR = SEGMENT_NAME.getSegmentName();
   private static final long START_OFFSET_VALUE = 198L;
   private static final LongMsgOffset START_OFFSET = new LongMsgOffset(START_OFFSET_VALUE);
-  // Batch size of OffsetPayloadConsumerFactory and row limit of the segments consuming it
   private static final int OFFSET_STREAM_BATCH_SIZE = 10;
   private static final int OFFSET_STREAM_SEGMENT_ROWS = 20;
 
@@ -2009,13 +2008,13 @@ public class RealtimeSegmentDataManagerTest {
   public void testFilteredAndDroppedRowsInOneBatchAreCountedOnTheirOwnMeters()
       throws Exception {
     OffsetPayloadDecoder.reset();
-    // All in the first batch, with a filtered row first: a meter shared with the filtered rows would absorb the drop
+    // A filtered row before the dropped one in the same batch: a shared meter local would count the drop as filtered
     OffsetPayloadDecoder.FILTERED_OFFSETS.add(START_OFFSET_VALUE + 1);
     OffsetPayloadDecoder.DROPPED_OFFSETS.add(START_OFFSET_VALUE + 2);
     OffsetPayloadDecoder.FILTERED_OFFSETS.add(START_OFFSET_VALUE + 4);
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics)) {
-      // The registry is shared by the tests, so compare against the counts before consuming
+      // The registry is shared across tests, so compare deltas
       long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
       long filteredBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_ROWS_FILTERED);
 
@@ -2032,8 +2031,6 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /// Creates a segment manager consuming [OffsetPayloadConsumerFactory] with [OffsetPayloadDecoder], which ends the
-  /// segment after [#OFFSET_STREAM_SEGMENT_ROWS] indexed rows.
   private FakeRealtimeSegmentDataManager createOffsetPayloadSegmentManager(ServerMetrics serverMetrics)
       throws Exception {
     TableConfig tableConfig = Fixtures.createTableConfig(OffsetPayloadConsumerFactory.class.getName(),
@@ -2042,7 +2039,7 @@ public class RealtimeSegmentDataManagerTest {
         tableConfig, serverMetrics);
   }
 
-  /// Runs the real consume loop from the start offset until the row limit ends the segment, then commits it.
+  /// Runs the real consume loop until the row limit ends the segment, then commits it.
   private static void consumeToRowLimitAndCommit(FakeRealtimeSegmentDataManager segmentDataManager)
       throws Exception {
     segmentDataManager._stubConsumeLoop = false;
@@ -2232,8 +2229,7 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /// Endless stream whose message at offset `n` carries `n` as its payload, so that [OffsetPayloadDecoder] can act on
-  /// chosen offsets.
+  /// Endless stream whose message at offset `n` has payload `n`.
   public static class OffsetPayloadConsumerFactory extends FakeStreamConsumerFactory {
     @Override
     public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
@@ -2278,8 +2274,7 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /// Decodes the payloads of [OffsetPayloadConsumerFactory]: returns `null` (the row is dropped) for
-  /// [#DROPPED_OFFSETS], a row the transform pipeline filters out for [#FILTERED_OFFSETS], and a regular row otherwise.
+  /// Drops [#DROPPED_OFFSETS] (returns `null`) and marks [#FILTERED_OFFSETS] to be filtered out.
   public static class OffsetPayloadDecoder implements StreamMessageDecoder<byte[]> {
     static final Set<Long> DROPPED_OFFSETS = ConcurrentHashMap.newKeySet();
     static final Set<Long> FILTERED_OFFSETS = ConcurrentHashMap.newKeySet();
