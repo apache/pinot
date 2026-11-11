@@ -345,7 +345,7 @@ public class MailboxServiceTest {
     }
     sendingMailbox.send(SuccessMseBlock.INSTANCE, MultiStageQueryStats.emptyStats(SENDER_STAGE_ID).serialize());
 
-    // Wait until all the mails are delivered
+    // Wait until all the data blocks are delivered
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     receivingMailbox.registeredReader(() -> {
     });
@@ -360,9 +360,15 @@ public class MailboxServiceTest {
       assertEquals(rows.get(0), new Object[]{Integer.toString(i)});
     }
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    MseBlock block = readBlock(receivingMailbox);
-    assertNotNull(block);
-    assertTrue(block.isSuccess());
+    // EOS is not included in the pending data block count and may arrive later.
+    TestUtils.waitForCondition(aVoid -> {
+      MseBlock block = readBlock(receivingMailbox);
+      if (block == null) {
+        return false;
+      }
+      assertTrue(block.isSuccess());
+      return true;
+    }, 10000L, "Failed to deliver EOS");
   }
 
   @Test
