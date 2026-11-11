@@ -723,28 +723,28 @@ public class HelixHelper {
   /// Writes the capabilities that an instance of the given type advertises in this version
   /// ([InstanceCapability#values()]) to the map field `capabilities` of the instance config, together with the
   /// reserved entry `pinotVersion` ([CommonConstants.Helix.Instance#CAPABILITIES_PINOT_VERSION_KEY]) set to the Pinot
-  /// version of this build. Readers ignore the capabilities when that entry differs from the simple field
-  /// `pinotVersion`, which [#updatePinotVersion] writes. Any instance type can call it. Returns whether the field
-  /// changed.
+  /// version of this build. It also writes the simple field `pinotVersion` with [#updatePinotVersion], so one call
+  /// leaves a record that readers trust: readers ignore the capabilities when the two values differ. The call replaces
+  /// the whole map, so a capability that this build does not advertise disappears. Any instance type can call it.
+  /// Returns whether the instance config changed.
   public static boolean updateCapabilities(InstanceConfig instanceConfig, InstanceType instanceType) {
     return updateCapabilities(instanceConfig, instanceType, InstanceCapability.values());
   }
 
   /// Same as [#updateCapabilities(InstanceConfig, InstanceType)] with the given capabilities instead of
   /// [InstanceCapability#values()]. An extension passes the capabilities of Pinot together with its own, see
-  /// [InstanceCapability]. Fails when two capabilities have the same name.
+  /// [InstanceCapability]. Fails, before it changes the instance config, when two capabilities have the same name.
   public static boolean updateCapabilities(InstanceConfig instanceConfig, InstanceType instanceType,
       Collection<InstanceCapability> capabilities) {
-    ZNRecord record = instanceConfig.getRecord();
-    InstanceCapability.checkUniqueNames(List.copyOf(capabilities));
     Map<String, String> currentCapabilities = InstanceCapability.toMapField(capabilities, instanceType);
     currentCapabilities.put(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, PinotVersion.VERSION);
-    Map<String, String> oldCapabilities = record.getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY);
-    if (!currentCapabilities.equals(oldCapabilities)) {
+    boolean updated = updatePinotVersion(instanceConfig);
+    ZNRecord record = instanceConfig.getRecord();
+    if (!currentCapabilities.equals(record.getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY))) {
       record.setMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY, currentCapabilities);
-      return true;
+      updated = true;
     }
-    return false;
+    return updated;
   }
 
   public static boolean updateMaxConcurrentTasksPerInstance(InstanceConfig instanceConfig, int maxConcurrentTasks) {

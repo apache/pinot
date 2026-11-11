@@ -312,6 +312,18 @@ public class BrokerRoutingManagerTest {
         anyInt())).thenReturn(List.of(server1, broker));
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
     assertEquals(_routingManager.getMinServerCapabilityRevision(capability), 2);
+
+    // A failed fetch supports nothing: a server can restart under the same id on an older build.
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(),
+        anyInt())).thenThrow(new RuntimeException("ZooKeeper is not reachable"));
+    expectThrows(RuntimeException.class, () -> _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG));
+    assertEquals(_routingManager.getMinServerCapabilityRevision(capability), 0);
+
+    // The next successful fetch restores the minimum, also when the instance configs did not change.
+    doReturn(List.of(server1, broker)).when(_zkDataAccessor)
+        .getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertEquals(_routingManager.getMinServerCapabilityRevision(capability), 2);
   }
 
   @Test

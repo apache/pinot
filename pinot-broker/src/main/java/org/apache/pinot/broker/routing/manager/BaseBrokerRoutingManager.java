@@ -481,13 +481,21 @@ public abstract class BaseBrokerRoutingManager
     LOGGER.info("Processing instance config change");
     long startTimeMs = System.currentTimeMillis();
 
-    List<ZNRecord> instanceConfigZNRecords =
-        _zkDataAccessor.getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT, Helix.ZkClient.RETRY_COUNT,
-            Helix.ZkClient.RETRY_INTERVAL_MS);
+    List<ZNRecord> instanceConfigZNRecords;
+    try {
+      instanceConfigZNRecords =
+          _zkDataAccessor.getChildren(_instanceConfigsPath, null, AccessOption.PERSISTENT, Helix.ZkClient.RETRY_COUNT,
+              Helix.ZkClient.RETRY_INTERVAL_MS);
+    } catch (RuntimeException e) {
+      // The previous snapshot no longer proves that a server supports a capability: the server can restart under the
+      // same id on an older build. Support nothing until the next successful fetch.
+      _serverCapabilityTracker.invalidate();
+      throw e;
+    }
     long fetchInstanceConfigsEndTimeMs = System.currentTimeMillis();
 
     // Feed the capability tracker with the same snapshot, so that it reads no ZooKeeper data of its own. A failure here
-    // must not stop the routing update: the tracker keeps its previous result.
+    // must not stop the routing update: the tracker then supports nothing until the next successful update.
     // The tracker publishes before the routing below changes. That order is safe: a new server lowers the minimum
     // before it becomes routable. The minimum goes up only when a server rewrites its own instance config with a newer
     // revision, or when its instance config is deleted, which needs the server to be down already.
@@ -495,6 +503,7 @@ public abstract class BaseBrokerRoutingManager
       _serverCapabilityTracker.update(instanceConfigZNRecords);
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating the server capabilities", e);
+      _serverCapabilityTracker.invalidate();
     }
 
     // Calculate new enabled and disabled servers

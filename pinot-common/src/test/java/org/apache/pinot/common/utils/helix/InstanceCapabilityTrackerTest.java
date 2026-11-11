@@ -179,6 +179,20 @@ public class InstanceCapabilityTrackerTest {
   }
 
   @Test
+  public void testInvalidateUntilTheNextUpdate() {
+    putInstance(SERVER_1, Map.of(CAPABILITY_NAME, "1"));
+    putInstance(SERVER_2, Map.of(CAPABILITY_NAME, "1"));
+    update();
+    assertEquals(_tracker.getMinRevision(CAPABILITY), 1);
+
+    _tracker.invalidate();
+    assertEquals(_tracker.getMinRevision(CAPABILITY), 0);
+    // The next update restores the minimum, also when the set is the same as before the invalidation.
+    update();
+    assertEquals(_tracker.getMinRevision(CAPABILITY), 1);
+  }
+
+  @Test
   public void testMatchingVersionStampGivesTheAdvertisedRevision() {
     putInstance(SERVER_1, Map.of(CAPABILITY_NAME, "2"), VERSION, VERSION);
     update();

@@ -313,7 +313,7 @@ public class HelixHelperTest {
     InstanceCapability brokerCapability = new InstanceCapability("TEST_BROKER_CAPABILITY", InstanceType.BROKER, 1);
     List<InstanceCapability> capabilities = List.of(serverCapability, brokerCapability);
     InstanceConfig instanceConfig = new InstanceConfig("Server_localhost_1234");
-    assertTrue(HelixHelper.updatePinotVersion(instanceConfig));
+    // One call also writes the simple field pinotVersion.
     assertTrue(HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, capabilities));
     // Only the capabilities of the instance type, and the version stamp.
     Map<String, String> expected = Map.of("TEST_SERVER_CAPABILITY", "2",
@@ -353,5 +353,19 @@ public class HelixHelperTest {
         List.of(serverCapability, new InstanceCapability("TEST_SERVER_CAPABILITY", InstanceType.SERVER, 3));
     assertThrows(IllegalStateException.class,
         () -> HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, duplicates));
+    // Also across instance types, and before the instance config changes.
+    InstanceConfig newConfig = new InstanceConfig("Server_localhost_5678");
+    List<InstanceCapability> crossTypeDuplicates =
+        List.of(serverCapability, new InstanceCapability("TEST_SERVER_CAPABILITY", InstanceType.BROKER, 1));
+    assertThrows(IllegalStateException.class,
+        () -> HelixHelper.updateCapabilities(newConfig, InstanceType.SERVER, crossTypeDuplicates));
+    assertNull(newConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY));
+    assertNull(newConfig.getRecord().getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY));
+
+    // The simple field pinotVersion of another version is replaced, so the stamp matches it.
+    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, "0.0.1");
+    assertTrue(HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, capabilities));
+    assertEquals(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY),
+        PinotVersion.VERSION);
   }
 }

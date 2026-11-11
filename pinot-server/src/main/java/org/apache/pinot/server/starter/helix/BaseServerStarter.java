@@ -537,7 +537,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       updated |= updatePortIfNeeded(simpleFields, Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
           serverConf.getMultiStageMailboxPort());
     }
-    updated |= HelixHelper.updatePinotVersion(instanceConfig);
+    // Also writes the simple field pinotVersion.
     updated |= HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, getInstanceCapabilities());
 
     // Update environment properties

@@ -51,6 +51,10 @@ import org.slf4j.LoggerFactory;
 /// value counts as revision 0 (not supported). [#getMinRevision] returns 0 before the first [#update] and while the
 /// set has no instance of the tracked type.
 ///
+/// When the owner cannot read a complete set, for example because the read from ZooKeeper failed, it calls
+/// [#invalidate]. The previous set no longer proves anything: an instance can restart under the same id on an older
+/// build. So [#getMinRevision] returns 0 until the next successful [#update].
+///
 /// Rollback guard: the map also holds the reserved entry `pinotVersion`
 /// ([CommonConstants.Helix.Instance#CAPABILITIES_PINOT_VERSION_KEY]), the Pinot version that wrote the capabilities.
 /// The tracker reads the capabilities of an instance only when that entry is string-equal to the simple field
@@ -82,8 +86,10 @@ public class InstanceCapabilityTracker {
   private final String _clusterName;
   private final InstanceType _instanceType;
   private final List<InstanceCapability> _loggedCapabilities;
-  // Guarded by this. For each tracked instance, the revision of each capability that it advertises.
-  private Map<String, Map<String, Integer>> _revisionsByInstance = Map.of();
+  // Guarded by this. For each tracked instance, the revision of each capability that it advertises. Null before the
+  // first update and after invalidate(), so that the next update never takes the unchanged-set early return.
+  @Nullable
+  private Map<String, Map<String, Integer>> _revisionsByInstance;
   // Guarded by this. The instances whose capabilities are ignored because the version stamp does not match.
   private Set<String> _staleInstances = Set.of();
 
@@ -132,7 +138,8 @@ public class InstanceCapabilityTracker {
       }
       Map<String, Integer> revisions = readRevisions(record);
       revisionsByInstance.put(instanceId, revisions);
-      if (revisions.containsValue(MALFORMED_REVISION) && !revisions.equals(_revisionsByInstance.get(instanceId))) {
+      if (revisions.containsValue(MALFORMED_REVISION) && (_revisionsByInstance == null || !revisions.equals(
+          _revisionsByInstance.get(instanceId)))) {
         LOGGER.warn("Malformed capability revisions for instance: {} of cluster: {}, treating them as 0: {}",
             instanceId, _clusterName, record.getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY));
       }
@@ -149,6 +156,19 @@ public class InstanceCapabilityTracker {
       _minRevisions = minRevisions;
     }
     logLaggingInstances();
+  }
+
+  /// Forgets the set of instances: [#getMinRevision] returns 0 for every capability until the next [#update]. The
+  /// owner calls it when it cannot read a complete set of instance configs.
+  public synchronized void invalidate() {
+    _revisionsByInstance = null;
+    _staleInstances = Set.of();
+    if (!_minRevisions.isEmpty()) {
+      LOGGER.warn("Invalidating the capabilities of the {} instances of cluster: {}, treating every capability as "
+          + "not supported until the next successful update. Previous minimum revisions: {}", _instanceType,
+          _clusterName, _minRevisions);
+      _minRevisions = Map.of();
+    }
   }
 
   /// The sorted ids of the tracked instances whose capabilities are ignored because the version stamp does not match.
@@ -169,6 +189,9 @@ public class InstanceCapabilityTracker {
       int minRevision = Integer.MAX_VALUE;
       for (Map<String, Integer> revisions : revisionsByInstance.values()) {
         minRevision = Math.min(minRevision, revisions.getOrDefault(name, 0));
+        if (minRevision <= 0) {
+          break;
+        }
       }
       if (minRevision > 0) {
         minRevisions.put(name, minRevision);
@@ -181,6 +204,9 @@ public class InstanceCapabilityTracker {
   /// lists: the instances that advertise no or an older revision, and the instances whose capabilities are ignored
   /// because the version stamp does not match.
   private void logLaggingInstances() {
+    if (_loggedCapabilities.isEmpty() || !LOGGER.isInfoEnabled()) {
+      return;
+    }
     Map<String, Map<String, Integer>> sortedRevisions = new TreeMap<>(_revisionsByInstance);
     for (InstanceCapability capability : _loggedCapabilities) {
       List<String> olderInstances = new ArrayList<>();

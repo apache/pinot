@@ -54,7 +54,12 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 /// - A revision is not a Pinot version. Nothing compares Pinot version strings.
 /// - A new feature that old instances cannot handle adds a constant with revision 1, and adds it to [#values()] in
 ///   the same change as the code that supports the feature. An instance must never advertise a feature it cannot run.
-/// - The names are persisted in ZooKeeper: never rename or remove a capability.
+/// - The names are persisted in ZooKeeper: never rename a capability, and never use its name again for another
+///   feature.
+/// - A capability can retire after its compatibility window. First remove the readers and their fallback code, then
+///   the advertisement. Remove a reader only when no supported version that can run in the same cluster still needs
+///   the fallback. A completed rollout alone is not enough: a missing key means revision 0, so an older reader that
+///   still checks the key falls back. The full map replacement at startup removes a retired advertisement.
 ///
 /// Extensions: a distribution or a plugin built on Pinot can define its own capabilities with the public constructor.
 /// It passes them, together with [#values()], to `HelixHelper.updateCapabilities` when the instance starts, so that
@@ -112,10 +117,13 @@ public final class InstanceCapability {
     return toMapField(VALUES, instanceType);
   }
 
-  /// Same as [#toMapField(InstanceType)] over the given capabilities instead of [#values()].
+  /// Same as [#toMapField(InstanceType)] over the given capabilities instead of [#values()]. Fails when two
+  /// capabilities have the same name, of any instance type.
   public static Map<String, String> toMapField(Collection<InstanceCapability> capabilities, InstanceType instanceType) {
+    Set<String> names = new HashSet<>();
     Map<String, String> mapField = new HashMap<>();
     for (InstanceCapability capability : capabilities) {
+      Preconditions.checkState(names.add(capability._name), "Duplicate capability name: %s", capability._name);
       if (capability._instanceType == instanceType) {
         mapField.put(capability._name, Integer.toString(capability._revision));
       }
