@@ -36,15 +36,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.NameValuePair;
-import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
-import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -60,34 +58,26 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
-import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class which provides a framework for N -> M segment conversion tasks.
- * <p> This class handles segment download and upload
- *
- * {@link BaseMultipleSegmentsConversionExecutor} assumes that output segments are new segments derived from input
- * segments. So, we do not check crc or modify zk metadata when uploading segments. In case of modifying the existing
- * segments, {@link BaseSingleSegmentConversionExecutor} has to be used.
- *
- * TODO: add test for SegmentZKMetadataCustomMapModifier
- */
+/// Base class which provides a framework for N -> M segment conversion tasks.
+///
+/// This class handles segment download and upload
+///
+/// [BaseMultipleSegmentsConversionExecutor] assumes that output segments are new segments derived from input
+/// segments. So, we do not check crc or modify zk metadata when uploading segments. In case of modifying the existing
+/// segments, [BaseSingleSegmentConversionExecutor] has to be used.
+///
+/// TODO: add test for SegmentZKMetadataCustomMapModifier
 public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseMultipleSegmentsConversionExecutor.class);
   private static final String CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID = "lineageEntryId";
-
-  private static final int DEFAULT_PUSH_ATTEMPTS = 5;
-  private static final int DEFAULT_PUSH_PARALLELISM = 1;
-  private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
 
   protected MinionConf _minionConf;
 
@@ -99,32 +89,28 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     _minionConf = minionConf;
   }
 
-  /**
-   * Converts the segment based on the given {@link PinotTaskConfig}.
-   *
-   * @param pinotTaskConfig Task config
-   * @param segmentDirs Index directories for the original segments
-   * @param workingDir Working directory for the converted segment
-   * @return a list of segment conversion result
-   * @throws Exception
-   */
+  /// Converts the segment based on the given [PinotTaskConfig].
+  ///
+  /// @param pinotTaskConfig Task config
+  /// @param segmentDirs Index directories for the original segments
+  /// @param workingDir Working directory for the converted segment
+  /// @return a list of segment conversion result
+  /// @throws Exception
   protected abstract List<SegmentConversionResult> convert(PinotTaskConfig pinotTaskConfig, List<File> segmentDirs,
       File workingDir)
       throws Exception;
 
-  /**
-   * Pre processing operations to be done at the beginning of task execution
-   *
-   * The default implementation checks whether all segments to process exist in the table, if not, terminate early to
-   * avoid wasting computing resources.
-   */
+  /// Pre processing operations to be done at the beginning of task execution
+  ///
+  /// The default implementation checks whether all segments to process exist in the table, if not, terminate early to
+  /// avoid wasting computing resources.
   protected void preProcess(PinotTaskConfig pinotTaskConfig)
       throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+    AuthProvider authProvider = resolveAuthProvider(configs);
     Set<String> segmentNamesForTable = SegmentConversionUtils.getSegmentNamesForTable(tableNameWithType,
         FileUploadDownloadClient.extractBaseURI(new URI(uploadURL)), authProvider);
     Set<String> nonExistingSegmentNames =
@@ -136,9 +122,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     }
   }
 
-  /**
-   * Post processing operations to be done before exiting a successful task execution
-   */
+  /// Post processing operations to be done before exiting a successful task execution
   protected void postProcess(PinotTaskConfig pinotTaskConfig)
       throws Exception {
   }
@@ -157,7 +141,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
               .collect(Collectors.toList());
       String lineageEntryId =
           SegmentConversionUtils.startSegmentReplace(context.getTableNameWithType(), context.getUploadURL(),
-              new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo), context.getAuthProvider());
+              new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo), context.getAuthProvider(), true,
+              _minionConf.getStartReplaceSegmentsTimeoutMs());
       context.setCustomContext(CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID, lineageEntryId);
     }
   }
@@ -194,7 +179,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String uploadURL = taskConfigs.get(MinionConstants.UPLOAD_URL_KEY);
     String downloadURLString = taskConfigs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
-    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(taskConfigs.get(MinionConstants.AUTH_TOKEN));
+    AuthProvider authProvider = resolveAuthProvider(taskConfigs);
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
     int numRecords;
@@ -229,6 +214,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       int numOutputSegments = segmentConversionResults.size();
       List<File> tarredSegmentFiles = new ArrayList<>(numOutputSegments);
+      // METADATA pushes send only metadata.properties and creation.meta, built here from the local converted segment
+      // so the staged tar is never downloaded back. Null entries for TAR push.
+      List<File> segmentMetadataTarFiles = new ArrayList<>(numOutputSegments);
+      BatchConfigProperties.SegmentPushType pushType = getSegmentPushType(taskConfigs);
       int count = 1;
       for (SegmentConversionResult segmentConversionResult : segmentConversionResults) {
         File convertedSegmentDir = segmentConversionResult.getFile();
@@ -241,6 +230,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             segmentConversionResult.getSegmentName() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
         TarCompressionUtils.createCompressedTarFile(convertedSegmentDir, convertedSegmentTarFile);
         tarredSegmentFiles.add(convertedSegmentTarFile);
+        segmentMetadataTarFiles.add(pushType == BatchConfigProperties.SegmentPushType.TAR ? null
+            : SegmentPushUtils.generateSegmentMetadataFile(convertedSegmentDir, convertedTarredSegmentDir,
+                segmentConversionResult.getSegmentName()));
         if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
           LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
         }
@@ -264,13 +256,14 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       SegmentUploadContext segmentUploadContext = new SegmentUploadContext(pinotTaskConfig, segmentConversionResults);
       preUploadSegments(segmentUploadContext);
-      Map<String, String> segmentUriToTarPathMap = new HashMap<>();
+      Map<String, File> segmentUriToMetadataFileMap = new HashMap<>();
       PushJobSpec pushJobSpec = getPushJobSpec(taskConfigs);
       boolean batchSegmentUpload = pushJobSpec.isBatchSegmentUpload();
 
       // Upload the tarred segments
       for (int i = 0; i < numOutputSegments; i++) {
         File convertedTarredSegmentFile = tarredSegmentFiles.get(i);
+        File segmentMetadataTarFile = segmentMetadataTarFiles.get(i);
         SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         String resultSegmentName = segmentConversionResult.getSegmentName();
         _eventObserver.notifyProgress(_pinotTaskConfig, "Uploading segment: " + resultSegmentName + " (" + (i + 1)
@@ -309,20 +302,24 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         }
 
         if (batchSegmentUpload) {
-          updateSegmentUriToTarPathMap(taskConfigs, outputSegmentTarURI, segmentConversionResult,
-              segmentUriToTarPathMap, pushJobSpec);
+          for (String segmentUri : getSegmentUris(taskConfigs, outputSegmentTarURI, segmentConversionResult,
+              pushJobSpec)) {
+            segmentUriToMetadataFileMap.put(segmentUri, segmentMetadataTarFile);
+          }
         } else {
           String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-          pushSegment(rawTableName, taskConfigs, outputSegmentTarURI, httpHeaders, parameters, segmentConversionResult);
+          pushSegment(rawTableName, taskConfigs, outputSegmentTarURI, httpHeaders, parameters, segmentConversionResult,
+              segmentMetadataTarFile);
           if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
             LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
           }
+          FileUtils.deleteQuietly(segmentMetadataTarFile);
         }
       }
 
       if (batchSegmentUpload) {
         try {
-          pushSegments(tableNameWithType, taskConfigs, pinotTaskConfig, segmentUriToTarPathMap, pushJobSpec,
+          pushSegments(tableNameWithType, taskConfigs, pinotTaskConfig, segmentUriToMetadataFileMap, pushJobSpec,
               authProvider, segmentConversionResults);
         } finally {
           for (File convertedTarredSegmentFile : tarredSegmentFiles) {
@@ -331,6 +328,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
                   convertedTarredSegmentFile.getAbsolutePath());
             }
           }
+          segmentMetadataTarFiles.forEach(FileUtils::deleteQuietly);
         }
       }
 
@@ -425,111 +423,50 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     }
   }
 
+  /// Download URIs the controller should register for a staged segment tar (prefix/suffix rules from the push spec).
   @VisibleForTesting
-  void updateSegmentUriToTarPathMap(Map<String, String> taskConfigs, URI outputSegmentTarURI,
-      SegmentConversionResult segmentConversionResult, Map<String, String> segmentUriToTarPathMap,
-      PushJobSpec pushJobSpec) {
+  Set<String> getSegmentUris(Map<String, String> taskConfigs, URI outputSegmentTarURI,
+      SegmentConversionResult segmentConversionResult, PushJobSpec pushJobSpec) {
     String segmentName = segmentConversionResult.getSegmentName();
     if (!taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
       throw new RuntimeException("Output dir URI missing for metadata push while processing segment: " + segmentName);
     }
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    Map<String, String> localSegmentUriToTarPathMap =
-        SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
-            new String[]{outputSegmentTarURI.toString()});
-    if (!localSegmentUriToTarPathMap.isEmpty()) {
-      segmentUriToTarPathMap.putAll(localSegmentUriToTarPathMap);
-    }
-  }
-
-  @VisibleForTesting
-  PushJobSpec getPushJobSpec(Map<String, String> taskConfigs) {
-    PushJobSpec pushJobSpec = new PushJobSpec();
-    pushJobSpec.setPushAttempts(DEFAULT_PUSH_ATTEMPTS);
-    pushJobSpec.setPushParallelism(DEFAULT_PUSH_PARALLELISM);
-    pushJobSpec.setPushRetryIntervalMillis(DEFAULT_PUSH_RETRY_INTERVAL_MILLIS);
-    pushJobSpec.setSegmentUriPrefix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX));
-    pushJobSpec.setSegmentUriSuffix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX));
-    boolean batchSegmentUpload = Boolean.parseBoolean(taskConfigs.getOrDefault(
-        BatchConfigProperties.BATCH_SEGMENT_UPLOAD, "false"));
-    if (batchSegmentUpload) {
-      pushJobSpec.setBatchSegmentUpload(true);
-    }
-    return pushJobSpec;
+    return SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
+        new String[]{outputSegmentTarURI.toString()}).keySet();
   }
 
   @VisibleForTesting
   List<Header> getSegmentPushCommonHeaders(PinotTaskConfig pinotTaskConfig, AuthProvider authProvider,
       List<SegmentConversionResult> segmentConversionResults) {
-    SegmentConversionResult segmentConversionResult;
-    if (segmentConversionResults.size() == 1) {
-      segmentConversionResult = segmentConversionResults.get(0);
-    } else {
-      // Setting to null as the base method expects a single object. This is ok for now, since the
-      // segmentConversionResult is not made use of while generating the customMap.
-      segmentConversionResult = null;
-    }
-    SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
-        getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
-    Header segmentZKMetadataCustomMapModifierHeader =
-        new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
-            segmentZKMetadataCustomMapModifier.toJsonString());
-
-    List<Header> headers = new ArrayList<>();
-    headers.add(segmentZKMetadataCustomMapModifierHeader);
-    headers.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
-    return headers;
-  }
-
-  @VisibleForTesting
-  List<NameValuePair> getSegmentPushCommonParams(String tableNameWithType) {
-    List<NameValuePair> params = new ArrayList<>();
-    params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
-        "true"));
-    params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
-        TableNameBuilder.extractRawTableName(tableNameWithType)));
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType != null) {
-      params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE, tableType.toString()));
-    } else {
-      throw new RuntimeException("Failed to determine the tableType from name: " + tableNameWithType);
-    }
-    return params;
+    SegmentConversionResult segmentConversionResult =
+        segmentConversionResults.size() == 1 ? segmentConversionResults.get(0) : null;
+    return getSegmentPushMetadataHeaders(pinotTaskConfig, authProvider, segmentConversionResult);
   }
 
   private void pushSegments(String tableNameWithType, Map<String, String> taskConfigs, PinotTaskConfig pinotTaskConfig,
-      Map<String, String> segmentUriToTarPathMap, PushJobSpec pushJobSpec,
-      AuthProvider authProvider, List<SegmentConversionResult> segmentConversionResults)
+      Map<String, File> segmentUriToMetadataFileMap, PushJobSpec pushJobSpec, AuthProvider authProvider,
+      List<SegmentConversionResult> segmentConversionResults)
       throws Exception {
     String tableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     SegmentGenerationJobSpec spec = generateSegmentGenerationJobSpec(tableName, taskConfigs, pushJobSpec);
 
     List<Header> headers = getSegmentPushCommonHeaders(pinotTaskConfig, authProvider, segmentConversionResults);
     List<NameValuePair> parameters = getSegmentPushCommonParams(tableNameWithType);
-
-    URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
-      SegmentPushUtils.sendSegmentsUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, headers, parameters);
-    }
+    SegmentPushUtils.sendSegmentsUriAndMetadata(spec, segmentUriToMetadataFileMap, headers, parameters);
   }
 
   private void pushSegment(String tableName, Map<String, String> taskConfigs, URI outputSegmentTarURI,
-      List<Header> headers, List<NameValuePair> parameters, SegmentConversionResult segmentConversionResult)
+      List<Header> headers, List<NameValuePair> parameters, SegmentConversionResult segmentConversionResult,
+      @Nullable File segmentMetadataTarFile)
       throws Exception {
-    String pushMode =
-        taskConfigs.getOrDefault(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.TAR.name());
-    LOGGER.info("Trying to push Pinot segment with push mode {} from {}", pushMode, outputSegmentTarURI);
+    BatchConfigProperties.SegmentPushType pushType = getSegmentPushType(taskConfigs);
+    LOGGER.info("Trying to push Pinot segment with push mode {} from {}", pushType, outputSegmentTarURI);
 
-    PushJobSpec pushJobSpec = new PushJobSpec();
-    pushJobSpec.setPushAttempts(DEFAULT_PUSH_ATTEMPTS);
-    pushJobSpec.setPushParallelism(DEFAULT_PUSH_PARALLELISM);
-    pushJobSpec.setPushRetryIntervalMillis(DEFAULT_PUSH_RETRY_INTERVAL_MILLIS);
-    pushJobSpec.setSegmentUriPrefix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX));
-    pushJobSpec.setSegmentUriSuffix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX));
-
+    PushJobSpec pushJobSpec = getPushJobSpec(taskConfigs);
     SegmentGenerationJobSpec spec = generateSegmentGenerationJobSpec(tableName, taskConfigs, pushJobSpec);
 
-    switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
+    switch (pushType) {
       case TAR:
         File tarFile = new File(outputSegmentTarURI);
         String segmentName = segmentConversionResult.getSegmentName();
@@ -539,56 +476,15 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             uploadURL, tarFile);
         break;
       case METADATA:
-        if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
-          URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-          try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
-            Map<String, String> segmentUriToTarPathMap =
-                SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
-                    new String[]{outputSegmentTarURI.toString()});
-            SegmentPushUtils.sendSegmentUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, headers, parameters);
-          }
-        } else {
-          throw new RuntimeException("Output dir URI missing for metadata push");
+        Map<String, File> segmentUriToMetadataFileMap = new HashMap<>();
+        for (String segmentUri : getSegmentUris(taskConfigs, outputSegmentTarURI, segmentConversionResult,
+            pushJobSpec)) {
+          segmentUriToMetadataFileMap.put(segmentUri, segmentMetadataTarFile);
         }
+        SegmentPushUtils.sendSegmentUriAndMetadata(spec, segmentUriToMetadataFileMap, headers, parameters);
         break;
       default:
-        throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
-    }
-  }
-
-  private SegmentGenerationJobSpec generateSegmentGenerationJobSpec(String tableName, Map<String, String> taskConfigs,
-      PushJobSpec pushJobSpec) {
-
-    TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(tableName);
-
-    PinotClusterSpec pinotClusterSpec = new PinotClusterSpec();
-    pinotClusterSpec.setControllerURI(taskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI));
-    PinotClusterSpec[] pinotClusterSpecs = new PinotClusterSpec[]{pinotClusterSpec};
-
-    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
-    spec.setPushJobSpec(pushJobSpec);
-    spec.setTableSpec(tableSpec);
-    spec.setPinotClusterSpecs(pinotClusterSpecs);
-    spec.setAuthToken(taskConfigs.get(BatchConfigProperties.AUTH_TOKEN));
-
-    return spec;
-  }
-
-  private URI moveSegmentToOutputPinotFS(Map<String, String> taskConfigs, File localSegmentTarFile)
-      throws Exception {
-    URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
-    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
-      URI outputSegmentTarURI =
-          URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI) + localSegmentTarFile.getName());
-      if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
-          outputSegmentTarURI)) {
-        throw new RuntimeException("Output file: " + outputSegmentTarURI + " already exists. Set 'overwriteOutput' to "
-            + "true to ignore this error");
-      } else {
-        outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
-      }
-      return outputSegmentTarURI;
+        throw new UnsupportedOperationException("Unrecognized push mode - " + pushType);
     }
   }
 
@@ -613,7 +509,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       Map<String, String> configs = pinotTaskConfig.getConfigs();
       _tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
       _uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-      _authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+      _authProvider = resolveAuthProvider(configs);
       _inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
       String replaceSegmentsString = configs.get(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY);
       _replaceSegmentsEnabled = Boolean.parseBoolean(replaceSegmentsString);

@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.reduce;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,11 +40,10 @@ import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GapfillUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-/**
- * Helper class to reduce and set gap fill results into the BrokerResponseNative
- */
+/// Helper class to reduce and set gap fill results into the BrokerResponseNative
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GapfillProcessor extends BaseGapfillProcessor {
 
@@ -61,12 +59,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     _groupByKeys = new HashSet<>();
   }
 
-  /**
-   * Here are three things that happen
-   * 1. Sort the result sets from all pinot servers based on timestamp
-   * 2. Gapfill the data for missing entities per time bucket
-   * 3. Aggregate the dataset per time bucket.
-   */
+  /// Here are three things that happen
+  /// 1. Sort the result sets from all pinot servers based on timestamp
+  /// 2. Gapfill the data for missing entities per time bucket
+  /// 3. Aggregate the dataset per time bucket.
   public void process(BrokerResponseNative brokerResponseNative) {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
     replaceColumnNameWithAlias(dataSchema);
@@ -74,7 +70,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
-      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, List.of()));
       return;
     }
 
@@ -89,7 +85,12 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     // The first one argument of timeSeries is time column. The left ones are defining entity.
     for (ExpressionContext entityColum : _timeSeries) {
-      int index = indexes.get(entityColum.getIdentifier());
+      String colName = entityColum.getIdentifier();
+      Integer index = indexes.get(colName);
+      if (index == null) {
+        throw new BadQueryRequestException(
+            "TIMESERIESON column '" + colName + "' is not present in the SELECT list");
+      }
       _isGroupBySelections[index] = true;
     }
 
@@ -333,9 +334,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     }
   }
 
-  /**
-   * Merge all result tables from different pinot servers and sort the rows based on timebucket.
-   */
+  /// Merge all result tables from different pinot servers and sort the rows based on timebucket.
   private List<Object[]>[] putRawRowsIntoTimeBucket(List<Object[]> rows) {
     List<Object[]>[] bucketedItems = new List[_numOfTimeBuckets];
 

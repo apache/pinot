@@ -39,9 +39,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@link SegmentGenerationAndPushTaskExecutor}
- */
+/// Tests for [SegmentGenerationAndPushTaskExecutor]
 public class SegmentGenerationAndPushTaskExecutorTest {
 
   @Test
@@ -57,25 +55,25 @@ public class SegmentGenerationAndPushTaskExecutorTest {
     Schema schema = new Schema.SchemaBuilder().build();
     FieldUtils.writeField(executor, "_eventObserver", new DefaultMinionEventObserver(), true);
     Map<String, String> configMap = new HashMap<>() {{
-      put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc + "dummyTable.json");
-      put(BatchConfigProperties.INPUT_FORMAT, "");
-      put(BatchConfigProperties.RECORD_READER_CLASS, "AReaderClass");
-      put(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, "AReaderConfigClass");
-      put(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop1", "value1");
-      put(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop.2", "value2");
-      put(BatchConfigProperties.AUTH_TOKEN, "not_used");
-      put(BatchConfigProperties.TABLE_NAME, "not_used");
-      put(BatchConfigProperties.SCHEMA, schema.toSingleLineJsonString());
-      put(BatchConfigProperties.SCHEMA_URI, "not_used");
-      put(BatchConfigProperties.TABLE_CONFIGS, tableConfig);
-      put(BatchConfigProperties.TABLE_CONFIGS_URI, "not_used");
-      put(BatchConfigProperties.SEQUENCE_ID, "42");
-      put(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT, "true");
-      put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, "inputtext");
-      put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".prop.seg.1", "valseg1");
-      put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".propseg2", "valseg2");
-      put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "true");
-    }};
+        put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc + "dummyTable.json");
+        put(BatchConfigProperties.INPUT_FORMAT, "");
+        put(BatchConfigProperties.RECORD_READER_CLASS, "AReaderClass");
+        put(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, "AReaderConfigClass");
+        put(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop1", "value1");
+        put(BatchConfigProperties.RECORD_READER_PROP_PREFIX + ".prop.2", "value2");
+        put(BatchConfigProperties.AUTH_TOKEN, "not_used");
+        put(BatchConfigProperties.TABLE_NAME, "not_used");
+        put(BatchConfigProperties.SCHEMA, schema.toSingleLineJsonString());
+        put(BatchConfigProperties.SCHEMA_URI, "not_used");
+        put(BatchConfigProperties.TABLE_CONFIGS, tableConfig);
+        put(BatchConfigProperties.TABLE_CONFIGS_URI, "not_used");
+        put(BatchConfigProperties.SEQUENCE_ID, "42");
+        put(BatchConfigProperties.FAIL_ON_EMPTY_SEGMENT, "true");
+        put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, "inputtext");
+        put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".prop.seg.1", "valseg1");
+        put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + ".propseg2", "valseg2");
+        put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "true");
+      }};
     SegmentGenerationTaskSpec spec = executor.generateTaskSpec(configMap, Paths.get(resourcesLoc.toURI()).toFile());
     assertEquals(spec.getSequenceId(), 42);
     assertEquals("file:" + spec.getInputFilePath(), resourcesLoc + "input/dummyTable.json");
@@ -87,5 +85,42 @@ public class SegmentGenerationAndPushTaskExecutorTest {
     assertEqualsDeep(spec.getSegmentNameGeneratorSpec().getConfigs(),
         Map.of("prop.seg.1", "valseg1", "propseg2", "valseg2", SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME,
             "true"));
+  }
+
+  @Test
+  public void testGenerateTaskSpecAppendUuidPrecedence()
+      throws Exception {
+    // Explicit prefixed config wins over the top-level key
+    assertAppendUuid(Map.of(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "true",
+        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + "."
+            + SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME, "false"), "false");
+    // Top-level key is still honored when the prefixed config is absent
+    assertAppendUuid(Map.of(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "true"), "true");
+    assertAppendUuid(Map.of(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, "false"), "false");
+    // Unchanged default when neither is set
+    assertAppendUuid(Map.of(), "false");
+  }
+
+  private void assertAppendUuid(Map<String, String> appendUuidConfigs, String expected)
+      throws Exception {
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL resourcesLoc = classLoader.getResource(".");
+    assertNotNull(resourcesLoc);
+    URL tableConfigUrl = classLoader.getResource("dummyTable.json");
+    assertNotNull(tableConfigUrl);
+    SegmentGenerationAndPushTaskExecutor executor = new SegmentGenerationAndPushTaskExecutor();
+    FieldUtils.writeField(executor, "_eventObserver", new DefaultMinionEventObserver(), true);
+    Map<String, String> configMap = new HashMap<>(appendUuidConfigs);
+    configMap.put(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, resourcesLoc + "dummyTable.json");
+    configMap.put(BatchConfigProperties.RECORD_READER_CLASS, "AReaderClass");
+    configMap.put(BatchConfigProperties.RECORD_READER_CONFIG_CLASS, "AReaderConfigClass");
+    configMap.put(BatchConfigProperties.SCHEMA, new Schema.SchemaBuilder().build().toSingleLineJsonString());
+    configMap.put(BatchConfigProperties.TABLE_CONFIGS,
+        FileUtils.readFileToString(new File(tableConfigUrl.getFile()), StandardCharsets.UTF_8));
+    configMap.put(BatchConfigProperties.SEQUENCE_ID, "42");
+    configMap.put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE, "inputFile");
+    SegmentGenerationTaskSpec spec = executor.generateTaskSpec(configMap, Paths.get(resourcesLoc.toURI()).toFile());
+    assertEquals(spec.getSegmentNameGeneratorSpec().getConfigs()
+        .get(SegmentGenerationTaskRunner.APPEND_UUID_TO_SEGMENT_NAME), expected);
   }
 }

@@ -50,7 +50,9 @@ public class QueryOptimizerTest {
           .addSingleValueDimension("double", DataType.DOUBLE)
           .addSingleValueDimension("string", DataType.STRING)
           .addSingleValueDimension("bytes", DataType.BYTES)
-          .addMultiValueDimension("mvInt", DataType.INT).build();
+          .addMultiValueDimension("mvInt", DataType.INT)
+          .addMultiValueDimension("mvLong", DataType.LONG)
+          .addMultiValueDimension("mvString", DataType.STRING).build();
 
   @Test
   public void testNoFilter() {
@@ -251,6 +253,10 @@ public class QueryOptimizerTest {
 
     testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\"", "SELECT * FROM testTable WHERE true");
     testQuery("SELECT * FROM testTable WHERE \"a\"!=\"a\"", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE \"a\">=\"a\"", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE \"a\"<=\"a\"", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE \"a\">\"a\"", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE \"a\"<\"a\"", "SELECT * FROM testTable WHERE false");
     testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" AND \"a\"!=\"a\"", "SELECT * FROM testTable WHERE false");
     testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" OR \"a\"!=\"a\"", "SELECT * FROM testTable WHERE true");
 
@@ -267,6 +273,9 @@ public class QueryOptimizerTest {
 
     testQuery("SELECT * FROM testTable WHERE 1=1 AND true", "SELECT * FROM testTable WHERE true");
     testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" AND true", "SELECT * FROM testTable WHERE true");
+
+    // Non-comparison boolean functions with identical column arguments must not be folded
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE startsWith(string, string)");
 
     // TextMatchFilterOptimizer
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
@@ -369,6 +378,50 @@ public class QueryOptimizerTest {
     testCannotOptimizeQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo')");
   }
 
+  @Test
+  public void testArrayContainsFilter() {
+    // A boolean arrayContains predicate on an MV column is rewritten into an EQUALS predicate, which has MV
+    // "any element matches" semantics and can use the inverted index and segment pruning
+    testQuery("SELECT * FROM testTable WHERE arrayContainsString(mvString, 'foo')",
+        "SELECT * FROM testTable WHERE mvString = 'foo'");
+    testQuery("SELECT * FROM testTable WHERE ARRAY_CONTAINS_STRING(mvString, 'foo')",
+        "SELECT * FROM testTable WHERE mvString = 'foo'");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsString(mvString, 'foo') = true",
+        "SELECT * FROM testTable WHERE mvString = 'foo'");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 5)",
+        "SELECT * FROM testTable WHERE mvInt = 5");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 5) AND int = 1",
+        "SELECT * FROM testTable WHERE mvInt = 5 AND int = 1");
+    // Combines with the other optimizers (merged into IN)
+    testQuery("SELECT * FROM testTable WHERE arrayContainsString(mvString, 'foo') OR mvString = 'bar'",
+        "SELECT * FROM testTable WHERE mvString IN ('foo', 'bar')");
+
+    // The literal is converted to the function parameter type the same way the scalar function does it
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 5.0)", "SELECT * FROM testTable WHERE mvInt = 5");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 5.5)", "SELECT * FROM testTable WHERE mvInt = 5");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, ' 5')", "SELECT * FROM testTable WHERE mvInt = 5");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 4294967301)",
+        "SELECT * FROM testTable WHERE mvInt = 5");
+    testQuery("SELECT * FROM testTable WHERE arrayContainsString(mvString, 5)",
+        "SELECT * FROM testTable WHERE mvString = '5'");
+    // Literal that cannot be converted keeps the scalar function
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvInt, 'foo')");
+
+    // NOT arrayContains means "no element matches", while `!=` on an MV column means "some element does not
+    // match", so negations must not be rewritten
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE NOT arrayContainsString(mvString, 'foo')");
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsString(mvString, 'foo') = false");
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsString(mvString, 'foo') <> true");
+    // Non-identifier / non-literal arguments
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsString(mvString, string)");
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsInt(arraySliceInt(mvInt, 0, 2), 5)");
+    // Column not in the schema, single-value column, or function type that does not match the column type
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsString(nonExistingColumn, 'foo')");
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsString(string, 'foo')");
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsString(mvInt, '5')");
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE arrayContainsInt(mvLong, 5)");
+  }
+
   private static void testQuery(String actual, String expected) {
     assertNotEquals(actual, expected, "You must provide different queries to test");
     PinotQuery actualPinotQuery = CalciteSqlParser.compileToPinotQuery(actual);
@@ -429,9 +482,7 @@ public class QueryOptimizerTest {
     }
   }
 
-  /**
-   * Handles different order of children under AND/OR filter.
-   */
+  /// Handles different order of children under AND/OR filter.
   private static void compareFilterExpressionChildren(List<Expression> actual, List<Expression> expected) {
     assertEquals(actual.size(), expected.size());
     List<Expression> unmatchedExpectedChildren = new ArrayList<>(expected);

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.partition.function.ModuloPartitionFunction;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -36,7 +37,6 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.partition.ModuloPartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -54,13 +54,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for Segment partitioning:
- * <ul>
- *   <li> Test to cover segment generation and metadata.</li>
- *   <li> Test to cover segment pruning during query execution. </li>
- * </ul>
- */
+/// Unit test for Segment partitioning:
+///
+/// - Test to cover segment generation and metadata.
+/// - Test to cover segment pruning during query execution.
 public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
   private static final String SEGMENT_DIR_NAME =
       System.getProperty("java.io.tmpdir") + File.separator + "partitionTest";
@@ -85,23 +82,19 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
     buildSegment();
   }
 
-  /**
-   * Clean up after test
-   */
+  /// Clean up after test
   @AfterClass
   public void cleanup() {
     _segment.destroy();
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
   }
 
-  /**
-   * Unit test:
-   * <ul>
-   *   <li> Partitioning metadata is written out correctly for column where all values comply to partition scheme. </li>
-   *   <li> Partitioning metadata is dropped for column that does not comply to partitioning scheme. </li>
-   *   <li> Partitioning metadata is not written out for column for which the metadata was not specified. </li>
-   * </ul>
-   */
+  /// Unit test:
+  ///
+  /// - Partitioning metadata is written out correctly for column where all values comply to partition
+  ///      scheme.
+  /// - Partitioning metadata is dropped for column that does not comply to partitioning scheme.
+  /// - Partitioning metadata is not written out for column for which the metadata was not specified.
   @Test
   public void testMetadata() {
     SegmentMetadata segmentMetadata = _segment.getSegmentMetadata();
@@ -117,14 +110,12 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
     Assert.assertNull(columnMetadata.getPartitions());
   }
 
-  /**
-   * Unit test for {@link SegmentPartitionConfig} that tests the following:
-   * <ul>
-   *   <li> Conversion from/to JSON string. </li>
-   *   <li> Function names, values and ranges are as expected. </li>
-   * </ul>
-   * @throws IOException
-   */
+  /// Unit test for [SegmentPartitionConfig] that tests the following:
+  ///
+  /// - Conversion from/to JSON string.
+  /// - Function names, values and ranges are as expected.
+  ///
+  /// @throws IOException
   @Test
   public void testSegmentPartitionConfig()
       throws IOException {
@@ -161,15 +152,13 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
         JsonUtils.stringToObject(jsonStringWithNewField, SegmentPartitionConfig.class).toJsonString());
   }
 
-  /**
-   * Helper method to build a segment for testing:
-   * <ul>
-   *   <li> First column is partitioned correctly as per the specification in the segment generation config. </li>
-   *   <li> Second column is not partitioned as per the specification in the segment generation config. </li>
-   *   <li> Third column does not have any partitioning config in the segment generation config. </li>
-   * </ul>
-   * @throws Exception
-   */
+  /// Helper method to build a segment for testing:
+  ///
+  /// - First column is partitioned correctly as per the specification in the segment generation config.
+  /// - Second column is not partitioned as per the specification in the segment generation config.
+  /// - Third column does not have any partitioning config in the segment generation config.
+  ///
+  /// @throws Exception
   private void buildSegment()
       throws Exception {
     Schema schema = new Schema();

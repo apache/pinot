@@ -20,9 +20,7 @@ package org.apache.pinot.core.query.selection;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
@@ -35,32 +33,17 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- *
- * The <code>SelectionOperatorService</code> class provides the services for selection queries with
- * <code>ORDER BY</code>.
- * <p>Expected behavior:
- * <ul>
- *   <li>
- *     Return selection results with the same order of columns as user passed in.
- *     <ul>
- *       <li>Eg. SELECT colB, colA, colC FROM table -> [valB, valA, valC]</li>
- *     </ul>
- *   </li>
- *   <li>
- *     For 'SELECT *', return columns with alphabetically order.
- *     <ul>
- *       <li>Eg. SELECT * FROM table -> [valA, valB, valC]</li>
- *     </ul>
- *   </li>
- *   <li>
- *     Order by does not change the order of columns in selection results.
- *     <ul>
- *       <li>Eg. SELECT colB, colA, colC FROM table ORDER BY calC -> [valB, valA, valC]</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// The `SelectionOperatorService` class provides the services for selection queries with
+/// `ORDER BY`.
+///
+/// Expected behavior:
+///
+/// - Return selection results with the same order of columns as user passed in.
+///   - Eg. SELECT colB, colA, colC FROM table -> \[valB, valA, valC\]
+/// - For 'SELECT \*', return columns with alphabetically order.
+///   - Eg. SELECT \* FROM table -> \[valA, valB, valC\]
+/// - Order by does not change the order of columns in selection results.
+///   - Eg. SELECT colB, colA, colC FROM table ORDER BY calC -> \[valB, valA, valC\]
 public class SelectionOperatorService {
   private final QueryContext _queryContext;
   private final DataSchema _dataSchema;
@@ -70,7 +53,7 @@ public class SelectionOperatorService {
   private final int _numRowsToKeep;
   // TODO: consider moving this to a util class
 
-  /** Util class used for n-way merge */
+  /// Util class used for n-way merge
   private static class MergeItem {
     final Object[] _row;
     final int _dataTableId;
@@ -92,27 +75,10 @@ public class SelectionOperatorService {
     assert queryContext.getOrderByExpressions() != null;
   }
 
-  /**
-   * Reduce multiple sorted (and unsorted) dataTables into a single resultTable, ordered, limited, and offset
-   * @param dataTables dataTables to be reduced
-   * @return resultTable
-   */
+  /// Reduce multiple sorted dataTables into a single resultTable, ordered, limited, and offset
+  /// @param dataTables dataTables to be reduced
+  /// @return resultTable
   public ResultTable reduceWithOrdering(Collection<DataTable> dataTables) {
-    boolean allSorted = true;
-    for (DataTable dataTable : dataTables) {
-      String sorted = dataTable.getMetadata().get(DataTable.MetadataKey.SORTED.getName());
-      if (!Boolean.parseBoolean(sorted)) {
-        allSorted = false;
-        break;
-      }
-    }
-
-    // TODO: backward compatible, to be removed after 1.2.0 no longer supported
-    if (!allSorted) {
-      List<Object[]> heapSortedRows = heapSortDataTable(dataTables);
-      return new ResultTable(_dataSchema, heapSortedRows);
-    } // end todo
-
     if (dataTables.size() == 1) {
       // short circuit single table case
       DataTable dataTable = dataTables.iterator().next();
@@ -126,11 +92,9 @@ public class SelectionOperatorService {
     return new ResultTable(_dataSchema, mergedRows);
   }
 
-  /**
-   * Merge sorted dataTables using N-way merge
-   * @param dataTables sorted dataTables
-   * @return sorted rows
-   */
+  /// Merge sorted dataTables using N-way merge
+  /// @param dataTables sorted dataTables
+  /// @return sorted rows
   private List<Object[]> nWayMergeDataTables(List<DataTable> dataTables) {
     Comparator<Object[]> comparator = OrderByComparatorFactory.getComparator(_queryContext.getOrderByExpressions(),
         _queryContext.isNullHandlingEnabled());
@@ -189,7 +153,7 @@ public class SelectionOperatorService {
     int numRows = dataTable.getNumberOfRows();
 
     if (numRows <= _offset) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     int start = _offset;
@@ -217,7 +181,7 @@ public class SelectionOperatorService {
     return resultRows;
   }
 
-  /** get nullBitmaps for dataTables */
+  /// get nullBitmaps for dataTables
   private RoaringBitmap[][] getdataTableNullBitmaps(List<DataTable> dataTables) {
     RoaringBitmap[][] dataTableNullBitmaps = new RoaringBitmap[dataTables.size()][];
     if (!_queryContext.isNullHandlingEnabled()) {
@@ -230,7 +194,7 @@ public class SelectionOperatorService {
     return dataTableNullBitmaps;
   }
 
-  /** get a single row from dataTable with null handling if nullBitmaps provided */
+  /// get a single row from dataTable with null handling if nullBitmaps provided
   private Object[] getDataTableRow(DataTable dataTable, int rowId, @Nullable RoaringBitmap[] nullBitmaps) {
     QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId, "SelectionOperatorService#getDataTableRow");
     Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
@@ -265,52 +229,5 @@ public class SelectionOperatorService {
       }
     }
     return resultRow;
-  }
-
-  /**
-   * Heapsort unsorted dataTables, this code is unreachable for
-   * server version >= 1.3.0 as server always performs sorting
-   * TODO: remove after 1.2.0 no longer supported
-   * @param dataTables unsorted dataTables
-   * @return sorted rows
-   */
-  private List<Object[]> heapSortDataTable(Collection<DataTable> dataTables) {
-    Comparator<Object[]> comparator = OrderByComparatorFactory.getComparator(_queryContext.getOrderByExpressions(),
-        _queryContext.isNullHandlingEnabled());
-    PriorityQueue<Object[]> heapSortRows =
-        new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-            comparator.reversed());
-    // reduce
-    for (DataTable dataTable : dataTables) {
-      int numRows = dataTable.getNumberOfRows();
-      if (_queryContext.isNullHandlingEnabled()) {
-        RoaringBitmap[] nullBitmaps = getNullBitmap(dataTable);
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
-              "SelectionOperatorService#heapSortDataTable");
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-          setNullsForRow(nullBitmaps, rowId, row);
-          SelectionOperatorUtils.addToPriorityQueue(row, heapSortRows, _numRowsToKeep);
-        }
-      } else {
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId,
-              "SelectionOperatorService#heapSortDataTable");
-          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-          SelectionOperatorUtils.addToPriorityQueue(row, heapSortRows, _numRowsToKeep);
-        }
-      }
-    }
-    // render
-    LinkedList<Object[]> resultRows = new LinkedList<>();
-    DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
-    int numColumns = columnDataTypes.length;
-    while (heapSortRows.size() > _offset) {
-      Object[] row = heapSortRows.poll();
-      assert row != null;
-      Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
-      resultRows.addFirst(resultRow);
-    }
-    return resultRows;
   }
 }

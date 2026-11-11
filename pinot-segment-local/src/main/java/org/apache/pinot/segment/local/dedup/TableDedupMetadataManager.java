@@ -22,39 +22,31 @@ import java.io.Closeable;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public interface TableDedupMetadataManager extends Closeable {
-  /**
-   * Initialize TableDedupMetadataManager.
-   */
+  /// Initialize TableDedupMetadataManager.
   void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet);
 
-  /**
-   * Create a new PartitionDedupMetadataManager if not present already, otherwise return existing one.
-   */
+  /// Create a new PartitionDedupMetadataManager if not present already, otherwise return existing one.
   PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId);
 
   DedupContext getContext();
 
-  /// @deprecated Use {@link #getContext()} instead.
+  /// @deprecated Use [#getContext()] instead.
   @Deprecated
   boolean isEnablePreload();
 
-  /**
-   * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
-   */
+  /// Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
   void stop();
 
-  /**
-   * Retrieves a mapping of partition id to the primary key count for the partition.
-   *
-   * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition
-   */
+  /// Retrieves a mapping of partition id to the primary key count for the partition.
+  ///
+  /// @return A `Map` where keys are partition id and values are count of primary keys for that specific partition
   Map<Integer, Long> getPartitionToPrimaryKeyCount();
 }

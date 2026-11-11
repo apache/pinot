@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.inverted;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -30,7 +29,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInve
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.RawValueBitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -63,7 +61,7 @@ public class InvertedIndexType
     extends AbstractIndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "inverted";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
   protected InvertedIndexType() {
     super(StandardIndexes.INVERTED_ID);
@@ -84,6 +82,8 @@ public class InvertedIndexType
     IndexConfig invertedIndexConfig = indexConfigs.getConfig(StandardIndexes.inverted());
     if (invertedIndexConfig.isEnabled()) {
       String column = fieldSpec.getName();
+      Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+          "Cannot create inverted index on column: %s without dictionary", column);
       Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
           "Cannot create inverted index on MAP column: %s", column);
     }
@@ -149,19 +149,31 @@ public class InvertedIndexType
     return new InvertedIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    // Inverted index posting lists are keyed by dictionary IDs; an enabled inverted index always requires a
+    // dictionary.
+    return true;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    // Inverted index references dictionary IDs; enabling/disabling the dictionary changes whether the index can
+    // exist at all and (for shared-dict columns) the format on disk.
+    return true;
+  }
+
   public static class ReaderFactory implements IndexReaderFactory<InvertedIndexReader> {
     public static final ReaderFactory INSTANCE = new ReaderFactory();
 
     private ReaderFactory() {
     }
 
-    /**
-     * Creates a {@link InvertedIndexReader}.
-     *
-     * Unless {@link #createSkippingForward(SegmentDirectory.Reader, ColumnMetadata)}, this method first try to use the
-     * forward index reader in case it is also an inverted index. That is the case, for example, when the column is
-     * sorted and single value.
-     */
+    /// Creates a [InvertedIndexReader].
+    ///
+    /// Unless [#createSkippingForward(SegmentDirectory.Reader, ColumnMetadata)], this method first try to use the
+    /// forward index reader in case it is also an inverted index. That is the case, for example, when the column is
+    /// sorted and single value.
     @Override
     public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
@@ -169,7 +181,11 @@ public class InvertedIndexType
       if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.inverted())) {
         return null;
       }
-      if (metadata.isSorted() && metadata.isSingleValue() && metadata.hasDictionary()) {
+      if (!metadata.hasDictionary()) {
+        throw new IllegalStateException("Column " + metadata.getColumnName() + " cannot be indexed by an inverted "
+            + "index if it has no dictionary");
+      }
+      if (metadata.isSorted() && metadata.isSingleValue()) {
         ForwardIndexReader fwdReader =
             StandardIndexes.forward().getReaderFactory().createIndexReader(segmentReader, fieldIndexConfigs, metadata);
         Preconditions.checkState(fwdReader instanceof SortedIndexReader);
@@ -179,20 +195,18 @@ public class InvertedIndexType
       }
     }
 
-    /**
-     * Directly creates a {@link InvertedIndexReader}.
-     *
-     * Unless {@link #createIndexReader}, this method always tries to create the actual inverted index reader instead of
-     * try to use the forward index when the column is sorted and single value.
-     */
+    /// Directly creates a [InvertedIndexReader].
+    ///
+    /// Unless [#createIndexReader], this method always tries to create the actual inverted index reader instead
+    /// of try to use the forward index when the column is sorted and single value.
     public InvertedIndexReader createSkippingForward(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata)
         throws IOException {
-      PinotDataBuffer dataBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.inverted());
-      if (metadata.hasDictionary()) {
-        return new BitmapInvertedIndexReader(dataBuffer, metadata.getCardinality());
-      } else {
-        return new RawValueBitmapInvertedIndexReader(dataBuffer, metadata.getDataType());
+      if (!metadata.hasDictionary()) {
+        throw new IllegalStateException("Column " + metadata.getColumnName() + " cannot be indexed by an inverted "
+            + "index if it has no dictionary");
       }
+      PinotDataBuffer dataBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.inverted());
+      return new BitmapInvertedIndexReader(dataBuffer, metadata.getCardinality());
     }
   }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.ColumnContext;
@@ -25,14 +26,12 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 
 
-/**
- * The ArrayLengthTransformFunction class implements arrayLength function for multi-valued columns
- *
- * Sample queries:
- * SELECT COUNT(*) FROM table WHERE arrayLength(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY arrayLength(mvColumn)
- * SELECT MAX(arrayLength(mvColumn)) FROM table
- */
+/// The ArrayLengthTransformFunction class implements arrayLength function for multi-valued columns
+///
+/// Sample queries:
+/// SELECT COUNT(\*) FROM table WHERE arrayLength(mvColumn) > 2
+/// SELECT COUNT(\*) FROM table GROUP BY arrayLength(mvColumn)
+/// SELECT MAX(arrayLength(mvColumn)) FROM table
 public class ArrayLengthTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "arrayLength";
 
@@ -94,10 +93,22 @@ public class ArrayLengthTransformFunction extends BaseTransformFunction {
           _intValuesSV[i] = doubleValuesMV[i].length;
         }
         break;
+      case BIG_DECIMAL:
+        BigDecimal[][] bigDecimalValuesMV = _argument.transformToBigDecimalValuesMV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          _intValuesSV[i] = bigDecimalValuesMV[i].length;
+        }
+        break;
       case STRING:
         String[][] stringValuesMV = _argument.transformToStringValuesMV(valueBlock);
         for (int i = 0; i < length; i++) {
           _intValuesSV[i] = stringValuesMV[i].length;
+        }
+        break;
+      case BYTES:
+        byte[][][] bytesValuesMV = _argument.transformToBytesValuesMV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          _intValuesSV[i] = bytesValuesMV[i].length;
         }
         break;
       default:

@@ -31,13 +31,11 @@ public class LongGroupByResultHolder implements GroupByResultHolder {
   private int _resultHolderCapacity;
   private long[] _resultArray;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param initialCapacity Initial capacity of the result holder
-   * @param maxCapacity Maximum capacity of the result holder
-   * @param defaultValue Default value of un-initialized results
-   */
+  /// Constructor for the class.
+  ///
+  /// @param initialCapacity Initial capacity of the result holder
+  /// @param maxCapacity Maximum capacity of the result holder
+  /// @param defaultValue Default value of un-initialized results
   public LongGroupByResultHolder(int initialCapacity, int maxCapacity, long defaultValue) {
     _maxCapacity = maxCapacity;
     _defaultValue = defaultValue;

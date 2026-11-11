@@ -18,17 +18,23 @@
  */
 package org.apache.pinot.spi.executor;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -126,5 +132,84 @@ public class HardLimitExecutorTest {
     Map<String, Object> configMap5 = new HashMap<>();
     PinotConfiguration config5 = new PinotConfiguration(configMap5);
     assertEquals(HardLimitExecutor.getMultiStageExecutorHardLimit(config5), -1);
+  }
+
+  /// A task that passes the submit-time check must run even if the limit is reached before it starts. The limit used
+  /// to be re-checked at start time, which silently dropped the task: the exception was captured by the FutureTask
+  /// created by AbstractExecutorService.submit and never reached the submitter.
+  @Test
+  public void testAcceptedTaskRunsEvenIfLimitIsReachedBeforeItStarts()
+      throws Exception {
+    DeferredExecutor deferred = new DeferredExecutor();
+    HardLimitExecutor ex = new HardLimitExecutor(1, deferred);
+    CountDownLatch firstStarted = new CountDownLatch(1);
+    CountDownLatch firstRelease = new CountDownLatch(1);
+    CountDownLatch secondRan = new CountDownLatch(1);
+
+    // Both submissions pass the synchronous check because nothing has started yet.
+    ex.execute(() -> {
+      firstStarted.countDown();
+      try {
+        firstRelease.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    });
+    ex.execute(secondRan::countDown);
+    assertEquals(deferred._queued.size(), 2);
+
+    Thread first = new Thread(deferred._queued.get(0));
+    first.start();
+    assertTrue(firstStarted.await(10, TimeUnit.SECONDS), "first task did not start");
+
+    // The running counter is at the limit now, but the second task was already accepted and must run.
+    deferred._queued.get(1).run();
+    assertTrue(secondRan.await(10, TimeUnit.SECONDS), "accepted task was dropped at start time");
+
+    // A third submission is rejected synchronously because the first task is still running.
+    try {
+      ex.execute(() -> {
+      });
+      fail("Should not allow more than 1 task");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Tasks limit exceeded.");
+    }
+
+    firstRelease.countDown();
+    first.join(TimeUnit.SECONDS.toMillis(10));
+  }
+
+  /// Executor that queues tasks instead of running them so the test controls when each one starts.
+  private static class DeferredExecutor extends AbstractExecutorService {
+    final List<Runnable> _queued = new ArrayList<>();
+
+    @Override
+    public void execute(Runnable command) {
+      _queued.add(command);
+    }
+
+    @Override
+    public void shutdown() {
+    }
+
+    @Override
+    public List<Runnable> shutdownNow() {
+      return List.of();
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return false;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return false;
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      return true;
+    }
   }
 }

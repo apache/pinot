@@ -37,12 +37,10 @@ public interface DimensionTable extends Closeable {
 
   boolean containsKey(PrimaryKey pk);
 
-  /**
-   * Deprecated because GenericRow is an inefficient data structure.
-   * Use getValue() or getValues() instead.
-   * @param pk primary key
-   * @return primary key and value as GenericRow.
-   */
+  /// Deprecated because GenericRow is an inefficient data structure.
+  /// Use getValue() or getValues() instead.
+  /// @param pk primary key
+  /// @return primary key and value as GenericRow.
   @Deprecated
   @Nullable
   GenericRow getRow(PrimaryKey pk);

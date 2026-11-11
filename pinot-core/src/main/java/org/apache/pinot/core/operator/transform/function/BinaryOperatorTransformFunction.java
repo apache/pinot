@@ -36,18 +36,15 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * <code>BinaryOperatorTransformFunction</code> abstracts common functions for binary operators (=, !=, >=, >, <=, <).
- * The results are BOOLEAN type.
- *
- * TODO: Support MV columns
- */
+/// `BinaryOperatorTransformFunction` abstracts common functions for binary operators (=, !=, >=, >, <=, <).
+/// The results are BOOLEAN type.
+///
+/// TODO: Support MV columns
 public abstract class BinaryOperatorTransformFunction extends BaseTransformFunction {
   private static final int EQUALS = 0;
   private static final int GREATER_THAN_OR_EQUAL = 1;
@@ -110,15 +107,16 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     _leftTransformFunction = arguments.get(0);
     _rightTransformFunction = arguments.get(1);
     DataType leftDataType = _leftTransformFunction.getResultMetadata().getDataType();
+    DataType rightDataType = _rightTransformFunction.getResultMetadata().getDataType();
     _leftStoredType = leftDataType.getStoredType();
-    _rightStoredType = _rightTransformFunction.getResultMetadata().getDataType().getStoredType();
+    _rightStoredType = rightDataType.getStoredType();
 
     // Data type check: left and right types should be compatible.
     if (_leftStoredType == DataType.BYTES || _rightStoredType == DataType.BYTES) {
       Preconditions.checkState(_leftStoredType == _rightStoredType, String.format(
           "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform "
-              + "Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
-          _rightTransformFunction.getName(), _rightStoredType));
+              + "Function [%s] result type is [%s]]", getTransformFunctionDisplayName(_leftTransformFunction),
+          _leftStoredType, getTransformFunctionDisplayName(_rightTransformFunction), _rightStoredType));
     }
 
     // Create predicate evaluator when the right side is a literal
@@ -128,10 +126,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  /**
-   * Creates a predicate evaluator for the binary operator. Returns {@code null} when the binary operator always
-   * evaluates to the same value (true/false/null) where the predicate evaluator is not needed.
-   */
+  /// Creates a predicate evaluator for the binary operator. Returns `null` when the binary operator always
+  /// evaluates to the same value (true/false/null) where the predicate evaluator is not needed.
   @Nullable
   private PredicateEvaluator createPredicateEvaluator(DataType leftDataType, @Nullable Dictionary leftDictionary,
       LiteralContext rightLiteral) {
@@ -143,16 +139,15 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     if (predicate == null) {
       return null;
     }
-    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, leftDictionary, leftDataType);
+    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, leftDictionary, leftDataType, null);
   }
 
-  /**
-   * Creates a predicate for the binary operator. Returns {@code null} when the binary operator always evaluates to the
-   * same value (true/false/null) where the predicate is not needed.
-   *
-   * It might rewrite the right value similar to {@link NumericalFilterOptimizer}.
-   * TODO: Extract the common logic.
-   */
+  /// Creates a predicate for the binary operator. Returns `null` when the binary operator always evaluates to the
+  /// same value (true/false/null) where the predicate is not needed.
+  ///
+  /// It might rewrite the right value similar to
+  /// [org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer].
+  /// TODO: Extract the common logic.
   @Nullable
   private Predicate createPredicate(DataType leftDataType, LiteralContext rightLiteral) {
     DataType rightDataType = rightLiteral.getType();
@@ -413,9 +408,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
   }
 
-  /**
-   * Returns the operator (int value) for the given comparison result of actual value and converted value.
-   */
+  /// Returns the operator (int value) for the given comparison result of actual value and converted value.
   private int getOperator(int comparison) {
     assert comparison != 0;
     if (comparison > 0) {
@@ -697,8 +690,15 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private IllegalStateException illegalState() {
     throw new IllegalStateException(String.format(
         "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right "
-            + "Transform Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
-        _rightTransformFunction.getName(), _rightStoredType));
+            + "Transform Function [%s] result type is [%s]]", getTransformFunctionDisplayName(_leftTransformFunction),
+        _leftStoredType, getTransformFunctionDisplayName(_rightTransformFunction), _rightStoredType));
+  }
+
+  private static String getTransformFunctionDisplayName(TransformFunction transformFunction) {
+    if (transformFunction instanceof IdentifierTransformFunction) {
+      return ((IdentifierTransformFunction) transformFunction).getColumnName();
+    }
+    return transformFunction.getName();
   }
 
   private void fillResultString(ValueBlock valueBlock, int length) {
@@ -712,8 +712,10 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillResultBytes(ValueBlock valueBlock, int length) {
     byte[][] leftBytesValues = _leftTransformFunction.transformToBytesValuesSV(valueBlock);
     byte[][] rightBytesValues = _rightTransformFunction.transformToBytesValuesSV(valueBlock);
+    // ByteArray.compare is unsigned byte-wise lexicographic; for canonical 16-byte big-endian UUIDs this is
+    // equivalent to UuidUtils.compare's unsigned 64-bit-word ordering, so a single comparator handles both.
     for (int i = 0; i < length; i++) {
-      _intValuesSV[i] = getIntResult((ByteArray.compare(leftBytesValues[i], rightBytesValues[i])));
+      _intValuesSV[i] = getIntResult(ByteArray.compare(leftBytesValues[i], rightBytesValues[i]));
     }
   }
 

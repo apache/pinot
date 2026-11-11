@@ -166,6 +166,119 @@ public class UnnestOperatorTest {
   }
 
   @Test
+  public void shouldPrunePassthroughColumnsWhenSourceArrayDropped() {
+    // Input keeps the source array, but the pruned output schema drops it: only "id" passes through.
+    DataSchema inputSchema = new DataSchema(new String[]{"id", "arr"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT_ARRAY
+    });
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema,
+            new Object[]{1, new int[]{10, 20}},
+            new Object[]{2, new int[]{30}}));
+
+    DataSchema resultSchema = new DataSchema(new String[]{"id", "elem"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT
+    });
+    RexExpression arrayExpr = new RexExpression.InputRef(1);
+    // Passthrough only input column 0 ("id") to output 0; element lands at output 1. prunedPassthrough = true.
+    UnnestNode.TableFunctionContext context =
+        new UnnestNode.TableFunctionContext(false, List.of(1), UnnestNode.UNSPECIFIED_INDEX, List.of(0), true);
+    UnnestNode node = new UnnestNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of(arrayExpr), context);
+    UnnestOperator operator = new UnnestOperator(OperatorTestUtil.getTracingContext(), _input, inputSchema, node);
+
+    List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 3);
+    for (Object[] row : rows) {
+      assertEquals(row.length, 2); // source array is not carried
+    }
+    assertEquals(rows.get(0)[0], 1);
+    assertEquals(rows.get(0)[1], 10);
+    assertEquals(rows.get(1)[0], 1);
+    assertEquals(rows.get(1)[1], 20);
+    assertEquals(rows.get(2)[0], 2);
+    assertEquals(rows.get(2)[1], 30);
+  }
+
+  @Test
+  public void shouldPrunePassthroughToZeroColumns() {
+    // SELECT only the unnested element: no passthrough columns retained.
+    DataSchema inputSchema = new DataSchema(new String[]{"id", "arr"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT_ARRAY
+    });
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1, new int[]{10, 20}}));
+
+    DataSchema resultSchema = new DataSchema(new String[]{"elem"}, new ColumnDataType[]{ColumnDataType.INT});
+    RexExpression arrayExpr = new RexExpression.InputRef(1);
+    UnnestNode.TableFunctionContext context =
+        new UnnestNode.TableFunctionContext(false, List.of(0), UnnestNode.UNSPECIFIED_INDEX, List.of(), true);
+    UnnestNode node = new UnnestNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of(arrayExpr), context);
+    UnnestOperator operator = new UnnestOperator(OperatorTestUtil.getTracingContext(), _input, inputSchema, node);
+
+    List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0).length, 1);
+    assertEquals(rows.get(0)[0], 10);
+    assertEquals(rows.get(1)[0], 20);
+  }
+
+  @Test
+  public void shouldPrunePassthroughWithOrdinality() {
+    DataSchema inputSchema = new DataSchema(new String[]{"id", "arr"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT_ARRAY
+    });
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1, new int[]{5, 6}}));
+
+    // Pruned output [id, elem, ord]; source array dropped. element at 1, ordinality at 2.
+    DataSchema resultSchema = new DataSchema(new String[]{"id", "elem", "ord"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT
+    });
+    UnnestNode.TableFunctionContext context =
+        new UnnestNode.TableFunctionContext(true, List.of(1), 2, List.of(0), true);
+    UnnestNode node = new UnnestNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(),
+        List.of(new RexExpression.InputRef(1)), context);
+    UnnestOperator operator = new UnnestOperator(OperatorTestUtil.getTracingContext(), _input, inputSchema, node);
+
+    List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0).length, 3);
+    assertEquals(rows.get(0)[0], 1);
+    assertEquals(rows.get(0)[1], 5);
+    assertEquals(rows.get(0)[2], 1);
+    assertEquals(rows.get(1)[1], 6);
+    assertEquals(rows.get(1)[2], 2);
+  }
+
+  @Test
+  public void shouldPrunePassthroughWithMultipleArrays() {
+    DataSchema inputSchema = new DataSchema(new String[]{"id", "a1", "a2"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY
+    });
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{10, new int[]{1, 2}, new String[]{"x", "y"}}));
+
+    // Pruned output [id, v1, v2]; both source arrays dropped.
+    DataSchema resultSchema = new DataSchema(new String[]{"id", "v1", "v2"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.STRING
+    });
+    UnnestNode.TableFunctionContext context =
+        new UnnestNode.TableFunctionContext(false, List.of(1, 2), UnnestNode.UNSPECIFIED_INDEX, List.of(0), true);
+    UnnestNode node = new UnnestNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(),
+        List.of(new RexExpression.InputRef(1), new RexExpression.InputRef(2)), context);
+    UnnestOperator operator = new UnnestOperator(OperatorTestUtil.getTracingContext(), _input, inputSchema, node);
+
+    List<Object[]> rows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0).length, 3);
+    assertEquals(rows.get(0)[0], 10);
+    assertEquals(rows.get(0)[1], 1);
+    assertEquals(rows.get(0)[2], "x");
+    assertEquals(rows.get(1)[1], 2);
+    assertEquals(rows.get(1)[2], "y");
+  }
+
+  @Test
   public void shouldZipMultipleArraysIntoColumns() {
     DataSchema inputSchema = new DataSchema(new String[]{"id", "a1", "a2"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.INT_ARRAY, ColumnDataType.STRING_ARRAY

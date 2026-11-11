@@ -31,17 +31,15 @@ import org.apache.calcite.sql2rel.SqlRexContext;
 import org.apache.calcite.sql2rel.SqlRexConvertlet;
 
 
-/**
- * Convertlet that rewrites ROW comparisons into scalar comparisons.
- *
- * Transforms:
- *   (A, B) = (X, Y)   → (A = X) AND (B = Y)
- *   (A, B) > (X, Y)   → (A > X) OR ((A = X) AND (B > Y))
- *   (A, B) >= (X, Y)  → (A > X) OR ((A = X) AND (B > Y)) OR ((A = X) AND (B = Y))
- *   (A, B) < (X, Y)   → (A < X) OR ((A = X) AND (B < Y))
- *   (A, B) <= (X, Y)  → (A < X) OR ((A = X) AND (B < Y)) OR ((A = X) AND (B = Y))
- *   (A, B) <> (X, Y)  → NOT((A = X) AND (B = Y))
- */
+/// Convertlet that rewrites ROW comparisons into scalar comparisons.
+///
+/// Transforms:
+///   (A, B) = (X, Y)   → (A = X) AND (B = Y)
+///   (A, B) > (X, Y)   → (A > X) OR ((A = X) AND (B > Y))
+///   (A, B) >= (X, Y)  → (A > X) OR ((A = X) AND (B > Y)) OR ((A = X) AND (B = Y))
+///   (A, B) < (X, Y)   → (A < X) OR ((A = X) AND (B < Y))
+///   (A, B) <= (X, Y)  → (A < X) OR ((A = X) AND (B < Y)) OR ((A = X) AND (B = Y))
+///   (A, B) <> (X, Y)  → NOT((A = X) AND (B = Y))
 public class RowComparisonConvertlet implements SqlRexConvertlet {
 
   public static final RowComparisonConvertlet INSTANCE =

@@ -22,8 +22,9 @@ import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
+import org.apache.pinot.common.function.scalar.arithmetic.AbsScalarFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
@@ -33,11 +34,10 @@ import org.apache.pinot.core.udf.UdfSignature;
 
 
 @AutoService(Udf.class)
-public class AbsUdf extends Udf.FromAnnotatedMethod {
-
-  public AbsUdf()
-      throws NoSuchMethodException {
-    super(ArithmeticFunctions.class.getMethod("abs", double.class));
+public class AbsUdf extends Udf {
+  @Override
+  public String getMainName() {
+    return "abs";
   }
 
   @Override
@@ -59,5 +59,10 @@ public class AbsUdf extends Udf.FromAnnotatedMethod {
   @Override
   public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
     return Pair.of(TransformFunctionType.ABS, SingleParamMathTransformFunction.AbsTransformFunction.class);
+  }
+
+  @Override
+  public PinotScalarFunction getScalarFunction() {
+    return new AbsScalarFunction();
   }
 }

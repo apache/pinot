@@ -52,11 +52,14 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -72,8 +75,9 @@ import org.slf4j.LoggerFactory;
 
 
 @ThreadSafe
-public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
+public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler, PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
+  private static final String ALL_ROLES_QUERY_FINGERPRINTING = "pinot.all.enable.query.fingerprinting";
   protected final PinotConfiguration _config;
   protected final String _brokerId;
   protected final RoutingManager _routingManager;
@@ -88,6 +92,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final boolean _enableRowColumnLevelAuth;
   protected final QueryLogger _queryLogger;
+  private final boolean _queryFingerprintingBrokerDefault;
+  protected volatile boolean _enableQueryFingerprinting;
   @Nullable
   protected final String _enableNullHandling;
   @Nullable
@@ -95,20 +101,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final boolean _enableQueryCancellation;
   @Nullable
   protected final String _enableAutoRewriteAggregationType;
+  @Nullable
+  protected final MultiClusterRoutingContext _multiClusterRoutingContext;
 
-  /**
-   * Maps broker-generated query id to the query string.
-   */
+  /// Maps broker-generated query id to the query string.
   protected final Map<Long, String> _queriesById;
-  /**
-   * Maps broker-generated query id to client-provided query id.
-   */
+  /// Maps broker-generated query id to client-provided query id.
   protected final Map<Long, String> _clientQueryIds;
+  /// Resolves the approximate-function rewrite defaults, live from the Helix cluster config. Registered as a
+  /// listener by the broker starter through [#getApproximateFunctionOverrideProvider()].
+  protected final ApproximateFunctionOverrideProvider _approximateFunctionOverrideProvider;
+  /// Resolves the default of the `inferAnyValueType` query option, live from the Helix cluster config. Registered as a
+  /// listener by the broker starter through [#getInferAnyValueTypeProvider()].
+  protected final InferAnyValueTypeProvider _inferAnyValueTypeProvider;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant) {
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
     _config = config;
     _brokerId = brokerId;
     _requestIdGenerator = requestIdGenerator;
@@ -117,6 +127,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _tableCache = tableCache;
     _threadAccountant = threadAccountant;
+    _multiClusterRoutingContext = multiClusterRoutingContext;
+    _approximateFunctionOverrideProvider = new ApproximateFunctionOverrideProvider(config);
+    _inferAnyValueTypeProvider = new InferAnyValueTypeProvider(config);
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
@@ -124,6 +137,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _enableRowColumnLevelAuth = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
         Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH);
     _queryLogger = new QueryLogger(config);
+    _queryFingerprintingBrokerDefault = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+        Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
+    updateQueryFingerprinting(_queryFingerprintingBrokerDefault);
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
     _regexDictSizeThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD);
     _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
@@ -139,6 +155,48 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
+  /// Returns the provider that resolves the approximate-function rewrite defaults. The broker starter registers it
+  /// with the cluster config change handler so that the defaults reload without a restart.
+  public ApproximateFunctionOverrideProvider getApproximateFunctionOverrideProvider() {
+    return _approximateFunctionOverrideProvider;
+  }
+
+  /// Returns the provider that resolves the default of the `inferAnyValueType` query option. The broker starter
+  /// registers it with the cluster config change handler so that the default reloads without a restart.
+  public InferAnyValueTypeProvider getInferAnyValueTypeProvider() {
+    return _inferAnyValueTypeProvider;
+  }
+
+  /// Applies the live cluster override. Removing it restores the broker configuration (enabled by default).
+  /// Literal-value SQL redaction always requires fingerprinting, including when the override is `false`.
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING)
+        && !changedConfigs.contains(ALL_ROLES_QUERY_FINGERPRINTING)) {
+      return;
+    }
+    String key = clusterConfigs.containsKey(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING)
+        ? Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING : ALL_ROLES_QUERY_FINGERPRINTING;
+    String enabled = clusterConfigs.get(key);
+    if (enabled != null && !"true".equalsIgnoreCase(enabled.trim()) && !"false".equalsIgnoreCase(enabled.trim())) {
+      LOGGER.warn("Ignoring invalid value '{}' for {}", enabled, key);
+      return;
+    }
+    updateQueryFingerprinting(
+        enabled != null ? Boolean.parseBoolean(enabled.trim()) : _queryFingerprintingBrokerDefault);
+    LOGGER.info("Updated query fingerprinting: enabled: {}", _enableQueryFingerprinting);
+  }
+
+  private void updateQueryFingerprinting(boolean enabled) {
+    boolean redactionNeedsFingerprinting =
+        _queryLogger.getSqlRedactionMode() == QueryLogger.SqlRedactionMode.LITERAL_VALUES;
+    if (redactionNeedsFingerprinting && !enabled) {
+      LOGGER.warn("SQL redaction mode 'literal_values' requires query fingerprinting. "
+          + "Enabling query fingerprinting automatically.");
+    }
+    _enableQueryFingerprinting = enabled || redactionNeedsFingerprinting;
+  }
+
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
@@ -146,18 +204,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setBrokerId(_brokerId);
     long requestId = _requestIdGenerator.get();
     requestContext.setRequestId(requestId);
-
-    if (httpHeaders != null && !_trackedHeaders.isEmpty()) {
-      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
-      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(_trackedHeaders.size());
-      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
-        String key = entry.getKey().toLowerCase();
-        if (_trackedHeaders.contains(key)) {
-          trackedHeadersMap.put(key, entry.getValue());
-        }
-      }
-      requestContext.setRequestHttpHeaders(trackedHeadersMap);
-    }
+    setTrackedHeadersInRequestContext(requestContext, httpHeaders, _trackedHeaders);
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
@@ -190,8 +237,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+        QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+        requestContext.setErrorCode(errorCode);
+        return new BrokerResponseNative(errorCode, e.getMessage());
       }
     }
 
@@ -216,6 +264,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           .putIfAbsent(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE, _enableAutoRewriteAggregationType);
     }
 
+    if (_inferAnyValueTypeProvider.isEnabled()) {
+      sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.INFER_ANY_VALUE_TYPE, "true");
+    }
+
     if (_regexDictSizeThreshold != null) {
       sqlNodeAndOptions.getOptions().putIfAbsent(QueryOptionKey.REGEX_DICT_SIZE_THRESHOLD, _regexDictSizeThreshold);
     }
@@ -225,9 +277,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             accessControl);
     brokerResponse.setBrokerId(_brokerId);
     brokerResponse.setRequestId(Long.toString(requestId));
-    _brokerQueryEventListener.onQueryCompletion(requestContext);
+    onQueryCompletion(requestContext, brokerResponse);
 
     return brokerResponse;
+  }
+
+  /// Called after every successfully executed query with the fully-populated [RequestContext]
+  /// and [BrokerResponse]. The default implementation fires the configured
+  /// [org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener]. Subclasses may
+  /// override to intercept the complete response (e.g. for async query-log pipelines) while still
+  /// calling `super` to preserve the SPI listener behaviour.
+  protected void onQueryCompletion(RequestContext requestContext, BrokerResponse brokerResponse) {
+    _brokerQueryEventListener.onQueryCompletion(requestContext);
   }
 
   protected abstract BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
@@ -235,9 +296,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception;
 
-  /**
-   * Validates whether the requester has access to all the tables.
-   */
+  /// Validates whether the requester has access to all the tables.
   protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext, HttpHeaders httpHeaders) {
     final long startTimeNs = System.nanoTime();
@@ -268,9 +327,34 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return tableAuthorizationResult;
   }
 
-  /**
-   * Returns true if the QPS quota of query tables, database or application has been exceeded.
-   */
+  /// Validates that tables can be queried with enableMultiClusterRouting if and only if they are logical tables.
+  /// Physical tables are cluster-specific and cannot be federated across clusters.
+  /// Multi-cluster routing is only supported for logical tables.
+  ///
+  /// @param tableNames Set of table names to validate
+  /// @param queryOptions Map of query options
+  /// @throws org.apache.pinot.spi.exception.QueryException if any physical table is queried with
+  ///         enableMultiClusterRouting=true
+  protected void validatePhysicalTablesWithMultiClusterRouting(Set<String> tableNames,
+      Map<String, String> queryOptions) {
+    Preconditions.checkNotNull(tableNames, "Table names cannot be null when validating multi-cluster routing");
+    Preconditions.checkNotNull(queryOptions, "Query options cannot be null");
+    boolean isMultiClusterRoutingEnabled = queryOptions.containsKey(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING)
+        && Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING));
+
+    if (isMultiClusterRoutingEnabled) {
+      for (String tableName : tableNames) {
+        if (!_tableCache.isLogicalTable(tableName)) {
+          throw QueryErrorCode.QUERY_VALIDATION.asException(
+              "Physical table '" + tableName + "' cannot be queried with enableMultiClusterRouting=true. "
+              + "Multi-cluster routing is only supported for logical tables. "
+              + "Please remove the enableMultiClusterRouting query option or use a logical table instead.");
+        }
+      }
+    }
+  }
+
+  /// Returns true if the QPS quota of query tables, database or application has been exceeded.
   protected boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
       RequestContext requestContext) {
     if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
@@ -279,15 +363,41 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return true;
     }
     for (String tableName : tableNames) {
-      if (!_queryQuotaManager.acquire(tableName)) {
+      if (isTableQpsQuotaBreachEnforced(tableName)) {
         LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
         return true;
       }
     }
     return false;
+  }
+
+  ///  Acquires the QPS quota of the given table (name with or without type suffix) and returns true only if the quota
+  ///  is breached and the table's enforcement mode requires rejecting the query.
+  protected boolean isTableQpsQuotaBreachEnforced(String tableName) {
+    return !_queryQuotaManager.acquire(tableName) && shouldEnforceQpsQuotaBreach(tableName);
+  }
+
+  ///  Same as [#isTableQpsQuotaBreachEnforced(String)] for a logical table.
+  protected boolean isLogicalTableQpsQuotaBreachEnforced(String logicalTableName) {
+    return !_queryQuotaManager.acquireLogicalTable(logicalTableName)
+        && shouldEnforceQpsQuotaBreach(logicalTableName);
+  }
+
+  /// Meters a QPS quota breach of the given table and returns whether its enforcement mode requires rejecting the
+  /// query. The mode is only resolved on a breach, so that queries within quota do not pay for it.
+  private boolean shouldEnforceQpsQuotaBreach(String tableName) {
+    QuotaEnforcementMode enforcementMode = _queryQuotaManager.getQueryQuotaEnforcementMode(tableName);
+    if (enforcementMode == QuotaEnforcementMode.DISABLED) {
+      return false;
+    }
+    _brokerMetrics.addMeteredTableValue(TableNameBuilder.extractRawTableName(tableName),
+        BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
+    if (enforcementMode == QuotaEnforcementMode.SHADOW) {
+      LOGGER.warn("Query exceeds quota for table: {}, but enforcement mode is SHADOW, allowing the query", tableName);
+      return false;
+    }
+    return true;
   }
 
   protected void updatePhaseTimingForTables(Set<String> tableNames, BrokerQueryPhase phase, long time) {
@@ -297,10 +407,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  /**
-   * Attempts to cancel an ongoing query identified by its broker-generated id.
-   * @return true if the query was successfully cancelled, false otherwise.
-   */
+  /// Attempts to cancel an ongoing query identified by its broker-generated id.
+  /// @return true if the query was successfully cancelled, false otherwise.
   protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
       HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
       throws Exception;
@@ -318,6 +426,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setNumExceptions(numExceptions);
     statistics.setGroupsTrimmed(response.isGroupsTrimmed());
     statistics.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    statistics.setMseLiteLeafStageLimitReached(response.isMseLiteLeafStageLimitReached());
     statistics.setProcessingTimeMillis(response.getTimeUsedMs());
     statistics.setNumDocsScanned(response.getNumDocsScanned());
     statistics.setTotalDocs(response.getTotalDocs());
@@ -355,6 +464,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
     statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
     statistics.setTraceInfo(response.getTraceInfo());
+  }
+
+  protected static void setTrackedHeadersInRequestContext(RequestContext requestContext,
+      HttpHeaders httpHeaders, Set<String> trackedHeaders) {
+    if (httpHeaders != null && !trackedHeaders.isEmpty()) {
+      MultivaluedMap<String, String> requestHeaders = httpHeaders.getRequestHeaders();
+      Map<String, List<String>> trackedHeadersMap = Maps.newHashMapWithExpectedSize(trackedHeaders.size());
+      for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
+        String key = entry.getKey().toLowerCase();
+        if (trackedHeaders.contains(key)) {
+          trackedHeadersMap.put(key, entry.getValue());
+        }
+      }
+      requestContext.setRequestHttpHeaders(trackedHeadersMap);
+    }
   }
 
   @Override
@@ -402,12 +526,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return sqlNodeAndOptions.getOptions().get(QueryOptionKey.CLIENT_QUERY_ID);
   }
 
-  /**
-   * Called when a query starts
-   * TODO: This method was created to keep track of running queries for cancellation, but it is useful for other uses.
-   *   But right now the semantics are not clear. For example, while MSE calls this method once, SSE calls it once per
-   *   query AND subquery, which means this method is called multiple times for the same query.
-   */
+  /// Called when a query starts
+  /// TODO: This method was created to keep track of running queries for cancellation, but it is useful for other uses.
+  ///   But right now the semantics are not clear. For example, while MSE calls this method once, SSE calls it once per
+  ///   query AND subquery, which means this method is called multiple times for the same query.
   protected void onQueryStart(long requestId, @Nullable String clientRequestId, String query, Object... extras) {
     if (isQueryCancellationEnabled()) {
       _queriesById.put(requestId, query);

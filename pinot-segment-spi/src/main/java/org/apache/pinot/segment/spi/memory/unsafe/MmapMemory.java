@@ -39,26 +39,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A {@link Memory} that whose bytes are mapped on a file.
- */
+/// A [Memory] that whose bytes are mapped on a file.
 public class MmapMemory implements Memory {
   private static final Logger LOGGER = LoggerFactory.getLogger(MmapMemory.class);
 
   private static final MapFun MAP_FUN;
 
-  /**
-   * The address that correspond to the offset given at creation time.
-   *
-   * The actual mapping address may be smaller than this value, as usually memory map must start on an address that is
-   * page aligned.
-   */
+  /// The address that correspond to the offset given at creation time.
+  ///
+  /// The actual mapping address may be smaller than this value, as usually memory map must start on an address that is
+  /// page aligned.
   private final long _address;
-  /**
-   * How many bytes have been requested to be mapped.
-   * The actual mapped size may be larger (up to the next page), but the actual mapped size
-   * is stored by {@link #_section}.
-   */
+  /// How many bytes have been requested to be mapped.
+  /// The actual mapped size may be larger (up to the next page), but the actual mapped size
+  /// is stored by [#_section].
   private final long _size;
   private final MapSection _section;
   private boolean _closed = false;
@@ -150,19 +144,17 @@ public class MmapMemory implements Memory {
       return _unmapFun;
     }
 
-    /**
-     * Call posix_madvise (if available) at the address aligned start of MapSection for size bytes
-     *
-     * Internally posix_madvise operates on pages, so unaligned size would affect all remaining bytes on the page.
-     * _address is expected to be page aligned.
-     * In the future, it may be helpful to expose this to upstream consumers as a "hint()" abstraction in cases where
-     * advice other than MADV_RANDOM perform better (particularly sequential reads on slow filesystems).
-     *
-     * Errors during advise are ignored since this is considered a nice-to-have step.
-     *
-     * @param size Size of the region to set advice for.
-     * @param advice Specific advice to apply (see the LibC interface for options)
-     */
+    /// Call posix_madvise (if available) at the address aligned start of MapSection for size bytes
+    ///
+    /// Internally posix_madvise operates on pages, so unaligned size would affect all remaining bytes on the page.
+    /// \_address is expected to be page aligned.
+    /// In the future, it may be helpful to expose this to upstream consumers as a "hint()" abstraction in cases where
+    /// advice other than MADV_RANDOM perform better (particularly sequential reads on slow filesystems).
+    ///
+    /// Errors during advise are ignored since this is considered a nice-to-have step.
+    ///
+    /// @param size Size of the region to set advice for.
+    /// @param advice Specific advice to apply (see the LibC interface for options)
     protected void madvise(long size, int advice) {
       if (LIB_C != null) {
         int errno = LIB_C.posix_madvise(_address, size, advice);
@@ -191,21 +183,17 @@ public class MmapMemory implements Memory {
     }
   }
 
-  /**
-   * This is a factory method that can be used to create {@link MapSection}s.
-   *
-   * Each JVM may provide different method to map files in memory.
-   */
+  /// This is a factory method that can be used to create [MapSection]s.
+  ///
+  /// Each JVM may provide different method to map files in memory.
   interface MapFun {
 
-    /**
-     * @param file The file to be mapped. If its length is lower than offset + size and the mode is not read only,
-     *            the file will be resized to that size.
-     * @param offset The offset in the file. Any positive value is valid, even if it is larger than the file size.
-     * @param size How many bytes to map.
-     * @throws IOException in several situations. For example, if the offset + size is larger than file length and the
-     * mode is read only or if the process doesn't have permission to read or modify the file.
-     */
+    /// @param file The file to be mapped. If its length is lower than offset + size and the mode is not read only,
+    ///            the file will be resized to that size.
+    /// @param offset The offset in the file. Any positive value is valid, even if it is larger than the file size.
+    /// @param size How many bytes to map.
+    /// @throws IOException in several situations. For example, if the offset + size is larger than file length and the
+    /// mode is read only or if the process doesn't have permission to read or modify the file.
     MapSection map(File file, boolean readOnly, long offset, long size) throws IOException;
 
     static MapFun find()
@@ -228,20 +216,14 @@ public class MmapMemory implements Memory {
     }
   }
 
-  /**
-   * As defined by POSIX, the map0 method requires that the offset is page aligned. Failing to do that may produce
-   * segfault errors. This interface is a {@link MapFun} that does some sanitation before calling the map method.
-   * They include:
-   * <ul>
-   *   <li>Grow the file if the last mapped byte is larger than the file length.</li>
-   *   <li>Align the offset with the previous page. This means that we need to correct the actual mapped address.</li>
-   * </ul>
-   */
+  /// As defined by POSIX, the map0 method requires that the offset is page aligned. Failing to do that may produce
+  /// segfault errors. This interface is a [MapFun] that does some sanitation before calling the map method.
+  /// They include:
+  /// - Grow the file if the last mapped byte is larger than the file length.
+  /// - Align the offset with the previous page. This means that we need to correct the actual mapped address.
   interface Map0Fun extends MapFun {
 
-    /**
-     * @param pageAlignedOffset It has to be a positive value that is page aligned.
-     */
+    /// @param pageAlignedOffset It has to be a positive value that is page aligned.
     MapSection map0(FileChannel fc, boolean readOnly, long pageAlignedOffset, long size)
         throws InvocationTargetException, IllegalAccessException, IOException;
 
@@ -291,11 +273,9 @@ public class MmapMemory implements Memory {
       };
     }
 
-    /**
-     * Instead of looking for the correct map method by our self, this finder delegates on
-     * {@link OS#map(FileChannel, FileChannel.MapMode, long, long)} and {@link OS#unmap(long, long)}, which internally
-     * does the same thing.
-     */
+    /// Instead of looking for the correct map method by our self, this finder delegates on
+    /// [OS#map(FileChannel, FileChannel.MapMode, long, long)] and [OS#unmap(long, long)], which internally
+    /// does the same thing.
     class ChronicleCore implements Finder<Map0Fun> {
       @Override
       public Map0Fun tryFind() {
@@ -368,11 +348,9 @@ public class MmapMemory implements Memory {
       }
     }
 
-    /**
-     * In Java 20 the method used to map already does the alignment corrections, so we could call it with a non-aligned
-     * offset. But we need to know the position in the page in order to correct the address, so it is useful to return a
-     * Map0Fun instead of a MapFun.
-     */
+    /// In Java 20 the method used to map already does the alignment corrections, so we could call it with a non-aligned
+    /// offset. But we need to know the position in the page in order to correct the address, so it is useful to return
+    /// a Map0Fun instead of a MapFun.
     class Java20 implements Finder<Map0Fun> {
       @Override
       public Map0Fun tryFind()

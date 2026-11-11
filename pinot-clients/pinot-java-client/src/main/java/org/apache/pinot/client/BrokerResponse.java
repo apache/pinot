@@ -19,11 +19,10 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import javax.annotation.Nullable;
 
 
-/**
- * Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
- */
+/// Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
 public class BrokerResponse {
   private String _requestId;
   private String _brokerId;
@@ -51,18 +50,22 @@ public class BrokerResponse {
     return _exceptions != null && !_exceptions.isEmpty();
   }
 
+  @Nullable
   public JsonNode getExceptions() {
     return _exceptions;
   }
 
+  @Nullable
   public JsonNode getAggregationResults() {
     return _aggregationResults;
   }
 
+  @Nullable
   public JsonNode getSelectionResults() {
     return _selectionResults;
   }
 
+  @Nullable
   public JsonNode getResultTable() {
     return _resultTable;
   }
@@ -104,6 +107,7 @@ public class BrokerResponse {
     return (valueNode != null && !valueNode.isNull()) ? valueNode.asText() : defaultValue;
   }
 
+  @Nullable
   private static JsonNode getJsonNodeOrNull(JsonNode node, String fieldName) {
     if (node == null) {
       return null;

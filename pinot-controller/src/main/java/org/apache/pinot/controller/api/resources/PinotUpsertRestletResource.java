@@ -38,6 +38,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -67,32 +69,31 @@ public class PinotUpsertRestletResource {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotUpsertRestletResource.class);
 
-  /**
-   * The API to estimate heap usage for a Pinot upsert table.
-   *
-   * Sample usage: provide tableConfig, tableSchema, and ColumnStats payload.
-   *
-   * The tool calculates heap usage by estimating total Key/Value space based on unique key combinations.
-   * It used the following formula
-   * ```
-   * TotalHeapSize = uniqueCombinations * (BytesPerKey + BytesPerValue).
-   * ```
-   * The following params need to be provided:
-   * ```
-   * -schemaFile, it contains primary key information.
-   * -tableConfigFile, it contains upsertConfig, tablePartitionConfig etc.
-   * -columnStats, which stores column information, collected from kafka or staging pinot table.
-   * ```
-   * For columns stats, we need to gather the following stats
-   * ```
-   * -cardinality, a required information unique combination of primary keys.
-   * -primaryKeySize, it uses for calculating BytesPerKey.
-   * -comparisonColSize, it uses for calculating BytesPerValue.
-   * -partitionNums(optional), it uses for host assignment calculation.
-   * ```
-   */
+  /// The API to estimate heap usage for a Pinot upsert table.
+  ///
+  /// Sample usage: provide tableConfig, tableSchema, and ColumnStats payload.
+  ///
+  /// The tool calculates heap usage by estimating total Key/Value space based on unique key combinations.
+  /// It used the following formula
+  /// ```
+  /// TotalHeapSize = uniqueCombinations * (BytesPerKey + BytesPerValue).
+  /// ```
+  /// The following params need to be provided:
+  /// ```
+  /// -schemaFile, it contains primary key information.
+  /// -tableConfigFile, it contains upsertConfig, tablePartitionConfig etc.
+  /// -columnStats, which stores column information, collected from kafka or staging pinot table.
+  /// ```
+  /// For columns stats, we need to gather the following stats
+  /// ```
+  /// -cardinality, a required information unique combination of primary keys.
+  /// -primaryKeySize, it uses for calculating BytesPerKey.
+  /// -comparisonColSize, it uses for calculating BytesPerValue.
+  /// -partitionNums(optional), it uses for host assignment calculation.
+  /// ```
   @POST
   @Path("/upsert/estimateHeapUsage")
+  @Authenticate(AccessType.READ)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.ESTIMATE_UPSERT_MEMORY)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)

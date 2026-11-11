@@ -85,10 +85,10 @@ public class DateTimeConverterHopWindowTest {
               GMT+0000 */, 1696585500000L /* Fri Oct 06 2023 09:45:00 GMT+0000 */, 1696584600000L /* Fri Oct 06 2023
               09:30:00 GMT+0000 */,
           }, new long[]{
-          1693998000000L /* Fri Oct 06 2023 10:15:00 GMT+0000 */, 1693997100000L /* Fri Oct 06 2023 10:00:00 GMT+0000
+            1693998000000L /* Fri Oct 06 2023 10:15:00 GMT+0000 */, 1693997100000L /* Fri Oct 06 2023 10:00:00 GMT+0000
            */, 1693996200000L /* Fri Oct 06 2023 09:45:00 GMT+0000 */, 1693995300000L /* Fri Oct 06 2023 09:30:00
            GMT+0000 */,
-      }
+          }
       };
       entries.add(new Object[]{
           "EPOCH|MILLISECONDS", "EPOCH|MILLISECONDS", "MINUTES|15", "HOURS", input, expected
@@ -177,7 +177,7 @@ public class DateTimeConverterHopWindowTest {
         String[][] expected = {
             {"2023-10-06-10:15", "2023-10-06-10:00", "2023-10-06-09:45", "2023-10-06-09:30"}, {
             "2023-10-06-09:00", "2023-10-06-08:45", "2023-10-06-08:30", "2023-10-06-08:15"
-        }
+          }
         };
         entries.add(new Object[]{
             "EPOCH|MILLISECONDS", "SIMPLE_DATE_FORMAT|yyyy-MM-dd-HH:mm|GMT", "MINUTES|15", "HOURS|1", input, expected
@@ -274,7 +274,7 @@ public class DateTimeConverterHopWindowTest {
       };
       entries.add(new Object[]{
           "SIMPLE_DATE_FORMAT|yyyy-MM-dd HH:mm:ss|SECONDS|1", "SIMPLE_DATE_FORMAT|yyyy-MM-dd "
-          + "HH:mm|America/Los_Angeles", "MINUTES|15", "MINUTES|60", input, expected
+            + "HH:mm|America/Los_Angeles", "MINUTES|15", "MINUTES|60", input, expected
       });
     }
 

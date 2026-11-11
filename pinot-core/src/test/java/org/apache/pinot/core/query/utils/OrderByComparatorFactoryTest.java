@@ -20,14 +20,17 @@
 package org.apache.pinot.core.query.utils;
 
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.data.table.Record;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class OrderByComparatorFactoryTest {
@@ -54,7 +57,7 @@ public class OrderByComparatorFactoryTest {
   @Test
   public void testAscNullsLast() {
     List<OrderByExpressionContext> orderBys =
-        Collections.singletonList(new OrderByExpressionContext(COLUMN1, ASC, NULLS_LAST));
+        List.of(new OrderByExpressionContext(COLUMN1, ASC, NULLS_LAST));
     setUpSingleColumnRows();
 
     _rows.sort(OrderByComparatorFactory.getComparator(orderBys, ENABLE_NULL_HANDLING));
@@ -65,7 +68,7 @@ public class OrderByComparatorFactoryTest {
   @Test
   public void testAscNullsFirst() {
     List<OrderByExpressionContext> orderBys =
-        Collections.singletonList(new OrderByExpressionContext(COLUMN1, ASC, NULLS_FIRST));
+        List.of(new OrderByExpressionContext(COLUMN1, ASC, NULLS_FIRST));
     setUpSingleColumnRows();
 
     _rows.sort(OrderByComparatorFactory.getComparator(orderBys, ENABLE_NULL_HANDLING));
@@ -76,7 +79,7 @@ public class OrderByComparatorFactoryTest {
   @Test
   public void testDescNullsLast() {
     List<OrderByExpressionContext> orderBys =
-        Collections.singletonList(new OrderByExpressionContext(COLUMN1, DESC, NULLS_LAST));
+        List.of(new OrderByExpressionContext(COLUMN1, DESC, NULLS_LAST));
     setUpSingleColumnRows();
 
     _rows.sort(OrderByComparatorFactory.getComparator(orderBys, ENABLE_NULL_HANDLING));
@@ -87,7 +90,7 @@ public class OrderByComparatorFactoryTest {
   @Test
   public void testDescNullsFirst() {
     List<OrderByExpressionContext> orderBys =
-        Collections.singletonList(new OrderByExpressionContext(COLUMN1, DESC, NULLS_FIRST));
+        List.of(new OrderByExpressionContext(COLUMN1, DESC, NULLS_FIRST));
     setUpSingleColumnRows();
 
     _rows.sort(OrderByComparatorFactory.getComparator(orderBys, ENABLE_NULL_HANDLING));
@@ -104,5 +107,39 @@ public class OrderByComparatorFactoryTest {
     _rows.sort(OrderByComparatorFactory.getComparator(orderBys, ENABLE_NULL_HANDLING));
 
     assertEquals(extractColumn(_rows, COLUMN2_INDEX), Arrays.asList(1, 2, 3));
+  }
+
+  private static ExpressionContext function(String name, String arg) {
+    return ExpressionContext.forFunction(
+        new FunctionContext(FunctionContext.Type.TRANSFORM, name, List.of(ExpressionContext.forIdentifier(arg))));
+  }
+
+  /// getRecordKeyComparator maps each ORDER BY expression to its position in the GROUP BY list. When several
+  /// group-by keys are transform expressions rather than plain identifiers, every expression must still resolve to
+  /// its own column, otherwise SortedRecordsMerger sees unequal groups as equal and merges them.
+  @Test
+  public void testRecordKeyComparatorWithMultipleTransformGroupByKeys() {
+    ExpressionContext key0 = function("datetrunc", "tsColumn");
+    ExpressionContext key1 = function("jsonextractindex", "jsonColumn");
+    List<ExpressionContext> groupByExpressions = List.of(key0, key1);
+    List<OrderByExpressionContext> orderBys =
+        List.of(new OrderByExpressionContext(key0, ASC, NULLS_LAST), new OrderByExpressionContext(key1, ASC,
+            NULLS_LAST));
+
+    Comparator<Record> comparator =
+        OrderByComparatorFactory.getRecordKeyComparator(orderBys, groupByExpressions, false);
+
+    // Same second key, different first key: these are distinct groups and must not compare equal.
+    Record a = new Record(new Object[]{1L, "x", 10.0});
+    Record b = new Record(new Object[]{2L, "x", 20.0});
+    assertTrue(comparator.compare(a, b) < 0, "rows differing only in the first group key compared equal");
+    assertTrue(comparator.compare(b, a) > 0);
+
+    // Same first key, different second key: also distinct groups.
+    Record c = new Record(new Object[]{1L, "y", 30.0});
+    assertTrue(comparator.compare(a, c) < 0, "rows differing only in the second group key compared equal");
+
+    // Identical keys are the same group.
+    assertEquals(comparator.compare(a, new Record(new Object[]{1L, "x", 99.0})), 0);
   }
 }

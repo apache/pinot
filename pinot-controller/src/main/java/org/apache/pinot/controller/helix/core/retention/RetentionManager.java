@@ -23,6 +23,8 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +37,10 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.logging.log4j.util.Strings;
+import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -46,6 +50,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
@@ -62,6 +67,8 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -70,10 +77,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>RetentionManager</code> class manages retention for all segments and delete expired segments.
- * <p>It is scheduled to run only on leader controller.
- */
+/// The `RetentionManager` class manages retention for all segments and delete expired segments.
+///
+/// It is scheduled to run only on leader controller.
 public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final String TASK_NAME = "RetentionManager";
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
@@ -85,19 +91,24 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
   private volatile boolean _isHybridTableRetentionStrategyEnabled;
+  private volatile boolean _useCreationTimeFallbackForRetention;
   private final BrokerServiceHelper _brokerServiceHelper;
+  private final ControllerConf _controllerConf;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       BrokerServiceHelper brokerServiceHelper) {
     super(TASK_NAME, config.getRetentionControllerFrequencyInSeconds(),
-        config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
-        controllerMetrics);
+            config.getRetentionManagerInitialDelayInSeconds(), config.getRetentionControllerCronExpression(),
+        pinotHelixResourceManager,
+        leadControllerManager, controllerMetrics);
     _untrackedSegmentDeletionEnabled = config.getUntrackedSegmentDeletionEnabled();
     _untrackedSegmentsRetentionTimeInDays = config.getUntrackedSegmentsRetentionTimeInDays();
     _agedSegmentsDeletionBatchSize = config.getAgedSegmentsDeletionBatchSize();
     _isHybridTableRetentionStrategyEnabled = config.isHybridTableRetentionStrategyEnabled();
+    _useCreationTimeFallbackForRetention = config.isRetentionCreationTimeFallbackEnabled();
     _brokerServiceHelper = brokerServiceHelper;
+    _controllerConf = config;
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}", getIntervalInSeconds());
   }
 
@@ -117,6 +128,198 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // Delete segments based on segment lineage and clean up segment lineage metadata.
     manageSegmentLineageCleanupForTable(tableConfig);
+
+    // Re-read active segments after time and lineage cleanup so already-deleted bytes do not cause extra eviction.
+    manageSizeBasedRetention(tableConfig);
+  }
+
+  /// Enforces the optional compressed-segment size limit on live data independently of time retention. Replaced
+  /// segments are excluded from accounting. Eviction proceeds oldest first and stops before the first active segment
+  /// listed on either side of any lineage entry, including replacement copies excluded from accounting. The newest
+  /// OFFLINE segment and realtime recovery segments are preserved. Each typed table uses its own size limit and
+  /// eviction order without consulting the OFFLINE time boundary.
+  /// Unknown sizes or missing metadata disable this pass; consuming segments are excluded from accounting and eviction.
+  @VisibleForTesting
+  protected void manageSizeBasedRetention(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    String retentionSize = tableConfig.getValidationConfig().getRetentionSize();
+    if (retentionSize == null || (tableConfig.getTableType() == TableType.OFFLINE
+        && !"APPEND".equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig)))) {
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED);
+      return;
+    }
+    boolean blocked = true;
+    try {
+      blocked = !enforceSizeBasedRetention(tableConfig, retentionSize);
+    } finally {
+      // Publish only the completed pass's result, including a blocked result if an exception interrupted it.
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED,
+          blocked ? 1 : 0);
+    }
+  }
+
+  /// Returns whether the table is within its size cap after this pass; unsafe skips and failed evictions return false.
+  private boolean enforceSizeBasedRetention(TableConfig tableConfig, String retentionSize) {
+    String tableNameWithType = tableConfig.getTableName();
+    long retentionSizeBytes;
+    try {
+      retentionSizeBytes = DataSizeUtils.toBytes(retentionSize);
+      Preconditions.checkArgument(retentionSizeBytes > 0, "Retention size must be positive");
+    } catch (Exception e) {
+      LOGGER.warn("Invalid retention size: {} for table: {}, skip size retention", retentionSize, tableNameWithType);
+      return false;
+    }
+
+    // Read IdealState before lineage, matching the existing live-segment filtering order. A replacement starting
+    // after this snapshot cannot add both its source and destination to the bytes counted by this pass.
+    Set<String> activeSegments = new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
+    SegmentLineage segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+    Map<String, LineageEntry> lineageEntries = segmentLineage == null ? Map.of() : segmentLineage.getLineageEntries();
+    Set<String> lineageOwnedSegments = new HashSet<>();
+    // Size retention protects both sides of every retained entry, regardless of state, age, or the deletion flag.
+    lineageEntries.values().forEach(entry -> {
+      lineageOwnedSegments.addAll(entry.getSegmentsFrom());
+      lineageOwnedSegments.addAll(entry.getSegmentsTo());
+    });
+    lineageOwnedSegments.retainAll(activeSegments);
+    // Replaced segments awaiting lineage cleanup are no longer queryable and must not trigger live-data eviction.
+    SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(activeSegments, segmentLineage);
+    if (activeSegments.isEmpty()) {
+      return true;
+    }
+    List<SegmentZKMetadata> metadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
+    Map<String, SegmentZKMetadata> lineageOwnedMetadata = new HashMap<>();
+    Set<String> segmentsWithMetadata = new HashSet<>();
+    List<SegmentZKMetadata> completedSegments = new ArrayList<>();
+    Map<String, Long> completedSegmentSizes = new HashMap<>();
+    boolean realtime = tableConfig.getTableType() == TableType.REALTIME;
+    long retainedBytes = 0L;
+    for (SegmentZKMetadata metadata : metadataList) {
+      String segmentName = metadata.getSegmentName();
+      if (lineageOwnedSegments.contains(segmentName)) {
+        lineageOwnedMetadata.put(segmentName, metadata);
+      }
+      if (!activeSegments.contains(segmentName)) {
+        continue;
+      }
+      segmentsWithMetadata.add(segmentName);
+      if (realtime && !metadata.getStatus().isCompleted()) {
+        continue;
+      }
+      long size = getSizeRetentionSegmentSize(tableNameWithType, metadata);
+      if (size < 0) {
+        LOGGER.warn("Unknown size for segment: {} in table: {}, skip size retention", segmentName, tableNameWithType);
+        return false;
+      }
+      // Plain addition assumes realistic table sizes; corrupt totals above Long.MAX_VALUE may wrap and report healthy.
+      retainedBytes += size;
+      completedSegments.add(metadata);
+      completedSegmentSizes.put(segmentName, size);
+    }
+    if (!segmentsWithMetadata.containsAll(activeSegments)) {
+      LOGGER.warn("Missing active segment metadata for table: {}, skip size retention", tableNameWithType);
+      return false;
+    }
+    if (retainedBytes <= retentionSizeBytes) {
+      return true;
+    }
+
+    Comparator<SegmentZKMetadata> evictionOrder = Comparator.comparingLong(RetentionManager::getSizeRetentionTimestamp)
+        .thenComparing(SegmentZKMetadata::getSegmentName);
+    // Shadow copies do not count toward the cap, but still stop eviction at their position in the ordering.
+    // Without metadata or a timestamp for any active lineage-owned segment, its position cannot be determined safely.
+    if (lineageOwnedMetadata.size() != lineageOwnedSegments.size() || lineageOwnedMetadata.values().stream()
+        .anyMatch(metadata -> getSizeRetentionTimestamp(metadata) < 0)) {
+      LOGGER.warn("Cannot order lineage-owned segments for table: {}, skip size retention", tableNameWithType);
+      return false;
+    }
+    SegmentZKMetadata lineageBarrier = lineageOwnedMetadata.values().stream().min(evictionOrder).orElse(null);
+    completedSegments.removeIf(metadata -> getSizeRetentionTimestamp(metadata) < 0);
+    if (realtime) {
+      Set<String> lastCompletedSegments =
+          new HashSet<>(_pinotHelixResourceManager.getLastLLCCompletedSegments(metadataList));
+      completedSegments.removeIf(metadata -> lastCompletedSegments.contains(metadata.getSegmentName()));
+    } else {
+      // A size typo must not remove the entire OFFLINE table, even if its newest segment exceeds the cap alone.
+      completedSegments.stream().max(evictionOrder)
+          .ifPresent(newest -> completedSegments.removeIf(metadata -> metadata == newest));
+    }
+    completedSegments.sort(evictionOrder);
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    long projectedRetainedBytes = retainedBytes;
+    for (SegmentZKMetadata metadata : completedSegments) {
+      if (projectedRetainedBytes <= retentionSizeBytes) {
+        break;
+      }
+      // Stop at the lineage boundary even when that segment is excluded by another protection or from accounting.
+      // This snapshot rule applies regardless of the lineage-exclusive deletion flag.
+      if (lineageBarrier != null && evictionOrder.compare(metadata, lineageBarrier) >= 0) {
+        LOGGER.info("Stop size retention for table: {} at lineage-owned segment: {}", tableNameWithType,
+            lineageBarrier.getSegmentName());
+        break;
+      }
+      long size = completedSegmentSizes.get(metadata.getSegmentName());
+      if (size == 0) {
+        continue;
+      }
+      segmentsToDelete.add(metadata.getSegmentName());
+      projectedRetainedBytes -= size;
+    }
+    if (!segmentsToDelete.isEmpty()) {
+      PinotResourceManagerResponse response;
+      // Coordinate with local lineage writers and reject stale accounting or a changed stopping point, even when
+      // lineage-exclusive deletion is disabled. Other controllers can still update lineage after this fresh read.
+      synchronized (_pinotHelixResourceManager.getLineageUpdaterLock(tableNameWithType)) {
+        SegmentLineage currentLineage =
+            SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
+                tableNameWithType);
+        Map<String, LineageEntry> currentEntries =
+            currentLineage == null ? Map.of() : currentLineage.getLineageEntries();
+        if (!lineageEntries.equals(currentEntries)) {
+          LOGGER.warn("Segment lineage changed for table: {}, skip size retention deletion", tableNameWithType);
+          return false;
+        }
+        response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+      }
+      if (!response.isSuccessful()) {
+        LOGGER.warn("Size retention deletion failed for table: {}, bytes retained: {}, cap: {}, response: {}",
+            tableNameWithType, retainedBytes, retentionSize, response);
+        return false;
+      }
+      retainedBytes = projectedRetainedBytes;
+      LOGGER.info("Deleted {} oldest segments from table: {} for retention size: {}", segmentsToDelete.size(),
+          tableNameWithType, retentionSize);
+    }
+    if (retainedBytes > retentionSizeBytes) {
+      LOGGER.warn("Table: {} remains above retention size: {} due to protected, undated, or lineage-owned segments",
+          tableNameWithType, retentionSize);
+      return false;
+    }
+    return true;
+  }
+
+  @Override
+  protected void nonLeaderCleanup(List<String> tableNamesWithType) {
+    for (String tableNameWithType : tableNamesWithType) {
+      _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SIZE_RETENTION_BLOCKED);
+    }
+  }
+
+  /// Returns the compressed bytes used by size retention, or a negative value when the size is unknown.
+  /// Subclasses can supply authoritative sizes for logical segments that aggregate multiple physical segments.
+  protected long getSizeRetentionSegmentSize(String tableNameWithType, SegmentZKMetadata metadata) {
+    return metadata.getSizeInBytes();
+  }
+
+  private static long getSizeRetentionTimestamp(SegmentZKMetadata metadata) {
+    long endTime = metadata.getEndTimeMs();
+    if (endTime >= 0) {
+      return endTime;
+    }
+    long creationTime = metadata.getCreationTime();
+    return creationTime >= 0 ? creationTime : metadata.getPushTime();
   }
 
   @Override
@@ -137,19 +340,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Segment push type is not APPEND for table: {}, skip managing retention", tableNameWithType);
       return;
     }
-    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
-    String retentionTimeValue = validationConfig.getRetentionTimeValue();
     int untrackedSegmentsDeletionBatchSize =
         validationConfig.getUntrackedSegmentsDeletionBatchSize() != null ? Integer.parseInt(
             validationConfig.getUntrackedSegmentsDeletionBatchSize()) : DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE;
 
-    RetentionStrategy retentionStrategy;
-    try {
-      retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
-          Long.parseLong(retentionTimeValue));
-    } catch (Exception e) {
-      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue,
-          tableNameWithType);
+    RetentionStrategy retentionStrategy =
+        TableConfigRetentionUtils.buildRetentionStrategy(tableConfig, _useCreationTimeFallbackForRetention);
+    if (retentionStrategy == null) {
       return;
     }
 
@@ -158,13 +355,17 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // Scan all segment ZK metadata and purge segments if necessary
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      if (validationConfig.getHybridTableRetentionStrategy() != Enablement.DEFAULT) {
+        LOGGER.warn("hybridTableRetentionStrategy is only applicable to realtime tables, "
+            + "ignoring it for offline table: {}", tableNameWithType);
+      }
       manageRetentionForOfflineTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize,
           untrackedSegmentsRetentionStrategy);
     } else {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
       // hybrid table check should be performed before the realtime table check.
-      if (_isHybridTableRetentionStrategyEnabled && offlineTableConfig != null) {
+      if (offlineTableConfig != null && shouldEnableHybridTableRetentionStrategy(tableConfig, offlineTableConfig)) {
         // TODO: handle the orphan segment deletion for hybrid table
         manageRetentionForHybridTable(tableConfig, offlineTableConfig);
       } else {
@@ -172,6 +373,17 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             untrackedSegmentsRetentionStrategy);
       }
     }
+  }
+
+  /// Returns whether the hybrid table retention strategy should be applied to the given REALTIME table. Subclasses can
+  /// override this to decide per table.
+  ///
+  /// By default, the table-level `hybridTableRetentionStrategy` takes precedence; when it is `DEFAULT`, the value of
+  /// [ControllerConf#ENABLE_HYBRID_TABLE_RETENTION_STRATEGY] is used.
+  protected boolean shouldEnableHybridTableRetentionStrategy(TableConfig realtimeTableConfig,
+      TableConfig offlineTableConfig) {
+    return realtimeTableConfig.getValidationConfig().getHybridTableRetentionStrategy()
+        .isEnabled(_isHybridTableRetentionStrategyEnabled);
   }
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy,
@@ -189,13 +401,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         segmentsToDelete.add(segmentZKMetadata.getSegmentName());
       }
     }
+    removeLineageLockedSegments(offlineTableName, segmentsToDelete);
     if (!segmentsToDelete.isEmpty()) {
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), offlineTableName);
       _pinotHelixResourceManager.deleteSegments(offlineTableName, segmentsToDelete);
     }
   }
 
-  private void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy,
+  @VisibleForTesting
+  void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy,
       int untrackedSegmentsDeletionBatchSize, RetentionStrategy untrackedSegmentsRetentionStrategy) {
     List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
@@ -227,6 +441,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     // Remove last sealed segments such that the table can still create new consuming segments if it's paused
     segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(realtimeTableName));
 
+    removeLineageLockedSegments(realtimeTableName, segmentsToDelete);
     if (!segmentsToDelete.isEmpty()) {
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
@@ -238,29 +453,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     LOGGER.info("Managing retention for hybrid table: {}", realtimeTableConfig.getTableName());
     List<String> segmentsToDelete = new ArrayList<>();
     String realtimeTableName = realtimeTableConfig.getTableName();
-    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     try {
-      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-      Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, offlineTableName);
-      Preconditions.checkState(schema != null, "Failed to get schema for table: " + offlineTableName);
-      String timeColumn = null;
-      SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
-      if (validationConfig != null) {
-        timeColumn = validationConfig.getTimeColumnName();
-      }
-      Preconditions.checkState(StringUtils.isNotEmpty(timeColumn),
-          "TimeColumn is null or empty for table: " + offlineTableName);
-      DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
-      Preconditions.checkState(dateTimeSpec != null, String.format(
-          "Failed to get DateTimeFieldSpec for time column: %s of table: %s", timeColumn, offlineTableName));
-      DateTimeFormatSpec timeFormatSpec = dateTimeSpec.getFormatSpec();
-      TimeBoundaryInfo timeBoundaryInfo = _brokerServiceHelper.getTimeBoundaryInfo(offlineTableConfig);
-      Preconditions.checkState(timeBoundaryInfo != null,
-          "Failed to get time boundary info for table: " + offlineTableName);
-      long timeBoundaryMs = timeFormatSpec.fromFormatToMillis(timeBoundaryInfo.getTimeValue());
-      Preconditions.checkState(timeBoundaryMs > 0,
-          "Failed to determine a valid time boundary for table: " + offlineTableName);
+      long timeBoundaryMs = getHybridTimeBoundaryMs(offlineTableConfig);
 
       // Iterate over all COMPLETED segments of the REALTIME table and check if they are eligible for deletion.
       for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
@@ -274,6 +468,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
           segmentsToDelete.add(segmentZKMetadata.getSegmentName());
         }
       }
+      removeLineageLockedSegments(realtimeTableName, segmentsToDelete);
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       if (!segmentsToDelete.isEmpty()) {
         _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
@@ -283,6 +478,31 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.error("Exception while managing retention for hybrid table: {}", realtimeTableConfig.getTableName(), e);
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.RETENTION_MANAGER_ERROR, 1);
     }
+  }
+
+  private long getHybridTimeBoundaryMs(TableConfig offlineTableConfig) {
+    String offlineTableName = offlineTableConfig.getTableName();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, offlineTableName);
+    Preconditions.checkState(schema != null, "Failed to get schema for table: " + offlineTableName);
+    String timeColumn = null;
+    SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
+    if (validationConfig != null) {
+      timeColumn = validationConfig.getTimeColumnName();
+    }
+    Preconditions.checkState(StringUtils.isNotEmpty(timeColumn),
+        "TimeColumn is null or empty for table: " + offlineTableName);
+    DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
+    Preconditions.checkState(dateTimeSpec != null, String.format(
+        "Failed to get DateTimeFieldSpec for time column: %s of table: %s", timeColumn, offlineTableName));
+    DateTimeFormatSpec timeFormatSpec = dateTimeSpec.getFormatSpec();
+    TimeBoundaryInfo timeBoundaryInfo = _brokerServiceHelper.getTimeBoundaryInfo(offlineTableConfig);
+    Preconditions.checkState(timeBoundaryInfo != null,
+        "Failed to get time boundary info for table: " + offlineTableName);
+    long timeBoundaryMs = timeFormatSpec.fromFormatToMillis(timeBoundaryInfo.getTimeValue());
+    Preconditions.checkState(timeBoundaryMs > 0,
+        "Failed to determine a valid time boundary for table: " + offlineTableName);
+    return timeBoundaryMs;
   }
 
   private boolean shouldDeleteInProgressLLCSegment(String segmentName, IdealState idealState,
@@ -307,6 +527,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       Set<String> states = new HashSet<>(stateMap.values());
       return states.size() == 1 && states.contains(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE);
     }
+  }
+
+  @VisibleForTesting
+  protected Set<String> getSegmentNames(String tableNameWithType,
+      List<SegmentZKMetadata> segmentZKMetadataList) {
+    return segmentZKMetadataList.stream()
+        .map(SegmentZKMetadata::getSegmentName)
+        .collect(Collectors.toCollection(HashSet::new));
+  }
+
+  protected List<String> getSegmentNames(String tableNameWithType) {
+    return _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false);
   }
 
   private List<String> getSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
@@ -341,18 +573,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return segmentsToDelete;
     }
 
-    Set<String> segmentsPresentInZK;
+    Set<String> segmentsPresentInZK = getSegmentNames(tableNameWithType, segmentZKMetadataList);
     if (isHybridTable) {
-      segmentsPresentInZK = new HashSet<>();
       // This must be the OFFLINE table
-      segmentsPresentInZK.addAll(
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet()));
       // Add segments from the REALTIME table as well
-      segmentsPresentInZK.addAll(
-          _pinotHelixResourceManager.getSegmentsFor(TableNameBuilder.REALTIME.tableNameWithType(rawTableName), false));
-    } else {
-      segmentsPresentInZK =
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet());
+      segmentsPresentInZK.addAll(getSegmentNames(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)));
     }
 
     try {
@@ -371,26 +596,24 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       }
     } catch (IOException e) {
       LOGGER.warn("Unable to fetch segments from deep store that are beyond retention period for table: {}",
-          tableNameWithType);
+          tableNameWithType, e);
     }
 
     return segmentsToDelete;
   }
 
-  /**
-   * Identifies segments in deepstore that are ready for deletion based on the retention strategy.
-   *
-   * This method finds segments that are beyond the retention period and are ready to be purged.
-   * It only considers segments that do not have entries in ZooKeeper metadata i.e. untracked segments.
-   * The lastModified time of the file in deepstore is used to determine whether the segment
-   * should be retained or purged.
-   *
-   * @param tableNameWithType   Name of the offline table
-   * @param retentionStrategy  Strategy to determine if a segment should be purged
-   * @param segmentsToExclude  Set of segment names that should be excluded from deletion
-   * @return List of segment names that should be deleted from deepstore
-   * @throws IOException If there's an error accessing the filesystem
-   */
+  /// Identifies segments in deepstore that are ready for deletion based on the retention strategy.
+  ///
+  /// This method finds segments that are beyond the retention period and are ready to be purged.
+  /// It only considers segments that do not have entries in ZooKeeper metadata i.e. untracked segments.
+  /// The lastModified time of the file in deepstore is used to determine whether the segment
+  /// should be retained or purged.
+  ///
+  /// @param tableNameWithType   Name of the offline table
+  /// @param retentionStrategy  Strategy to determine if a segment should be purged
+  /// @param segmentsToExclude  Set of segment names that should be excluded from deletion
+  /// @return List of segment names that should be deleted from deepstore
+  /// @throws IOException If there's an error accessing the filesystem
   @VisibleForTesting
   List<String> findUntrackedSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
       Set<String> segmentsToExclude, RetentionStrategy untrackedSegmentsRetentionStrategy)
@@ -400,6 +623,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     URI tableDataUri = URIUtils.getUri(_pinotHelixResourceManager.getDataDir(), rawTableName);
     PinotFS pinotFS = PinotFSFactory.create(tableDataUri.getScheme());
+
+    // The data dir is created when the first segment is pushed, so it is legitimately absent for a table that has
+    // never had a segment in deep store. Such a table has no untracked segments to delete, and listing a
+    // non-existent directory fails on most file systems.
+    if (!pinotFS.exists(tableDataUri)) {
+      LOGGER.info("Skipping deep store scan for untracked segments for table: {} as data dir: {} does not exist",
+          tableNameWithType, tableDataUri);
+      return segmentsToDelete;
+    }
 
     long startTimeMs = System.currentTimeMillis();
 
@@ -449,6 +681,41 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     return segmentName;
   }
 
+  /// Strips out any segments that participate in a live segment lineage entry from the retention-driven
+  /// delete batch. Time-based retention must not delete lineage-locked segments — they are owned by the
+  /// lineage lifecycle and get cleaned up by [#manageSegmentLineageCleanupForTable] when the lineage
+  /// entry becomes eligible. If we left them in, the public delete check would reject the whole batch and
+  /// the rest of the eligible segments would never get cleaned up.
+  ///
+  /// Gated by [ControllerConf#LINEAGE_EXCLUSIVE_DELETE_ENABLED]: when the kill switch is off,
+  /// `deleteSegments` also stops rejecting lineage-locked targets, so retention must mirror legacy
+  /// behavior and pass them through to the delete path instead of silently dropping them here.
+  private void removeLineageLockedSegments(String tableNameWithType, List<String> segmentsToDelete) {
+    if (segmentsToDelete.isEmpty()) {
+      return;
+    }
+    if (!_controllerConf.isLineageExclusiveDeleteEnabled()) {
+      return;
+    }
+    SegmentLineage segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+    if (segmentLineage == null) {
+      return;
+    }
+    Set<String> blocked = SegmentLineageUtils.getDeleteBlockedSegments(segmentLineage);
+    if (blocked.isEmpty()) {
+      return;
+    }
+    int sizeBefore = segmentsToDelete.size();
+    segmentsToDelete.removeIf(blocked::contains);
+    int removed = sizeBefore - segmentsToDelete.size();
+    if (removed > 0) {
+      LOGGER.info(
+          "Skipping {} segments in retention pass for table: {} because they participate in a live lineage entry; "
+              + "they will be cleaned up by the lineage retention path.", removed, tableNameWithType);
+    }
+  }
+
   private void manageSegmentLineageCleanupForTable(TableConfig tableConfig) {
     String tableNameWithType = tableConfig.getTableName();
     List<String> segmentsToDelete = new ArrayList<>();
@@ -494,7 +761,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
     // Delete segments based on the segment lineage
     if (!segmentsToDelete.isEmpty()) {
-      _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+      _pinotHelixResourceManager.deleteSegmentsForLineageCleanup(tableNameWithType, segmentsToDelete);
       LOGGER.info("Finished cleaning up segment lineage for table: {} in {}ms, deleted segments: {}",
           tableNameWithType, (System.currentTimeMillis() - cleanupStartTime), segmentsToDelete);
     }
@@ -534,10 +801,31 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       updateHybridTableRetentionStrategyEnabled(
           clusterConfigs.get(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY));
     }
+
+    if (changedConfigs.contains(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK)) {
+      updateRetentionCreationTimeFallbackEnabled(
+          clusterConfigs.get(ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK));
+    }
   }
 
   private void updateUntrackedSegmentDeletionEnabled(String newValue) {
     boolean oldValue = _untrackedSegmentDeletionEnabled;
+
+    // When the cluster config key is deleted, newValue will be null. Reset to default.
+    boolean defaultValue =
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_ENABLE_UNTRACKED_SEGMENT_DELETION;
+    if (newValue == null) {
+      if (oldValue != defaultValue) {
+        _untrackedSegmentDeletionEnabled = defaultValue;
+        LOGGER.info("Cluster config for untrackedSegmentDeletionEnabled was removed, "
+            + "reverting from {} to default ({})", oldValue, defaultValue);
+      } else {
+        LOGGER.info("Cluster config for untrackedSegmentDeletionEnabled was removed, "
+            + "already at default ({})", defaultValue);
+      }
+      return;
+    }
 
     // Validate that the value is a proper boolean string
     if (!"true".equalsIgnoreCase(newValue) && !"false".equalsIgnoreCase(newValue)) {
@@ -557,6 +845,21 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private void updateUntrackedSegmentsRetentionTimeInDays(String newValue) {
     int oldValue = _untrackedSegmentsRetentionTimeInDays;
+
+    // When the cluster config key is deleted, newValue will be null. Reset to default.
+    if (newValue == null) {
+      int defaultValue = ControllerConf.ControllerPeriodicTasksConf.DEFAULT_UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS;
+      if (oldValue != defaultValue) {
+        _untrackedSegmentsRetentionTimeInDays = defaultValue;
+        LOGGER.info("Cluster config for untrackedSegmentsRetentionTimeInDays was removed, "
+            + "reverting from {} to default ({})", oldValue, defaultValue);
+      } else {
+        LOGGER.info("Cluster config for untrackedSegmentsRetentionTimeInDays was removed, "
+            + "already at default ({})", defaultValue);
+      }
+      return;
+    }
+
     try {
       int parsedValue = Integer.parseInt(newValue);
       if (parsedValue <= 0) {
@@ -577,22 +880,79 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private void updateHybridTableRetentionStrategyEnabled(String newValue) {
     boolean oldValue = _isHybridTableRetentionStrategyEnabled;
-    try {
-      boolean parsedValue = Boolean.parseBoolean(newValue);
-      if (oldValue == parsedValue) {
-        LOGGER.info("No change in isHybridTableRetentionStrategyEnabled, current value: {}", oldValue);
+
+    // When the cluster config key is deleted, newValue will be null. Reset to default.
+    boolean defaultValue = ControllerConf.DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY;
+    if (newValue == null) {
+      if (oldValue != defaultValue) {
+        _isHybridTableRetentionStrategyEnabled = defaultValue;
+        LOGGER.info("Cluster config for isHybridTableRetentionStrategyEnabled was removed, "
+            + "reverting from {} to default ({})", oldValue, defaultValue);
       } else {
-        _isHybridTableRetentionStrategyEnabled = parsedValue;
-        LOGGER.info("Updated isHybridTableRetentionStrategyEnabled from {} to {}", oldValue, parsedValue);
+        LOGGER.info("Cluster config for isHybridTableRetentionStrategyEnabled was removed, "
+            + "already at default ({})", defaultValue);
       }
-    } catch (Exception e) {
+      return;
+    }
+
+    // Validate that the value is a proper boolean string
+    if (!"true".equalsIgnoreCase(newValue) && !"false".equalsIgnoreCase(newValue)) {
       LOGGER.warn("Invalid value for isHybridTableRetentionStrategyEnabled: {}, keeping current value: {}", newValue,
           oldValue);
+      return;
+    }
+
+    boolean parsedValue = Boolean.parseBoolean(newValue);
+    if (oldValue == parsedValue) {
+      LOGGER.info("No change in isHybridTableRetentionStrategyEnabled, current value: {}", oldValue);
+    } else {
+      _isHybridTableRetentionStrategyEnabled = parsedValue;
+      LOGGER.info("Updated isHybridTableRetentionStrategyEnabled from {} to {}", oldValue, parsedValue);
+    }
+  }
+
+  private void updateRetentionCreationTimeFallbackEnabled(String newValue) {
+    boolean oldValue = _useCreationTimeFallbackForRetention;
+
+    // When the cluster config key is deleted, newValue will be null.
+    // Reset to default since this flag gates destructive retention deletion.
+    boolean defaultValue =
+        ControllerConf.ControllerPeriodicTasksConf.DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK;
+    if (newValue == null) {
+      if (oldValue != defaultValue) {
+        _useCreationTimeFallbackForRetention = defaultValue;
+        LOGGER.info("Cluster config for retentionCreationTimeFallbackEnabled was removed, "
+            + "reverting from {} to default ({})", oldValue, defaultValue);
+      } else {
+        LOGGER.info("Cluster config for retentionCreationTimeFallbackEnabled was removed, "
+            + "already at default ({})", defaultValue);
+      }
+      return;
+    }
+
+    // Validate that the value is a proper boolean string
+    if (!"true".equalsIgnoreCase(newValue) && !"false".equalsIgnoreCase(newValue)) {
+      LOGGER.warn("Invalid value for retentionCreationTimeFallbackEnabled: {}, keeping current value: {}", newValue,
+          oldValue);
+      return;
+    }
+
+    boolean parsedValue = Boolean.parseBoolean(newValue);
+    if (oldValue == parsedValue) {
+      LOGGER.info("No change in retentionCreationTimeFallbackEnabled, current value: {}", oldValue);
+    } else {
+      _useCreationTimeFallbackForRetention = parsedValue;
+      LOGGER.info("Updated retentionCreationTimeFallbackEnabled from {} to {}", oldValue, parsedValue);
     }
   }
 
   @VisibleForTesting
   public boolean isUntrackedSegmentDeletionEnabled() {
     return _untrackedSegmentDeletionEnabled;
+  }
+
+  @VisibleForTesting
+  public boolean isRetentionCreationTimeFallbackEnabled() {
+    return _useCreationTimeFallbackForRetention;
   }
 }

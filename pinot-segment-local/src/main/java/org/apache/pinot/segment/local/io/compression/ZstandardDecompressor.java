@@ -24,11 +24,9 @@ import java.nio.ByteBuffer;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
-/**
- * Implementation of {@link ChunkDecompressor} using Zstandard(Zstd) decompression algorithm.
- * Zstd.decompress(destinationBuffer, sourceBuffer)
- * Compresses the data in buffer 'srcBuf' using default compression level
- */
+/// Implementation of [ChunkDecompressor] using Zstandard(Zstd) decompression algorithm.
+/// Zstd.decompress(destinationBuffer, sourceBuffer)
+/// Compresses the data in buffer 'srcBuf' using default compression level
 class ZstandardDecompressor implements ChunkDecompressor {
 
   static final ZstandardDecompressor INSTANCE = new ZstandardDecompressor();
@@ -50,6 +48,6 @@ class ZstandardDecompressor implements ChunkDecompressor {
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    return (int) Zstd.decompressedSize(compressedInput);
+    return (int) Zstd.getFrameContentSize(compressedInput);
   }
 }

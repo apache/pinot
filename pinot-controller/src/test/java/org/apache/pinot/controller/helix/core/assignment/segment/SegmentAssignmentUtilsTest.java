@@ -21,7 +21,6 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -281,7 +280,7 @@ public class SegmentAssignmentUtilsTest {
 
     int numSegments = 90;
     List<String> segments = SegmentAssignmentTestUtils.getNameList(SEGMENT_NAME_PREFIX, numSegments);
-    Map<Integer, List<String>> partitionIdToSegmentsMap = Collections.singletonMap(0, segments);
+    Map<Integer, List<String>> partitionIdToSegmentsMap = Map.of(0, segments);
     int numInstances = 9;
     List<String> instances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, numInstances);
 

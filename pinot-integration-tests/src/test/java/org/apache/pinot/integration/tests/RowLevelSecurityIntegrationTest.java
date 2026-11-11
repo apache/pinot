@@ -27,7 +27,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -42,8 +41,10 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER_USER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest {
@@ -102,12 +103,8 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
   }
 
   @Override
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_controllerRequestClient == null) {
-      _controllerRequestClient =
-          new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(), AUTH_HEADER);
-    }
-    return _controllerRequestClient;
+  protected Map<String, String> getAdminClientHeaders() {
+    return AUTH_HEADER;
   }
 
   @Override
@@ -139,13 +136,10 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     setupTable(DEFAULT_TABLE_NAME);
     setupTable(DEFAULT_TABLE_NAME_2);
     setupTable(DEFAULT_TABLE_NAME_3);
-
-    waitForAllDocsLoaded(600_000L);
   }
 
   private void setupTable(String tableName)
       throws Exception {
-
     Schema schema = createSchema();
     schema.setSchemaName(tableName);
     addSchema(schema);
@@ -156,7 +150,7 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
     addTableConfig(tableConfig);
 
-    waitForDocsLoaded(600_000L, true, tableConfig.getTableName());
+    waitForAllDocsLoaded(tableName, 600_000L);
   }
 
   @AfterClass
@@ -284,6 +278,88 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
 
     assertTrue(compareRows(queryBroker(queryWithFiltersForUser2, AUTH_HEADER),
         queryBroker(multiStageQuery, AUTH_HEADER_USER_2)));
+  }
+
+  /// The row filters are added to the WHERE clause of the queried table, which no cross-table function reads through:
+  /// the server resolves IN_PARTITIONED_SUBQUERY by running the quoted subquery on the segments of the table, where
+  /// the filters do not reach it, so the subquery below would see the rows of every other airline. The broker rejects
+  /// every cross-table function for a principal with row filters, IN_SUBQUERY included although its nested request
+  /// is filtered on its own.
+  @Test
+  public void testCrossTableFunctionsRejectedForPrincipalWithRowFilters()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    long numRows = queryBroker("SELECT COUNT(*) FROM mytable", AUTH_HEADER).get("resultTable").get("rows").get(0)
+        .get(0).asLong();
+    for (String function : new String[]{"IN_PARTITIONED_SUBQUERY", "IN_SUBQUERY"}) {
+      String query = "SELECT COUNT(*) FROM mytable WHERE " + function + "(AirlineID - AirlineID, "
+          + "'SELECT ID_SET(AirlineID - AirlineID) FROM mytable WHERE AirlineID <> 19805') = 1";
+
+      // A principal without row filters keeps the function
+      JsonNode adminResponse = queryBroker(query, AUTH_HEADER);
+      assertFalse(adminResponse.get("rlsFiltersApplied").asBoolean(), function);
+      assertEquals(adminResponse.get("resultTable").get("rows").get(0).get(0).asLong(), numRows, function);
+
+      // A principal with row filters is rejected
+      try {
+        JsonNode response = queryBroker(query, AUTH_HEADER_USER);
+        fail("Expected " + function + " to be rejected, got: " + response);
+      } catch (IOException e) {
+        assertTrue(e.getMessage().contains("Cross-table functions are not allowed"), e.getMessage());
+      }
+    }
+  }
+
+  /// The user filter must not run on the rows that the RLS filter hides. `CAST(REPLACE(Carrier, 'AA', '1') AS INT)`
+  /// is 1 on the rows of `AirlineID = 19805` (carrier AA) and throws on every other row. The user stats must not show
+  /// the layout of the whole table.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testUserFilterDoesNotRunOnHiddenRows(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String adminQuery = "select count(*) from mytable where AirlineID = 19805";
+    String userQuery = "select count(*) from mytable where CAST(REPLACE(Carrier, 'AA', '1') AS INT) = 1";
+
+    JsonNode adminResponse = queryBroker(adminQuery, AUTH_HEADER);
+    JsonNode userResponse = queryBroker(userQuery, AUTH_HEADER_USER);
+
+    assertTrue(userResponse.get("exceptions").isEmpty(), userResponse.get("exceptions").toString());
+    assertTrue(adminResponse.get("resultTable").get("rows").get(0).get(0).asLong() > 0);
+    assertTrue(compareRows(adminResponse, userResponse));
+
+    assertTrue(adminResponse.get("totalDocs").asLong() > 0);
+    assertTrue(adminResponse.get("numSegmentsQueried").asLong() > 0);
+    List<String> tableLayoutStats = List.of("totalDocs", "numSegmentsQueried", "numSegmentsProcessed",
+        "numSegmentsMatched", "numConsumingSegmentsQueried", "numSegmentsPrunedByServer");
+    for (String stat : tableLayoutStats) {
+      assertEquals(userResponse.get(stat).asLong(), 0L, stat + " must be hidden: " + userResponse);
+    }
+
+    // The multi-stage engine also returns the stats of each stage. The leaf stage reads the stats from the
+    // server, which leaves them out under RLS.
+    if (useMultiStageQueryEngine) {
+      assertTrue(containsField(adminResponse.get("stageStats"), "totalDocs"), adminResponse.toString());
+      for (String stat : tableLayoutStats) {
+        assertFalse(containsField(userResponse.get("stageStats"), stat),
+            stat + " must be hidden in the stage stats: " + userResponse.get("stageStats"));
+      }
+    }
+  }
+
+  /// Returns whether the JSON tree holds a field with the given name at any depth.
+  private static boolean containsField(JsonNode node, String fieldName) {
+    if (node == null) {
+      return false;
+    }
+    if (node.has(fieldName)) {
+      return true;
+    }
+    for (JsonNode child : node) {
+      if (containsField(child, fieldName)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private JsonNode queryBroker(String query, Map<String, String> headers)

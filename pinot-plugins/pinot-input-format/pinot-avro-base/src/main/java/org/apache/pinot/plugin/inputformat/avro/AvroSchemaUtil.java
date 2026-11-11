@@ -20,55 +20,92 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import org.apache.avro.Conversion;
-import org.apache.avro.Conversions;
+import java.io.IOException;
 import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
-import org.apache.avro.data.TimeConversions;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
-
+/// Stateless helpers for mapping between Avro schema shapes and Pinot's [DataType] / Avro JSON schema representations.
 public class AvroSchemaUtil {
-  /*
-   * These constants are copied from org.apache.avro.LogicalTypes
-   */
-  private static final String DECIMAL = "decimal";
-  private static final String UUID = "uuid";
-  private static final String DATE = "date";
-  private static final String TIME_MILLIS = "time-millis";
-  private static final String TIME_MICROS = "time-micros";
-  private static final String TIMESTAMP_MILLIS = "timestamp-millis";
-  private static final String TIMESTAMP_MICROS = "timestamp-micros";
-  private static final Map<String, Conversion<?>> CONVERSION_MAP = new HashMap<>();
-
-  static {
-    CONVERSION_MAP.put(DECIMAL, new Conversions.DecimalConversion());
-    CONVERSION_MAP.put(UUID, new Conversions.UUIDConversion());
-    CONVERSION_MAP.put(DATE, new TimeConversions.DateConversion());
-    CONVERSION_MAP.put(TIME_MILLIS, new TimeConversions.TimeMillisConversion());
-    CONVERSION_MAP.put(TIME_MICROS, new TimeConversions.TimeMicrosConversion());
-    CONVERSION_MAP.put(TIMESTAMP_MILLIS, new TimeConversions.TimestampMillisConversion());
-    CONVERSION_MAP.put(TIMESTAMP_MICROS, new TimeConversions.TimestampMicrosConversion());
-  }
 
   private AvroSchemaUtil() {
   }
 
-  public static Conversion<?> findConversionFor(String typeName) {
-    return CONVERSION_MAP.get(typeName);
+  // Avro logical-type name for UUID (see org.apache.avro.LogicalTypes). Value-level logical-type conversion lives
+  // in AvroRecordExtractor; this class only deals with schema-shape mapping.
+  private static final String UUID = "uuid";
+
+  /// Returns the Avro schema for a single value of the given Pinot [DataType]. This is the canonical Pinot-to-Avro
+  /// type mapping; it is driven by the **original (logical)** data type rather than the stored type, so logical types
+  /// stay self-describing in the generated Avro schema instead of collapsing to their physical storage type.
+  ///
+  /// | Pinot type    | Avro type                | Value handed to the Avro writer                          |
+  /// |---------------|--------------------------|----------------------------------------------------------|
+  /// | INT           | `int`                    | `Integer`                                                 |
+  /// | LONG          | `long`                   | `Long`                                                    |
+  /// | FLOAT         | `float`                  | `Float`                                                   |
+  /// | DOUBLE        | `double`                 | `Double`                                                  |
+  /// | BOOLEAN       | `boolean`                | `Boolean` (Pinot stores `int` 0/1 — see note below)       |
+  /// | TIMESTAMP     | `long{timestamp-millis}` | `Long` millis since epoch (the logical type's base type)   |
+  /// | BIG_DECIMAL   | `bytes{big-decimal}`     | [java.math.BigDecimal] via Avro's `BigDecimalConversion`   |
+  /// | STRING / JSON | `string`                 | `String`                                                  |
+  /// | BYTES         | `bytes`                  | [java.nio.ByteBuffer]                                     |
+  /// | UUID          | `string{uuid}`           | 16-byte `byte[]` via a `uuid` `Conversion`                |
+  ///
+  /// `timestamp-millis` needs no write-side conversion because `Long` *is* that logical type's base representation.
+  /// `big-decimal` is used for BIG_DECIMAL rather than `decimal(precision, scale)` because Pinot does not pin a
+  /// per-column precision/scale, and `big-decimal` encodes the scale with every value. BOOLEAN is the one type with
+  /// no Avro logical type to hang a `Conversion` on, so writers must coerce Pinot's stored `int` 0/1 to `Boolean`
+  /// themselves (see `SegmentProcessorAvroUtils#convertGenericRowToAvroRecord` and `AvroWriter`).
+  ///
+  /// This mapping is intentionally one-way: [#valueOf(Schema)] does **not** map `timestamp-millis` back to TIMESTAMP
+  /// or `big-decimal` back to BIG_DECIMAL, so that Pinot schema inference from existing Avro data keeps its
+  /// long-standing behavior.
+  ///
+  /// Throws [UnsupportedOperationException] for types with no Avro representation (STRUCT / MAP / OPEN_STRUCT /
+  /// LIST / UNKNOWN).
+  public static Schema toAvroSchema(DataType dataType) {
+    switch (dataType) {
+      case INT:
+        return Schema.create(Schema.Type.INT);
+      case LONG:
+        return Schema.create(Schema.Type.LONG);
+      case FLOAT:
+        return Schema.create(Schema.Type.FLOAT);
+      case DOUBLE:
+        return Schema.create(Schema.Type.DOUBLE);
+      case BOOLEAN:
+        return Schema.create(Schema.Type.BOOLEAN);
+      case TIMESTAMP:
+        return LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG));
+      case BIG_DECIMAL:
+        return LogicalTypes.bigDecimal().addToSchema(Schema.create(Schema.Type.BYTES));
+      case STRING:
+      case JSON:
+        return Schema.create(Schema.Type.STRING);
+      case BYTES:
+        return Schema.create(Schema.Type.BYTES);
+      case UUID:
+        return LogicalTypes.uuid().addToSchema(Schema.create(Schema.Type.STRING));
+      default:
+        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+    }
   }
 
-  /**
-   * Returns the data type stored in Pinot that is associated with the given Avro type.
-   */
+  /// Returns the Avro schema for a whole Pinot column: [#toAvroSchema(DataType)] for a single-value field, or an
+  /// array of it for a multi-value field.
+  public static Schema toAvroSchema(FieldSpec fieldSpec) {
+    Schema valueSchema = toAvroSchema(fieldSpec.getDataType());
+    return fieldSpec.isSingleValueField() ? valueSchema : Schema.createArray(valueSchema);
+  }
+
+  /// Returns the Pinot data type for a bare Avro type. This does not honor logical types (e.g. a `string` or `fixed`
+  /// carrying `logicalType:uuid` maps to STRING/BYTES, not UUID); prefer [#valueOf(Schema)] when a full [Schema] is
+  /// available.
   public static DataType valueOf(Schema.Type avroType) {
     switch (avroType) {
       case INT:
@@ -93,13 +130,30 @@ public class AvroSchemaUtil {
       case UNION:
         return DataType.JSON;
       default:
-        throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
+        throw new IllegalStateException("Unsupported Avro type: " + avroType);
     }
   }
 
-  /**
-   * @return if the given avro type is a primitive type.
-   */
+  /// Returns the Pinot data type associated with the given Avro schema, including logical types.
+  ///
+  /// Recognizes the UUID logical type on both STRING-backed schemas (Avro spec §logical-types.uuid) and FIXED(16)
+  /// schemas (used by some producers including Confluent's fixed-uuid mode). Both forms arrive at
+  /// [AvroRecordExtractor] as either a [java.util.UUID] (for STRING-backed logical UUIDs) or a 16-byte `byte[]`
+  /// (for FIXED-backed ones), and both are accepted by [UuidUtils#toBytes].
+  public static DataType valueOf(Schema schema) {
+    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(schema);
+    if (logicalType != null && UUID.equals(logicalType.getName())) {
+      if (schema.getType() == Schema.Type.STRING) {
+        return DataType.UUID;
+      }
+      if (schema.getType() == Schema.Type.FIXED && schema.getFixedSize() == UuidUtils.UUID_NUM_BYTES) {
+        return DataType.UUID;
+      }
+    }
+    return valueOf(schema.getType());
+  }
+
+  /// Returns whether the given Avro type is a primitive type.
   public static boolean isPrimitiveType(Schema.Type avroType) {
     switch (avroType) {
       case INT:
@@ -115,158 +169,26 @@ public class AvroSchemaUtil {
     }
   }
 
+  /// Builds the Avro schema JSON for a single Pinot field, as a nullable union `["null", <type>]`. Used to generate
+  /// sample Avro data from a Pinot schema (see `AvroWriter`).
+  ///
+  /// The `<type>` branch is [#toAvroSchema(DataType)] rendered as JSON, so this shares the single logical-type
+  /// mapping documented there. The field is always emitted as the single-value type even for a multi-value
+  /// [FieldSpec] — the data generator backing `AvroWriter` has never produced Avro arrays.
   public static ObjectNode toAvroSchemaJsonObject(FieldSpec fieldSpec) {
     ObjectNode jsonSchema = JsonUtils.newObjectNode();
     jsonSchema.put("name", fieldSpec.getName());
-    switch (fieldSpec.getDataType().getStoredType()) {
-      case INT:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "int"));
-        return jsonSchema;
-      case LONG:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "long"));
-        return jsonSchema;
-      case FLOAT:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "float"));
-        return jsonSchema;
-      case DOUBLE:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "double"));
-        return jsonSchema;
-      case STRING:
-      case JSON:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
-        return jsonSchema;
-      case BYTES:
-        jsonSchema.set("type", convertStringsToJsonArray("null", "bytes"));
-        return jsonSchema;
-      default:
-        throw new UnsupportedOperationException();
+    ArrayNode nullableUnion = JsonUtils.newArrayNode();
+    nullableUnion.add("null");
+    // Schema.toString() emits valid JSON: a bare name for primitives ("int"), an object for logical types
+    // ({"type":"long","logicalType":"timestamp-millis"}).
+    try {
+      nullableUnion.add(JsonUtils.stringToJsonNode(toAvroSchema(fieldSpec.getDataType()).toString()));
+    } catch (IOException e) {
+      throw new IllegalStateException("Caught exception while parsing the Avro schema generated for field: "
+          + fieldSpec.getName(), e);
     }
-  }
-
-  private static ArrayNode convertStringsToJsonArray(String... strings) {
-    ArrayNode jsonArray = JsonUtils.newArrayNode();
-    for (String string : strings) {
-      jsonArray.add(string);
-    }
-    return jsonArray;
-  }
-
-  /**
-   * Applies the logical type conversion to the given Avro record field. If there isn't a logical
-   * type for the value then the value is returned unchanged. If there is a logical type associated
-   * to the field but no Avro conversion is known for the type then the value is returned unchanged.
-   *
-   * @param field Avro field spec
-   * @param value Value of the field
-   * @return Converted value as per the logical type in the spec, or the unchanged value if a
-   *     logical type or conversion can't be found.
-   */
-  public static Object applyLogicalType(Schema.Field field, Object value) {
-    if (field == null || field.schema() == null) {
-      return value;
-    }
-
-    Schema fieldSchema = resolveUnionSchema(field.schema());
-    return applySchemaTypeLogic(fieldSchema, value);
-  }
-
-  private static Schema resolveUnionSchema(Schema schema) {
-    if (schema.isUnion()) {
-      for (Schema subSchema : schema.getTypes()) {
-        if (subSchema.getLogicalType() != null) {
-          return subSchema;
-        }
-      }
-    }
-    return schema;
-  }
-
-  private static Object applySchemaTypeLogic(Schema schema, Object value) {
-    switch (schema.getType()) {
-      case ARRAY:
-        return processArraySchema(value, schema);
-      case MAP:
-        return processMapSchema((Map<String, Object>) value, schema);
-      case RECORD:
-        return convertLogicalType((GenericRecord) value);
-      default:
-        return applyConversion(value, schema);
-    }
-  }
-
-  private static Object processArraySchema(Object object, Schema schema) {
-    Schema elementSchema = schema.getElementType();
-    if (object == null) {
-      return null;
-    }
-    if (object instanceof List) {
-      List<Object> list = (List<Object>) object;
-      list.replaceAll(element -> processElement(element, elementSchema));
-      return list;
-    }
-    if (object.getClass().isArray()) {
-      int length = java.lang.reflect.Array.getLength(object);
-      for (int i = 0; i < length; i++) {
-        Object element = java.lang.reflect.Array.get(object, i);
-        java.lang.reflect.Array.set(object, i, processElement(element, elementSchema));
-      }
-      return object;
-    }
-
-    GenericData.Array array = (GenericData.Array) object;
-    for (int i = 0; i < array.size(); i++) {
-      array.set(i, processElement(array.get(i), elementSchema));
-    }
-    return array;
-  }
-
-  private static Object processMapSchema(Map<String, Object> map, Schema schema) {
-    Schema valueSchema = schema.getValueType();
-    if (map == null) {
-      return null;
-    }
-    for (Map.Entry<String, Object> entry : map.entrySet()) {
-      entry.setValue(processElement(entry.getValue(), valueSchema));
-    }
-    return map;
-  }
-
-  private static Object processElement(Object element, Schema schema) {
-    if (element instanceof GenericRecord) {
-      return convertLogicalType((GenericRecord) element);
-    } else {
-      return applyConversion(element, schema);
-    }
-  }
-
-  private static Object applyConversion(Object value, Schema schema) {
-    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(schema);
-    if (logicalType != null) {
-      Conversion<?> conversion = findConversionFor(logicalType.getName());
-      if (conversion != null) {
-        return Conversions.convertToLogicalType(value, schema, logicalType, conversion);
-      }
-    }
-    return value;
-  }
-
-  /**
-   * Converts all logical types within a given GenericRecord according to their Avro schema specifications.
-   * This method iterates over each field in the record's schema, applies the appropriate logical type conversion,
-   * and constructs a new GenericRecord with the converted values.
-   *
-   * @param record The original GenericRecord that contains fields potentially associated with logical types.
-   * @return A new GenericRecord with all applicable logical type conversions applied to its fields.
-   */
-  public static GenericRecord convertLogicalType(GenericRecord record) {
-    Schema schema = record.getSchema();
-    GenericRecord result = new GenericData.Record(schema);
-    for (Schema.Field field : schema.getFields()) {
-      Object value = record.get(field.name());
-      // Apply logical type conversion to the field value using the 'applyLogicalType' method.
-      Object convertedValue = applyLogicalType(field, value);
-      result.put(field.name(), convertedValue);
-    }
-    return result;
+    jsonSchema.set("type", nullableUnion);
+    return jsonSchema;
   }
 }

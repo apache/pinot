@@ -26,10 +26,8 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
-/**
- * Interface for mutable forward index (for CONSUMING segment).
- * NOTE: Mutable forward index does not use reader context to accelerate the reads.
- */
+/// Interface for mutable forward index (for CONSUMING segment).
+/// NOTE: Mutable forward index does not use reader context to accelerate the reads.
 public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexReaderContext>, MutableIndex {
 
   @Override
@@ -129,6 +127,17 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
           }
           setDoubleMV(docId, doubles);
           break;
+        case BIG_DECIMAL:
+          if (value instanceof BigDecimal[]) {
+            setBigDecimalMV(docId, (BigDecimal[]) value);
+          } else {
+            BigDecimal[] bigDecimals = new BigDecimal[length];
+            for (int i = 0; i < length; i++) {
+              bigDecimals[i] = (BigDecimal) value[i];
+            }
+            setBigDecimalMV(docId, bigDecimals);
+          }
+          break;
         case STRING:
           if (value instanceof String[]) {
             setStringMV(docId, (String[]) value);
@@ -157,30 +166,25 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     }
   }
 
-  /**
-   * Returns the length (size in bytes) of the shortest elements inside the forward index.
-   *
-   * @return The length (size in bytes) of the shortest elements inside the forward index.
-   */
+  /// Returns the length (size in bytes) of the shortest elements inside the forward index.
+  ///
+  /// @return The length (size in bytes) of the shortest elements inside the forward index.
   int getLengthOfShortestElement();
 
-  /**
-   * Returns the length (size in bytes) of the longest elements inside the forward index.
-   *
-   * @return The length (size in bytes) of the longest elements inside the forward index.
-   */
+  /// Returns the length (size in bytes) of the longest elements inside the forward index.
+  ///
+  /// @return The length (size in bytes) of the longest elements inside the forward index.
   int getLengthOfLongestElement();
 
-  /**
-   * DICTIONARY-ENCODED INDEX APIs
-   */
+  /// Returns `true` when all elements of a STRING raw forward index contain only ASCII characters, `false` otherwise.
+  boolean isAscii();
 
-  /**
-   * Reads the dictionary id for a single-value column at the given document id.
-   *
-   * @param docId Document id
-   * @return Dictionary id at the given document id
-   */
+  /// DICTIONARY-ENCODED INDEX APIs
+
+  /// Reads the dictionary id for a single-value column at the given document id.
+  ///
+  /// @param docId Document id
+  /// @return Dictionary id at the given document id
   default int getDictId(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -190,14 +194,12 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getDictId(docId);
   }
 
-  /**
-   * Batch reads multiple dictionary ids for a single-value column at the given document ids into the passed in buffer
-   * (the buffer size must be larger than or equal to the length).
-   *
-   * @param docIds Array containing the document ids to read
-   * @param length Number of values to read
-   * @param dictIdBuffer Dictionary id buffer
-   */
+  /// Batch reads multiple dictionary ids for a single-value column at the given document ids into the passed in buffer
+  /// (the buffer size must be larger than or equal to the length).
+  ///
+  /// @param docIds Array containing the document ids to read
+  /// @param length Number of values to read
+  /// @param dictIdBuffer Dictionary id buffer
   default void readDictIds(int[] docIds, int length, int[] dictIdBuffer) {
     throw new UnsupportedOperationException();
   }
@@ -207,25 +209,21 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     readDictIds(docIds, length, dictIdBuffer);
   }
 
-  /**
-   * Reads the dictionary ids for a multi-value column at the given document id into the passed in buffer (the buffer
-   * size must be enough to hold all the values for the multi-value entry) and returns the number of values within the
-   * multi-value entry.
-   *
-   * @param docId Document id
-   * @param dictIdBuffer Dictionary id buffer
-   * @return Number of values within the multi-value entry
-   */
+  /// Reads the dictionary ids for a multi-value column at the given document id into the passed in buffer (the buffer
+  /// size must be enough to hold all the values for the multi-value entry) and returns the number of values within the
+  /// multi-value entry.
+  ///
+  /// @param docId Document id
+  /// @param dictIdBuffer Dictionary id buffer
+  /// @return Number of values within the multi-value entry
   default int getDictIdMV(int docId, int[] dictIdBuffer) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Reads the dictionary ids for a multi-value column at the given document id into a buffer and returns the buffer.
-   *
-   * @param docId Document id
-   * @return A buffer containing the multi-value entries
-   */
+  /// Reads the dictionary ids for a multi-value column at the given document id into a buffer and returns the buffer.
+  ///
+  /// @param docId Document id
+  /// @return A buffer containing the multi-value entries
   default int[] getDictIdMV(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -240,37 +238,30 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getDictIdMV(docId);
   }
 
-  /**
-   * Writes the dictionary id for a single-value column into the given document id.
-   *
-   * @param docId Document id
-   * @param dictId Dictionary id to write
-   */
+  /// Writes the dictionary id for a single-value column into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param dictId Dictionary id to write
   default void setDictId(int docId, int dictId) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the dictionary ids for a multi-value column into the given document id.
-   *
-   * @param docId Document id
-   * @param dictIds Dictionary ids to write
-   */
+  /// Writes the dictionary ids for a multi-value column into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param dictIds Dictionary ids to write
   default void setDictIdMV(int docId, int[] dictIds) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * SINGLE-VALUE COLUMN RAW INDEX APIs
-   */
+  /// SINGLE-VALUE COLUMN RAW INDEX APIs
 
-  /**
-   * Reads the INT value at the given document id. The passed in reader context can be used to accelerate the reads.
-   * <p>NOTE: Dictionary id is handled as INT type.
-   *
-   * @param docId Document id
-   * @return INT type single-value at the given document id
-   */
+  /// Reads the INT value at the given document id. The passed in reader context can be used to accelerate the reads.
+  ///
+  /// NOTE: Dictionary id is handled as INT type.
+  ///
+  /// @param docId Document id
+  /// @return INT type single-value at the given document id
   default int getInt(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -280,13 +271,11 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getInt(docId);
   }
 
-  /**
-   * Reads the LONG type single-value at the given document id. The passed in reader context can be used to accelerate
-   * the reads.
-   *
-   * @param docId Document id
-   * @return LONG type single-value at the given document id
-   */
+  /// Reads the LONG type single-value at the given document id. The passed in reader context can be used to accelerate
+  /// the reads.
+  ///
+  /// @param docId Document id
+  /// @return LONG type single-value at the given document id
   default long getLong(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -296,13 +285,11 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getLong(docId);
   }
 
-  /**
-   * Reads the FLOAT type single-value at the given document id. The passed in reader context can be used to accelerate
-   * the reads.
-   *
-   * @param docId Document id
-   * @return FLOAT type single-value at the given document id
-   */
+  /// Reads the FLOAT type single-value at the given document id. The passed in reader context can be used to accelerate
+  /// the reads.
+  ///
+  /// @param docId Document id
+  /// @return FLOAT type single-value at the given document id
   default float getFloat(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -312,13 +299,11 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getFloat(docId);
   }
 
-  /**
-   * Reads the DOUBLE type single-value at the given document id. The passed in reader context can be used to accelerate
-   * the reads.
-   *
-   * @param docId Document id
-   * @return DOUBLE type single-value at the given document id
-   */
+  /// Reads the DOUBLE type single-value at the given document id. The passed in reader context can be used to
+  /// accelerate the reads.
+  ///
+  /// @param docId Document id
+  /// @return DOUBLE type single-value at the given document id
   default double getDouble(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -328,13 +313,11 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getDouble(docId);
   }
 
-  /**
-   * Reads the BIG_DECIMAL type single-value at the given document id. The passed in reader context can be used to
-   * accelerate the reads.
-   *
-   * @param docId Document id
-   * @return BIG_DECIMAL type single-value at the given document id
-   */
+  /// Reads the BIG_DECIMAL type single-value at the given document id. The passed in reader context can be used to
+  /// accelerate the reads.
+  ///
+  /// @param docId Document id
+  /// @return BIG_DECIMAL type single-value at the given document id
   default BigDecimal getBigDecimal(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -344,13 +327,11 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getBigDecimal(docId);
   }
 
-  /**
-   * Reads the STRING type single-value at the given document id. The passed in reader context can be used to accelerate
-   * the reads.
-   *
-   * @param docId Document id
-   * @return STRING type single-value at the given document id
-   */
+  /// Reads the STRING type single-value at the given document id. The passed in reader context can be used to
+  /// accelerate the reads.
+  ///
+  /// @param docId Document id
+  /// @return STRING type single-value at the given document id
   default String getString(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -360,13 +341,11 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getString(docId);
   }
 
-  /**
-   * Reads the BYTES type single-value at the given document id. The passed in reader context can be used to accelerate
-   * the reads.
-   *
-   * @param docId Document id
-   * @return BYTES type single-value at the given document id
-   */
+  /// Reads the BYTES type single-value at the given document id. The passed in reader context can be used to accelerate
+  /// the reads.
+  ///
+  /// @param docId Document id
+  /// @return BYTES type single-value at the given document id
   default byte[] getBytes(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -376,100 +355,80 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getBytes(docId);
   }
 
-  /**
-   * Writes the INT type single-value into the given document id.
-   *
-   * @param docId Document id
-   * @param value Value to write
-   */
+  /// Writes the INT type single-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param value Value to write
   default void setInt(int docId, int value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the LONG type single-value into the given document id.
-   *
-   * @param docId Document id
-   * @param value Value to write
-   */
+  /// Writes the LONG type single-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param value Value to write
   default void setLong(int docId, long value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the FLOAT type single-value into the given document id.
-   *
-   * @param docId Document id
-   * @param value Value to write
-   */
+  /// Writes the FLOAT type single-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param value Value to write
   default void setFloat(int docId, float value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the DOUBLE type single-value into the given document id.
-   *
-   * @param docId Document id
-   * @param value Value to write
-   */
+  /// Writes the DOUBLE type single-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param value Value to write
   default void setDouble(int docId, double value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the BIG_DECIMAL type single-value into the given document id.
-   *
-   * @param docId Document id
-   * @param value Value to write
-   */
+  /// Writes the BIG_DECIMAL type single-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param value Value to write
   default void setBigDecimal(int docId, BigDecimal value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the STRING type single-value into the given document id.
-   *
-   * @param docId Document id
-   * @param value Value to write
-   */
+  /// Writes the STRING type single-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param value Value to write
   default void setString(int docId, String value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the BYTES type single-value into the given document id.
-   *
-   * @param docId Document id
-   * @param value Value to write
-   */
+  /// Writes the BYTES type single-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param value Value to write
   default void setBytes(int docId, byte[] value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * MULTI-VALUE COLUMN RAW INDEX APIs
-   * TODO: Not supported yet
-   */
+  /// MULTI-VALUE COLUMN RAW INDEX APIs
+  /// TODO: Not supported yet
 
-  /**
-   * Reads the INT type multi-value at the given document id into the passed in value buffer (the buffer size must be
-   * enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
-   * entry.
-   *
-   * @param docId Document id
-   * @param valueBuffer Value buffer
-   * @return Number of values within the multi-value entry
-   */
+  /// Reads the INT type multi-value at the given document id into the passed in value buffer (the buffer size must be
+  /// enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
+  /// entry.
+  ///
+  /// @param docId Document id
+  /// @param valueBuffer Value buffer
+  /// @return Number of values within the multi-value entry
   default int getIntMV(int docId, int[] valueBuffer) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Reads the INT type multi-value at the given document id into a buffer and returns the buffer.
-   *
-   * @param docId Document id
-   * @return A buffer containing the multi-value entries
-   */
+  /// Reads the INT type multi-value at the given document id into a buffer and returns the buffer.
+  ///
+  /// @param docId Document id
+  /// @return A buffer containing the multi-value entries
   default int[] getIntMV(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -484,25 +443,21 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getIntMV(docId);
   }
 
-  /**
-   * Reads the LONG type multi-value at the given document id into the passed in value buffer (the buffer size must be
-   * enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
-   * entry.
-   *
-   * @param docId Document id
-   * @param valueBuffer Value buffer
-   * @return Number of values within the multi-value entry
-   */
+  /// Reads the LONG type multi-value at the given document id into the passed in value buffer (the buffer size must be
+  /// enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
+  /// entry.
+  ///
+  /// @param docId Document id
+  /// @param valueBuffer Value buffer
+  /// @return Number of values within the multi-value entry
   default int getLongMV(int docId, long[] valueBuffer) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Reads the LONG type multi-value at the given document id into a buffer and returns the buffer.
-   *
-   * @param docId Document id
-   * @return A buffer containing the multi-value entries
-   */
+  /// Reads the LONG type multi-value at the given document id into a buffer and returns the buffer.
+  ///
+  /// @param docId Document id
+  /// @return A buffer containing the multi-value entries
   default long[] getLongMV(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -517,25 +472,21 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getLongMV(docId);
   }
 
-  /**
-   * Reads the FLOAT type multi-value at the given document id into the passed in value buffer (the buffer size must be
-   * enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
-   * entry.
-   *
-   * @param docId Document id
-   * @param valueBuffer Value buffer
-   * @return Number of values within the multi-value entry
-   */
+  /// Reads the FLOAT type multi-value at the given document id into the passed in value buffer (the buffer size must be
+  /// enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
+  /// entry.
+  ///
+  /// @param docId Document id
+  /// @param valueBuffer Value buffer
+  /// @return Number of values within the multi-value entry
   default int getFloatMV(int docId, float[] valueBuffer) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Reads the FLOAT type multi-value at the given document id into a buffer and returns the buffer.
-   *
-   * @param docId Document id
-   * @return A buffer containing the multi-value entries
-   */
+  /// Reads the FLOAT type multi-value at the given document id into a buffer and returns the buffer.
+  ///
+  /// @param docId Document id
+  /// @return A buffer containing the multi-value entries
   default float[] getFloatMV(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -550,25 +501,21 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getFloatMV(docId);
   }
 
-  /**
-   * Reads the DOUBLE type multi-value at the given document id into the passed in value buffer (the buffer size must
-   * be enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
-   * entry.
-   *
-   * @param docId Document id
-   * @param valueBuffer Value buffer
-   * @return Number of values within the multi-value entry
-   */
+  /// Reads the DOUBLE type multi-value at the given document id into the passed in value buffer (the buffer size must
+  /// be enough to hold all the values for the multi-value entry) and returns the number of values within the
+  /// multi-value entry.
+  ///
+  /// @param docId Document id
+  /// @param valueBuffer Value buffer
+  /// @return Number of values within the multi-value entry
   default int getDoubleMV(int docId, double[] valueBuffer) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Reads the DOUBLE type multi-value at the given document id into a buffer and returns the buffer.
-   *
-   * @param docId Document id
-   * @return A buffer containing the multi-value entries
-   */
+  /// Reads the DOUBLE type multi-value at the given document id into a buffer and returns the buffer.
+  ///
+  /// @param docId Document id
+  /// @return A buffer containing the multi-value entries
   default double[] getDoubleMV(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -583,25 +530,21 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getDoubleMV(docId);
   }
 
-  /**
-   * Reads the STRING type multi-value at the given document id into the passed in value buffer (the buffer size must
-   * be enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
-   * entry.
-   *
-   * @param docId Document id
-   * @param valueBuffer Value buffer
-   * @return Number of values within the multi-value entry
-   */
+  /// Reads the STRING type multi-value at the given document id into the passed in value buffer (the buffer size must
+  /// be enough to hold all the values for the multi-value entry) and returns the number of values within the
+  /// multi-value entry.
+  ///
+  /// @param docId Document id
+  /// @param valueBuffer Value buffer
+  /// @return Number of values within the multi-value entry
   default int getStringMV(int docId, String[] valueBuffer) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Reads the STRING type multi-value at the given document id into a buffer and returns the buffer.
-   *
-   * @param docId Document id
-   * @return A buffer containing the multi-value entries
-   */
+  /// Reads the STRING type multi-value at the given document id into a buffer and returns the buffer.
+  ///
+  /// @param docId Document id
+  /// @return A buffer containing the multi-value entries
   default String[] getStringMV(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -616,25 +559,21 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getStringMV(docId);
   }
 
-  /**
-   * Reads the BYTES type multi-value at the given document id into the passed in value buffer (the buffer size must be
-   * enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
-   * entry.
-   *
-   * @param docId Document id
-   * @param valueBuffer Value buffer
-   * @return Number of values within the multi-value entry
-   */
+  /// Reads the BYTES type multi-value at the given document id into the passed in value buffer (the buffer size must be
+  /// enough to hold all the values for the multi-value entry) and returns the number of values within the multi-value
+  /// entry.
+  ///
+  /// @param docId Document id
+  /// @param valueBuffer Value buffer
+  /// @return Number of values within the multi-value entry
   default int getBytesMV(int docId, byte[][] valueBuffer) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Reads the BYTES type multi-value at the given document id into a buffer and returns the buffer.
-   *
-   * @param docId Document id
-   * @return A buffer containing the multi-value entries
-   */
+  /// Reads the BYTES type multi-value at the given document id into a buffer and returns the buffer.
+  ///
+  /// @param docId Document id
+  /// @return A buffer containing the multi-value entries
   default byte[][] getBytesMV(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -649,12 +588,10 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getBytesMV(docId);
   }
 
-  /**
-   * Gets the number of multi-values at a given document id and returns it.
-   *
-   * @param docId Document id
-   * @return Number of values within the multi-value entry
-   */
+  /// Gets the number of multi-values at a given document id and returns it.
+  ///
+  /// @param docId Document id
+  /// @return Number of values within the multi-value entry
   default int getNumValuesMV(int docId) {
     throw new UnsupportedOperationException();
   }
@@ -664,62 +601,58 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
     return getNumValuesMV(docId);
   }
 
-  /**
-   * Writes the INT type multi-value into the given document id.
-   *
-   * @param docId Document id
-   * @param values Values to write
-   */
+  /// Writes the INT type multi-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param values Values to write
   default void setIntMV(int docId, int[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the LONG type multi-value into the given document id.
-   *
-   * @param docId Document id
-   * @param values Values to write
-   */
+  /// Writes the LONG type multi-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param values Values to write
   default void setLongMV(int docId, long[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the FLOAT type multi-value into the given document id.
-   *
-   * @param docId Document id
-   * @param values Values to write
-   */
+  /// Writes the FLOAT type multi-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param values Values to write
   default void setFloatMV(int docId, float[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the DOUBLE type multi-value into the given document id.
-   *
-   * @param docId Document id
-   * @param values Values to write
-   */
+  /// Writes the DOUBLE type multi-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param values Values to write
   default void setDoubleMV(int docId, double[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the STRING type multi-value into the given document id.
-   *
-   * @param docId Document id
-   * @param values Values to write
-   */
+  /// Writes the BIG_DECIMAL type multi-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param values Values to write
+  default void setBigDecimalMV(int docId, BigDecimal[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Writes the STRING type multi-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param values Values to write
   default void setStringMV(int docId, String[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the BYTES type multi-value into the given document id.
-   *
-   * @param docId Document id
-   * @param values Values to write
-   */
+  /// Writes the BYTES type multi-value into the given document id.
+  ///
+  /// @param docId Document id
+  /// @param values Values to write
   default void setBytesMV(int docId, byte[][] values) {
     throw new UnsupportedOperationException();
   }

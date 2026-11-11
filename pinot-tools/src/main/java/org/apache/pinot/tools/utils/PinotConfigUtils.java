@@ -27,14 +27,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf;
-import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
+import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +51,15 @@ public class PinotConfigUtils {
   private static final String CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT =
       "Pinot Controller Config Validation Error: %s";
 
+  /// Generates the controller config from the given individual options.
+  ///
+  /// A `null` `tenantIsolation` leaves [ControllerConf#CLUSTER_TENANT_ISOLATION_ENABLE] out of the returned config so
+  /// that the value stays unresolved here. It is then decided by whoever consumes the config -- a controller starter
+  /// applying its own defaults, or the fallback in [ControllerConf#tenantIsolationEnabled]. Pass an explicit value
+  /// only when the caller genuinely wants to pin it.
   public static Map<String, Object> generateControllerConf(String zkAddress, String clusterName, String controllerHost,
-      String controllerPort, String dataDir, ControllerConf.ControllerMode controllerMode, boolean tenantIsolation)
+      String controllerPort, String dataDir, ControllerConf.ControllerMode controllerMode,
+      @Nullable Boolean tenantIsolation)
       throws SocketException, UnknownHostException {
     if (StringUtils.isEmpty(zkAddress)) {
       throw new RuntimeException("zkAddress cannot be empty.");
@@ -69,11 +78,13 @@ public class PinotConfigUtils {
     properties.put(ControllerConf.DATA_DIR, !StringUtils.isEmpty(dataDir) ? dataDir
         : TMP_DIR + String.format("Controller_%s_%s/controller/data", controllerHost, controllerPort));
     properties.put(ControllerConf.CONTROLLER_VIP_HOST, controllerHost);
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, tenantIsolation);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_RETENTION_MANAGER_FREQUENCY_IN_SECONDS, 3600 * 6);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS, 3600);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
-    properties.put(ControllerPeriodicTasksConf.DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS, 3600);
+    if (tenantIsolation != null) {
+      properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, tenantIsolation);
+    }
+    properties.put(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_PERIOD, "6h");
+    properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD, "1h");
+    properties.put(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD, "1h");
+    properties.put(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD, "1h");
     properties.put(ControllerConf.CONTROLLER_MODE, controllerMode.toString());
 
     return properties;
@@ -99,6 +110,7 @@ public class PinotConfigUtils {
       return null;
     }
 
+    CommonsConfigurationUtils.validateNoDuplicateKeys(configFile);
     Configurations configs = new Configurations();
     Map<String, Object> properties = CommonsConfigurationUtils.toMap(configs.properties(configFile));
     ControllerConf conf = new ControllerConf(properties);
@@ -144,15 +156,15 @@ public class PinotConfigUtils {
     }
     File configFile = new File(configFileName);
     if (configFile.exists()) {
+      CommonsConfigurationUtils.validateNoDuplicateKeys(configFile);
       Configurations configs = new Configurations();
       return CommonsConfigurationUtils.toMap(configs.properties(configFile));
     }
-
     return null;
   }
 
   public static Map<String, Object> generateBrokerConf(String clusterName, String zkAddress, String brokerHost,
-      int brokerPort, int brokerMultiStageRunnerPort)
+      int brokerPort, int brokerGrpcPort, int brokerMultiStageRunnerPort)
       throws SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
@@ -160,6 +172,11 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME,
         !StringUtils.isEmpty(brokerHost) ? brokerHost : NetUtils.getHostAddress());
     properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
+    if (brokerGrpcPort > 0) {
+      properties.put(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, brokerGrpcPort);
+    } else if (brokerGrpcPort == 0) {
+      properties.put(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, getAvailablePort());
+    }
     properties.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, brokerMultiStageRunnerPort != 0
         ? brokerMultiStageRunnerPort : getAvailablePort());
     return properties;
@@ -222,18 +239,12 @@ public class PinotConfigUtils {
     configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
     configOverrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     configOverrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    configOverrides.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    configOverrides.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
 
-    configOverrides.put(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        PerQueryCPUMemAccountantFactory.class.getCanonicalName());
-    configOverrides.put(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    configOverrides.put(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
-    configOverrides.put(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    String prefix = Accounting.COMMON_PREFIX + ".";
+    configOverrides.put(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    configOverrides.put(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configOverrides.put(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, false);
+    configOverrides.put(prefix + Accounting.Keys.OOM_PROTECTION_KILLING_QUERY, true);
     return configOverrides;
   }
 

@@ -55,9 +55,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Class for testing Raw index creators.
- */
+/// Class for testing Raw index creators.
 public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), RawIndexCreatorTest.class.getSimpleName());
@@ -121,50 +119,40 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 
-  /**
-   * Test for int raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for int raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testIntRawIndexCreator()
       throws Exception {
     testFixedLengthRawIndexCreator(INT_COLUMN, DataType.INT);
   }
 
-  /**
-   * Test for long raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for long raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testLongRawIndexCreator()
       throws Exception {
     testFixedLengthRawIndexCreator(LONG_COLUMN, DataType.LONG);
   }
 
-  /**
-   * Test for float raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for float raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testFloatRawIndexCreator()
       throws Exception {
     testFixedLengthRawIndexCreator(FLOAT_COLUMN, DataType.FLOAT);
   }
 
-  /**
-   * Test for double raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for double raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testDoubleRawIndexCreator()
       throws Exception {
     testFixedLengthRawIndexCreator(DOUBLE_COLUMN, DataType.DOUBLE);
   }
 
-  /**
-   * Test for string raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for string raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testStringRawIndexCreator()
       throws Exception {
@@ -180,12 +168,10 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  /**
-   * Helper method to perform actual tests for a given column.
-   *
-   * @param column Column for which to perform the test
-   * @param dataType Data type of the column
-   */
+  /// Helper method to perform actual tests for a given column.
+  ///
+  /// @param column Column for which to perform the test
+  /// @param dataType Data type of the column
   private void testFixedLengthRawIndexCreator(String column, DataType dataType)
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
@@ -199,10 +185,8 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  /**
-   * Test for multi value string raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for multi value string raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testStringMVRawIndexCreator()
       throws Exception {
@@ -232,10 +216,8 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  /**
-   * Test for multi value string raw index creator.
-   * Compares values read from the raw index against expected value.
-   */
+  /// Test for multi value string raw index creator.
+  /// Compares values read from the raw index against expected value.
   @Test
   public void testBytesMVRawIndexCreator()
       throws Exception {
@@ -265,22 +247,18 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  /**
-   * Helper method that returns index file name for a given column name.
-   *
-   * @param column Column name for which to get the index file name
-   * @return Name of index file for the given column name
-   */
+  /// Helper method that returns index file name for a given column name.
+  ///
+  /// @param column Column name for which to get the index file name
+  /// @return Name of index file for the given column name
   private PinotDataBuffer getIndexBufferForColumn(String column)
       throws IOException {
     return _segmentReader.getIndexFor(column, StandardIndexes.forward());
   }
 
-  /**
-   * Helper method to build a segment containing a single valued string column with RAW (no-dictionary) index.
-   *
-   * @return Array of string values for the rows in the generated index.
-   */
+  /// Helper method to build a segment containing a single valued string column with RAW (no-dictionary) index.
+  ///
+  /// @return Array of string values for the rows in the generated index.
   private RecordReader buildIndex()
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
@@ -318,12 +296,10 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
     return recordReader;
   }
 
-  /**
-   * Helper method that generates a random value for a given data type.
-   *
-   * @param dataType Data type for which to generate the random value
-   * @return Random value for the data type
-   */
+  /// Helper method that generates a random value for a given data type.
+  ///
+  /// @param dataType Data type for which to generate the random value
+  /// @return Random value for the data type
   public static Object getRandomValue(Random random, DataType dataType) {
     switch (dataType) {
       case INT:
@@ -335,24 +311,22 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
       case DOUBLE:
         return random.nextDouble();
       case STRING:
-        return StringUtil.sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
+        return StringUtil.sanitizeStringValue(RandomStringUtils.secure().next(random.nextInt(MAX_STRING_LENGTH)),
             Integer.MAX_VALUE);
       case BYTES:
-        return StringUtil.sanitizeStringValue(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)),
+        return StringUtil.sanitizeStringValue(RandomStringUtils.secure().next(random.nextInt(MAX_STRING_LENGTH)),
             Integer.MAX_VALUE).getBytes();
       default:
         throw new UnsupportedOperationException("Unsupported data type for random value generator: " + dataType);
     }
   }
 
-  /**
-   * Helper method to reader value for the given row.
-   *
-   * @param rawIndexReader Index reader
-   * @param readerContext Reader context
-   * @param docId Document id
-   * @return Value read from index
-   */
+  /// Helper method to reader value for the given row.
+  ///
+  /// @param rawIndexReader Index reader
+  /// @param readerContext Reader context
+  /// @param docId Document id
+  /// @return Value read from index
   private Object readValueFromIndex(FixedByteChunkSVForwardIndexReader rawIndexReader, ChunkReaderContext readerContext,
       int docId) {
     switch (rawIndexReader.getStoredType()) {

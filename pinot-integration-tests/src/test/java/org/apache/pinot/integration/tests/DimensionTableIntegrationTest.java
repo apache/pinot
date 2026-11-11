@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -33,7 +32,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -77,7 +75,7 @@ public class DimensionTableIntegrationTest extends BaseClusterIntegrationTest {
         .setSchemaName(getTableName())
         .addSingleValueDimension(LONG_COL, FieldSpec.DataType.LONG)
         .addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
-        .setPrimaryKeyColumns(Collections.singletonList(LONG_COL))
+        .setPrimaryKeyColumns(List.of(LONG_COL))
         .build();
   }
 
@@ -124,10 +122,6 @@ public class DimensionTableIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    if (_controllerRequestURLBuilder == null) {
-      _controllerRequestURLBuilder =
-          ControllerRequestURLBuilder.baseUrl("http://localhost:" + getControllerPort());
-    }
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     Schema schema = createSchema();
     addSchema(schema);

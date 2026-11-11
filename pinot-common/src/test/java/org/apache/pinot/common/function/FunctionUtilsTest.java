@@ -1,0 +1,312 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.common.function;
+
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.annotations.FunctionVolatility;
+import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.PinotDataType;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+
+
+public class FunctionUtilsTest {
+  /// Test fixture for class-level function volatility.
+  @ScalarFunction(enabled = false, volatility = FunctionVolatility.STABLE)
+  private static class AnnotatedFunction {
+    @ScalarFunction(enabled = false)
+    public static long classAnnotated() {
+      return 0L;
+    }
+  }
+
+  /// Test fixture for method-level and legacy volatility metadata.
+  private static class VolatilityAnnotatedFunction {
+    @ScalarFunction(enabled = false, isDeterministic = false)
+    public static long legacyVolatile() {
+      return 0L;
+    }
+
+    @ScalarFunction(enabled = false, volatility = FunctionVolatility.STABLE)
+    public static long stable() {
+      return 0L;
+    }
+  }
+
+  @Test
+  public void testGetArgumentType() {
+    // Single values delegated to PinotDataType.getSingleValueType
+    assertEquals(FunctionUtils.getArgumentType(1), PinotDataType.INT);
+    assertEquals(FunctionUtils.getArgumentType(1L), PinotDataType.LONG);
+    assertEquals(FunctionUtils.getArgumentType(1.0f), PinotDataType.FLOAT);
+    assertEquals(FunctionUtils.getArgumentType(1.0d), PinotDataType.DOUBLE);
+    assertEquals(FunctionUtils.getArgumentType(BigDecimal.ONE), PinotDataType.BIG_DECIMAL);
+    assertEquals(FunctionUtils.getArgumentType(Boolean.TRUE), PinotDataType.BOOLEAN);
+    assertEquals(FunctionUtils.getArgumentType(new Timestamp(0L)), PinotDataType.TIMESTAMP);
+    assertEquals(FunctionUtils.getArgumentType("foo"), PinotDataType.STRING);
+    assertEquals(FunctionUtils.getArgumentType(new byte[]{0}), PinotDataType.BYTES);
+    assertEquals(FunctionUtils.getArgumentType(new HashMap<>()), PinotDataType.MAP);
+    assertEquals(FunctionUtils.getArgumentType(LocalDate.EPOCH), PinotDataType.DATE);
+    assertEquals(FunctionUtils.getArgumentType(LocalTime.NOON), PinotDataType.TIME);
+    assertEquals(FunctionUtils.getArgumentType(UUID.randomUUID()), PinotDataType.UUID);
+    assertEquals(FunctionUtils.getArgumentType((byte) 1), PinotDataType.BYTE);
+    assertEquals(FunctionUtils.getArgumentType('a'), PinotDataType.CHARACTER);
+    assertEquals(FunctionUtils.getArgumentType((short) 1), PinotDataType.SHORT);
+  }
+
+  @Test
+  public void testFunctionVolatilityMetadata() {
+    FunctionInfo now = FunctionRegistry.lookupFunctionInfo("now", 0);
+    assertTrue(now.isDeterministic());
+    assertEquals(now.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo ago = FunctionRegistry.lookupFunctionInfo("ago", 1);
+    assertTrue(ago.isDeterministic());
+    assertEquals(ago.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo agoMv = FunctionRegistry.lookupFunctionInfo("agomv", 1);
+    assertTrue(agoMv.isDeterministic());
+    assertEquals(agoMv.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo random = FunctionRegistry.lookupFunctionInfo("rand", 0);
+    assertFalse(random.isDeterministic());
+    assertEquals(random.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo seededRandom = FunctionRegistry.lookupFunctionInfo("rand", 1);
+    assertTrue(seededRandom.isDeterministic());
+    assertEquals(seededRandom.getVolatility(), FunctionVolatility.IMMUTABLE);
+
+    FunctionInfo sleep = FunctionRegistry.lookupFunctionInfo("sleep", 1);
+    assertTrue(sleep.isDeterministic());
+    assertEquals(sleep.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo cid = FunctionRegistry.lookupFunctionInfo("cid", 1);
+    assertTrue(cid.isDeterministic());
+    assertEquals(cid.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo requestId = FunctionRegistry.lookupFunctionInfo("reqid", 1);
+    assertTrue(requestId.isDeterministic());
+    assertEquals(requestId.getVolatility(), FunctionVolatility.STABLE);
+
+    FunctionInfo startTime = FunctionRegistry.lookupFunctionInfo("starttime", 1);
+    assertTrue(startTime.isDeterministic());
+    assertEquals(startTime.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo workerId = FunctionRegistry.lookupFunctionInfo("workerid", 1);
+    assertTrue(workerId.isDeterministic());
+    assertEquals(workerId.getVolatility(), FunctionVolatility.VOLATILE);
+  }
+
+  /// The [FunctionInfo] volatility above is per-arity, but the [PinotSqlFunction] the planner sees is per-operator.
+  /// Both determinism and volatility are therefore aggregated conservatively across every registered overload.
+  @Test
+  public void testOperatorLevelVolatilityAggregatesAcrossOverloads() {
+    // rand() is VOLATILE and non-deterministic at 0 args, IMMUTABLE and deterministic at 1 arg. The single operator
+    // has to report the more restrictive of each.
+    PinotSqlFunction rand = toSqlFunction("rand");
+    assertFalse(rand.isDeterministic());
+    assertTrue(rand.isVolatile());
+
+    // now() stays deterministic so it can be constant-folded, but must still report volatile.
+    PinotSqlFunction now = toSqlFunction("now");
+    assertTrue(now.isDeterministic());
+    assertTrue(now.isVolatile());
+
+    // STABLE is constant within a query, so it must NOT be reported as volatile.
+    PinotSqlFunction reqId = toSqlFunction("reqid");
+    assertTrue(reqId.isDeterministic());
+    assertFalse(reqId.isVolatile());
+
+    PinotSqlFunction upper = toSqlFunction("upper");
+    assertTrue(upper.isDeterministic());
+    assertFalse(upper.isVolatile());
+  }
+
+  private static PinotSqlFunction toSqlFunction(String canonicalName) {
+    PinotScalarFunction scalarFunction = FunctionRegistry.getFunctions().get(canonicalName);
+    assertNotNull(scalarFunction, "Failed to find function: " + canonicalName);
+    PinotSqlFunction sqlFunction = scalarFunction.toPinotSqlFunction();
+    assertNotNull(sqlFunction, "Function is not registered as a PinotSqlFunction: " + canonicalName);
+    return sqlFunction;
+  }
+
+  @Test
+  public void testFunctionVolatilityResolution()
+      throws NoSuchMethodException {
+    FunctionInfo classAnnotated =
+        FunctionInfo.fromMethod(AnnotatedFunction.class.getMethod("classAnnotated"));
+    assertTrue(classAnnotated.isDeterministic());
+    assertEquals(classAnnotated.getVolatility(), FunctionVolatility.STABLE);
+
+    FunctionInfo classAnnotationAwareConstructor =
+        new FunctionInfo(AnnotatedFunction.class.getMethod("classAnnotated"), AnnotatedFunction.class, false);
+    assertTrue(classAnnotationAwareConstructor.isDeterministic());
+    assertEquals(classAnnotationAwareConstructor.getVolatility(), FunctionVolatility.STABLE);
+
+    FunctionInfo legacyVolatile =
+        FunctionInfo.fromMethod(VolatilityAnnotatedFunction.class.getMethod("legacyVolatile"));
+    assertFalse(legacyVolatile.isDeterministic());
+    assertEquals(legacyVolatile.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo annotationAwareConstructor =
+        new FunctionInfo(VolatilityAnnotatedFunction.class.getMethod("legacyVolatile"),
+            VolatilityAnnotatedFunction.class, false, true);
+    assertTrue(annotationAwareConstructor.isDeterministic());
+    assertEquals(annotationAwareConstructor.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo deterministicOverride =
+        new FunctionInfo(VolatilityAnnotatedFunction.class.getMethod("stable"),
+            VolatilityAnnotatedFunction.class, false, false);
+    assertFalse(deterministicOverride.isDeterministic());
+    assertEquals(deterministicOverride.getVolatility(), FunctionVolatility.VOLATILE);
+
+    FunctionInfo explicitVolatilityOverride = new FunctionInfo(
+        AnnotatedFunction.class.getMethod("classAnnotated"), AnnotatedFunction.class, false, true,
+        FunctionVolatility.IMMUTABLE);
+    assertTrue(explicitVolatilityOverride.isDeterministic());
+    assertEquals(explicitVolatilityOverride.getVolatility(), FunctionVolatility.IMMUTABLE);
+
+    PinotScalarFunction scalarFunction =
+        PinotScalarFunction.fromMethod(VolatilityAnnotatedFunction.class.getMethod("stable"), false, true);
+    FunctionInfo dynamicFunctionInfo = scalarFunction.getFunctionInfo(0);
+    assertNotNull(dynamicFunctionInfo);
+    assertTrue(dynamicFunctionInfo.isDeterministic());
+    assertEquals(dynamicFunctionInfo.getVolatility(), FunctionVolatility.STABLE);
+
+    PinotScalarFunction legacyDynamicFunction =
+        PinotScalarFunction.fromMethod(VolatilityAnnotatedFunction.class.getMethod("legacyVolatile"), false, true);
+    FunctionInfo legacyDynamicFunctionInfo = legacyDynamicFunction.getFunctionInfo(0);
+    assertNotNull(legacyDynamicFunctionInfo);
+    assertTrue(legacyDynamicFunctionInfo.isDeterministic());
+    assertEquals(legacyDynamicFunctionInfo.getVolatility(), FunctionVolatility.VOLATILE);
+  }
+
+  @Test
+  public void testGetArgumentTypeForVendorTimestampSubclass() {
+    // Vendor JDBC drivers commonly return Timestamp subclasses (e.g. BigQuery Simba's TimestampTz).
+    // Subclasses must resolve to TIMESTAMP via the instanceof dispatch.
+    class VendorTimestamp extends Timestamp {
+      VendorTimestamp(long time) {
+        super(time);
+      }
+    }
+    assertEquals(FunctionUtils.getArgumentType(new VendorTimestamp(0L)), PinotDataType.TIMESTAMP);
+  }
+
+  @Test
+  public void testGetArgumentTypeForPrimitiveArrays() {
+    assertEquals(FunctionUtils.getArgumentType(new int[]{1}), PinotDataType.PRIMITIVE_INT_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new long[]{1L}), PinotDataType.PRIMITIVE_LONG_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new float[]{1.0f}), PinotDataType.PRIMITIVE_FLOAT_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new double[]{1.0d}), PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new boolean[]{true}), PinotDataType.PRIMITIVE_BOOLEAN_ARRAY);
+  }
+
+  @Test
+  public void testGetArgumentTypeForReferenceArrays() {
+    // Reference arrays sample first non-null element via PinotDataType.getMultiValueType
+    assertEquals(FunctionUtils.getArgumentType(new Integer[]{1}), PinotDataType.INT_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new Long[]{1L}), PinotDataType.LONG_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new Float[]{1.0f}), PinotDataType.FLOAT_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new Double[]{1.0d}), PinotDataType.DOUBLE_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new BigDecimal[]{BigDecimal.ONE}), PinotDataType.BIG_DECIMAL_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new Boolean[]{true}), PinotDataType.BOOLEAN_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new Timestamp[]{new Timestamp(0L)}), PinotDataType.TIMESTAMP_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new String[]{"foo"}), PinotDataType.STRING_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new byte[][]{{0}}), PinotDataType.BYTES_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new LocalDate[]{LocalDate.EPOCH}), PinotDataType.DATE_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new LocalTime[]{LocalTime.NOON}), PinotDataType.TIME_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new UUID[]{UUID.randomUUID()}), PinotDataType.UUID_ARRAY);
+  }
+
+  @Test
+  public void testGetArgumentTypeForEmptyOrAllNullReferenceArray() {
+    // Empty / all-null reference arrays fall back to OBJECT_ARRAY (element type undeterminable).
+    assertEquals(FunctionUtils.getArgumentType(new Object[0]), PinotDataType.OBJECT_ARRAY);
+    assertEquals(FunctionUtils.getArgumentType(new Object[]{null, null}), PinotDataType.OBJECT_ARRAY);
+    // Specific component type with no usable sample also falls back to OBJECT_ARRAY.
+    assertEquals(FunctionUtils.getArgumentType(new Integer[0]), PinotDataType.OBJECT_ARRAY);
+  }
+
+  @Test
+  public void testGetArgumentTypeForCollection() {
+    assertEquals(FunctionUtils.getArgumentType(List.of(1, 2, 3)), PinotDataType.COLLECTION);
+  }
+
+  @Test
+  public void testGetArgumentTypeForUnknown() {
+    // Unrecognized non-array types fall back to OBJECT (best-effort coercion sentinel).
+    assertEquals(FunctionUtils.getArgumentType(new Object()), PinotDataType.OBJECT);
+  }
+
+  @Test
+  public void testGetParameterType() {
+    // Scalars
+    assertEquals(FunctionUtils.getParameterType(int.class), PinotDataType.INT);
+    assertEquals(FunctionUtils.getParameterType(Integer.class), PinotDataType.INT);
+    assertEquals(FunctionUtils.getParameterType(boolean.class), PinotDataType.BOOLEAN);
+    assertEquals(FunctionUtils.getParameterType(Boolean.class), PinotDataType.BOOLEAN);
+    assertEquals(FunctionUtils.getParameterType(Timestamp.class), PinotDataType.TIMESTAMP);
+    assertEquals(FunctionUtils.getParameterType(String.class), PinotDataType.STRING);
+    assertEquals(FunctionUtils.getParameterType(byte[].class), PinotDataType.BYTES);
+    // Arrays
+    assertEquals(FunctionUtils.getParameterType(int[].class), PinotDataType.PRIMITIVE_INT_ARRAY);
+    assertEquals(FunctionUtils.getParameterType(boolean[].class), PinotDataType.PRIMITIVE_BOOLEAN_ARRAY);
+    assertEquals(FunctionUtils.getParameterType(Timestamp[].class), PinotDataType.TIMESTAMP_ARRAY);
+    assertEquals(FunctionUtils.getParameterType(String[].class), PinotDataType.STRING_ARRAY);
+    assertEquals(FunctionUtils.getParameterType(byte[][].class), PinotDataType.BYTES_ARRAY);
+    // Boxed array forms not allowed as scalar function parameters
+    assertNull(FunctionUtils.getParameterType(Integer[].class));
+    assertNull(FunctionUtils.getParameterType(Boolean[].class));
+    // Unknown class
+    assertNull(FunctionUtils.getParameterType(LocalDate.class));
+  }
+
+  @Test
+  public void testGetColumnDataType() {
+    // Scalars
+    assertEquals(FunctionUtils.getColumnDataType(int.class), ColumnDataType.INT);
+    assertEquals(FunctionUtils.getColumnDataType(Integer.class), ColumnDataType.INT);
+    assertEquals(FunctionUtils.getColumnDataType(boolean.class), ColumnDataType.BOOLEAN);
+    assertEquals(FunctionUtils.getColumnDataType(Timestamp.class), ColumnDataType.TIMESTAMP);
+    assertEquals(FunctionUtils.getColumnDataType(byte[].class), ColumnDataType.BYTES);
+    // Arrays
+    assertEquals(FunctionUtils.getColumnDataType(int[].class), ColumnDataType.INT_ARRAY);
+    assertEquals(FunctionUtils.getColumnDataType(boolean[].class), ColumnDataType.BOOLEAN_ARRAY);
+    assertEquals(FunctionUtils.getColumnDataType(Timestamp[].class), ColumnDataType.TIMESTAMP_ARRAY);
+    assertEquals(FunctionUtils.getColumnDataType(byte[][].class), ColumnDataType.BYTES_ARRAY);
+    // Object
+    assertEquals(FunctionUtils.getColumnDataType(Object.class), ColumnDataType.OBJECT);
+    // Unknown class
+    assertNull(FunctionUtils.getColumnDataType(LocalDate.class));
+  }
+}

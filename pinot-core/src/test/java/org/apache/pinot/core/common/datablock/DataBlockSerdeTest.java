@@ -21,7 +21,6 @@ package org.apache.pinot.core.common.datablock;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -77,7 +76,7 @@ public class DataBlockSerdeTest {
       column[i] = r.nextInt(100);
     }
 
-    DataBlock dataBlock = DataBlockBuilder.buildFromColumns(Collections.singletonList(column), dataSchema);
+    DataBlock dataBlock = DataBlockBuilder.buildFromColumns(List.<Object[]>of(column), dataSchema);
     List<ByteBuffer> serialize = DataBlockUtils.serialize(DataBlockSerde.Version.V1_V2, dataBlock);
     DataBlock deserializedDataBlock = DataBlockUtils.deserialize(serialize);
     DataBlockEquals.checkSameContent(deserializedDataBlock, dataBlock,

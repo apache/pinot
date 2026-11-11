@@ -18,231 +18,274 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
-import com.google.common.collect.Sets;
 import com.google.protobuf.ByteString;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.Arrays;
-import java.util.HashMap;
+import com.google.protobuf.DescriptorProtos.DescriptorProto;
+import com.google.protobuf.DescriptorProtos.EnumDescriptorProto;
+import com.google.protobuf.DescriptorProtos.EnumValueDescriptorProto;
+import com.google.protobuf.DescriptorProtos.FieldDescriptorProto;
+import com.google.protobuf.DescriptorProtos.FileDescriptorProto;
+import com.google.protobuf.DescriptorProtos.MessageOptions;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Descriptors.DescriptorValidationException;
+import com.google.protobuf.Descriptors.EnumValueDescriptor;
+import com.google.protobuf.Descriptors.FieldDescriptor;
+import com.google.protobuf.Descriptors.FileDescriptor;
+import com.google.protobuf.DynamicMessage;
+import com.google.protobuf.Message;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
-import org.apache.pinot.spi.data.readers.RecordReader;
+import java.util.function.Consumer;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.testng.annotations.Test;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static com.google.protobuf.DescriptorProtos.FieldDescriptorProto.Label;
+import static com.google.protobuf.DescriptorProtos.FieldDescriptorProto.Type;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
-/**
- * Tests for the {@link ProtoBufRecordExtractor}
- */
-public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
+/// Tests [ProtoBufRecordExtractor] — see its class Javadoc for the proto source type → Java output type
+/// matrix. Each test builds a single-field [DynamicMessage] whose only field is named [#COLUMN] of the type
+/// under test, so [#extract] only needs to take the message.
+public class ProtoBufRecordExtractorTest {
 
-  private final File _dataFile = new File(_tempDir, "test_complex_proto.data");
+  private static final String COLUMN = "col";
 
-  private static final String DESCRIPTOR_FILE = "complex_types.desc";
+  // === Single-value primitives — order follows the proto type list in the class Javadoc ===
 
-  private static final String STRING_FIELD = "string_field";
-  private static final String INT_FIELD = "int_field";
-  private static final String LONG_FIELD = "long_field";
-  private static final String DOUBLE_FIELD = "double_field";
-  private static final String FLOAT_FIELD = "float_field";
-  private static final String BOOL_FIELD = "bool_field";
-  private static final String BYTES_FIELD = "bytes_field";
-  private static final String NULLABLE_STRING_FIELD = "nullable_string_field";
-  private static final String NULLABLE_INT_FIELD = "nullable_int_field";
-  private static final String NULLABLE_LONG_FIELD = "nullable_long_field";
-  private static final String NULLABLE_DOUBLE_FIELD = "nullable_double_field";
-  private static final String NULLABLE_FLOAT_FIELD = "nullable_float_field";
-  private static final String NULLABLE_BOOL_FIELD = "nullable_bool_field";
-  private static final String NULLABLE_BYTES_FIELD = "nullable_bytes_field";
-  private static final String REPEATED_STRINGS = "repeated_strings";
-  private static final String NESTED_MESSAGE = "nested_message";
-  private static final String REPEATED_NESTED_MESSAGES = "repeated_nested_messages";
-  private static final String COMPLEX_MAP = "complex_map";
-  private static final String SIMPLE_MAP = "simple_map";
-  private static final String ENUM_FIELD = "enum_field";
-  private static final String NESTED_INT_FIELD = "nested_int_field";
-  private static final String NESTED_STRING_FIELD = "nested_string_field";
-
-  @Override
-  protected List<Map<String, Object>> getInputRecords() {
-    return Arrays.asList(createExplicitOptionalDefaultRecord(), createOptionalDefaultRecordWithNulls());
+  @Test
+  public void testBooleanPreserved() {
+    Object result = extract(singleField(Type.TYPE_BOOL, true));
+    assertEquals(result, true);
   }
 
-  @Override
-  protected Set<String> getSourceFields() {
-    return Sets.newHashSet(STRING_FIELD, INT_FIELD, LONG_FIELD, DOUBLE_FIELD, FLOAT_FIELD, BOOL_FIELD, BYTES_FIELD,
-        NULLABLE_STRING_FIELD, NULLABLE_INT_FIELD, NULLABLE_LONG_FIELD, NULLABLE_DOUBLE_FIELD, NULLABLE_FLOAT_FIELD,
-        NULLABLE_BOOL_FIELD, NULLABLE_BYTES_FIELD, REPEATED_STRINGS, NESTED_MESSAGE, REPEATED_NESTED_MESSAGES,
-        COMPLEX_MAP, SIMPLE_MAP, ENUM_FIELD);
+  @Test
+  public void testIntegerPreserved() {
+    Object result = extract(singleField(Type.TYPE_INT32, 123));
+    assertEquals(result, 123);
   }
 
-  /**
-   * Creates a ProtoBufRecordReader
-   */
-  @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
-      throws IOException {
-    ProtoBufRecordReader protoBufRecordReader = new ProtoBufRecordReader();
-    protoBufRecordReader.init(_dataFile, fieldsToRead, getProtoRecordReaderConfig());
-    return protoBufRecordReader;
+  @Test
+  public void testLongPreserved() {
+    Object result = extract(singleField(Type.TYPE_INT64, 1_588_469_340_000L));
+    assertEquals(result, 1_588_469_340_000L);
   }
 
-  /**
-   * Create a data input file using input records containing various ProtoBuf types
-   */
-  @Override
-  protected void createInputFile()
-      throws IOException {
-    for (Map<String, Object> inputRecord : _inputRecords) {
-      ComplexTypes.TestMessage.Builder messageBuilder = ComplexTypes.TestMessage.newBuilder();
-      messageBuilder.setStringField((String) inputRecord.get(STRING_FIELD));
-      messageBuilder.setIntField((Integer) inputRecord.get(INT_FIELD));
-      messageBuilder.setLongField((Long) inputRecord.get(LONG_FIELD));
-      messageBuilder.setDoubleField((Double) inputRecord.get(DOUBLE_FIELD));
-      messageBuilder.setFloatField((Float) inputRecord.get(FLOAT_FIELD));
-      messageBuilder.setBoolField(Boolean.parseBoolean((String) inputRecord.get(BOOL_FIELD)));
-      messageBuilder.setBytesField(ByteString.copyFrom((byte[]) inputRecord.get(BYTES_FIELD)));
+  @Test
+  public void testFloatPreserved() {
+    Object result = extract(singleField(Type.TYPE_FLOAT, 0.5f));
+    assertEquals(result, 0.5f);
+  }
 
-      if (inputRecord.get(NULLABLE_STRING_FIELD) != null) {
-        messageBuilder.setNullableStringField((String) inputRecord.get(NULLABLE_STRING_FIELD));
-      }
-      if (inputRecord.get(NULLABLE_INT_FIELD) != null) {
-        messageBuilder.setNullableIntField((Integer) inputRecord.get(NULLABLE_INT_FIELD));
-      }
-      if (inputRecord.get(NULLABLE_LONG_FIELD) != null) {
-        messageBuilder.setNullableLongField((Long) inputRecord.get(NULLABLE_LONG_FIELD));
-      }
-      if (inputRecord.get(NULLABLE_DOUBLE_FIELD) != null) {
-        messageBuilder.setNullableDoubleField((Double) inputRecord.get(NULLABLE_DOUBLE_FIELD));
-      }
-      if (inputRecord.get(NULLABLE_FLOAT_FIELD) != null) {
-        messageBuilder.setNullableFloatField((Float) inputRecord.get(NULLABLE_FLOAT_FIELD));
-      }
-      if (inputRecord.get(NULLABLE_BOOL_FIELD) != null) {
-        messageBuilder.setNullableBoolField(Boolean.parseBoolean((String) inputRecord.get(NULLABLE_BOOL_FIELD)));
-      }
-      if (inputRecord.get(NULLABLE_BYTES_FIELD) != null) {
-        messageBuilder.setNullableBytesField(ByteString.copyFrom((byte[]) inputRecord.get(NULLABLE_BYTES_FIELD)));
-      }
+  @Test
+  public void testDoublePreserved() {
+    Object result = extract(singleField(Type.TYPE_DOUBLE, 0.5d));
+    assertEquals(result, 0.5d);
+  }
 
-      messageBuilder.addAllRepeatedStrings((List) inputRecord.get(REPEATED_STRINGS));
-      messageBuilder.setNestedMessage(createNestedMessage((Map<String, Object>) inputRecord.get(NESTED_MESSAGE)));
+  @Test
+  public void testStringPreserved() {
+    Object result = extract(singleField(Type.TYPE_STRING, "hello"));
+    assertEquals(result, "hello");
+  }
 
-      List<Map<String, Object>> nestedMessagesValues =
-          (List<Map<String, Object>>) inputRecord.get(REPEATED_NESTED_MESSAGES);
-      for (Map<String, Object> nestedMessage : nestedMessagesValues) {
-        messageBuilder.addRepeatedNestedMessages(createNestedMessage(nestedMessage));
-      }
+  @Test
+  public void testBytesConvertedToByteArray() {
+    Object result = extract(singleField(Type.TYPE_BYTES, ByteString.copyFrom(new byte[]{0, 1, 2, 3})));
+    assertEquals((byte[]) result, new byte[]{0, 1, 2, 3});
+  }
 
-      Map<String, Map<String, Object>> complexMapValues =
-          (Map<String, Map<String, Object>>) inputRecord.get(COMPLEX_MAP);
-      for (Map.Entry<String, Map<String, Object>> mapEntry : complexMapValues.entrySet()) {
-        messageBuilder.putComplexMap(mapEntry.getKey(), createNestedMessage(mapEntry.getValue()));
-      }
-      messageBuilder.putAllSimpleMap((Map<String, Integer>) inputRecord.get(SIMPLE_MAP));
-      messageBuilder.setEnumField(ComplexTypes.TestMessage.TestEnum.valueOf((String) inputRecord.get(ENUM_FIELD)));
+  // === Enum → String ===
 
-      try (FileOutputStream output = new FileOutputStream(_dataFile, true)) {
-        messageBuilder.build().writeDelimitedTo(output);
-      }
+  @Test
+  public void testEnumExtractedAsString() {
+    EnumDescriptorProto enumProto = EnumDescriptorProto.newBuilder()
+        .setName("Color")
+        .addValue(EnumValueDescriptorProto.newBuilder().setName("RED").setNumber(0))
+        .addValue(EnumValueDescriptorProto.newBuilder().setName("GREEN").setNumber(1))
+        .addValue(EnumValueDescriptorProto.newBuilder().setName("BLUE").setNumber(2))
+        .build();
+    Descriptor desc = buildDescriptor(builder -> {
+      builder.addEnumType(enumProto);
+      builder.addField(fieldProto(Type.TYPE_ENUM, Label.LABEL_OPTIONAL).setTypeName(enumProto.getName()));
+    });
+    EnumValueDescriptor green = desc.findEnumTypeByName(enumProto.getName()).findValueByNumber(1);
+    Message message = DynamicMessage.newBuilder(desc).setField(desc.findFieldByName(COLUMN), green).build();
+    Object result = extract(message);
+    assertEquals(result, "GREEN");
+  }
+
+  // === Repeated → Object[] ===
+
+  @Test
+  public void testRepeatedStringsExtractedAsArray() {
+    Object[] result = (Object[]) extract(repeatedField(Type.TYPE_STRING, List.of("a", "b", "c")));
+    assertEquals(result, new Object[]{"a", "b", "c"});
+  }
+
+  @Test
+  public void testEmptyRepeatedExtractedAsEmptyArray() {
+    Object[] result = (Object[]) extract(repeatedField(Type.TYPE_STRING, List.of()));
+    assertEquals(result.length, 0);
+  }
+
+  // === Nested message → Map ===
+
+  @Test
+  public void testNestedMessageExtractedAsMap() {
+    DescriptorProto inner = pairMessage("Inner", Type.TYPE_STRING, Type.TYPE_INT32);
+    Descriptor outer = buildDescriptor(builder -> {
+      builder.addNestedType(inner);
+      builder.addField(fieldProto(Type.TYPE_MESSAGE, Label.LABEL_OPTIONAL).setTypeName(inner.getName()));
+    });
+    DynamicMessage innerMsg = DynamicMessage.newBuilder(outer.findNestedTypeByName(inner.getName()))
+        .setField(outer.findNestedTypeByName(inner.getName()).findFieldByName("a"), "hello")
+        .setField(outer.findNestedTypeByName(inner.getName()).findFieldByName("b"), 42)
+        .build();
+    Message message = DynamicMessage.newBuilder(outer).setField(outer.findFieldByName(COLUMN), innerMsg).build();
+    Map<?, ?> result = (Map<?, ?>) extract(message);
+    assertEquals(result.get("a"), "hello");
+    assertEquals(result.get("b"), 42);
+  }
+
+  @Test
+  public void testUnsetNestedMessageReturnsNull() {
+    Descriptor outer = buildDescriptor(builder -> {
+      DescriptorProto inner = pairMessage("Inner", Type.TYPE_STRING, Type.TYPE_INT32);
+      builder.addNestedType(inner);
+      builder.addField(fieldProto(Type.TYPE_MESSAGE, Label.LABEL_OPTIONAL).setTypeName(inner.getName()));
+    });
+    assertNull(extract(DynamicMessage.newBuilder(outer).build()));
+  }
+
+  // === Map (proto `map<K, V>`) ===
+
+  @Test
+  public void testMapStringToInt() {
+    DescriptorProto entry = mapEntry(Type.TYPE_STRING, Type.TYPE_INT32);
+    Descriptor outer = buildDescriptor(builder -> {
+      builder.addNestedType(entry);
+      builder.addField(fieldProto(Type.TYPE_MESSAGE, Label.LABEL_REPEATED).setTypeName(entry.getName()));
+    });
+    Descriptor entryDesc = outer.findNestedTypeByName(entry.getName());
+    Message message = DynamicMessage.newBuilder(outer)
+        .addRepeatedField(outer.findFieldByName(COLUMN), buildMapEntry(entryDesc, "a", 1))
+        .addRepeatedField(outer.findFieldByName(COLUMN), buildMapEntry(entryDesc, "b", 2))
+        .build();
+    Map<?, ?> result = (Map<?, ?>) extract(message);
+    assertEquals(result.size(), 2);
+    assertEquals(result.get("a"), 1);
+    assertEquals(result.get("b"), 2);
+  }
+
+  // === Field-presence semantics (proto3 `optional` keyword) ===
+
+  @Test
+  public void testNonOptionalFieldUnsetSurfacesTypeDefault() {
+    // Non-optional int32 field unset returns the proto3 type default (0), not null.
+    Descriptor desc = buildDescriptor(builder -> builder.addField(fieldProto(Type.TYPE_INT32, Label.LABEL_OPTIONAL)));
+    assertEquals(extract(DynamicMessage.newBuilder(desc).build()), 0);
+  }
+
+  @Test
+  public void testOptionalFieldUnsetReturnsNull() {
+    // proto3 `optional` keyword (proto3_optional + synthetic oneof) tracks presence: unset → null.
+    Descriptor desc = buildDescriptor(builder -> builder
+        .addOneofDecl(com.google.protobuf.DescriptorProtos.OneofDescriptorProto.newBuilder().setName("_" + COLUMN))
+        .addField(fieldProto(Type.TYPE_INT32, Label.LABEL_OPTIONAL).setProto3Optional(true).setOneofIndex(0)));
+    assertNull(extract(DynamicMessage.newBuilder(desc).build()));
+  }
+
+  @Test
+  public void testOptionalFieldExplicitDefaultIsPreserved() {
+    // Setting an optional field to its type default (0) preserves it as 0, distinguishing from "unset".
+    Descriptor desc = buildDescriptor(builder -> builder
+        .addOneofDecl(com.google.protobuf.DescriptorProtos.OneofDescriptorProto.newBuilder().setName("_" + COLUMN))
+        .addField(fieldProto(Type.TYPE_INT32, Label.LABEL_OPTIONAL).setProto3Optional(true).setOneofIndex(0)));
+    Message message = DynamicMessage.newBuilder(desc).setField(desc.findFieldByName(COLUMN), 0).build();
+    assertEquals(extract(message), 0);
+  }
+
+  // === Helpers — runtime proto descriptor / DynamicMessage construction ===
+
+  private static Object extract(Message message) {
+    ProtoBufRecordExtractor extractor = new ProtoBufRecordExtractor();
+    extractor.init(null, new RecordExtractorConfig() {
+    });
+    GenericRow row = new GenericRow();
+    extractor.extract(message, row);
+    return row.getValue(COLUMN);
+  }
+
+  /// Build a single-field message of the given primitive type set to `value`.
+  private static Message singleField(Type type, Object value) {
+    Descriptor desc = buildDescriptor(builder -> builder.addField(fieldProto(type, Label.LABEL_OPTIONAL)));
+    return DynamicMessage.newBuilder(desc).setField(desc.findFieldByName(COLUMN), value).build();
+  }
+
+  /// Build a single-repeated-field message of the given element type with all entries set.
+  private static Message repeatedField(Type elementType, List<?> values) {
+    Descriptor desc = buildDescriptor(builder -> builder.addField(fieldProto(elementType, Label.LABEL_REPEATED)));
+    DynamicMessage.Builder messageBuilder = DynamicMessage.newBuilder(desc);
+    FieldDescriptor fd = desc.findFieldByName(COLUMN);
+    for (Object value : values) {
+      messageBuilder.addRepeatedField(fd, value);
     }
+    return messageBuilder.build();
   }
 
-  private ComplexTypes.TestMessage.NestedMessage createNestedMessage(Map<String, Object> nestedMessageFields) {
-    ComplexTypes.TestMessage.NestedMessage.Builder nestedMessage = ComplexTypes.TestMessage.NestedMessage.newBuilder();
-    return nestedMessage.setNestedIntField((Integer) nestedMessageFields.get(NESTED_INT_FIELD))
-        .setNestedStringField((String) nestedMessageFields.get(NESTED_STRING_FIELD)).build();
+  /// Build a nested message descriptor with two fields named `a` and `b` of the given types.
+  private static DescriptorProto pairMessage(String name, Type aType, Type bType) {
+    return DescriptorProto.newBuilder()
+        .setName(name)
+        .addField(named("a", 1, aType, Label.LABEL_OPTIONAL))
+        .addField(named("b", 2, bType, Label.LABEL_OPTIONAL))
+        .build();
   }
 
-  /**
-   * Test that verifies that optional fields with explicitly set default protobuf values
-   * are preserved/not treated as nulls.
-   */
-  private Map<String, Object> createExplicitOptionalDefaultRecord() {
-    Map<String, Object> record = new HashMap<>();
-    record.put(STRING_FIELD, "hello");
-    record.put(INT_FIELD, 10);
-    record.put(LONG_FIELD, 100L);
-    record.put(DOUBLE_FIELD, 1.1);
-    record.put(FLOAT_FIELD, 2.2f);
-    record.put(BOOL_FIELD, "true");
-    record.put(BYTES_FIELD, "hello world!".getBytes(UTF_8));
-    // These optional fields are explicitly set to proto defaults and expect
-    // to see these values preserved (not treated as null).
-    record.put(NULLABLE_STRING_FIELD, "");
-    record.put(NULLABLE_INT_FIELD, 0);
-    record.put(NULLABLE_LONG_FIELD, 0L);
-    record.put(NULLABLE_DOUBLE_FIELD, 0.0);
-    record.put(NULLABLE_FLOAT_FIELD, 0.0f);
-    record.put(NULLABLE_BOOL_FIELD, "false");
-    record.put(NULLABLE_BYTES_FIELD, "".getBytes(UTF_8));
-    record.put(REPEATED_STRINGS, Arrays.asList("aaa", "bbb", "ccc"));
-    record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 9));
-    record.put(REPEATED_NESTED_MESSAGES, Arrays
-        .asList(getNestedMap(NESTED_STRING_FIELD, "vanilla", NESTED_INT_FIELD, 3),
-            getNestedMap(NESTED_STRING_FIELD, "chocolate", NESTED_INT_FIELD, 5)));
-    record.put(COMPLEX_MAP,
-        getNestedMap("fruit1", getNestedMap(NESTED_STRING_FIELD, "apple", NESTED_INT_FIELD, 1), "fruit2",
-            getNestedMap(NESTED_STRING_FIELD, "orange", NESTED_INT_FIELD, 2)));
-    record.put(SIMPLE_MAP, getNestedMap("Tuesday", 3, "Wednesday", 4));
-    record.put(ENUM_FIELD, "GAMMA");
-    return record;
+  /// Build a `map<K, V>` entry descriptor (a synthetic message with `key` and `value` fields and the
+  /// `map_entry` option set, per the proto wire format for maps).
+  private static DescriptorProto mapEntry(Type keyType, Type valueType) {
+    return DescriptorProto.newBuilder()
+        .setName("Entry")
+        .setOptions(MessageOptions.newBuilder().setMapEntry(true))
+        .addField(named("key", 1, keyType, Label.LABEL_OPTIONAL))
+        .addField(named("value", 2, valueType, Label.LABEL_OPTIONAL))
+        .build();
   }
 
-  /**
-   * Test that verifies that optional fields not explicitly set are treated as nulls.
-   */
-  private Map<String, Object> createOptionalDefaultRecordWithNulls() {
-    Map<String, Object> record = new HashMap<>();
-    record.put(STRING_FIELD, "world");
-    record.put(INT_FIELD, 20);
-    record.put(LONG_FIELD, 200L);
-    record.put(DOUBLE_FIELD, 3.3);
-    record.put(FLOAT_FIELD, 4.4f);
-    record.put(BOOL_FIELD, "true");
-    record.put(BYTES_FIELD, "goodbye world!".getBytes(UTF_8));
-    record.put(NULLABLE_STRING_FIELD, null);
-    record.put(NULLABLE_INT_FIELD, null);
-    record.put(NULLABLE_LONG_FIELD, null);
-    record.put(NULLABLE_DOUBLE_FIELD, null);
-    record.put(NULLABLE_FLOAT_FIELD, null);
-    record.put(NULLABLE_BOOL_FIELD, null);
-    record.put(NULLABLE_BYTES_FIELD, null);
-    record.put(REPEATED_STRINGS, Arrays.asList("ddd", "eee", "fff"));
-    record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "Starbucks", NESTED_INT_FIELD, 100));
-    record.put(REPEATED_NESTED_MESSAGES, Arrays
-        .asList(getNestedMap(NESTED_STRING_FIELD, "coffee", NESTED_INT_FIELD, 10),
-            getNestedMap(NESTED_STRING_FIELD, "tea", NESTED_INT_FIELD, 20)));
-    record.put(COMPLEX_MAP,
-        getNestedMap("food3", getNestedMap(NESTED_STRING_FIELD, "pizza", NESTED_INT_FIELD, 1), "food4",
-            getNestedMap(NESTED_STRING_FIELD, "hamburger", NESTED_INT_FIELD, 2)));
-    record.put(SIMPLE_MAP, getNestedMap("Sunday", 1, "Monday", 2));
-    record.put(ENUM_FIELD, "BETA");
-    return record;
+  private static FieldDescriptorProto.Builder named(String name, int number, Type type, Label label) {
+    return FieldDescriptorProto.newBuilder().setName(name).setNumber(number).setType(type).setLabel(label);
   }
 
-  private Map<String, Object> getNestedMap(String key1, Object value1, String key2, Object value2) {
-    Map<String, Object> nestedMap = new HashMap<>(2);
-    nestedMap.put(key1, value1);
-    nestedMap.put(key2, value2);
-    return nestedMap;
+  private static DynamicMessage buildMapEntry(Descriptor entryDesc, Object key, Object value) {
+    return DynamicMessage.newBuilder(entryDesc)
+        .setField(entryDesc.findFieldByName("key"), key)
+        .setField(entryDesc.findFieldByName("value"), value)
+        .build();
   }
 
-  private ProtoBufRecordReaderConfig getProtoRecordReaderConfig()
-      throws IOException {
-    ProtoBufRecordReaderConfig config = new ProtoBufRecordReaderConfig();
-    URI descriptorFile;
+  /// Build the outer message [Descriptor] given a customizer for its [DescriptorProto.Builder]. The customizer
+  /// adds whatever fields / nested types the test needs.
+  private static Descriptor buildDescriptor(Consumer<DescriptorProto.Builder> customizer) {
+    DescriptorProto.Builder messageBuilder = DescriptorProto.newBuilder().setName("Test");
+    customizer.accept(messageBuilder);
+    FileDescriptorProto fileProto = FileDescriptorProto.newBuilder()
+        .setName("test.proto")
+        .setSyntax("proto3")
+        .addMessageType(messageBuilder.build())
+        .build();
     try {
-      descriptorFile = getClass().getClassLoader().getResource(DESCRIPTOR_FILE).toURI();
-    } catch (URISyntaxException e) {
-      throw new IOException("Could not load descriptor file: " + DESCRIPTOR_FILE, e.getCause());
+      FileDescriptor file = FileDescriptor.buildFrom(fileProto, new FileDescriptor[]{});
+      return file.findMessageTypeByName("Test");
+    } catch (DescriptorValidationException e) {
+      throw new RuntimeException(e);
     }
-    config.setDescriptorFile(descriptorFile);
-    return config;
+  }
+
+  /// Build a [FieldDescriptorProto.Builder] for the test's [#COLUMN] field with the given type / label.
+  private static FieldDescriptorProto.Builder fieldProto(Type type, Label label) {
+    return FieldDescriptorProto.newBuilder().setName(COLUMN).setNumber(1).setType(type).setLabel(label);
   }
 }

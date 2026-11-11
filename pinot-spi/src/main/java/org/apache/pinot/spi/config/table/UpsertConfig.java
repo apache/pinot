@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.utils.Enablement;
 
 
@@ -57,6 +58,13 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Partial update strategies.")
   @Nullable
   private Map<String, Strategy> _partialUpsertStrategies;
+
+  @JsonPropertyDescription("Transform configs evaluated after partial upsert merge to populate derived columns. Lives "
+      + "under UpsertConfig because these transforms are applied on the merged upsert view, not during ingestion. "
+      + "These transforms run during upsert merge (not query time) and derived columns must be part of the table "
+      + "schema to be queryable.")
+  @Nullable
+  private List<TransformConfig> _postPartialUpsertTransformConfigs;
 
   @JsonPropertyDescription("default upsert strategy for partial mode")
   private Strategy _defaultPartialUpsertStrategy = Strategy.OVERWRITE;
@@ -122,17 +130,17 @@ public class UpsertConfig extends BaseJsonConfig {
   @Nullable
   private Map<String, String> _metadataManagerConfigs;
 
-  /// @deprecated use {@link #_snapshot} instead. This is kept here for backward compatibility.
+  /// @deprecated use [#_snapshot] instead. This is kept here for backward compatibility.
   @Deprecated
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
 
-  /// @deprecated use {@link #_preload} instead. This is kept here for backward compatibility.
+  /// @deprecated use [#_preload] instead. This is kept here for backward compatibility.
   @Deprecated
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
 
-  /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+  /// @deprecated use [org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)] instead.
   @Deprecated
   @JsonPropertyDescription("Whether to pause partial upsert table's partition consumption during commit")
   private boolean _allowPartialUpsertConsumptionDuringCommit;
@@ -170,6 +178,20 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setPartialUpsertStrategies(@Nullable Map<String, Strategy> partialUpsertStrategies) {
     _partialUpsertStrategies = partialUpsertStrategies;
+  }
+
+  @Nullable
+  public List<TransformConfig> getPostPartialUpsertTransformConfigs() {
+    return _postPartialUpsertTransformConfigs;
+  }
+
+  public void setPostPartialUpsertTransformConfigs(
+      @Nullable List<TransformConfig> postPartialUpsertTransformConfigs) {
+    if (CollectionUtils.isNotEmpty(postPartialUpsertTransformConfigs)) {
+      _postPartialUpsertTransformConfigs = postPartialUpsertTransformConfigs;
+    } else {
+      _postPartialUpsertTransformConfigs = null;
+    }
   }
 
   public Strategy getDefaultPartialUpsertStrategy() {
@@ -330,7 +352,8 @@ public class UpsertConfig extends BaseJsonConfig {
     _metadataManagerConfigs = metadataManagerConfigs;
   }
 
-  @Deprecated
+  /// @deprecated Use `upsertConfig.snapshot` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isEnableSnapshot() {
     return _enableSnapshot;
   }
@@ -343,7 +366,8 @@ public class UpsertConfig extends BaseJsonConfig {
     }
   }
 
-  @Deprecated
+  /// @deprecated Use `upsertConfig.preload` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isEnablePreload() {
     return _enablePreload;
   }
@@ -356,7 +380,8 @@ public class UpsertConfig extends BaseJsonConfig {
     }
   }
 
-  @Deprecated
+  /// @deprecated Use `ingestionConfig.streamIngestionConfig.parallelSegmentConsumptionPolicy` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isAllowPartialUpsertConsumptionDuringCommit() {
     return _allowPartialUpsertConsumptionDuringCommit;
   }

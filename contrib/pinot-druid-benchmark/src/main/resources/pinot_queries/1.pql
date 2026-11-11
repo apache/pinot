@@ -1,1 +1,0 @@
-SELECT SUM(l_extendedprice) FROM tpch_lineitem WHERE l_returnflag = 'R'

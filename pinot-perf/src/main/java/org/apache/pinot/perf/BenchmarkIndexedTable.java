@@ -21,7 +21,6 @@ package org.apache.pinot.perf;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -29,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -58,8 +58,7 @@ import org.openjdk.jmh.runner.options.TimeValue;
 public class BenchmarkIndexedTable {
   private static final int TRIM_SIZE = 800;
   private static final int TRIM_THRESHOLD = TRIM_SIZE * 4;
-  private static final int NUM_RECORDS = 1000;
-  private static final Random RANDOM = new Random();
+  private static final int NUM_RECORDS = 100_000;
 
   private QueryContext _queryContext;
   private DataSchema _dataSchema;
@@ -75,7 +74,7 @@ public class BenchmarkIndexedTable {
     int cardinalityD1 = 100;
     Set<String> d1 = new HashSet<>(cardinalityD1);
     while (d1.size() < cardinalityD1) {
-      d1.add(RandomStringUtils.randomAlphabetic(3));
+      d1.add(RandomStringUtils.secure().nextAlphabetic(3));
     }
     _d1 = new ArrayList<>(cardinalityD1);
     _d1.addAll(d1);
@@ -102,9 +101,10 @@ public class BenchmarkIndexedTable {
   }
 
   private Record getNewRecord() {
+    ThreadLocalRandom random = ThreadLocalRandom.current();
     Object[] columns = new Object[]{
-        _d1.get(RANDOM.nextInt(_d1.size())), _d2.get(RANDOM.nextInt(_d2.size())), (double) RANDOM.nextInt(1000),
-        (double) RANDOM.nextInt(1000)
+        _d1.get(random.nextInt(_d1.size())), _d2.get(random.nextInt(_d2.size())), (double) random.nextInt(1000),
+        (double) random.nextInt(1000)
     };
     return new Record(columns);
   }

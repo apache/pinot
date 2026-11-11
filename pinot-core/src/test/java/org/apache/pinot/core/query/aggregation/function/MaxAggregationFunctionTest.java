@@ -18,189 +18,240 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class MaxAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
+  /// MAX only supports numeric columns (see https://github.com/apache/pinot/issues/19603); applying it to a
+  /// non-numeric (e.g. STRING) column must fail with a clear, actionable message instead of an opaque
+  /// `NumberFormatException`.
+  @Test
+  public void testNonNumericColumnExceptionInAggregateMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MaxAggregationFunction function = new MaxAggregationFunction(List.of(expression), false);
+
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(mockBlockValSet.isSingleValue()).thenReturn(true);
+    blockValSetMap.put(expression, mockBlockValSet);
+
+    try {
+      function.aggregate(10, resultHolder, blockValSetMap);
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("Cannot compute max for non-numeric type"));
+      assertTrue(e.getMessage().contains("MAXSTRING"));
+      assertTrue(e.getMessage().contains("autoRewriteAggregationType"));
+    }
+  }
+
+  @Test
+  public void testNonNumericColumnExceptionInAggregateGroupBySVMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MaxAggregationFunction function = new MaxAggregationFunction(List.of(expression), false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(mockBlockValSet.isSingleValue()).thenReturn(true);
+    when(mockBlockValSet.getDoubleValuesSV()).thenThrow(new NumberFormatException("For input string: \"abc\""));
+    blockValSetMap.put(expression, mockBlockValSet);
+
+    try {
+      function.aggregateGroupBySV(10, new int[10], groupByResultHolder, blockValSetMap);
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("Cannot compute max for non-numeric value"));
+      assertTrue(e.getMessage().contains("MAXSTRING"));
+      assertTrue(e.getMessage().contains("autoRewriteAggregationType"));
+    }
+  }
+
+  @Test
+  public void testNonNumericColumnExceptionInAggregateGroupByMVMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MaxAggregationFunction function = new MaxAggregationFunction(List.of(expression), false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(mockBlockValSet.isSingleValue()).thenReturn(true);
+    when(mockBlockValSet.getDoubleValuesSV()).thenThrow(new NumberFormatException("For input string: \"abc\""));
+    blockValSetMap.put(expression, mockBlockValSet);
+
+    try {
+      function.aggregateGroupByMV(10, new int[10][], groupByResultHolder, blockValSetMap);
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("Cannot compute max for non-numeric value"));
+      assertTrue(e.getMessage().contains("MAXSTRING"));
+      assertTrue(e.getMessage().contains("autoRewriteAggregationType"));
+    }
+  }
+
+  /// A STRING column holding numeric values keeps working on the group-by path, since `getDoubleValuesSV()` parses
+  /// them; only values that cannot be parsed are reported with the new message.
+  @Test
+  public void testNumericStringColumnStillAggregatesInGroupBy() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MaxAggregationFunction function = new MaxAggregationFunction(List.of(expression), false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.STRING);
+    when(mockBlockValSet.isSingleValue()).thenReturn(true);
+    when(mockBlockValSet.getDoubleValuesSV()).thenReturn(new double[]{2, 10});
+    blockValSetMap.put(expression, mockBlockValSet);
+
+    function.aggregateGroupBySV(2, new int[]{0, 0}, groupByResultHolder, blockValSetMap);
+    assertEquals(groupByResultHolder.getDoubleResult(0), 10.0);
+  }
+
   @DataProvider(name = "scenarios")
   Object[] scenarios() {
     return new Object[] {
-        new DataTypeScenario(FieldSpec.DataType.INT),
-        new DataTypeScenario(FieldSpec.DataType.LONG),
-        new DataTypeScenario(FieldSpec.DataType.FLOAT),
-        new DataTypeScenario(FieldSpec.DataType.DOUBLE),
-        new DataTypeScenario(FieldSpec.DataType.BIG_DECIMAL)
+        new DataTypeScenario(DataType.INT),
+        new DataTypeScenario(DataType.LONG),
+        new DataTypeScenario(DataType.FLOAT),
+        new DataTypeScenario(DataType.DOUBLE),
+        new DataTypeScenario(DataType.BIG_DECIMAL)
     };
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationAllNullsWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select max(myField) from testTable")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select max(myField) from testTable")
         .thenResultIs("DOUBLE",
-            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, scenario.getDataType(), null)));
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, scenario.getDataType(), null)));
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select max(myField) from testTable")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select max(myField) from testTable")
         .thenResultIs("DOUBLE", "null");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVAllNullsWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', max(myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | DOUBLE", "literal | "
-            + FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, scenario.getDataType(), null));
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', max(myField) from testTable group by 'literal'")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "literal | " + FieldSpec.getDefaultNullValue(FieldType.DIMENSION, scenario.getDataType(), null)
+        );
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', max(myField) from testTable group by 'literal'")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', max(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | null");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "2",
-            "null",
-            "3"
-        ).andOnSecondInstance("myField",
-            "null",
-            "5",
-            "null"
-        ).whenQuery("select max(myField) from testTable")
+        .onFirstInstance("myField", "2", "null", "3")
+        .andOnSecondInstance("myField", "null", "5", "null")
+        .whenQuery("select max(myField) from testTable")
         .thenResultIs("DOUBLE", "5");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationWithNullHandlingEnabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "2",
-            "null",
-            "3"
-        ).andOnSecondInstance("myField",
-            "null",
-            "5",
-            "null"
-        ).whenQuery("select max(myField) from testTable")
+        .onFirstInstance("myField", "2", "null", "3")
+        .andOnSecondInstance("myField", "null", "5", "null")
+        .whenQuery("select max(myField) from testTable")
         .thenResultIs("DOUBLE", "5");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "2",
-            "null",
-            "3"
-        ).andOnSecondInstance("myField",
-            "null",
-            "5",
-            "null"
-        ).whenQuery("select 'literal', max(myField) from testTable group by 'literal'")
+        .onFirstInstance("myField", "2", "null", "3")
+        .andOnSecondInstance("myField", "null", "5", "null")
+        .whenQuery("select 'literal', max(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | 5");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupBySVWithNullHandlingEnabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "3",
-            "null",
-            "5"
-        ).andOnSecondInstance("myField",
-            "null",
-            "null",
-            "null"
-        ).whenQuery("select 'literal', max(myField) from testTable group by 'literal'")
+        .onFirstInstance("myField", "3", "null", "5")
+        .andOnSecondInstance("myField", "null", "null", "null")
+        .whenQuery("select 'literal', max(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | 5");
   }
 
   @Test(dataProvider = "scenarios")
   void aggregationGroupByMV(DataTypeScenario scenario) {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("tags", DataType.STRING)
+        .addMetricField("value", scenario.getDataType())
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", scenario.getDataType())
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"tag1;tag2", -1},
-            new Object[]{"tag2;tag3", null}
-        )
-        .andOnSecondInstance(
-            new Object[]{"tag1;tag2", -2},
-            new Object[]{"tag2;tag3", null}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"tag1;tag2", -1}, new Object[]{"tag2;tag3", null})
+        .andOnSecondInstance(new Object[]{"tag1;tag2", -2}, new Object[]{"tag2;tag3", null})
         .whenQuery("select tags, MAX(value) from testTable group by tags order by tags")
-        .thenResultIs(
-            "STRING | DOUBLE",
-            "tag1    | -1.0",
-            "tag2    | 0.0",
-            "tag3    | 0.0"
-        )
+        .thenResultIs("STRING | DOUBLE", "tag1    | -1.0", "tag2    | 0.0", "tag3    | 0.0")
         .whenQueryWithNullHandlingEnabled("select tags, MAX(value) from testTable group by tags order by tags")
-        .thenResultIs(
-            "STRING | DOUBLE",
-            "tag1    | -1.0",
-            "tag2    | -1.0",
-            "tag3    | null"
-        );
+        .thenResultIs("STRING | DOUBLE", "tag1    | -1.0", "tag2    | -1.0", "tag3    | null");
   }
 
   @Test
   public void aggregationMVAllNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null"})
+        .andOnSecondInstance(new Object[]{"null"})
         .whenQuery("select max(mv) from testTable")
-        .thenResultIs("DOUBLE",
-            String.valueOf(
-                (int) FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null))
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf((int) FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
         )
         .whenQueryWithNullHandlingEnabled("select max(mv) from testTable")
         .thenResultIs("DOUBLE", "null");
@@ -208,19 +259,14 @@ public class MaxAggregationFunctionTest extends AbstractAggregationFunctionTest 
 
   @Test
   public void aggregationMVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1;2;3"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2;3"})
+        .andOnSecondInstance(new Object[]{"null"})
         .whenQuery("select max(mv) from testTable")
         .thenResultIs("DOUBLE", "3")
         .whenQueryWithNullHandlingEnabled("select max(mv) from testTable")
@@ -229,45 +275,32 @@ public class MaxAggregationFunctionTest extends AbstractAggregationFunctionTest 
 
   @Test
   public void aggregationMVGroupBySVAllNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1"})
+        .andOnSecondInstance(new Object[]{"null", "k1"})
         .whenQuery("select max(mv) from testTable group by sv")
-        .thenResultIs("DOUBLE",
-            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)))
+        .thenResultIs("DOUBLE", String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)))
         .whenQueryWithNullHandlingEnabled("select max(mv) from testTable group by sv")
         .thenResultIs("DOUBLE", "null");
   }
 
   @Test
   public void aggregationGroupBySVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1"},
-            new Object[]{"1;2;3", "k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k2"},
-            new Object[]{"1;2;3", "k1"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1"}, new Object[]{"1;2;3", "k2"})
+        .andOnSecondInstance(new Object[]{"null", "k2"}, new Object[]{"1;2;3", "k1"})
         .whenQuery("select max(mv) from testTable group by sv")
         .thenResultIs("DOUBLE", "3", "3")
         .whenQueryWithNullHandlingEnabled("select max(mv) from testTable group by sv")
@@ -276,44 +309,36 @@ public class MaxAggregationFunctionTest extends AbstractAggregationFunctionTest 
 
   @Test
   public void aggregationMVGroupByMVAllNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv1", DataType.INT)
+        .addMultiValueDimension("mv2", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv1", FieldSpec.DataType.INT)
-                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"null", "k1;k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1;k2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"null", "k1;k2"})
+        .andOnSecondInstance(new Object[]{"null", "k1;k2"})
         .whenQuery("select max(mv1) from testTable group by mv2")
-        .thenResultIs("DOUBLE",
-            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)),
-            String.valueOf(FieldSpec.getDefaultNullValue(FieldSpec.FieldType.DIMENSION, FieldSpec.DataType.INT, null)))
+        .thenResultIs(
+            "DOUBLE",
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null)),
+            String.valueOf(FieldSpec.getDefaultNullValue(FieldType.DIMENSION, DataType.INT, null))
+        )
         .whenQueryWithNullHandlingEnabled("select max(mv1) from testTable group by mv2")
         .thenResultIs("DOUBLE", "null", "null");
   }
 
   @Test
   public void aggregationMVGroupByMVWithNulls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv1", DataType.INT)
+        .addMultiValueDimension("mv2", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv1", FieldSpec.DataType.INT)
-                .addMultiValueDimension("mv2", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1;2", "k1;k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"null", "k1;k2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2", "k1;k2"})
+        .andOnSecondInstance(new Object[]{"null", "k1;k2"})
         .whenQuery("select max(mv1) from testTable group by mv2")
         .thenResultIs("DOUBLE", "2", "2")
         .whenQueryWithNullHandlingEnabled("select max(mv1) from testTable group by mv2")

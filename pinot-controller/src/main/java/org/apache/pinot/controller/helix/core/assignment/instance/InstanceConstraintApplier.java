@@ -23,15 +23,11 @@ import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
 
 
-/**
- * The instance constraint applier is responsible for filtering out unqualified instances and sorts instances for
- * picking priority.
- */
+/// The instance constraint applier is responsible for filtering out unqualified instances and sorts instances for
+/// picking priority.
 public interface InstanceConstraintApplier {
 
-  /**
-   * Applies the instance constraint to the given map from pool to instance configs to filter out unqualified instances
-   * and sort instances for picking priority.
-   */
+  /// Applies the instance constraint to the given map from pool to instance configs to filter out unqualified instances
+  /// and sort instances for picking priority.
   Map<Integer, List<InstanceConfig>> applyConstraint(Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap);
 }

@@ -35,7 +35,6 @@ import org.apache.avro.util.Utf8;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.Predicate;
 import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -70,9 +69,8 @@ public class SegmentTestUtils {
     return segmentGeneratorConfig;
   }
 
-  /**
-   * Returns an {@link IngestionConfig} to skip the time check in {@link SegmentColumnarIndexCreator}.
-   */
+  /// Returns an [IngestionConfig] to skip the time check in
+  /// [org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator].
   public static IngestionConfig getSkipTimeCheckIngestionConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setRowTimeValueCheck(false);
@@ -84,10 +82,8 @@ public class SegmentTestUtils {
       String timeColumn, TimeUnit timeUnit, String tableName)
       throws IOException {
     Schema schema = extractSchemaFromAvroWithoutTime(inputAvro);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(tableName)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
         .setInvertedIndexColumns(new ArrayList<>(schema.getColumnNames()))
-        .setCreateInvertedIndexDuringSegmentGeneration(true)
         .setIngestionConfig(getSkipTimeCheckIngestionConfig())
         .build();
 

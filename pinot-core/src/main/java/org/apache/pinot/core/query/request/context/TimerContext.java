@@ -66,27 +66,25 @@ public class TimerContext {
     return _queryArrivalTimeMs;
   }
 
-  /**
-   * Creates a new timer for query phase with the given start time in millis.
-   * <p>Calling this again for same phase will overwrite existing timing information.
-   *
-   * @param queryPhase Query phase to be timed
-   * @param startTimeMs Timer start time in millis
-   * @return Timer for the query phase
-   */
+  /// Creates a new timer for query phase with the given start time in millis.
+  ///
+  /// Calling this again for same phase will overwrite existing timing information.
+  ///
+  /// @param queryPhase Query phase to be timed
+  /// @param startTimeMs Timer start time in millis
+  /// @return Timer for the query phase
   public Timer startNewPhaseTimer(ServerQueryPhase queryPhase, long startTimeMs) {
     Timer phaseTimer = new Timer(queryPhase, startTimeMs);
     _phaseTimers[queryPhase.ordinal()] = phaseTimer;
     return phaseTimer;
   }
 
-  /**
-   * Creates a new timer for query phase with {@link System#currentTimeMillis()} as the start time.
-   * <p>Calling this again for same phase will overwrite existing timing information.
-   *
-   * @param queryPhase Query phase to be timed
-   * @return Timer for the query phase
-   */
+  /// Creates a new timer for query phase with [System#currentTimeMillis()] as the start time.
+  ///
+  /// Calling this again for same phase will overwrite existing timing information.
+  ///
+  /// @param queryPhase Query phase to be timed
+  /// @return Timer for the query phase
   public Timer startNewPhaseTimer(ServerQueryPhase queryPhase) {
     return startNewPhaseTimer(queryPhase, System.currentTimeMillis());
   }

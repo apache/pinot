@@ -76,9 +76,9 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 import org.testng.SkipException;
@@ -92,9 +92,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Base class for integration tests that involve a complete Pinot cluster.
- */
+/// Base class for integration tests that involve a complete Pinot cluster.
 @Listeners(NettyTestNGListener.class)
 public abstract class ClusterTest extends ControllerTest {
   protected static final String TEMP_DIR =
@@ -117,6 +115,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected String _minionBaseApiUrl;
 
   protected boolean _useMultiStageQueryEngine = false;
+  protected boolean _usePhysicalOptimizer = false;
 
   protected int getServerGrpcPort() {
     return _serverGrpcPort;
@@ -146,8 +145,16 @@ public abstract class ClusterTest extends ControllerTest {
     return _useMultiStageQueryEngine;
   }
 
+  protected boolean usePhysicalOptimizer() {
+    return _usePhysicalOptimizer;
+  }
+
   protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
     _useMultiStageQueryEngine = useMultiStageQueryEngine;
+  }
+
+  protected void setUsePhysicalOptimizer(boolean usePhysicalOptimizer) {
+    _usePhysicalOptimizer = usePhysicalOptimizer;
   }
 
   protected void disableMultiStageQueryEngine() {
@@ -158,15 +165,11 @@ public abstract class ClusterTest extends ControllerTest {
     setUseMultiStageQueryEngine(true);
   }
 
-  /**
-   * Can be overridden to add more properties.
-   */
+  /// Can be overridden to add more properties.
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
   }
 
-  /**
-   * Can be overridden to use a different implementation.
-   */
+  /// Can be overridden to use a different implementation.
   protected BaseBrokerStarter createBrokerStarter() {
     return new HelixBrokerStarter();
   }
@@ -176,7 +179,7 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     brokerConf.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, LOCAL_HOST);
-    int brokerPort = NetUtils.findOpenPort(_nextBrokerPort);
+    int brokerPort = _brokerPortRange.findOpenPort(_nextBrokerPort);
     brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort);
     _brokerPorts.add(brokerPort);
     if (_brokerBaseApiUrl == null) {
@@ -187,12 +190,15 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     brokerConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
 
-    int brokerGrpcPort = NetUtils.findOpenPort(_nextBrokerGrpcPort);
+    int brokerGrpcPort = _brokerGrpcPortRange.findOpenPort(_nextBrokerGrpcPort);
     brokerConf.setProperty(Broker.Grpc.KEY_OF_GRPC_PORT, brokerGrpcPort);
     if (_brokerGrpcEndpoint == null) {
       _brokerGrpcEndpoint = "localhost:" + brokerGrpcPort;
     }
     _nextBrokerGrpcPort = brokerGrpcPort + 1;
+    int brokerQueryRunnerPort = _brokerQueryRunnerPortRange.findOpenPort(_nextBrokerQueryRunnerPort);
+    brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, brokerQueryRunnerPort);
+    _nextBrokerQueryRunnerPort = brokerQueryRunnerPort + 1;
     overrideBrokerConf(brokerConf);
     return brokerConf;
   }
@@ -225,15 +231,11 @@ public abstract class ClusterTest extends ControllerTest {
     return _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
   }
 
-  /**
-   * Can be overridden to add more properties.
-   */
+  /// Can be overridden to add more properties.
   protected void overrideServerConf(PinotConfiguration serverConf) {
   }
 
-  /**
-   * Can be overridden to use a different implementation.
-   */
+  /// Can be overridden to use a different implementation.
   protected BaseServerStarter createServerStarter() {
     return new HelixServerStarter();
   }
@@ -250,18 +252,26 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
     serverConf.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
 
-    int serverAdminApiPort = NetUtils.findOpenPort(_nextServerPort);
+    int serverAdminApiPort = _serverPortRange.findOpenPort(_nextServerPort);
     serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, serverAdminApiPort);
-    int serverNettyPort = NetUtils.findOpenPort(serverAdminApiPort + 1);
+    int serverNettyPort = _serverPortRange.findOpenPort(serverAdminApiPort + 1);
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, serverNettyPort);
-    int serverGrpcPort = NetUtils.findOpenPort(serverNettyPort + 1);
+    int serverGrpcPort = _serverPortRange.findOpenPort(serverNettyPort + 1);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, serverGrpcPort);
+    // Assign the multi-stage query engine ports explicitly using the incremental findOpenPort pattern so that
+    // rapid back-to-back server starts in the same JVM don't collide on OS-ephemeral ports. Otherwise
+    // BaseServerStarter.init() falls back to NetUtils.findOpenPort() which probes and releases a ServerSocket(0)
+    // before the gRPC server binds, opening a window where the same port can be handed to a later caller.
+    int queryServerPort = _serverPortRange.findOpenPort(serverGrpcPort + 1);
+    serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, queryServerPort);
+    int queryRunnerPort = _serverPortRange.findOpenPort(queryServerPort + 1);
+    serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, queryRunnerPort);
     if (_serverAdminApiPort == 0) {
       _serverAdminApiPort = serverAdminApiPort;
       _serverNettyPort = serverNettyPort;
       _serverGrpcPort = serverGrpcPort;
     }
-    _nextServerPort = serverGrpcPort + 1;
+    _nextServerPort = queryRunnerPort + 1;
 
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
@@ -300,15 +310,19 @@ public abstract class ClusterTest extends ControllerTest {
     return serverStarter;
   }
 
-  /**
-   * Can be overridden to add more properties.
-   */
+  protected BaseBrokerStarter startOneBroker(PinotConfiguration brokerConfig)
+      throws Exception {
+    BaseBrokerStarter brokerStarter = createBrokerStarter();
+    brokerStarter.init(brokerConfig);
+    brokerStarter.start();
+    return brokerStarter;
+  }
+
+  /// Can be overridden to add more properties.
   protected void overrideMinionConf(PinotConfiguration minionConf) {
   }
 
-  /**
-   * Can be overridden to use a different implementation.
-   */
+  /// Can be overridden to use a different implementation.
   protected BaseMinionStarter createMinionStarter() {
     return new MinionStarter();
   }
@@ -318,7 +332,7 @@ public abstract class ClusterTest extends ControllerTest {
     minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     minionConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     minionConf.setProperty(Helix.KEY_OF_MINION_HOST, LOCAL_HOST);
-    int minionPort = NetUtils.findOpenPort(_nextMinionPort);
+    int minionPort = _minionPortRange.findOpenPort(_nextMinionPort);
     minionConf.setProperty(Helix.KEY_OF_MINION_PORT, minionPort);
     if (_minionBaseApiUrl == null) {
       _minionBaseApiUrl = "http://localhost:" + minionPort;
@@ -390,42 +404,50 @@ public abstract class ClusterTest extends ControllerTest {
     return startOneServer(serverConfig);
   }
 
-  /**
-   * Upload all segments inside the given directory to the cluster.
-   */
+  protected void restartBrokers()
+      throws Exception {
+    assertNotNull(_brokerStarters, "Brokers are not started");
+    List<BaseBrokerStarter> oldBrokers = new ArrayList<>(_brokerStarters);
+    int numBrokers = _brokerStarters.size();
+    _brokerStarters.clear();
+    for (int i = 0; i < numBrokers; i++) {
+      _brokerStarters.add(restartBroker(oldBrokers.get(i)));
+    }
+  }
+
+  protected BaseBrokerStarter restartBroker(BaseBrokerStarter brokerStarter)
+      throws Exception {
+    PinotConfiguration brokerConfig = brokerStarter.getConfig();
+    brokerStarter.stop();
+    return startOneBroker(brokerConfig);
+  }
+
+  /// Upload all segments inside the given directory to the cluster.
   protected void uploadSegments(String tableName, File tarDir)
       throws Exception {
     uploadSegments(tableName, TableType.OFFLINE, tarDir);
   }
 
-  /**
-   * Upload all segments inside the given directory to the cluster.
-   */
+  /// Upload all segments inside the given directory to the cluster.
   protected void uploadSegments(String tableName, List<File> tarDirs)
       throws Exception {
     uploadSegments(tableName, TableType.OFFLINE, tarDirs);
   }
 
-  /**
-   * Upload all segments inside the given directory to the cluster.
-   */
+  /// Upload all segments inside the given directory to the cluster.
   protected void uploadSegments(String tableName, TableType tableType, File tarDir)
       throws Exception {
     uploadSegments(tableName, tableType, List.of(tarDir));
   }
 
-  /**
-   * Returns the headers to be sent to the controller for segment upload flow.
-   * Can be overridden to add custom headers, e.g., for authentication.
-   * By default, returns an empty list.
-   */
+  /// Returns the headers to be sent to the controller for segment upload flow.
+  /// Can be overridden to add custom headers, e.g., for authentication.
+  /// By default, returns an empty list.
   protected List<Header> getSegmentUploadAuthHeaders() {
     return List.of();
   }
 
-  /**
-   * Upload all segments inside the given directories to the cluster.
-   */
+  /// Upload all segments inside the given directories to the cluster.
   protected void uploadSegments(String tableName, TableType tableType, List<File> tarDirs)
       throws Exception {
     List<File> segmentTarFiles = new ArrayList<>();
@@ -437,7 +459,7 @@ public abstract class ClusterTest extends ControllerTest {
     int numSegments = segmentTarFiles.size();
     assertTrue(numSegments > 0);
 
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getOrCreateAdminClient().getSegmentUploadUrl());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles.get(0);
@@ -544,9 +566,7 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  /**
-   * Queries the broker's query endpoint (/query/sql), picking http or grpc randomly.
-   */
+  /// Queries the broker's query endpoint (/query/sql), picking http or grpc randomly.
   public JsonNode postQuery(@Language("sql") String query)
       throws Exception {
     if (useGrpcEndpoint()) {
@@ -555,23 +575,19 @@ public abstract class ClusterTest extends ControllerTest {
     return queryBrokerHttpEndpoint(query);
   }
 
-  /**
-   * Queries the broker's timeseries query endpoint (/timeseries/api/v1/query_range).
-   * This is used for testing timeseries queries.
-   */
+  /// Queries the broker's timeseries query endpoint (/timeseries/api/v1/query_range).
+  /// This is used for testing timeseries queries.
   public JsonNode getTimeseriesQuery(String query, long startTime, long endTime, Map<String, String> headers) {
     return getTimeseriesQuery(getBrokerBaseApiUrl(), query, startTime, endTime, headers);
   }
 
-  /**
-   * Queries the timeseries query endpoint (/timeseries/api/v1/query_range) of the given base URL.
-   * This is used for testing timeseries queries.
-   */
+  /// Queries the timeseries query endpoint (/timeseries/api/v1/query_range) of the given base URL.
+  /// This is used for testing timeseries queries.
   public JsonNode getTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
       Map<String, String> headers) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
-        String.valueOf(startTime), "end", String.valueOf(endTime));
+          String.valueOf(startTime), "end", String.valueOf(endTime));
       String url = buildQueryUrl(getTimeSeriesQueryApiUrl(baseUrl), queryParams);
       JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
       return sanitizeResponse(responseJsonNode);
@@ -582,9 +598,25 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
       Map<String, String> headers) {
+    return postTimeseriesQuery(baseUrl, query, startTime, endTime, null, headers, null);
+  }
+
+  public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime, String mode,
+      Map<String, String> headers, Map<String, Object> queryOptions) {
     try {
-      Map<String, String> payload = Map.of("language", "m3ql", "query", query, "start",
-          String.valueOf(startTime), "end", String.valueOf(endTime));
+      ObjectNode payload = JsonUtils.newObjectNode();
+      payload.put("language", "m3ql");
+      payload.put("query", query);
+      payload.put("start", String.valueOf(startTime));
+      payload.put("end", String.valueOf(endTime));
+      if (mode != null) {
+        payload.put("mode", mode);
+      }
+      if (queryOptions != null && !queryOptions.isEmpty()) {
+        ObjectNode queryOptionsNode = JsonUtils.newObjectNode();
+        queryOptions.forEach(queryOptionsNode::putPOJO);
+        payload.set("queryOptions", queryOptionsNode);
+      }
       return JsonUtils.stringToJsonNode(
           sendPostRequest(baseUrl + "/query/timeseries", JsonUtils.objectToString(payload), headers));
     } catch (Exception e) {
@@ -592,18 +624,14 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  /**
-   * Queries the broker's query endpoint (/query/sql)
-   */
+  /// Queries the broker's query endpoint (/query/sql)
   public JsonNode queryBrokerHttpEndpoint(@Language("sql") String query)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
   }
 
-  /**
-   * Queries the broker's grpc query endpoint (/query/sql).
-   */
+  /// Queries the broker's grpc query endpoint (/query/sql).
   public JsonNode queryBrokerGrpcEndpoint(@Language("sql") String query)
       throws Exception {
     return queryGrpcEndpoint(query,
@@ -629,9 +657,7 @@ public abstract class ClusterTest extends ControllerTest {
     return System.currentTimeMillis() % 2 == 0;
   }
 
-  /**
-   * Queries the broker's sql query endpoint (/query/sql)
-   */
+  /// Queries the broker's sql query endpoint (/query/sql)
   protected JsonNode postQuery(@Language("sql") String query, Map<String, String> headers)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), headers,
@@ -652,9 +678,7 @@ public abstract class ClusterTest extends ControllerTest {
     return Map.of();
   }
 
-  /**
-   * Queries the broker's sql query endpoint (/query or /query/sql)
-   */
+  /// Queries the broker's sql query endpoint (/query or /query/sql)
   public static JsonNode postQuery(@Language("sql") String query, String brokerQueryApiUrl, Map<String, String> headers,
       Map<String, String> extraJsonProperties)
       throws Exception {
@@ -724,8 +748,9 @@ public abstract class ClusterTest extends ControllerTest {
         case DOUBLE_ARRAY:
           array[k] = jsonValue.get(k).asDouble();
           break;
-        case STRING_ARRAY:
+        case BIG_DECIMAL_ARRAY:
         case TIMESTAMP_ARRAY:
+        case STRING_ARRAY:
         case BYTES_ARRAY:
           array[k] = jsonValue.get(k).textValue();
           break;
@@ -757,11 +782,11 @@ public abstract class ClusterTest extends ControllerTest {
       case DOUBLE:
         object = jsonValue.asDouble();
         break;
+      case BIG_DECIMAL:
+      case TIMESTAMP:
       case STRING:
       case BYTES:
-      case TIMESTAMP:
       case JSON:
-      case BIG_DECIMAL:
         object = jsonValue.textValue();
         break;
       case UNKNOWN:
@@ -776,18 +801,14 @@ public abstract class ClusterTest extends ControllerTest {
     return JsonUtils.objectToJsonNode(object);
   }
 
-  /**
-   * Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
-   */
+  /// Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
   protected JsonNode postQueryWithOptions(@Language("sql") String query, String queryOptions)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         Map.of("queryOptions", queryOptions));
   }
 
-  /**
-   * Queries the controller's sql query endpoint (/sql)
-   */
+  /// Queries the controller's sql query endpoint (/sql)
   public JsonNode postQueryToController(@Language("sql") String query)
       throws Exception {
     return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryPropertiesForController());
@@ -795,14 +816,11 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode cancelQuery(String clientQueryId)
       throws Exception {
-    URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
-    Object o = _httpClient.sendDeleteRequest(cancelURI);
-    return null; // TODO
+    String response = getOrCreateAdminClient().getQueryClient().cancelQueryByClientId(clientQueryId);
+    return JsonUtils.stringToJsonNode(response);
   }
 
-  /**
-   * Execute a query and extract the count result
-   */
+  /// Execute a query and extract the count result
   protected int getQueryNumResultRows(String query) throws Exception {
     JsonNode response = postQuery(query);
     JsonNode resTbl = response.get("resultTable");
@@ -813,12 +831,14 @@ public abstract class ClusterTest extends ControllerTest {
     if (!useMultiStageQueryEngine()) {
       return Map.of();
     }
-    return Map.of("queryOptions", "useMultistageEngine=true");
+    StringBuilder queryOptions = new StringBuilder("useMultistageEngine=true");
+    if (usePhysicalOptimizer()) {
+      queryOptions.append("; usePhysicalOptimizer=true");
+    }
+    return Map.of("queryOptions", queryOptions.toString());
   }
 
-  /**
-   * Queries the controller's sql query endpoint (/sql)
-   */
+  /// Queries the controller's sql query endpoint (/sql)
   public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers,
       Map<String, String> extraJsonProperties)
       throws Exception {

@@ -23,8 +23,6 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 
 public interface InvertedIndexReader<T> extends IndexReader {
 
-  /**
-   * Returns the document ids for the given dictionary id.
-   */
+  /// Returns the document ids for the given dictionary id.
   T getDocIds(int dictId);
 }

@@ -1,0 +1,574 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.segment.index.readers.vector;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
+import org.apache.pinot.segment.local.segment.index.vector.IvfCombinedBuffers;
+import org.apache.pinot.segment.local.segment.index.vector.IvfFlatVectorIndexCreator;
+import org.apache.pinot.segment.local.segment.index.vector.VectorQuantizationUtils;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.VectorQuantizerType;
+import org.apache.pinot.segment.spi.index.reader.ApproximateRadiusVectorIndexReader;
+import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
+import org.apache.pinot.segment.spi.index.reader.NprobeAware;
+import org.apache.pinot.segment.spi.index.reader.VectorQuantizer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+/// Disk-backed reader for IVF_FLAT index files using positional buffer reads.
+///
+/// Unlike [IvfFlatVectorIndexReader] which loads all data into heap, this reader
+/// keeps the backing [PinotDataBuffer] open and performs positional reads on demand.
+/// Centroids are always loaded into heap for fast probe selection; inverted list data
+/// (doc IDs and vectors) is read on demand from the buffer.
+///
+/// This reader can read standard IVF_FLAT index files (magic 0x49564646). The on-disk
+/// format is identical — only the runtime access pattern differs.
+///
+/// ## Thread safety
+///
+/// Thread-safe for concurrent reads. Query-scoped nprobe overrides use ThreadLocal.
+/// Positional buffer reads are thread-safe; each read specifies an absolute offset.
+public class IvfOnDiskVectorIndexReader
+    implements FilterAwareVectorIndexReader, ApproximateRadiusVectorIndexReader, NprobeAware {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IvfOnDiskVectorIndexReader.class);
+
+  static final int DEFAULT_NPROBE = 4;
+
+  // Header fields (loaded into heap)
+  private final int _dimension;
+  private final int _numVectors;
+  private final int _nlist;
+  private final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
+  private final int _indexFormatVersion;
+  private final VectorQuantizerType _quantizerType;
+  private final VectorQuantizer _quantizer;
+  private final int _encodedBytesPerVector;
+  private final String _column;
+  private final int _defaultNprobe;
+
+  // Centroids in heap for fast probe selection
+  private final float[][] _centroids;
+
+  // Backing buffer for random-access reads of inverted list data. Closed by this reader only
+  // when {@code _ownsBuffer} is true (combined mmap); borrowed buffers (segment-directory owned)
+  // outlive the reader. The buffer is mapped BIG_ENDIAN to match the IVF_FLAT on-disk format.
+  private final PinotDataBuffer _buffer;
+  private final boolean _ownsBuffer;
+
+  // Offsets to each inverted list in the file
+  private final long[] _listOffsets;
+  // Cached list sizes (loaded at init to avoid repeated buffer reads for sizes)
+  private final int[] _listSizes;
+
+  // Observability: per-centroid access count
+  private final AtomicLong[] _centroidAccessCounts;
+  private final AtomicLong _totalSearches = new AtomicLong(0);
+  private final AtomicLong _filteredSearches = new AtomicLong(0);
+  private final AtomicLong _unfilteredSearches = new AtomicLong(0);
+
+  private final ThreadLocal<Integer> _nprobeOverride = new ThreadLocal<>();
+
+  /// Opens an IVF_FLAT index from the given buffer for on-demand positional reads. The reader
+  /// takes ownership of the buffer and closes it in [#close()]; use the four-arg overload
+  /// to pass a borrowed buffer (e.g. one owned by the segment directory).
+  public IvfOnDiskVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config) {
+    this(column, buffer, config, /* ownsBuffer */ true);
+  }
+
+  /// Opens an IVF_FLAT index from the given buffer for on-demand positional reads.
+  ///
+  /// The buffer must be mapped [java.nio.ByteOrder#BIG_ENDIAN] (the IVF_FLAT on-disk byte order)
+  /// and must remain valid for the lifetime of the reader (positional reads at query time).
+  ///
+  /// @param column      the column name
+  /// @param buffer      the IVF_FLAT index buffer (BIG_ENDIAN)
+  /// @param config      the vector index configuration
+  /// @param ownsBuffer  when `true`, the reader closes the buffer in [#close()] (or
+  ///                    on constructor failure). Pass `false` when the buffer is owned by
+  ///                    the segment directory.
+  public IvfOnDiskVectorIndexReader(String column, PinotDataBuffer buffer, VectorIndexConfig config,
+      boolean ownsBuffer) {
+    _column = column;
+    _buffer = buffer;
+    _ownsBuffer = ownsBuffer;
+
+    try {
+      // --- Read Header (6 ints = 24 bytes) ---
+      int magic = _buffer.getInt(0);
+      Preconditions.checkState(magic == IvfFlatVectorIndexCreator.MAGIC,
+          "Invalid IVF magic: 0x%s, expected 0x%s",
+          Integer.toHexString(magic), Integer.toHexString(IvfFlatVectorIndexCreator.MAGIC));
+
+      int version = _buffer.getInt(4);
+      Preconditions.checkState(version == IvfFlatVectorIndexCreator.FORMAT_VERSION,
+          "Unsupported IVF format version: %s, expected: %s",
+          version, IvfFlatVectorIndexCreator.FORMAT_VERSION);
+      _indexFormatVersion = version;
+
+      _dimension = _buffer.getInt(8);
+      _numVectors = _buffer.getInt(12);
+      _nlist = _buffer.getInt(16);
+      int distanceFunctionOrdinal = _buffer.getInt(20);
+      VectorIndexConfig.VectorDistanceFunction[] allFunctions = VectorIndexConfig.VectorDistanceFunction.values();
+      Preconditions.checkState(distanceFunctionOrdinal >= 0 && distanceFunctionOrdinal < allFunctions.length,
+          "Invalid distance function ordinal: %s", distanceFunctionOrdinal);
+      _distanceFunction = allFunctions[distanceFunctionOrdinal];
+
+      int quantizerTypeOrdinal = _buffer.getInt(24);
+      VectorQuantizerType[] allQuantizerTypes = VectorQuantizerType.values();
+      Preconditions.checkState(quantizerTypeOrdinal >= 0 && quantizerTypeOrdinal < allQuantizerTypes.length,
+          "Invalid quantizer type ordinal: %s", quantizerTypeOrdinal);
+      _quantizerType = allQuantizerTypes[quantizerTypeOrdinal];
+
+      int quantizerParamsLength = _buffer.getInt(28);
+      Preconditions.checkState(quantizerParamsLength >= 0,
+          "Invalid quantizer params length: %s", quantizerParamsLength);
+      byte[] quantizerParams = new byte[quantizerParamsLength];
+      if (quantizerParamsLength > 0) {
+        _buffer.copyTo(32L, quantizerParams, 0, quantizerParamsLength);
+      }
+      _quantizer = VectorQuantizationUtils.createReadQuantizer(_quantizerType, _dimension, quantizerParams);
+      _encodedBytesPerVector = _quantizer.getEncodedBytesPerVector();
+      long centroidsOffset = 32L + quantizerParamsLength;
+
+      _defaultNprobe = Math.min(DEFAULT_NPROBE, _nlist);
+
+      // --- Read Centroids into heap ---
+      _centroids = new float[_nlist][_dimension];
+      long centroidPos = centroidsOffset;
+      for (int c = 0; c < _nlist; c++) {
+        for (int d = 0; d < _dimension; d++) {
+          _centroids[c][d] = _buffer.getFloat(centroidPos);
+          centroidPos += Float.BYTES;
+        }
+      }
+
+      // --- Read inverted list offsets from footer ---
+      // Footer: last 8 bytes = offsetToOffsets
+      long fileSize = _buffer.size();
+      long offsetToOffsets = _buffer.getLong(fileSize - 8);
+
+      _listOffsets = new long[_nlist];
+      long offsetsCursor = offsetToOffsets;
+      for (int c = 0; c < _nlist; c++) {
+        _listOffsets[c] = _buffer.getLong(offsetsCursor);
+        offsetsCursor += Long.BYTES;
+      }
+
+      // --- Pre-read list sizes ---
+      _listSizes = new int[_nlist];
+      for (int c = 0; c < _nlist; c++) {
+        _listSizes[c] = _buffer.getInt(_listOffsets[c]);
+      }
+
+      // --- Init observability ---
+      _centroidAccessCounts = new AtomicLong[_nlist];
+      for (int c = 0; c < _nlist; c++) {
+        _centroidAccessCounts[c] = new AtomicLong(0);
+      }
+
+      LOGGER.info("Opened IVF_ON_DISK index for column: {}: {} vectors, {} centroids, dim={}, "
+              + "formatVersion={}, quantizer={}",
+          column, _numVectors, _nlist, _dimension, _indexFormatVersion, _quantizerType);
+    } catch (Exception e) {
+      // Close the buffer to avoid leaking the mmap when the caller never receives a reader to
+      // close — but only if we own it. Borrowed buffers (segment-directory owned) are released
+      // by their owner.
+      if (_ownsBuffer) {
+        IvfCombinedBuffers.closeQuietly(_buffer);
+      }
+      throw e instanceof RuntimeException ? (RuntimeException) e
+          : new RuntimeException("Failed to open IVF index for column: " + column, e);
+    }
+  }
+
+  @Override
+  public MutableRoaringBitmap getDocIds(float[] searchQuery, int topK) {
+    _unfilteredSearches.incrementAndGet();
+    return searchInternal(searchQuery, topK, null);
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDocIds(float[] searchQuery, int topK, ImmutableRoaringBitmap preFilterBitmap) {
+    Preconditions.checkNotNull(preFilterBitmap, "Pre-filter bitmap must not be null for filtered vector search");
+    if (preFilterBitmap.isEmpty()) {
+      return new MutableRoaringBitmap();
+    }
+    _filteredSearches.incrementAndGet();
+    return searchInternal(searchQuery, topK, preFilterBitmap);
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDocIdsWithinApproximateRadius(float[] searchQuery, float threshold,
+      int maxCandidates) {
+    Preconditions.checkArgument(searchQuery.length == _dimension,
+        "Query dimension mismatch: expected %s, got %s", _dimension, searchQuery.length);
+    Preconditions.checkArgument(maxCandidates > 0, "maxCandidates must be positive, got: %s", maxCandidates);
+
+    if (_numVectors == 0 || _nlist == 0) {
+      return new MutableRoaringBitmap();
+    }
+
+    _unfilteredSearches.incrementAndGet();
+    _totalSearches.incrementAndGet();
+    int effectiveNprobe = Math.min(getNprobe(), _nlist);
+    int[] probeCentroids = findClosestCentroids(searchQuery, effectiveNprobe);
+    int effectiveMaxCandidates = Math.min(maxCandidates, _numVectors);
+    PriorityQueue<ScoredDoc> maxHeap = new PriorityQueue<>(effectiveMaxCandidates,
+        (a, b) -> Float.compare(b._distance, a._distance));
+
+    for (int probeIdx : probeCentroids) {
+      _centroidAccessCounts[probeIdx].incrementAndGet();
+      scanInvertedListWithinApproximateRadius(
+          probeIdx, searchQuery, threshold, effectiveMaxCandidates, maxHeap);
+    }
+
+    MutableRoaringBitmap result = new MutableRoaringBitmap();
+    for (ScoredDoc doc : maxHeap) {
+      result.add(doc._docId);
+    }
+    return result;
+  }
+
+  private MutableRoaringBitmap searchInternal(float[] searchQuery, int topK,
+      ImmutableRoaringBitmap preFilterBitmap) {
+    Preconditions.checkArgument(searchQuery.length == _dimension,
+        "Query dimension mismatch: expected %s, got %s", _dimension, searchQuery.length);
+    Preconditions.checkArgument(topK > 0, "topK must be positive, got: %s", topK);
+
+    if (_numVectors == 0 || _nlist == 0) {
+      return new MutableRoaringBitmap();
+    }
+
+    _totalSearches.incrementAndGet();
+    int effectiveNprobe = Math.min(getNprobe(), _nlist);
+    int[] probeCentroids = findClosestCentroids(searchQuery, effectiveNprobe);
+
+    int effectiveTopK = Math.min(topK, _numVectors);
+    PriorityQueue<ScoredDoc> maxHeap = new PriorityQueue<>(effectiveTopK,
+        (a, b) -> Float.compare(b._distance, a._distance));
+
+    for (int probeIdx : probeCentroids) {
+      _centroidAccessCounts[probeIdx].incrementAndGet();
+      scanInvertedList(probeIdx, searchQuery, effectiveTopK, maxHeap, preFilterBitmap);
+    }
+
+    MutableRoaringBitmap result = new MutableRoaringBitmap();
+    for (ScoredDoc doc : maxHeap) {
+      result.add(doc._docId);
+    }
+    return result;
+  }
+
+  /// Reads and scans an inverted list from the backing buffer.
+  ///
+  /// Uses a ThreadLocal ByteBuffer to avoid per-call heap allocation for the list data,
+  /// and reuses a single float\[\] for reading each document vector.
+  ///
+  /// @param centroidIdx index of the centroid
+  /// @param query query vector
+  /// @param topK max results to keep
+  /// @param maxHeap priority queue for top-K tracking
+  /// @param preFilterBitmap optional filter bitmap; if non-null, only matching docs are scored
+  private void scanInvertedList(int centroidIdx, float[] query, int topK,
+      PriorityQueue<ScoredDoc> maxHeap, ImmutableRoaringBitmap preFilterBitmap) {
+    int listSize = _listSizes[centroidIdx];
+    if (listSize == 0) {
+      return;
+    }
+
+    // Position after the listSize int
+    long dataOffset = _listOffsets[centroidIdx] + 4;
+
+    // Read entire inverted list data into a thread-local heap buffer: docIds (int[]) + encoded vectors
+    int listBytes = listSize * (Integer.BYTES + _encodedBytesPerVector);
+    ByteBuffer buf = getOrResizeThreadLocalBuffer(listBytes);
+    _buffer.copyTo(dataOffset, buf.array(), 0, listBytes);
+    buf.position(0);
+    buf.limit(listBytes);
+
+    // Read doc IDs
+    int[] docIds = new int[listSize];
+    for (int i = 0; i < listSize; i++) {
+      docIds[i] = buf.getInt();
+    }
+
+    // Reuse per-doc buffers to avoid allocation churn in the hot loop.
+    byte[] encodedVector = new byte[_encodedBytesPerVector];
+
+    // Read and score vectors
+    for (int i = 0; i < listSize; i++) {
+      int docId = docIds[i];
+
+      // In filter-aware mode, skip decoding and distance computation for rejected docs.
+      if (preFilterBitmap != null && !preFilterBitmap.contains(docId)) {
+        skipStoredVector(buf);
+        continue;
+      }
+
+      float dist = readDistanceForCurrentVector(buf, query, encodedVector);
+      offer(maxHeap, docId, dist, topK);
+    }
+  }
+
+  private void scanInvertedListWithinApproximateRadius(int centroidIdx, float[] query, float threshold,
+      int maxCandidates, PriorityQueue<ScoredDoc> maxHeap) {
+    int listSize = _listSizes[centroidIdx];
+    if (listSize == 0) {
+      return;
+    }
+
+    long dataOffset = _listOffsets[centroidIdx] + 4;
+    int listBytes = listSize * (Integer.BYTES + _encodedBytesPerVector);
+    ByteBuffer buf = getOrResizeThreadLocalBuffer(listBytes);
+    _buffer.copyTo(dataOffset, buf.array(), 0, listBytes);
+    buf.position(0);
+    buf.limit(listBytes);
+
+    int[] docIds = new int[listSize];
+    for (int i = 0; i < listSize; i++) {
+      docIds[i] = buf.getInt();
+    }
+
+    byte[] encodedVector = new byte[_encodedBytesPerVector];
+    for (int i = 0; i < listSize; i++) {
+      int docId = docIds[i];
+      float distance = readDistanceForCurrentVector(buf, query, encodedVector);
+      if (distance <= threshold) {
+        offer(maxHeap, docId, distance, maxCandidates);
+      }
+    }
+  }
+
+  protected float readDistanceForCurrentVector(ByteBuffer buf, float[] query, byte[] encodedVector) {
+    buf.get(encodedVector);
+    return _quantizer.computeDistance(query, encodedVector, _distanceFunction);
+  }
+
+  private void skipStoredVector(ByteBuffer buf) {
+    buf.position(buf.position() + _encodedBytesPerVector);
+  }
+
+  // ThreadLocal ByteBuffer for scanInvertedList to avoid per-call heap allocation.
+  // Buffers larger than MAX_THREAD_LOCAL_BUFFER_SIZE are allocated fresh per call
+  // to avoid pinning excessive memory on the thread.
+  private static final int MAX_THREAD_LOCAL_BUFFER_SIZE = 4 * 1024 * 1024; // 4 MB
+  private static final ThreadLocal<ByteBuffer> SCAN_BUFFER = new ThreadLocal<>();
+
+  /// Returns a ByteBuffer of at least the given capacity, cleared and ready for use.
+  /// Uses a thread-local buffer when the required capacity is within the size cap.
+  /// Allocates a fresh buffer for oversized requests to avoid pinning large allocations.
+  private static ByteBuffer getOrResizeThreadLocalBuffer(int requiredCapacity) {
+    if (requiredCapacity > MAX_THREAD_LOCAL_BUFFER_SIZE) {
+      // Allocate a fresh buffer for oversized requests — do not cache in ThreadLocal
+      ByteBuffer buf = ByteBuffer.allocate(requiredCapacity);
+      buf.limit(requiredCapacity);
+      return buf;
+    }
+    ByteBuffer buf = SCAN_BUFFER.get();
+    if (buf == null || buf.capacity() < requiredCapacity) {
+      buf = ByteBuffer.allocate(requiredCapacity);
+      SCAN_BUFFER.set(buf);
+    } else {
+      buf.clear();
+    }
+    buf.limit(requiredCapacity);
+    return buf;
+  }
+
+  // -----------------------------------------------------------------------
+  // NprobeAware implementation
+  // -----------------------------------------------------------------------
+
+  @Override
+  public void setNprobe(int nprobe) {
+    if (nprobe < 1) {
+      throw new IllegalArgumentException("nprobe must be >= 1, got: " + nprobe);
+    }
+    _nprobeOverride.set(Math.min(nprobe, _nlist));
+  }
+
+  @Override
+  public void clearNprobe() {
+    _nprobeOverride.remove();
+  }
+
+  public int getNprobe() {
+    Integer override = _nprobeOverride.get();
+    return override != null ? override : _defaultNprobe;
+  }
+
+  // -----------------------------------------------------------------------
+  // Distance / centroid helpers
+  // -----------------------------------------------------------------------
+
+  private float computeDistance(float[] a, float[] b) {
+    switch (_distanceFunction) {
+      case EUCLIDEAN:
+      case L2:
+        return (float) VectorFunctions.euclideanDistance(a, b);
+      case COSINE:
+        return (float) VectorFunctions.cosineDistance(a, b);
+      case INNER_PRODUCT:
+      case DOT_PRODUCT:
+        return (float) -VectorFunctions.dotProduct(a, b);
+      default:
+        throw new IllegalArgumentException("Unsupported distance function: " + _distanceFunction);
+    }
+  }
+
+  private int[] findClosestCentroids(float[] query, int n) {
+    int[] bestIndices = new int[n];
+    float[] bestDistances = new float[n];
+    Arrays.fill(bestDistances, Float.POSITIVE_INFINITY);
+
+    for (int c = 0; c < _nlist; c++) {
+      float distance = computeDistance(query, _centroids[c]);
+      if (distance >= bestDistances[n - 1]) {
+        continue;
+      }
+      int insertPos = n - 1;
+      while (insertPos > 0 && distance < bestDistances[insertPos - 1]) {
+        bestDistances[insertPos] = bestDistances[insertPos - 1];
+        bestIndices[insertPos] = bestIndices[insertPos - 1];
+        insertPos--;
+      }
+      bestDistances[insertPos] = distance;
+      bestIndices[insertPos] = c;
+    }
+    return bestIndices;
+  }
+
+  private static void offer(PriorityQueue<ScoredDoc> heap, int docId, float distance, int maxCandidates) {
+    if (heap.size() < maxCandidates) {
+      heap.offer(new ScoredDoc(docId, distance));
+    } else if (distance < heap.peek()._distance) {
+      heap.poll();
+      heap.offer(new ScoredDoc(docId, distance));
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Debug / observability
+  // -----------------------------------------------------------------------
+
+  @Override
+  public Map<String, Object> getIndexDebugInfo() {
+    Map<String, Object> info = new LinkedHashMap<>();
+    info.put("backend", "IVF_ON_DISK");
+    info.put("column", _column);
+    info.put("dimension", _dimension);
+    info.put("numVectors", _numVectors);
+    info.put("nlist", _nlist);
+    info.put("distanceFunction", _distanceFunction.name());
+    info.put("effectiveNprobe", getNprobe());
+    info.put("indexFormatVersion", _indexFormatVersion);
+    info.put("quantizer", _quantizerType.name());
+    info.put("encodedBytesPerVector", _encodedBytesPerVector);
+    info.put("totalSearches", _totalSearches.get());
+    info.put("filteredSearches", _filteredSearches.get());
+    info.put("unfilteredSearches", _unfilteredSearches.get());
+    info.put("supportsPreFilter", supportsPreFilter());
+    info.put("storageMode", "pinotDataBuffer");
+
+    // Compute cache warmth estimate: fraction of centroids accessed at least once
+    long accessedCentroids = 0;
+    for (AtomicLong count : _centroidAccessCounts) {
+      if (count.get() > 0) {
+        accessedCentroids++;
+      }
+    }
+    info.put("warmCentroidRatio", _nlist > 0 ? (double) accessedCentroids / _nlist : 0.0);
+
+    // List size stats
+    int minListSize = Integer.MAX_VALUE;
+    int maxListSize = 0;
+    int emptyLists = 0;
+    for (int size : _listSizes) {
+      if (size == 0) {
+        emptyLists++;
+      }
+      minListSize = Math.min(minListSize, size);
+      maxListSize = Math.max(maxListSize, size);
+    }
+    if (_nlist > 0) {
+      info.put("avgDocsPerList", _numVectors > 0 ? (double) _numVectors / _nlist : 0.0);
+      info.put("minListSize", minListSize == Integer.MAX_VALUE ? 0 : minListSize);
+      info.put("maxListSize", maxListSize);
+      info.put("emptyLists", emptyLists);
+    }
+    return info;
+  }
+
+  @Override
+  public void close() throws IOException {
+    clearNprobe();
+    if (_ownsBuffer && _buffer != null) {
+      _buffer.close();
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Accessors for testing
+  // -----------------------------------------------------------------------
+
+  @VisibleForTesting
+  public int getDimension() {
+    return _dimension;
+  }
+
+  @VisibleForTesting
+  public int getNumVectors() {
+    return _numVectors;
+  }
+
+  @VisibleForTesting
+  public int getNlist() {
+    return _nlist;
+  }
+
+  @VisibleForTesting
+  public long getTotalSearches() {
+    return _totalSearches.get();
+  }
+
+  private static final class ScoredDoc {
+    final int _docId;
+    final float _distance;
+
+    ScoredDoc(int docId, float distance) {
+      _docId = docId;
+      _distance = distance;
+    }
+  }
+}

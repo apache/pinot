@@ -63,29 +63,27 @@ public class PinotDriver implements Driver {
     _sslContext = sslContext;
   }
 
-  /**
-   * Created connection to Pinot Controller from provided properties.
-   * The following properties can be provided -
-   * tenant - Specify the tenant for which this connection is being created. If not provided, DefaultTenant is used.
-   * The connection cannot handle queries for tables which are not present in the specified tenant.
-   * headers.Authorization - base64 token to query pinot. This is required in case Auth is enabled on pinot cluster.
-   * user - Name of the user for which auth is enabled.
-   * password - Password associated with the user for which auth is enabled.
-   * You can also specify username and password in the URL, e.g. jdbc:pinot://localhost:9000?user=Foo&password=Bar
-   * If username and password are specified at multiple places, the precedence takes place in the following order
-   * (header.Authorization property) > (username and password in URL) > (user and password specified in properties)
-   * @param url  jdbc connection url containing pinot controller machine host:port.
-   * example - jdbc:pinot://localhost:9000
-   * @param info properties required for creating connection
-   * @return JDBC connection object to query pinot
-   * @throws SQLException
-   */
+  /// Created connection to Pinot Controller from provided properties.
+  /// The following properties can be provided -
+  /// tenant - Specify the tenant for which this connection is being created. If not provided, DefaultTenant is used.
+  /// The connection cannot handle queries for tables which are not present in the specified tenant.
+  /// headers.Authorization - base64 token to query pinot. This is required in case Auth is enabled on pinot cluster.
+  /// user - Name of the user for which auth is enabled.
+  /// password - Password associated with the user for which auth is enabled.
+  /// You can also specify username and password in the URL, e.g. jdbc:pinot://localhost:9000?user=Foo&password=Bar
+  /// If username and password are specified at multiple places, the precedence takes place in the following order
+  /// (header.Authorization property) > (username and password in URL) > (user and password specified in properties)
+  /// @param url  jdbc connection url containing pinot controller machine host:port.
+  /// example - jdbc:pinot://localhost:9000
+  /// @param info properties required for creating connection
+  /// @return JDBC connection object to query pinot
+  /// @throws SQLException
   @Override
   public Connection connect(String url, Properties info)
       throws SQLException {
 
-      PinotClientTransport pinotClientTransport = null;
-      PinotControllerTransport pinotControllerTransport = null;
+    PinotClientTransport pinotClientTransport = null;
+    PinotControllerTransport pinotControllerTransport = null;
     try {
       if (!this.acceptsURL(url)) {
         return null;
@@ -139,11 +137,9 @@ public class PinotDriver implements Driver {
     }
   }
 
-  /**
-   * If something goes wrong generating the connection, the transports need to be safely closed to prevent leaks.
-   * @param pinotClientTransport connection client transport
-   * @param pinotControllerTransport connection controller transport
-   */
+  /// If something goes wrong generating the connection, the transports need to be safely closed to prevent leaks.
+  /// @param pinotClientTransport connection client transport
+  /// @param pinotControllerTransport connection controller transport
   private static void closeResourcesSafely(PinotClientTransport pinotClientTransport,
       PinotControllerTransport pinotControllerTransport) {
     try {

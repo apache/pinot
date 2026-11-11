@@ -22,7 +22,6 @@ package org.apache.pinot.segment.local.segment.index.h3;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -60,7 +59,7 @@ import org.apache.pinot.spi.data.Schema;
 
 public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "h3";
-  private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+  private static final List<String> EXTENSIONS = List.of(V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
 
   protected H3IndexType() {
     super(StandardIndexes.H3_ID);
@@ -123,6 +122,18 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       Schema schema, TableConfig tableConfig) {
     return new H3IndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, H3IndexConfig indexConfig) {
+    // H3 index is built directly from geospatial values; it does not depend on a dictionary.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, H3IndexConfig indexConfig) {
+    // H3 cell IDs are derived from geometry values, independent of dictionary representation.
+    return false;
   }
 
   @Override

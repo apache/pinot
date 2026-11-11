@@ -20,7 +20,6 @@ package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,12 +28,10 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
 
-/**
- * Quick start for Time Series Engine.
- *
- * To test this quick start, you can run the following command in pinot-tools/src/main/resources/scripts/timeseries/
- * python3 run_ts_query.py
- */
+/// Quick start for Time Series Engine.
+///
+/// To test this quick start, you can run the following command in pinot-tools/src/main/resources/scripts/timeseries/
+/// python3 run_ts_query.py
 public class TimeSeriesEngineQuickStart extends Quickstart {
   private static final String[] TIME_SERIES_TABLE_DIRECTORIES = new String[]{
       "examples/batch/airlineStats",
@@ -59,7 +56,7 @@ public class TimeSeriesEngineQuickStart extends Quickstart {
 
   @Override
   public List<String> types() {
-    return Collections.singletonList("TIME_SERIES");
+    return List.of("TIME_SERIES");
   }
 
   @Override

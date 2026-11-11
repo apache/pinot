@@ -30,10 +30,8 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * FieldIndexConfigs are a map like structure that relates index types with their configuration, providing a type safe
- * interface.
- */
+/// FieldIndexConfigs are a map like structure that relates index types with their configuration, providing a type safe
+/// interface.
 public class FieldIndexConfigs {
 
   public static final FieldIndexConfigs EMPTY = new FieldIndexConfigs(new HashMap<>());
@@ -44,10 +42,8 @@ public class FieldIndexConfigs {
     _configMap = Collections.unmodifiableMap(configMap);
   }
 
-  /**
-   * Returns the configuration associated with the given index type, which will be null if there is no configuration for
-   * that index type.
-   */
+  /// Returns the configuration associated with the given index type, which will be null if there is no configuration
+  /// for that index type.
   public <C extends IndexConfig, I extends IndexType<C, ?, ?>> C getConfig(I indexType) {
     IndexConfig config = _configMap.get(indexType);
     if (config == null) {

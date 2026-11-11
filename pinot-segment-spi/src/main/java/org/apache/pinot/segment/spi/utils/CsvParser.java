@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.utils;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
@@ -31,18 +30,16 @@ public class CsvParser {
     // Hide utility class default constructor
   }
 
-  /**
-   * Parse the input csv string with customizable parsing behavior. Sometimes the individual values may contain comma
-   * and other white space characters. These characters are sometimes expected to be part of the actual argument.
-   *
-   * @param input  string to split on comma
-   * @param escapeComma if true, we don't split on escaped commas, and we replace "\," with "," after the split
-   * @param trim   whether we should trim each tokenized terms
-   * @return a list of values, empty list if input is empty or null
-   */
+  /// Parse the input csv string with customizable parsing behavior. Sometimes the individual values may contain comma
+  /// and other white space characters. These characters are sometimes expected to be part of the actual argument.
+  ///
+  /// @param input  string to split on comma
+  /// @param escapeComma if true, we don't split on escaped commas, and we replace "\," with "," after the split
+  /// @param trim   whether we should trim each tokenized terms
+  /// @return a list of values, empty list if input is empty or null
   public static List<String> parse(@Nullable String input, boolean escapeComma, boolean trim) {
     if (null == input || input.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     Stream<String> tokenStream;
@@ -63,13 +60,11 @@ public class CsvParser {
     return tokenStream.collect(Collectors.toList());
   }
 
-  /**
-   * Parse the input list of string with customized serialization behavior.
-   * @param input containing a list of string to be serialized
-   * @param escapeComma if true, escape commas by replacing "," with "\," before the join
-   * @param trim whether we should trim each tokenized terms before serialization
-   * @return serialized string representing the input list of string
-   */
+  /// Parse the input list of string with customized serialization behavior.
+  /// @param input containing a list of string to be serialized
+  /// @param escapeComma if true, escape commas by replacing "," with "\," before the join
+  /// @param trim whether we should trim each tokenized terms before serialization
+  /// @return serialized string representing the input list of string
   public static String serialize(List<String> input, boolean escapeComma, boolean trim) {
     Stream<String> tokenStream = input.stream();
     if (escapeComma) {

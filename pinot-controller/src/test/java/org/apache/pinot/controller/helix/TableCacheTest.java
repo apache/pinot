@@ -137,7 +137,7 @@ public class TableCacheTest {
     assertTrue(tableCache.registerSchemaChangeListener(schemaChangeListener));
     assertEquals(schemaChangeListener._schemaList.size(), 2);
     assertTrue(schemaChangeListener._schemaList.get(0).equals(expectedSchema)
-    || schemaChangeListener._schemaList.get(1).equals(expectedSchema));
+        || schemaChangeListener._schemaList.get(1).equals(expectedSchema));
 
     TestLogicalTableConfigChangeListener logicalTableConfigChangeListener = new TestLogicalTableConfigChangeListener();
     assertTrue(tableCache.registerLogicalTableConfigChangeListener(logicalTableConfigChangeListener));
@@ -218,8 +218,7 @@ public class TableCacheTest {
     logicalTableConfig = ControllerTest.getDummyLogicalTableConfig(LOGICAL_TABLE_NAME,
         List.of(OFFLINE_TABLE_NAME, ANOTHER_TABLE_OFFLINE), "DefaultTenant");
     logicalTableConfig.setQueryConfig(new QueryConfig(
-        1L, false, false, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), 1L, 1L
-    ));
+        1L, false, false, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), 1L, 1L));
     TEST_INSTANCE.getHelixResourceManager().updateLogicalTableConfig(logicalTableConfig);
     TestUtils.waitForCondition(
         aVoid -> Objects.requireNonNull(tableCache.getLogicalTableConfig(LOGICAL_TABLE_NAME))
@@ -304,6 +303,11 @@ public class TableCacheTest {
     expectedColumnMap.put(isCaseInsensitive ? "$hostname" : "$hostName", "$hostName");
     expectedColumnMap.put(isCaseInsensitive ? "$segmentname" : "$segmentName", "$segmentName");
     expectedColumnMap.put(isCaseInsensitive ? "$partitionid" : "$partitionId", "$partitionId");
+    expectedColumnMap.put(isCaseInsensitive ? "$creationtime" : "$creationTime", "$creationTime");
+    expectedColumnMap.put(isCaseInsensitive ? "$starttime" : "$startTime", "$startTime");
+    expectedColumnMap.put(isCaseInsensitive ? "$endtime" : "$endTime", "$endTime");
+    expectedColumnMap.put(isCaseInsensitive ? "$totaldocs" : "$totalDocs", "$totalDocs");
+    expectedColumnMap.put("$crc", "$crc");
     return expectedColumnMap;
   }
 
@@ -312,7 +316,12 @@ public class TableCacheTest {
         .addSingleValueDimension(BuiltInVirtualColumn.DOCID, DataType.INT)
         .addSingleValueDimension(BuiltInVirtualColumn.HOSTNAME, DataType.STRING)
         .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING)
-        .addMultiValueDimension(BuiltInVirtualColumn.PARTITIONID, DataType.STRING).build();
+        .addMultiValueDimension(BuiltInVirtualColumn.PARTITIONID, DataType.STRING)
+        .addSingleValueDimension(BuiltInVirtualColumn.CREATIONTIME, DataType.TIMESTAMP)
+        .addSingleValueDimension(BuiltInVirtualColumn.STARTTIME, DataType.TIMESTAMP)
+        .addSingleValueDimension(BuiltInVirtualColumn.ENDTIME, DataType.TIMESTAMP)
+        .addSingleValueDimension(BuiltInVirtualColumn.TOTALDOCS, DataType.INT)
+        .addSingleValueDimension(BuiltInVirtualColumn.CRC, DataType.LONG).build();
   }
 
   @DataProvider(name = "testTableCacheDataProvider")

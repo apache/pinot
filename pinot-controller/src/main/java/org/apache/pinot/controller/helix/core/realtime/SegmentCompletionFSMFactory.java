@@ -40,12 +40,10 @@ public class SegmentCompletionFSMFactory {
     register(SegmentCompletionConfig.DEFAULT_PAUSELESS_FSM_SCHEME, PauselessSegmentCompletionFSM.class);
   }
 
-  /**
-   * Registers an FSM class with a specific scheme/type.
-   *
-   * @param scheme The scheme or type key.
-   * @param fsmClass The class for the FSM.
-   */
+  /// Registers an FSM class with a specific scheme/type.
+  ///
+  /// @param scheme The scheme or type key.
+  /// @param fsmClass The class for the FSM.
   public static void register(String scheme, Class<? extends SegmentCompletionFSM> fsmClass) {
     Preconditions.checkNotNull(scheme, "Scheme cannot be null");
     Preconditions.checkNotNull(fsmClass, "FSM Class cannot be null");
@@ -58,11 +56,9 @@ public class SegmentCompletionFSMFactory {
     LOGGER.info("Registered SegmentCompletionFSM class {} for scheme {}", fsmClass, scheme);
   }
 
-  /**
-   * Initializes the factory with configurations.
-   *
-   * @param fsmFactoryConfig The configuration object containing FSM schemes and classes.
-   */
+  /// Initializes the factory with configurations.
+  ///
+  /// @param fsmFactoryConfig The configuration object containing FSM schemes and classes.
   public static void init(SegmentCompletionConfig fsmFactoryConfig) {
     Map<String, String> schemesConfig = fsmFactoryConfig.getFsmSchemes();
     for (Map.Entry<String, String> entry : schemesConfig.entrySet()) {
@@ -79,16 +75,14 @@ public class SegmentCompletionFSMFactory {
     }
   }
 
-  /**
-   * Creates an FSM instance based on the scheme/type.
-   *
-   * @param scheme The scheme or type key.
-   * @param manager The SegmentCompletionManager instance.
-   * @param segmentManager The PinotLLCRealtimeSegmentManager instance.
-   * @param llcSegmentName The segment name.
-   * @param segmentMetadata The segment metadata.
-   * @return An instance of SegmentCompletionFSM.
-   */
+  /// Creates an FSM instance based on the scheme/type.
+  ///
+  /// @param scheme The scheme or type key.
+  /// @param manager The SegmentCompletionManager instance.
+  /// @param segmentManager The PinotLLCRealtimeSegmentManager instance.
+  /// @param llcSegmentName The segment name.
+  /// @param segmentMetadata The segment metadata.
+  /// @return An instance of SegmentCompletionFSM.
   public static SegmentCompletionFSM createFSM(String scheme,
       SegmentCompletionManager manager,
       PinotLLCRealtimeSegmentManager segmentManager,
@@ -109,19 +103,15 @@ public class SegmentCompletionFSMFactory {
     }
   }
 
-  /**
-   * Checks if a scheme is supported.
-   *
-   * @param factoryType The scheme to check.
-   * @return True if supported, false otherwise.
-   */
+  /// Checks if a scheme is supported.
+  ///
+  /// @param factoryType The scheme to check.
+  /// @return True if supported, false otherwise.
   public static boolean isFactoryTypeSupported(String factoryType) {
     return FSM_CLASS_MAP.containsKey(factoryType);
   }
 
-  /**
-   * Clears all registered FSM classes.
-   */
+  /// Clears all registered FSM classes.
   public static void shutdown() {
     FSM_CLASS_MAP.clear();
   }

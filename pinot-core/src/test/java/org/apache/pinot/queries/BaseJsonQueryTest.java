@@ -34,6 +34,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.intellij.lang.annotations.Language;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
@@ -60,26 +61,6 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
         {JSON_COLUMN},
         {RAW_JSON_COLUMN},
         {JSON_COLUMN_WITHOUT_INDEX},
-        {RAW_BYTES_COLUMN},
-        {DICTIONARY_BYTES_COLUMN},
-        {RAW_STRING_COLUMN},
-        {DICTIONARY_STRING_COLUMN},
-    };
-  }
-
-  @DataProvider
-  public static Object[][] nativeJsonColumns() {
-    return new Object[][]{
-        {JSON_COLUMN},
-        {RAW_JSON_COLUMN},
-        {JSON_COLUMN_WITHOUT_INDEX},
-    };
-  }
-
-  @DataProvider
-  public static Object[][] nonNativeJsonColumns() {
-    // columns where we should be able to extract JSON with a function, but can't use all the literal features
-    return new Object[][]{
         {RAW_BYTES_COLUMN},
         {DICTIONARY_BYTES_COLUMN},
         {RAW_STRING_COLUMN},
@@ -145,6 +126,7 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
     records.add(createRecord(16, 16, "john doe", "{\"longVal\": \"-9223372036854775808\" }"));
     records.add(createRecord(17, 17, "john doe", "{\"longVal\": \"-100.12345\" }"));
     records.add(createRecord(18, 18, "john doe", "{\"longVal\": \"10e2\" }"));
+    records.add(createRecord(19, 19, "john doe", "{\"longVal\": null }"));
 
     tableConfig.getIndexingConfig().setJsonIndexColumns(List.of("jsonColumn"));
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
@@ -178,7 +160,7 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  protected void checkResult(String query, Object[][] expectedResults) {
+  protected void checkResult(@Language("sql") String query, Object[][] expectedResults) {
     BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, schema());
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, Arrays.asList(expectedResults));
   }

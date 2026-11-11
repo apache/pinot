@@ -20,62 +20,71 @@ package org.apache.pinot.query.mailbox;
 
 import java.util.List;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
-/**
- * Mailbox that's used to send data.
- *
- * Usages of this interface should follow the pattern:
- *
- * <ol>
- *   <li>Zero or more calls to {@link #send(MseBlock.Data)}</li>
- *   <li>Then exactly one of:
- *     <ul>
- *       <li>One call to {@link #send(MseBlock.Eos, List)} if the receiver is not early terminated</li>
- *       <li>One call to {@link #cancel(Throwable)} if the sender wants to cancel the receiver</li>
- *     </ul>
- *   </li>
- * </ol>
- */
+/// Mailbox that's used to send data.
+///
+/// Usages of this interface should follow the pattern:
+///
+/// 1. Zero or more calls to [#send(MseBlock.Data)]
+/// 2. Then exactly one of:
+///   - One call to [#send(MseBlock.Eos, List)] if the receiver is not early terminated
+///   - One call to [#cancel(Throwable)] if the sender wants to cancel the receiver
 public interface SendingMailbox extends AutoCloseable {
 
-  /**
-   * Returns whether the mailbox is sending data to a local receiver, where blocks can be directly passed to the
-   * receiver.
-   */
+  /// Returns whether blocks can be passed to this mailbox whole, instead of being split into smaller blocks that
+  /// respect the maximum content size of a mailbox message.
+  ///
+  /// This says nothing about whether the receiver ends up with a reference to the block: see
+  /// [#deliversByReference()].
   boolean isLocal();
 
-  /**
-   * Sends a data block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call,
-   * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
-   * error sending the data, since that would allow {@link BlockExchange} to exit early.
-   */
+  /// Returns whether a receiver may keep a reference to the blocks sent to this mailbox, instead of reading their
+  /// contents within [#send(MseBlock.Data)]. The answer must not change during the life of the mailbox, so callers
+  /// can read it once.
+  ///
+  /// A mailbox that returns `true` here also returns `true` from [#isLocal()], because a block can only be given by
+  /// reference to a receiver in this process. The reverse does not hold: a local mailbox can still read the block
+  /// within [#send(MseBlock.Data)] and pass on something else.
+  ///
+  /// A caller that sends the same block instance to more than one mailbox, when anything downstream mutates the
+  /// contents of that block, must:
+  ///
+  /// 1. Give a copy of the block to all the mailboxes that return `true` here, except one.
+  /// 2. Give the original block to that remaining mailbox last, once every other mailbox has returned from
+  ///    [#send(MseBlock.Data)].
+  ///
+  /// Step 2 matters as much as step 1. A receiver of the original block can mutate it as soon as `send` gives it the
+  /// block, which would corrupt the block for a mailbox that is still reading it.
+  ///
+  /// See [org.apache.pinot.query.runtime.operator.exchange.BroadcastExchange].
+  boolean deliversByReference();
+
+  /// Sends a data block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this
+  /// call, and they should **not** acquire any resources when they are created. This method should throw if there was
+  /// an error sending the data, since that would allow
+  /// [org.apache.pinot.query.runtime.operator.exchange.BlockExchange] to exit early.
+  ///
+  /// Implementations that return `false` from [#deliversByReference()] must finish reading the block before this
+  /// method returns, because the caller may then pass the same block to a receiver that mutates it.
   void send(MseBlock.Data data);
 
-  /**
-   * Sends an EOS block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call,
-   * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
-   * error sending the data, since that would allow {@link BlockExchange} to exit early.
-   */
+  /// Sends an EOS block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this
+  /// call, and they should **not** acquire any resources when they are created. This method should throw if there was
+  /// an error sending the data, since that would allow
+  /// [org.apache.pinot.query.runtime.operator.exchange.BlockExchange] to exit early.
   void send(MseBlock.Eos block, List<DataBuffer> serializedStats);
 
-  /**
-   * Cancels the mailbox and notifies the receiver of the cancellation so that it can release the underlying resources.
-   * No more blocks can be sent after calling this method.
-   */
+  /// Cancels the mailbox and notifies the receiver of the cancellation so that it can release the underlying resources.
+  /// No more blocks can be sent after calling this method.
   void cancel(Throwable t);
 
-  /**
-   * Returns whether the {@link ReceivingMailbox} is already closed. There is no need to send more blocks after the
-   * mailbox is terminated.
-   */
+  /// Returns whether the [ReceivingMailbox] is already closed. There is no need to send more blocks after the
+  /// mailbox is terminated.
   boolean isTerminated();
 
-  /**
-   * Returns whether the {@link ReceivingMailbox} is considered itself finished, and is expected a EOS block with
-   * statistics to be sent next.
-   */
+  /// Returns whether the [ReceivingMailbox] is considered itself finished, and is expected a EOS block with
+  /// statistics to be sent next.
   boolean isEarlyTerminated();
 }

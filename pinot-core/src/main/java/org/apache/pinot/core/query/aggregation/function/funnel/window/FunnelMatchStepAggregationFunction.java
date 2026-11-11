@@ -18,20 +18,21 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel.window;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.PriorityQueue;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
-public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFunction<IntArrayList> {
+public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFunction<int[]> {
 
-  public FunnelMatchStepAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public FunnelMatchStepAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override
@@ -45,15 +46,13 @@ public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFun
   }
 
   @Override
-  public IntArrayList extractFinalResult(PriorityQueue<FunnelStepEvent> stepEvents) {
+  public int[] extractFinalResult(@Nullable PriorityQueue<FunnelStepEvent> stepEvents) {
     int finalMaxStep = 0;
-    IntArrayList result = new IntArrayList(_numSteps);
-    for (int i = 0; i < _numSteps; i++) {
-      result.add(0);
-    }
+    int[] result = new int[_numSteps];
     if (stepEvents == null || stepEvents.isEmpty()) {
       return result;
     }
+    stepEvents = new PriorityQueue<>(stepEvents);
     ArrayDeque<FunnelStepEvent> slidingWindow = new ArrayDeque<>();
     while (!stepEvents.isEmpty()) {
       fillWindow(stepEvents, slidingWindow);
@@ -70,7 +69,7 @@ public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFun
       }
     }
     for (int i = 0; i < finalMaxStep; i++) {
-      result.set(i, 1);
+      result[i] = 1;
     }
     return result;
   }
@@ -78,7 +77,10 @@ public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFun
   protected Integer processWindow(ArrayDeque<FunnelStepEvent> slidingWindow) {
     int maxStep = 0;
     long previousTimestamp = -1;
+    int numEventsProcessed = 0;
     for (FunnelStepEvent event : slidingWindow) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numEventsProcessed++,
+          "FunnelMatchStepAggregationFunction#processWindow");
       int currentEventStep = event.getStep();
       // If the same condition holds for the sequence of events, then such repeating event interrupts further
       // processing.
@@ -112,13 +114,13 @@ public class FunnelMatchStepAggregationFunction extends FunnelBaseAggregationFun
   }
 
   @Override
-  public IntArrayList mergeFinalResult(IntArrayList finalResult1, IntArrayList finalResult2) {
+  public int[] mergeFinalResult(int[] finalResult1, int[] finalResult2) {
     // Return the longest 1s sequence from both results
     for (int i = 0; i < _numSteps; i++) {
-      if (finalResult1.getInt(i) == 0) {
+      if (finalResult1[i] == 0) {
         return finalResult2;
       }
-      if (finalResult2.getInt(i) == 0) {
+      if (finalResult2[i] == 0) {
         return finalResult1;
       }
     }

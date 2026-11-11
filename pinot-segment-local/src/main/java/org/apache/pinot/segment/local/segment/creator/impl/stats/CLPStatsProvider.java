@@ -27,7 +27,7 @@ public interface CLPStatsProvider {
 
   default CLPV2Stats getCLPV2Stats() {
     throw new IllegalStateException(
-        "This method should only be implemented and used in MutableNoDictionaryColStatistics class.");
+        "This method should only be implemented and used in MutableNoDictColumnStatistics class.");
   }
 
   class CLPStats {
@@ -72,11 +72,9 @@ public interface CLPStatsProvider {
     }
   }
 
-  /**
-   * CLPV2Stats maintains a reference to CLPMutableForwardIndexV2. In CLP V2 forward indexes,
-   * to convert a mutable forward index to an immutable one, it tries to bypasses the need to decode
-   * and re-encode the CLP-encoded data.
-   */
+  /// CLPV2Stats maintains a reference to CLPMutableForwardIndexV2. In CLP V2 forward indexes,
+  /// to convert a mutable forward index to an immutable one, it tries to bypasses the need to decode
+  /// and re-encode the CLP-encoded data.
   class CLPV2Stats {
     private CLPMutableForwardIndexV2 _clpMutableForwardIndexV2;
 

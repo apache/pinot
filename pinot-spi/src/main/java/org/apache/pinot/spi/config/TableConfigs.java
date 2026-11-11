@@ -20,6 +20,7 @@ package org.apache.pinot.spi.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
@@ -31,10 +32,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Wrapper for all configs of a table, which include the offline table config, realtime table config and schema.
- * This helps look at and operate on the pinot table configs as a whole unit.
- */
+/// Wrapper for all configs of a table, which include the offline table config, realtime table config and schema.
+/// This helps look at and operate on the pinot table configs as a whole unit.
 public class TableConfigs extends BaseJsonConfig {
   private String _tableName;
   private final Schema _schema;
@@ -83,7 +82,8 @@ public class TableConfigs extends BaseJsonConfig {
     return _realtime;
   }
 
-  private ObjectNode toJsonObject() {
+  @JsonValue
+  public ObjectNode toJsonObject() {
     ObjectNode tableConfigsObjectNode = JsonUtils.newObjectNode();
     tableConfigsObjectNode.put("tableName", _tableName);
     tableConfigsObjectNode.set("schema", _schema.toJsonObject());

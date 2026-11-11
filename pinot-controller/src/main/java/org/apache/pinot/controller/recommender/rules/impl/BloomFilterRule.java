@@ -37,11 +37,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Create bloomfilter for dimensions frequently used in EQ predicate
- *    The partitioned dimension should be frequently used in the “=”
- *    Skip the no dictionary columns
- */
+/// Create bloomfilter for dimensions frequently used in EQ predicate
+///    The partitioned dimension should be frequently used in the “=”
+///    Skip the no dictionary columns
 public class BloomFilterRule extends AbstractRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(BloomFilterRule.class);
   private final BloomFilterRuleParams _params;
@@ -96,12 +94,10 @@ public class BloomFilterRule extends AbstractRule {
     return parsePredicateList(filter);
   }
 
-  /**
-   * TODO: The partitioned dimension should used in the “=” （IN, NOT IN, != are not using bloom filter in Pinot for
-   * now) filter.
-   * @param filterContext filterContext
-   * @return dimension used in eq in this query
-   */
+  /// TODO: The partitioned dimension should used in the “=” （IN, NOT IN, != are not using bloom filter in Pinot for
+  /// now) filter.
+  /// @param filterContext filterContext
+  /// @return dimension used in eq in this query
   private FixedLenBitset parsePredicateList(FilterContext filterContext) {
     FixedLenBitset ret = mutableEmptySet();
     List<FilterContext> children = filterContext.getChildren();

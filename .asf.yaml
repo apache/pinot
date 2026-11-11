@@ -20,23 +20,46 @@
 # Please refer https://cwiki.apache.org/confluence/display/INFRA/Git+-+.asf.yaml+features
 
 github:
-  description: "Apache Pinot - A realtime distributed OLAP datastore"
+  description: "Apache Pinot: a real-time analytics database for low-latency SQL and vector search, serving user-facing and agent-facing applications"
   homepage: https://pinot.apache.org/
   labels:
     - java
+    - database
+    - sql
+    - olap
+    - analytics
+    - real-time-analytics
+    - kafka
+    - distributed-database
+    - vector-search
+    - vector-database
+    - ai-agents
   del_branch_on_merge: true
   enabled_merge_buttons:
     squash: true
     merge: false
     rebase: false
   collaborators:
-    - noob-se7en
-    - J-HowHuang
-    - shauryachats
-    - 9aman
+    - Akanksha-kedia
     - deepthi912
-    - abhishekbafna
-    - raghavyadav01
-    - rhodo
-    - lnbest0707-uber
+    - J-HowHuang
+    - suvodeep-pyne
+    - hongkunxu
     - shounakmk219
+    - jadami10
+    - arunkumarucet
+    - dang-stripe
+    - jineshparakh
+  rulesets:
+    - name: "Default Branch Protection"
+      type: branch
+      branches:
+        includes:
+          - "~DEFAULT_BRANCH"
+          - "release/*"
+          - "rel/*"
+        excludes: []
+      bypass_teams:
+        - root
+      restrict_deletion: true
+      restrict_force_push: true

@@ -19,8 +19,10 @@
 package org.apache.pinot.segment.spi.index;
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -28,10 +30,14 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class IndexServiceTest {
@@ -75,6 +81,31 @@ public class IndexServiceTest {
     descendingSet.add(plugin2);
     IndexService indexService2 = new IndexService(descendingSet);
     assertSame(indexService2.get("test"), indexType2);
+  }
+
+  @Test
+  public void testMaxIndexTypes() {
+    IndexService full = new IndexService(plugins(IndexService.MAX_INDEX_TYPES));
+    List<IndexType<?, ?, ?>> allIndexes = full.getAllIndexes();
+    assertEquals(allIndexes.size(), IndexService.MAX_INDEX_TYPES);
+    // Numeric ids are positions in getAllIndexes(), so the last one is the highest bit of a long.
+    for (int i = 0; i < allIndexes.size(); i++) {
+      assertEquals(full.getNumericId(allIndexes.get(i)), i);
+    }
+
+    IllegalArgumentException thrown =
+        expectThrows(IllegalArgumentException.class, () -> new IndexService(plugins(IndexService.MAX_INDEX_TYPES + 1)));
+    assertTrue(thrown.getMessage().startsWith("Cannot register 65 index types, at most 64 are supported"),
+        thrown.getMessage());
+  }
+
+  private static Set<IndexPlugin<?>> plugins(int numTypes) {
+    Set<IndexPlugin<?>> plugins = new HashSet<>();
+    for (int i = 0; i < numTypes; i++) {
+      TestIndexType indexType = new TestIndexType(String.format("index_%02d", i));
+      plugins.add((IndexPlugin<TestIndexType>) () -> indexType);
+    }
+    return plugins;
   }
 
   private static class TestIndexType implements IndexType<IndexConfig, IndexReader, IndexCreator> {
@@ -124,6 +155,16 @@ public class IndexServiceTest {
     public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory,
         Map<String, FieldIndexConfigs> configsByCol, Schema schema, TableConfig tableConfig) {
       throw new UnsupportedOperationException(IndexType.class.getName() + " should not be created");
+    }
+
+    @Override
+    public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
+      return false;
+    }
+
+    @Override
+    public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, IndexConfig indexConfig) {
+      return false;
     }
 
     @Override

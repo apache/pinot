@@ -28,14 +28,15 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * The {@code OffHeapStarTree} class implements the star-tree using off-heap memory.
- */
+/// The `OffHeapStarTree` class implements the star-tree using off-heap memory.
 public class OffHeapStarTree implements StarTree {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OffHeapStarTree.class);
   public static final long MAGIC_MARKER = 0xBADDA55B00DAD00DL;
   public static final int VERSION = 1;
 
@@ -97,9 +98,7 @@ public class OffHeapStarTree implements StarTree {
     printTreeHelper(dictionaryMap, _root, 0);
   }
 
-  /**
-   * Helper method to print the tree.
-   */
+  /// Helper method to print the tree.
   private void printTreeHelper(Map<String, Dictionary> dictionaryMap, OffHeapStarTreeNode node, int level) {
     StringBuilder stringBuilder = new StringBuilder();
     for (int i = 0; i < level; i++) {
@@ -128,7 +127,7 @@ public class OffHeapStarTree implements StarTree {
         .add("startDocId", node.getStartDocId()).add("endDocId", node.getEndDocId())
         .add("aggregatedDocId", node.getAggregatedDocId()).add("numChildren", node.getNumChildren()).toString();
     stringBuilder.append(formattedOutput);
-    System.out.println(stringBuilder.toString());
+    LOGGER.debug("{}", stringBuilder);
 
     if (!node.isLeaf()) {
       Iterator<OffHeapStarTreeNode> childrenIterator = node.getChildrenIterator();

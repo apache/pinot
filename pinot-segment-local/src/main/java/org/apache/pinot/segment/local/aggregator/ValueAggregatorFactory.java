@@ -25,20 +25,16 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * The {@code ValueAggregatorFactory} class is the factory for all value aggregators.
- */
+/// The `ValueAggregatorFactory` class is the factory for all value aggregators.
 @SuppressWarnings("rawtypes")
 public class ValueAggregatorFactory {
   private ValueAggregatorFactory() {
   }
 
-  /**
-   * Returns a new instance of value aggregator for the given aggregation type.
-   *
-   * @param aggregationType Aggregation type
-   * @return Value aggregator
-   */
+  /// Returns a new instance of value aggregator for the given aggregation type.
+  ///
+  /// @param aggregationType Aggregation type
+  /// @return Value aggregator
   public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType,
       List<ExpressionContext> arguments) {
     switch (aggregationType) {
@@ -90,17 +86,17 @@ public class ValueAggregatorFactory {
       case PERCENTILETDIGEST:
       case PERCENTILERAWTDIGEST:
         return new PercentileTDigestValueAggregator(arguments);
+      case ARRAYAGG:
+        return new ArrayAggDistinctValueAggregator();
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }
   }
 
-  /**
-   * Returns the data type of the aggregated value for the given aggregation type.
-   *
-   * @param aggregationType Aggregation type
-   * @return Data type of the aggregated value
-   */
+  /// Returns the data type of the aggregated value for the given aggregation type.
+  ///
+  /// @param aggregationType Aggregation type
+  /// @return Data type of the aggregated value
   public static DataType getAggregatedValueType(AggregationFunctionType aggregationType) {
     switch (aggregationType) {
       case COUNT:
@@ -151,6 +147,8 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTULL:
       case DISTINCTCOUNTRAWULL:
         return DistinctCountULLValueAggregator.AGGREGATED_VALUE_TYPE;
+      case ARRAYAGG:
+        return ArrayAggDistinctValueAggregator.AGGREGATED_VALUE_TYPE;
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

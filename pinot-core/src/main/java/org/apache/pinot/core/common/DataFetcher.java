@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -35,12 +36,10 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
-/**
- * DataFetcher is a higher level abstraction for data fetching. Given the DataSource, DataFetcher can manage the
- * readers (ForwardIndexReader and Dictionary) for the column, preventing redundant construction for these instances.
- * DataFetcher can be used by both selection, aggregation and group-by data fetching process, reducing duplicate codes
- * and garbage collection.
- */
+/// DataFetcher is a higher level abstraction for data fetching. Given the DataSource, DataFetcher can manage the
+/// readers (ForwardIndexReader and Dictionary) for the column, preventing redundant construction for these instances.
+/// DataFetcher can be used by both selection, aggregation and group-by data fetching process, reducing duplicate codes
+/// and garbage collection.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DataFetcher implements AutoCloseable {
   // Thread local (reusable) buffer for single-valued column dictionary Ids
@@ -52,17 +51,25 @@ public class DataFetcher implements AutoCloseable {
   private final Map<String, ColumnValueReader> _columnValueReaderMap;
   private final int[] _reusableMVDictIds;
   private final int _maxNumValuesPerMVEntry;
+  private final Map<String, String> _queryOptions;
 
-  /**
-   * Constructor for DataFetcher.
-   *
-   * @param dataSourceMap Map from column to data source
-   */
-  public DataFetcher(Map<String, DataSource> dataSourceMap) {
+  /// Constructor for DataFetcher.
+  ///
+  /// @param dataSourceMap  Map from column to data source
+  /// @param queryOptions   Query-level options propagated to reader contexts
+  public DataFetcher(Map<String, DataSource> dataSourceMap, Map<String, String> queryOptions) {
+    _queryOptions = queryOptions;
     _columnValueReaderMap = new HashMap<>();
     int maxNumValuesPerMVEntry = 0;
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
       DataSource dataSource = entry.getValue();
+      // An OPEN_STRUCT parent holds no readers of its own — every value is read through a per-key data source that
+      // ProjectionBlock#getBlockValueSet(String[]) registers lazily via addDataSource. Registering the parent here
+      // would trip the forward-index precondition. (MAP parents do carry a MapIndexReader forward index, so they
+      // are registered normally.)
+      if (dataSource instanceof OpenStructDataSource) {
+        continue;
+      }
       addDataSource(entry.getKey(), dataSource);
       DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
       if (!dataSourceMetadata.isSingleValue()) {
@@ -74,109 +81,103 @@ public class DataFetcher implements AutoCloseable {
   }
 
   public void addDataSource(String column, DataSource dataSource) {
+    // Idempotent: ProjectionBlock#getBlockValueSet(String[]) re-resolves the per-key data source on every block, and
+    // an unconditional put would orphan the displaced ColumnValueReader together with its off-heap reader context —
+    // close() only walks the readers still in the map. The key resolves to the same underlying index for the life of
+    // one ProjectionOperator, so keeping the first reader is equivalent.
+    if (_columnValueReaderMap.containsKey(column)) {
+      return;
+    }
     ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
     Preconditions.checkState(forwardIndexReader != null,
         "Forward index disabled for column: %s, cannot create DataFetcher!", column);
-    ColumnValueReader columnValueReader = new ColumnValueReader(forwardIndexReader, dataSource.getDictionary());
+    // A RAW forward index cannot serve dict ids cheaply even when a (shared) dictionary is on disk —
+    // looking up dict ids would require a per-row Dictionary#indexOf call. Drop the dictionary here so
+    // ColumnValueReader takes the raw-value paths uniformly; callers that genuinely need dict ids on a
+    // RAW + shared-dict column must read raw values and consult the dictionary directly.
+    Dictionary dictionary = forwardIndexReader.isDictionaryEncoded() ? dataSource.getDictionary() : null;
+    ColumnValueReader columnValueReader = new ColumnValueReader(forwardIndexReader, dictionary);
     _columnValueReaderMap.put(column, columnValueReader);
   }
 
-  /**
-   * SINGLE-VALUED COLUMN API
-   */
+  /// SINGLE-VALUED COLUMN API
 
-  /**
-   * Fetch the dictionary Ids for a single-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outDictIds Buffer for output
-   */
+  /// Fetch the dictionary Ids for a single-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outDictIds Buffer for output
   public void fetchDictIds(String column, int[] inDocIds, int length, int[] outDictIds) {
     _columnValueReaderMap.get(column).readDictIds(inDocIds, length, outDictIds);
   }
 
-  /**
-   * Fetch the int values for a single-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the int values for a single-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchIntValues(String column, int[] inDocIds, int length, int[] outValues) {
     _columnValueReaderMap.get(column).readIntValues(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the long values for a single-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the long values for a single-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchLongValues(String column, int[] inDocIds, int length, long[] outValues) {
     _columnValueReaderMap.get(column).readLongValues(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch long values for a single-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch long values for a single-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchFloatValues(String column, int[] inDocIds, int length, float[] outValues) {
     _columnValueReaderMap.get(column).readFloatValues(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the double values for a single-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the double values for a single-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchDoubleValues(String column, int[] inDocIds, int length, double[] outValues) {
     _columnValueReaderMap.get(column).readDoubleValues(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the BigDecimal values for a single-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the BigDecimal values for a single-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchBigDecimalValues(String column, int[] inDocIds, int length, BigDecimal[] outValues) {
     _columnValueReaderMap.get(column).readBigDecimalValues(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the string values for a single-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the string values for a single-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchStringValues(String column, int[] inDocIds, int length, String[] outValues) {
     _columnValueReaderMap.get(column).readStringValues(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch byte[] values for a single-valued column.
-   *
-   * @param column Column to read
-   * @param inDocIds Input document id's buffer
-   * @param length Number of input document id'
-   * @param outValues Buffer for output
-   */
+  /// Fetch byte\[\] values for a single-valued column.
+  ///
+  /// @param column Column to read
+  /// @param inDocIds Input document id's buffer
+  /// @param length Number of input document id'
+  /// @param outValues Buffer for output
   public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][] outValues) {
     _columnValueReaderMap.get(column).readBytesValues(inDocIds, length, outValues);
   }
@@ -197,113 +198,103 @@ public class DataFetcher implements AutoCloseable {
     _columnValueReaderMap.get(column).read128BitsMurmur3HashValues(inDocIds, length, outValues);
   }
 
-  /**
-   * MULTI-VALUED COLUMN API
-   */
+  /// MULTI-VALUED COLUMN API
 
-  /**
-   * Fetch the dictionary Ids for a multi-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outDictIds Buffer for output
-   */
+  /// Fetch the dictionary Ids for a multi-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outDictIds Buffer for output
   public void fetchDictIds(String column, int[] inDocIds, int length, int[][] outDictIds) {
     _columnValueReaderMap.get(column).readDictIdsMV(inDocIds, length, outDictIds);
   }
 
-  /**
-   * Fetch the int values for a multi-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the int values for a multi-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchIntValues(String column, int[] inDocIds, int length, int[][] outValues) {
     _columnValueReaderMap.get(column).readIntValuesMV(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the long values for a multi-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the long values for a multi-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchLongValues(String column, int[] inDocIds, int length, long[][] outValues) {
     _columnValueReaderMap.get(column).readLongValuesMV(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the float values for a multi-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the float values for a multi-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchFloatValues(String column, int[] inDocIds, int length, float[][] outValues) {
     _columnValueReaderMap.get(column).readFloatValuesMV(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the double values for a multi-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the double values for a multi-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchDoubleValues(String column, int[] inDocIds, int length, double[][] outValues) {
     _columnValueReaderMap.get(column).readDoubleValuesMV(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the string values for a multi-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the BigDecimal values for a multi-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
+  public void fetchBigDecimalValues(String column, int[] inDocIds, int length, BigDecimal[][] outValues) {
+    _columnValueReaderMap.get(column).readBigDecimalValuesMV(inDocIds, length, outValues);
+  }
+
+  /// Fetch the string values for a multi-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchStringValues(String column, int[] inDocIds, int length, String[][] outValues) {
     _columnValueReaderMap.get(column).readStringValuesMV(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the bytes values for a multi-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outValues Buffer for output
-   */
+  /// Fetch the bytes values for a multi-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outValues Buffer for output
   public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][][] outValues) {
     _columnValueReaderMap.get(column).readBytesValuesMV(inDocIds, length, outValues);
   }
 
-  /**
-   * Fetch the number of values for a multi-valued column.
-   *
-   * @param column Column name
-   * @param inDocIds Input document Ids buffer
-   * @param length Number of input document Ids
-   * @param outNumValues Buffer for output
-   */
+  /// Fetch the number of values for a multi-valued column.
+  ///
+  /// @param column Column name
+  /// @param inDocIds Input document Ids buffer
+  /// @param length Number of input document Ids
+  /// @param outNumValues Buffer for output
   public void fetchNumValues(String column, int[] inDocIds, int length, int[] outNumValues) {
     _columnValueReaderMap.get(column).readNumValuesMV(inDocIds, length, outNumValues);
   }
 
-  /**
-   * Helper class to read values for a column from forward index and dictionary. For raw (non-dictionary-encoded)
-   * forward index, similar to Dictionary, type conversion among INT, LONG, FLOAT, DOUBLE, STRING is supported; type
-   * conversion between STRING and BYTES via Hex encoding/decoding is supported.
-   *
-   * TODO: Type conversion for BOOLEAN and TIMESTAMP is not handled
-   */
+  /// Helper class to read values for a column from forward index and dictionary. For raw (non-dictionary-encoded)
+  /// forward index, similar to Dictionary, type conversion among INT, LONG, FLOAT, DOUBLE, STRING is supported; type
+  /// conversion between STRING and BYTES via Hex encoding/decoding is supported.
+  ///
+  /// TODO: Type conversion for BOOLEAN and TIMESTAMP is not handled
   private class ColumnValueReader implements AutoCloseable {
     final ForwardIndexReader _reader;
     final Dictionary _dictionary;
@@ -321,9 +312,8 @@ public class DataFetcher implements AutoCloseable {
     }
 
     private ForwardIndexReaderContext getReaderContext() {
-      // Create reader context lazily to reduce the duration of existence
       if (!_readerContextCreated) {
-        _readerContext = _reader.createContext();
+        _readerContext = _reader.createContext(_queryOptions);
         _readerContextCreated = true;
       }
       return _readerContext;
@@ -545,6 +535,21 @@ public class DataFetcher implements AutoCloseable {
       }
     }
 
+    void readBigDecimalValuesMV(int[] docIds, int length, BigDecimal[][] valuesBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        for (int i = 0; i < length; i++) {
+          int numValues = _reader.getDictIdMV(docIds[i], _reusableMVDictIds, readerContext);
+          BigDecimal[] values = new BigDecimal[numValues];
+          _dictionary.readBigDecimalValues(_reusableMVDictIds, numValues, values);
+          valuesBuffer[i] = values;
+        }
+      } else {
+        _reader.readValuesMV(docIds, length, _maxNumValuesPerMVEntry, valuesBuffer, readerContext);
+      }
+    }
+
     void readStringValuesMV(int[] docIds, int length, String[][] valuesBuffer) {
       Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       ForwardIndexReaderContext readerContext = getReaderContext();
@@ -590,9 +595,7 @@ public class DataFetcher implements AutoCloseable {
     }
   }
 
-  /**
-   * Close the DataFetcher and release all resources (specifically, the ForwardIndexReaderContext off-heap buffers).
-   */
+  /// Close the DataFetcher and release all resources (specifically, the ForwardIndexReaderContext off-heap buffers).
   @Override
   public void close() {
     for (ColumnValueReader columnValueReader : _columnValueReaderMap.values()) {

@@ -35,11 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is the runner class for the rule engine, it parses the input json and maps it to a input manager,
- * Then according to the _recommend* flags set in the RulesToExecute, the engine will call the corresponding rules
- * constructed by RuleFactory
- */
+/// This is the runner class for the rule engine, it parses the input json and maps it to a input manager,
+/// Then according to the \_recommend\* flags set in the RulesToExecute, the engine will call the corresponding rules
+/// constructed by RuleFactory
 public class RecommenderDriver {
   private RecommenderDriver() {
   }

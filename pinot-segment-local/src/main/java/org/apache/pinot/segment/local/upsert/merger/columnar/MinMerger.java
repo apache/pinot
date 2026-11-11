@@ -20,9 +20,7 @@ package org.apache.pinot.segment.local.upsert.merger.columnar;
 
 public class MinMerger implements PartialUpsertColumnMerger {
 
-  /**
-   * Keep the minimal value for the given field.
-   */
+  /// Keep the minimal value for the given field.
   @Override
   public Object merge(Object previousValue, Object currentValue) {
     return ((Comparable) previousValue).compareTo((Comparable) currentValue) < 0 ? previousValue : currentValue;

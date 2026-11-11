@@ -38,24 +38,25 @@ import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Broker response for single-stage engine.
- * This class can be used to serialize/deserialize the broker response.
- */
+/// Broker response for single-stage engine.
+/// This class can be used to serialize/deserialize the broker response.
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "clientRequestId", "brokerId", "numDocsScanned",
-    "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
-    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
-    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
-    "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
-    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "maxRowsWithoutChangeInDistinctReached",
+    "maxExecutionTimeInDistinctReached", "timeUsedMs", "requestId", "clientRequestId", "brokerId", "numDocsScanned",
+    "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried",
+    "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
+    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
+    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer",
+    "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "numRemoteAccesses",
+    "remoteAccessBytes", "numDirectRemoteAccesses", "directRemoteAccessBytes", "brokerReduceTimeMs",
+    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
-    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed"
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes", "pools",
+    "rlsFiltersApplied", "approximatedResult", "groupsTrimmed", "materializedViewQueried", "serverStats"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -74,6 +75,9 @@ public class BrokerResponseNative implements BrokerResponse {
   private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
+  private boolean _maxRowsInDistinctReached = false;
+  private boolean _maxRowsWithoutChangeInDistinctReached = false;
+  private boolean _maxExecutionTimeInDistinctReached = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
   private String _clientRequestId;
@@ -96,6 +100,10 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsPrunedInvalid = 0L;
   private long _numSegmentsPrunedByLimit = 0L;
   private long _numSegmentsPrunedByValue = 0L;
+  private long _numRemoteAccesses = 0L;
+  private long _remoteAccessBytes = 0L;
+  private long _numDirectRemoteAccesses = 0L;
+  private long _directRemoteAccessBytes = 0L;
   private long _brokerReduceTimeMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
@@ -116,6 +124,13 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
+  private boolean _approximatedResult = false;
+
+  @Nullable
+  private String _materializedViewQueried;
+
+  @Nullable
+  private String _serverStats;
 
   public BrokerResponseNative() {
   }
@@ -138,7 +153,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return brokerResponse;
   }
 
-  /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
+  /// Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server.
   private static BrokerResponseNative getBrokerResponseExplainPlanOutput() {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
     List<Object[]> rows = new ArrayList<>();
@@ -147,9 +162,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return brokerResponse;
   }
 
-  /**
-   * Get a new empty {@link BrokerResponseNative}.
-   */
+  /// Get a new empty [BrokerResponseNative].
   public static BrokerResponseNative empty() {
     return new BrokerResponseNative();
   }
@@ -189,7 +202,8 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInDistinctReached()
+        || isMaxRowsWithoutChangeInDistinctReached() || isMaxExecutionTimeInDistinctReached();
   }
 
   @Override
@@ -230,6 +244,30 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
     _numGroupsWarningLimitReached = numGroupsWarningLimitReached;
+  }
+
+  public boolean isMaxRowsInDistinctReached() {
+    return _maxRowsInDistinctReached;
+  }
+
+  public void setMaxRowsInDistinctReached(boolean maxRowsInDistinctReached) {
+    _maxRowsInDistinctReached = maxRowsInDistinctReached;
+  }
+
+  public boolean isMaxRowsWithoutChangeInDistinctReached() {
+    return _maxRowsWithoutChangeInDistinctReached;
+  }
+
+  public void setMaxRowsWithoutChangeInDistinctReached(boolean numRowsWithoutChangeInDistinctReached) {
+    _maxRowsWithoutChangeInDistinctReached = numRowsWithoutChangeInDistinctReached;
+  }
+
+  public boolean isMaxExecutionTimeInDistinctReached() {
+    return _maxExecutionTimeInDistinctReached;
+  }
+
+  public void setMaxExecutionTimeInDistinctReached(boolean timeLimitInDistinctReached) {
+    _maxExecutionTimeInDistinctReached = timeLimitInDistinctReached;
   }
 
   @JsonIgnore
@@ -445,6 +483,46 @@ public class BrokerResponseNative implements BrokerResponse {
     _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
   }
 
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumRemoteAccesses() {
+    return _numRemoteAccesses;
+  }
+
+  public void setNumRemoteAccesses(long numRemoteAccesses) {
+    _numRemoteAccesses = numRemoteAccesses;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getRemoteAccessBytes() {
+    return _remoteAccessBytes;
+  }
+
+  public void setRemoteAccessBytes(long remoteAccessBytes) {
+    _remoteAccessBytes = remoteAccessBytes;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getNumDirectRemoteAccesses() {
+    return _numDirectRemoteAccesses;
+  }
+
+  public void setNumDirectRemoteAccesses(long numDirectRemoteAccesses) {
+    _numDirectRemoteAccesses = numDirectRemoteAccesses;
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  @Override
+  public long getDirectRemoteAccessBytes() {
+    return _directRemoteAccessBytes;
+  }
+
+  public void setDirectRemoteAccessBytes(long directRemoteAccessBytes) {
+    _directRemoteAccessBytes = directRemoteAccessBytes;
+  }
+
   @Override
   public long getBrokerReduceTimeMs() {
     return _brokerReduceTimeMs;
@@ -568,12 +646,15 @@ public class BrokerResponseNative implements BrokerResponse {
   public void setOfflineThreadMemAllocatedBytes(long offlineThreadMemAllocatedBytes) {
     _offlineThreadMemAllocatedBytes = offlineThreadMemAllocatedBytes;
   }
+
   public void setRealtimeThreadMemAllocatedBytes(long realtimeThreadMemAllocatedBytes) {
     _realtimeThreadMemAllocatedBytes = realtimeThreadMemAllocatedBytes;
   }
+
   public void setOfflineResponseSerMemAllocatedBytes(long offlineResponseSerMemAllocatedBytes) {
     _offlineResponseSerMemAllocatedBytes = offlineResponseSerMemAllocatedBytes;
   }
+
   public void setRealtimeResponseSerMemAllocatedBytes(long realtimeResponseSerMemAllocatedBytes) {
     _realtimeResponseSerMemAllocatedBytes = realtimeResponseSerMemAllocatedBytes;
   }
@@ -598,5 +679,41 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;
+  }
+
+  @JsonProperty("approximatedResult")
+  public void setApproximatedResult(boolean approximatedResult) {
+    _approximatedResult = approximatedResult;
+  }
+
+  @JsonProperty("approximatedResult")
+  @Override
+  public boolean isApproximatedResult() {
+    return _approximatedResult;
+  }
+
+  @JsonProperty("materializedViewQueried")
+  public void setMaterializedViewQueried(@Nullable String materializedViewQueried) {
+    _materializedViewQueried = materializedViewQueried;
+  }
+
+  @Nullable
+  @JsonProperty("materializedViewQueried")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Override
+  public String getMaterializedViewQueried() {
+    return _materializedViewQueried;
+  }
+
+  @JsonProperty("serverStats")
+  public void setServerStats(@Nullable String serverStats) {
+    _serverStats = serverStats;
+  }
+
+  @Nullable
+  @JsonProperty("serverStats")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public String getServerStats() {
+    return _serverStats;
   }
 }

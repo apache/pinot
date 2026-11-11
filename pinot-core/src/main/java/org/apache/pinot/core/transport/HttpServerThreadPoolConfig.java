@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.transport;
 
-/**
- * This configures the thread pool configs for the Http servers in Pinot server, controller, broker and minion.
- */
+/// This configures the thread pool configs for the Http servers in Pinot server, controller, broker and minion.
 public class HttpServerThreadPoolConfig {
   private static final HttpServerThreadPoolConfig DEFAULT =
       new HttpServerThreadPoolConfig(Runtime.getRuntime().availableProcessors() * 2,

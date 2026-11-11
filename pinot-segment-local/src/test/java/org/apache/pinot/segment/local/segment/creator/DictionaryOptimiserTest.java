@@ -21,9 +21,9 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.avro.file.DataFileStream;
@@ -33,7 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -61,7 +61,10 @@ public class DictionaryOptimiserTest implements PinotBuffersAfterMethodCheckRule
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryOptimiserTest.class);
 
   private static final String AVRO_DATA = "data/mixed_cardinality_data.avro";
-  private static final File INDEX_DIR = new File(DictionariesTest.class.toString());
+  // Per-class unique dir so this test never shares an index directory with DictionariesTest (which
+  // used the same DictionariesTest.class-derived path) when the two run concurrently in parallel forks.
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectoryPath(),
+      DictionaryOptimiserTest.class.getSimpleName() + "-" + UUID.randomUUID());
 
   private static File _segmentDirectory;
 
@@ -82,7 +85,7 @@ public class DictionaryOptimiserTest implements PinotBuffersAfterMethodCheckRule
     final SegmentGeneratorConfig config =
         getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_column", TimeUnit.DAYS,
             "test");
-    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
     _segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
@@ -148,7 +151,7 @@ public class DictionaryOptimiserTest implements PinotBuffersAfterMethodCheckRule
 
     List<FieldConfig> fieldConfigList = stringColumns.stream()
         .map(x -> new FieldConfig(x.getName(), FieldConfig.EncodingType.DICTIONARY,
-        Collections.singletonList(FieldConfig.IndexType.TEXT), null, null)).collect(Collectors.toList());
+        List.of(FieldConfig.IndexType.TEXT), null, null)).collect(Collectors.toList());
 
     final SegmentGeneratorConfig segmentGenSpec =
         new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)

@@ -30,7 +30,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -79,11 +78,10 @@ public abstract class BaseSparkSegmentMetadataPushJobRunner implements Ingestion
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
 
-    List<String> segmentsToPush = new ArrayList<>();
-    for (String file : files) {
-      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        segmentsToPush.add(file);
-      }
+    List<String> segmentsToPush = new ArrayList<>(
+        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files).values());
+    if (segmentsToPush.isEmpty()) {
+      return;
     }
 
     int pushParallelism = _spec.getPushJobSpec().getPushParallelism();
@@ -102,14 +100,12 @@ public abstract class BaseSparkSegmentMetadataPushJobRunner implements Ingestion
     }
   }
 
-  /**
-   * Parallelizes the metadata push job using Spark to distribute the work across multiple nodes.
-   *
-   * @param segmentsToPush the list of segment URIs to be pushed
-   * @param pinotFSSpecs the list of Pinot file system specifications to be registered
-   * @param pushParallelism the level of parallelism for the push job
-   * @param outputDirURI the URI of the output directory containing the segments
-   */
+  /// Parallelizes the metadata push job using Spark to distribute the work across multiple nodes.
+  ///
+  /// @param segmentsToPush the list of segment URIs to be pushed
+  /// @param pinotFSSpecs the list of Pinot file system specifications to be registered
+  /// @param pushParallelism the level of parallelism for the push job
+  /// @param outputDirURI the URI of the output directory containing the segments
   public abstract void parallelizeMetadataPushJob(List<String> segmentsToPush, List<PinotFSSpec> pinotFSSpecs,
       int pushParallelism, URI outputDirURI);
 }

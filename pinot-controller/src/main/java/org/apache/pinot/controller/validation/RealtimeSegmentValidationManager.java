@@ -32,15 +32,16 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
+import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
-import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -51,10 +52,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming,
- * and uploading segments to deep store if segment download url is missing in the metadata.
- */
+/// Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming,
+/// and uploading segments to deep store if segment download url is missing in the metadata.
 public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<RealtimeSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);
   public static final String OFFSET_CRITERIA = "offsetCriteria";
@@ -77,8 +76,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker,
       ResourceUtilizationManager resourceUtilizationManager) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
-        config.getRealtimeSegmentValidationManagerInitialDelaySeconds(), pinotHelixResourceManager,
-        leadControllerManager, controllerMetrics);
+        config.getRealtimeSegmentValidationManagerInitialDelaySeconds(),
+        config.getRealtimeSegmentValidationCronExpression(),
+        pinotHelixResourceManager, leadControllerManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
     _controllerMetrics = controllerMetrics;
@@ -135,7 +135,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     boolean isPauselessTable = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
     if (isPauselessTable || _segmentAutoResetOnErrorAtValidation) {
-      // For realtime tables without dedup or partial upsert, repair segments in error state.
+      // Repair segments in error state. Dedup and partial upsert tables skip the repairs that consume from the stream
+      // again unless overridden (see repairSegmentsInErrorState).
       // When pauseless consumption is disabled, this behavior remains gated by
       // _segmentAutoResetOnErrorAtValidation to preserve legacy semantics.
       _llcRealtimeSegmentManager.repairSegmentsInErrorState(tableConfig,
@@ -148,12 +149,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
   }
 
-  /**
-   *
-   * Updates the table paused state based on pause validations (e.g. storage quota being exceeded).
-   * Skips updating the pause state if table is paused by admin.
-   * Returns true if table is not paused
-   */
+  /// Updates the table paused state based on pause validations (e.g. storage quota being exceeded).
+  /// Skips updating the pause state if table is paused by admin.
+  /// Returns true if table is not paused
   @VisibleForTesting
   boolean shouldEnsureConsuming(String tableNameWithType) {
     PauseStatusDetails pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
@@ -173,7 +171,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       if (!isTablePaused || !pauseStatus.getReasonCode()
           .equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
         _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType,
-            PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization limit exceeded.");
+            PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+            "Resource utilization limit exceeded. Check ResourceUtilizationManager log on controllers for detail "
+                + "reasons");
       }
       return false; // if resource utilization check failed, then skip subsequent checks
     } else if ((isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.PASS) && isTablePaused
@@ -189,7 +189,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
       // The table was previously paused due to exceeding resource utilization, but the current status cannot be
       // determined. To be safe, leave it as paused and once the status is available take the correct action
-      LOGGER.warn("Resource utilization limit could not be determined for for table: {}, and it is paused, leave it as "
+      LOGGER.warn("Resource utilization limit could not be determined for table: {}, and it is paused, leave it as "
           + "paused", tableNameWithType);
       return false;
     }
@@ -198,11 +198,19 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Perform storage quota checks.
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
-    if (isQuotaExceeded == isTablePaused) {
+    QuotaEnforcementMode enforcementMode = _storageQuotaChecker.getEnforcementMode(tableConfig);
+    if (isQuotaExceeded && enforcementMode == QuotaEnforcementMode.SHADOW) {
+      // The breach meter is already emitted by StorageQuotaChecker
+      LOGGER.warn("Storage quota exceeded for table: {}, but enforcement mode is SHADOW, not pausing consumption",
+          tableNameWithType);
+    }
+    // Only an enforced breach pauses consumption; a breach in SHADOW or DISABLED mode is treated as within quota
+    boolean shouldPauseForQuota = isQuotaExceeded && enforcementMode == QuotaEnforcementMode.ENFORCED;
+    if (shouldPauseForQuota == isTablePaused) {
       return !isTablePaused;
     }
     // if quota breach and pause flag is not in sync, update the IS
-    if (isQuotaExceeded) {
+    if (shouldPauseForQuota) {
       String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
       // as quota is breached pause the consumption right away
       _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
@@ -212,7 +220,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
           PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, "Table storage within quota limits");
     }
-    return !isQuotaExceeded;
+    return !shouldPauseForQuota;
   }
 
   private void runSegmentLevelValidation(TableConfig tableConfig) {

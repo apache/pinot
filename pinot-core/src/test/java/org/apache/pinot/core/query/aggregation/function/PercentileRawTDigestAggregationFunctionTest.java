@@ -1,0 +1,196 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.core.query.aggregation.function;
+
+import java.nio.ByteBuffer;
+import java.util.Comparator;
+import java.util.List;
+import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.TDigestTestUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
+
+/// Tests the legacy byte format and reader capacity contract of `percentileRawTDigest`.
+public class PercentileRawTDigestAggregationFunctionTest {
+  private static final int TDIGEST_TYPE = 10;
+
+  private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
+
+  @Test
+  public void testHistoricalUnknownQuantileOrdering() {
+    TDigest finiteDigest = TDigestAccumulator.forLegacyAggregation(100.0);
+    finiteDigest.add(0.5);
+    TDigest infinityDigest =
+        new PercentileTDigestValueAggregator(List.of()).getInitialAggregatedValue(Double.POSITIVE_INFINITY);
+    byte[] corruptBytes = TDigestCodec.serializeCentroids(100.0, 0.0, 1.0, new double[]{100.0}, new double[]{1.0}, 1);
+    TDigest unknownDigest = TDigestAccumulator.fromBytes(corruptBytes);
+    assertTrue(Double.isNaN(unknownDigest.quantile(0.5)));
+
+    SerializedTDigest finite = new SerializedTDigest(finiteDigest, 50.0);
+    SerializedTDigest infinity = new SerializedTDigest(infinityDigest, 50.0);
+    SerializedTDigest unknown = new SerializedTDigest(unknownDigest, 50.0);
+    assertTrue(finite.compareTo(infinity) < 0);
+    assertTrue(infinity.compareTo(unknown) < 0);
+    assertTrue(finite.compareTo(unknown) < 0);
+    List<SerializedTDigest> results = List.of(unknown, finite, infinity);
+    assertEquals(results.stream().sorted().toList(), List.of(finite, infinity, unknown));
+    assertEquals(results.stream().sorted(Comparator.reverseOrder()).toList(), List.of(unknown, infinity, finite));
+    for (SerializedTDigest first : List.of(finite, infinity, unknown)) {
+      for (SerializedTDigest second : List.of(finite, infinity, unknown)) {
+        assertEquals(Integer.signum(first.compareTo(second)), -Integer.signum(second.compareTo(first)));
+      }
+    }
+  }
+
+  @Test
+  public void testFinalResultPreservesLegacyCapacityState() {
+    int numCentroids = 51;
+    double compression = 20.0;
+    byte[] small = createSmallUnitCentroidDigest(numCentroids, compression, 60, 100);
+
+    TDigest direct = TDigestAccumulator.fromBytes(ByteBuffer.wrap(small));
+    assertEquals(direct.size(), numCentroids);
+
+    PercentileRawTDigestAggregationFunction function =
+        new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, (int) compression, false);
+    TDigest intermediateResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(small)));
+    assertTrue(intermediateResult instanceof TDigestAccumulator);
+
+    SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
+    byte[] serialized = BytesUtils.toBytes(finalResult.toString());
+    assertLegacyCompatibleShape(serialized, compression);
+    assertEquals(serialized, small, "Untouched legacy small state must retain its original bytes");
+
+    // Before the capacity fix, verbose output exceeded the allocation of a legacy reader.
+    TDigest roundTripped = TDigestAccumulator.fromBytes(ByteBuffer.wrap(serialized));
+    assertUnitCentroidDigest(roundTripped, numCentroids);
+
+    // Also cover the materialized (merged) accumulator state, not just the serialized pass-through.
+    TDigest merged = function.merge(intermediateResult,
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(small))));
+    byte[] mergedSerialized = BytesUtils.toBytes(function.extractFinalResult(merged).toString());
+    assertLegacyCompatibleShape(mergedSerialized, compression);
+    TDigest mergedRoundTripped = TDigestAccumulator.fromBytes(ByteBuffer.wrap(mergedSerialized));
+    assertEquals(mergedRoundTripped.size(), 2L * numCentroids);
+    assertEquals(mergedRoundTripped.quantile(0.5), (numCentroids - 1.0) / 2.0, 1.0);
+  }
+
+  @Test
+  public void testFinalResultRoundTripForRegularDigest() {
+    double compression = 100.0;
+    TDigest input = TDigestAccumulator.forLegacyAggregation(compression);
+    for (int i = 0; i < 1000; i++) {
+      input.add(i);
+    }
+    byte[] bytes = input.serialize();
+
+    PercentileRawTDigestAggregationFunction function =
+        new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, (int) compression, false);
+    TDigest intermediateResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(bytes)));
+
+    SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
+    byte[] serialized = BytesUtils.toBytes(finalResult.toString());
+    TDigest roundTripped = TDigestAccumulator.fromBytes(ByteBuffer.wrap(serialized));
+    assertEquals(roundTripped.size(), 1000);
+    assertEquals(roundTripped.quantile(0.5), input.quantile(0.5), 1e-6);
+  }
+
+  /// A verbose digest with more centroids than a t-digest 3.2 reader of the same compression allocates is accepted
+  /// since the 3.3 upgrade, but the emitted final result must stay readable by legacy readers.
+  @Test
+  public void testAccumulatorFinalSerializationIsLegacyCompatibleAtLowCompression() {
+    PercentileRawTDigestAggregationFunction function =
+        new PercentileRawTDigestAggregationFunction(EXPRESSION, 50.0, 20, false);
+    byte[] verbose = createVerboseUnitCentroidDigest(51, 20.0);
+    TDigest intermediateResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(verbose)));
+    assertTrue(intermediateResult instanceof TDigestAccumulator);
+
+    SerializedTDigest finalResult = function.extractFinalResult(intermediateResult);
+    byte[] serialized = BytesUtils.toBytes(finalResult.toString());
+    assertLegacyCompatibleShape(serialized, 20.0);
+
+    TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(serialized);
+    assertEquals(roundTripped.compression(), 20.0);
+    assertUnitCentroidDigest(roundTripped, 51);
+  }
+
+  /// Verbose-encoded digest (encoding 1) with unit-weight centroids at means 0..numCentroids-1. Package-private:
+  /// shared with [PercentileTDigestAggregationFunctionTest] and [PercentileSmartTDigestAggregationFunctionTest].
+  static byte[] createVerboseUnitCentroidDigest(int numCentroids, double compression) {
+    return TDigestTestUtils.unitCentroids(false, numCentroids, compression, 0, 0);
+  }
+
+  /// SMALL-encoded digest (encoding 2) with explicit main/buffer capacities, unit-weight centroids
+  /// at means 0..numCentroids-1. This is the layout t-digest's `asSmallBytes` produces and
+  /// legacy readers accept using the encoded capacity rather than the default for the compression.
+  /// Package-private: shared with [PercentileSmartTDigestAggregationFunctionTest].
+  static byte[] createSmallUnitCentroidDigest(int numCentroids, double compression, int mainCapacity,
+      int bufferCapacity) {
+    return TDigestTestUtils.unitCentroids(true, numCentroids, compression, mainCapacity, bufferCapacity);
+  }
+
+  static void assertLegacyCompatibleShape(byte[] bytes, double compression) {
+    // Decode the documented legacy header independently of the production codec. The centroid count must fit
+    // the allocation that a tdunning reader makes before it consumes any centroid payload.
+    ByteBuffer buffer = ByteBuffer.wrap(bytes);
+    int encoding = buffer.getInt();
+    buffer.position(Integer.BYTES + 2 * Double.BYTES);
+    int centroidCount;
+    int centroidSize;
+    if (encoding == 1) {
+      assertEquals(buffer.getDouble(), compression);
+      centroidCount = buffer.getInt();
+      centroidSize = 2 * Double.BYTES;
+      assertTrue(centroidCount <= 2 * Math.ceil(compression) + 10,
+          "Verbose encoding exceeds the legacy reader centroid capacity: " + centroidCount);
+    } else {
+      assertEquals(encoding, 2, "Unexpected t-digest encoding");
+      assertEquals(buffer.getFloat(), (float) compression);
+      int mainCapacity = buffer.getShort();
+      int bufferCapacity = buffer.getShort();
+      centroidCount = buffer.getShort();
+      centroidSize = 2 * Float.BYTES;
+      assertTrue(mainCapacity >= centroidCount);
+      assertTrue(bufferCapacity >= mainCapacity);
+    }
+    assertTrue(centroidCount >= 0);
+    assertEquals(buffer.remaining(), centroidCount * centroidSize);
+  }
+
+  private static void assertUnitCentroidDigest(TDigest digest, int expectedSize) {
+    assertEquals(digest.size(), expectedSize);
+    assertEquals(digest.quantile(0.0), 0.0);
+    assertEquals(digest.quantile(0.5), (expectedSize - 1.0) / 2.0, 1.0);
+    assertEquals(digest.quantile(1.0), expectedSize - 1.0);
+  }
+}

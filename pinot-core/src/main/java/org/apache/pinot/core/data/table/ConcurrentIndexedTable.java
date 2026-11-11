@@ -22,13 +22,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Thread safe {@link Table} implementation for aggregating Records based on combination of keys
- */
+/// Thread safe [Table] implementation for aggregating Records based on combination of keys
 public class ConcurrentIndexedTable extends IndexedTable {
   private final AtomicBoolean _noMoreNewRecords = new AtomicBoolean();
   private final ReentrantReadWriteLock _readWriteLock = new ReentrantReadWriteLock();
@@ -39,15 +38,13 @@ public class ConcurrentIndexedTable extends IndexedTable {
         new ConcurrentHashMap<>(initialCapacity), executorService);
   }
 
-  /**
-   * Thread safe implementation of upsert for inserting {@link Record} into {@link Table}
-   */
+  /// Thread safe implementation of upsert for inserting [Record] into [Table]
   @Override
   public boolean upsert(Key key, Record record) {
     if (_hasOrderBy) {
       upsertWithOrderBy(key, record);
     } else {
-      upsertWithoutOrderBy(key, record);
+      upsertWithoutOrderBy(key, record, null);
     }
     return true;
   }
@@ -72,12 +69,16 @@ public class ConcurrentIndexedTable extends IndexedTable {
     }
   }
 
-  protected void upsertWithoutOrderBy(Key key, Record record) {
+  @Override
+  protected void upsertWithoutOrderBy(Key key, @Nullable Record record, @Nullable Object result) {
     if (_noMoreNewRecords.get()) {
-      updateExistingRecord(key, record);
+      updateExistingRecord(key, record, result);
     } else {
-      addOrUpdateRecord(key, record);
-      if (_lookupMap.size() >= _resultSize) {
+      addOrUpdateRecord(key, record, result);
+      // ConcurrentHashMap.size() sums a striped counter-cell array, so calling it per upsert is measurably
+      // expensive under multi-threaded combine. Skip it entirely when the result size is unbounded (e.g. the
+      // grouping-sets derive table): the cap can never engage, so the check is pure overhead.
+      if (_resultSize != Integer.MAX_VALUE && _lookupMap.size() >= _resultSize) {
         _noMoreNewRecords.set(true);
       }
     }

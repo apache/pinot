@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -31,7 +34,6 @@ import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
-import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigSchemaRefreshMessage;
@@ -44,8 +46,13 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
-import org.apache.pinot.spi.config.workload.InstanceCost;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.OpenStructNaming;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,8 +62,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   // We only allow limited number of segments refresh/reload happen at the same time
   // The reason for that is segment refresh/reload will temporarily use double-sized memory
-  private final InstanceDataManager _instanceDataManager;
-  private final ServerMetrics _metrics;
+  protected final InstanceDataManager _instanceDataManager;
+  protected final ServerMetrics _metrics;
 
   public SegmentMessageHandlerFactory(InstanceDataManager instanceDataManager, ServerMetrics metrics) {
     _instanceDataManager = instanceDataManager;
@@ -80,9 +87,6 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
       case TableConfigSchemaRefreshMessage.REFRESH_TABLE_CONFIG_AND_SCHEMA:
         return new TableSchemaRefreshMessageHandler(new TableConfigSchemaRefreshMessage(message), _metrics, context);
-      case QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE:
-      case QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE:
-        return new QueryWorkloadRefreshMessageHandler(new QueryWorkloadRefreshMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -125,6 +129,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private class SegmentReloadMessageHandler extends DefaultMessageHandler {
     private final boolean _forceDownload;
+    private final boolean _onlyIfNeeded;
     private final List<String> _segmentList;
     private final String _reloadJobId;
 
@@ -132,6 +137,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
       _forceDownload = segmentReloadMessage.shouldForceDownload();
+      _onlyIfNeeded = segmentReloadMessage.shouldReloadOnlyIfNeeded();
       _segmentList = segmentReloadMessage.getSegmentList();
       _reloadJobId = segmentReloadMessage.getReloadJobId();
     }
@@ -142,16 +148,18 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       _logger.info("Handling message: {}", _message);
       try {
         if (CollectionUtils.isNotEmpty(_segmentList)) {
-          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload, _reloadJobId);
+          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload, _onlyIfNeeded,
+              _reloadJobId);
         } else if (StringUtils.isNotEmpty(_segmentName)) {
           // TODO: check _segmentName to be backward compatible. Moving forward, we just need to check the list to
           //       reload one or more segments. If the list or the segment name is empty, all segments are reloaded.
-          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload, _reloadJobId);
+          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload, _onlyIfNeeded,
+              _reloadJobId);
         } else {
           // NOTE: the method continues if any segment reload encounters an unhandled exception,
           // and failed segments are logged out in the end. We don't acquire any permit here as they'll be acquired
           // by worked threads later.
-          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _reloadJobId);
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _onlyIfNeeded, _reloadJobId);
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {
@@ -175,6 +183,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling table deletion message: {}", _message);
+      // Resolved before the table goes away: these gauge keys come from the table config, and the only
+      // in-memory copy of it lives on the table data manager that deleteTable is about to discard.
+      List<String> openStructMetricKeys = resolveOpenStructMetricKeys();
       try {
         long deletionTimeMs = _message.getCreateTimeStamp();
         if (deletionTimeMs <= 0) {
@@ -194,6 +205,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         Arrays.stream(ServerGauge.values())
             .filter(g -> !g.isGlobal())
             .forEach(g -> _metrics.removeTableGauge(_tableNameWithType, g));
+        // OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT registers as <gauge>.<table>.<column>$<key>, so the sweep above --
+        // which composes only the unkeyed <gauge>.<table> -- cannot reach it. Only the configured keys are
+        // recoverable here; see openStructMetricKeys for the keys this misses.
+        openStructMetricKeys.forEach(
+            metricKey -> _metrics.removeTableGauge(_tableNameWithType, metricKey,
+                ServerGauge.OPEN_STRUCT_LAST_SEGMENT_KEY_DOC_COUNT));
         Arrays.stream(ServerTimer.values())
             .filter(t -> !t.isGlobal())
             .forEach(t -> _metrics.removeTableTimer(_tableNameWithType, t));
@@ -205,6 +222,41 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       }
       return helixTaskResult;
     }
+
+    private List<String> resolveOpenStructMetricKeys() {
+      try {
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
+        if (tableDataManager == null) {
+          return List.of();
+        }
+        Pair<TableConfig, Schema> configAndSchema = tableDataManager.getCachedTableConfigAndSchema();
+        return configAndSchema == null ? List.of()
+            : openStructMetricKeys(configAndSchema.getLeft(), configAndSchema.getRight());
+      } catch (Exception e) {
+        // Metric bookkeeping must never block table deletion.
+        _logger.warn("Could not resolve OPEN_STRUCT gauge keys for table: {}; its per-key gauges may survive until "
+            + "the next restart", _tableNameWithType, e);
+        return List.of();
+      }
+    }
+  }
+
+  /// The `<column>$<key>` metric keys of the per-key OPEN_STRUCT gauges recoverable from the given
+  /// table's config — one per configured `denseKeys` entry. Complete when `perKeyMetricsEnabled` is
+  /// off; a subset when on, since discovered keys exist only in ingested data and cannot be named at
+  /// deletion time. Gauges for discovered keys survive until the server restarts.
+  @VisibleForTesting
+  static List<String> openStructMetricKeys(TableConfig tableConfig, Schema schema) {
+    List<String> metricKeys = new ArrayList<>();
+    FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema).forEach((column, indexConfigs) -> {
+      IndexConfig openStructConfig = indexConfigs.getConfig(StandardIndexes.openStruct());
+      if (openStructConfig instanceof OpenStructIndexConfig) {
+        for (String key : ((OpenStructIndexConfig) openStructConfig).getDenseKeys()) {
+          metricKeys.add(OpenStructNaming.metricKey(column, key));
+        }
+      }
+    });
+    return metricKeys;
   }
 
   private class ForceCommitMessageHandler extends DefaultMessageHandler {
@@ -266,8 +318,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
         if (tableDataManager != null) {
-          // Update the table config and schema by fetching from ZK
-          tableDataManager.fetchIndexLoadingConfig();
+          // A genuine table config / schema change: notify the table data manager so it can refresh the cached config
+          // and schema (and react to the change) without going through the incidental index-loading-config fetch.
+          tableDataManager.onTableConfigOrSchemaRefresh();
         } else {
           _logger.warn("No data manager found for table: {}", _tableNameWithType);
         }
@@ -278,52 +331,6 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;
-    }
-  }
-
-  private static class QueryWorkloadRefreshMessageHandler extends DefaultMessageHandler {
-    final String _queryWorkloadName;
-    final InstanceCost _instanceCost;
-    final String _messageType;
-
-    QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
-                                       ServerMetrics metrics, NotificationContext context) {
-      super(queryWorkloadRefreshMessage, metrics, context);
-      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadName();
-      _instanceCost = queryWorkloadRefreshMessage.getInstanceCost();
-      _messageType = queryWorkloadRefreshMessage.getMsgSubType();
-    }
-
-    @Override
-    public HelixTaskResult handleMessage() {
-      LOGGER.info("Handling query workload message: {}", _message);
-      try {
-        if (_messageType.equals(QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
-          WorkloadBudgetManager.get().deleteWorkload(_queryWorkloadName);
-        } else if (_messageType.equals(QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
-          if (_instanceCost == null) {
-            throw new IllegalStateException(
-                "Instance cost is not provided for refreshing query workload: " + _queryWorkloadName);
-          }
-          WorkloadBudgetManager.get()
-              .addOrUpdateWorkload(_queryWorkloadName, _instanceCost.getCpuCostNs(),
-                  _instanceCost.getMemoryCostBytes());
-        } else {
-          throw new IllegalStateException("Unknown message type: " + _messageType);
-        }
-        HelixTaskResult result = new HelixTaskResult();
-        result.setSuccess(true);
-        return result;
-      } catch (Exception e) {
-        LOGGER.warn("Failed to handle query workload message: {}", _queryWorkloadName, e);
-        throw e;
-      }
-    }
-
-    @Override
-    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
-      LOGGER.error("Got error while refreshing query workload config for query workload: {} (error code: {},"
-          + " error type: {})", _queryWorkloadName, errorCode, errorType, e);
     }
   }
 

@@ -33,6 +33,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.reduce.PostAggregationHandler;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
@@ -80,59 +81,84 @@ public class EmptyResponseUtils {
   private static ResultTable buildEmptyAggregationResultTable(QueryContext queryContext) {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
-    List<String> aliases = queryContext.getAliasList();
     assert filteredAggregationFunctions != null;
     int numAggregations = filteredAggregationFunctions.size();
-    String[] columnNames = new String[numAggregations];
-    ColumnDataType[] columnDataTypes = new ColumnDataType[numAggregations];
-    Object[] row = new Object[numAggregations];
+
+    // Build pre-post-aggregation DataSchema from individual aggregation functions
+    String[] preAggColumnNames = new String[numAggregations];
+    ColumnDataType[] preAggColumnDataTypes = new ColumnDataType[numAggregations];
+    Object[] rawRow = new Object[numAggregations];
     for (int i = 0; i < numAggregations; i++) {
       Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
       AggregationFunction aggregationFunction = pair.getLeft();
-      if (aliases.size() == numAggregations && aliases.get(i) != null) {
-        columnNames[i] = aliases.get(i);
-      } else {
-        columnNames[i] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
-      }
-      columnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
+      preAggColumnNames[i] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
+      preAggColumnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
       Object finalResult = aggregationFunction.extractFinalResult(
           aggregationFunction.extractAggregationResult(aggregationFunction.createAggregationResultHolder()));
-      row[i] = finalResult != null ? columnDataTypes[i].convert(finalResult) : null;
+      rawRow[i] = finalResult != null ? preAggColumnDataTypes[i].convert(finalResult) : null;
     }
-    return new ResultTable(new DataSchema(columnNames, columnDataTypes), List.<Object[]>of(row));
+    DataSchema prePostAggDataSchema = new DataSchema(preAggColumnNames, preAggColumnDataTypes);
+
+    // Use PostAggregationHandler to evaluate post-aggregation expressions and reorder columns
+    PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, prePostAggDataSchema);
+    DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
+    Object[] resultRow = postAggregationHandler.getResult(rawRow);
+
+    applyAliases(queryContext, resultDataSchema);
+    return new ResultTable(resultDataSchema, List.<Object[]>of(resultRow));
   }
 
   private static ResultTable buildEmptyGroupByResultTable(QueryContext queryContext) {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
-    List<String> aliases = queryContext.getAliasList();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert filteredAggregationFunctions != null && groupByExpressions != null;
-    int numColumns = groupByExpressions.size() + filteredAggregationFunctions.size();
-    String[] columnNames = new String[numColumns];
-    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
-    int index = 0;
-    for (ExpressionContext groupByExpression : groupByExpressions) {
-      if (aliases.size() == numColumns && aliases.get(index) != null) {
-        columnNames[index] = aliases.get(index);
-      } else {
-        columnNames[index] = groupByExpression.toString();
-      }
+    int numGroupByExpressions = groupByExpressions.size();
+    int numAggregations = filteredAggregationFunctions.size();
+    int numColumns = numGroupByExpressions + numAggregations;
+
+    // Build pre-post-aggregation DataSchema with group-by columns followed by aggregation columns
+    String[] preAggColumnNames = new String[numColumns];
+    ColumnDataType[] preAggColumnDataTypes = new ColumnDataType[numColumns];
+    for (int i = 0; i < numGroupByExpressions; i++) {
+      preAggColumnNames[i] = groupByExpressions.get(i).toString();
       // Use STRING column data type as default for group-by expressions
-      columnDataTypes[index] = ColumnDataType.STRING;
-      index++;
+      preAggColumnDataTypes[i] = ColumnDataType.STRING;
     }
-    for (Pair<AggregationFunction, FilterContext> pair : filteredAggregationFunctions) {
+    for (int i = 0; i < numAggregations; i++) {
+      Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
       AggregationFunction aggregationFunction = pair.getLeft();
-      if (aliases.size() == numColumns && aliases.get(index) != null) {
-        columnNames[index] = aliases.get(index);
-      } else {
-        columnNames[index] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
-      }
-      columnDataTypes[index] = aggregationFunction.getFinalResultColumnType();
-      index++;
+      preAggColumnNames[numGroupByExpressions + i] =
+          AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
+      preAggColumnDataTypes[numGroupByExpressions + i] = aggregationFunction.getFinalResultColumnType();
     }
-    return new ResultTable(new DataSchema(columnNames, columnDataTypes), List.of());
+    DataSchema prePostAggDataSchema = new DataSchema(preAggColumnNames, preAggColumnDataTypes);
+
+    // Use PostAggregationHandler to evaluate post-aggregation expressions and reorder columns
+    PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, prePostAggDataSchema);
+    DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
+
+    applyAliases(queryContext, resultDataSchema);
+    return new ResultTable(resultDataSchema, List.of());
+  }
+
+  private static void applyAliases(QueryContext queryContext, DataSchema dataSchema) {
+    List<String> aliasList = queryContext.getAliasList();
+    if (aliasList == null || aliasList.isEmpty()) {
+      return;
+    }
+    String[] columnNames = dataSchema.getColumnNames();
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    int numSelectExpressions = selectExpressions.size();
+    if (columnNames.length != numSelectExpressions || aliasList.size() != numSelectExpressions) {
+      return;
+    }
+    for (int i = 0; i < numSelectExpressions; i++) {
+      String alias = aliasList.get(i);
+      if (alias != null) {
+        columnNames[i] = alias;
+      }
+    }
   }
 
   /// Tries to fill an [DataSchema] when no row has been returned.

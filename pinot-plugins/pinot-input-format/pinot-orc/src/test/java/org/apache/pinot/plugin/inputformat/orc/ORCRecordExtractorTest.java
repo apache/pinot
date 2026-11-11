@@ -18,18 +18,11 @@
  */
 package org.apache.pinot.plugin.inputformat.orc;
 
-import com.google.common.collect.Sets;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.Map;
-import java.util.Set;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
+import java.util.function.Consumer;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
@@ -38,326 +31,249 @@ import org.apache.hadoop.hive.ql.exec.vector.ListColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.MapColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.StructColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.TimestampColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
-import org.apache.orc.OrcFile;
 import org.apache.orc.TypeDescription;
-import org.apache.orc.Writer;
-import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
-import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
-/**
- * Tests the {@link ORCRecordReader} using a schema containing groovy transform functions
- */
-public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
-  private final File _dataFile = new File(_tempDir, "events.orc");
+/// Tests [ORCRecordExtractor] directly — no ORC file IO. Each test builds a one-row [VectorizedRowBatch]
+/// in-memory, populates the column vector via the test-provided lambda, and runs the extractor. See the
+/// extractor's class Javadoc for the ORC schema category → Java output type matrix.
+public class ORCRecordExtractorTest {
 
-  /**
-   * Create an ORCRecordReader
-   */
-  @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
-      throws IOException {
-    ORCRecordReader orcRecordReader = new ORCRecordReader();
-    orcRecordReader.init(_dataFile, fieldsToRead, null);
-    return orcRecordReader;
+  private static final String COLUMN = "col";
+
+  // === Single-value — order follows the ORC type list in the class Javadoc ===
+
+  @Test
+  public void testBooleanPreserved() {
+    Object result = extract("boolean", batch -> ((LongColumnVector) batch.cols[0]).vector[0] = 1);
+    assertEquals(result, true);
   }
 
-  /**
-   * Create an ORC input file using the input records
-   */
-  @Override
-  protected void createInputFile()
-      throws IOException {
-    // CHECKSTYLE:OFF
-    // @format:off
-    TypeDescription schema = TypeDescription.fromString(
-        "struct<" + "userID:int," + "firstName:string," + "bids:array<int>," + "cost:double," + "timestamp:bigint,"
-            + "simpleStruct:struct<structString:string,structLong:bigint,structDouble:double>,"
-            + "complexStruct:struct<structString:string,nestedStruct:struct<nestedStructInt:int,"
-            + "nestedStructLong:bigint>>,"
-            + "complexList:array<struct<complexListInt:int,complexListDouble:decimal(10,5)>>,"
-            + "simpleMap:map<string,int>,"
-            + "complexMap:map<string,struct<doubleField:double,stringField:string>>" + ">");
-    // @format:on
-    // CHECKSTYLE:ON
-
-    int numRecords = _inputRecords.size();
-    VectorizedRowBatch rowBatch = schema.createRowBatch(numRecords);
-    LongColumnVector userIdVector = (LongColumnVector) rowBatch.cols[0];
-    userIdVector.noNulls = false;
-    BytesColumnVector firstNameVector = (BytesColumnVector) rowBatch.cols[1];
-    firstNameVector.noNulls = false;
-
-    // simple list containing long
-    ListColumnVector bidsVector = (ListColumnVector) rowBatch.cols[2];
-    bidsVector.noNulls = false;
-    LongColumnVector bidsElementVector = (LongColumnVector) bidsVector.child;
-    bidsElementVector.ensureSize(6, false);
-
-    DoubleColumnVector costVector = (DoubleColumnVector) rowBatch.cols[3];
-    LongColumnVector timestampVector = (LongColumnVector) rowBatch.cols[4];
-
-    // simple struct - string, long, and double
-    StructColumnVector simpleStructVector = (StructColumnVector) rowBatch.cols[5];
-    simpleStructVector.noNulls = false;
-    BytesColumnVector simpleStructBytesVector = (BytesColumnVector) simpleStructVector.fields[0];
-    LongColumnVector simpleStructLongVector = (LongColumnVector) simpleStructVector.fields[1];
-    DoubleColumnVector simpleStructDoubleVector = (DoubleColumnVector) simpleStructVector.fields[2];
-
-    // complex struct - string and struct containing int and long
-    StructColumnVector complexStructVector = (StructColumnVector) rowBatch.cols[6];
-    complexStructVector.noNulls = false;
-    BytesColumnVector complexStructBytesVector = (BytesColumnVector) complexStructVector.fields[0];
-    StructColumnVector complexStructInnerVector = (StructColumnVector) complexStructVector.fields[1];
-    LongColumnVector complexStructIntVector = (LongColumnVector) complexStructInnerVector.fields[0];
-    LongColumnVector complexStructLongVector = (LongColumnVector) complexStructInnerVector.fields[1];
-
-    // complex list elements - each element is a struct containing int and long
-    ListColumnVector complexListVector = (ListColumnVector) rowBatch.cols[7];
-    complexListVector.noNulls = false;
-    StructColumnVector complexListElementVector = (StructColumnVector) complexListVector.child;
-    LongColumnVector complexListIntVector = (LongColumnVector) complexListElementVector.fields[0];
-    complexListIntVector.ensureSize(5, false);
-    DecimalColumnVector complexListDoubleVector = (DecimalColumnVector) complexListElementVector.fields[1];
-    complexListDoubleVector.ensureSize(5, false);
-
-    // simple map - string key and value long
-    MapColumnVector simpleMapVector = (MapColumnVector) rowBatch.cols[8];
-    simpleMapVector.noNulls = false;
-    BytesColumnVector simpleMapKeysVector = (BytesColumnVector) simpleMapVector.keys;
-    LongColumnVector simpleMapValuesVector = (LongColumnVector) simpleMapVector.values;
-    simpleMapKeysVector.ensureSize(6, false);
-    simpleMapValuesVector.ensureSize(6, false);
-
-    // complex map - string key and struct value containing double and string
-    MapColumnVector complexMapVector = (MapColumnVector) rowBatch.cols[9];
-    complexMapVector.noNulls = false;
-    BytesColumnVector complexMapKeysVector = (BytesColumnVector) complexMapVector.keys;
-    complexMapKeysVector.ensureSize(6, false);
-    StructColumnVector complexMapValuesVector = (StructColumnVector) complexMapVector.values;
-    DoubleColumnVector complexMapValueDoubleVector = (DoubleColumnVector) complexMapValuesVector.fields[0];
-    complexMapValueDoubleVector.ensureSize(6, false);
-    BytesColumnVector complexMapValueBytesVector = (BytesColumnVector) complexMapValuesVector.fields[1];
-    complexMapValueBytesVector.ensureSize(6, false);
-
-    Writer writer = OrcFile.createWriter(new Path(_dataFile.getAbsolutePath()),
-        OrcFile.writerOptions(new Configuration()).setSchema(schema).overwrite(true));
-    for (int i = 0; i < numRecords; i++) {
-      Map<String, Object> record = _inputRecords.get(i);
-
-      Integer userId = (Integer) record.get("userID");
-      if (userId != null) {
-        userIdVector.vector[i] = userId;
-      } else {
-        userIdVector.isNull[i] = true;
-      }
-
-      String firstName = (String) record.get("firstName");
-      if (firstName != null) {
-        firstNameVector.setVal(i, firstName.getBytes(UTF_8));
-      } else {
-        firstNameVector.isNull[i] = true;
-      }
-
-      List<Integer> bids = (List<Integer>) record.get("bids");
-      if (bids != null) {
-        bidsVector.offsets[i] = bidsVector.childCount;
-        bidsVector.lengths[i] = bids.size();
-        for (int bid : bids) {
-          bidsElementVector.vector[bidsVector.childCount++] = bid;
-        }
-      } else {
-        bidsVector.isNull[i] = true;
-      }
-
-      costVector.vector[i] = (double) record.get("cost");
-      timestampVector.vector[i] = (long) record.get("timestamp");
-
-      // simple map with string key and int value
-      Map<String, Integer> simpleMap = (Map<String, Integer>) record.get("simpleMap");
-      if (simpleMap != null) {
-        simpleMapVector.offsets[i] = simpleMapVector.childCount;
-        simpleMapVector.lengths[i] = simpleMap.size();
-        for (Map.Entry<String, Integer> entry : simpleMap.entrySet()) {
-          simpleMapKeysVector.setVal(simpleMapVector.childCount, entry.getKey().getBytes(UTF_8));
-          simpleMapValuesVector.vector[simpleMapVector.childCount] = entry.getValue();
-          simpleMapVector.childCount++;
-        }
-      } else {
-        simpleMapVector.isNull[i] = true;
-      }
-
-      // simple struct with long and double values
-      Map<String, Object> struct1 = (Map<String, Object>) record.get("simpleStruct");
-      if (struct1 != null) {
-        simpleStructBytesVector.setVal(i, ((String) struct1.get("structString")).getBytes(UTF_8));
-        simpleStructLongVector.vector[i] = (long) struct1.get("structLong");
-        simpleStructDoubleVector.vector[i] = (double) struct1.get("structDouble");
-      } else {
-        simpleStructVector.isNull[i] = true;
-      }
-
-      // complex struct - string, struct containing int and long
-      Map<String, Object> complexStruct = (Map<String, Object>) record.get("complexStruct");
-      if (complexStruct != null) {
-        complexStructBytesVector.setVal(i, ((String) complexStruct.get("structString")).getBytes(UTF_8));
-        // Set nested struct vector
-        complexStructIntVector.vector[i] =
-            (Integer) ((Map<String, Object>) complexStruct.get("nestedStruct")).get("nestedStructInt");
-        complexStructLongVector.vector[i] =
-            (Long) ((Map<String, Object>) complexStruct.get("nestedStruct")).get("nestedStructLong");
-      } else {
-        complexStructVector.isNull[i] = true;
-      }
-
-      // complex list elements
-      List<Map<String, Object>> complexList = (List<Map<String, Object>>) record.get("complexList");
-      if (complexList != null) {
-        complexListVector.offsets[i] = complexListVector.childCount;
-        complexListVector.lengths[i] = complexList.size();
-        for (Map<String, Object> complexElement : complexList) {
-          complexListIntVector.vector[complexListVector.childCount] = (int) complexElement.get("complexListInt");
-          complexListDoubleVector.vector[complexListVector.childCount] =
-          new HiveDecimalWritable(HiveDecimal.create((String) complexElement.get("complexListDouble")));
-          complexListVector.childCount++;
-        }
-      } else {
-        complexListVector.isNull[i] = true;
-      }
-
-      // complex map with key string and struct. struct contains double and string.
-      Map<String, Map<String, Object>> complexMap = (Map<String, Map<String, Object>>) record.get("complexMap");
-      if (complexMap != null) {
-        complexMapVector.offsets[i] = complexMapVector.childCount;
-        complexMapVector.lengths[i] = complexMap.size();
-        for (Map.Entry<String, Map<String, Object>> entry : complexMap.entrySet()) {
-          complexMapKeysVector.setVal(complexMapVector.childCount, entry.getKey().getBytes(UTF_8));
-          complexMapValueDoubleVector.vector[complexMapVector.childCount] =
-              (double) entry.getValue().get("doubleField");
-          complexMapValueBytesVector.setVal(complexMapVector.childCount,
-              ((String) entry.getValue().get("stringField")).getBytes(UTF_8));
-          complexMapVector.childCount++;
-        }
-      } else {
-        complexMapVector.isNull[i] = true;
-      }
-
-      rowBatch.size++;
-    }
-
-    writer.addRowBatch(rowBatch);
-    rowBatch.reset();
-    writer.close();
+  @Test
+  public void testTinyIntExtractedAsInteger() {
+    Object result = extract("tinyint", batch -> ((LongColumnVector) batch.cols[0]).vector[0] = 7);
+    assertEquals(result, 7);
   }
 
-  @Override
-  protected List<Map<String, Object>> getInputRecords() {
-    // simple struct - contains a string, long and double array
-    Map[] simpleStructs = new Map[]{
-        null, createStructInput("structString", "abc", "structLong", 1000L, "structDouble", 5.99999),
-        createStructInput("structString", "def", "structLong", 2000L, "structDouble", 6.99999),
-        createStructInput("structString", "ghi", "structLong", 3000L, "structDouble", 7.99999)
-    };
-
-    // complex struct - contains a string and nested struct of int and long
-    Map[] complexStructs = new Map[]{
-        createStructInput("structString", "abc", "nestedStruct",
-            createStructInput("nestedStructInt", 4, "nestedStructLong", 4000L)),
-        createStructInput("structString", "def", "nestedStruct",
-            createStructInput("nestedStructInt", 5, "nestedStructLong", 5000L)), null,
-        createStructInput("structString", "ghi", "nestedStruct",
-            createStructInput("nestedStructInt", 6, "nestedStructLong", 6000L))
-    };
-
-    // complex list element - each element contains a struct of int and double
-    List[] complexLists = new List[]{
-        Arrays.asList(createStructInput("complexListInt", 10, "complexListDouble", "100"),
-            createStructInput("complexListInt", 20, "complexListDouble", "200.212")), null,
-        Collections.singletonList(createStructInput("complexListInt", 30, "complexListDouble", "300.378")),
-        Arrays.asList(createStructInput("complexListInt", 40, "complexListDouble", "400.1"),
-            createStructInput("complexListInt", 50, "complexListDouble", "500.2323"))
-    };
-
-    // single value integer
-    Integer[] userID = new Integer[]{1, 2, null, 4};
-
-    // single value string
-    String[] firstName = new String[]{null, "John", "Ringo", "George"};
-
-    // collection of integers
-    List[] bids = new List[]{Arrays.asList(10, 20), null, Collections.singletonList(1), Arrays.asList(1, 2, 3)};
-
-    // single value double
-    double[] cost = new double[]{10000, 20000, 30000, 25000};
-
-    // single value long
-    long[] timestamp = new long[]{1570863600000L, 1571036400000L, 1571900400000L, 1574000000000L};
-
-    // simple map with string keys and integer values
-    Map[] simpleMaps = new Map[]{
-        createStructInput("key1", 10, "key2", 20), null, createStructInput("key3", 30),
-        createStructInput("key4", 40, "key5", 50)
-    };
-
-    // complex map with struct values - struct contains double and string
-    Map[] complexMap = new Map[]{
-        createStructInput("key1", createStructInput("doubleField", 2.0, "stringField", "abc")), null,
-        createStructInput("key1", createStructInput("doubleField", 3.0, "stringField", "xyz"), "key2",
-            createStructInput("doubleField", 4.0, "stringField", "abc123")),
-        createStructInput("key1", createStructInput("doubleField", 3.0, "stringField", "xyz"), "key2",
-            createStructInput("doubleField", 4.0, "stringField", "abc123"), "key3",
-            createStructInput("doubleField", 4.0, "stringField", "asdf"))
-    };
-
-    List<Map<String, Object>> inputRecords = new ArrayList<>(4);
-    for (int i = 0; i < 4; i++) {
-      Map<String, Object> record = new HashMap<>();
-      record.put("userID", userID[i]);
-      record.put("firstName", firstName[i]);
-      record.put("bids", bids[i]);
-      record.put("cost", cost[i]);
-      record.put("timestamp", timestamp[i]);
-      record.put("simpleStruct", simpleStructs[i]);
-      record.put("complexStruct", complexStructs[i]);
-      record.put("complexList", complexLists[i]);
-      record.put("simpleMap", simpleMaps[i]);
-      record.put("complexMap", complexMap[i]);
-
-      inputRecords.add(record);
-    }
-    return inputRecords;
+  @Test
+  public void testSmallIntExtractedAsInteger() {
+    Object result = extract("smallint", batch -> ((LongColumnVector) batch.cols[0]).vector[0] = 42);
+    assertEquals(result, 42);
   }
 
-  @Override
-  protected Set<String> getSourceFields() {
-    return Sets
-        .newHashSet("userID", "firstName", "bids", "cost", "timestamp", "simpleMap", "simpleStruct", "complexStruct",
-            "complexList", "complexMap");
+  @Test
+  public void testIntPreserved() {
+    Object result = extract("int", batch -> ((LongColumnVector) batch.cols[0]).vector[0] = 1234);
+    assertEquals(result, 1234);
   }
 
-  private Map<String, Object> createStructInput(String fieldName1, Object value1) {
-    Map<String, Object> struct = new HashMap<>(1);
-    struct.put(fieldName1, value1);
-    return struct;
+  @Test
+  public void testBigIntPreservedAsLong() {
+    Object result = extract("bigint", batch -> ((LongColumnVector) batch.cols[0]).vector[0] = 1_588_469_340_000L);
+    assertEquals(result, 1_588_469_340_000L);
   }
 
-  private Map<String, Object> createStructInput(String fieldName1, Object value1, String fieldName2, Object value2) {
-    Map<String, Object> struct = new HashMap<>(2);
-    struct.put(fieldName1, value1);
-    struct.put(fieldName2, value2);
-    return struct;
+  @Test
+  public void testFloatPreserved() {
+    Object result = extract("float", batch -> ((DoubleColumnVector) batch.cols[0]).vector[0] = 1.5d);
+    assertEquals(result, 1.5f);
   }
 
-  private Map<String, Object> createStructInput(String fieldName1, Object value1, String fieldName2, Object value2,
-      String fieldName3, Object value3) {
-    Map<String, Object> struct = new HashMap<>(3);
-    struct.put(fieldName1, value1);
-    struct.put(fieldName2, value2);
-    struct.put(fieldName3, value3);
-    return struct;
+  @Test
+  public void testDoublePreserved() {
+    Object result = extract("double", batch -> ((DoubleColumnVector) batch.cols[0]).vector[0] = 2.5d);
+    assertEquals(result, 2.5d);
+  }
+
+  @Test
+  public void testStringPreserved() {
+    Object result = extract("string", batch -> ((BytesColumnVector) batch.cols[0]).setVal(0, "hello".getBytes(UTF_8)));
+    assertEquals(result, "hello");
+  }
+
+  @Test
+  public void testBinaryExtractedAsByteArray() {
+    byte[] bytes = {0, 1, 2, 3};
+    Object result = extract("binary", batch -> ((BytesColumnVector) batch.cols[0]).setVal(0, bytes));
+    assertEquals((byte[]) result, bytes);
+  }
+
+  @Test
+  public void testTimestampExtractedAsTimestamp() {
+    long epochMillis = 1_649_924_302_123L;
+    Object result = extract("timestamp", batch -> {
+      TimestampColumnVector tsv = (TimestampColumnVector) batch.cols[0];
+      // Reader splits epoch millis into seconds-precision `time` + nanos. Match that representation.
+      tsv.time[0] = (epochMillis / 1000) * 1000;
+      tsv.nanos[0] = (int) (epochMillis % 1000) * 1_000_000;
+    });
+    assertEquals(result, new Timestamp(epochMillis));
+  }
+
+  @Test
+  public void testTimestampPreservesSubMillisecondNanos() {
+    // `nanos[rowId]` carries full sub-second precision. The extractor must propagate it via `setNanos` so
+    // micro/nano-precision survives.
+    long epochSecondsMillis = 1_649_924_302_000L;
+    int subSecondNanos = 123_456_789;
+    Object result = extract("timestamp", batch -> {
+      TimestampColumnVector tsv = (TimestampColumnVector) batch.cols[0];
+      tsv.time[0] = epochSecondsMillis;
+      tsv.nanos[0] = subSecondNanos;
+    });
+    Timestamp expected = new Timestamp(epochSecondsMillis);
+    expected.setNanos(subSecondNanos);
+    assertEquals(result, expected);
+    assertEquals(((Timestamp) result).getNanos(), subSecondNanos);
+  }
+
+  @Test
+  public void testTimestampInstantExtractedAsTimestamp() {
+    // ORC's `timestamp with local time zone` (TIMESTAMP_INSTANT) shares TimestampColumnVector with TIMESTAMP.
+    long epochMillis = 1_649_924_302_123L;
+    Object result = extract("timestamp with local time zone", batch -> {
+      TimestampColumnVector tsv = (TimestampColumnVector) batch.cols[0];
+      tsv.time[0] = (epochMillis / 1000) * 1000;
+      tsv.nanos[0] = (int) (epochMillis % 1000) * 1_000_000;
+    });
+    assertEquals(result, new Timestamp(epochMillis));
+  }
+
+  @Test
+  public void testDateExtractedAsLocalDate() {
+    // ORC stores `date` as days-since-epoch in a `LongColumnVector`; surface as [LocalDate] via
+    // `LocalDate.ofEpochDay(...)`. 19_456 days = 2023-04-09.
+    Object result = extract("date", batch -> ((LongColumnVector) batch.cols[0]).vector[0] = 19_456L);
+    assertEquals(result, LocalDate.of(2023, 4, 9));
+  }
+
+  @Test
+  public void testDecimalExtractedAsBigDecimal() {
+    Object result = extract("decimal(10,5)", batch -> {
+      DecimalColumnVector vec = (DecimalColumnVector) batch.cols[0];
+      vec.set(0, new HiveDecimalWritable(HiveDecimal.create("123.45000")));
+    });
+    assertEquals(result, new BigDecimal("123.45"));
+  }
+
+  // === Complex types ===
+
+  @Test
+  public void testListOfIntsExtractedAsArray() {
+    Object[] result = (Object[]) extract("array<int>", batch -> {
+      ListColumnVector list = (ListColumnVector) batch.cols[0];
+      LongColumnVector child = (LongColumnVector) list.child;
+      child.ensureSize(3, false);
+      list.offsets[0] = 0;
+      list.lengths[0] = 3;
+      child.vector[0] = 10;
+      child.vector[1] = 20;
+      child.vector[2] = 30;
+    });
+    assertEquals(result, new Object[]{10, 20, 30});
+  }
+
+  @Test
+  public void testListPreservesNullElements() {
+    // The contract requires multi-value shape preservation: null elements stay null in `Object[]`.
+    Object[] result = (Object[]) extract("array<int>", batch -> {
+      ListColumnVector list = (ListColumnVector) batch.cols[0];
+      LongColumnVector child = (LongColumnVector) list.child;
+      child.ensureSize(3, false);
+      child.noNulls = false;
+      child.isNull[1] = true;
+      list.offsets[0] = 0;
+      list.lengths[0] = 3;
+      child.vector[0] = 10;
+      child.vector[2] = 30;
+    });
+    assertEquals(result, new Object[]{10, null, 30});
+  }
+
+  @Test
+  public void testEmptyListExtractedAsEmptyArray() {
+    // The contract requires shape preservation: an empty list surfaces as an empty `Object[]`, not `null`.
+    Object[] result = (Object[]) extract("array<int>", batch -> {
+      ListColumnVector list = (ListColumnVector) batch.cols[0];
+      list.offsets[0] = 0;
+      list.lengths[0] = 0;
+    });
+    assertEquals(result, new Object[]{});
+  }
+
+  @Test
+  public void testMapStringToIntExtractedAsMap() {
+    Object result = extract("map<string,int>", batch -> {
+      MapColumnVector map = (MapColumnVector) batch.cols[0];
+      BytesColumnVector keys = (BytesColumnVector) map.keys;
+      LongColumnVector values = (LongColumnVector) map.values;
+      keys.ensureSize(2, false);
+      values.ensureSize(2, false);
+      map.offsets[0] = 0;
+      map.lengths[0] = 2;
+      keys.setVal(0, "a".getBytes(UTF_8));
+      keys.setVal(1, "b".getBytes(UTF_8));
+      values.vector[0] = 1;
+      values.vector[1] = 2;
+    });
+    Map<?, ?> resultMap = (Map<?, ?>) result;
+    assertEquals(resultMap.size(), 2);
+    assertEquals(resultMap.get("a"), 1);
+    assertEquals(resultMap.get("b"), 2);
+  }
+
+  @Test
+  public void testStructExtractedAsMap() {
+    Object result = extract("struct<s:string,i:int>", batch -> {
+      StructColumnVector struct = (StructColumnVector) batch.cols[0];
+      BytesColumnVector sVec = (BytesColumnVector) struct.fields[0];
+      LongColumnVector iVec = (LongColumnVector) struct.fields[1];
+      sVec.setVal(0, "hello".getBytes(UTF_8));
+      iVec.vector[0] = 42;
+    });
+    Map<?, ?> resultMap = (Map<?, ?>) result;
+    assertEquals(resultMap.get("s"), "hello");
+    assertEquals(resultMap.get("i"), 42);
+  }
+
+  // === Null handling ===
+
+  @Test
+  public void testNullValueReturnsNull() {
+    Object result = extract("int", batch -> {
+      LongColumnVector vec = (LongColumnVector) batch.cols[0];
+      vec.noNulls = false;
+      vec.isNull[0] = true;
+    });
+    assertNull(result);
+  }
+
+  // === Helpers ===
+
+  /// Build a one-row [VectorizedRowBatch] with a single column of the given ORC type, populate it via
+  /// `populate`, then run the extractor and return the extracted column value.
+  private static Object extract(String orcType, Consumer<VectorizedRowBatch> populate) {
+    TypeDescription schema = TypeDescription.fromString("struct<" + COLUMN + ":" + orcType + ">");
+    VectorizedRowBatch batch = schema.createRowBatch(1);
+    populate.accept(batch);
+    batch.size = 1;
+
+    ORCRecordExtractor.Record record = new ORCRecordExtractor.Record();
+    record.set(batch, schema, 0);
+
+    ORCRecordExtractor extractor = new ORCRecordExtractor();
+    extractor.init(null, null);
+    GenericRow row = new GenericRow();
+    extractor.extract(record, row);
+    return row.getValue(COLUMN);
   }
 }

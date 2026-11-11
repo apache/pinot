@@ -23,9 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Helper class to read configured resource limit policy
- */
+/// Helper class to read configured resource limit policy
 public class ResourceLimitPolicy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResourceLimitPolicy.class);
 

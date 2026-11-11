@@ -30,9 +30,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-/**
- * A utility class used to create comparators that should be used by operators that implements order by semantics.
- */
+/// A utility class used to create comparators that should be used by operators that implements order by semantics.
 public class OrderByComparatorFactory {
   private OrderByComparatorFactory() {
   }
@@ -63,9 +61,7 @@ public class OrderByComparatorFactory {
     return getComparator(orderByExpressions, nullHandlingEnabled, 0, orderByExpressions.size());
   }
 
-  /**
-   * Get orderBy expressions on the groupBy keys when orderBy keys match groupBy keys
-   */
+  /// Get orderBy expressions on the groupBy keys when orderBy keys match groupBy keys
   public static Comparator<Record> getRecordKeyComparator(List<OrderByExpressionContext> orderByExpressions,
       List<ExpressionContext> groupByExpressions, boolean nullHandlingEnabled) {
     List<OrderByExpressionWithIndex> groupKeyOrderByExpressions =
@@ -74,18 +70,20 @@ public class OrderByComparatorFactory {
     return (k1, k2) -> valueComparator.compare(k1.getValues(), k2.getValues());
   }
 
-  private static Map<String, Integer> getGroupByExpressionIndexMap(List<ExpressionContext> groupByExpressions) {
-    Map<String, Integer> groupByExpressionIndexMap = new HashMap<>();
+  private static Map<ExpressionContext, Integer> getGroupByExpressionIndexMap(
+      List<ExpressionContext> groupByExpressions) {
+    Map<ExpressionContext, Integer> groupByExpressionIndexMap = new HashMap<>();
     int numGroupByExpressions = groupByExpressions.size();
     for (int i = 0; i < numGroupByExpressions; i++) {
-      groupByExpressionIndexMap.put(groupByExpressions.get(i).getIdentifier(), i);
+      // NOTE: Key on the whole expression, not on getIdentifier(). getIdentifier() is null for anything that is not a
+      //       plain column reference, so keying on it collapses every transform group-by key onto a single null entry
+      //       and makes all ORDER BY expressions resolve to the same column index.
+      groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
     }
     return groupByExpressionIndexMap;
   }
 
-  /**
-   * Orderby expression with an index with respect to its position in the group keys
-   */
+  /// Orderby expression with an index with respect to its position in the group keys
   private static class OrderByExpressionWithIndex {
     final OrderByExpressionContext _orderByExpressionContext;
     final int _index;
@@ -96,23 +94,18 @@ public class OrderByComparatorFactory {
     }
   }
 
-  /**
-   * Add an index for each orderby expression with respect to its position in the group keys
-   */
+  /// Add an index for each orderby expression with respect to its position in the group keys
   private static List<OrderByExpressionWithIndex> getGroupKeyOrderByExpressionFromRowOrderByExpressions(
       List<OrderByExpressionContext> rowOrderByExpressions, List<ExpressionContext> groupByExpressions) {
-    Map<String, Integer> groupByExpressionIndexMap = getGroupByExpressionIndexMap(groupByExpressions);
+    Map<ExpressionContext, Integer> groupByExpressionIndexMap = getGroupByExpressionIndexMap(groupByExpressions);
     List<OrderByExpressionWithIndex> result = new ArrayList<>();
     // get index wrt group key for each order by expression
-    rowOrderByExpressions.forEach(expr ->
-        result.add(
-            new OrderByExpressionWithIndex(expr, groupByExpressionIndexMap.get(expr.getExpression().getIdentifier()))));
+    rowOrderByExpressions.forEach(
+        expr -> result.add(new OrderByExpressionWithIndex(expr, groupByExpressionIndexMap.get(expr.getExpression()))));
     return result;
   }
 
-  /**
-   * Get comparator that applies list of orderByExpressions that each has a column index
-   */
+  /// Get comparator that applies list of orderByExpressions that each has a column index
   @SuppressWarnings({"rawtypes", "unchecked"})
   private static Comparator<Object[]> getComparatorWithIndex(List<OrderByExpressionWithIndex> orderByExpressions,
       boolean nullHandlingEnabled) {

@@ -20,10 +20,15 @@ package org.apache.pinot.spi.query;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
@@ -56,17 +61,34 @@ public class QueryThreadContext implements AutoCloseable {
   @Nullable
   private final MseWorkerInfo _mseWorkerInfo;
   private final ThreadAccountant _accountant;
+  // The stats of the query execution served by this thread, replaced by the query executor per execution
+  private RemoteAccessStats _remoteAccessStats;
 
   private QueryThreadContext(QueryExecutionContext executionContext, @Nullable MseWorkerInfo mseWorkerInfo,
-      ThreadAccountant accountant) {
+      ThreadAccountant accountant, RemoteAccessStats remoteAccessStats) {
     _executionContext = executionContext;
     _mseWorkerInfo = mseWorkerInfo;
     _accountant = accountant;
+    _remoteAccessStats = remoteAccessStats;
     LoggerConstants.REQUEST_ID_KEY.registerInMdc(Long.toString(executionContext.getRequestId()));
     LoggerConstants.CORRELATION_ID_KEY.registerInMdc(executionContext.getCid());
+    String queryHash = executionContext.getQueryHash();
+    if (queryHash != null) {
+      LoggerConstants.QUERY_HASH_KEY.registerInMdc(queryHash);
+    }
     if (mseWorkerInfo != null) {
       LoggerConstants.STAGE_ID_KEY.registerInMdc(Integer.toString(mseWorkerInfo.getStageId()));
       LoggerConstants.WORKER_ID_KEY.registerInMdc(Integer.toString(mseWorkerInfo.getWorkerId()));
+      if (!mseWorkerInfo.getUpstreamStageIds().isEmpty()) {
+        LoggerConstants.UPSTREAM_STAGE_IDS_KEY.registerInMdc(
+            mseWorkerInfo.getUpstreamStageIds().stream().sorted().map(String::valueOf)
+                .collect(Collectors.joining(",")));
+      }
+      if (!mseWorkerInfo.getDownstreamStageIds().isEmpty()) {
+        LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.registerInMdc(
+            mseWorkerInfo.getDownstreamStageIds().stream().sorted().map(String::valueOf)
+                .collect(Collectors.joining(",")));
+      }
     }
   }
 
@@ -84,8 +106,49 @@ public class QueryThreadContext implements AutoCloseable {
     return _accountant;
   }
 
+  /// Returns the [RemoteAccessStats] of the query execution served by the current thread.
+  public RemoteAccessStats getRemoteAccessStats() {
+    return _remoteAccessStats;
+  }
+
+  /// Sets the [RemoteAccessStats] of the query execution served by the current thread. Tasks submitted afterwards to a
+  /// [#contextAwareExecutorService] share the same instance, so a query executor sets fresh stats when it starts an
+  /// execution and every thread serving it reports into them through [#addRemoteAccesses].
+  public void setRemoteAccessStats(RemoteAccessStats remoteAccessStats) {
+    _remoteAccessStats = remoteAccessStats;
+  }
+
   private void sampleUsageInternal() {
     _accountant.sampleUsage();
+  }
+
+  // Blocks the thread if the accountant has activated a pause, then re-checks termination before returning if the
+  // thread actually entered the slow path. The re-check catches the case where the watcher terminated this query
+  // while the thread was paused, allowing the thread to throw immediately instead of proceeding with more work. When
+  // the fast-path is taken (no pause was active), the re-check is skipped since termination was just checked by the
+  // caller.
+  private void waitIfPausedInternal(String scope) {
+    if (_accountant.waitIfPaused()) {
+      checkTerminationInternal(scope);
+    }
+  }
+
+  private void waitIfPausedInternal(Supplier<String> scopeSupplier) {
+    if (_accountant.waitIfPaused()) {
+      checkTerminationInternal(scopeSupplier);
+    }
+  }
+
+  private void waitIfPausedInternal(String scope, long deadlineMs) {
+    if (_accountant.waitIfPaused()) {
+      checkTerminationInternal(scope, deadlineMs);
+    }
+  }
+
+  private void waitIfPausedInternal(Supplier<String> scopeSupplier, long deadlineMs) {
+    if (_accountant.waitIfPaused()) {
+      checkTerminationInternal(scopeSupplier, deadlineMs);
+    }
   }
 
   private void checkTerminationInternal(String scope) {
@@ -122,16 +185,23 @@ public class QueryThreadContext implements AutoCloseable {
     }
   }
 
-  /// Closes the {@link QueryThreadContext} and removes it from the thread-local storage and MDC context.
+  /// Closes the [QueryThreadContext] and removes it from the thread-local storage and MDC context.
   @Override
   public void close() {
     _accountant.clear();
     THREAD_LOCAL.remove();
     LoggerConstants.REQUEST_ID_KEY.unregisterFromMdc();
     LoggerConstants.CORRELATION_ID_KEY.unregisterFromMdc();
+    LoggerConstants.QUERY_HASH_KEY.unregisterFromMdc();
     if (_mseWorkerInfo != null) {
       LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
       LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();
+      if (LoggerConstants.UPSTREAM_STAGE_IDS_KEY.isRegistered()) {
+        LoggerConstants.UPSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+      }
+      if (LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.isRegistered()) {
+        LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.unregisterFromMdc();
+      }
     }
   }
 
@@ -143,7 +213,13 @@ public class QueryThreadContext implements AutoCloseable {
   /// Opens a new [QueryThreadContext] for the current thread and add it to the thread-local storage.
   public static QueryThreadContext open(QueryExecutionContext executionContext, @Nullable MseWorkerInfo mseWorkerInfo,
       ThreadAccountant accountant) {
-    QueryThreadContext threadContext = new QueryThreadContext(executionContext, mseWorkerInfo, accountant);
+    return open(executionContext, mseWorkerInfo, accountant, new RemoteAccessStats());
+  }
+
+  private static QueryThreadContext open(QueryExecutionContext executionContext, @Nullable MseWorkerInfo mseWorkerInfo,
+      ThreadAccountant accountant, RemoteAccessStats remoteAccessStats) {
+    QueryThreadContext threadContext =
+        new QueryThreadContext(executionContext, mseWorkerInfo, accountant, remoteAccessStats);
     THREAD_LOCAL.set(threadContext);
     accountant.setupTask(threadContext);
     return threadContext;
@@ -156,7 +232,8 @@ public class QueryThreadContext implements AutoCloseable {
 
   @VisibleForTesting
   public static QueryThreadContext openForMseTest() {
-    return open(QueryExecutionContext.forMseTest(), new MseWorkerInfo(0, 0), ThreadAccountantUtils.getNoOpAccountant());
+    return open(QueryExecutionContext.forMseTest(), new MseWorkerInfo(0, 0, Set.of(), Set.of()),
+        ThreadAccountantUtils.getNoOpAccountant());
   }
 
   /// Returns the [QueryThreadContext] for the current thread.
@@ -172,30 +249,120 @@ public class QueryThreadContext implements AutoCloseable {
     return THREAD_LOCAL.get();
   }
 
+  /// Registers a generic response-metadata entry (arbitrary JSON value) on the current query's
+  /// [QueryExecutionContext], to be surfaced in the query response by the broker (see
+  /// [QueryExecutionContext#getResponseMetadata()]). This is the entry point for code — including
+  /// product extensions — that wants to attach an informational note to the response without a
+  /// dedicated typed field or knowledge of the response object.
+  ///
+  /// Must be called from **broker-side** code: the sink lives in the broker's execution context and
+  /// is not propagated from workers, so an entry registered while running on a server would be
+  /// silently dropped. The `Broker` in the name records that restriction, which is a limit of the
+  /// current implementation rather than of the response field it feeds: when worker-side metadata
+  /// becomes supported, this method can either be renamed or joined by an `addResponseMetadata` that
+  /// servers may call too, with both feeding the same generic `responseMetadata` response field.
+  ///
+  /// No-op when no [QueryThreadContext] is active on the current thread (e.g. tests or planning paths
+  /// that run outside a query context), so callers never need a null check.
+  public static void addResponseBrokerMetadata(String key, JsonNode value) {
+    QueryThreadContext threadContext = getIfAvailable();
+    if (threadContext != null) {
+      threadContext.getExecutionContext().addResponseMetadata(key, value);
+    }
+  }
+
+  /// String convenience for [#addResponseBrokerMetadata(String, JsonNode)] — the common case.
+  public static void addResponseBrokerMetadata(String key, String value) {
+    QueryThreadContext threadContext = getIfAvailable();
+    if (threadContext != null) {
+      threadContext.getExecutionContext().addResponseMetadata(key, value);
+    }
+  }
+
+  /// Records remote accesses (local cache misses) and the bytes they read on the [RemoteAccessStats] of the query
+  /// execution served by the current thread. No-op when the current thread has no [QueryThreadContext], e.g. when the
+  /// remote data is read to load a segment.
+  public static void addRemoteAccesses(long numRemoteAccesses, long remoteAccessBytes) {
+    QueryThreadContext threadContext = THREAD_LOCAL.get();
+    if (threadContext != null) {
+      threadContext._remoteAccessStats.addRemoteAccesses(numRemoteAccesses, remoteAccessBytes);
+    }
+  }
+
+  /// Records direct remote accesses, i.e. reads that went to the remote storage tier directly instead of through the
+  /// buffers fetched for the query, and the bytes they read on the [RemoteAccessStats] of the query execution served
+  /// by the current thread. No-op when the current thread has no [QueryThreadContext].
+  public static void addDirectRemoteAccesses(long numDirectRemoteAccesses, long directRemoteAccessBytes) {
+    QueryThreadContext threadContext = THREAD_LOCAL.get();
+    if (threadContext != null) {
+      threadContext._remoteAccessStats.addDirectRemoteAccesses(numDirectRemoteAccesses, directRemoteAccessBytes);
+    }
+  }
+
+  /// Merges the given stats, e.g. the ones of a released fetch, into the [RemoteAccessStats] of the query execution
+  /// served by the current thread. No-op when the current thread has no [QueryThreadContext].
+  public static void mergeRemoteAccessStats(RemoteAccessStats remoteAccessStats) {
+    QueryThreadContext threadContext = THREAD_LOCAL.get();
+    if (threadContext != null) {
+      threadContext._remoteAccessStats.merge(remoteAccessStats);
+    }
+  }
+
+  /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
+  /// state of the thread submitting the tasks. The [Future] of each task passed to `submit()` is registered for
+  /// cancellation when the query is terminated. Tasks passed to `execute()` are not registered.
+  public static ExecutorService contextAwareExecutorService(ExecutorService executorService) {
+    return contextAwareExecutorService(executorService, true);
+  }
+
   /// Returns a new [ExecutorService] whose tasks will be executed with the [QueryThreadContext] initialized with the
   /// state of the thread submitting the tasks.
-  public static ExecutorService contextAwareExecutorService(ExecutorService executorService) {
-    return new DecoratorExecutorService(executorService, future -> get().getExecutionContext().addTask(future)) {
+  /// @param registerTaskForCancellation If true, tasks passed to `submit()` are registered with
+  ///                                    QueryExecutionContext.addTask() and will be cancelled (via Thread.interrupt())
+  ///                                    when the query is terminated. Set to false for executors where interrupt could
+  ///                                    cause corruption
+  public static ExecutorService contextAwareExecutorService(ExecutorService executorService,
+      boolean registerTaskForCancellation) {
+    Consumer<Future<?>> onSubmit = registerTaskForCancellation
+        ? future -> get().getExecutionContext().addTask(future)
+        : null;
+    return new DecoratorExecutorService(executorService, onSubmit) {
       @Override
       protected <T> Callable<T> decorate(Callable<T> task) {
-        QueryThreadContext parentThreadContext = get();
-        return () -> {
-          try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
-              parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
-            return task.call();
-          }
-        };
+        // NOTE: When registerTaskForCancellation is false, the task may not come from query execution, in which case
+        //       the thread context might not be set up.
+        QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
+        if (parentThreadContext != null) {
+          // Captured at submission, so that the task reports into the execution that submitted it
+          RemoteAccessStats remoteAccessStats = parentThreadContext._remoteAccessStats;
+          return () -> {
+            try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
+                parentThreadContext._mseWorkerInfo, parentThreadContext._accountant, remoteAccessStats)) {
+              return task.call();
+            }
+          };
+        } else {
+          return task;
+        }
       }
 
       @Override
       protected Runnable decorate(Runnable task) {
-        QueryThreadContext parentThreadContext = get();
-        return () -> {
-          try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
-              parentThreadContext._mseWorkerInfo, parentThreadContext._accountant)) {
-            task.run();
-          }
-        };
+        // NOTE: When registerTaskForCancellation is false, the task may not come from query execution, in which case
+        //       the thread context might not be set up.
+        QueryThreadContext parentThreadContext = registerTaskForCancellation ? get() : getIfAvailable();
+        if (parentThreadContext != null) {
+          // Captured at submission, so that the task reports into the execution that submitted it
+          RemoteAccessStats remoteAccessStats = parentThreadContext._remoteAccessStats;
+          return () -> {
+            try (QueryThreadContext ignore = open(parentThreadContext._executionContext,
+                parentThreadContext._mseWorkerInfo, parentThreadContext._accountant, remoteAccessStats)) {
+              task.run();
+            }
+          };
+        } else {
+          return task;
+        }
       }
     };
   }
@@ -209,6 +376,7 @@ public class QueryThreadContext implements AutoCloseable {
     //       is not set up.
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scopeSupplier);
+      threadContext.waitIfPausedInternal(scopeSupplier);
     }
   }
 
@@ -222,6 +390,7 @@ public class QueryThreadContext implements AutoCloseable {
     //       is not set up.
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scopeSupplier, deadlineMs);
+      threadContext.waitIfPausedInternal(scopeSupplier, deadlineMs);
     }
   }
 
@@ -244,6 +413,7 @@ public class QueryThreadContext implements AutoCloseable {
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scope);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scope);
     }
   }
 
@@ -256,6 +426,7 @@ public class QueryThreadContext implements AutoCloseable {
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scopeSupplier);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scopeSupplier);
     }
   }
 
@@ -268,6 +439,7 @@ public class QueryThreadContext implements AutoCloseable {
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scope, deadlineMs);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scope, deadlineMs);
     }
   }
 
@@ -280,6 +452,7 @@ public class QueryThreadContext implements AutoCloseable {
     if (threadContext != null) {
       threadContext.checkTerminationInternal(scopeSupplier, deadlineMs);
       threadContext.sampleUsageInternal();
+      threadContext.waitIfPausedInternal(scopeSupplier, deadlineMs);
     }
   }
 
@@ -313,10 +486,18 @@ public class QueryThreadContext implements AutoCloseable {
   public static class MseWorkerInfo {
     private final int _stageId;
     private final int _workerId;
+    private final Set<Integer> _upstreamStageIds;
+    private final Set<Integer> _downstreamStageIds;
 
     public MseWorkerInfo(int stageId, int workerId) {
+      this(stageId, workerId, Set.of(), Set.of());
+    }
+
+    public MseWorkerInfo(int stageId, int workerId, Set<Integer> upstreamStageIds, Set<Integer> downstreamStageIds) {
       _stageId = stageId;
       _workerId = workerId;
+      _upstreamStageIds = upstreamStageIds;
+      _downstreamStageIds = downstreamStageIds;
     }
 
     public int getStageId() {
@@ -325,6 +506,14 @@ public class QueryThreadContext implements AutoCloseable {
 
     public int getWorkerId() {
       return _workerId;
+    }
+
+    public Set<Integer> getUpstreamStageIds() {
+      return _upstreamStageIds;
+    }
+
+    public Set<Integer> getDownstreamStageIds() {
+      return _downstreamStageIds;
     }
   }
 }

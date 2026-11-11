@@ -21,17 +21,15 @@ package org.apache.pinot.core.data.function;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
+import org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the scalar transform functions for logical operators
- * Currently, only not operator is supported.
- */
+/// Tests the scalar transform functions for logical operators
+/// Currently, only not operator is supported.
 public class LogicalFunctionsTest {
 
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,

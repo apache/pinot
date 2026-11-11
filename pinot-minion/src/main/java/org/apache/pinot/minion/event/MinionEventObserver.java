@@ -24,26 +24,20 @@ import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 
-/**
- * The <code>MinionEventObserver</code> interface provides call backs for Minion events.
- */
+/// The `MinionEventObserver` interface provides call backs for Minion events.
 public interface MinionEventObserver {
 
   void init(MinionTaskObserverStorageManager progressManager);
 
-  /**
-   * Invoked when a minion task starts.
-   *
-   * @param pinotTaskConfig Pinot task config
-   */
+  /// Invoked when a minion task starts.
+  ///
+  /// @param pinotTaskConfig Pinot task config
   void notifyTaskStart(PinotTaskConfig pinotTaskConfig);
 
-  /**
-   * Invoked to update a minion task progress status.
-   *
-   * @param pinotTaskConfig Pinot task config
-   * @param progress progress status
-   */
+  /// Invoked to update a minion task progress status.
+  ///
+  /// @param pinotTaskConfig Pinot task config
+  /// @param progress progress status
   default void notifyProgress(PinotTaskConfig pinotTaskConfig, @Nullable Object progress) {
   }
 
@@ -57,48 +51,36 @@ public interface MinionEventObserver {
     return null;
   }
 
-  /**
-   * Invoked when a minion task succeeds.
-   *
-   * @param pinotTaskConfig Pinot task config
-   * @param executionResult Execution result
-   */
+  /// Invoked when a minion task succeeds.
+  ///
+  /// @param pinotTaskConfig Pinot task config
+  /// @param executionResult Execution result
   void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult);
 
-  /**
-   * Invoked when a minion task gets cancelled.
-   *
-   * @param pinotTaskConfig Pinot task config
-   */
+  /// Invoked when a minion task gets cancelled.
+  ///
+  /// @param pinotTaskConfig Pinot task config
   void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig);
 
-  /**
-   * Invoked when a minion task encounters exception.
-   *
-   * @param pinotTaskConfig Pinot task config
-   * @param exception Exception encountered during execution
-   */
+  /// Invoked when a minion task encounters exception.
+  ///
+  /// @param pinotTaskConfig Pinot task config
+  /// @param exception Exception encountered during execution
   void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception);
 
-  /**
-   * Gets the minion task state
-   * @return a {@link MinionTaskState}
-   */
+  /// Gets the minion task state
+  /// @return a [MinionTaskState]
   default MinionTaskState getTaskState() {
     return MinionTaskState.UNKNOWN;
   }
 
-  /**
-   * Gets the minion task start timestamp
-   * @return the minion task start timestamp
-   */
+  /// Gets the minion task start timestamp
+  /// @return the minion task start timestamp
   default long getStartTs() {
     return -1;
   }
 
-  /**
-   * Place to handle the cleanup required on {@link MinionTaskObserverStorageManager} for the associated task.
-   * This method should be called before removing the observer.
-   */
+  /// Place to handle the cleanup required on [MinionTaskObserverStorageManager] for the associated task.
+  /// This method should be called before removing the observer.
   void cleanup();
 }

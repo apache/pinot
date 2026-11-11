@@ -50,10 +50,9 @@ public class MergeRollupTaskUtils {
   };
   //@formatter:on
 
-  /**
-   * Extracts a map from merge level to config from the task config.
-   * <p>The config for a specific level should have key of format "{level}.{configKey}" within the task config.
-   */
+  /// Extracts a map from merge level to config from the task config.
+  ///
+  /// The config for a specific level should have key of format "{level}.{configKey}" within the task config.
   public static Map<String, Map<String, String>> getLevelToConfigMap(Map<String, String> taskConfig) {
     Map<String, Map<String, String>> levelToConfigMap = new TreeMap<>();
 
@@ -86,12 +85,10 @@ public class MergeRollupTaskUtils {
     return levelToConfigMap;
   }
 
-  /**
-   * Returns a lookup key composed of the current merge level / key combination
-   * @param key the key of the value within the task configuration.
-   * @param taskConfig the current merge rollup task configuration used for sourcing the merge level.
-   * @return composite lookup key if the merge level is configured.  Otherwise, return original key.
-   */
+  /// Returns a lookup key composed of the current merge level / key combination
+  /// @param key the key of the value within the task configuration.
+  /// @param taskConfig the current merge rollup task configuration used for sourcing the merge level.
+  /// @return composite lookup key if the merge level is configured.  Otherwise, return original key.
   public static String buildMergeLevelKeyPrefix(String key, Map<String, String> taskConfig) {
     String mergeLevel = taskConfig.get(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY);
     if (mergeLevel == null) {
@@ -101,10 +98,9 @@ public class MergeRollupTaskUtils {
     }
   }
 
-  /**
-   * Extracts an array of dimensions to reduce/erase from the task config.
-   * <p>The config for the dimensions to erase should be a comma-separated string value.
-   */
+  /// Extracts an array of dimensions to reduce/erase from the task config.
+  ///
+  /// The config for the dimensions to erase should be a comma-separated string value.
   public static Set<String> getDimensionsToErase(Map<String, String> taskConfig) {
     if (taskConfig == null) {
       return new HashSet<>();
@@ -120,9 +116,7 @@ public class MergeRollupTaskUtils {
         .collect(Collectors.toSet());
   }
 
-  /**
-   * Returns a map from column name to the aggregation function parameters associated with it based on the task config.
-   */
+  /// Returns a map from column name to the aggregation function parameters associated with it based on the task config.
   public static Map<String, Map<String, String>> getAggregationFunctionParameters(Map<String, String> taskConfig) {
     Map<String, Map<String, String>> aggregationFunctionParameters = new HashMap<>();
     String prefix = buildMergeLevelKeyPrefix(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX, taskConfig);

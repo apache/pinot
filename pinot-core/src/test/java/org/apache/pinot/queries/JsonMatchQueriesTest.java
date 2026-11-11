@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -52,11 +53,10 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for JSON_MATCH predicate.
- */
+/// Queries test for JSON_MATCH predicate.
 public class JsonMatchQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonMatchQueriesTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "JsonMatchQueriesTest-" + UUID.randomUUID());
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
 
@@ -154,7 +154,7 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
     ObjectNode indexes = JsonUtils.newObjectNode();
     JsonIndexConfig config = new JsonIndexConfig();
     config.setDisableCrossArrayUnnest(isDisableCrossArrayUnnest());
-    indexes.put("json", config.toJsonNode());
+    indexes.set("json", config.toJsonNode());
 
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)

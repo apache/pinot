@@ -30,9 +30,7 @@ import static org.apache.pinot.controller.ControllerConf.DEFAULT_CONTROLLER_RESO
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Test for extra resource package registered with HTTP server
- */
+/// Test for extra resource package registered with HTTP server
 @Test(groups = "stateless")
 public class PinotDummyExtraRestletResourceStatelessTest extends ControllerTest {
 

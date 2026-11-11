@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
@@ -29,9 +29,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * A sub-command for pinot-admin tool to rebalance a specific table
- */
+/// A sub-command for pinot-admin tool to rebalance a specific table
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
 @CommandLine.Command(name = "RebalanceTable", mixinStandardHelpOptions = true)
 public class RebalanceTableCommand extends AbstractBaseAdminCommand implements Command {

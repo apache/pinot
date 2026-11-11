@@ -34,16 +34,17 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.SegmentUtils;
-import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -124,6 +125,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
     String taskType = MinionConstants.UpsertCompactMergeTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    boolean useCreationTimeFallback = MinionTaskUtils.isCreationTimeFallbackEnabled(_clusterInfoAccessor);
     for (TableConfig tableConfig : tableConfigs) {
 
       String tableNameWithType = tableConfig.getTableName();
@@ -147,8 +149,14 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
 
       // Get completed segments and filter out the segments based on the buffer time configuration
+      long currentTimeMs = System.currentTimeMillis();
       List<SegmentZKMetadata> candidateSegments =
-          getCandidateSegments(taskConfigs, allSegments, System.currentTimeMillis());
+          getCandidateSegments(taskConfigs, allSegments, currentTimeMs);
+      // Complements the bufferTimePeriod filter above: getCandidateSegments ensures freshness (don't compact
+      // segments still being written), while this filter excludes segments nearing deletion by RetentionManager.
+      candidateSegments =
+          MinionTaskUtils.filterSegmentsPastRetention(candidateSegments, tableConfig, taskConfigs, currentTimeMs,
+              useCreationTimeFallback);
 
       if (candidateSegments.isEmpty()) {
         LOGGER.info("No segments were eligible for compactMerge task for table: {}", tableNameWithType);
@@ -170,15 +178,27 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
           new ServerSegmentMetadataReader(_clusterInfoAccessor.getExecutor(),
               _clusterInfoAccessor.getConnectionManager());
 
+      // Reuse the compaction task's consensus-mode and validation-mode config so both tasks behave the same. With
+      // EXECUTOR_ONLY the generator skips these checks (the executor stays the gate).
+      MinionConstants.ValidDocIdsConsensusMode consensusMode = MinionTaskUtils.resolveGeneratorConsensusMode(
+          MinionTaskUtils.parseValidDocIdsConsensusMode(
+              taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+                  MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)),
+          MinionTaskUtils.parseValidDocIdsValidationMode(
+              taskConfigs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_VALIDATION_MODE_KEY,
+                  MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_VALIDATION_MODE)));
+
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
       // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
       int numSegmentsBatchPerServerRequest = Integer.parseInt(
           taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
               String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
 
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+      ServerSegmentMetadataReader.ValidDocIdsMetadataResult validDocIdsMetadataResult =
           serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
               serverToEndpoints, null, 60_000, ValidDocIdsType.SNAPSHOT.toString(), numSegmentsBatchPerServerRequest);
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+          validDocIdsMetadataResult.getSegmentToMetadata();
 
       Map<String, SegmentZKMetadata> candidateSegmentsMap =
           candidateSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
@@ -187,7 +207,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
       SegmentSelectionResult segmentSelectionResult =
           processValidDocIdsMetadata(tableNameWithType, taskConfigs, candidateSegmentsMap, validDocIdsMetadataList,
-              alreadyMergedSegments);
+              alreadyMergedSegments, validDocIdsMetadataResult.getSegmentToExpectedReplicaCount(), consensusMode,
+              _clusterInfoAccessor.getControllerMetrics());
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
@@ -240,10 +261,15 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
+  /// Determines which segments are eligible for deletion or compact-merge. For each segment, replicas are validated
+  /// via `consensusMode` (CRC match, server health, validDocIds agreement); segments that fail are skipped.
+  /// Segments with zero valid docs are marked for deletion, the rest are grouped by partition for compaction.
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdsMetadata(String tableNameWithType,
       Map<String, String> taskConfigs, Map<String, SegmentZKMetadata> candidateSegmentsMap,
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap, Set<String> alreadyMergedSegments) {
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap, Set<String> alreadyMergedSegments,
+      Map<String, Integer> segmentToReplicaCount, MinionConstants.ValidDocIdsConsensusMode consensusMode,
+      ControllerMetrics controllerMetrics) {
     Map<Integer, List<SegmentMergerMetadata>> segmentsEligibleForCompactMerge = new HashMap<>();
     Set<String> segmentsForDeletion = new HashSet<>();
 
@@ -286,49 +312,39 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         continue;
       }
       SegmentZKMetadata segment = candidateSegmentsMap.get(segmentName);
-      for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
-        long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
-        long totalValidDocs = validDocIdsMetadata.getTotalValidDocs();
-        long segmentSizeInBytes = validDocIdsMetadata.getSegmentSizeInBytes();
 
-        // Skip segments if the crc from zk metadata and server does not match. They may be getting reloaded.
-        if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
-          LOGGER.warn("CRC mismatch for segment: {}, (segmentZKMetadata={}, validDocIdsMetadata={})", segmentName,
-              segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
-          continue;
-        }
+      // Validate replicas (CRC match, server health, validDocIds consensus) before scheduling. Returns null when the
+      // segment should be skipped so we never schedule a task the executor would later reject.
+      List<ValidDocIdsMetadataInfo> replicas = validDocIdsMetadataInfoMap.get(segmentName);
+      ValidDocIdsMetadataInfo validDocIdsMetadata = MinionTaskUtils.selectValidDocIdsMetadataForConsensus(
+          MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segment, replicas,
+          segmentToReplicaCount.getOrDefault(segmentName, replicas.size()), consensusMode);
+      if (validDocIdsMetadata == null) {
+        continue;
+      }
 
-        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
-        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
-        if (validDocIdsMetadata.getServerStatus() != null && !validDocIdsMetadata.getServerStatus()
-            .equals(ServiceStatus.Status.GOOD)) {
-          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
-              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
-              MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segmentName);
-          continue;
-        }
+      long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
+      long totalValidDocs = validDocIdsMetadata.getTotalValidDocs();
+      long segmentSizeInBytes = validDocIdsMetadata.getSegmentSizeInBytes();
+      long totalDocs = validDocIdsMetadata.getTotalDocs();
 
-        // segments eligible for deletion with no valid records
-        long totalDocs = validDocIdsMetadata.getTotalDocs();
-        if (totalInvalidDocs == totalDocs) {
-          segmentsForDeletion.add(segmentName);
-        } else if (alreadyMergedSegments.contains(segmentName)) {
-          LOGGER.debug("Segment {} already merged. Skipping it for {}", segmentName,
+      // Segments with no valid records can be deleted outright.
+      if (totalInvalidDocs == totalDocs) {
+        segmentsForDeletion.add(segmentName);
+      } else if (alreadyMergedSegments.contains(segmentName)) {
+        LOGGER.debug("Segment {} already merged. Skipping it for {}", segmentName,
+            MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
+      } else {
+        Integer partitionID = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
+        if (partitionID == null) {
+          LOGGER.warn("Partition ID not found for segment: {}, skipping it for {}", segmentName,
               MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
-          break;
-        } else {
-          Integer partitionID = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
-          if (partitionID == null) {
-            LOGGER.warn("Partition ID not found for segment: {}, skipping it for {}", segmentName,
-                MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
-            continue;
-          }
-          double expectedSegmentSizeAfterCompaction = (segmentSizeInBytes * totalValidDocs * 1.0) / totalDocs;
-          segmentsEligibleForCompactMerge.computeIfAbsent(partitionID, k -> new ArrayList<>())
-              .add(new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs,
-                  expectedSegmentSizeAfterCompaction));
+          continue;
         }
-        break;
+        double expectedSegmentSizeAfterCompaction = (segmentSizeInBytes * totalValidDocs * 1.0) / totalDocs;
+        segmentsEligibleForCompactMerge.computeIfAbsent(partitionID, k -> new ArrayList<>())
+            .add(new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs,
+                expectedSegmentSizeAfterCompaction));
       }
     }
 
@@ -463,6 +479,12 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
     Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
         "'snapshot' from UpsertConfig must not be 'DISABLE' for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
+    // check metadataTTL is not set: UpsertCompactMergeTask does not compact tombstoned rows in a way that is
+    // consistent with metadataTTL-driven cleanup, so enabling them together can leave stale rows behind or
+    // resurface aged-out keys. Block the combination to avoid silent correctness issues.
+    Preconditions.checkState(upsertConfig.getMetadataTTL() <= 0,
+        "%s does not support tables with 'metadataTTL' enabled, got metadataTTL: %s",
+        MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertConfig.getMetadataTTL());
     // check no malformed period
     if (taskConfigs.containsKey(MinionConstants.UpsertCompactMergeTask.BUFFER_TIME_PERIOD_KEY)) {
       TimeUtils.convertPeriodToMillis(taskConfigs.get(MinionConstants.UpsertCompactMergeTask.BUFFER_TIME_PERIOD_KEY));

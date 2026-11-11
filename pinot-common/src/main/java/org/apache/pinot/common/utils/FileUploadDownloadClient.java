@@ -27,7 +27,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -66,7 +65,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -74,10 +72,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>FileUploadDownloadClient</code> class provides methods to upload schema/segment, download segment or send
- * segment completion protocol request through HTTP/HTTPS.
- */
+/// The `FileUploadDownloadClient` class provides methods to upload schema/segment, download segment or send
+/// segment completion protocol request through HTTP/HTTPS.
 @SuppressWarnings("unused")
 public class FileUploadDownloadClient implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadDownloadClient.class);
@@ -87,10 +83,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
     public static final String REFRESH_ONLY = "REFRESH_ONLY";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
 
-    /**
-     * This header is only used for METADATA push, to allow controller to copy segment to deep store,
-     * if segment was not placed in the deep store to begin with
-     */
+    /// This header is only used for METADATA push, to allow controller to copy segment to deep store,
+    /// if segment was not placed in the deep store to begin with
     public static final String COPY_SEGMENT_TO_DEEP_STORE = "COPY_SEGMENT_TO_DEEP_STORE";
     public static final String SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER = "Pinot-SegmentZKMetadataCustomMapModifier";
     public static final String CRYPTER = "CRYPTER";
@@ -154,25 +148,21 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return _httpClient;
   }
 
-  /**
-   * Extracts base URI from a URI, e.g., http://example.com:8000/a/b -> http://example.com:8000
-   * @param fullURI a full URI with
-   * @return a URI
-   * @throws URISyntaxException when there are problems generating the URI
-   */
+  /// Extracts base URI from a URI, e.g., http://example.com:8000/a/b -> http://example.com:8000
+  /// @param fullURI a full URI with
+  /// @return a URI
+  /// @throws URISyntaxException when there are problems generating the URI
   public static URI extractBaseURI(URI fullURI)
       throws URISyntaxException {
     return getURI(fullURI.getScheme(), fullURI.getHost(), fullURI.getPort());
   }
 
-  /**
-   * Generates a URI from the given protocol, host and port
-   * @param protocol the protocol part of the URI
-   * @param host the host part of the URI
-   * @param port the port part of the URI
-   * @return a URI
-   * @throws URISyntaxException when there are problems generating the URIg
-   */
+  /// Generates a URI from the given protocol, host and port
+  /// @param protocol the protocol part of the URI
+  /// @param host the host part of the URI
+  /// @param port the port part of the URI
+  /// @return a URI
+  /// @throws URISyntaxException when there are problems generating the URIg
   public static URI getURI(String protocol, String host, int port)
       throws URISyntaxException {
     if (!SUPPORTED_PROTOCOLS.contains(protocol)) {
@@ -197,84 +187,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return new URI(protocol, null, host, port, path, query, null);
   }
 
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * @see FileUploadDownloadClient#getRetrieveTableConfigURI(String, String, int, String)
-   */
-  @Deprecated
-  public static URI getRetrieveTableConfigHttpURI(String host, int port, String rawTableName)
-      throws URISyntaxException {
-    return getURI(HTTP, host, port, TABLES_PATH + "/" + rawTableName);
-  }
-
   public static URI getRetrieveTableConfigURI(String protocol, String host, int port, String rawTableName)
       throws URISyntaxException {
     return getURI(protocol, host, port, TABLES_PATH + "/" + rawTableName);
   }
 
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * This method calls the old segment endpoint. We will deprecate this behavior soon.
-   */
-  @Deprecated
-  public static URI getDeleteSegmentHttpUri(String host, int port, String rawTableName, String segmentName,
-      String tableType)
-      throws URISyntaxException {
-    return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"), OLD_SEGMENT_PATH,
-        rawTableName + "/" + URIUtils.encode(segmentName) + "?" + TYPE_DELIMITER + tableType));
-  }
-
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * This method calls the old segment endpoint. We will deprecate this behavior soon.
-   */
-  @Deprecated
-  public static URI getRetrieveAllSegmentWithTableTypeHttpUri(String host, int port, String rawTableName,
-      String tableType)
-      throws URISyntaxException {
-    return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"), OLD_SEGMENT_PATH,
-        rawTableName + "?" + TYPE_DELIMITER + tableType));
-  }
-
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * @see FileUploadDownloadClient#getRetrieveSchemaURI(String, String, int, String)
-   */
-  @Deprecated
-  public static URI getRetrieveSchemaHttpURI(String host, int port, String schemaName)
-      throws URISyntaxException {
-    return getURI(HTTP, host, port, SCHEMA_PATH + "/" + schemaName);
-  }
-
   public static URI getRetrieveSchemaURI(String protocol, String host, int port, String schemaName)
       throws URISyntaxException {
     return getURI(protocol, host, port, SCHEMA_PATH + "/" + schemaName);
-  }
-
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * @see FileUploadDownloadClient#getUploadSchemaURI(String, String, int)
-   */
-  @Deprecated
-  public static URI getUploadSchemaHttpURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTP, host, port, SCHEMA_PATH);
-  }
-
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * @see FileUploadDownloadClient#getUploadSchemaURI(String, String, int)
-   */
-  @Deprecated
-  public static URI getUploadSchemaHttpsURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTPS, host, port, SCHEMA_PATH);
   }
 
   public static URI getUploadSchemaURI(String protocol, String host, int port)
@@ -309,56 +229,6 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public static URI getUploadSchemaURI(URI controllerURI)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SCHEMA_PATH);
-  }
-
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * @see FileUploadDownloadClient#getUploadSegmentURI(String, String, int)
-   *
-   * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
-   * getUploadSegmentHttpURI to construct your request.
-   */
-  @Deprecated
-  public static URI getOldUploadSegmentHttpURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTP, host, port, OLD_SEGMENT_PATH);
-  }
-
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * @see FileUploadDownloadClient#getUploadSegmentURI(String, String, int)
-   *
-   * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
-   * getUploadSegmentHttpsURI to construct your request.
-   */
-  @Deprecated
-  public static URI getOldUploadSegmentHttpsURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTPS, host, port, OLD_SEGMENT_PATH);
-  }
-
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * @see FileUploadDownloadClient#getUploadSegmentURI(String, String, int)
-   */
-  @Deprecated
-  public static URI getUploadSegmentHttpURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTP, host, port, SEGMENT_PATH);
-  }
-
-  /**
-   * Deprecated due to lack of protocol/scheme support. May break for deployments with TLS/SSL enabled
-   *
-   * @see FileUploadDownloadClient#getUploadSegmentURI(String, String, int)
-   */
-  @Deprecated
-  public static URI getUploadSegmentHttpsURI(String host, int port)
-      throws URISyntaxException {
-    return getURI(HTTPS, host, port, SEGMENT_PATH);
   }
 
   public static URI getUploadSegmentURI(String protocol, String host, int port)
@@ -541,38 +411,16 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return new InputStreamBody(inputStream, ContentType.DEFAULT_BINARY, fileName);
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * Add schema.
-   *
-   * @see FileUploadDownloadClient#addSchema(URI, String, File, List, List)
-   *
-   * @param uri URI
-   * @param schemaName Schema name
-   * @param schemaFile Schema file
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  @Deprecated
-  public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile)
-      throws IOException, HttpErrorStatusException {
-    return addSchema(uri, schemaName, schemaFile, Collections.emptyList(), Collections.emptyList());
-  }
-
-  /**
-   * Add schema.
-   *
-   * @param uri URI
-   * @param schemaName Schema name
-   * @param schemaFile Schema file
-   * @param headers HTTP headers
-   * @param parameters HTTP parameters
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Add schema.
+  ///
+  /// @param uri URI
+  /// @param schemaName Schema name
+  /// @param schemaFile Schema file
+  /// @param headers HTTP headers
+  /// @param parameters HTTP parameters
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters)
       throws IOException, HttpErrorStatusException {
@@ -580,40 +428,16 @@ public class FileUploadDownloadClient implements AutoCloseable {
         _httpClient.sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile, headers, parameters)));
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * Update schema.
-   *
-   * @see FileUploadDownloadClient#updateSchema(URI, String, File, List, List)
-   *
-   * @param uri URI
-   * @param schemaName Schema name
-   * @param schemaFile Schema file
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  @Deprecated
-  public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile)
-      throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
-        getUploadFileRequest(HttpPut.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), null, null),
-        HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
-  }
-
-  /**
-   * Update schema.
-   *
-   * @param uri URI
-   * @param schemaName Schema name
-   * @param schemaFile Schema file
-   * @param headers HTTP headers
-   * @param parameters HTTP parameters
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Update schema.
+  ///
+  /// @param uri URI
+  /// @param schemaName Schema name
+  /// @param schemaFile Schema file
+  /// @param headers HTTP headers
+  /// @param parameters HTTP parameters
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters)
       throws IOException, HttpErrorStatusException {
@@ -622,38 +446,22 @@ public class FileUploadDownloadClient implements AutoCloseable {
         HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
   }
 
-  /**
-   * Upload segment by sending a zip of creation.meta and metadata.properties.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param segmentMetadataFile Segment metadata file
-   * @param headers Optional http headers
-   * @param parameters Optional query parameters
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Upload segment by sending a zip of creation.meta and metadata.properties.
+  ///
+  /// @param uri URI
+  /// @param segmentName Segment name
+  /// @param segmentMetadataFile Segment metadata file
+  /// @param headers Optional http headers
+  /// @param parameters Optional query parameters
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse uploadSegmentMetadata(URI uri, String segmentName, File segmentMetadataFile,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
     return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
         getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters), socketTimeoutMs));
-  }
-
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * @see FileUploadDownloadClient#uploadSegment(URI, String, InputStream, List, List, int)
-   */
-  @Deprecated
-  // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
-  public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
-      int segmentUploadRequestTimeoutMs)
-      throws IOException, HttpErrorStatusException {
-    return uploadSegmentMetadataFiles(uri, metadataFiles, Collections.emptyList(), Collections.emptyList(),
-        segmentUploadRequestTimeoutMs);
   }
 
   // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
@@ -665,24 +473,22 @@ public class FileUploadDownloadClient implements AutoCloseable {
             segmentUploadRequestTimeoutMs));
   }
 
-  /**
-   * Upload segment with segment file.
-   *
-   * Note: table name needs to be added as a parameter except for the case where this gets called during realtime
-   * segment commit protocol.
-   *
-   * TODO: fix the realtime segment commit protocol to add table name as a parameter.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param segmentFile Segment file
-   * @param headers Optional http headers
-   * @param parameters Optional query parameters
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Upload segment with segment file.
+  ///
+  /// Note: table name needs to be added as a parameter except for the case where this gets called during realtime
+  /// segment commit protocol.
+  ///
+  /// TODO: fix the realtime segment commit protocol to add table name as a parameter.
+  ///
+  /// @param uri URI
+  /// @param segmentName Segment name
+  /// @param segmentFile Segment file
+  /// @param headers Optional http headers
+  /// @param parameters Optional query parameters
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
@@ -691,42 +497,38 @@ public class FileUploadDownloadClient implements AutoCloseable {
             socketTimeoutMs));
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * Upload segment with segment file using default settings. Include table name as a request parameter.
-   *
-   * @see FileUploadDownloadClient#uploadSegment(URI, String, InputStream, List, List, int)
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param segmentFile Segment file
-   * @param tableName Table name with or without type suffix
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Deprecated due to lack of auth header support. May break for deployments with auth enabled
+  ///
+  /// Upload segment with segment file using default settings. Include table name as a request parameter.
+  ///
+  /// @see FileUploadDownloadClient#uploadSegment(URI, String, InputStream, List, List, int)
+  ///
+  /// @param uri URI
+  /// @param segmentName Segment name
+  /// @param segmentFile Segment file
+  /// @param tableName Table name with or without type suffix
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   @Deprecated
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName)
       throws IOException, HttpErrorStatusException {
     // Add table name as a request parameter
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
-    List<NameValuePair> parameters = Collections.singletonList(tableNameValuePair);
+    List<NameValuePair> parameters = List.of(tableNameValuePair);
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Upload segment with segment file using default settings. Include table name and type as a request parameters.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param segmentFile Segment file
-   * @param tableName Table name with or without type suffix
-   * @param tableType Table type
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Upload segment with segment file using default settings. Include table name and type as a request parameters.
+  ///
+  /// @param uri URI
+  /// @param segmentName Segment name
+  /// @param segmentFile Segment file
+  /// @param tableName Table name with or without type suffix
+  /// @param tableType Table type
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName,
       TableType tableType)
       throws IOException, HttpErrorStatusException {
@@ -737,22 +539,20 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Upload segment with segment file using default settings. Include table name and type as a request parameters.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param segmentFile Segment file
-   * @param headers Optional http headers
-   * @param tableName Table name with or without type suffix
-   * @param tableType Table type
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Upload segment with segment file using default settings. Include table name and type as a request parameters.
+  ///
+  /// @param uri URI
+  /// @param segmentName Segment name
+  /// @param segmentFile Segment file
+  /// @param headers Optional http headers
+  /// @param tableName Table name with or without type suffix
+  /// @param tableType Table type
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, List<Header> headers,
-    String tableName, TableType tableType)
-    throws IOException, HttpErrorStatusException {
+      String tableName, TableType tableType)
+      throws IOException, HttpErrorStatusException {
     // Add table name and type request parameters
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
     NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());
@@ -760,21 +560,19 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return uploadSegment(uri, segmentName, segmentFile, headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Upload segment with segment file using  table name, type, enableParallelPushProtection and allowRefresh as
-   * request parameters.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param segmentFile Segment file
-   * @param tableName Table name with or without type suffix
-   * @param tableType Table type
-   * @param enableParallelPushProtection enable protection against concurrent segment uploads for the same segment
-   * @param allowRefresh whether to refresh a segment if it already exists
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Upload segment with segment file using  table name, type, enableParallelPushProtection and allowRefresh as
+  /// request parameters.
+  ///
+  /// @param uri URI
+  /// @param segmentName Segment name
+  /// @param segmentFile Segment file
+  /// @param tableName Table name with or without type suffix
+  /// @param tableType Table type
+  /// @param enableParallelPushProtection enable protection against concurrent segment uploads for the same segment
+  /// @param allowRefresh whether to refresh a segment if it already exists
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, String tableName,
       TableType tableType, boolean enableParallelPushProtection, boolean allowRefresh)
       throws IOException, HttpErrorStatusException {
@@ -792,22 +590,20 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return uploadSegment(uri, segmentName, segmentFile, null, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Upload segment with segment file input stream.
-   *
-   * Note: table name has to be set as a parameter.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param inputStream Segment file input stream
-   * @param headers Optional http headers
-   * @param parameters Optional query parameters
-   * @param tableName Table name with or without type suffix
-   * @param tableType Table type
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Upload segment with segment file input stream.
+  ///
+  /// Note: table name has to be set as a parameter.
+  ///
+  /// @param uri URI
+  /// @param segmentName Segment name
+  /// @param inputStream Segment file input stream
+  /// @param headers Optional http headers
+  /// @param parameters Optional query parameters
+  /// @param tableName Table name with or without type suffix
+  /// @param tableType Table type
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, String tableName, TableType tableType)
       throws IOException, HttpErrorStatusException {
@@ -822,21 +618,19 @@ public class FileUploadDownloadClient implements AutoCloseable {
             HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
   }
 
-  /**
-   * Upload segment with segment file input stream.
-   *
-   * Note: table name has to be set as a parameter.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param inputStream Segment file input stream
-   * @param headers Optional http headers
-   * @param parameters Optional query parameters
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Upload segment with segment file input stream.
+  ///
+  /// Note: table name has to be set as a parameter.
+  ///
+  /// @param uri URI
+  /// @param segmentName Segment name
+  /// @param inputStream Segment file input stream
+  /// @param headers Optional http headers
+  /// @param parameters Optional query parameters
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
@@ -845,17 +639,15 @@ public class FileUploadDownloadClient implements AutoCloseable {
             socketTimeoutMs));
   }
 
-  /**
-   * Upload segment with segment file input stream using default settings. Include table name as a request parameter.
-   *
-   * @param uri URI
-   * @param segmentName Segment name
-   * @param inputStream Segment file input stream
-   * @param rawTableName Raw table name
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Upload segment with segment file input stream using default settings. Include table name as a request parameter.
+  ///
+  /// @param uri URI
+  /// @param segmentName Segment name
+  /// @param inputStream Segment file input stream
+  /// @param rawTableName Raw table name
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream, String rawTableName)
       throws IOException, HttpErrorStatusException {
     // Add table name as a request parameter
@@ -864,57 +656,69 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return uploadSegment(uri, segmentName, inputStream, null, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
-   * If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
-   * @param controllerBaseUri the base controller URI, e.g., https://example.com:8000
-   * @param rawTableName the raw table name without table type
-   * @param tableType the table type (OFFLINE or REALTIME)
-   * @param excludeReplacedSegments whether to exclude replaced segments (determined by segment lineage)
-   * @return a map from a given tableType to a list of segment names
-   * @throws Exception when failed to get segments from the controller
-   */
+  /// Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
+  /// If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
+  /// @param controllerBaseUri the base controller URI, e.g., https://example.com:8000
+  /// @param rawTableName the raw table name without table type
+  /// @param tableType the table type (OFFLINE or REALTIME)
+  /// @param excludeReplacedSegments whether to exclude replaced segments (determined by segment lineage)
+  /// @return a map from a given tableType to a list of segment names
+  /// @throws Exception when failed to get segments from the controller
   public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
       @Nullable TableType tableType, boolean excludeReplacedSegments)
       throws Exception {
     return getSegments(controllerBaseUri, rawTableName, tableType, excludeReplacedSegments, null);
   }
 
-  /**
-   * Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
-   * If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
-   * @param controllerBaseUri the base controller URI, e.g., https://example.com:8000
-   * @param rawTableName the raw table name without table type
-   * @param tableType the table type (OFFLINE or REALTIME)
-   * @param excludeReplacedSegments whether to exclude replaced segments (determined by segment lineage)
-   * @param authProvider the {@link AuthProvider}
-   * @return a map from a given tableType to a list of segment names
-   * @throws Exception when failed to get segments from the controller
-   */
+  /// Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
+  /// If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
+  /// @param controllerBaseUri the base controller URI, e.g., https://example.com:8000
+  /// @param rawTableName the raw table name without table type
+  /// @param tableType the table type (OFFLINE or REALTIME)
+  /// @param excludeReplacedSegments whether to exclude replaced segments (determined by segment lineage)
+  /// @param authProvider the [AuthProvider]
+  /// @return a map from a given tableType to a list of segment names
+  /// @throws Exception when failed to get segments from the controller
   public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
       @Nullable TableType tableType, boolean excludeReplacedSegments, @Nullable AuthProvider authProvider)
       throws Exception {
-    return getSegments(controllerBaseUri, rawTableName, tableType, excludeReplacedSegments, Long.MIN_VALUE,
-        Long.MAX_VALUE, false, authProvider);
+    return getSegments(controllerBaseUri, rawTableName, tableType, excludeReplacedSegments, authProvider,
+        HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
-   * If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
-   * @param controllerBaseUri the base controller URI, e.g., https://example.com:8000
-   * @param rawTableName the raw table name without table type
-   * @param tableType the table type (OFFLINE or REALTIME)
-   * @param excludeReplacedSegments whether to exclude replaced segments (determined by segment lineage)
-   * @param startTimestamp start timestamp in ms (inclusive)
-   * @param endTimestamp end timestamp in ms (exclusive)
-   * @param excludeOverlapping whether to exclude the segments overlapping with the timestamps, false by default
-   * @param authProvider the {@link AuthProvider}
-   * @return a map from a given tableType to a list of segment names
-   * @throws Exception when failed to get segments from the controller
-   */
+  /// Returns table segments using an explicit socket timeout for the controller request.
+  public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
+      @Nullable TableType tableType, boolean excludeReplacedSegments, @Nullable AuthProvider authProvider,
+      int socketTimeoutMs)
+      throws Exception {
+    return getSegments(controllerBaseUri, rawTableName, tableType, excludeReplacedSegments, Long.MIN_VALUE,
+        Long.MAX_VALUE, false, authProvider, socketTimeoutMs);
+  }
+
+  /// Returns a map from a given tableType to a list of segments for that given tableType (OFFLINE or REALTIME)
+  /// If tableType is left unspecified, both OFFLINE and REALTIME segments will be returned in the map.
+  /// @param controllerBaseUri the base controller URI, e.g., https://example.com:8000
+  /// @param rawTableName the raw table name without table type
+  /// @param tableType the table type (OFFLINE or REALTIME)
+  /// @param excludeReplacedSegments whether to exclude replaced segments (determined by segment lineage)
+  /// @param startTimestamp start timestamp in ms (inclusive)
+  /// @param endTimestamp end timestamp in ms (exclusive)
+  /// @param excludeOverlapping whether to exclude the segments overlapping with the timestamps, false by default
+  /// @param authProvider the [AuthProvider]
+  /// @return a map from a given tableType to a list of segment names
+  /// @throws Exception when failed to get segments from the controller
   public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
       @Nullable TableType tableType, boolean excludeReplacedSegments, long startTimestamp, long endTimestamp,
       boolean excludeOverlapping, @Nullable AuthProvider authProvider)
+      throws Exception {
+    return getSegments(controllerBaseUri, rawTableName, tableType, excludeReplacedSegments, startTimestamp,
+        endTimestamp, excludeOverlapping, authProvider, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /// Returns table segments using an explicit socket timeout for the controller request.
+  public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
+      @Nullable TableType tableType, boolean excludeReplacedSegments, long startTimestamp, long endTimestamp,
+      boolean excludeOverlapping, @Nullable AuthProvider authProvider, int socketTimeoutMs)
       throws Exception {
     List<String> tableTypes;
     if (tableType == null) {
@@ -936,7 +740,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
       RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0).attempt(() -> {
         try {
           SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
-              _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+              _httpClient.sendRequest(requestBuilder.build(), socketTimeoutMs));
           LOGGER.info("Response {}: {} received for GET request to URI: {}", response.getStatusCode(),
               response.getResponse(), uri);
           tableTypeToSegments.put(tableTypeToFilter,
@@ -978,21 +782,26 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return segments;
   }
 
-  /**
-   * Used by controllers to send requests to servers:
-   * Controller periodic task uses this endpoint to ask servers
-   * to upload committed llc segment to segment store if missing.
-   * @param uri The uri to ask servers to upload segment to segment store
-   * @return the uploaded segment download url from segment store
-   * @throws URISyntaxException
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   *
-   * TODO: migrate this method to another class
-   */
+  /// Used by controllers to send requests to servers:
+  /// Controller periodic task uses this endpoint to ask servers
+  /// to upload committed llc segment to segment store if missing.
+  /// @param uri The uri to ask servers to upload segment to segment store
+  /// @return the uploaded segment download url from segment store
+  /// @throws URISyntaxException
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
+  ///
+  /// TODO: migrate this method to another class
   public String uploadToSegmentStore(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
+    return uploadToSegmentStore(uri, null);
+  }
+
+  /// Authenticated variant of [#uploadToSegmentStore(String)].
+  public String uploadToSegmentStore(String uri, @Nullable AuthProvider authProvider)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::setHeader);
     // sendRequest checks the response status code
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
@@ -1005,18 +814,23 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return downloadUrl;
   }
 
-  /**
-   * Used by controllers to send requests to servers: Controller periodic task uses this endpoint to ask servers
-   * to upload committed llc segment to segment store if missing.
-   * @param uri The uri to ask servers to upload segment to segment store
-   * @return {@link TableLLCSegmentUploadResponse} - segment download url, crc, other metadata
-   * @throws URISyntaxException
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Used by controllers to send requests to servers: Controller periodic task uses this endpoint to ask servers
+  /// to upload committed llc segment to segment store if missing.
+  /// @param uri The uri to ask servers to upload segment to segment store
+  /// @return [TableLLCSegmentUploadResponse] - segment download url, crc, other metadata
+  /// @throws URISyntaxException
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public TableLLCSegmentUploadResponse uploadLLCToSegmentStore(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
+    return uploadLLCToSegmentStore(uri, null);
+  }
+
+  /// Authenticated variant of [#uploadLLCToSegmentStore(String)].
+  public TableLLCSegmentUploadResponse uploadLLCToSegmentStore(String uri, @Nullable AuthProvider authProvider)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::setHeader);
     // sendRequest checks the response status code
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
@@ -1031,18 +845,23 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return tableLLCSegmentUploadResponse;
   }
 
-  /**
-   * Used by controllers to send requests to servers: Controller periodic task uses this endpoint to ask servers
-   * to upload committed llc segment to segment store if missing.
-   * @param uri The uri to ask servers to upload segment to segment store
-   * @return {@link SegmentZKMetadata} - segment download url, crc, other metadata
-   * @throws URISyntaxException
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Used by controllers to send requests to servers: Controller periodic task uses this endpoint to ask servers
+  /// to upload committed llc segment to segment store if missing.
+  /// @param uri The uri to ask servers to upload segment to segment store
+  /// @return [SegmentZKMetadata] - segment download url, crc, other metadata
+  /// @throws URISyntaxException
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SegmentZKMetadata uploadLLCToSegmentStoreWithZKMetadata(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
+    return uploadLLCToSegmentStoreWithZKMetadata(uri, null);
+  }
+
+  /// Authenticated variant of [#uploadLLCToSegmentStoreWithZKMetadata(String)].
+  public SegmentZKMetadata uploadLLCToSegmentStoreWithZKMetadata(String uri, @Nullable AuthProvider authProvider)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::setHeader);
     // sendRequest checks the response status code
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
@@ -1055,20 +874,18 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return segmentZKMetadata;
   }
 
-  /**
-   * Send segment uri.
-   *
-   * Note: table name has to be set as a parameter.
-   *
-   * @param uri URI
-   * @param downloadUri Segment download uri
-   * @param headers Optional http headers
-   * @param parameters Optional query parameters
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Send segment uri.
+  ///
+  /// Note: table name has to be set as a parameter.
+  ///
+  /// @param uri URI
+  /// @param downloadUri Segment download uri
+  /// @param headers Optional http headers
+  /// @param parameters Optional query parameters
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
@@ -1076,41 +893,16 @@ public class FileUploadDownloadClient implements AutoCloseable {
         _httpClient.sendRequest(getSendSegmentUriRequest(uri, downloadUri, headers, parameters), socketTimeoutMs));
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * Send segment uri using default settings. Include table name as a request parameter.
-   *
-   * @see FileUploadDownloadClient#sendSegmentUri(URI, String, List, List, int)
-   *
-   * @param uri URI
-   * @param downloadUri Segment download uri
-   * @param rawTableName Raw table name
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  @Deprecated
-  public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri, String rawTableName)
-      throws IOException, HttpErrorStatusException {
-    // Add table name as a request parameter
-    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, rawTableName);
-    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair);
-    return sendSegmentUri(uri, downloadUri, null, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
-  }
-
-  /**
-   * Send segment json.
-   *
-   * @param uri URI
-   * @param jsonString Segment json string
-   * @param headers Optional http headers
-   * @param parameters Optional query parameters
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Send segment json.
+  ///
+  /// @param uri URI
+  /// @param jsonString Segment json string
+  /// @param headers Optional http headers
+  /// @param parameters Optional query parameters
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse sendSegmentJson(URI uri, String jsonString, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
@@ -1118,53 +910,37 @@ public class FileUploadDownloadClient implements AutoCloseable {
         _httpClient.sendRequest(getSendSegmentJsonRequest(uri, jsonString, headers, parameters), socketTimeoutMs));
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * Send segment json using default settings.
-   *
-   * @see FileUploadDownloadClient#sendSegmentJson(URI, String, List, List, int)
-   *
-   * @param uri URI
-   * @param jsonString Segment json string
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  @Deprecated
-  public SimpleHttpResponse sendSegmentJson(URI uri, String jsonString)
-      throws IOException, HttpErrorStatusException {
-    return sendSegmentJson(uri, jsonString, null, null, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
-  }
-
-  /**
-   * Start replace segments with default settings.
-   *
-   * @param uri URI
-   * @param startReplaceSegmentsRequest request
-   * @param authProvider auth provider
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Start replace segments with default settings.
+  ///
+  /// @param uri URI
+  /// @param startReplaceSegmentsRequest request
+  /// @param authProvider auth provider
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest,
       @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
-        getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest), authProvider),
-        HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+    return startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * End replace segments with default settings.
-   *
-   * @param uri URI
-   * @oaram socketTimeoutMs Socket timeout in milliseconds
-   * @param authProvider auth provider
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Starts the consistent-push replace protocol using an explicit socket timeout.
+  public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest,
+      @Nullable AuthProvider authProvider, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest), authProvider),
+        socketTimeoutMs));
+  }
+
+  /// End replace segments with default settings.
+  ///
+  /// @param uri URI
+  /// @oaram socketTimeoutMs Socket timeout in milliseconds
+  /// @param authProvider auth provider
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs,
       @Nullable EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
@@ -1173,64 +949,45 @@ public class FileUploadDownloadClient implements AutoCloseable {
         _httpClient.sendRequest(getEndReplaceSegmentsRequest(uri, jsonBody, authProvider), socketTimeoutMs));
   }
 
-  /**
-   * Revert replace segments with default settings.
-   *
-   * @param uri URI
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Revert replace segments with default settings.
+  ///
+  /// @param uri URI
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse revertReplaceSegments(URI uri)
       throws IOException, HttpErrorStatusException {
     return revertReplaceSegments(uri, null);
   }
 
-  /**
-   * Revert replace segments with default settings.
-   *
-   * @param uri URI
-   * @param authProvider auth provider
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Revert replace segments with default settings.
+  ///
+  /// @param uri URI
+  /// @param authProvider auth provider
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse revertReplaceSegments(URI uri, @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
-        getRevertReplaceSegmentRequest(uri, authProvider)));
+    return revertReplaceSegments(uri, authProvider, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * Send segment completion protocol request.
-   *
-   * @see FileUploadDownloadClient#sendSegmentCompletionProtocolRequest(URI, List, List, int)
-   *
-   * @param uri URI
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  @Deprecated
-  public SimpleHttpResponse sendSegmentCompletionProtocolRequest(URI uri, int socketTimeoutMs)
+  /// Reverts the consistent-push replace protocol using an explicit socket timeout.
+  public SimpleHttpResponse revertReplaceSegments(URI uri, @Nullable AuthProvider authProvider, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
-    return sendSegmentCompletionProtocolRequest(uri, Collections.emptyList(), Collections.emptyList(), socketTimeoutMs);
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getRevertReplaceSegmentRequest(uri, authProvider), socketTimeoutMs));
   }
 
-  /**
-   * Send segment completion protocol request.
-   *
-   * @param uri URI
-   * @param headers Optional http headers
-   * @param parameters Optional query parameters
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Send segment completion protocol request.
+  ///
+  /// @param uri URI
+  /// @param headers Optional http headers
+  /// @param parameters Optional query parameters
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @return Response
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public SimpleHttpResponse sendSegmentCompletionProtocolRequest(URI uri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
@@ -1238,108 +995,61 @@ public class FileUploadDownloadClient implements AutoCloseable {
         _httpClient.sendRequest(getSegmentCompletionProtocolRequest(uri, headers, parameters), socketTimeoutMs));
   }
 
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * Download a file using default settings
-   *
-   * @see HttpClient#downloadFile(URI, int, File, AuthProvider, List)
-   *
-   * @param uri URI
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @param dest File destination
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  @Deprecated
-  public int downloadFile(URI uri, int socketTimeoutMs, File dest)
-      throws IOException, HttpErrorStatusException {
-    return _httpClient.downloadFile(uri, socketTimeoutMs, dest, null, null);
-  }
-
-  /**
-   * Deprecated due to lack of auth header support. May break for deployments with auth enabled
-   *
-   * Download a file.
-   *
-   * @see FileUploadDownloadClient#downloadFile(URI, File, AuthProvider)
-   *
-   * @param uri URI
-   * @param dest File destination
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  @Deprecated
-  public int downloadFile(URI uri, File dest)
-      throws IOException, HttpErrorStatusException {
-    return downloadFile(uri, dest, null);
-  }
-
-  /**
-   * Download a file.
-   *
-   * @param uri URI
-   * @param dest File destination
-   * @param authProvider auth provider
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Download a file.
+  ///
+  /// @param uri URI
+  /// @param dest File destination
+  /// @param authProvider auth provider
+  /// @return Response status code
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public int downloadFile(URI uri, File dest, AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
     return _httpClient.downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider, null);
   }
 
-  /**
-   * Download a file.
-   *
-   * @param uri URI
-   * @param dest File destination
-   * @param authProvider auth provider
-   * @param httpHeaders http headers
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Download a file.
+  ///
+  /// @param uri URI
+  /// @param dest File destination
+  /// @param authProvider auth provider
+  /// @param httpHeaders http headers
+  /// @return Response status code
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public int downloadFile(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
     return _httpClient.downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider, httpHeaders);
   }
 
-  /**
-   * Download a file.
-   *
-   * @param uri URI
-   * @param dest File destination
-   * @param authProvider auth provider
-   * @param httpHeaders http headers
-   * @param connectionRequestTimeoutMs Connection request timeout in milliseconds
-   * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Download a file.
+  ///
+  /// @param uri URI
+  /// @param dest File destination
+  /// @param authProvider auth provider
+  /// @param httpHeaders http headers
+  /// @param connectionRequestTimeoutMs Connection request timeout in milliseconds
+  /// @param socketTimeoutMs Socket timeout in milliseconds
+  /// @return Response status code
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public int downloadFile(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
       int connectionRequestTimeoutMs, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
     return _httpClient.downloadFile(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest, authProvider, httpHeaders);
   }
 
-  /**
-   * Download and untar a file in a streamed way with rate limit
-   *
-   * @param uri URI
-   * @param dest File destination
-   * @param authProvider auth token
-   * @param httpHeaders http headers
-   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
-   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Download and untar a file in a streamed way with rate limit
+  ///
+  /// @param uri URI
+  /// @param dest File destination
+  /// @param authProvider auth token
+  /// @param httpHeaders http headers
+  /// @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+  ///                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+  /// @return Response status code
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public File downloadUntarFileStreamed(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
       long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {
@@ -1347,19 +1057,17 @@ public class FileUploadDownloadClient implements AutoCloseable {
         httpHeaders, maxStreamRateInByte);
   }
 
-  /**
-   * Download and untar a file in a streamed way with rate limit
-   *
-   * @param uri URI
-   * @param dest File destination
-   * @param authProvider auth token
-   * @param httpHeaders http headers
-   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
-   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
-   * @return Response status code
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
+  /// Download and untar a file in a streamed way with rate limit
+  ///
+  /// @param uri URI
+  /// @param dest File destination
+  /// @param authProvider auth token
+  /// @param httpHeaders http headers
+  /// @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+  ///                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+  /// @return Response status code
+  /// @throws IOException
+  /// @throws HttpErrorStatusException
   public File downloadUntarFileStreamed(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
       long maxStreamRateInByte, int connectionRequestTimeoutMs, int socketTimeoutMs)
       throws IOException, HttpErrorStatusException {
@@ -1367,12 +1075,10 @@ public class FileUploadDownloadClient implements AutoCloseable {
         httpHeaders, maxStreamRateInByte);
   }
 
-  /**
-   * Generate a param list with a table name attribute.
-   *
-   * @param tableName table name
-   * @return param list
-   */
+  /// Generate a param list with a table name attribute.
+  ///
+  /// @param tableName table name
+  /// @return param list
   public static List<NameValuePair> makeTableParam(String tableName) {
     List<NameValuePair> tableParams = new ArrayList<>();
     tableParams.add(new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName));

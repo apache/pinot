@@ -21,10 +21,10 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -36,34 +36,39 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.IntIterator;
 
 
-/**
- * This function is used for LastWithTime calculations.
- * <p>The function can be used as LastWithTime(dataExpression, timeExpression, 'dataType')
- * <p>Following arguments are supported:
- * <ul>
- *   <li>dataExpression: expression that contains the column to be calculated last on</li>
- *   <li>timeExpression: expression that contains the column to be used to decide which data is last, can be any
- *   Numeric column</li>
- *   <li>dataType: the data type of data column</li>
- * </ul>
- */
+/// This function is used for LastWithTime calculations.
+///
+/// The function can be used as LastWithTime(dataExpression, timeExpression, 'dataType')
+///
+/// Following arguments are supported:
+///
+/// - dataExpression: expression that contains the column to be calculated last on
+/// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
+///   Numeric column
+/// - dataType: the data type of data column
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
-    extends NullableSingleInputAggregationFunction<ValueLongPair<V>, V> {
+    extends BaseSingleInputAggregationFunction<ValueLongPair<V>, V> {
   protected final ExpressionContext _timeCol;
-  private final ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
 
-  public LastWithTimeAggregationFunction(ExpressionContext dataCol,
-      ExpressionContext timeCol,
-      ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe, boolean nullHandlingEnabled) {
+  public LastWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled) {
     super(dataCol, nullHandlingEnabled);
     _timeCol = timeCol;
-    _objectSerDe = objectSerDe;
   }
 
   public abstract ValueLongPair<V> constructValueLongPair(V value, long time);
 
+  /// Deserializes a value-time pair from the bytes of a pre-aggregated value.
+  public abstract ValueLongPair<V> deserializeValueLongPair(byte[] bytes);
+
   public abstract ValueLongPair<V> getDefaultValueTimePair();
+
+  /// Whether the data input holds serialized value-time pairs, as a pre-aggregated BYTES column does, rather than data
+  /// values.
+  protected boolean isSerializedPairInput(BlockValSet blockValSet) {
+    return blockValSet.getValueType() == DataType.BYTES;
+  }
 
   public abstract V readCell(BlockValSet block, int docId);
 
@@ -100,7 +105,7 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet blockTimeSet = blockValSetMap.get(_timeCol);
-    if (blockValSet.getValueType() != DataType.BYTES) {
+    if (!isSerializedPairInput(blockValSet)) {
       IntLongPair defaultPair = new IntLongPair(Integer.MIN_VALUE, Long.MIN_VALUE);
       long[] timeValues = blockTimeSet.getLongValuesSV();
 
@@ -130,7 +135,7 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
       // Serialized LastPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        ValueLongPair<V> lastWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+        ValueLongPair<V> lastWithTimePair = deserializeValueLongPair(bytesValues[i]);
         V data = lastWithTimePair.getValue();
         long time = lastWithTimePair.getTime();
         if (time >= lastTime) {
@@ -154,14 +159,14 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet timeValSet = blockValSetMap.get(_timeCol);
-    if (blockValSet.getValueType() != DataType.BYTES) {
+    if (!isSerializedPairInput(blockValSet)) {
       aggregateGroupResultWithRawDataSv(length, groupKeyArray, groupByResultHolder,
           blockValSet, timeValSet);
     } else {
       // Serialized LastPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        ValueLongPair<V> lastWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+        ValueLongPair<V> lastWithTimePair = deserializeValueLongPair(bytesValues[i]);
         setGroupByResult(groupKeyArray[i],
             groupByResultHolder,
             lastWithTimePair.getValue(),
@@ -175,13 +180,13 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet timeValSet = blockValSetMap.get(_timeCol);
-    if (blockValSet.getValueType() != DataType.BYTES) {
+    if (!isSerializedPairInput(blockValSet)) {
       aggregateGroupResultWithRawDataMv(length, groupKeysArray, groupByResultHolder, blockValSet, timeValSet);
     } else {
       // Serialized ValueTimePair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        ValueLongPair<V> lastWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+        ValueLongPair<V> lastWithTimePair = deserializeValueLongPair(bytesValues[i]);
         V data = lastWithTimePair.getValue();
         long time = lastWithTimePair.getTime();
         for (int groupKey : groupKeysArray[i]) {
@@ -237,8 +242,10 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
     return ColumnDataType.OBJECT;
   }
 
+  @Nullable
   @Override
-  public V extractFinalResult(ValueLongPair<V> intermediateResult) {
-    return intermediateResult.getValue();
+  public V extractFinalResult(@Nullable ValueLongPair<V> intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and there is no last value
+    return intermediateResult != null ? intermediateResult.getValue() : null;
   }
 }

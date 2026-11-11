@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
-/**
- * PatternType describes the types of time series models available for generation. Each type maps to a dedicated
- * generator class in GeneratorFactory.
- *
- * @see GeneratorFactory
- */
+/// PatternType describes the types of time series models available for generation. Each type maps to a dedicated
+/// generator class in GeneratorFactory.
+///
+/// @see GeneratorFactory
 public enum PatternType {
   SEASONAL, SPIKE, SEQUENCE, STRING, MIXTURE
 }

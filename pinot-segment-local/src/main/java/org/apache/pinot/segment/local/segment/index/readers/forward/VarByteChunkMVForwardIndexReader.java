@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -27,13 +28,12 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Chunk-based multi-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
- * (STRING, BYTES).
- * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriter}
- *
- * TODO: Consider reading directly from sliced ByteBuffer instead of copying to byte[] first
- */
+/// Chunk-based multi-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
+/// (STRING, BYTES).
+///
+/// For data layout, please refer to the documentation for [VarByteChunkForwardIndexWriter]
+///
+/// TODO: Consider reading directly from sliced ByteBuffer instead of copying to byte\[\] first
 public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader {
   private static final int ROW_OFFSET_SIZE = VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
@@ -52,6 +52,16 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     } else {
       return null;
     }
+  }
+
+  @Override
+  public int getBigDecimalMV(int docId, BigDecimal[] valueBuffer, ChunkReaderContext context) {
+    return ArraySerDeUtils.deserializeBigDecimalArray(getBytes(docId, context), valueBuffer);
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalMV(int docId, ChunkReaderContext context) {
+    return ArraySerDeUtils.deserializeBigDecimalArray(getBytes(docId, context));
   }
 
   @Override
@@ -88,9 +98,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     }
   }
 
-  /**
-   * Helper method to read BYTES value from the compressed index.
-   */
+  /// Helper method to read BYTES value from the compressed index.
   private byte[] getBytesCompressed(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
@@ -105,9 +113,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     return bytes;
   }
 
-  /**
-   * Helper method to read BYTES value from the uncompressed index.
-   */
+  /// Helper method to read BYTES value from the uncompressed index.
   private byte[] getBytesUncompressed(int docId) {
     int chunkId = docId / _numDocsPerChunk;
     int chunkRowId = docId % _numDocsPerChunk;
@@ -123,9 +129,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     return bytes;
   }
 
-  /**
-   * Helper method to compute the end offset of the value in the chunk buffer.
-   */
+  /// Helper method to compute the end offset of the value in the chunk buffer.
   private int getValueEndOffset(int rowId, ByteBuffer chunkBuffer) {
     if (rowId == _numDocsPerChunk - 1) {
       // Last row in the chunk
@@ -141,9 +145,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     }
   }
 
-  /**
-   * Helper method to compute the end offset of the value in the data buffer.
-   */
+  /// Helper method to compute the end offset of the value in the data buffer.
   private long getValueEndOffset(int chunkId, int chunkRowId, long chunkStartOffset) {
     if (chunkId == _numChunks - 1) {
       // Last chunk

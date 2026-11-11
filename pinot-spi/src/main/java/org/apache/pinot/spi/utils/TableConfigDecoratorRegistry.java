@@ -23,11 +23,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigDecorator;
 
 
-/**
- * Registry for TableConfigDecorator implementations.
- * Enables external plugins to register decorators that enhance TableConfig objects.
- * By default, no decorator is registered.
- */
+/// Registry for TableConfigDecorator implementations.
+/// Enables external plugins to register decorators that enhance TableConfig objects.
+/// By default, no decorator is registered.
 public class TableConfigDecoratorRegistry {
   private TableConfigDecoratorRegistry() {
   }
@@ -38,22 +36,18 @@ public class TableConfigDecoratorRegistry {
   // Initialize with the no-op decorator
   private static final AtomicReference<TableConfigDecorator> DECORATOR_INSTANCE = new AtomicReference<>(NOOP);
 
-  /**
-   * Registers a decorator during startup.
-   *
-   * @param decorator The decorator to register
-   * @return true if registration was successful, false if already registered
-   */
+  /// Registers a decorator during startup.
+  ///
+  /// @param decorator The decorator to register
+  /// @return true if registration was successful, false if already registered
   public static boolean register(TableConfigDecorator decorator) {
     return DECORATOR_INSTANCE.compareAndSet(NOOP, decorator);
   }
 
-  /**
-   * Applies the registered decorator to a TableConfig.
-   *
-   * @param tableConfig The config to decorate
-   * @return The decorated config or original if decoration fails
-   */
+  /// Applies the registered decorator to a TableConfig.
+  ///
+  /// @param tableConfig The config to decorate
+  /// @return The decorated config or original if decoration fails
   public static TableConfig applyDecorator(TableConfig tableConfig) {
     return DECORATOR_INSTANCE.get().decorate(tableConfig);
   }

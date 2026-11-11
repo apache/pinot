@@ -24,14 +24,23 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
 public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<FloatSet> {
+  private static final int FLOAT_SET_TYPE = 16;
+
   public ArrayAggDistinctFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return true;
   }
 
   @Override
@@ -40,6 +49,18 @@ public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<Flo
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     FloatOpenHashSet valueSet = aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
         : new FloatOpenHashSet(length);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set to merge in.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.addAll(ObjectSerDeUtils.FLOAT_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.FLOAT)));
+        }
+      });
+      aggregationResultHolder.setValue(valueSet);
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       float[] values = blockValSet.getFloatValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -72,9 +93,8 @@ public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<Flo
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(FloatSet floatSet) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatSet.getValue(),
-        ObjectSerDeUtils.FLOAT_SET_SER_DE.serialize(floatSet));
+  public SerializedResult serializeIntermediateResult(FloatSet floatSet) {
+    return new SerializedValue<>(FLOAT_SET_TYPE, floatSet, ObjectSerDeUtils.FLOAT_SET_SER_DE);
   }
 
   @Override

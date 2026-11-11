@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar.array;
 
+import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
@@ -49,8 +50,14 @@ public class ArrayLengthScalarFunction implements PinotScalarFunction {
       TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.DOUBLE_ARRAY,
           new FunctionInfo(ArrayLengthScalarFunction.class.getMethod("arrayLength", double[].class),
               ArrayLengthScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BIG_DECIMAL_ARRAY,
+          new FunctionInfo(ArrayLengthScalarFunction.class.getMethod("arrayLength", BigDecimal[].class),
+              ArrayLengthScalarFunction.class, false));
       TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.STRING_ARRAY,
           new FunctionInfo(ArrayLengthScalarFunction.class.getMethod("arrayLength", String[].class),
+              ArrayLengthScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BYTES_ARRAY,
+          new FunctionInfo(ArrayLengthScalarFunction.class.getMethod("arrayLength", byte[][].class),
               ArrayLengthScalarFunction.class, false));
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
@@ -109,7 +116,15 @@ public class ArrayLengthScalarFunction implements PinotScalarFunction {
     return array.length;
   }
 
+  public static int arrayLength(BigDecimal[] array) {
+    return array.length;
+  }
+
   public static int arrayLength(String[] array) {
+    return array.length;
+  }
+
+  public static int arrayLength(byte[][] array) {
     return array.length;
   }
 }

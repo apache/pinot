@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
@@ -32,7 +32,6 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
@@ -44,12 +43,10 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Lucene text index reader supporting near realtime search. An instance of this
- * is created per consuming segment by {@link MutableSegmentImpl}.
- * Internally it uses {@link LuceneTextIndexCreator} for adding documents to the lucene index
- * as and when they are indexed by the consuming segment.
- */
+/// Lucene text index reader supporting near realtime search. An instance of this
+/// is created per consuming segment by [org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl].
+/// Internally it uses [LuceneTextIndexCreator] for adding documents to the lucene index
+/// as and when they are indexed by the consuming segment.
 public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndex.class);
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
@@ -65,14 +62,12 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private final RealtimeLuceneRefreshListener _refreshListener;
   private final RealtimeLuceneIndexRefreshManager.SearcherManagerHolder _searcherManagerHolder;
 
-  /**
-   * Created by {@link MutableSegmentImpl}
-   * for each column on which text index has been enabled
-   * @param column column name
-   * @param segmentIndexDir realtime segment consumer dir
-   * @param segmentName realtime segment name
-   * @param config the table index config
-   */
+  /// Created by [org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl]
+  /// for each column on which text index has been enabled
+  /// @param column column name
+  /// @param segmentIndexDir realtime segment consumer dir
+  /// @param segmentName realtime segment name
+  /// @param config the table index config
   public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName, TextIndexConfig config) {
     _column = column;
     _segmentName = segmentName;
@@ -112,17 +107,13 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     }
   }
 
-  /**
-   * Adds a new document.
-   */
+  /// Adds a new document.
   @Override
   public void add(String document) {
     _indexCreator.add(document);
   }
 
-  /**
-   * Adds a new document, made up of multiple values.
-   */
+  /// Adds a new document, made up of multiple values.
   @Override
   public void add(String[] documents) {
     _indexCreator.add(documents, documents.length);
@@ -157,30 +148,12 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       LuceneTextIndexUtils.LuceneTextIndexOptions options) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
     RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
-    // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter
-    // which the SearcherManager is created with. To ensure the index is never corrupted the search is executed
-    // in a child thread and the interrupt is handled in the current thread by canceling the search gracefully.
+    // Search is executed in SEARCHER_POOL which is wrapped with contextAwareExecutorService(executor, false).
+    // This propagates QueryThreadContext for CPU/memory tracking without registering the task for cancellation,
+    // preventing Thread.interrupt() during Lucene search which could corrupt FSDirectory.
     // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
-    Callable<MutableRoaringBitmap> searchCallable = () -> {
-      IndexSearcher indexSearcher = null;
-      try {
-        Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, _column, _analyzer);
-        indexSearcher = _searcherManager.acquire();
-        indexSearcher.search(query, docIDCollector);
-        return getPinotDocIds(indexSearcher, docIDs);
-      } finally {
-        try {
-          if (indexSearcher != null) {
-            _searcherManager.release(indexSearcher);
-          }
-        } catch (Exception e) {
-          LOGGER.error(
-              "Failed while releasing the searcher manager for realtime text index for column {}, exception {}",
-              _column, e.getMessage());
-        }
-      }
-    };
-    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(searchCallable);
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(
+        () -> executeSearchWithOptions(actualQuery, options, docIDCollector));
     try {
       return searchFuture.get();
     } catch (InterruptedException e) {
@@ -193,51 +166,36 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     }
   }
 
+  /// Executes Lucene search with options. Extracted to a separate method for clarity.
+  private MutableRoaringBitmap executeSearchWithOptions(String actualQuery,
+      LuceneTextIndexUtils.LuceneTextIndexOptions options, RealtimeLuceneDocIdCollector docIDCollector)
+      throws Exception {
+    IndexSearcher indexSearcher = null;
+    try {
+      Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, _column, _analyzer);
+      indexSearcher = _searcherManager.acquire();
+      indexSearcher.search(query, docIDCollector);
+      return getPinotDocIds(indexSearcher, docIDCollector.getDocIds());
+    } finally {
+      if (indexSearcher != null) {
+        try {
+          _searcherManager.release(indexSearcher);
+        } catch (Exception e) {
+          LOGGER.error("Failed while releasing searcher manager for column {}", _column, e);
+        }
+      }
+    }
+  }
+
   private MutableRoaringBitmap getDocIdsWithoutOptions(String searchQuery) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
     RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
-    // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter
-    // which the SearcherManager is created with. To ensure the index is never corrupted the search is executed
-    // in a child thread and the interrupt is handled in the current thread by canceling the search gracefully.
+    // Search is executed in SEARCHER_POOL which is wrapped with contextAwareExecutorService(executor, false).
+    // This propagates QueryThreadContext for CPU/memory tracking without registering the task for cancellation,
+    // preventing Thread.interrupt() during Lucene search which could corrupt FSDirectory.
     // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
-    Callable<MutableRoaringBitmap> searchCallable = () -> {
-      IndexSearcher indexSearcher = null;
-      try {
-        // Lucene query parsers are generally stateful and a new instance must be created per query.
-        QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
-        if (_enablePrefixSuffixMatchingInPhraseQueries) {
-          // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
-          // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
-          // Additionally, it does not support wildcards that span across terms.
-          // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
-          // Workaround: Use a custom query parser that correctly implements wildcard searches.
-          parser.setAllowLeadingWildcard(true);
-        }
-        Query query = parser.parse(searchQuery);
-        if (_enablePrefixSuffixMatchingInPhraseQueries) {
-          // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
-          // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
-          // Additionally, it does not support wildcards that span across terms.
-          // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
-          // Workaround: Use a custom query parser that correctly implements wildcard searches.
-          query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
-        }
-        indexSearcher = _searcherManager.acquire();
-        indexSearcher.search(query, docIDCollector);
-        return getPinotDocIds(indexSearcher, docIDs);
-      } finally {
-        try {
-          if (indexSearcher != null) {
-            _searcherManager.release(indexSearcher);
-          }
-        } catch (Exception e) {
-          LOGGER.error(
-              "Failed while releasing the searcher manager for realtime text index for column {}, exception {}",
-              _column, e.getMessage());
-        }
-      }
-    };
-    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(searchCallable);
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(
+        () -> executeSearchWithoutOptions(searchQuery, docIDCollector));
     try {
       return searchFuture.get();
     } catch (InterruptedException e) {
@@ -247,6 +205,46 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     } catch (Exception e) {
       throw new RuntimeException("Failed while searching the realtime text index for segment " + _segmentName
           + " for column " + _column + " with search query: " + searchQuery, e);
+    }
+  }
+
+  /// Executes Lucene search without options.
+  private MutableRoaringBitmap executeSearchWithoutOptions(String searchQuery,
+      RealtimeLuceneDocIdCollector docIDCollector) throws Exception {
+    IndexSearcher indexSearcher = null;
+    try {
+      // Lucene query parsers are generally stateful and a new instance must be created per query.
+      QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
+      if (_enablePrefixSuffixMatchingInPhraseQueries) {
+        // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
+        // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
+        // Additionally, it does not support wildcards that span across terms.
+        // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
+        // Workaround: Use a custom query parser that correctly implements wildcard searches.
+        parser.setAllowLeadingWildcard(true);
+      }
+      Query query = parser.parse(searchQuery);
+      if (_enablePrefixSuffixMatchingInPhraseQueries) {
+        // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
+        // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
+        // Additionally, it does not support wildcards that span across terms.
+        // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
+        // Workaround: Use a custom query parser that correctly implements wildcard searches.
+        query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
+      }
+      indexSearcher = _searcherManager.acquire();
+      indexSearcher.search(query, docIDCollector);
+      return getPinotDocIds(indexSearcher, docIDCollector.getDocIds());
+    } finally {
+      if (indexSearcher != null) {
+        try {
+          _searcherManager.release(indexSearcher);
+        } catch (Exception e) {
+          LOGGER.error(
+              "Failed while releasing the searcher manager for realtime text index for column {}, exception {}",
+              _column, e.getMessage());
+        }
+      }
     }
   }
 
@@ -260,7 +258,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       while (luceneDocIDIterator.hasNext()) {
         int luceneDocId = luceneDocIDIterator.next();
         Document document = indexSearcher.doc(luceneDocId);
-        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
         actualDocIDs.add(pinotDocId);
       }
     } catch (Exception e) {
@@ -341,5 +339,28 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
 
   public SearcherManager getSearcherManager() {
     return _searcherManager;
+  }
+
+  @Override
+  public int getSearchableDocCount() {
+    // The refresh listener records a lower bound that can miss documents added during a refresh.
+    SearcherManager searcherManager = _searcherManager;
+    IndexSearcher indexSearcher = null;
+    try {
+      indexSearcher = searcherManager.acquire();
+      // This is a doc-id fence, so deleted document slots must remain within its bounds.
+      return indexSearcher.getIndexReader().maxDoc();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get searchable document count for realtime text index for segment "
+          + _segmentName + " for column " + _column, e);
+    } finally {
+      if (indexSearcher != null) {
+        try {
+          searcherManager.release(indexSearcher);
+        } catch (IOException e) {
+          LOGGER.error("Failed while releasing searcher manager for column {}", _column, e);
+        }
+      }
+    }
   }
 }

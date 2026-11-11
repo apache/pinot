@@ -29,6 +29,8 @@ import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -110,6 +112,83 @@ public class TransformOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2.0, 0.0});
     assertEquals(resultRows.get(1), new Object[]{5.0, -1.0});
+  }
+
+  @Test
+  public void shouldHandleBytesArrayLiteralTransform() {
+    DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT});
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}, new Object[]{3}));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"bytesArray"}, new ColumnDataType[]{ColumnDataType.BYTES_ARRAY});
+    ByteArray first = new ByteArray(new byte[]{0});
+    ByteArray second = new ByteArray(new byte[]{1, 2});
+    List<RexExpression> operands = List.of(new RexExpression.Literal(ColumnDataType.BYTES, first),
+        new RexExpression.Literal(ColumnDataType.BYTES, second));
+    List<RexExpression> projects = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", operands));
+
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 3);
+    for (Object[] resultRow : resultRows) {
+      assertEquals((ByteArray[]) resultRow[0], new ByteArray[]{first, second});
+    }
+  }
+
+  @Test
+  public void shouldHandleDynamicBytesArrayTransform() {
+    DataSchema inputSchema =
+        new DataSchema(new String[]{"left", "right"}, new ColumnDataType[]{ColumnDataType.BYTES, ColumnDataType.BYTES});
+    ByteArray literal = new ByteArray(new byte[]{0});
+    ByteArray left0 = new ByteArray(new byte[]{1});
+    ByteArray right0 = new ByteArray(new byte[]{2});
+    ByteArray left1 = new ByteArray(new byte[]{3});
+    ByteArray right1 = new ByteArray(new byte[]{4});
+    ByteArray left2 = new ByteArray(new byte[]{5});
+    ByteArray right2 = new ByteArray(new byte[]{6});
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{left0, right0},
+        new Object[]{left1, right1}, new Object[]{left2, right2}));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"bytesArray"}, new ColumnDataType[]{ColumnDataType.BYTES_ARRAY});
+    List<RexExpression> operands = List.of(new RexExpression.Literal(ColumnDataType.BYTES, literal),
+        new RexExpression.InputRef(0), new RexExpression.InputRef(1));
+    List<RexExpression> projects = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.BYTES_ARRAY, "ARRAY_VALUE_CONSTRUCTOR", operands));
+
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+    assertEquals(resultRows.size(), 3);
+    ByteArray[][] expected = {{literal, left0, right0}, {literal, left1, right1}, {literal, left2, right2}};
+    for (int i = 0; i < expected.length; i++) {
+      ByteArray[] actual = (ByteArray[]) resultRows.get(i)[0];
+      assertEquals(actual, expected[i]);
+    }
+  }
+
+  @Test
+  public void shouldRenderUuidToStringAsCanonicalText() {
+    String uuid = "550e8400-e29b-41d4-a716-446655440000";
+    ByteArray uuidBytes = new ByteArray(UuidUtils.toBytes(uuid));
+    DataSchema inputSchema = new DataSchema(new String[]{"stringCol", "bytesCol", "uuidCol"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.UUID});
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema,
+        new Object[]{uuid.toUpperCase(), uuidBytes, uuidBytes}));
+    DataSchema resultSchema = new DataSchema(new String[]{"fromString", "fromBytes", "fromUuid"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING});
+    List<RexExpression> projects = List.of(
+        new RexExpression.FunctionCall(
+            ColumnDataType.STRING, "UUID_TO_STRING", List.of(new RexExpression.InputRef(0))),
+        new RexExpression.FunctionCall(
+            ColumnDataType.STRING, "UUID_TO_STRING", List.of(new RexExpression.InputRef(1))),
+        new RexExpression.FunctionCall(
+            ColumnDataType.STRING, "UUID_TO_STRING", List.of(new RexExpression.InputRef(2))));
+
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{uuid, uuid, uuid});
   }
 
   @Test

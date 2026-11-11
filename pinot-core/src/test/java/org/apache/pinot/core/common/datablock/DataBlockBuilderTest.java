@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -49,13 +48,25 @@ public class DataBlockBuilderTest {
 
   @DataProvider(name = "columnDataTypes")
   ColumnDataType[] columnDataTypes() {
-    return EnumSet.complementOf(EnumSet.of(ColumnDataType.BYTES_ARRAY)).toArray(new ColumnDataType[0]);
+    return ColumnDataType.values();
   }
 
   @Test(dataProvider = "columnDataTypes")
   void testRowBlock(ColumnDataType type)
       throws IOException {
-    int numRows = 100;
+    runRowBlockTest(type, 100);
+  }
+
+  /// Exercises the multi-batch path of [DataBlockBuilder#buildFromRows] with a row count well past the internal
+  /// `interruptableLoopStep` so that the inner loop runs across multiple `(start, end)` chunks.
+  @Test(dataProvider = "columnDataTypes")
+  void testRowBlockMultiBatch(ColumnDataType type)
+      throws IOException {
+    runRowBlockTest(type, 25_000);
+  }
+
+  private void runRowBlockTest(ColumnDataType type, int numRows)
+      throws IOException {
     List<Object[]> rows = generateRows(type, numRows);
     DataSchema dataSchema = new DataSchema(new String[]{"column"}, new ColumnDataType[]{type});
     AggregationFunction[] aggFunctions = null;
@@ -135,9 +146,24 @@ public class DataBlockBuilderTest {
           result.add(new Object[]{new double[]{r.nextDouble(), r.nextDouble()}});
         }
         break;
+      case BIG_DECIMAL_ARRAY:
+        for (int i = 0; i < numRows; i++) {
+          result.add(new Object[]{new BigDecimal[]{BigDecimal.valueOf(r.nextInt()), BigDecimal.valueOf(r.nextInt())}});
+        }
+        break;
       case STRING_ARRAY:
         for (int i = 0; i < numRows; i++) {
           result.add(new Object[]{new String[]{String.valueOf(r.nextInt()), String.valueOf(r.nextInt())}});
+        }
+        break;
+      case BYTES_ARRAY:
+        for (int i = 0; i < numRows; i++) {
+          result.add(new Object[]{
+              new ByteArray[]{
+                  new ByteArray(String.valueOf(r.nextInt()).getBytes()),
+                  new ByteArray(String.valueOf(r.nextInt()).getBytes())
+              }
+          });
         }
         break;
       case OBJECT:
@@ -158,7 +184,41 @@ public class DataBlockBuilderTest {
   @Test(dataProvider = "columnDataTypes")
   void testColumnBlock(ColumnDataType type)
       throws IOException {
-    int numRows = 100;
+    runColumnBlockTest(type, 100);
+  }
+
+  /// Exercises the multi-batch path of [DataBlockBuilder#buildFromColumns] with a row count past the internal
+  /// `interruptableLoopStep` of `serializeColumnData` so the inner loop runs across multiple `(start, end)` chunks.
+  @Test(dataProvider = "columnDataTypes")
+  void testColumnBlockMultiBatch(ColumnDataType type)
+      throws IOException {
+    runColumnBlockTest(type, 25_000);
+  }
+
+  /// A null in a UUID column must serialize as the nil UUID, not as the zero-length placeholder its stored type
+  /// (BYTES) supplies. The value is normally masked by the null bitmap, but it must still decode as a valid 16-byte
+  /// UUID for any consumer that renders the raw column, and [UuidUtils#toString] rejects any other width.
+  @Test
+  void testUuidNullPlaceholderIsNilUuid()
+      throws IOException {
+    ByteArray uuid = new ByteArray(UuidUtils.toBytes("550e8400-e29b-41d4-a716-446655440000"));
+    DataSchema dataSchema = new DataSchema(new String[]{"uuidCol"}, new ColumnDataType[]{ColumnDataType.UUID});
+    Object[] column = {uuid, null};
+    List<Object[]> rows = List.of(new Object[]{uuid}, new Object[]{null});
+
+    List<DataBlock> blocks = List.of(DataBlockBuilder.buildFromRows(rows, dataSchema),
+        DataBlockBuilder.buildFromColumns(List.<Object[]>of(column), dataSchema));
+    for (DataBlock block : blocks) {
+      assertEquals(block.getNumberOfRows(), 2);
+      assertEquals(new ByteArray(block.getBytes(0, 0).getBytes()), uuid);
+      // Row 1 is null: the bitmap flags it, and the placeholder underneath still renders as the nil UUID.
+      assertEquals(block.getNullRowIds(0), RoaringBitmap.bitmapOf(1));
+      assertEquals(UuidUtils.toString(block.getBytes(1, 0).getBytes()), "00000000-0000-0000-0000-000000000000");
+    }
+  }
+
+  private void runColumnBlockTest(ColumnDataType type, int numRows)
+      throws IOException {
     Object[] column = generateColumns(type, numRows);
     DataSchema dataSchema = new DataSchema(new String[]{"column"}, new ColumnDataType[]{type});
     AggregationFunction[] aggFunctions = null;
@@ -166,7 +226,7 @@ public class DataBlockBuilderTest {
       aggFunctions = new AggregationFunction[]{mock(AggregationFunction.class)};
     }
     DataBlock rowDataBlock =
-        DataBlockBuilder.buildFromColumns(Collections.singletonList(column), dataSchema, aggFunctions);
+        DataBlockBuilder.buildFromColumns(List.<Object[]>of(column), dataSchema, aggFunctions);
     assertEquals(rowDataBlock.getNumberOfRows(), numRows);
     checkEquals(type, rowDataBlock, i -> column[i]);
   }
@@ -238,9 +298,22 @@ public class DataBlockBuilderTest {
           result[i] = new double[]{r.nextDouble(), r.nextDouble()};
         }
         break;
+      case BIG_DECIMAL_ARRAY:
+        for (int i = 0; i < numRows; i++) {
+          result[i] = new BigDecimal[]{BigDecimal.valueOf(r.nextInt()), BigDecimal.valueOf(r.nextInt())};
+        }
+        break;
       case STRING_ARRAY:
         for (int i = 0; i < numRows; i++) {
           result[i] = new String[]{String.valueOf(r.nextInt()), String.valueOf(r.nextInt())};
+        }
+        break;
+      case BYTES_ARRAY:
+        for (int i = 0; i < numRows; i++) {
+          result[i] = new ByteArray[]{
+              new ByteArray(String.valueOf(r.nextInt()).getBytes()),
+              new ByteArray(String.valueOf(r.nextInt()).getBytes())
+          };
         }
         break;
       case OBJECT:
@@ -354,11 +427,27 @@ public class DataBlockBuilderTest {
           }
         }
         break;
+      case BIG_DECIMAL_ARRAY:
+        for (int i = 0; i < numRows; i++) {
+          Object expected = rowToData.apply(i);
+          if (expected != null) {
+            assertEquals(block.getBigDecimalArray(i, 0), expected, "Failure on row " + i);
+          }
+        }
+        break;
       case STRING_ARRAY:
         for (int i = 0; i < numRows; i++) {
           Object expected = rowToData.apply(i);
           if (expected != null) {
             assertEquals(block.getStringArray(i, 0), (String[]) rowToData.apply(i));
+          }
+        }
+        break;
+      case BYTES_ARRAY:
+        for (int i = 0; i < numRows; i++) {
+          Object expected = rowToData.apply(i);
+          if (expected != null) {
+            assertEquals(block.getBytesArray(i, 0), (ByteArray[]) rowToData.apply(i), "Failure on row " + i);
           }
         }
         break;

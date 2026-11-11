@@ -22,14 +22,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
-/**
- * Interface for forward index creator.
- */
+/// Interface for forward index creator.
 public interface ForwardIndexCreator extends IndexCreator {
 
   @Override
@@ -39,7 +38,7 @@ public interface ForwardIndexCreator extends IndexCreator {
 
   @Override
   default void add(Object cellValue, int dictId) {
-    if (dictId >= 0) {
+    if (isDictionaryEncoded()) {
       putDictId(dictId);
     } else {
       switch (getValueType()) {
@@ -84,9 +83,8 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void add(Object[] cellValues, @Nullable int[] dictIds)
-      throws IOException {
-    if (dictIds != null) {
+  default void add(Object[] cellValues, @Nullable int[] dictIds) {
+    if (isDictionaryEncoded()) {
       putDictIdMV(dictIds);
     } else {
       int length = cellValues.length;
@@ -122,6 +120,17 @@ public interface ForwardIndexCreator extends IndexCreator {
           }
           putDoubleMV(doubles);
           break;
+        case BIG_DECIMAL:
+          if (cellValues instanceof BigDecimal[]) {
+            putBigDecimalMV((BigDecimal[]) cellValues);
+          } else {
+            BigDecimal[] bigDecimals = new BigDecimal[length];
+            for (int i = 0; i < length; i++) {
+              bigDecimals[i] = (BigDecimal) cellValues[i];
+            }
+            putBigDecimalMV(bigDecimals);
+          }
+          break;
         case STRING:
           if (cellValues instanceof String[]) {
             putStringMV((String[]) cellValues);
@@ -150,16 +159,13 @@ public interface ForwardIndexCreator extends IndexCreator {
     }
   }
 
-  /**
-   * Primitive type additions for columnar processing optimization.
-   * These methods avoid boxing overhead when iterating over columnar data.
-   * Default implementations delegate to putDictId or put* methods based on dictId.
-   */
+  /// Primitive type additions for columnar processing optimization.
+  /// These methods avoid boxing overhead when iterating over columnar data.
+  /// Default implementations delegate to putDictId or put\* methods based on dictId.
 
   @Override
-  default void addInt(int value, int dictId)
-      throws IOException {
-    if (dictId >= 0) {
+  default void addInt(int value, int dictId) {
+    if (isDictionaryEncoded()) {
       putDictId(dictId);
     } else {
       putInt(value);
@@ -167,9 +173,8 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addLong(long value, int dictId)
-      throws IOException {
-    if (dictId >= 0) {
+  default void addLong(long value, int dictId) {
+    if (isDictionaryEncoded()) {
       putDictId(dictId);
     } else {
       putLong(value);
@@ -177,9 +182,8 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addFloat(float value, int dictId)
-      throws IOException {
-    if (dictId >= 0) {
+  default void addFloat(float value, int dictId) {
+    if (isDictionaryEncoded()) {
       putDictId(dictId);
     } else {
       putFloat(value);
@@ -187,9 +191,8 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addDouble(double value, int dictId)
-      throws IOException {
-    if (dictId >= 0) {
+  default void addDouble(double value, int dictId) {
+    if (isDictionaryEncoded()) {
       putDictId(dictId);
     } else {
       putDouble(value);
@@ -197,9 +200,17 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addString(String value, int dictId)
-      throws IOException {
-    if (dictId >= 0) {
+  default void addBigDecimal(BigDecimal value, int dictId) {
+    if (isDictionaryEncoded()) {
+      putDictId(dictId);
+    } else {
+      putBigDecimal(value);
+    }
+  }
+
+  @Override
+  default void addString(String value, int dictId) {
+    if (isDictionaryEncoded()) {
       putDictId(dictId);
     } else {
       putString(value);
@@ -207,9 +218,8 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addBytes(byte[] value, int dictId)
-      throws IOException {
-    if (dictId >= 0) {
+  default void addBytes(byte[] value, int dictId) {
+    if (isDictionaryEncoded()) {
       putDictId(dictId);
     } else {
       putBytes(value);
@@ -217,9 +227,8 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addIntMV(int[] values, @Nullable int[] dictIds)
-      throws IOException {
-    if (dictIds != null) {
+  default void addIntMV(int[] values, @Nullable int[] dictIds) {
+    if (isDictionaryEncoded()) {
       putDictIdMV(dictIds);
     } else {
       putIntMV(values);
@@ -227,9 +236,8 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addLongMV(long[] values, @Nullable int[] dictIds)
-      throws IOException {
-    if (dictIds != null) {
+  default void addLongMV(long[] values, @Nullable int[] dictIds) {
+    if (isDictionaryEncoded()) {
       putDictIdMV(dictIds);
     } else {
       putLongMV(values);
@@ -237,9 +245,8 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addFloatMV(float[] values, @Nullable int[] dictIds)
-      throws IOException {
-    if (dictIds != null) {
+  default void addFloatMV(float[] values, @Nullable int[] dictIds) {
+    if (isDictionaryEncoded()) {
       putDictIdMV(dictIds);
     } else {
       putFloatMV(values);
@@ -247,9 +254,8 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addDoubleMV(double[] values, @Nullable int[] dictIds)
-      throws IOException {
-    if (dictIds != null) {
+  default void addDoubleMV(double[] values, @Nullable int[] dictIds) {
+    if (isDictionaryEncoded()) {
       putDictIdMV(dictIds);
     } else {
       putDoubleMV(values);
@@ -257,9 +263,17 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addStringMV(String[] values, @Nullable int[] dictIds)
-      throws IOException {
-    if (dictIds != null) {
+  default void addBigDecimalMV(BigDecimal[] values, @Nullable int[] dictIds) {
+    if (isDictionaryEncoded()) {
+      putDictIdMV(dictIds);
+    } else {
+      putBigDecimalMV(values);
+    }
+  }
+
+  @Override
+  default void addStringMV(String[] values, @Nullable int[] dictIds) {
+    if (isDictionaryEncoded()) {
       putDictIdMV(dictIds);
     } else {
       putStringMV(values);
@@ -267,176 +281,152 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void addBytesMV(byte[][] values, @Nullable int[] dictIds)
-      throws IOException {
-    if (dictIds != null) {
+  default void addBytesMV(byte[][] values, @Nullable int[] dictIds) {
+    if (isDictionaryEncoded()) {
       putDictIdMV(dictIds);
     } else {
       putBytesMV(values);
     }
   }
 
-  /**
-   * Returns {@code true} if the forward index is dictionary-encoded, {@code false} if it is raw.
-   */
+  /// Returns `true` if the forward index is dictionary-encoded, `false` if it is raw.
   boolean isDictionaryEncoded();
 
-  /**
-   * Returns {@code true} if the forward index is for a single-value column, {@code false} if it is for a multi-value
-   * column.
-   */
+  /// Returns `true` if the forward index is for a single-value column, `false` if it is for a multi-value
+  /// column.
   boolean isSingleValue();
 
-  /**
-   * Returns the data type of the values in the forward index. Returns {@link DataType#INT} for dictionary-encoded
-   * forward index.
-   */
+  /// Returns the data type of the values in the forward index. Returns [DataType#INT] for dictionary-encoded
+  /// forward index.
   DataType getValueType();
 
-  /**
-   * DICTIONARY-ENCODED INDEX APIs
-   */
+  /// Returns serialized value bytes presented to the raw forward-index chunk compressor, or `-1` when unavailable.
+  default long getRawForwardIndexUncompressedValueSizeInBytes() {
+    return -1;
+  }
 
-  /**
-   * Writes the dictionary id for the next single-value into the forward index.
-   *
-   * @param dictId Document id to write
-   */
+  /// Returns the chunk-compression type actually selected by this raw forward-index creator, or `null` when this
+  /// creator is dictionary encoded or does not expose compression statistics.
+  @Nullable
+  default ChunkCompressionType getRawForwardIndexChunkCompressionType() {
+    return null;
+  }
+
+  /// DICTIONARY-ENCODED INDEX APIs
+
+  /// Writes the dictionary id for the next single-value into the forward index.
+  ///
+  /// @param dictId Document id to write
   default void putDictId(int dictId) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the dictionary ids for the next multi-value into the forward index.
-   *
-   * @param dictIds Document ids to write
-   */
+  /// Writes the dictionary ids for the next multi-value into the forward index.
+  ///
+  /// @param dictIds Document ids to write
   default void putDictIdMV(int[] dictIds) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * SINGLE-VALUE COLUMN RAW INDEX APIs
-   */
+  /// SINGLE-VALUE COLUMN RAW INDEX APIs
 
-  /**
-   * Writes the next INT type single-value into the forward index.
-   *
-   * @param value Value to write
-   */
+  /// Writes the next INT type single-value into the forward index.
+  ///
+  /// @param value Value to write
   default void putInt(int value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next LONG type single-value into the forward index.
-   *
-   * @param value Value to write
-   */
+  /// Writes the next LONG type single-value into the forward index.
+  ///
+  /// @param value Value to write
   default void putLong(long value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next FLOAT type single-value into the forward index.
-   *
-   * @param value Value to write
-   */
+  /// Writes the next FLOAT type single-value into the forward index.
+  ///
+  /// @param value Value to write
   default void putFloat(float value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next DOUBLE type single-value into the forward index.
-   *
-   * @param value Value to write
-   */
+  /// Writes the next DOUBLE type single-value into the forward index.
+  ///
+  /// @param value Value to write
   default void putDouble(double value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next BIG_DECIMAL type single-value into the forward index.
-   *
-   * @param value Value to write
-   */
+  /// Writes the next BIG_DECIMAL type single-value into the forward index.
+  ///
+  /// @param value Value to write
   default void putBigDecimal(BigDecimal value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next STRING type single-value into the forward index.
-   *
-   * @param value Value to write
-   */
+  /// Writes the next STRING type single-value into the forward index.
+  ///
+  /// @param value Value to write
   default void putString(String value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next BYTES type single-value into the forward index.
-   *
-   * @param value Value to write
-   */
+  /// Writes the next BYTES type single-value into the forward index.
+  ///
+  /// @param value Value to write
   default void putBytes(byte[] value) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * MULTI-VALUE COLUMN RAW INDEX APIs
-   * TODO: Not supported yet
-   */
+  /// MULTI-VALUE COLUMN RAW INDEX APIs
+  /// TODO: Not supported yet
 
-  /**
-   * Writes the next INT type multi-value into the forward index.
-   *
-   * @param values Values to write
-   */
+  /// Writes the next INT type multi-value into the forward index.
+  ///
+  /// @param values Values to write
   default void putIntMV(int[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next LONG type multi-value into the forward index.
-   *
-   * @param values Values to write
-   */
+  /// Writes the next LONG type multi-value into the forward index.
+  ///
+  /// @param values Values to write
   default void putLongMV(long[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next FLOAT type multi-value into the forward index.
-   *
-   * @param values Values to write
-   */
+  /// Writes the next FLOAT type multi-value into the forward index.
+  ///
+  /// @param values Values to write
   default void putFloatMV(float[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next DOUBLE type multi-value into the forward index.
-   *
-   * @param values Values to write
-   */
+  /// Writes the next DOUBLE type multi-value into the forward index.
+  ///
+  /// @param values Values to write
   default void putDoubleMV(double[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next STRING type multi-value into the forward index.
-   *
-   * @param values Values to write
-   */
+  /// Writes the next BIG_DECIMAL type multi-value into the forward index.
+  ///
+  /// @param values Values to write
+  default void putBigDecimalMV(BigDecimal[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Writes the next STRING type multi-value into the forward index.
+  ///
+  /// @param values Values to write
   default void putStringMV(String[] values) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Writes the next byte[] type multi-value into the forward index.
-   *
-   * @param values Values to write
-   */
+  /// Writes the next byte\[\] type multi-value into the forward index.
+  ///
+  /// @param values Values to write
   default void putBytesMV(byte[][] values) {
     throw new UnsupportedOperationException();
   }

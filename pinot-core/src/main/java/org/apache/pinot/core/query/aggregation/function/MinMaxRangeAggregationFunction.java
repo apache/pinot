@@ -20,11 +20,11 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -34,7 +34,10 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregationFunction<MinMaxRangePair, Double> {
+public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFunction<MinMaxRangePair, Double> {
+  private static final int MIN_MAX_RANGE_PAIR_TYPE = 5;
+
+  private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   public MinMaxRangeAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "MIN_MAX_RANGE"), nullHandlingEnabled);
@@ -85,7 +88,7 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
     byte[][] bytesValues = blockValSet.getBytesValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
+        MinMaxRangePair minMaxRangePair = MinMaxRangePair.fromBytes(bytesValues[i]);
         minMax.apply(minMaxRangePair);
       }
     });
@@ -143,7 +146,7 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
     byte[][] bytesValues = blockValSet.getBytesValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
+        MinMaxRangePair minMaxRangePair = MinMaxRangePair.fromBytes(bytesValues[i]);
         setGroupByResult(groupKeyArray[i], groupByResultHolder, minMaxRangePair.getMin(), minMaxRangePair.getMax());
       }
     });
@@ -207,7 +210,7 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
+        MinMaxRangePair minMaxRangePair = MinMaxRangePair.fromBytes(bytesValues[i]);
         double min = minMaxRangePair.getMin();
         double max = minMaxRangePair.getMax();
         for (int groupKey : groupKeysArray[i]) {
@@ -254,36 +257,20 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
     }
   }
 
+  @Nullable
   @Override
   public MinMaxRangePair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
-    if (minMaxRangePair == null && !_nullHandlingEnabled) {
-      return new MinMaxRangePair();
-    } else {
-      return minMaxRangePair;
-    }
+    return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
   public MinMaxRangePair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
-    if (minMaxRangePair == null && !_nullHandlingEnabled) {
-      return new MinMaxRangePair();
-    } else {
-      return minMaxRangePair;
-    }
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
   public MinMaxRangePair merge(MinMaxRangePair intermediateResult1, MinMaxRangePair intermediateResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateResult1 == null) {
-        return intermediateResult2;
-      }
-      if (intermediateResult2 == null) {
-        return intermediateResult1;
-      }
-    }
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }
@@ -294,14 +281,13 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(MinMaxRangePair minMaxRangePair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.MinMaxRangePair.getValue(),
-        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair));
+  public SerializedResult serializeIntermediateResult(MinMaxRangePair minMaxRangePair) {
+    return new SerializedBytes(MIN_MAX_RANGE_PAIR_TYPE, minMaxRangePair.toBytes());
   }
 
   @Override
   public MinMaxRangePair deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return MinMaxRangePair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override
@@ -309,10 +295,13 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(MinMaxRangePair intermediateResult) {
+  public Double extractFinalResult(@Nullable MinMaxRangePair intermediateResult) {
+    // A null intermediate result means nothing was aggregated. With null handling enabled the range of nothing is
+    // NULL; with it disabled it is what an untouched pair renders to, which is the sentinel below.
     if (intermediateResult == null) {
-      return null;
+      return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
     }
     return intermediateResult.getMax() - intermediateResult.getMin();
   }

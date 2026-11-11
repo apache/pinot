@@ -21,16 +21,12 @@ package org.apache.pinot.core.query.reduce.filter;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Factory for {@link ValueExtractor}.
- */
+/// Factory for [ValueExtractor].
 public interface ValueExtractorFactory {
 
-  /**
-   * Create the {@link ValueExtractor} for specific column.
-   *
-   * @param expression - column expression
-   * @return {@link ValueExtractor}
-   */
+  /// Create the [ValueExtractor] for specific column.
+  ///
+  /// @param expression - column expression
+  /// @return [ValueExtractor]
   ValueExtractor getValueExtractor(ExpressionContext expression);
 }

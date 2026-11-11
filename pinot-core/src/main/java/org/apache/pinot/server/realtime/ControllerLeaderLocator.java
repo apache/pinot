@@ -62,10 +62,8 @@ public class ControllerLeaderLocator {
     _cachedControllerLeaderMap = new HashMap<>();
   }
 
-  /**
-   * To be called once when the server starts
-   * @param helixManager should already be started
-   */
+  /// To be called once when the server starts
+  /// @param helixManager should already be started
   public static void create(HelixManager helixManager) {
     if (_instance != null) {
       // We create multiple server instances in the hybrid cluster integration tests, so allow the call to create an
@@ -83,13 +81,11 @@ public class ControllerLeaderLocator {
     return _instance;
   }
 
-  /**
-   * Locates the controller leader so that we can send LLC segment completion requests to it.
-   * Checks the {@link ControllerLeaderLocator::_cachedControllerLeaderValid} flag and fetches the leaders to
-   * {@link ControllerLeaderLocator::_cachedControllerLeaderMap} from helix if cached value is invalid
-   * @param rawTableName table name without type.
-   * @return The host-port pair of the current controller leader.
-   */
+  /// Locates the controller leader so that we can send LLC segment completion requests to it.
+  /// Checks the [ControllerLeaderLocator::_cachedControllerLeaderValid] flag and fetches the leaders to
+  /// [ControllerLeaderLocator::_cachedControllerLeaderMap] from helix if cached value is invalid
+  /// @param rawTableName table name without type.
+  /// @return The host-port pair of the current controller leader.
   public synchronized Pair<String, Integer> getControllerLeader(String rawTableName) {
     int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
     if (_cachedControllerLeaderValid) {
@@ -101,13 +97,11 @@ public class ControllerLeaderLocator {
     return _cachedControllerLeaderValid ? _cachedControllerLeaderMap.get(partitionId) : null;
   }
 
-  /**
-   * Checks whether lead controller resource has been enabled or not.
-   * If yes, updates lead controller pairs from the external view of lead controller resource.
-   * Otherwise, updates lead controller pairs from Helix cluster leader.
-   * Note: Exception may happen due to Helix/ZK disconnect. If so, we should NOT regress the behavior back to false.
-   * Thus, simply exiting the method should be enough. Retry will be done in the next request.
-   */
+  /// Checks whether lead controller resource has been enabled or not.
+  /// If yes, updates lead controller pairs from the external view of lead controller resource.
+  /// Otherwise, updates lead controller pairs from Helix cluster leader.
+  /// Note: Exception may happen due to Helix/ZK disconnect. If so, we should NOT regress the behavior back to false.
+  /// Thus, simply exiting the method should be enough. Retry will be done in the next request.
   private void refreshControllerLeaderMap() {
     try {
       // Checks whether lead controller resource has been enabled or not.
@@ -121,9 +115,7 @@ public class ControllerLeaderLocator {
     }
   }
 
-  /**
-   * Updates lead controller pairs from the external view of lead controller resource.
-   */
+  /// Updates lead controller pairs from the external view of lead controller resource.
   private void refreshControllerLeaderMapFromLeadControllerResource() {
     try {
       HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
@@ -176,9 +168,7 @@ public class ControllerLeaderLocator {
     }
   }
 
-  /**
-   * Updates lead controller pairs from Helix cluster leader.
-   */
+  /// Updates lead controller pairs from Helix cluster leader.
   private void refreshControllerLeaderMapFromHelixClusterLeader() {
     Pair<String, Integer> helixClusterLeader = getHelixClusterLeader();
     if (helixClusterLeader == null) {
@@ -192,44 +182,65 @@ public class ControllerLeaderLocator {
     LOGGER.info("Refreshed controller leader map successfully.");
   }
 
-  /**
-   * Gets Helix leader in the cluster. Null if there is no leader.
-   * @return instance id of Helix cluster leader, e.g. localhost_9000.
-   */
+  /// Gets Helix leader in the cluster. Null if there is no leader.
+  /// @return instance id of Helix cluster leader, e.g. localhost_9000.
   private Pair<String, Integer> getHelixClusterLeader() {
     String helixLeader = LeadControllerUtils.getHelixClusterLeader(_helixManager);
     return convertToHostAndPortPair(helixLeader);
   }
 
-  /**
-   * Converts instance id to a pair of hostname and port.
-   * @param instanceId instance id without any prefix, e.g. localhost_9000
-   */
+  /// Converts instance id to a pair of hostname and port.
+  /// @param instanceId instance id without any prefix, e.g. localhost_9000
   private Pair<String, Integer> convertToHostAndPortPair(String instanceId) {
-    // TODO: improve the exception handling.
-    if (instanceId == null) {
+    if (instanceId == null || instanceId.trim().isEmpty()) {
+      LOGGER.warn("Instance ID is null or empty");
       return null;
     }
-    int index = instanceId.lastIndexOf('_');
-    String leaderHost = instanceId.substring(0, index);
-    int leaderPort = Integer.parseInt(instanceId.substring(index + 1));
-    return Pair.of(leaderHost, leaderPort);
+
+    try {
+      int index = instanceId.lastIndexOf('_');
+      if (index <= 0 || index >= instanceId.length() - 1) {
+        LOGGER.error("Invalid instance ID format: {}. Expected format: hostname_port", instanceId);
+        return null;
+      }
+
+      String leaderHost = instanceId.substring(0, index);
+      String portStr = instanceId.substring(index + 1);
+
+      if (leaderHost.trim().isEmpty()) {
+        LOGGER.error("Empty hostname in instance ID: {}", instanceId);
+        return null;
+      }
+
+      int leaderPort = Integer.parseInt(portStr);
+      if (leaderPort <= 0 || leaderPort > 65535) {
+        LOGGER.error("Invalid port number {} in instance ID: {}. Port must be between 1 and 65535",
+            leaderPort, instanceId);
+        return null;
+      }
+
+      return Pair.of(leaderHost, leaderPort);
+    } catch (NumberFormatException e) {
+      LOGGER.error("Failed to parse port number from instance ID: {}. Error: {}", instanceId, e.getMessage());
+      return null;
+    } catch (Exception e) {
+      LOGGER.error("Unexpected error while parsing instance ID: {}. Error: {}", instanceId, e.getMessage());
+      return null;
+    }
   }
 
-  /**
-   * Invalidates the cached controller leader value by setting the {@link ControllerLeaderLocator
-   * ::_cacheControllerLeadeInvalid} flag.
-   * This flag is always checked first by {@link ControllerLeaderLocator::getControllerLeader()} method before
-   * returning the leader. If set, leader is fetched from helix, else cached leader value is returned.
-   *
-   * Invalidates are not allowed more frequently than {@link ControllerLeaderLocator::MIN_INVALIDATE_INTERVAL_MS}
-   * millis.
-   * The cache is invalidated whenever server gets NOT_LEADER or NOT_SENT response. A NOT_LEADER response definitely
-   * needs a cache refresh. However, a NOT_SENT response could also happen for reasons other than controller not
-   * being leader.
-   * Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be
-   * getting too many NOT_SENT responses due to some other errors.
-   */
+  /// Invalidates the cached controller leader value by setting the [`::_cacheControllerLeadeInvalid`]
+  /// \[ControllerLeaderLocator\] flag.
+  /// This flag is always checked first by [ControllerLeaderLocator::getControllerLeader()] method before
+  /// returning the leader. If set, leader is fetched from helix, else cached leader value is returned.
+  ///
+  /// Invalidates are not allowed more frequently than [ControllerLeaderLocator::MIN_INVALIDATE_INTERVAL_MS]
+  /// millis.
+  /// The cache is invalidated whenever server gets NOT_LEADER or NOT_SENT response. A NOT_LEADER response definitely
+  /// needs a cache refresh. However, a NOT_SENT response could also happen for reasons other than controller not
+  /// being leader.
+  /// Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be
+  /// getting too many NOT_SENT responses due to some other errors.
   public synchronized void invalidateCachedControllerLeader() {
     long now = getCurrentTimeMs();
     long millisSinceLastInvalidate = now - _lastCacheInvalidationTimeMs;

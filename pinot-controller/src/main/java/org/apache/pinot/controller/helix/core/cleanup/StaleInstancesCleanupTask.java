@@ -19,13 +19,13 @@
 package org.apache.pinot.controller.helix.core.cleanup;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -39,16 +39,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Automatically removes stale instances from the cluster to not spam Helix.
- * Stale instance is the instance not in use (not hosting any data or query) and has been in the offline status for more
- * than the stale instance retention time.
- *
- * TODO:
- *   There is a race condition between this task removing instance and instance of the same name joining the cluster,
- *   which could end up leaving a live instance without InstanceConfig, and breaks Helix controller.
- *   To fix it, we need to do a version check when removing InstanceConfig, which requires Helix 1.4.0+.
- */
+/// Automatically removes stale instances from the cluster to not spam Helix. Stale instance is the instance not in use
+/// (not hosting any data or query) and has been in the offline status for more than the stale instance retention time.
+///
+/// TODO:
+///   There is a race condition between this task removing instance and instance of the same name joining the cluster,
+///   which could end up leaving a live instance without InstanceConfig, and breaks Helix controller.
+///   To fix it, we need to do a version check when removing InstanceConfig, which requires Helix 1.4.0+.
 public class StaleInstancesCleanupTask extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(StaleInstancesCleanupTask.class);
   private final static String TASK_NAME = "StaleInstancesCleanupTask";
@@ -62,7 +59,8 @@ public class StaleInstancesCleanupTask extends BasePeriodicTask {
   public StaleInstancesCleanupTask(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(TASK_NAME, controllerConf.getStaleInstancesCleanupTaskFrequencyInSeconds(),
-        controllerConf.getStaleInstanceCleanupTaskInitialDelaySeconds());
+        controllerConf.getStaleInstanceCleanupTaskInitialDelaySeconds(),
+        controllerConf.getStaleInstancesCleanupTaskCronExpression());
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _leadControllerManager = leadControllerManager;
     _controllerMetrics = controllerMetrics;
@@ -143,9 +141,12 @@ public class StaleInstancesCleanupTask extends BasePeriodicTask {
 
   private Set<String> getServerInstancesInUse() {
     Set<String> serverInstancesInUse = new HashSet<>();
-    _pinotHelixResourceManager.getAllTables().forEach(tableName -> serverInstancesInUse.addAll(
-        Optional.ofNullable(_pinotHelixResourceManager.getTableIdealState(tableName))
-            .map(is -> is.getInstanceSet(tableName)).orElse(Collections.emptySet())));
+    _pinotHelixResourceManager.getAllTables().forEach(tableName ->
+        Optional.ofNullable(_pinotHelixResourceManager.getTableIdealState(tableName)).ifPresent(is -> {
+          is.getPartitionSet().forEach(partitionName -> serverInstancesInUse.addAll(is.getInstanceSet(partitionName)));
+          // The instances of the partition assignment are in use although they might host no segment
+          serverInstancesInUse.addAll(PartitionAssignmentUtils.getAllInstances(is));
+        }));
     return serverInstancesInUse;
   }
 }

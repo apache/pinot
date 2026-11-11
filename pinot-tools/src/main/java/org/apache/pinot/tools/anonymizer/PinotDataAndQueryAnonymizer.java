@@ -61,49 +61,47 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The goal of this tool is to generate test dataset (as Avro files) with
- * characteristics similar to a given source dataset. The source dataset is
- * a set of Pinot segments. The tool can be used in situations where actual
- * source data isn't allowed to be used for the purpose of testing (regression,
- * performance, functional, evaluation of other OLAP systems etc).
- *
- * The tool understands the characteristics of the given dataset (Pinot segments)
- * and generates corresponding random data while preserving those characteristics.
- * The tool can then also be used to generate queries for the random data.
- *
- * So if we have a set of production data which you want to use for testing
- * but are unable to do so (because of security restrictions etc), then this tool
- * can be used to generate corresponding anonymous data and queries. Users can then
- * use the anonymized dataset (avro files) and generated queries for their testing.
- *
- * One avro file is generated per input Pinot segment. The tool also randomizes the
- * column names (and table name) so that source schema is not revealed. The user is also
- * allowed to provide a set of columns for which they want the data to be retained
- * as is (not anonymized). User should be careful when choosing these columns. Ideally
- * these should be time (or time related) columns since they don't reveal anything and so
- * it is fine to copy them as is from souce segments into Avro files.
- *
- * Please see the implementation notes further in the code explaining the global
- * dictionary building, and data generation and query generation phases in detail.
- *
- * Also, please see usage examples in
- * {@link org.apache.pinot.tools.admin.command.AnonymizeDataCommand} to learn
- * how this tool can be invoked from command line.
- *
- * Future workadd --
- * - Add support for partitioning (where dataset is hash partitioned on column)
- * - Potential memory explosion for extreme high cardinality global dictionary columns
- *   Please read the design doc for details.
- * - Add support for no dictionary filter columns (Generally this should not happen since
- *   whoever is using filter on a column should have created a dictionary for that column.
- *   But in case the filter column does not have segment dictionary, then we will not be
- *   able to build global dictionary)
- * - Make the global dictionary building phase per column basis to reduce the memory footprint
- * - Add support for generating queries when a predicate was not there in the original table
- *   and therefore not present in global dictionary either. The current implementation won't be
- *   able to rewrite this predicate correctly. It will substitute the original value with null.
- */
+/// The goal of this tool is to generate test dataset (as Avro files) with
+/// characteristics similar to a given source dataset. The source dataset is
+/// a set of Pinot segments. The tool can be used in situations where actual
+/// source data isn't allowed to be used for the purpose of testing (regression,
+/// performance, functional, evaluation of other OLAP systems etc).
+///
+/// The tool understands the characteristics of the given dataset (Pinot segments)
+/// and generates corresponding random data while preserving those characteristics.
+/// The tool can then also be used to generate queries for the random data.
+///
+/// So if we have a set of production data which you want to use for testing
+/// but are unable to do so (because of security restrictions etc), then this tool
+/// can be used to generate corresponding anonymous data and queries. Users can then
+/// use the anonymized dataset (avro files) and generated queries for their testing.
+///
+/// One avro file is generated per input Pinot segment. The tool also randomizes the
+/// column names (and table name) so that source schema is not revealed. The user is also
+/// allowed to provide a set of columns for which they want the data to be retained
+/// as is (not anonymized). User should be careful when choosing these columns. Ideally
+/// these should be time (or time related) columns since they don't reveal anything and so
+/// it is fine to copy them as is from souce segments into Avro files.
+///
+/// Please see the implementation notes further in the code explaining the global
+/// dictionary building, and data generation and query generation phases in detail.
+///
+/// Also, please see usage examples in
+/// [org.apache.pinot.tools.admin.command.AnonymizeDataCommand] to learn
+/// how this tool can be invoked from command line.
+///
+/// Future workadd --
+/// - Add support for partitioning (where dataset is hash partitioned on column)
+/// - Potential memory explosion for extreme high cardinality global dictionary columns
+///   Please read the design doc for details.
+/// - Add support for no dictionary filter columns (Generally this should not happen since
+///   whoever is using filter on a column should have created a dictionary for that column.
+///   But in case the filter column does not have segment dictionary, then we will not be
+///   able to build global dictionary)
+/// - Make the global dictionary building phase per column basis to reduce the memory footprint
+/// - Add support for generating queries when a predicate was not there in the original table
+///   and therefore not present in global dictionary either. The current implementation won't be
+///   able to rewrite this predicate correctly. It will substitute the original value with null.
 public class PinotDataAndQueryAnonymizer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataAndQueryAnonymizer.class);
 
@@ -136,12 +134,10 @@ public class PinotDataAndQueryAnonymizer {
 
   private String[] _segmentDirectories;
 
-  /**
-   * Create an instance of PinotDataGenerator
-   * @param outputDir parent directory where avro files will be generated
-   * @param segmentDir directory containing segment
-   * @param fileNamePrefix generated avro file name prefix
-   */
+  /// Create an instance of PinotDataGenerator
+  /// @param outputDir parent directory where avro files will be generated
+  /// @param segmentDir directory containing segment
+  /// @param fileNamePrefix generated avro file name prefix
   public PinotDataAndQueryAnonymizer(String segmentDir, String outputDir, String fileNamePrefix,
       Map<String, Integer> globalDictionaryColumns, Set<String> columnsNotAnonymized,
       boolean mapBasedGlobalDictionary) {
@@ -182,11 +178,11 @@ public class PinotDataAndQueryAnonymizer {
     LOGGER.info(sb.toString());
   }
 
-  /*****************************************************
-   *                                                   *
-   *             Global Dictionary Builder             *
-   *                                                   *
-   *****************************************************/
+  /// \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
+  ///                                                   \*
+  ///             Global Dictionary Builder             \*
+  ///                                                   \*
+  /// \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
 
   /*
    * Global Dictionary Implementation Notes
@@ -283,11 +279,9 @@ public class PinotDataAndQueryAnonymizer {
     }
   }
 
-  /**
-   * Read dictionaries from a single segment
-   * @param segmentDirectory segment index directory
-   * @throws Exception
-   */
+  /// Read dictionaries from a single segment
+  /// @param segmentDirectory segment index directory
+  /// @throws Exception
   private void readDictionariesFromSegment(String segmentDirectory)
       throws Exception {
     File segmentIndexDir = new File(segmentDirectory);
@@ -322,10 +316,8 @@ public class PinotDataAndQueryAnonymizer {
     }
   }
 
-  /**
-   * Write global dictionaries and column name mapping to disk
-   * @throws Exception
-   */
+  /// Write global dictionaries and column name mapping to disk
+  /// @throws Exception
   private void writeGlobalDictionariesAndColumnMapping()
       throws Exception {
     // write column name mapping
@@ -351,11 +343,11 @@ public class PinotDataAndQueryAnonymizer {
     columnMappingWriter.flush();
   }
 
-  /*****************************************************
-   *                                                   *
-   *             Data Generator                        *
-   *                                                   *
-   *****************************************************/
+  /// \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
+  ///                                                   \*
+  ///             Data Generator                        \*
+  ///                                                   \*
+  /// \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
 
   /*
    * Data Generation Implementation Notes
@@ -462,16 +454,14 @@ public class PinotDataAndQueryAnonymizer {
     avroRecordWriter.append(avroRow);
   }
 
-  /**
-   * Used for columns that are neither time (time related) columns (for which we retain value)
-   * or filter columns (for which we generate global dictionary 1:1 mapping between
-   * original and generated values).
-   * We can generate any random value for such columns and it doesn't matter to
-   * the query generation.
-   * @param origValue original value as seen when reading Pinot segment record
-   * @param fieldSpec field spec of column
-   * @return random generated value
-   */
+  /// Used for columns that are neither time (time related) columns (for which we retain value)
+  /// or filter columns (for which we generate global dictionary 1:1 mapping between
+  /// original and generated values).
+  /// We can generate any random value for such columns and it doesn't matter to
+  /// the query generation.
+  /// @param origValue original value as seen when reading Pinot segment record
+  /// @param fieldSpec field spec of column
+  /// @return random generated value
   private Object generateRandomDerivedValue(Object origValue, FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
       // SV column
@@ -512,7 +502,7 @@ public class PinotDataAndQueryAnonymizer {
           // derived value will be the same
           return val;
         } else {
-          return RandomStringUtils.randomAlphanumeric(val.length());
+          return RandomStringUtils.secure().nextAlphanumeric(val.length());
         }
       case BYTES:
         byte[] value = (byte[]) origValue;
@@ -532,10 +522,8 @@ public class PinotDataAndQueryAnonymizer {
     }
   }
 
-  /**
-   * Anonymize the column names in source schema
-   * @param pinotSchema pinot schema
-   */
+  /// Anonymize the column names in source schema
+  /// @param pinotSchema pinot schema
   private void anonymizeColumnNames(Schema pinotSchema) {
     Map<String, FieldSpec> fieldSpecMap = pinotSchema.getFieldSpecMap();
     int col = 0;
@@ -566,11 +554,9 @@ public class PinotDataAndQueryAnonymizer {
     }
   }
 
-  /**
-   * Generate corresponding Avro schema from Pinot table schema
-   * @param pinotSchema pinot table schema
-   * @return Avro schema
-   */
+  /// Generate corresponding Avro schema from Pinot table schema
+  /// @param pinotSchema pinot table schema
+  /// @return Avro schema
   private org.apache.avro.Schema getAvroSchemaFromPinotSchema(Schema pinotSchema) {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
@@ -630,11 +616,11 @@ public class PinotDataAndQueryAnonymizer {
     return fieldAssembler.endRecord();
   }
 
-  /*****************************************************
-   *                                                   *
-   *             QueryGenerator                        *
-   *                                                   *
-   *****************************************************/
+  /// \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
+  ///                                                   \*
+  ///             QueryGenerator                        \*
+  ///                                                   \*
+  /// \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
 
   /*
    * Query Generator Implementation Notes
@@ -1140,11 +1126,11 @@ public class PinotDataAndQueryAnonymizer {
 //    }
 //  }
 
-  /*****************************************************
-   *                                                   *
-   *             Filter Column Extractor               *
-   *                                                   *
-   *****************************************************/
+  /// \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
+  ///                                                   \*
+  ///             Filter Column Extractor               \*
+  ///                                                   \*
+  /// \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
 
   public static class FilterColumnExtractor {
 

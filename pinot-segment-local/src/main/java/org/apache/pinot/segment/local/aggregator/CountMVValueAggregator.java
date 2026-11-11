@@ -21,10 +21,8 @@ package org.apache.pinot.segment.local.aggregator;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
-/**
- * Value aggregator for COUNTMV aggregation function.
- * This aggregator handles multi-value columns by counting all values in all arrays.
- */
+/// Value aggregator for COUNTMV aggregation function.
+/// This aggregator handles multi-value columns by counting all values in all arrays.
 public class CountMVValueAggregator extends CountValueAggregator {
 
   @Override
@@ -48,20 +46,11 @@ public class CountMVValueAggregator extends CountValueAggregator {
     return value + processMultiValueArray(rawValue);
   }
 
-  /**
-   * Processes a multi-value array and returns the count of non-null values.
-   * The rawValue can be an Object[] array containing values.
-   */
+  /// Processes a multi-value array and returns the count of values.
+  /// The rawValue can be an Object\[\] array containing values.
   private Long processMultiValueArray(Object rawValue) {
     if (rawValue instanceof Object[]) {
-      Object[] values = (Object[]) rawValue;
-      long count = 0;
-      for (Object value : values) {
-        if (value != null) {
-          count++;
-        }
-      }
-      return count;
+      return (long) ((Object[]) rawValue).length;
     } else {
       return 1L;
     }

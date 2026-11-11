@@ -32,11 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Configuration manager for audit logging settings.
- * Handles dynamic configuration updates from cluster configuration changes.
- * Note. Needs to be registered with the provided cluster config provider to listen to config changes
- */
+/// Configuration manager for audit logging settings.
+/// Handles dynamic configuration updates from cluster configuration changes.
+/// Note. Needs to be registered with the provided cluster config provider to listen to config changes
 @Singleton
 public final class AuditConfigManager implements PinotClusterConfigChangeListener {
   private static final Logger LOG = LoggerFactory.getLogger(AuditConfigManager.class);
@@ -52,11 +50,9 @@ public final class AuditConfigManager implements PinotClusterConfigChangeListene
     _configPrefix = constructAuditConfigPrefix(serviceRole);
   }
 
-  /**
-   * Maps cluster configuration properties with a common prefix to a POJO using Jackson.
-   * Uses PinotConfiguration.subset() to extract properties with the given prefix and
-   * Jackson's convertValue() for automatic object mapping.
-   */
+  /// Maps cluster configuration properties with a common prefix to a POJO using Jackson.
+  /// Uses PinotConfiguration.subset() to extract properties with the given prefix and
+  /// Jackson's convertValue() for automatic object mapping.
   @VisibleForTesting
   static AuditConfig buildFromClusterConfig(Map<String, String> clusterConfigs, String auditConfigPrefix) {
     final MapConfiguration mapConfig = new MapConfiguration(clusterConfigs);

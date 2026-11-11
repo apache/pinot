@@ -23,12 +23,9 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.MutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -39,25 +36,23 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>CaseTransformFunction</code> class implements the CASE-WHEN-THEN-ELSE transformation.
- * <p>
- * The SQL Syntax is: CASE WHEN condition1 THEN result1 WHEN condition2 THEN result2 WHEN conditionN THEN resultN ELSE
- * result END;
- * <p>
- * Usage: case(${WHEN_STATEMENT_1}, ${THEN_EXPRESSION_1}, ..., ${WHEN_STATEMENT_N}, ${THEN_EXPRESSION_N}, ...,
- * ${ELSE_EXPRESSION})
- * <p>
- * There are 2 * N + 1 arguments:
- * <code>WHEN_STATEMENT_$i</code> is a <code>BinaryOperatorTransformFunction</code> represents <code>condition$i</code>
- * <code>THEN_EXPRESSION_$i</code> is a <code>TransformFunction</code> represents <code>result$i</code>
- * <code>ELSE_EXPRESSION</code> is a <code>TransformFunction</code> represents <code>result</code>
- * <p>
- * ELSE_EXPRESSION can be omitted. When none of when statements is evaluated to be true, and there is no else
- * expression, we output null. Note that when statement is considered as false if it is evaluated to be null.
- * <p>
- * PostgreSQL documentation: <a href="https://www.postgresql.org/docs/current/typeconv-union-case.html">CASE</a>
- */
+/// The `CaseTransformFunction` class implements the CASE-WHEN-THEN-ELSE transformation.
+///
+/// The SQL Syntax is: CASE WHEN condition1 THEN result1 WHEN condition2 THEN result2 WHEN conditionN THEN resultN ELSE
+/// result END;
+///
+/// Usage: case(${WHEN_STATEMENT_1}, ${THEN_EXPRESSION_1}, ..., ${WHEN_STATEMENT_N}, ${THEN_EXPRESSION_N}, ...,
+/// ${ELSE_EXPRESSION})
+///
+/// There are 2 \* N + 1 arguments:
+/// `WHEN_STATEMENT_$i` is a `BinaryOperatorTransformFunction` represents `condition$i`
+/// `THEN_EXPRESSION_$i` is a `TransformFunction` represents `result$i`
+/// `ELSE_EXPRESSION` is a `TransformFunction` represents `result`
+///
+/// ELSE_EXPRESSION can be omitted. When none of when statements is evaluated to be true, and there is no else
+/// expression, we output null. Note that when statement is considered as false if it is evaluated to be null.
+///
+/// PostgreSQL documentation: [CASE](https://www.postgresql.org/docs/current/typeconv-union-case.html)
 public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEnabledTransformFunction {
   public static final String FUNCTION_NAME = "case";
 
@@ -209,10 +204,12 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
       case JSON:
         break;
       case BYTES:
+      case UUID:
         try {
-          BytesUtils.toBytes(literal);
+          byte[] bytes = BytesUtils.toBytes(literal);
+          Preconditions.checkArgument(dataType != DataType.UUID || bytes.length == dataType.size());
         } catch (Exception e) {
-          throw new IllegalArgumentException("Invalid literal: " + literal + " for BYTES");
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for " + dataType);
         }
         break;
       default:
@@ -225,10 +222,8 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     return _resultMetadata;
   }
 
-  /**
-   * Evaluate the ValueBlock for the WHEN statements, returns an array with the index(1 to N) of matched WHEN clause -1
-   * means there is no match.
-   */
+  /// Evaluate the ValueBlock for the WHEN statements, returns an array with the index(1 to N) of matched WHEN clause -1
+  /// means there is no match.
   private int[] getSelectedArray(ValueBlock valueBlock, boolean nullHandlingEnabled) {
     int numDocs = valueBlock.getNumDocs();
     if (_selectedResults == null || _selectedResults.length < numDocs) {
@@ -286,15 +281,15 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, int[]> thenStatementsIndexToValues = new HashMap<>();
+    int[][] thenValues = new int[numThenStatements][];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToIntValuesSV(valueBlock));
+        thenValues[i] = _thenStatements.get(i).transformToIntValuesSV(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        _intValuesSV[docId] = thenStatementsIndexToValues.get(selected[docId])[docId];
+        _intValuesSV[docId] = thenValues[selected[docId]][docId];
         unselectedDocs.clear(docId);
       }
     }
@@ -322,18 +317,19 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, Pair<int[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
+    int[][] thenValues = new int[numThenStatements][];
+    RoaringBitmap[] thenNullBitmaps = new RoaringBitmap[numThenStatements];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToIntValuesSV(valueBlock),
-            _thenStatements.get(i).getNullBitmap(valueBlock)));
+        thenValues[i] = _thenStatements.get(i).transformToIntValuesSV(valueBlock);
+        thenNullBitmaps[i] = _thenStatements.get(i).getNullBitmap(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        Pair<int[], RoaringBitmap> nullValuePair = thenStatementsIndexToValues.get(selected[docId]);
-        _intValuesSV[docId] = nullValuePair.getLeft()[docId];
-        RoaringBitmap nullBitmap = nullValuePair.getRight();
+        int thenIndex = selected[docId];
+        _intValuesSV[docId] = thenValues[thenIndex][docId];
+        RoaringBitmap nullBitmap = thenNullBitmaps[thenIndex];
         if (nullBitmap != null && nullBitmap.contains(docId)) {
           bitmap.add(docId);
         }
@@ -371,15 +367,15 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, long[]> thenStatementsIndexToValues = new HashMap<>();
+    long[][] thenValues = new long[numThenStatements][];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToLongValuesSV(valueBlock));
+        thenValues[i] = _thenStatements.get(i).transformToLongValuesSV(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        _longValuesSV[docId] = thenStatementsIndexToValues.get(selected[docId])[docId];
+        _longValuesSV[docId] = thenValues[selected[docId]][docId];
         unselectedDocs.clear(docId);
       }
     }
@@ -407,18 +403,19 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, Pair<long[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
+    long[][] thenValues = new long[numThenStatements][];
+    RoaringBitmap[] thenNullBitmaps = new RoaringBitmap[numThenStatements];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToLongValuesSV(valueBlock),
-            _thenStatements.get(i).getNullBitmap(valueBlock)));
+        thenValues[i] = _thenStatements.get(i).transformToLongValuesSV(valueBlock);
+        thenNullBitmaps[i] = _thenStatements.get(i).getNullBitmap(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        Pair<long[], RoaringBitmap> nullValuePair = thenStatementsIndexToValues.get(selected[docId]);
-        _longValuesSV[docId] = nullValuePair.getLeft()[docId];
-        RoaringBitmap nullBitmap = nullValuePair.getRight();
+        int thenIndex = selected[docId];
+        _longValuesSV[docId] = thenValues[thenIndex][docId];
+        RoaringBitmap nullBitmap = thenNullBitmaps[thenIndex];
         if (nullBitmap != null && nullBitmap.contains(docId)) {
           bitmap.add(docId);
         }
@@ -456,15 +453,15 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, float[]> thenStatementsIndexToValues = new HashMap<>();
+    float[][] thenValues = new float[numThenStatements][];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToFloatValuesSV(valueBlock));
+        thenValues[i] = _thenStatements.get(i).transformToFloatValuesSV(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        _floatValuesSV[docId] = thenStatementsIndexToValues.get(selected[docId])[docId];
+        _floatValuesSV[docId] = thenValues[selected[docId]][docId];
         unselectedDocs.clear(docId);
       }
     }
@@ -492,18 +489,19 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, Pair<float[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
+    float[][] thenValues = new float[numThenStatements][];
+    RoaringBitmap[] thenNullBitmaps = new RoaringBitmap[numThenStatements];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToFloatValuesSV(valueBlock),
-            _thenStatements.get(i).getNullBitmap(valueBlock)));
+        thenValues[i] = _thenStatements.get(i).transformToFloatValuesSV(valueBlock);
+        thenNullBitmaps[i] = _thenStatements.get(i).getNullBitmap(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        Pair<float[], RoaringBitmap> nullValuePair = thenStatementsIndexToValues.get(selected[docId]);
-        _floatValuesSV[docId] = nullValuePair.getLeft()[docId];
-        RoaringBitmap nullBitmap = nullValuePair.getRight();
+        int thenIndex = selected[docId];
+        _floatValuesSV[docId] = thenValues[thenIndex][docId];
+        RoaringBitmap nullBitmap = thenNullBitmaps[thenIndex];
         if (nullBitmap != null && nullBitmap.contains(docId)) {
           bitmap.add(docId);
         }
@@ -541,15 +539,15 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, double[]> thenStatementsIndexToValues = new HashMap<>();
+    double[][] thenValues = new double[numThenStatements][];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToDoubleValuesSV(valueBlock));
+        thenValues[i] = _thenStatements.get(i).transformToDoubleValuesSV(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        _doubleValuesSV[docId] = thenStatementsIndexToValues.get(selected[docId])[docId];
+        _doubleValuesSV[docId] = thenValues[selected[docId]][docId];
         unselectedDocs.clear(docId);
       }
     }
@@ -577,19 +575,19 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, Pair<double[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
+    double[][] thenValues = new double[numThenStatements][];
+    RoaringBitmap[] thenNullBitmaps = new RoaringBitmap[numThenStatements];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i,
-            ImmutablePair.of(_thenStatements.get(i).transformToDoubleValuesSV(valueBlock),
-                _thenStatements.get(i).getNullBitmap(valueBlock)));
+        thenValues[i] = _thenStatements.get(i).transformToDoubleValuesSV(valueBlock);
+        thenNullBitmaps[i] = _thenStatements.get(i).getNullBitmap(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        Pair<double[], RoaringBitmap> nullValuePair = thenStatementsIndexToValues.get(selected[docId]);
-        _doubleValuesSV[docId] = nullValuePair.getLeft()[docId];
-        RoaringBitmap nullBitmap = nullValuePair.getRight();
+        int thenIndex = selected[docId];
+        _doubleValuesSV[docId] = thenValues[thenIndex][docId];
+        RoaringBitmap nullBitmap = thenNullBitmaps[thenIndex];
         if (nullBitmap != null && nullBitmap.contains(docId)) {
           bitmap.add(docId);
         }
@@ -627,15 +625,15 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, BigDecimal[]> thenStatementsIndexToValues = new HashMap<>();
+    BigDecimal[][] thenValues = new BigDecimal[numThenStatements][];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToBigDecimalValuesSV(valueBlock));
+        thenValues[i] = _thenStatements.get(i).transformToBigDecimalValuesSV(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        _bigDecimalValuesSV[docId] = thenStatementsIndexToValues.get(selected[docId])[docId];
+        _bigDecimalValuesSV[docId] = thenValues[selected[docId]][docId];
         unselectedDocs.clear(docId);
       }
     }
@@ -663,19 +661,19 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, Pair<BigDecimal[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
+    BigDecimal[][] thenValues = new BigDecimal[numThenStatements][];
+    RoaringBitmap[] thenNullBitmaps = new RoaringBitmap[numThenStatements];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i,
-            ImmutablePair.of(_thenStatements.get(i).transformToBigDecimalValuesSV(valueBlock),
-                _thenStatements.get(i).getNullBitmap(valueBlock)));
+        thenValues[i] = _thenStatements.get(i).transformToBigDecimalValuesSV(valueBlock);
+        thenNullBitmaps[i] = _thenStatements.get(i).getNullBitmap(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        Pair<BigDecimal[], RoaringBitmap> nullValuePair = thenStatementsIndexToValues.get(selected[docId]);
-        _bigDecimalValuesSV[docId] = nullValuePair.getLeft()[docId];
-        RoaringBitmap nullBitmap = nullValuePair.getRight();
+        int thenIndex = selected[docId];
+        _bigDecimalValuesSV[docId] = thenValues[thenIndex][docId];
+        RoaringBitmap nullBitmap = thenNullBitmaps[thenIndex];
         if (nullBitmap != null && nullBitmap.contains(docId)) {
           bitmap.add(docId);
         }
@@ -713,15 +711,15 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, String[]> thenStatementsIndexToValues = new HashMap<>();
+    String[][] thenValues = new String[numThenStatements][];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToStringValuesSV(valueBlock));
+        thenValues[i] = _thenStatements.get(i).transformToStringValuesSV(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        _stringValuesSV[docId] = thenStatementsIndexToValues.get(selected[docId])[docId];
+        _stringValuesSV[docId] = thenValues[selected[docId]][docId];
         unselectedDocs.clear(docId);
       }
     }
@@ -749,19 +747,19 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, Pair<String[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
+    String[][] thenValues = new String[numThenStatements][];
+    RoaringBitmap[] thenNullBitmaps = new RoaringBitmap[numThenStatements];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i,
-            ImmutablePair.of(_thenStatements.get(i).transformToStringValuesSV(valueBlock),
-                _thenStatements.get(i).getNullBitmap(valueBlock)));
+        thenValues[i] = _thenStatements.get(i).transformToStringValuesSV(valueBlock);
+        thenNullBitmaps[i] = _thenStatements.get(i).getNullBitmap(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        Pair<String[], RoaringBitmap> nullValuePair = thenStatementsIndexToValues.get(selected[docId]);
-        _stringValuesSV[docId] = nullValuePair.getLeft()[docId];
-        RoaringBitmap nullBitmap = nullValuePair.getRight();
+        int thenIndex = selected[docId];
+        _stringValuesSV[docId] = thenValues[thenIndex][docId];
+        RoaringBitmap nullBitmap = thenNullBitmaps[thenIndex];
         if (nullBitmap != null && nullBitmap.contains(docId)) {
           bitmap.add(docId);
         }
@@ -799,15 +797,15 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, byte[][]> thenStatementsIndexToValues = new HashMap<>();
+    byte[][][] thenValues = new byte[numThenStatements][][];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToBytesValuesSV(valueBlock));
+        thenValues[i] = _thenStatements.get(i).transformToBytesValuesSV(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        _bytesValuesSV[docId] = thenStatementsIndexToValues.get(selected[docId])[docId];
+        _bytesValuesSV[docId] = thenValues[selected[docId]][docId];
         unselectedDocs.clear(docId);
       }
     }
@@ -831,22 +829,23 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
-    initStringValuesSV(numDocs);
+    initBytesValuesSV(numDocs);
     int numThenStatements = _thenStatements.size();
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
-    Map<Integer, Pair<byte[][], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
+    byte[][][] thenValues = new byte[numThenStatements][][];
+    RoaringBitmap[] thenNullBitmaps = new RoaringBitmap[numThenStatements];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToBytesValuesSV(valueBlock),
-            _thenStatements.get(i).getNullBitmap(valueBlock)));
+        thenValues[i] = _thenStatements.get(i).transformToBytesValuesSV(valueBlock);
+        thenNullBitmaps[i] = _thenStatements.get(i).getNullBitmap(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        Pair<byte[][], RoaringBitmap> nullValuePair = thenStatementsIndexToValues.get(selected[docId]);
-        _bytesValuesSV[docId] = nullValuePair.getLeft()[docId];
-        RoaringBitmap nullBitmap = nullValuePair.getRight();
+        int thenIndex = selected[docId];
+        _bytesValuesSV[docId] = thenValues[thenIndex][docId];
+        RoaringBitmap nullBitmap = thenNullBitmaps[thenIndex];
         if (nullBitmap != null && nullBitmap.contains(docId)) {
           bitmap.add(docId);
         }
@@ -876,6 +875,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     return _bytesValuesSV;
   }
 
+
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, true);
@@ -884,15 +884,15 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     BitSet unselectedDocs = new BitSet();
     unselectedDocs.set(0, numDocs);
     final RoaringBitmap bitmap = new RoaringBitmap();
-    Map<Integer, RoaringBitmap> thenStatementsIndexToValues = new HashMap<>();
+    RoaringBitmap[] thenNullBitmaps = new RoaringBitmap[numThenStatements];
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).getNullBitmap(valueBlock));
+        thenNullBitmaps[i] = _thenStatements.get(i).getNullBitmap(valueBlock);
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
       if (selected[docId] >= 0) {
-        RoaringBitmap nullBitmap = thenStatementsIndexToValues.get(selected[docId]);
+        RoaringBitmap nullBitmap = thenNullBitmaps[selected[docId]];
         if (nullBitmap != null && nullBitmap.contains(docId)) {
           bitmap.add(docId);
         }

@@ -22,19 +22,29 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.function.Supplier;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
-import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest;
 import org.apache.pinot.client.BrokerResponse;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.PinotClientTransport;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -52,12 +62,12 @@ import static org.apache.pinot.client.Connection.FAIL_ON_EXCEPTIONS;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * This test suite is focused only on validating that the config changes are propagated properly as expected.
- * Validations around different cases arising from cluster config, database config and table config are extensively
- * tested as part of {@link HelixExternalViewBasedQueryQuotaManagerTest}
- */
+/// This test suite is focused only on validating that the config changes are propagated properly as expected.
+/// Validations around different cases arising from cluster config, database config and table config are extensively
+/// tested as part of [org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest]
 public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest {
+  private static final int OVERLOAD_QUERY_THREADS = 4;
+
   private PinotClientTransport _pinotClientTransport;
   private String _brokerHostPort;
 
@@ -65,12 +75,16 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _httpClient = getHttpClient();
 
     // Start the Pinot cluster
     startZk();
     startController();
     startBrokers(1);
     startServers(1);
+
+    // Wait for broker to be ready before getting port (avoid race condition)
+    TestUtils.waitForCondition(aVoid -> !_brokerPorts.isEmpty(), 500, 30000, "Broker ports not available");
     _brokerHostPort = LOCAL_HOST + ":" + _brokerPorts.get(0);
 
     // Create and upload the schema and table config
@@ -84,6 +98,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     addSchema(schema);
     LogicalTableConfig logicalTableConfig = getLogicalTableConfig();
     addLogicalTableConfig(logicalTableConfig);
+
+    // Wait for cluster to be ready before creating connection
+    Thread.sleep(500);
 
     Properties properties = new Properties();
     properties.put(FAIL_ON_EXCEPTIONS, "FALSE");
@@ -270,6 +287,50 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @Test
+  public void testShadowModeTableQueryQuota()
+      throws Exception {
+    // Cluster default is ENFORCED; the table opts into SHADOW
+    int shadowQps = 5;
+    addQueryQuotaToTableConfig(shadowQps, QuotaEnforcementMode.SHADOW);
+    verifyQuotaUpdate(shadowQps);
+    long breachesBefore = queryQuotaBreachCount();
+    runQueries(shadowQps * 4, false);
+    Assert.assertTrue(queryQuotaBreachCount() > breachesBefore,
+        "SHADOW mode must still meter QUERY_QUOTA_EXCEEDED when the quota is breached");
+
+    // Flip to ENFORCED (different QPS so verifyQuotaUpdate waits for propagation): same load is now rejected
+    int enforcedQps = 6;
+    addQueryQuotaToTableConfig(enforcedQps, QuotaEnforcementMode.ENFORCED);
+    verifyQuotaUpdate(enforcedQps);
+    runQueries(enforcedQps * 4, true);
+
+    // Flip back to SHADOW: no rejections again
+    addQueryQuotaToTableConfig(shadowQps, QuotaEnforcementMode.SHADOW);
+    verifyQuotaUpdate(shadowQps);
+    runQueries(shadowQps * 4, false);
+  }
+
+  @Test
+  public void testDisabledModeTableQueryQuota()
+      throws Exception {
+    int maxQps = 5;
+    addQueryQuotaToTableConfig(maxQps, QuotaEnforcementMode.DISABLED);
+    verifyQuotaUpdate(maxQps);
+    long breachesBefore = queryQuotaBreachCount();
+    runQueries(maxQps * 4, false);
+    Assert.assertEquals(queryQuotaBreachCount(), breachesBefore, "DISABLED mode must not meter breaches");
+  }
+
+  @Test
+  public void testUnsetModeBehavesAsEnforced()
+      throws Exception {
+    int maxQps = 5;
+    addQueryQuotaToTableConfig(maxQps);
+    verifyQuotaUpdate(maxQps);
+    runQueries(maxQps * 4, true);
+  }
+
+  @Test
   public void testLogicalTableQueryQuota()
       throws Exception {
     int maxQps = 10;
@@ -311,11 +372,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     runQueriesOnBroker(databaseMaxQps * 2, true, getLogicalTableName());
   }
 
-  /**
-   * Runs the query load with the max rate that the quota can allow and ensures queries are not failing.
-   * Then runs the query load with double the max rate and expects queries to fail due to quota breach.
-   * @param maxRate max rate allowed by the quota
-   */
+  /// Runs the query load with the max rate that the quota can allow and ensures queries are not failing.
+  /// Then runs the query load with double the max rate and expects queries to fail due to quota breach.
+  /// @param maxRate max rate allowed by the quota
   void testQueryRate(int maxRate) {
     verifyQuotaUpdate(maxRate);
     runQueries(maxRate, false);
@@ -348,40 +407,81 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   private void runQueries(int qps, boolean shouldFail) {
     runQueries(qps, shouldFail, "default");
   }
+
   private void runQueries(int qps, boolean shouldFail, String applicationName) {
     runQueries(qps, shouldFail, applicationName, getTableName());
   }
 
-  // try to keep the qps below 50 to ensure that the time lost between 2 query runs on top of the sleepMillis
-  // is not comparable to sleepMillis, else the actual qps would end up being much lower than required qps
+  // Pace allowed loads so they exercise the configured rate. Send overload loads concurrently so synchronous query
+  // latency cannot reduce the achieved request rate below the quota and make the rejection assertion timing-sensitive.
   private void runQueries(int qps, boolean shouldFail, String applicationName, String tableName) {
-    int failCount = 0;
-    boolean isLastFail = false;
-    long deadline = System.currentTimeMillis() + 1000;
-
     String query = "SET applicationName='" + applicationName + "'; SELECT COUNT(*) FROM " + tableName;
-
-    for (int i = 0; i < qps; i++) {
-      sleep(deadline, qps - i);
+    int failCount = runQueryLoad(qps, shouldFail, () -> {
       ResultSetGroup resultSetGroup = _pinotConnection.execute(query);
       for (PinotClientException exception : resultSetGroup.getExceptions()) {
         try {
           JsonNode exceptionNode = JsonUtils.stringToJsonNode(exception.getMessage());
           if (exceptionNode.get("errorCode").intValue() == QueryErrorCode.TOO_MANY_REQUESTS.getId()) {
-            failCount++;
-            isLastFail = i == qps - 1;
-            break;
+            return true;
           }
         } catch (IOException e) {
           throw new UncheckedIOException(e);
         }
       }
-    }
+      return false;
+    });
 
     if (shouldFail) {
-      Assert.assertNotEquals(failCount, 0, "Expected nonzero failures for qps: " + qps + " isLastFail: " + isLastFail);
+      Assert.assertNotEquals(failCount, 0, "Expected nonzero failures for qps: " + qps);
     } else {
-      Assert.assertEquals(failCount, 0, "Expected zero failures for qps: " + qps + " isLastFail: " + isLastFail);
+      Assert.assertEquals(failCount, 0, "Expected zero failures for qps: " + qps);
+    }
+  }
+
+  private static int runQueryLoad(int queryCount, boolean overload, Supplier<Boolean> query) {
+    if (overload) {
+      return runConcurrentQueryLoad(queryCount, query);
+    }
+
+    int failCount = 0;
+    long deadline = System.currentTimeMillis() + 1000;
+    for (int i = 0; i < queryCount; i++) {
+      sleep(deadline, queryCount - i);
+      if (query.get()) {
+        failCount++;
+      }
+    }
+    return failCount;
+  }
+
+  private static int runConcurrentQueryLoad(int queryCount, Supplier<Boolean> query) {
+    int numThreads = Math.min(OVERLOAD_QUERY_THREADS, queryCount);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    try (ExecutorService executorService = Executors.newFixedThreadPool(numThreads)) {
+      List<Future<Boolean>> results = new ArrayList<>(queryCount);
+      try {
+        for (int i = 0; i < queryCount; i++) {
+          results.add(executorService.submit(() -> {
+            startLatch.await();
+            return query.get();
+          }));
+        }
+      } finally {
+        startLatch.countDown();
+      }
+
+      int failCount = 0;
+      for (Future<Boolean> result : results) {
+        if (result.get()) {
+          failCount++;
+        }
+      }
+      return failCount;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while running query load", e);
+    } catch (ExecutionException e) {
+      throw new RuntimeException("Failed to run query load", e.getCause());
     }
   }
 
@@ -439,27 +539,36 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private void runQueriesOnBroker(float qps, boolean shouldFail, String tableName) {
-    int failCount = 0;
-    long deadline = System.currentTimeMillis() + 1000;
-
-    for (int i = 0; i < qps; i++) {
-      sleep(deadline, qps - i);
+    int queryCount = (int) Math.ceil(qps);
+    int failCount = runQueryLoad(queryCount, shouldFail, () -> {
       BrokerResponse resultSetGroup =
           executeQueryOnBroker("SET applicationName='default'; SELECT COUNT(*) FROM " + tableName);
       for (Iterator<JsonNode> it = resultSetGroup.getExceptions().elements(); it.hasNext(); ) {
         JsonNode exception = it.next();
         if (exception.get("errorCode").asInt() == QueryErrorCode.TOO_MANY_REQUESTS.getId()) {
-          failCount++;
-          break;
+          return true;
         }
       }
-    }
+      return false;
+    });
 
     if (shouldFail) {
       assertTrue(failCount != 0, "Expected nonzero failures for qps: " + qps);
     } else {
       Assert.assertEquals(failCount, 0, "Expected 0 failures for qps: " + qps);
     }
+  }
+
+  private long queryQuotaBreachCount() {
+    return BrokerMetrics.get().getMeteredTableValue(getTableName(), BrokerMeter.QUERY_QUOTA_EXCEEDED).count();
+  }
+
+  public void addQueryQuotaToTableConfig(Integer maxQps, QuotaEnforcementMode queryMode)
+      throws Exception {
+    TableConfig tableConfig = getOfflineTableConfig();
+    QuotaConfig quotaConfig = new QuotaConfig(null, maxQps == null ? null : maxQps.toString(), null, queryMode);
+    tableConfig.setQuotaConfig(quotaConfig);
+    updateTableConfig(tableConfig);
   }
 
   public void addQueryQuotaToTableConfig(Integer maxQps)
@@ -480,9 +589,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
 
   public void addQueryQuotaToDatabaseConfig(Integer maxQps)
       throws Exception {
-    String url = _controllerRequestURLBuilder.getBaseUrl() + "/databases/default/quotas";
+    String url = getOrCreateAdminClient().getControllerBaseUrl() + "/databases/default/quotas";
     if (maxQps != null) {
-        url += "?maxQueriesPerSecond=" + maxQps;
+      url += "?maxQueriesPerSecond=" + maxQps;
     }
     HttpClient.wrapAndThrowHttpException(_httpClient.sendPostRequest(new URI(url), null, null));
     // to allow change propagation to QueryQuotaManager
@@ -490,7 +599,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
 
   public void setQueryQuotaForApplication(Integer maxQps)
       throws Exception {
-    String url = _controllerRequestURLBuilder.getBaseUrl() + "/applicationQuotas/default";
+    String url = getOrCreateAdminClient().getControllerBaseUrl() + "/applicationQuotas/default";
     if (maxQps != null) {
       url += "?maxQueriesPerSecond=" + maxQps;
     }
@@ -501,13 +610,9 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   public void addQueryQuotaToClusterConfig(Integer maxQps)
       throws Exception {
     if (maxQps == null) {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(
-        _controllerRequestURLBuilder.forClusterConfigs() + "/"
-            + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND)));
+      deleteClusterConfig(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND);
     } else {
-      String payload = "{\"" + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
-      HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
+      updateClusterConfig(Map.of(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, String.valueOf(maxQps)));
     }
     // to allow change propagation to QueryQuotaManager
   }
@@ -515,18 +620,16 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   public void addAppQueryQuotaToClusterConfig(Integer maxQps)
       throws Exception {
     if (maxQps == null) {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(
-          _controllerRequestURLBuilder.forClusterConfigs() + "/"
-              + CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND)));
+      deleteClusterConfig(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND);
     } else {
-      String payload = "{\"" + CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
-      HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
+      updateClusterConfig(
+          Map.of(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND, String.valueOf(maxQps)));
     }
     // to allow change propagation to QueryQuotaManager
   }
 
-  private static String getLogicalTableName() {
+  @Override
+  protected String getLogicalTableName() {
     return "logical_table";
   }
 

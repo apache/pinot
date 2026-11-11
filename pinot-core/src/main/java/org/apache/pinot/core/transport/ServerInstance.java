@@ -57,31 +57,17 @@ public final class ServerInstance {
   private final String _adminEndpoint;
   private final int _pool;
 
-  /**
-   * By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
-   * {@code Server_localhost_12345}, hostname is of format: {@code Server_<hostname>}, e.g. {@code Server_localhost}.
-   */
+  /// By default (auto joined instances), server instance name is of format: `Server_<hostname>_<port>`, e.g.
+  /// `Server_localhost_12345`, hostname is of format: `Server_<hostname>`, e.g. `Server_localhost`.
+  ///
+  /// The instance id is interned. The same id is repeated as a key across many long-lived routing structures, and
+  /// Jackson already interns it when decoding the map fields of `IdealState` / `ExternalView`, so joining the JVM pool
+  /// lets all of them share one `String` and lets hash lookups hit the identity fast path. It also keeps the instances
+  /// rebuilt on every instance config refresh from each retaining a separate copy of the id.
   public ServerInstance(InstanceConfig instanceConfig) {
-    _instanceId = instanceConfig.getInstanceName();
-    String hostname = instanceConfig.getHostName();
-    if (hostname != null) {
-      if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        _hostname = hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
-      } else {
-        _hostname = hostname;
-      }
-      _port = Integer.parseInt(instanceConfig.getPort());
-    } else {
-      // Hostname might be null in some tests (InstanceConfig created by calling the constructor instead of fetching
-      // from ZK), directly parse the instance name
-      String instanceName = instanceConfig.getInstanceName();
-      if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
-      }
-      String[] hostnameAndPort = StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
-      _hostname = hostnameAndPort[0];
-      _port = Integer.parseInt(hostnameAndPort[1]);
-    }
+    _instanceId = instanceConfig.getInstanceName().intern();
+    _hostname = extractHostnameFromConfig(instanceConfig);
+    _port = extractPortFromConfig(instanceConfig);
     _grpcPort = instanceConfig.getRecord().getIntField(Helix.Instance.GRPC_PORT_KEY, INVALID_PORT);
     _nettyTlsPort = instanceConfig.getRecord().getIntField(Helix.Instance.NETTY_TLS_PORT_KEY, INVALID_PORT);
     _queryServicePort = instanceConfig.getRecord().getIntField(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY,
@@ -92,9 +78,47 @@ public final class ServerInstance {
     _pool = extractPool(instanceConfig);
   }
 
+  /// Extracts the raw hostname from an InstanceConfig, stripping the "Server\_" prefix if present.
+  ///
+  /// By default (auto joined instances), server instance name is of format:
+  /// `Server_<hostname>_<port>`, e.g. `Server_localhost_12345`, hostname is of format:
+  /// `Server_<hostname>`, e.g. `Server_localhost`.
+  public static String extractHostnameFromConfig(InstanceConfig instanceConfig) {
+    String hostname = instanceConfig.getHostName();
+    if (hostname != null) {
+      if (hostname.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        return hostname.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+      }
+      return hostname;
+    }
+    return parseInstanceNameParts(instanceConfig)[0];
+  }
+
+  /// Extracts the port from an InstanceConfig. When `instanceConfig.getPort()` is not null, uses it directly.
+  /// Otherwise, parses the last segment of the instance name.
+  public static int extractPortFromConfig(InstanceConfig instanceConfig) {
+    String port = instanceConfig.getPort();
+    if (port != null) {
+      return Integer.parseInt(port);
+    }
+    String[] parts = parseInstanceNameParts(instanceConfig);
+    return Integer.parseInt(parts[1]);
+  }
+
+  /// Parses the instance name into parts split by `_`, stripping the "Server\_" prefix if present.
+  /// This is a fallback for when hostname/port are null (e.g. in tests where InstanceConfig is constructed
+  /// directly instead of fetched from ZK).
+  private static String[] parseInstanceNameParts(InstanceConfig instanceConfig) {
+    String instanceName = instanceConfig.getInstanceName();
+    if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      instanceName = instanceName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    }
+    return StringUtils.split(instanceName, HOSTNAME_PORT_DELIMITER);
+  }
+
   @VisibleForTesting
   ServerInstance(String hostname, int port) {
-    _instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
+    _instanceId = (Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port).intern();
     _hostname = hostname;
     _port = port;
     _grpcPort = INVALID_PORT;
@@ -105,6 +129,7 @@ public final class ServerInstance {
     _pool = FALLBACK_POOL_ID;
   }
 
+  /// Returns the interned instance id.
   public String getInstanceId() {
     return _instanceId;
   }
@@ -138,16 +163,6 @@ public final class ServerInstance {
 
   public int getPool() {
     return _pool;
-  }
-
-  // Does not require TLS until all servers guaranteed to be on TLS
-  @Deprecated
-  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, boolean preferNettyTls) {
-    if (preferNettyTls && _nettyTlsPort > 0) {
-      return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, true);
-    } else {
-      return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType);
-    }
   }
 
   public ServerRoutingInstance toServerRoutingInstance(TableType tableType, RoutingType routingType) {

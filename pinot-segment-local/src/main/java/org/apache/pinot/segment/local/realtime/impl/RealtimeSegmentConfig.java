@@ -71,13 +71,12 @@ public class RealtimeSegmentConfig {
   private final String _consumerDir;
   @Nullable
   private final MultiColumnTextIndexConfig _multiColIndexConfig;
+  private final boolean _dropRecordOnPartitionMismatch;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
-  /**
-   * @param nullHandlingEnabled whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-   */
+  /// @param nullHandlingEnabled whether null handling is enabled by default. This value is only used if
+  /// [Schema#isEnableColumnBasedNullHandling()] is false.
   private RealtimeSegmentConfig(
       String tableNameWithType,
       String segmentName,
@@ -99,7 +98,8 @@ public class RealtimeSegmentConfig {
       @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager,
       String consumerDir,
-      @Nullable MultiColumnTextIndexConfig textIndexConfig) {
+      @Nullable MultiColumnTextIndexConfig textIndexConfig,
+      boolean dropRecordOnPartitionMismatch) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -122,6 +122,7 @@ public class RealtimeSegmentConfig {
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _consumerDir = consumerDir;
     _multiColIndexConfig = textIndexConfig;
+    _dropRecordOnPartitionMismatch = dropRecordOnPartitionMismatch;
   }
 
   public String getTableNameWithType() {
@@ -217,6 +218,10 @@ public class RealtimeSegmentConfig {
     return _multiColIndexConfig;
   }
 
+  public boolean isDropRecordOnPartitionMismatch() {
+    return _dropRecordOnPartitionMismatch;
+  }
+
   public static class Builder {
     private String _tableNameWithType;
     private String _segmentName;
@@ -235,15 +240,14 @@ public class RealtimeSegmentConfig {
     private int _partitionId;
     private boolean _aggregateMetrics;
     private List<AggregationConfig> _ingestionAggregationConfigs;
-    /**
-     * Whether null handling is enabled by default. This value is only used if
-     * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-     */
+    /// Whether null handling is enabled by default. This value is only used if
+    /// [Schema#isEnableColumnBasedNullHandling()] is false.
     private boolean _defaultNullHandlingEnabled;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private String _consumerDir;
     private MultiColumnTextIndexConfig _textIndexConfig;
+    private boolean _dropRecordOnPartitionMismatch;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();
@@ -263,15 +267,22 @@ public class RealtimeSegmentConfig {
       for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsByColName.entrySet()) {
         _indexConfigByCol.put(entry.getKey(), new FieldIndexConfigs.Builder(entry.getValue()));
       }
-      // Add inverted index to sorted column for 2 reasons:
+      // Add inverted index to dictionary-enabled sorted column for 2 reasons:
       // 1. Since sorted index doesn't apply to mutable segment, add inverted index to get better performance
       // 2. When converting mutable segment to immutable segment, we use sorted column's inverted index to accelerate
       //    the index creation
+      // NOTE: When the column is configured as no-dictionary (raw), sorting is done by reading raw values directly from
+      // the forward index.
       if (CollectionUtils.isNotEmpty(sortedColumns)) {
         String sortedColumn = sortedColumns.get(0);
-        FieldIndexConfigs.Builder builder =
-            _indexConfigByCol.computeIfAbsent(sortedColumn, k -> new FieldIndexConfigs.Builder());
-        builder.add(StandardIndexes.inverted(), new IndexConfig(false));
+        FieldIndexConfigs existingConfigs = indexConfigsByColName.get(sortedColumn);
+        boolean dictionaryEnabled =
+            existingConfigs == null || existingConfigs.getConfig(StandardIndexes.dictionary()).isEnabled();
+        if (dictionaryEnabled) {
+          FieldIndexConfigs.Builder builder =
+              _indexConfigByCol.computeIfAbsent(sortedColumn, k -> new FieldIndexConfigs.Builder());
+          builder.add(StandardIndexes.inverted(), new IndexConfig(false));
+        }
       }
     }
 
@@ -376,19 +387,8 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    /**
-     * Whether null handling is enabled by default. This value is only used if
-     * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-     */
-    @Deprecated
-    public Builder setNullHandlingEnabled(boolean nullHandlingEnabled) {
-      return setDefaultNullHandlingEnabled(nullHandlingEnabled);
-    }
-
-    /**
-     * Whether null handling is enabled by default. This value is only used if
-     * {@link Schema#isEnableColumnBasedNullHandling()} is false.
-     */
+    /// Whether null handling is enabled by default. This value is only used if
+    /// [Schema#isEnableColumnBasedNullHandling()] is false.
     public Builder setDefaultNullHandlingEnabled(boolean defaultNullHandlingEnabled) {
       _defaultNullHandlingEnabled = defaultNullHandlingEnabled;
       return this;
@@ -409,6 +409,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setDropRecordOnPartitionMismatch(boolean dropRecordOnPartitionMismatch) {
+      _dropRecordOnPartitionMismatch = dropRecordOnPartitionMismatch;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       Map<String, FieldIndexConfigs> indexConfigByCol = Maps.newHashMapWithExpectedSize(_indexConfigByCol.size());
       for (Map.Entry<String, FieldIndexConfigs.Builder> entry : _indexConfigByCol.entrySet()) {
@@ -419,7 +424,7 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _ingestionAggregationConfigs, _defaultNullHandlingEnabled, _partitionUpsertMetadataManager,
-          _partitionDedupMetadataManager, _consumerDir, _textIndexConfig);
+          _partitionDedupMetadataManager, _consumerDir, _textIndexConfig, _dropRecordOnPartitionMismatch);
     }
   }
 }

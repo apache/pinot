@@ -20,39 +20,80 @@ package org.apache.pinot.query.service.dispatch;
 
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
+import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.query.grpc.GrpcKeepAliveConfig;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.service.dispatch.streaming.StreamingDispatchObserver;
+import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Dispatches a query plan to given a {@link QueryServerInstance}. Each {@link DispatchClient} has its own gRPC Channel
- * and Client Stub.
- * TODO: It might be neater to implement pooling at the client level. Two options: (1) Pass a channel provider and
- *       let that take care of pooling. (2) Create a DispatchClient interface and implement pooled/non-pooled versions.
- */
+/// Dispatches a query plan to given a [QueryServerInstance]. Each [DispatchClient] has its own gRPC Channel
+/// and Client Stub.
+/// TODO: It might be neater to implement pooling at the client level. Two options: (1) Pass a channel provider and
+///       let that take care of pooling. (2) Create a DispatchClient interface and implement pooled/non-pooled versions.
 class DispatchClient {
   private static final StreamObserver<Worker.CancelResponse> NO_OP_CANCEL_STREAM_OBSERVER = new CancelObserver();
+  /// Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
+  /// Using a static allocator allows for better memory pooling across all DispatchClient instances.
+  private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
+
+  /// The channel is refreshed at most once in this interval, see [#refreshChannel].
+  private static final long MIN_REFRESH_INTERVAL_NS = TimeUnit.SECONDS.toNanos(1);
 
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
+  /// When the channel was last refreshed, from [System#nanoTime()], see [#refreshChannel].
+  private final AtomicLong _lastRefreshTimeNs = new AtomicLong(System.nanoTime() - MIN_REFRESH_INTERVAL_NS);
 
   public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig) {
+    this(host, port, tlsConfig, null, GrpcKeepAliveConfig.DISABLED);
+  }
+
+  public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext) {
+    this(host, port, tlsConfig, sslContext, GrpcKeepAliveConfig.DISABLED);
+  }
+
+  DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext,
+      GrpcKeepAliveConfig keepAliveConfig) {
+    this(host, port, tlsConfig, sslContext, keepAliveConfig,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+  }
+
+  /// @param maxInboundMessageSizeBytes Max size of an inbound message on the broker's dispatch channel. The default
+  ///     gRPC limit is 4 MB, but a single `SubmitWithStream` `OpChainComplete` can carry a large
+  ///     [Worker.MultiStageStatsTree] (wide/deep plans, large STRING stats), and the plans servers return for
+  ///     `EXPLAIN` carry the query's literals. Exceeding the limit fails the whole query with `RESOURCE_EXHAUSTED`.
+  DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig, @Nullable SslContext sslContext,
+      GrpcKeepAliveConfig keepAliveConfig, int maxInboundMessageSizeBytes) {
+    // Always use NettyChannelBuilder to allow setting Netty-specific channel options like the buffer allocator.
+    // This ensures we can explicitly configure direct (off-heap) buffers for better performance.
+    NettyChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(host, port)
+        .withOption(ChannelOption.ALLOCATOR, BUF_ALLOCATOR)
+        .maxInboundMessageSize(maxInboundMessageSizeBytes);
     if (tlsConfig == null) {
-      _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+      channelBuilder.usePlaintext();
     } else {
-      _channel = NettyChannelBuilder.forAddress(host, port)
-          .sslContext(ServerGrpcQueryClient.buildSslContext(tlsConfig))
-          .build();
+      SslContext contextToUse = sslContext != null ? sslContext : ServerGrpcQueryClient.buildSslContext(tlsConfig);
+      channelBuilder.sslContext(contextToUse);
     }
+    // Enable gRPC keep-alive when configured so that a silently unreachable peer transitions the channel out of READY,
+    // which lets the broker's FailureDetector exclude it from routing.
+    _channel = keepAliveConfig.configure(channelBuilder).build();
     _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);
   }
 
@@ -63,6 +104,59 @@ class DispatchClient {
   public void submit(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncResponse<Worker.QueryResponse>> callback) {
     _dispatchStub.withDeadline(deadline).submit(request, new LastValueDispatchObserver<>(virtualServer, callback));
+  }
+
+  /// Makes the channel resolve the server's hostname again and open a new connection, without reconnect backoff, for
+  /// the next request. Requests in flight finish on the old connection. Does nothing, and returns false, if the
+  /// channel was refreshed less than a second ago: each refresh drops the connection that the previous one opened.
+  public boolean refreshChannel() {
+    long nowNs = System.nanoTime();
+    long lastRefreshTimeNs = _lastRefreshTimeNs.get();
+    if (nowNs - lastRefreshTimeNs < MIN_REFRESH_INTERVAL_NS
+        || !_lastRefreshTimeNs.compareAndSet(lastRefreshTimeNs, nowNs)) {
+      return false;
+    }
+    _channel.enterIdle();
+    return true;
+  }
+
+  /// Opens a `SubmitWithStream` bidi RPC for one server, sends the initial `submit`, and registers the
+  /// resulting [StreamingDispatchObserver] with `session` for cancel fan-out and `OpChainComplete`
+  /// accumulation.
+  ///
+  /// The submit-ack callback is invoked exactly once: with the [Worker.QueryResponse] on the first
+  /// `submit_ack` from the server, or with a non-null [Throwable] if the stream errors before the ack
+  /// arrives.
+  ///
+  /// @param request               the plan submission
+  /// @param virtualServer         server identity (used in callbacks for routing decisions on failure)
+  /// @param deadline              gRPC deadline for the call
+  /// @param session               broker-side streaming session — the returned observer registers itself here
+  /// @param expectedOpChainsForThisServer  number of opchains this server is expected to report; used to drain the
+  ///                              session latch correctly when the stream errors before all opchains have responded
+  /// @param ackCallback           receives the submit-ack response or a failure throwable
+  /// @return the observer, also exposed as
+  ///         [org.apache.pinot.query.service.dispatch.streaming.StreamingServerHandle] on the session for
+  ///         cancel fan-out
+  public StreamingDispatchObserver submitWithStream(Worker.QueryRequest request, QueryServerInstance virtualServer,
+      Deadline deadline, StreamingQuerySession session, int expectedOpChainsForThisServer,
+      BiConsumer<Worker.QueryResponse, Throwable> ackCallback) {
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(virtualServer, session,
+        expectedOpChainsForThisServer, ackCallback);
+    try {
+      StreamObserver<Worker.BrokerToServer> outbound = _dispatchStub.withDeadline(deadline).submitWithStream(observer);
+      observer.attachOutboundStream(outbound);
+      session.registerStream(observer);
+      observer.sendSubmit(request);
+    } catch (Throwable t) {
+      // Deliver the failure through the observer so the ack callback fires exactly once (its CAS dedupes against a
+      // later gRPC-initiated onError for the same stream) and the session latch is drained for this server's
+      // opchains. The caller must NOT offer its own error ack — doing so could double-fill the (exactly server-count
+      // sized) ack queue and silently drop another server's ack.
+      observer.onError(t);
+      throw t;
+    }
+    return observer;
   }
 
   public void cancelAsync(long requestId) {

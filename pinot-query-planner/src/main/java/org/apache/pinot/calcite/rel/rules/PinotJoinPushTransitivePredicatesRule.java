@@ -38,12 +38,13 @@ public class PinotJoinPushTransitivePredicatesRule extends JoinPushTransitivePre
       = new PinotJoinPushTransitivePredicatesRule(Config.DEFAULT);
 
   public static PinotJoinPushTransitivePredicatesRule instanceWithDescription(String description) {
-      return new PinotJoinPushTransitivePredicatesRule((Config) Config.DEFAULT.withDescription(description));
+    return new PinotJoinPushTransitivePredicatesRule((Config) Config.DEFAULT.withDescription(description));
   }
 
   // Following code are copy-pasted from Calcite, and modified to not push down filter into right side of lookup join.
   //@formatter:off
-  @Override public void onMatch(RelOptRuleCall call) {
+  @Override
+  public void onMatch(RelOptRuleCall call) {
     Join join = call.rel(0);
     final RelMetadataQuery mq = call.getMetadataQuery();
     RelOptPredicateList preds = mq.getPulledUpPredicates(join);

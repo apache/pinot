@@ -110,7 +110,7 @@ public class BenchmarkStringVarLengthDictionary {
     _inputData = new String[DICTIONARY_LENGTH];
     int i = 0;
     while (i < DICTIONARY_LENGTH) {
-      String randomString = RandomStringUtils.randomAlphanumeric(
+      String randomString = RandomStringUtils.secure().nextAlphanumeric(
           USE_FIXED_SIZE_STRING ? MAX_STRING_LENGTH : (1 + random.nextInt(MAX_STRING_LENGTH)));
       if (uniqueStrings.contains(randomString)) {
         continue;

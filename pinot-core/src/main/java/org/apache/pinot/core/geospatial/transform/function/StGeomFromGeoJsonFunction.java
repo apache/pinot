@@ -22,9 +22,7 @@ import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.io.geojson.GeoJsonReader;
 
 
-/**
- * Constructor function for geometry object from GEO JSON.
- */
+/// Constructor function for geometry object from GEO JSON.
 public class StGeomFromGeoJsonFunction extends ConstructFromGeoJsonFunction {
 
   public static final String FUNCTION_NAME = "ST_GeomFromGeoJSON";

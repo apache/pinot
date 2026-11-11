@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.lang.foreign.MemorySegment;
+import java.util.Base64;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -48,8 +51,26 @@ public class PercentileRawKLLAggregationFunction extends PercentileKLLAggregatio
         + ")";
   }
 
+  @Nullable
   @Override
-  public SerializedKLL extractFinalResult(KllDoublesSketch sketch) {
+  public SerializedKLL extractFinalResult(@Nullable KllDoublesSketch sketch) {
+    // There is no sketch to serialize when nothing was aggregated, and the wrapper dereferences whatever it is handed,
+    // so resolve it here instead of deferring the failure to the point where the value is rendered.
+    if (sketch == null) {
+      return null;
+    }
     return new SerializedKLL(sketch, _percentile);
+  }
+
+  /// Merges two final results, which are serialized sketches in string form, into the string form of the merged
+  /// sketch.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    KllDoublesSketch merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedKLL(merged, _percentile).toString();
+  }
+
+  private static KllDoublesSketch deserializeFinalResult(Comparable<?> finalResult) {
+    return KllDoublesSketch.wrap(MemorySegment.ofArray(Base64.getDecoder().decode((String) finalResult)).asReadOnly());
   }
 }

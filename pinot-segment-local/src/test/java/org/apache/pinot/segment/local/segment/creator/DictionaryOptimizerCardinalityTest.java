@@ -22,7 +22,6 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -30,7 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -116,7 +115,7 @@ public class DictionaryOptimizerCardinalityTest implements PinotBuffersAfterClas
             .collect(Collectors.toList());
 
     List<FieldConfig> fieldConfigList = stringColumns.stream().map(
-            x -> new FieldConfig(x.getName(), FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(), null, null))
+            x -> new FieldConfig(x.getName(), FieldConfig.EncodingType.DICTIONARY, List.of(), null, null))
         .collect(Collectors.toList());
 
     SegmentGeneratorConfig segmentGenSpec =
@@ -134,7 +133,7 @@ public class DictionaryOptimizerCardinalityTest implements PinotBuffersAfterClas
     segmentGenSpec.setOptimizeDictionary(true);
     segmentGenSpec.setNoDictionaryCardinalityRatioThreshold(0.1); // cardinality must be <10% of total docs to override
 
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGenSpec);
     driver.build();
 

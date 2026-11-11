@@ -42,13 +42,16 @@ import org.apache.pinot.core.transport.ChannelHandlerFactory;
 import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.query.runtime.KeepPipelineBreakerStatsPredicate;
+import org.apache.pinot.query.runtime.SendStatsPredicate;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.conf.ServerConf;
-import org.apache.pinot.server.starter.helix.SendStatsPredicate;
+import org.apache.pinot.server.warmup.PageCacheWarmupServerQueryExecutor;
 import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -60,10 +63,8 @@ import org.slf4j.LoggerFactory;
 import static java.util.Objects.requireNonNull;
 
 
-/**
- * A standalone server which will listen on a port and serve queries based on the given configuration. Cluster
- * management is maintained outside of this class.
- */
+/// A standalone server which will listen on a port and serve queries based on the given configuration. Cluster
+/// management is maintained outside of this class.
 public class ServerInstance {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
@@ -80,13 +81,15 @@ public class ServerInstance {
   private final WorkerQueryServer _workerQueryServer;
   private final ChannelHandler _instanceRequestHandler;
   private final ServerMetrics _serverMetrics = ServerMetrics.get();
+  private final PageCacheWarmupServerQueryExecutor _pageCacheWarmupServerQueryExecutor;
 
   private boolean _dataManagerStarted = false;
   private boolean _queryServerStarted = false;
 
   public ServerInstance(ServerConf serverConf, String instanceId, HelixManager helixManager,
-      AccessControlFactory accessControlFactory, @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      AccessControlFactory accessControlFactory, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet,
       ThreadAccountant threadAccountant, SendStatsPredicate sendStatsPredicate,
+      KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate,
       ServerReloadJobStatusCache reloadJobStatusCache)
       throws Exception {
     LOGGER.info("Initializing server instance: {}", instanceId);
@@ -94,21 +97,22 @@ public class ServerInstance {
     _threadAccountant = threadAccountant;
     _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
 
-    if (segmentOperationsThrottler != null) {
+    if (segmentOperationsThrottlerSet != null) {
       // Initialize the metrics for the throttler so it picks up the newly registered ServerMetrics object
-      segmentOperationsThrottler.initializeMetrics();
+      segmentOperationsThrottlerSet.initializeMetrics();
     }
 
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
     _instanceDataManager = PluginManager.get().createInstance(instanceDataManagerClassName);
     _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics,
-        segmentOperationsThrottler, _reloadJobStatusCache);
+        segmentOperationsThrottlerSet, _reloadJobStatusCache);
 
-    // Initialize ServerQueryLogger and FunctionRegistry before starting the query executor
+    // Initialize ServerQueryLogger, FunctionRegistry and PartitionFunctionFactory before starting the query executor
     ServerQueryLogger.init(serverConf.getQueryLogMaxRate(), serverConf.getQueryLogDroppedReportMaxRate(),
         _serverMetrics);
     FunctionRegistry.init();
+    PartitionFunctionFactory.init();
     String queryExecutorClassName = serverConf.getQueryExecutorClassName();
     LOGGER.info("Initializing query executor of class: {}", queryExecutorClassName);
     _queryExecutor = PluginManager.get().createInstance(queryExecutorClassName);
@@ -132,7 +136,8 @@ public class ServerInstance {
     if (serverConf.isMultiStageServerEnabled()) {
       LOGGER.info("Initializing Multi-stage query engine");
       _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager,
-          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, threadAccountant, sendStatsPredicate);
+          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, threadAccountant, sendStatsPredicate,
+          keepPipelineBreakerStatsPredicate);
     } else {
       _workerQueryServer = null;
     }
@@ -184,6 +189,8 @@ public class ServerInstance {
       }
     }
     TransformFunctionFactory.init(transformFunctionClasses);
+    _pageCacheWarmupServerQueryExecutor = new PageCacheWarmupServerQueryExecutor(_instanceDataManager, _queryScheduler,
+        serverConf.getPinotConfig(), _helixManager);
 
     LOGGER.info("Finish initializing server instance");
   }
@@ -308,5 +315,14 @@ public class ServerInstance {
 
   public QueryScheduler getQueryScheduler() {
     return _queryScheduler;
+  }
+
+  public PageCacheWarmupServerQueryExecutor getPageCacheWarmupServerQueryExecutor() {
+    return _pageCacheWarmupServerQueryExecutor;
+  }
+
+  @Nullable
+  public WorkerQueryServer getWorkerQueryServer() {
+    return _workerQueryServer;
   }
 }

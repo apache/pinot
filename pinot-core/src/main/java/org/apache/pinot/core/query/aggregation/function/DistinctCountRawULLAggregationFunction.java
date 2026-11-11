@@ -19,7 +19,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
+import java.util.Base64;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.customobject.SerializedULL;
@@ -27,21 +29,37 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class DistinctCountRawULLAggregationFunction extends DistinctCountULLAggregationFunction {
-  public DistinctCountRawULLAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public DistinctCountRawULLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
+  @Nullable
   @Override
-  public SerializedULL extractFinalResult(UltraLogLog intermediateResult) {
+  public SerializedULL extractFinalResult(@Nullable UltraLogLog intermediateResult) {
+    if (intermediateResult == null) {
+      return null;
+    }
     return new SerializedULL(intermediateResult);
   }
 
+  @Override
   public AggregationFunctionType getType() {
-    return AggregationFunctionType.DISTINCTCOUNTULL;
+    return AggregationFunctionType.DISTINCTCOUNTRAWULL;
   }
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
     return ColumnDataType.STRING;
+  }
+
+  /// Merges two final results, which are serialized ULLs in string form, into the string form of the merged ULL.
+  @Override
+  public String mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    UltraLogLog merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedULL(merged).toString();
+  }
+
+  private static UltraLogLog deserializeFinalResult(Comparable finalResult) {
+    return UltraLogLog.wrap(Base64.getDecoder().decode((String) finalResult));
   }
 }

@@ -100,7 +100,8 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
     // Register file systems
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+      PinotFSFactory.registerIfNeeded(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+          new PinotConfiguration(pinotFSSpec));
     }
   }
 
@@ -175,7 +176,8 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
 
       // Tar segment directory to compress file
       File localSegmentDir = new File(localOutputTempDir, segmentName);
-      String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
+      String segmentTarFileName = URIUtils.encode(
+          segmentName + Constants.SEGMENT_TAR_FILE_EXTENSIONS.get(_spec.getSegmentTarCompressionCodec()));
       File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
       LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
       TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);

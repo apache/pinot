@@ -25,14 +25,11 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.distinct.BaseSingleColumnDistinctExecutor;
-import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.table.IntDistinctTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * {@link DistinctExecutor} for single raw INT column.
- */
+/// [org.apache.pinot.core.query.distinct.DistinctExecutor] for single raw INT column.
 public class IntDistinctExecutor extends BaseSingleColumnDistinctExecutor<IntDistinctTable, int[], int[][]> {
 
   public IntDistinctExecutor(ExpressionContext expression, DataType dataType, int limit, boolean nullHandlingEnabled,

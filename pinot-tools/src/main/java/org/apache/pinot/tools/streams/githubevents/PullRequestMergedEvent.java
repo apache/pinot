@@ -21,7 +21,6 @@ package org.apache.pinot.tools.streams.githubevents;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -30,9 +29,7 @@ import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 
 
-/**
- * Represents the pull request merged event
- */
+/// Represents the pull request merged event
 public class PullRequestMergedEvent {
 
   private static final DateTimeFormatter DATE_FORMATTER = ISODateTimeFormat.dateTimeNoMillis();
@@ -76,14 +73,12 @@ public class PullRequestMergedEvent {
   private final JsonNode _reviewCommentsArray;
   private final JsonNode _commentsArray;
 
-  /**
-   * Construct a PullRequestMergedEvent from the github event of type PullRequestEvent which is also merged and closed.
-   * Note that this constructor assumes that the event is valid of this type
-   * @param event - event of type PullRequestEvent which has action closed and is merged
-   * @param commits - commits data corresponding to the event
-   * @param reviewComments - review comments data corresponding to the event
-   * @param comments - comments data corresponding to the event
-   */
+  /// Construct a PullRequestMergedEvent from the github event of type PullRequestEvent which is also merged and closed.
+  /// Note that this constructor assumes that the event is valid of this type
+  /// @param event - event of type PullRequestEvent which has action closed and is merged
+  /// @param commits - commits data corresponding to the event
+  /// @param reviewComments - review comments data corresponding to the event
+  /// @param comments - comments data corresponding to the event
   public PullRequestMergedEvent(JsonNode event, JsonNode commits, JsonNode reviewComments, JsonNode comments) {
 
     JsonNode payload = event.get("payload");
@@ -131,9 +126,7 @@ public class PullRequestMergedEvent {
     _elapsedTimeMillis = _mergedTimeMillis - _createdTimeMillis;
   }
 
-  /**
-   * Extracts reviewer userIds for the PR
-   */
+  /// Extracts reviewer userIds for the PR
   private Set<String> extractReviewers() {
     Set<String> reviewers;
     if (_reviewCommentsArray != null && !_reviewCommentsArray.isEmpty()) {
@@ -142,14 +135,12 @@ public class PullRequestMergedEvent {
         reviewers.add(reviewComment.get("user").get("login").asText());
       }
     } else {
-      reviewers = Collections.emptySet();
+      reviewers = Set.of();
     }
     return reviewers;
   }
 
-  /**
-   * Extracts commenter names for the PR
-   */
+  /// Extracts commenter names for the PR
   private Set<String> extractCommenters() {
     Set<String> commenters;
     if (_commentsArray != null && !_commentsArray.isEmpty()) {
@@ -158,14 +149,12 @@ public class PullRequestMergedEvent {
         commenters.add(comment.get("user").get("login").asText());
       }
     } else {
-      commenters = Collections.emptySet();
+      commenters = Set.of();
     }
     return commenters;
   }
 
-  /**
-   * Extracts committer names for the PR
-   */
+  /// Extracts committer names for the PR
   private Set<String> extractCommitters() {
     Set<String> committers;
     if (_commitsArray != null && !_commitsArray.isEmpty()) {
@@ -180,14 +169,12 @@ public class PullRequestMergedEvent {
         }
       }
     } else {
-      committers = Collections.emptySet();
+      committers = Set.of();
     }
     return committers;
   }
 
-  /**
-   * Extracts author names for the PR
-   */
+  /// Extracts author names for the PR
   private Set<String> extractAuthors() {
     Set<String> authors;
     if (_commitsArray != null && !_commitsArray.isEmpty()) {
@@ -202,14 +189,12 @@ public class PullRequestMergedEvent {
         }
       }
     } else {
-      authors = Collections.emptySet();
+      authors = Set.of();
     }
     return authors;
   }
 
-  /**
-   * Extracts labels for the PR
-   */
+  /// Extracts labels for the PR
   private List<String> extractLabels() {
     Iterator<JsonNode> labelsIterator = _pullRequest.get("labels").elements();
     List<String> labels = new ArrayList<>();
@@ -219,9 +204,7 @@ public class PullRequestMergedEvent {
     return labels;
   }
 
-  /**
-   * Extracts assignees for the PR
-   */
+  /// Extracts assignees for the PR
   private List<String> extractAssignees() {
     Iterator<JsonNode> assigneesIterator = _pullRequest.get("assignees").elements();
     List<String> assignees = new ArrayList<>();
@@ -231,9 +214,7 @@ public class PullRequestMergedEvent {
     return assignees;
   }
 
-  /**
-   * Extracts list of requested reviewers
-   */
+  /// Extracts list of requested reviewers
   private List<String> extractRequestedReviewers() {
     Iterator<JsonNode> requestedReviewersIterator = _pullRequest.get("requested_reviewers").elements();
     List<String> requestedReviewers = new ArrayList<>();
@@ -243,9 +224,7 @@ public class PullRequestMergedEvent {
     return requestedReviewers;
   }
 
-  /**
-   * Extracts list of review requested teams
-   */
+  /// Extracts list of review requested teams
   private List<String> extractRequestedTeams() {
 
     Iterator<JsonNode> requestedTeamsIterator = _pullRequest.get("requested_teams").elements();

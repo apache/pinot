@@ -29,9 +29,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.fail;
 
 
-/**
- * Tests for the Utils classes.
- */
+/// Tests for the Utils classes.
 public class UtilsTest {
 
   @Test

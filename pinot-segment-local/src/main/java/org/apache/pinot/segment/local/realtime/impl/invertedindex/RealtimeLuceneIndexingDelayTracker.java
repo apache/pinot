@@ -27,20 +27,23 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 
 
-/**
- * RealtimeLuceneIndexingDelayTracker is used to track the last Lucene refresh time for each segment,
- * and each partition of a table.
- * <p>
- * To reduce maximum metric cardinality, only the maximum delay for a partition is emitted. In practice,
- * segment/column granularity is similar.
- * <p>
- * For example, if a table has 3 segments and 2 partitions, the metrics emitted will be:
- * <p> - luceneIndexDelayMs.table1.partition0
- * <p> - luceneIndexDelayMs.table1.partition1
- * <p> - luceneIndexDelayDocs.table1.partition0
- * <p> - luceneIndexDelayDocs.table1.partition1
- * <p> where the values are the maximum indexDelayMs or indexDelayDocs across all segments for that partition
- */
+/// RealtimeLuceneIndexingDelayTracker is used to track the last Lucene refresh time for each segment,
+/// and each partition of a table.
+///
+/// To reduce maximum metric cardinality, only the maximum delay for a partition is emitted. In practice,
+/// segment/column granularity is similar.
+///
+/// For example, if a table has 3 segments and 2 partitions, the metrics emitted will be:
+///
+/// - luceneIndexDelayMs.table1.partition0
+///
+/// - luceneIndexDelayMs.table1.partition1
+///
+/// - luceneIndexDelayDocs.table1.partition0
+///
+/// - luceneIndexDelayDocs.table1.partition1
+///
+/// where the values are the maximum indexDelayMs or indexDelayDocs across all segments for that partition
 public class RealtimeLuceneIndexingDelayTracker {
   private final Map<String, TableDelay> _tableToPartitionToDelayMs;
   // Lock is used to prevent removing a gauge while a new suppliers are being registered. Otherwise, it is possible
@@ -51,9 +54,7 @@ public class RealtimeLuceneIndexingDelayTracker {
     _tableToPartitionToDelayMs = new HashMap<>();
   }
 
-  /**
-   * Returns the singleton instance of the RealtimeLuceneIndexingDelayTracker.
-   */
+  /// Returns the singleton instance of the RealtimeLuceneIndexingDelayTracker.
   public static RealtimeLuceneIndexingDelayTracker getInstance() {
     return SingletonHolder.INSTANCE;
   }
@@ -74,10 +75,8 @@ public class RealtimeLuceneIndexingDelayTracker {
     }
   }
 
-  /**
-   * Clears the entry for a given table, segment, and partition.
-   * If the entry for the partition is empty, the gauge is removed.
-   */
+  /// Clears the entry for a given table, segment, and partition.
+  /// If the entry for the partition is empty, the gauge is removed.
   public void clear(String tableName, String segmentName, String columnName, int partition) {
     _lock.lock();
     try {
@@ -93,17 +92,13 @@ public class RealtimeLuceneIndexingDelayTracker {
     }
   }
 
-  /**
-   * Reset the tracker by removing all lastRefreshTimeMs data.
-   */
+  /// Reset the tracker by removing all lastRefreshTimeMs data.
   @VisibleForTesting
   public void reset() {
     _tableToPartitionToDelayMs.clear();
   }
 
-  /**
-   * TableDelay is used to track the latest Lucene refresh lastRefreshTimeMs for each partition, of a table.
-   */
+  /// TableDelay is used to track the latest Lucene refresh lastRefreshTimeMs for each partition, of a table.
   private static class TableDelay {
     final String _tableName;
     final Map<Integer, PartitionDelay> _partitionDelayMap;
@@ -123,11 +118,9 @@ public class RealtimeLuceneIndexingDelayTracker {
       updateMetrics(partitionDelay);
     }
 
-    /**
-     * Clears the entry for a given segment and partition. If the entry for the partition is empty, the
-     * gauge is removed. It is important for any stale gauge to be removed as the next segment may not be on the same
-     * server.
-     */
+    /// Clears the entry for a given segment and partition. If the entry for the partition is empty, the
+    /// gauge is removed. It is important for any stale gauge to be removed as the next segment may not be on the same
+    /// server.
     void clearPartitionDelay(String segmentName, String columnName, int partition) {
       PartitionDelay partitionDelay = _partitionDelayMap.get(partition);
       if (partitionDelay != null) {
@@ -162,9 +155,8 @@ public class RealtimeLuceneIndexingDelayTracker {
     }
   }
 
-  /**
-   * PartitionDelay is used to track the latest Lucene refresh lastRefreshTimeMs for each segment, of a given partition.
-   */
+  /// PartitionDelay is used to track the latest Lucene refresh lastRefreshTimeMs for each segment, of a given
+  /// partition.
   private static class PartitionDelay {
     final int _partition;
     final Map<String, Supplier<Integer>> _columnNumDocsDelaySuppliers;

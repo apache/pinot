@@ -37,9 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The instance tag/pool selector is responsible for selecting instances based on the tag and pool config.
- */
+/// The instance tag/pool selector is responsible for selecting instances based on the tag and pool config.
 public class InstanceTagPoolSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceTagPoolSelector.class);
 
@@ -56,9 +54,7 @@ public class InstanceTagPoolSelector {
     _existingInstancePartitions = existingInstancePartitions;
   }
 
-  /**
-   * Returns a map from pool to instance configs based on the tag and pool config for the given instance configs.
-   */
+  /// Returns a map from pool to instance configs based on the tag and pool config for the given instance configs.
   public Map<Integer, List<InstanceConfig>> selectInstances(List<InstanceConfig> instanceConfigs) {
     int tableNameHash = Math.abs(_tableNameWithType.hashCode());
     LOGGER.info("Starting instance tag/pool selection for table: {} with hash: {}", _tableNameWithType, tableNameHash);

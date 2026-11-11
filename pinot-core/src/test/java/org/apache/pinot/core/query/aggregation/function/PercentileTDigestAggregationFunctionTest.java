@@ -18,26 +18,1327 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Suppliers;
+import com.google.common.io.Resources;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.SplittableRandom;
+import java.util.function.IntPredicate;
+import java.util.function.Supplier;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedResult;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigestInput;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.TDigestTestUtils;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 public class PercentileTDigestAggregationFunctionTest {
+  private static final int TDIGEST_TYPE = 10;
+
+  private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("col");
+  private static final Supplier<Map<String, LegacyReducerReference>> LEGACY_REDUCER_RANK_ERRORS =
+      Suppliers.memoize(PercentileTDigestAggregationFunctionTest::loadLegacyReducerRankErrors);
+
+  @DataProvider(name = "rowCounts")
+  public static Object[][] rowCounts() {
+    return new Object[][]{{0}, {1}, {255}, {256}, {257}, {10_003}};
+  }
+
+  @Test(dataProvider = "rowCounts")
+  public void testRawNumericAggregation(int numRows) {
+    SplittableRandom random = new SplittableRandom(42);
+    double[] values = new double[numRows];
+    for (int i = 0; i < numRows; i++) {
+      values[i] = random.nextDouble();
+    }
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(numRows, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, values)));
+    TDigest result = function.extractAggregationResult(resultHolder);
+
+    Assert.assertTrue(result instanceof TDigestAccumulator);
+    Assert.assertEquals(result.size(), numRows);
+    Assert.assertEquals(result.compression(), PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+    if (numRows == 0) {
+      Assert.assertTrue(Double.isNaN(function.extractFinalResult(result)));
+    } else {
+      double[] sortedValues = values.clone();
+      Arrays.sort(sortedValues);
+      double expected = sortedValues[(int) ((long) numRows * 75 / 100)];
+      Assert.assertEquals(function.extractFinalResult(result), expected, 0.01);
+    }
+
+    TDigest deserialized = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(
+        ObjectSerDeUtils.TDIGEST_SER_DE.serialize(result));
+    Assert.assertTrue(deserialized instanceof TDigestAccumulator);
+    Assert.assertEquals(deserialized.size(), numRows);
+    Assert.assertEquals(deserialized.quantile(0.75), result.quantile(0.75));
+  }
+
+  @Test
+  public void testRawNumericAggregationWithNulls() {
+    int numRows = 1_024;
+    double[] values = new double[numRows];
+    for (int i = 0; i < numRows; i++) {
+      values[i] = i;
+    }
+    RoaringBitmap nullBitmap = RoaringBitmap.bitmapOf(0, 1, 254, 255, 256, 511, 512, 1_023);
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, true);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(numRows, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(nullBitmap, values)));
+    TDigest result = function.extractAggregationResult(resultHolder);
+
+    Assert.assertEquals(result.size(), numRows - nullBitmap.getCardinality());
+    double[] nonNullValues = new double[numRows - nullBitmap.getCardinality()];
+    int index = 0;
+    for (int i = 0; i < numRows; i++) {
+      if (!nullBitmap.contains(i)) {
+        nonNullValues[index++] = values[i];
+      }
+    }
+    Assert.assertEquals(function.extractFinalResult(result), nonNullValues[nonNullValues.length * 75 / 100], 2.0);
+
+    RoaringBitmap allNull = new RoaringBitmap();
+    allNull.add(0L, numRows);
+    resultHolder = function.createAggregationResultHolder();
+    function.aggregate(numRows, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(allNull, values)));
+    Assert.assertEquals(function.extractAggregationResult(resultHolder).size(), 0L);
+  }
+
+  @Test
+  public void testRawMultiValueAggregation() {
+    double[][] values = {{0.1, 0.2}, {}, {0.3}, {0.7, 0.8, 0.9}, {1.0}};
+    RoaringBitmap nullBitmap = RoaringBitmap.bitmapOf(2);
+    BlockValSet blockValSet = new SyntheticBlockValSets.Base() {
+      @Override
+      public RoaringBitmap getNullBitmap() {
+        return nullBitmap;
+      }
+
+      @Override
+      public DataType getValueType() {
+        return DataType.DOUBLE;
+      }
+
+      @Override
+      public boolean isSingleValue() {
+        return false;
+      }
+
+      @Override
+      public double[][] getDoubleValuesMV() {
+        return values;
+      }
+    };
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, true);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(values.length, resultHolder, Map.of(EXPRESSION, blockValSet));
+    TDigest result = function.extractAggregationResult(resultHolder);
+
+    Assert.assertEquals(result.size(), 6L);
+    Assert.assertEquals(function.extractFinalResult(result), 0.8, 0.1);
+  }
+
+  @Test
+  public void testDuplicateAndSpecialValues() {
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 50.0, false);
+    double[] duplicateValues = new double[10_003];
+    Arrays.fill(duplicateValues, 42.0);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(duplicateValues.length, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, duplicateValues)));
+    TDigest result = function.extractAggregationResult(resultHolder);
+    Assert.assertEquals(result.size(), duplicateValues.length);
+    Assert.assertEquals(function.extractFinalResult(result), 42.0);
+    Assert.assertEquals(result.getMin(), 42.0);
+    Assert.assertEquals(result.getMax(), 42.0);
+
+    double[] specialValues = {Double.NEGATIVE_INFINITY, -1.0, -0.0, 0.0, 1.0, Double.POSITIVE_INFINITY};
+    resultHolder = function.createAggregationResultHolder();
+    function.aggregate(specialValues.length, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, specialValues)));
+    result = function.extractAggregationResult(resultHolder);
+    Assert.assertEquals(result.size(), specialValues.length);
+    Assert.assertEquals(result.getMin(), Double.NEGATIVE_INFINITY);
+    Assert.assertEquals(result.getMax(), Double.POSITIVE_INFINITY);
+    Assert.assertEquals(result.quantile(0.0), Double.NEGATIVE_INFINITY);
+    Assert.assertEquals(result.quantile(1.0), Double.POSITIVE_INFINITY);
+    Assert.assertEquals(result.quantile(0.5), 0.0);
+  }
+
+  @Test
+  public void testReverseMergeDoesNotTreatSignedZeroAsSameSign() {
+    TDigestAccumulator accumulator = new TDigestAccumulator(10);
+    accumulator.add(-0.0);
+    accumulator.compress();
+    accumulator.add(0.0);
+    accumulator.add(Double.MIN_VALUE);
+    accumulator.add(Double.MAX_VALUE, 9);
+    accumulator.compress();
+
+    List<Centroid> centroids = new ArrayList<>(accumulator.centroids());
+    Assert.assertEquals(centroids.size(), 3);
+    Assert.assertEquals(centroids.get(1).weight(), 2);
+    Assert.assertEquals(Double.doubleToRawLongBits(centroids.get(1).mean()),
+        Double.doubleToRawLongBits(0.0));
+  }
+
+  @Test
+  public void testDuplicateInfiniteValuesAcrossRawAndSerializedReduction() {
+    int repetitions = 1_000;
+    double[] values = new double[3 * repetitions];
+    Arrays.fill(values, 0, repetitions, Double.NEGATIVE_INFINITY);
+    Arrays.fill(values, repetitions, 2 * repetitions, 0.0);
+    Arrays.fill(values, 2 * repetitions, values.length, Double.POSITIVE_INFINITY);
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 50.0, 20, false);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(values.length, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, values)));
+    TDigest rawResult = function.extractAggregationResult(resultHolder);
+    assertDuplicateInfinityResult(rawResult, values.length);
+    Assert.assertEquals(rawResult.cdf(-1.0), 1.0 / 3.0, 1e-12);
+    Assert.assertEquals(rawResult.cdf(0.0), 0.5, 1e-12);
+    // Verified against 3.3 on the same centroid snapshots: a positive-infinity neighbor retains half-centroid mass.
+    assertEquals(rawResult.cdf(1.0), 0.6321666666666667, 1e-12);
+
+    byte[] serialized = function.serializeIntermediateResult(rawResult).getBytes();
+    TDigest reducedResult = aggregateSerialized(new byte[][]{serialized, serialized}, null, false);
+    assertDuplicateInfinityResult(reducedResult, 2L * values.length);
+    Assert.assertEquals(reducedResult.cdf(-1.0), 1.0 / 3.0, 1e-12);
+    Assert.assertEquals(reducedResult.cdf(0.0), 0.5, 1e-12);
+    assertEquals(reducedResult.cdf(1.0), 0.6494166666666666, 1e-12);
+  }
+
+  @Test
+  public void testOnlyInfiniteValuesProduceMonotonicQuantiles() {
+    int repetitions = 1_000;
+    double[] values = new double[2 * repetitions];
+    Arrays.fill(values, 0, repetitions, Double.NEGATIVE_INFINITY);
+    Arrays.fill(values, repetitions, values.length, Double.POSITIVE_INFINITY);
+    TDigestAccumulator accumulator = new TDigestAccumulator(20);
+    accumulator.add(values, 0, values.length);
+
+    double previous = Double.NEGATIVE_INFINITY;
+    for (double quantile : new double[]{0.0, 0.25, 0.5, 0.75, 1.0}) {
+      double value = accumulator.quantile(quantile);
+      Assert.assertFalse(Double.isNaN(value));
+      Assert.assertTrue(value >= previous);
+      previous = value;
+    }
+    Assert.assertEquals(accumulator.cdf(0.0), 0.5, 1e-12);
+  }
+
+  @Test
+  public void testLegacyWeightedBoundariesUseTheirSourceExtrema() {
+    byte[] legacy = TDigestTestUtils.verbose(20.0, 0.0, 10.0, new double[]{1.0, 10.0}, new double[]{2.0, 1.0});
+    byte[] shifted = TDigestTestUtils.verbose(new double[]{-100.0, 100.0}, new double[]{1.0, 1.0}, 20.0);
+
+    TDigestAccumulator actual = TDigestAccumulator.forReduction(20.0);
+    actual.addSerializedTDigest(legacy);
+    actual.addSerializedTDigest(shifted);
+    TDigestAccumulator expected = new TDigestAccumulator(20);
+    expected.add(new double[]{0.0, 2.0, 10.0, -100.0, 100.0}, 0, 5);
+
+    Assert.assertEquals(actual.size(), 5L);
+    for (double quantile : new double[]{0.0, 0.25, 0.5, 0.75, 1.0}) {
+      Assert.assertEquals(actual.quantile(quantile), expected.quantile(quantile), 1e-12,
+          "Legacy boundary repair used extrema from another source at p" + quantile * 100);
+    }
+  }
+
+  @Test
+  public void testSerializedAggregationVerboseAndSmallEncodings() {
+    int numDigests = 32;
+    int valuesPerDigest = 200;
+    byte[][] verboseValues = createSerializedDigests(numDigests, valuesPerDigest, 100.0, ignored -> false);
+    byte[][] smallValues = createSerializedDigests(numDigests, valuesPerDigest, 100.0, ignored -> true);
+
+    TDigest verboseResult = aggregateSerialized(verboseValues, null, false);
+    TDigest smallResult = aggregateSerialized(smallValues, null, false);
+    long expectedSize = (long) numDigests * valuesPerDigest;
+    double expectedPercentile = 0.75;
+    for (TDigest result : new TDigest[]{verboseResult, smallResult}) {
+      Assert.assertTrue(result instanceof TDigestAccumulator);
+      Assert.assertEquals(result.size(), expectedSize);
+      Assert.assertEquals(result.compression(), 100.0);
+      Assert.assertEquals(result.quantile(0.75), expectedPercentile, 0.005);
+      Assert.assertEquals(result.getMin(), 0.0);
+      Assert.assertEquals(result.getMax(), (expectedSize - 1.0) / expectedSize, 0.000_001);
+    }
+    // The compact source narrows centroids to floats and can take a different valid merge path. Both results are
+    // independently bounded against the exact percentile above, so keep their cross-encoding envelope equally tight.
+    Assert.assertEquals(smallResult.quantile(0.75), verboseResult.quantile(0.75), 0.005);
+  }
+
+  @Test
+  public void testSerializedAggregationWithFirstAndNonLeadingNulls() {
+    int numDigests = 6;
+    int valuesPerDigest = 20;
+    byte[][] values = createSerializedDigests(numDigests, valuesPerDigest, 100.0, index -> (index & 1) == 0);
+    RoaringBitmap nullBitmap = RoaringBitmap.bitmapOf(0, 2, 5);
+    for (int index : nullBitmap) {
+      values[index] = new byte[0];
+    }
+
+    TDigest result = aggregateSerialized(values, nullBitmap, true);
+    int expectedSize = (numDigests - nullBitmap.getCardinality()) * valuesPerDigest;
+    Assert.assertEquals(result.size(), expectedSize);
+    double[] expectedValues = new double[expectedSize];
+    int outputIndex = 0;
+    for (int digestIndex = 0; digestIndex < numDigests; digestIndex++) {
+      if (!nullBitmap.contains(digestIndex)) {
+        for (int valueIndex = 0; valueIndex < valuesPerDigest; valueIndex++) {
+          expectedValues[outputIndex++] = serializedValue(digestIndex, valueIndex, numDigests, valuesPerDigest);
+        }
+      }
+    }
+    Arrays.sort(expectedValues);
+    Assert.assertEquals(result.getMin(), expectedValues[0]);
+    Assert.assertEquals(result.getMax(), expectedValues[expectedSize - 1]);
+    Assert.assertEquals(result.quantile(0.75), expectedValues[expectedSize * 75 / 100], 0.02);
+  }
+
+  @Test
+  public void testSerializedAggregationAllNull() {
+    byte[][] values = {new byte[0], new byte[0], new byte[0]};
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0L, values.length);
+
+    Assert.assertNull(aggregateSerialized(values, nullBitmap, true));
+  }
+
+  @Test
+  public void testSerializedAggregationAcrossCallsAndBatchBoundaries() {
+    int[] batchSizes = {1, 63, 64, 65, 257};
+    int numDigests = Arrays.stream(batchSizes).sum();
+    int valuesPerDigest = 10;
+    byte[][] values = createSerializedDigests(numDigests, valuesPerDigest, 100.0, index -> (index & 1) != 0);
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    int offset = 0;
+    for (int batchSize : batchSizes) {
+      byte[][] batch = Arrays.copyOfRange(values, offset, offset + batchSize);
+      function.aggregate(batchSize, resultHolder, Map.of(EXPRESSION, bytesBlockValSet(batch, null)));
+      offset += batchSize;
+    }
+
+    TDigest result = function.extractAggregationResult(resultHolder);
+    long expectedSize = (long) numDigests * valuesPerDigest;
+    Assert.assertEquals(result.size(), expectedSize);
+    Assert.assertEquals(result.quantile(0.75), 0.75, 0.005);
+  }
+
+  @Test
+  public void testSerializedAggregationPreservesFirstDigestDoubleCompression() {
+    double compression = 42.125;
+    byte[][] values = createSerializedDigests(8, 100, compression, ignored -> false);
+
+    TDigest result = aggregateSerialized(values, null, false);
+    Assert.assertEquals(result.size(), 800L);
+    Assert.assertEquals(result.compression(), compression);
+    Assert.assertEquals(result.quantile(0.75), 0.75, 0.01);
+  }
+
+  @Test
+  public void testSerializedGroupBySV() {
+    int numDigests = 12;
+    int valuesPerDigest = 100;
+    double compression = 42.125;
+    byte[][] values = createSerializedDigests(numDigests, valuesPerDigest, compression, index -> (index & 1) == 0);
+    int[] groupKeys = {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
+    RoaringBitmap nullBitmap = RoaringBitmap.bitmapOf(0, 7);
+    for (int index : nullBitmap) {
+      values[index] = new byte[0];
+    }
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, true);
+    GroupByResultHolder resultHolder = function.createGroupByResultHolder(4, 4);
+    function.aggregateGroupBySV(numDigests, groupKeys, resultHolder,
+        Map.of(EXPRESSION, bytesBlockValSet(values, nullBitmap)));
+    function.aggregateGroupBySV(numDigests, groupKeys, resultHolder,
+        Map.of(EXPRESSION, bytesBlockValSet(values, nullBitmap)));
+
+    assertSerializedAccumulatorState(resultHolder, 0);
+    assertSerializedAccumulatorState(resultHolder, 1);
+    assertSerializedAccumulatorState(resultHolder, 2);
+    double denominator = numDigests * (double) valuesPerDigest;
+    assertGroupResult(function, resultHolder, 0, 6L * valuesPerDigest, compression, 3.0 / denominator,
+        (99.0 * numDigests + 9.0) / denominator);
+    assertGroupResult(function, resultHolder, 1, 6L * valuesPerDigest, compression, 1.0 / denominator,
+        (99.0 * numDigests + 10.0) / denominator);
+    assertGroupResult(function, resultHolder, 2, 8L * valuesPerDigest, compression, 2.0 / denominator,
+        (99.0 * numDigests + 11.0) / denominator);
+    Assert.assertNull(function.extractGroupByResult(resultHolder, 3));
+  }
+
+  @Test
+  public void testSerializedGroupByMV() {
+    int numDigests = 6;
+    int valuesPerDigest = 100;
+    byte[][] values = createSerializedDigests(numDigests, valuesPerDigest, 100.0, index -> (index & 1) != 0);
+    int[][] groupKeys = {{0, 1}, {1}, {0, 2}, {2, 3}, {0, 3}, {1, 2, 3}};
+    RoaringBitmap nullBitmap = RoaringBitmap.bitmapOf(3);
+    values[3] = new byte[0];
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, true);
+    GroupByResultHolder resultHolder = function.createGroupByResultHolder(4, 4);
+    function.aggregateGroupByMV(numDigests, groupKeys, resultHolder,
+        Map.of(EXPRESSION, bytesBlockValSet(values, nullBitmap)));
+
+    for (int groupKey = 0; groupKey < 4; groupKey++) {
+      assertSerializedAccumulatorState(resultHolder, groupKey);
+    }
+    double denominator = numDigests * (double) valuesPerDigest;
+    assertGroupResult(function, resultHolder, 0, 3L * valuesPerDigest, 100.0, 0.0,
+        (99.0 * numDigests + 4.0) / denominator);
+    assertGroupResult(function, resultHolder, 1, 3L * valuesPerDigest, 100.0, 0.0,
+        (99.0 * numDigests + 5.0) / denominator);
+    assertGroupResult(function, resultHolder, 2, 2L * valuesPerDigest, 100.0, 2.0 / denominator,
+        (99.0 * numDigests + 5.0) / denominator);
+    assertGroupResult(function, resultHolder, 3, 2L * valuesPerDigest, 100.0, 4.0 / denominator,
+        (99.0 * numDigests + 5.0) / denominator);
+  }
+
+  @Test
+  public void testSerializedGroupByMVNormalizesSharedBoundariesOncePerRow() {
+    byte[] initial = TDigestCodec.serializeCentroids(100.0, 5.0, 5.0,
+        new double[]{5.0}, new double[]{1.0}, 1);
+    byte[] weighted = TDigestCodec.serializeCentroids(100.0, 0.0, 10.0,
+        new double[]{0.0, 5.0, 10.0}, new double[]{3.0, 2.0, 3.0}, 3);
+    byte[] original = weighted.clone();
+    byte[][] values = {initial, weighted, weighted};
+    int[][] groupKeys = {{0, 1}, {0, 1}, {0, 1, 2}};
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 50.0, false);
+    GroupByResultHolder resultHolder = function.createGroupByResultHolder(3, 3);
+    function.aggregateGroupByMV(values.length, groupKeys, resultHolder,
+        Map.of(EXPRESSION, bytesBlockValSet(values, null)));
+
+    for (int groupKey = 0; groupKey < 2; groupKey++) {
+      TDigest result = function.extractGroupByResult(resultHolder, groupKey);
+      assertEquals(result.size(), 17L);
+      assertEquals(result.getMin(), 0.0);
+      assertEquals(result.getMax(), 10.0);
+      assertEquals(result.quantile(0.5), 5.0);
+    }
+    // A group initialized after the fanout repair still reads the original encoded distribution.
+    assertEquals(function.extractGroupByResult(resultHolder, 2).serialize(),
+        TDigestAccumulator.fromBytes(original).serialize());
+    assertEquals(weighted, original);
+  }
+
+  @Test
+  public void testSerializedGroupByMVSharedInputEdgeCases()
+      throws ReflectiveOperationException {
+    TDigest empty = TDigestAccumulator.forLegacyAggregation(20.0);
+    TDigest one = TDigestAccumulator.forLegacyAggregation(100.0);
+    one.add(1.0);
+    byte[] smallBytes = TDigestTestUtils.compactFixture(one);
+    TDigest two = TDigestAccumulator.forLegacyAggregation(100.0);
+    two.add(2.0);
+    byte[][] values = {
+        new byte[0], ObjectSerDeUtils.TDIGEST_SER_DE.serialize(empty), smallBytes,
+        ObjectSerDeUtils.TDIGEST_SER_DE.serialize(two)
+    };
+    int[][] groupKeys = {{}, {0, 1}, {0, 1, 2, 2}, {0, 1, 2, 3}};
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
+    GroupByResultHolder resultHolder = function.createGroupByResultHolder(4, 4);
+    function.aggregateGroupByMV(values.length, groupKeys, resultHolder,
+        Map.of(EXPRESSION, bytesBlockValSet(values, null)));
+
+    TDigestAccumulator pendingAccumulator = resultHolder.getResult(3);
+    for (String fieldName
+        : new String[]{"_rawValues", "_centroidMeans", "_outputMeans", "_incomingMeans"}) {
+      Field field = TDigestAccumulator.class.getDeclaredField(fieldName);
+      field.setAccessible(true);
+      Assert.assertNull(field.get(pendingAccumulator));
+    }
+
+    long[] expectedSizes = {2L, 2L, 3L, 1L};
+    double[] expectedCompressions = {20.0, 20.0, 100.0, 100.0};
+    double[] expectedMinimums = {1.0, 1.0, 1.0, 2.0};
+    for (int groupKey = 0; groupKey < 4; groupKey++) {
+      TDigest result = function.extractGroupByResult(resultHolder, groupKey);
+      Assert.assertEquals(result.size(), expectedSizes[groupKey]);
+      Assert.assertEquals(result.compression(), expectedCompressions[groupKey]);
+      Assert.assertEquals(result.getMin(), expectedMinimums[groupKey]);
+      Assert.assertEquals(result.getMax(), 2.0);
+    }
+  }
+
+  @Test
+  public void testSerializedGroupByMVPreservesOversizedSmallCapacity() {
+    int numCentroids = 80;
+    ByteBuffer oversizedSmall = ByteBuffer.allocate(Integer.BYTES + 2 * Double.BYTES + Float.BYTES
+        + 3 * Short.BYTES + 2 * Float.BYTES * numCentroids);
+    oversizedSmall.putInt(2);
+    oversizedSmall.putDouble(0.0);
+    oversizedSmall.putDouble(numCentroids - 1.0);
+    oversizedSmall.putFloat(20.0F);
+    oversizedSmall.putShort((short) numCentroids);
+    oversizedSmall.putShort((short) 100);
+    oversizedSmall.putShort((short) numCentroids);
+    for (int i = 0; i < numCentroids; i++) {
+      oversizedSmall.putFloat(1.0F);
+      oversizedSmall.putFloat(i);
+    }
+    TDigest empty = TDigestAccumulator.forLegacyAggregation(20.0);
+
+    PercentileTDigestAggregationFunction function = new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
+    TDigest lazyResult =
+        function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(oversizedSmall.array())));
+    assertEquals(function.serializeIntermediateResult(lazyResult).getBytes(), oversizedSmall.array());
+    assertOversizedSmallIntermediateRoundTrip(function, lazyResult, numCentroids, true);
+
+    GroupByResultHolder resultHolder = function.createGroupByResultHolder(1, 1);
+    function.aggregateGroupByMV(2, new int[][]{{0}, {0}}, resultHolder,
+        Map.of(EXPRESSION, bytesBlockValSet(
+            new byte[][]{oversizedSmall.array(), ObjectSerDeUtils.TDIGEST_SER_DE.serialize(empty)}, null)));
+
+    TDigest result = function.extractGroupByResult(resultHolder, 0);
+    Assert.assertEquals(result.size(), numCentroids);
+    Assert.assertEquals(result.compression(), 20.0);
+    Assert.assertEquals(result.getMin(), 0.0);
+    Assert.assertEquals(result.getMax(), numCentroids - 1.0);
+    Assert.assertEquals(result.quantile(0.75), 59.5, 1.0);
+    assertEquals(result.centroidCount(), numCentroids);
+    assertOversizedSmallIntermediateRoundTrip(function, result, numCentroids, false);
+    result.add(numCentroids);
+    Assert.assertEquals(result.size(), numCentroids + 1L);
+
+    double preciseCompression = 20.0000001;
+    TDigest preciseEmpty = TDigestAccumulator.forLegacyAggregation(preciseCompression);
+    GroupByResultHolder preciseResultHolder = function.createGroupByResultHolder(1, 1);
+    function.aggregateGroupByMV(2, new int[][]{{0}, {0}}, preciseResultHolder,
+        Map.of(EXPRESSION, bytesBlockValSet(
+            new byte[][]{ObjectSerDeUtils.TDIGEST_SER_DE.serialize(preciseEmpty), oversizedSmall.array()}, null)));
+    TDigest preciseResult = function.extractGroupByResult(preciseResultHolder, 0);
+    Assert.assertEquals(preciseResult.compression(), preciseCompression);
+    Assert.assertEquals(preciseResult.size(), numCentroids);
+    preciseResult.compress();
+    Assert.assertTrue(preciseResult.centroidCount() <= 2 * Math.ceil(preciseCompression) + 30);
+  }
+
+  private static void assertOversizedSmallIntermediateRoundTrip(PercentileTDigestAggregationFunction function,
+      TDigest result, int expectedSize, boolean preservesInput) {
+    SerializedResult serializedResult = function.serializeIntermediateResult(result);
+    Assert.assertEquals(serializedResult.getType(), TDIGEST_TYPE);
+    byte[] serializedBytes = serializedResult.getBytes();
+    if (preservesInput) {
+      assertEquals(ByteBuffer.wrap(serializedBytes).getInt(), TDigestCodec.SMALL_ENCODING);
+    } else {
+      PercentileRawTDigestAggregationFunctionTest.assertLegacyCompatibleShape(serializedBytes, 20.0);
+    }
+    assertTrue(serializedBytes.length <= result.maxSerializedByteSize());
+    TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(serializedBytes);
+    assertTrue(roundTripped.hasValidStatistics());
+    Assert.assertEquals(roundTripped.size(), expectedSize);
+    if (preservesInput) {
+      assertEquals(roundTripped.centroidCount(), expectedSize);
+    }
+    Assert.assertEquals(roundTripped.compression(), 20.0);
+    Assert.assertEquals(roundTripped.getMin(), 0.0);
+    Assert.assertEquals(roundTripped.getMax(), expectedSize - 1.0);
+    double previousValue = Double.NEGATIVE_INFINITY;
+    for (double quantile : new double[]{0.0, 0.5, 0.75, 0.95, 0.99, 1.0}) {
+      double value = roundTripped.quantile(quantile);
+      Assert.assertTrue(Double.isFinite(value));
+      Assert.assertTrue(value >= previousValue);
+      assertEquals(value, result.quantile(quantile), preservesInput ? 0.0 : 1.0);
+      previousValue = value;
+    }
+  }
+
+  /// `quantile()` must reject `NaN` like the non-finite-aware digest does, instead of letting it slip past the
+  /// range guard (every `NaN` comparison is false) and propagate through the computation.
+  @Test
+  public void testQuantileRejectsNaN() {
+    TDigestAccumulator accumulator = TDigestAccumulator.forReduction(100.0);
+    accumulator.add(1.0);
+    IllegalArgumentException exception =
+        Assert.expectThrows(IllegalArgumentException.class, () -> accumulator.quantile(Double.NaN));
+    Assert.assertEquals(exception.getMessage(), "q should be in [0,1], got NaN");
+  }
+
+  @Test
+  public void testCentroidsPreserveWeightExceedingIntegerMaxValue() {
+    TDigestAccumulator accumulator = TDigestAccumulator.forReduction(100.0);
+    double oversizedWeight = Integer.MAX_VALUE + 1_000.5;
+    accumulator.add(1.0, oversizedWeight);
+
+    List<Centroid> centroids = new ArrayList<>(accumulator.centroids());
+    assertEquals(accumulator.getTotalWeight(), oversizedWeight);
+    assertEquals(centroids.stream().mapToDouble(Centroid::weight).sum(), oversizedWeight);
+    assertTrue(centroids.stream().anyMatch(centroid -> centroid.weight() > Integer.MAX_VALUE));
+    for (Centroid centroid : centroids) {
+      assertEquals(centroid.mean(), 1.0);
+    }
+  }
+
+  @Test
+  public void testSerializedGroupByMVSharedInputReservesBoundaryCapacity()
+      throws ReflectiveOperationException {
+    ByteBuffer oneCentroid = ByteBuffer.allocate(30 + 2 * Float.BYTES);
+    oneCentroid.putInt(2);
+    oneCentroid.putDouble(1.0);
+    oneCentroid.putDouble(1.0);
+    oneCentroid.putFloat(1_000_000.0F);
+    oneCentroid.putShort((short) 1);
+    oneCentroid.putShort((short) 1);
+    oneCentroid.putShort((short) 1);
+    oneCentroid.putFloat(1.0F);
+    oneCentroid.putFloat(1.0F);
+    TDigest empty = TDigestAccumulator.forLegacyAggregation(20.0);
+    byte[] emptyBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(empty);
+    TDigestAccumulator accumulator =
+        TDigestAccumulator.forReduction(TDigestCodec.readCompression(emptyBytes));
+    accumulator.addSerializedTDigest(emptyBytes);
+    SerializedTDigestInput input =
+        new SerializedTDigestInput();
+    input.reset(oneCentroid.array());
+    accumulator.addSerializedTDigest(input);
+
+    Field meansField = SerializedTDigestInput.class.getDeclaredField("_means");
+    meansField.setAccessible(true);
+    Assert.assertEquals(((double[]) meansField.get(input)).length, 3);
+    Assert.assertEquals(accumulator.size(), 1L);
+  }
+
+  @Test
+  public void testSerializedAccumulatorAllocatesRawBufferLazily()
+      throws ReflectiveOperationException {
+    byte[] serializedDigest = createSerializedDigests(1, 100, 100.0, ignored -> false)[0];
+    Field rawValuesField = TDigestAccumulator.class.getDeclaredField("_rawValues");
+    rawValuesField.setAccessible(true);
+
+    TDigestAccumulator accumulator =
+        TDigestAccumulator.forReduction(TDigestCodec.readCompression(serializedDigest));
+    Assert.assertNull(rawValuesField.get(accumulator));
+    accumulator.add(new double[0], 0, 0);
+    Assert.assertNull(rawValuesField.get(accumulator));
+    accumulator.addSerializedTDigest(serializedDigest);
+    accumulator.compress();
+    Assert.assertNull(rawValuesField.get(accumulator));
+
+    accumulator.add(new double[]{1.0}, 0, 1);
+    Assert.assertNotNull(rawValuesField.get(accumulator));
+    accumulator.addSerializedTDigest(serializedDigest);
+    accumulator.compress();
+    TDigest result = accumulator;
+    Assert.assertEquals(result.size(), 201L);
+    Assert.assertEquals(result.getMin(), 0.0);
+    Assert.assertEquals(result.getMax(), 1.0);
+    Assert.assertNull(rawValuesField.get(
+        TDigestAccumulator.forReduction(TDigestCodec.readCompression(serializedDigest))));
+    Assert.assertNotNull(rawValuesField.get(new TDigestAccumulator(100)));
+  }
+
+  @Test
+  public void testDirectMergeAtConfiguredCompressionIsNotRepeated()
+      throws ReflectiveOperationException {
+    byte[][] serializedDigests = createSerializedDigests(2, 100, 100.0, ignored -> false);
+    TDigestAccumulator accumulator =
+        TDigestAccumulator.forReduction(TDigestCodec.readCompression(serializedDigests[0]));
+    SerializedTDigestInput input =
+        new SerializedTDigestInput();
+    for (byte[] serializedDigest : serializedDigests) {
+      input.reset(serializedDigest);
+      accumulator.addSerializedTDigestDirect(input);
+    }
+
+    int mergeCount = (int) getAccumulatorField(accumulator, "_mergeCount");
+    Assert.assertTrue((boolean) getAccumulatorField(accumulator, "_publiclyCompressed"));
+    accumulator.compress();
+    Assert.assertEquals(getAccumulatorField(accumulator, "_mergeCount"), mergeCount);
+    Assert.assertEquals(accumulator.size(), 200L);
+  }
+
+  @Test
+  public void testSerializedAccumulatorGrowsBuffersForRawValues() {
+    TDigest serializedDigest = TDigestAccumulator.forLegacyAggregation(100.0);
+    serializedDigest.add(-1.0);
+    byte[] serializedBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(serializedDigest);
+    TDigestAccumulator accumulator =
+        TDigestAccumulator.forReduction(TDigestCodec.readCompression(serializedBytes));
+    accumulator.addSerializedTDigest(serializedBytes);
+
+    double[] rawValues = new double[768];
+    for (int i = 0; i < rawValues.length; i++) {
+      rawValues[i] = i;
+    }
+    accumulator.add(rawValues, 0, rawValues.length);
+
+    accumulator.compress();
+    TDigest result = accumulator;
+    Assert.assertEquals(result.size(), 769L);
+    Assert.assertEquals(result.getMin(), -1.0);
+    Assert.assertEquals(result.getMax(), 767.0);
+  }
+
+  @Test
+  public void testSerializedAccumulatorPreservesCompressionAfterEmptyDigests() {
+    TDigest first = TDigestAccumulator.forLegacyAggregation(20.0);
+    TDigest second = TDigestAccumulator.forLegacyAggregation(30.0);
+    TDigest third = TDigestAccumulator.forLegacyAggregation(40.0);
+    third.add(1.0);
+    byte[] firstBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(first);
+    TDigestAccumulator accumulator =
+        TDigestAccumulator.forReduction(TDigestCodec.readCompression(firstBytes));
+    accumulator.addSerializedTDigest(firstBytes);
+    accumulator.addSerializedTDigest(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(second));
+    accumulator.addSerializedTDigest(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(third));
+
+    accumulator.compress();
+    TDigest result = accumulator;
+    Assert.assertEquals(result.compression(), 20.0);
+    Assert.assertEquals(result.size(), 1L);
+    Assert.assertEquals(result.quantile(0.5), 1.0);
+  }
+
+  @Test
+  public void testRawNumericGroupByStillUsesTDigestState() {
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
+    GroupByResultHolder resultHolder = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupBySV(4, new int[]{0, 0, 1, 1}, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, new double[]{1.0, 2.0, 3.0, 4.0})));
+
+    Assert.assertTrue(resultHolder.getResult(0) instanceof TDigest);
+    Assert.assertEquals(function.extractGroupByResult(resultHolder, 0).size(), 2L);
+    Assert.assertEquals(function.extractGroupByResult(resultHolder, 1).size(), 2L);
+  }
+
+  @Test
+  public void testDuplicateInfiniteValuesInRawGroupBy() {
+    int repetitions = 1_000;
+    double[] values = new double[3 * repetitions];
+    Arrays.fill(values, 0, repetitions, Double.NEGATIVE_INFINITY);
+    Arrays.fill(values, repetitions, 2 * repetitions, 0.0);
+    Arrays.fill(values, 2 * repetitions, values.length, Double.POSITIVE_INFINITY);
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 50.0, 20, false);
+    GroupByResultHolder resultHolder = function.createGroupByResultHolder(1, 1);
+    function.aggregateGroupBySV(values.length, new int[values.length], resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, values)));
+
+    TDigest result = function.extractGroupByResult(resultHolder, 0);
+    assertDuplicateInfinityResult(result, values.length);
+    TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(
+        function.serializeIntermediateResult(result).getBytes());
+    assertDuplicateInfinityResult(roundTripped, values.length);
+  }
+
+  @DataProvider(name = "malformedSerializedDigests")
+  public static Object[][] malformedSerializedDigests() {
+    ByteBuffer invalidEncoding = ByteBuffer.allocate(Integer.BYTES);
+    invalidEncoding.putInt(99);
+    ByteBuffer truncatedVerbose = ByteBuffer.allocate(4 * Integer.BYTES + 2 * Double.BYTES);
+    truncatedVerbose.putInt(1);
+    truncatedVerbose.putDouble(0.0);
+    truncatedVerbose.putDouble(1.0);
+    truncatedVerbose.putDouble(100.0);
+    truncatedVerbose.putInt(1);
+    ByteBuffer truncatedSmall = ByteBuffer.allocate(3 * Integer.BYTES + 2 * Double.BYTES + Short.BYTES);
+    truncatedSmall.putInt(2);
+    truncatedSmall.putDouble(0.0);
+    truncatedSmall.putDouble(1.0);
+    truncatedSmall.putFloat(100.0F);
+    truncatedSmall.putShort((short) 210);
+    truncatedSmall.putShort((short) 500);
+    truncatedSmall.putShort((short) 1);
+    ByteBuffer oversizedVerbose = ByteBuffer.allocate(4 * Integer.BYTES + 2 * Double.BYTES);
+    oversizedVerbose.putInt(1);
+    oversizedVerbose.putDouble(0.0);
+    oversizedVerbose.putDouble(1.0);
+    oversizedVerbose.putDouble(100.0);
+    oversizedVerbose.putInt(10_000_000);
+    ByteBuffer oversizedSmall = ByteBuffer.allocate(3 * Integer.BYTES + 2 * Double.BYTES + Short.BYTES);
+    oversizedSmall.putInt(2);
+    oversizedSmall.putDouble(0.0);
+    oversizedSmall.putDouble(1.0);
+    oversizedSmall.putFloat(100.0F);
+    oversizedSmall.putShort((short) 210);
+    oversizedSmall.putShort((short) 500);
+    oversizedSmall.putShort(Short.MAX_VALUE);
+    ByteBuffer negativeMainCapacity = ByteBuffer.allocate(30);
+    negativeMainCapacity.putInt(2);
+    negativeMainCapacity.putDouble(0.0);
+    negativeMainCapacity.putDouble(1.0);
+    negativeMainCapacity.putFloat(100.0F);
+    negativeMainCapacity.putShort((short) -2);
+    negativeMainCapacity.putShort((short) 1);
+    negativeMainCapacity.putShort((short) 0);
+    ByteBuffer negativeBufferCapacity = ByteBuffer.allocate(30);
+    negativeBufferCapacity.putInt(2);
+    negativeBufferCapacity.putDouble(0.0);
+    negativeBufferCapacity.putDouble(1.0);
+    negativeBufferCapacity.putFloat(100.0F);
+    negativeBufferCapacity.putShort((short) 1);
+    negativeBufferCapacity.putShort((short) -2);
+    negativeBufferCapacity.putShort((short) 0);
+    ByteBuffer centroidsExceedMainCapacity = ByteBuffer.allocate(30 + 4 * Float.BYTES);
+    centroidsExceedMainCapacity.putInt(2);
+    centroidsExceedMainCapacity.putDouble(0.0);
+    centroidsExceedMainCapacity.putDouble(1.0);
+    centroidsExceedMainCapacity.putFloat(100.0F);
+    centroidsExceedMainCapacity.putShort((short) 1);
+    centroidsExceedMainCapacity.putShort((short) 2);
+    centroidsExceedMainCapacity.putShort((short) 2);
+    centroidsExceedMainCapacity.putFloat(1.0F);
+    centroidsExceedMainCapacity.putFloat(0.0F);
+    centroidsExceedMainCapacity.putFloat(1.0F);
+    centroidsExceedMainCapacity.putFloat(1.0F);
+    return new Object[][]{
+        {invalidEncoding.array()}, {truncatedVerbose.array()}, {truncatedSmall.array()}, {oversizedVerbose.array()},
+        {oversizedSmall.array()}, {negativeMainCapacity.array()}, {negativeBufferCapacity.array()},
+        {centroidsExceedMainCapacity.array()}
+    };
+  }
+
+  @Test
+  public void testLowCompressionVerboseCapacityAddedIn33() {
+    int numCentroids = 51;
+    byte[] verbose = PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(numCentroids, 20.0);
+
+    TDigest deserialized = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(verbose);
+    Assert.assertEquals(deserialized.size(), numCentroids);
+    Assert.assertEquals(deserialized.centroidCount(), numCentroids);
+    Assert.assertEquals(deserialized.getMin(), 0.0);
+    Assert.assertEquals(deserialized.getMax(), numCentroids - 1.0);
+  }
+
+  @Test
+  public void testFractionalCompressionVerboseCapacityAcrossVersions() {
+    for (Object[] testCase : new Object[][]{{42.125, 95}, {100.1, 212}}) {
+      double compression = (double) testCase[0];
+      int numCentroids = (int) testCase[1];
+      byte[] verbose =
+          PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(numCentroids, compression);
+
+      TDigest result = aggregateSerialized(new byte[][]{verbose}, null, false);
+      Assert.assertEquals(result.size(), numCentroids);
+      Assert.assertEquals(result.compression(), compression);
+      Assert.assertEquals(result.getMin(), 0.0);
+      Assert.assertEquals(result.getMax(), numCentroids - 1.0);
+
+      byte[] serialized = ((TDigestAccumulator) result).serialize();
+      TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(serialized);
+      Assert.assertEquals(roundTripped.size(), numCentroids);
+      Assert.assertEquals(roundTripped.compression(), compression);
+      Assert.assertEquals(roundTripped.getMin(), 0.0);
+      Assert.assertEquals(roundTripped.getMax(), numCentroids - 1.0);
+    }
+  }
+
+  @Test
+  public void testPendingLowCompressionDigestSerializesWithLegacyCompatibleCapacity() {
+    int numCentroids = 51;
+    byte[] verbose = PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(numCentroids, 20.0);
+    TDigestAccumulator accumulator =
+        TDigestAccumulator.forReduction(TDigestCodec.readCompression(verbose));
+    accumulator.addSerializedTDigest(verbose);
+
+    ByteBuffer serialized = ByteBuffer.wrap(accumulator.serialize());
+    Assert.assertEquals(serialized.getInt(), 2);
+    serialized.position(Integer.BYTES + 2 * Double.BYTES + Float.BYTES);
+    int mainCapacity = serialized.getShort();
+    serialized.getShort();
+    Assert.assertTrue(mainCapacity >= numCentroids);
+    Assert.assertEquals(serialized.getShort(), numCentroids);
+
+    TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(serialized.array());
+    Assert.assertEquals(roundTripped.size(), numCentroids);
+    Assert.assertEquals(roundTripped.getMin(), 0.0);
+    Assert.assertEquals(roundTripped.getMax(), numCentroids - 1.0);
+  }
+
+  @Test
+  public void testPendingSerializedDigestOwnsInputBytes() {
+    assertPendingSerializedDigestOwnsInputBytes(false);
+    assertPendingSerializedDigestOwnsInputBytes(true);
+  }
+
+  @Test
+  public void testAccumulatorSerializationDoesNotNarrowLargeMeans()
+      throws ReflectiveOperationException {
+    int centroidCount = 51;
+    double min = 1.0e18;
+    TDigestAccumulator accumulator = new TDigestAccumulator(20);
+    double[] means = new double[70];
+    double[] weights = new double[70];
+    for (int i = 0; i < centroidCount; i++) {
+      means[i] = min + 256.0 * i;
+      weights[i] = 1.0;
+    }
+    setAccumulatorField(accumulator, "_centroidMeans", means);
+    setAccumulatorField(accumulator, "_centroidWeights", weights);
+    setAccumulatorField(accumulator, "_numCentroids", centroidCount);
+    setAccumulatorField(accumulator, "_totalWeight", (double) centroidCount);
+    setAccumulatorField(accumulator, "_min", means[0]);
+    setAccumulatorField(accumulator, "_max", means[centroidCount - 1]);
+    setAccumulatorField(accumulator, "_publiclyCompressed", true);
+
+    byte[] serialized = accumulator.serialize();
+    ByteBuffer header = ByteBuffer.wrap(serialized);
+    Assert.assertEquals(header.getInt(), 1);
+    header.position(Integer.BYTES + 3 * Double.BYTES);
+    Assert.assertEquals(header.getInt(), 50);
+    TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(serialized);
+    Assert.assertEquals(roundTripped.size(), centroidCount);
+    Assert.assertEquals(roundTripped.getMin(), means[0]);
+    Assert.assertEquals(roundTripped.getMax(), means[centroidCount - 1]);
+    Assert.assertTrue(Double.isFinite(roundTripped.quantile(0.5)));
+  }
+
+  @Test
+  public void testCentroidInspectionPreservesWeightedHighMagnitudeMean() {
+    TDigestAccumulator accumulator = new TDigestAccumulator(100);
+    accumulator.add(1.0e308, 2);
+
+    double weight = 0.0;
+    for (Centroid centroid : accumulator.centroids()) {
+      Assert.assertEquals(centroid.mean(), 1.0e308);
+      weight += centroid.weight();
+    }
+    Assert.assertEquals(weight, 2.0, 1e-9);
+  }
+
+  @Test
+  public void testSerializedBoundaryRepairDoesNotOverflowFirstMoment() {
+    double min = 8.0e307;
+    double mean = 1.0e308;
+    double max = 1.2e308;
+    byte[] verbose = TDigestTestUtils.verbose(100.0, min, max, new double[]{mean}, new double[]{3.0});
+
+    TDigest result = aggregateSerialized(new byte[][]{verbose}, null, false);
+    assertEquals(result.centroids().size(), 1);
+    assertEquals(result.quantile(0.5), mean);
+    result.serialize();
+    List<Centroid> centroids = List.copyOf(result.centroids());
+    assertEquals(centroids.size(), 3);
+    assertEquals(centroids.get(0).mean(), min);
+    assertEquals(centroids.get(1).mean(), mean, 4.0 * Math.ulp(mean));
+    assertEquals(centroids.get(2).mean(), max);
+  }
+
+  @Test(dataProvider = "malformedSerializedDigests")
+  public void testMalformedSerializedDigestMatchesSharedDeserializer(byte[] bytes) {
+    RuntimeException expected = Assert.expectThrows(RuntimeException.class,
+        () -> ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes));
+    RuntimeException actual = Assert.expectThrows(RuntimeException.class,
+        () -> aggregateSerialized(new byte[][]{bytes}, null, false));
+    Assert.assertEquals(actual.getClass(), expected.getClass());
+    Assert.assertEquals(actual.getMessage(), expected.getMessage());
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
+    GroupByResultHolder resultHolder = function.createGroupByResultHolder(1, 1);
+    RuntimeException groupByActual = Assert.expectThrows(RuntimeException.class,
+        () -> function.aggregateGroupBySV(1, new int[]{0}, resultHolder,
+            Map.of(EXPRESSION, bytesBlockValSet(new byte[][]{bytes}, null))));
+    Assert.assertEquals(groupByActual.getClass(), expected.getClass());
+    Assert.assertEquals(groupByActual.getMessage(), expected.getMessage());
+
+    TDigest empty = TDigestAccumulator.forLegacyAggregation(100.0);
+    byte[] emptyBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(empty);
+    RuntimeException materializedActual = Assert.expectThrows(RuntimeException.class,
+        () -> aggregateSerialized(new byte[][]{emptyBytes, bytes}, null, false));
+    Assert.assertEquals(materializedActual.getClass(), expected.getClass());
+    Assert.assertEquals(materializedActual.getMessage(), expected.getMessage());
+
+    GroupByResultHolder groupByMVResultHolder = function.createGroupByResultHolder(1, 1);
+    RuntimeException groupByMVActual = Assert.expectThrows(RuntimeException.class,
+        () -> function.aggregateGroupByMV(2, new int[][]{{0}, {0}}, groupByMVResultHolder,
+            Map.of(EXPRESSION, bytesBlockValSet(new byte[][]{emptyBytes, bytes}, null))));
+    Assert.assertEquals(groupByMVActual.getClass(), expected.getClass());
+    Assert.assertEquals(groupByMVActual.getMessage(), expected.getMessage());
+  }
+
+  @DataProvider(name = "compressionFactors")
+  public static Object[][] compressionFactors() {
+    return new Object[][]{{10}, {50}, {100}, {200}, {1_000}, {10_000}};
+  }
+
+  @DataProvider(name = "reducerMergeCases")
+  public static Object[][] reducerMergeCases() {
+    List<Object[]> cases = new ArrayList<>();
+    for (int fanIn : new int[]{8, 32, 128}) {
+      for (int compression : new int[]{20, 100, 1_000}) {
+        for (ReducerDistribution distribution : ReducerDistribution.values()) {
+          for (MergeOrder mergeOrder : MergeOrder.values()) {
+            for (ReducerInput reducerInput : ReducerInput.values()) {
+              cases.add(new Object[]{fanIn, compression, distribution, mergeOrder, reducerInput});
+            }
+          }
+        }
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "reducerMergeCases")
+  public void testReducerMergeStructureAndAccuracy(int fanIn, int compression, ReducerDistribution distribution,
+      MergeOrder mergeOrder, ReducerInput reducerInput) {
+    int valuesPerDigest = 64;
+    int numValues = fanIn * valuesPerDigest;
+    double[] rawValues = new double[numValues];
+    TDigest[] sources = new TDigest[fanIn];
+    for (int digestIndex = 0; digestIndex < fanIn; digestIndex++) {
+      SplittableRandom random = new SplittableRandom(0x5EEDL + digestIndex);
+      double[] sourceValues = new double[valuesPerDigest];
+      for (int valueIndex = 0; valueIndex < valuesPerDigest; valueIndex++) {
+        double value = distribution.value(random.nextDouble());
+        rawValues[digestIndex * valuesPerDigest + valueIndex] = value;
+        sourceValues[valueIndex] = value;
+      }
+      sources[digestIndex] = createReducerSource(sourceValues, compression, reducerInput);
+    }
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, compression, false);
+    TDigest result = TDigestAccumulator.forLegacyAggregation(compression);
+    int[] sourceIndexes = mergeOrder.sourceIndexes(fanIn);
+    for (int sourceIndex : sourceIndexes) {
+      result = function.merge(result, sources[sourceIndex]);
+    }
+
+    Arrays.sort(rawValues);
+    String caseDescription =
+        fanIn + "/" + compression + "/" + distribution + "/" + mergeOrder + "/" + reducerInput;
+    // Compare each merge/input order with its own independent 3.3 K1 reference, allowing one raw observation.
+    LegacyReducerReference reference = LEGACY_REDUCER_RANK_ERRORS.get().get(caseDescription);
+    assertNotNull(reference, "Missing 3.3 oracle for " + caseDescription);
+    assertEquals(inputSha256(rawValues, sourceIndexes), reference.inputSha256(),
+        "Legacy oracle input changed for " + caseDescription);
+    double[] maxRankErrors = reference.rankErrors().clone();
+    for (int i = 0; i < maxRankErrors.length; i++) {
+      maxRankErrors[i] += 1.0 / numValues;
+    }
+    // Serialize before any query or compression so the codec cannot mask an extra reducer merge pass.
+    SerializedResult serializedResult = function.serializeIntermediateResult(result);
+    assertValidReducerResult(result, rawValues, caseDescription, maxRankErrors);
+    Assert.assertEquals(serializedResult.getType(), TDIGEST_TYPE);
+    TDigest roundTripped = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(serializedResult.getBytes());
+    Assert.assertTrue(roundTripped instanceof TDigestAccumulator);
+    for (double quantile : new double[]{0.0, 0.5, 0.75, 0.95, 0.99, 1.0}) {
+      Assert.assertEquals(result.quantile(quantile), roundTripped.quantile(quantile), 1e-15,
+          "Wire round trip changed p" + quantile * 100 + " for " + caseDescription);
+    }
+    getReducerRankErrors(roundTripped, rawValues, caseDescription + "/standard-wire");
+  }
+
+  @Test
+  public void testReducerSerializationBeforeQueryPreservesUniformRankAccuracy() {
+    int fanIn = 16;
+    int valuesPerSource = 2_000;
+    double[] values = new double[fanIn * valuesPerSource];
+    Random random = new Random(9);
+    TDigest result = null;
+    for (int sourceIndex = 0; sourceIndex < fanIn; sourceIndex++) {
+      TDigest source = new TDigestAccumulator(100);
+      for (int valueIndex = 0; valueIndex < valuesPerSource; valueIndex++) {
+        double value = random.nextDouble();
+        values[sourceIndex * valuesPerSource + valueIndex] = value;
+        source.add(value);
+      }
+      source.compress();
+      TDigest decoded = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(source.serialize());
+      if (result == null) {
+        result = decoded;
+      } else {
+        result.add(decoded);
+      }
+    }
+
+    // No read of the reducer state occurs before the common intermediate-result serialization path.
+    TDigest restored = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(result));
+    Arrays.sort(values);
+    double percentile = restored.quantile(0.75);
+    double rankError = Math.max(0.0, Math.max(lowerBound(values, percentile) / (double) values.length - 0.75,
+        0.75 - upperBound(values, percentile) / (double) values.length));
+    assertTrue(rankError <= 0.001, "Serialize-before-query P75 rank error: " + rankError);
+    assertEquals(restored.getTotalWeight(), (double) values.length);
+  }
+
+  @Test
+  public void testReducerMergeEmptyAndSingleton() {
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
+    for (ReducerInput reducerInput : ReducerInput.values()) {
+      TDigest empty = createReducerSource(new double[0], 100, reducerInput);
+      TDigest singleton = createReducerSource(new double[]{42.0}, 100, reducerInput);
+
+      TDigest result = function.merge(empty, singleton);
+      Assert.assertSame(result, singleton);
+      Assert.assertSame(function.merge(result, createReducerSource(new double[0], 100, reducerInput)), result);
+      assertValidReducerResult(result, new double[]{42.0}, "singleton/" + reducerInput);
+    }
+    for (int centroidCount : new int[]{0, 2}) {
+      ByteBuffer emptyBytes = ByteBuffer.allocate(32 + 16 * centroidCount);
+      emptyBytes.putInt(1).putDouble(Double.NaN).putDouble(Double.NaN).putDouble(100.0).putInt(centroidCount);
+      for (int i = 0; i < centroidCount; i++) {
+        emptyBytes.putDouble(0.0).putDouble(Double.NaN);
+      }
+      for (boolean nullHandlingEnabled : new boolean[]{true, false}) {
+        PercentileTDigestAggregationFunction extraction =
+            new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, nullHandlingEnabled);
+        for (TDigest empty : List.of(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(emptyBytes.array()),
+            aggregateSerialized(new byte[][]{emptyBytes.array()}, null, nullHandlingEnabled))) {
+          assertTrue(empty.isEmpty());
+          if (nullHandlingEnabled) {
+            assertNull(extraction.extractFinalResult(empty));
+          } else {
+            assertTrue(Double.isNaN(extraction.extractFinalResult(empty)));
+          }
+        }
+        for (boolean emptyFirst : new boolean[]{true, false}) {
+          TDigest empty = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(emptyBytes.array());
+          TDigest singleton = new TDigestAccumulator(100);
+          singleton.add(42.0);
+          byte[] singletonBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(singleton);
+          TDigest merged = emptyFirst ? extraction.merge(empty, singleton) : extraction.merge(singleton, empty);
+          byte[][] inputs = emptyFirst ? new byte[][]{emptyBytes.array(), singletonBytes}
+              : new byte[][]{singletonBytes, emptyBytes.array()};
+          TDigest aggregate = aggregateSerialized(inputs, null, nullHandlingEnabled);
+          GroupByResultHolder groups = extraction.createGroupByResultHolder(1, 1);
+          extraction.aggregateGroupBySV(2, new int[]{0, 0}, groups,
+              Map.of(EXPRESSION, bytesBlockValSet(inputs, null)));
+          for (TDigest result : List.of(merged, aggregate, extraction.extractGroupByResult(groups, 0))) {
+            assertEquals(result.getTotalWeight(), 1.0);
+            assertEquals(extraction.extractFinalResult(result), 42.0);
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testFractionalMassIsNotEmptyDuringAggregationMergeOrFinalExtraction() {
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 50.0, true);
+    byte[] fractionalBytes = TDigestTestUtils.verbose(new double[]{42.0}, new double[]{0.5});
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(1, holder, Map.of(EXPRESSION,
+        bytesBlockValSet(new byte[][]{fractionalBytes}, null)));
+    TDigest fractional = function.extractAggregationResult(holder);
+    assertEquals(fractional.size(), 0L);
+    assertFalse(fractional.isEmpty());
+    assertEquals(function.extractFinalResult(fractional), 42.0);
+    assertNull(function.extractFinalResult(TDigestAccumulator.forLegacyAggregation(100.0)));
+
+    for (boolean fractionalFirst : new boolean[]{true, false}) {
+      TDigest half = TDigestAccumulator.fromBytes(fractionalBytes);
+      TDigest singleton = TDigestAccumulator.forLegacyAggregation(100.0);
+      singleton.add(42.0);
+      TDigest merged = fractionalFirst ? function.merge(half, singleton) : function.merge(singleton, half);
+      assertEquals(merged.getTotalWeight(), 1.5);
+      assertEquals(function.extractFinalResult(merged), 42.0);
+      TDigest roundTrip =
+          ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(merged));
+      assertEquals(roundTrip.getTotalWeight(), 1.5);
+      assertEquals(function.extractFinalResult(roundTrip), 42.0);
+
+      TDigest healthy = TDigestAccumulator.forLegacyAggregation(100.0);
+      healthy.add(43.0);
+      byte[] healthyBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(healthy);
+      byte[][] inputs = fractionalFirst ? new byte[][]{fractionalBytes, healthyBytes}
+          : new byte[][]{healthyBytes, fractionalBytes};
+      TDigest leaf = aggregateSerialized(inputs, null, false);
+      GroupByResultHolder groups = function.createGroupByResultHolder(1, 1);
+      function.aggregateGroupBySV(2, new int[]{0, 0}, groups, Map.of(EXPRESSION, bytesBlockValSet(inputs, null)));
+      for (TDigest result : List.of(leaf, function.extractGroupByResult(groups, 0))) {
+        TDigest reread = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(result));
+        assertEquals(reread.getTotalWeight(), 1.5);
+        assertEquals(reread.getMin(), 42.0);
+        assertEquals(reread.getMax(), 43.0);
+        assertTrue(Double.isFinite(reread.quantile(0.5)));
+        assertEquals(reread.quantile(0.5), result.quantile(0.5));
+      }
+    }
+  }
+
+  @DataProvider(name = "degradedWeights")
+  public static Object[][] degradedWeights() {
+    return new Object[][]{{-1.0}, {Double.NaN}};
+  }
+
+  @Test(dataProvider = "degradedWeights")
+  public void testDegradedMassIsNotEmptyDuringAggregationMergeOrFinalExtraction(double invalidWeight) {
+    ByteBuffer poisonedBytes = ByteBuffer.allocate(64);
+    poisonedBytes.putInt(1).putDouble(1.0).putDouble(2.0).putDouble(100.0).putInt(2)
+        .putDouble(1.0).putDouble(1.0).putDouble(invalidWeight).putDouble(2.0);
+    TDigest poisoned = TDigestAccumulator.fromBytes(poisonedBytes.array());
+    assertEquals(poisoned.getTotalWeight(), 1.0 + invalidWeight);
+    assertFalse(poisoned.isEmpty());
+    for (boolean nullHandlingEnabled : new boolean[]{true, false}) {
+      PercentileTDigestAggregationFunction extraction =
+          new PercentileTDigestAggregationFunction(EXPRESSION, 50.0, nullHandlingEnabled);
+      assertTrue(Double.isNaN(extraction.extractFinalResult(poisoned)));
+      TDigest empty = TDigestAccumulator.forLegacyAggregation(100.0);
+      if (nullHandlingEnabled) {
+        assertNull(extraction.extractFinalResult(empty));
+      } else {
+        assertTrue(Double.isNaN(extraction.extractFinalResult(empty)));
+      }
+      byte[] emptyBytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(empty);
+      for (boolean poisonedFirst : new boolean[]{true, false}) {
+        byte[][] inputs = poisonedFirst ? new byte[][]{poisonedBytes.array(), emptyBytes}
+            : new byte[][]{emptyBytes, poisonedBytes.array()};
+        TDigest aggregate = aggregateSerialized(inputs, null, nullHandlingEnabled);
+        GroupByResultHolder groups = extraction.createGroupByResultHolder(1, 1);
+        extraction.aggregateGroupBySV(2, new int[]{0, 0}, groups,
+            Map.of(EXPRESSION, bytesBlockValSet(inputs, null)));
+        for (TDigest result : List.of(aggregate, extraction.extractGroupByResult(groups, 0))) {
+          assertTrue(Double.isNaN(extraction.extractFinalResult(result)));
+          assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(result), poisonedBytes.array());
+        }
+      }
+      TDigest singleton = TDigestAccumulator.forLegacyAggregation(100.0);
+      singleton.add(42.0);
+      assertThrows(IllegalArgumentException.class, () -> extraction.merge(poisoned, singleton));
+      assertThrows(IllegalArgumentException.class, () -> extraction.merge(singleton, poisoned));
+      assertEquals(singleton.getTotalWeight(), 1.0);
+      assertEquals(ObjectSerDeUtils.TDIGEST_SER_DE.serialize(poisoned), poisonedBytes.array());
+    }
+  }
+
+  @Test(dataProvider = "compressionFactors")
+  public void testCustomCompression(int compression) {
+    int numRows = 20_003;
+    SplittableRandom random = new SplittableRandom(42);
+    double[] values = new double[numRows];
+    for (int i = 0; i < numRows; i++) {
+      values[i] = random.nextDouble();
+    }
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, compression, false);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(numRows, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, values)));
+    TDigest result = function.extractAggregationResult(resultHolder);
+
+    Assert.assertEquals(result.size(), numRows);
+    Assert.assertEquals(result.compression(), compression);
+    double[] sortedValues = values.clone();
+    Arrays.sort(sortedValues);
+    double actual = function.extractFinalResult(result);
+    double maxAbsoluteError = compression == 10 ? 0.03 : 0.02;
+    Assert.assertEquals(actual, sortedValues[numRows * 75 / 100], maxAbsoluteError);
+
+    // Frozen P75 from independent tdunning 3.3 K1 over these exact seeded raw values.
+    double reference = switch (compression) {
+      case 10 -> 0.7440263683309334;
+      case 50 -> 0.7480218174152883;
+      case 100 -> 0.7476447224992978;
+      case 200 -> 0.7474362129360227;
+      case 1_000 -> 0.7471732639922914;
+      case 10_000 -> 0.7470900970758036;
+      default -> throw new IllegalArgumentException("Missing 3.3 oracle for compression " + compression);
+    };
+    assertEquals(actual, reference, 0.001,
+        "Pinot accumulator diverges from t-digest 3.3 K1 at compression " + compression);
+  }
+
+  @Test
+  public void testRawAndDirectLowCompressionHeavyTailAccuracy() {
+    int numDigests = 32;
+    int valuesPerDigest = 512;
+    int compression = 20;
+    int numValues = numDigests * valuesPerDigest;
+    double[] values = new double[numValues];
+    byte[][] serializedDigests = new byte[numDigests][];
+    for (int digestIndex = 0; digestIndex < numDigests; digestIndex++) {
+      TDigest digest = TDigestAccumulator.forLegacyAggregation(compression);
+      SplittableRandom random = new SplittableRandom(0x5EEDL + digestIndex);
+      for (int valueIndex = 0; valueIndex < valuesPerDigest; valueIndex++) {
+        double value = ReducerDistribution.HEAVY_TAIL.value(random.nextDouble());
+        values[digestIndex * valuesPerDigest + valueIndex] = value;
+        digest.add(value);
+      }
+      serializedDigests[digestIndex] = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(digest);
+    }
+
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, compression, false);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(values.length, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, values)));
+    TDigest rawResult = function.extractAggregationResult(resultHolder);
+    TDigest directResult = aggregateSerialized(serializedDigests, null, false);
+
+    Arrays.sort(values);
+    assertValidReducerResult(rawResult, values, "raw/20/heavy-tail", 0.06);
+    assertValidReducerResult(directResult, values, "direct/20/heavy-tail", 0.06);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = "Cannot add NaN to t-digest")
+  public void testNaNRejected() {
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, false);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(3, resultHolder,
+        Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, new double[]{1.0, Double.NaN, 2.0})));
+  }
 
   @Test
   public void testCanUseStarTreeDefaultCompression() {
     PercentileTDigestAggregationFunction function = new PercentileTDigestAggregationFunction(
-        ExpressionContext.forIdentifier("col"), 95, false);
+        EXPRESSION, 95, false);
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY, "100")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY, 100)));
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY, "200")));
 
-    function = new PercentileTDigestAggregationFunction(ExpressionContext.forIdentifier("col"), 99, 100, true);
+    function = new PercentileTDigestAggregationFunction(EXPRESSION, 99, 100, true);
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY, "100")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY, 100)));
@@ -47,11 +1348,393 @@ public class PercentileTDigestAggregationFunctionTest {
   @Test
   public void testCanUseStarTreeCustomCompression() {
     PercentileTDigestAggregationFunction function = new PercentileTDigestAggregationFunction(
-        ExpressionContext.forIdentifier("col"), 95, 200, false);
+        EXPRESSION, 95, 200, false);
 
     Assert.assertFalse(function.canUseStarTree(Map.of()));
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY, "100")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY, "200")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY, 200)));
+  }
+
+  private static byte[][] createSerializedDigests(int numDigests, int valuesPerDigest, double compression,
+      IntPredicate useSmallEncoding) {
+    byte[][] serializedDigests = new byte[numDigests][];
+    for (int digestIndex = 0; digestIndex < numDigests; digestIndex++) {
+      TDigest digest = TDigestAccumulator.forLegacyAggregation(compression);
+      for (int valueIndex = 0; valueIndex < valuesPerDigest; valueIndex++) {
+        digest.add(serializedValue(digestIndex, valueIndex, numDigests, valuesPerDigest));
+      }
+      if (useSmallEncoding.test(digestIndex)) {
+        serializedDigests[digestIndex] = TDigestTestUtils.compactFixture(digest);
+      } else {
+        serializedDigests[digestIndex] = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(digest);
+      }
+    }
+    return serializedDigests;
+  }
+
+  private static void assertPendingSerializedDigestOwnsInputBytes(boolean reusableInput) {
+    byte[] bytes = PercentileRawTDigestAggregationFunctionTest.createVerboseUnitCentroidDigest(3, 20.0);
+    byte[] expected = bytes.clone();
+    TDigestAccumulator accumulator;
+    if (reusableInput) {
+      SerializedTDigestInput input =
+          new SerializedTDigestInput();
+      input.reset(bytes);
+      accumulator = TDigestAccumulator.forReduction(input.getCompression());
+      accumulator.addSerializedTDigest(input);
+    } else {
+      accumulator = TDigestAccumulator.forReduction(TDigestCodec.readCompression(bytes));
+      accumulator.addSerializedTDigest(bytes);
+    }
+
+    Arrays.fill(bytes, (byte) 0);
+    Assert.assertEquals(accumulator.size(), 3L);
+    Assert.assertEquals(accumulator.centroidCount(), 3);
+    Assert.assertEquals(accumulator.getMin(), 0.0);
+    Assert.assertEquals(accumulator.getMax(), 2.0);
+    Assert.assertEquals(accumulator.serialize(), expected);
+  }
+
+  private static double serializedValue(int digestIndex, int valueIndex, int numDigests, int valuesPerDigest) {
+    return (valueIndex * (double) numDigests + digestIndex) / (numDigests * (double) valuesPerDigest);
+  }
+
+  private static TDigest aggregateSerialized(byte[][] values, RoaringBitmap nullBitmap, boolean nullHandlingEnabled) {
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, nullHandlingEnabled);
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    function.aggregate(values.length, resultHolder, Map.of(EXPRESSION, bytesBlockValSet(values, nullBitmap)));
+    return function.extractAggregationResult(resultHolder);
+  }
+
+  private static void assertSerializedAccumulatorState(GroupByResultHolder resultHolder, int groupKey) {
+    Assert.assertTrue(resultHolder.getResult(groupKey) instanceof TDigestAccumulator);
+  }
+
+  private static void assertGroupResult(PercentileTDigestAggregationFunction function,
+      GroupByResultHolder resultHolder, int groupKey, long expectedSize, double expectedCompression,
+      double expectedMin, double expectedMax) {
+    TDigest result = function.extractGroupByResult(resultHolder, groupKey);
+    Assert.assertTrue(result instanceof TDigestAccumulator);
+    Assert.assertEquals(result.size(), expectedSize);
+    Assert.assertEquals(result.compression(), expectedCompression);
+    Assert.assertEquals(result.getMin(), expectedMin);
+    Assert.assertEquals(result.getMax(), expectedMax);
+    Assert.assertEquals(result.quantile(0.75), 0.75, 0.02);
+  }
+
+  private record LegacyReducerReference(String inputSha256, double[] rankErrors) {
+  }
+
+  private static String inputSha256(double[] sortedValues, int[] sourceIndexes) {
+    ByteBuffer bytes = ByteBuffer.allocate(Double.BYTES * sortedValues.length + Integer.BYTES * sourceIndexes.length);
+    for (double value : sortedValues) {
+      bytes.putDouble(value);
+    }
+    for (int sourceIndex : sourceIndexes) {
+      bytes.putInt(sourceIndex);
+    }
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.array()));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private static Map<String, LegacyReducerReference> loadLegacyReducerRankErrors() {
+    Map<String, LegacyReducerReference> errors = new HashMap<>();
+    boolean mergeOrdersVerified = false;
+    boolean reducerInputsVerified = false;
+    try {
+      for (String line : Resources.readLines(Resources.getResource("data/tdigest-3.3-k1-rank-errors.csv"),
+          StandardCharsets.UTF_8)) {
+        if (line.startsWith("# mergeOrders=")) {
+          assertEquals(line.substring("# mergeOrders=".length()),
+              String.join(",", Arrays.stream(MergeOrder.values()).map(Enum::name).toList()),
+              "Regenerate the legacy oracle for changed merge orders");
+          mergeOrdersVerified = true;
+        } else if (line.startsWith("# reducerInputs=")) {
+          assertEquals(line.substring("# reducerInputs=".length()),
+              String.join(",", Arrays.stream(ReducerInput.values()).map(Enum::name).toList()),
+              "Regenerate the legacy oracle for changed reducer inputs");
+          reducerInputsVerified = true;
+        } else if (!line.startsWith("#") && !line.isBlank()) {
+          String[] fields = line.split(",", -1);
+          assertEquals(fields.length, 8, "Invalid legacy oracle row: " + line);
+          assertTrue(fields[1].matches("[0-9a-f]{64}"), "Invalid legacy oracle input fingerprint: " + line);
+          double[] rankErrors = Arrays.stream(fields).skip(2).mapToDouble(Double::parseDouble).toArray();
+          for (double error : rankErrors) {
+            assertTrue(Double.isFinite(error) && error >= 0.0 && error <= 1.0,
+                "Invalid legacy oracle rank error for " + fields[0]);
+          }
+          assertNull(errors.put(fields[0], new LegacyReducerReference(fields[1], rankErrors)),
+              "Duplicate legacy oracle key: " + fields[0]);
+        }
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    assertTrue(mergeOrdersVerified && reducerInputsVerified, "Missing legacy oracle test dimensions");
+    assertEquals(errors.size(), reducerMergeCases().length, "Missing legacy oracle cases");
+    return Map.copyOf(errors);
+  }
+
+  private static void assertValidReducerResult(TDigest result, double[] sortedValues, String caseDescription) {
+    assertValidReducerResult(result, sortedValues, caseDescription, 0.02);
+  }
+
+  private static void assertValidReducerResult(TDigest result, double[] sortedValues, String caseDescription,
+      double maxRankError) {
+    double[] maxRankErrors = new double[6];
+    Arrays.fill(maxRankErrors, maxRankError);
+    assertValidReducerResult(result, sortedValues, caseDescription, maxRankErrors);
+  }
+
+  private static void assertValidReducerResult(TDigest result, double[] sortedValues, String caseDescription,
+      double[] maxRankErrors) {
+    double[] rankErrors = getReducerRankErrors(result, sortedValues, caseDescription);
+    double[] quantiles = {0.0, 0.5, 0.75, 0.95, 0.99, 1.0};
+    for (int i = 0; i < quantiles.length; i++) {
+      Assert.assertTrue(rankErrors[i] <= maxRankErrors[i],
+          "Rank error " + rankErrors[i] + " exceeds the empirical rank envelope for p"
+              + quantiles[i] * 100 + " in " + caseDescription);
+    }
+  }
+
+  private static double[] getReducerRankErrors(TDigest result, double[] sortedValues, String caseDescription) {
+    // Compare final public-compression results with the independently generated legacy envelope.
+    result.compress();
+    Assert.assertEquals(result.size(), sortedValues.length, "Total weight differs for " + caseDescription);
+    double centroidWeight = 0.0;
+    double previousMean = Double.NEGATIVE_INFINITY;
+    for (Centroid centroid : result.centroids()) {
+      Assert.assertTrue(Double.isFinite(centroid.mean()), "Non-finite centroid mean for " + caseDescription);
+      Assert.assertTrue(centroid.weight() > 0, "Non-positive centroid weight for " + caseDescription);
+      Assert.assertTrue(centroid.mean() + 1e-12 >= previousMean,
+          "Centroids are not sorted for " + caseDescription);
+      centroidWeight += centroid.weight();
+      previousMean = centroid.mean();
+    }
+    Assert.assertEquals(centroidWeight, (double) sortedValues.length, 1e-9,
+        "Centroid weights do not sum to the input size for " + caseDescription);
+
+    double[] quantiles = {0.0, 0.5, 0.75, 0.95, 0.99, 1.0};
+    double[] rankErrors = new double[quantiles.length];
+    double previousQuantile = Double.NEGATIVE_INFINITY;
+    for (int i = 0; i < quantiles.length; i++) {
+      double quantile = quantiles[i];
+      double value = result.quantile(quantile);
+      Assert.assertTrue(Double.isFinite(value), "Non-finite p" + quantile * 100 + " for " + caseDescription);
+      Assert.assertTrue(value >= previousQuantile, "Quantiles are not monotonic for " + caseDescription);
+      previousQuantile = value;
+      if (quantile == 0.0) {
+        Assert.assertEquals(value, sortedValues[0], "Incorrect minimum for " + caseDescription);
+      } else if (quantile == 1.0) {
+        Assert.assertEquals(value, sortedValues[sortedValues.length - 1],
+            "Incorrect maximum for " + caseDescription);
+      } else {
+        double rankValue = snapToObservedValue(sortedValues, value);
+        int lowerRank = lowerBound(sortedValues, rankValue);
+        int upperRank = upperBound(sortedValues, rankValue);
+        rankErrors[i] = Math.max(0.0, Math.max(lowerRank / (double) sortedValues.length - quantile,
+            quantile - upperRank / (double) sortedValues.length));
+      }
+    }
+    return rankErrors;
+  }
+
+  private static double snapToObservedValue(double[] sortedValues, double value) {
+    int insertionPoint = lowerBound(sortedValues, value);
+    if (insertionPoint < sortedValues.length && nearlyEqual(value, sortedValues[insertionPoint])) {
+      return sortedValues[insertionPoint];
+    }
+    if (insertionPoint > 0 && nearlyEqual(value, sortedValues[insertionPoint - 1])) {
+      return sortedValues[insertionPoint - 1];
+    }
+    return value;
+  }
+
+  private static boolean nearlyEqual(double first, double second) {
+    return Math.abs(first - second) <= 1e-12 * Math.max(1.0, Math.max(Math.abs(first), Math.abs(second)));
+  }
+
+  private static void assertDuplicateInfinityResult(TDigest result, long expectedSize) {
+    Assert.assertEquals(result.size(), expectedSize);
+    Assert.assertEquals(result.getMin(), Double.NEGATIVE_INFINITY);
+    Assert.assertEquals(result.getMax(), Double.POSITIVE_INFINITY);
+    for (Centroid centroid : result.centroids()) {
+      Assert.assertFalse(Double.isNaN(centroid.mean()));
+      Assert.assertTrue(centroid.weight() > 0);
+    }
+    Assert.assertEquals(result.quantile(0.0), Double.NEGATIVE_INFINITY);
+    Assert.assertEquals(result.quantile(0.5), 0.0);
+    Assert.assertEquals(result.quantile(1.0), Double.POSITIVE_INFINITY);
+  }
+
+  private static TDigest createReducerSource(double[] values, int compression, ReducerInput reducerInput) {
+    PercentileTDigestAggregationFunction function =
+        new PercentileTDigestAggregationFunction(EXPRESSION, 75.0, compression, false);
+    if (reducerInput == ReducerInput.SERVER_LOCAL) {
+      AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+      function.aggregate(values.length, resultHolder,
+          Map.of(EXPRESSION, SyntheticBlockValSets.Double.create(null, values)));
+      return function.extractAggregationResult(resultHolder);
+    }
+
+    TDigest digest = TDigestAccumulator.forLegacyAggregation(compression);
+    for (double value : values) {
+      digest.add(value);
+    }
+    byte[] bytes = ObjectSerDeUtils.TDIGEST_SER_DE.serialize(digest);
+    return function.deserializeIntermediateResult(new CustomObject(TDIGEST_TYPE, ByteBuffer.wrap(bytes)));
+  }
+
+  private static int lowerBound(double[] sortedValues, double value) {
+    int low = 0;
+    int high = sortedValues.length;
+    while (low < high) {
+      int middle = (low + high) >>> 1;
+      if (sortedValues[middle] < value) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return low;
+  }
+
+  private static int upperBound(double[] sortedValues, double value) {
+    int low = 0;
+    int high = sortedValues.length;
+    while (low < high) {
+      int middle = (low + high) >>> 1;
+      if (sortedValues[middle] <= value) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return low;
+  }
+
+  private enum ReducerDistribution {
+    UNIFORM {
+      @Override
+      double value(double unitValue) {
+        return unitValue;
+      }
+    },
+    SKEWED {
+      @Override
+      double value(double unitValue) {
+        return StrictMath.pow(unitValue, 8.0);
+      }
+    },
+    HEAVY_TAIL {
+      @Override
+      double value(double unitValue) {
+        return StrictMath.pow(1.0 - 0.999 * unitValue, -1.5) - 1.0;
+      }
+    },
+    BIMODAL {
+      @Override
+      double value(double unitValue) {
+        return unitValue < 0.5 ? 0.1 + 0.2 * unitValue : 0.7 + 0.2 * unitValue;
+      }
+    },
+    DUPLICATE_HEAVY {
+      @Override
+      double value(double unitValue) {
+        return unitValue < 0.7 ? 0.1 : unitValue < 0.9 ? 0.5 : 0.9;
+      }
+    };
+
+    abstract double value(double unitValue);
+  }
+
+  private enum ReducerInput {
+    SERVER_LOCAL,
+    DISTRIBUTED
+  }
+
+  private static void setAccumulatorField(TDigestAccumulator accumulator, String name, Object value)
+      throws ReflectiveOperationException {
+    Field field = TDigestAccumulator.class.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(accumulator, value);
+  }
+
+  private static Object getAccumulatorField(TDigestAccumulator accumulator, String name)
+      throws ReflectiveOperationException {
+    Field field = TDigestAccumulator.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(accumulator);
+  }
+
+  private enum MergeOrder {
+    ORIGINAL {
+      @Override
+      int[] sourceIndexes(int fanIn) {
+        int[] indexes = new int[fanIn];
+        for (int i = 0; i < fanIn; i++) {
+          indexes[i] = i;
+        }
+        return indexes;
+      }
+    },
+    REVERSED {
+      @Override
+      int[] sourceIndexes(int fanIn) {
+        int[] indexes = ORIGINAL.sourceIndexes(fanIn);
+        for (int i = 0; i < fanIn / 2; i++) {
+          int otherIndex = fanIn - i - 1;
+          int value = indexes[i];
+          indexes[i] = indexes[otherIndex];
+          indexes[otherIndex] = value;
+        }
+        return indexes;
+      }
+    },
+    RANDOMIZED {
+      @Override
+      int[] sourceIndexes(int fanIn) {
+        int[] indexes = ORIGINAL.sourceIndexes(fanIn);
+        SplittableRandom random = new SplittableRandom(0xBADC0FFEE0DDF00DL + fanIn);
+        for (int i = indexes.length - 1; i > 0; i--) {
+          int otherIndex = random.nextInt(i + 1);
+          int value = indexes[i];
+          indexes[i] = indexes[otherIndex];
+          indexes[otherIndex] = value;
+        }
+        return indexes;
+      }
+    };
+
+    abstract int[] sourceIndexes(int fanIn);
+  }
+
+  private static BlockValSet bytesBlockValSet(byte[][] values, RoaringBitmap nullBitmap) {
+    return new SyntheticBlockValSets.Base() {
+      @Override
+      public RoaringBitmap getNullBitmap() {
+        return nullBitmap;
+      }
+
+      @Override
+      public DataType getValueType() {
+        return DataType.BYTES;
+      }
+
+      @Override
+      public boolean isSingleValue() {
+        return true;
+      }
+
+      @Override
+      public byte[][] getBytesValuesSV() {
+        return values;
+      }
+    };
   }
 }

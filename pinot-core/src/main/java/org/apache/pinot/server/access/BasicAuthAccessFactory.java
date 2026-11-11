@@ -20,12 +20,17 @@ package org.apache.pinot.server.access;
 
 import io.netty.channel.ChannelHandlerContext;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.ws.rs.NotAuthorizedException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -35,21 +40,21 @@ public class BasicAuthAccessFactory implements AccessControlFactory {
   private static final String PREFIX = "principals";
 
   private static final String AUTHORIZATION_KEY = "authorization";
+  private static final String ADMIN_PERMISSION = "admin";
 
   private AccessControl _accessControl;
 
   @Override
   public void init(PinotConfiguration configuration) {
-    _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
+    _accessControl = new BasicAuthAccessControl(
+        BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
   public AccessControl create() {
     return _accessControl;
   }
 
-  /**
-   * Access Control using metadata-based basic grpc authentication
-   */
+  /// Access Control using metadata-based basic grpc authentication
   private static class BasicAuthAccessControl implements AccessControl {
     private final Map<String, BasicAuthPrincipal> _token2principal;
 
@@ -63,29 +68,50 @@ public class BasicAuthAccessFactory implements AccessControlFactory {
     }
 
     @Override
+    public AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+      Optional<BasicAuthPrincipal> principal = getPrincipal(requesterIdentity);
+      if (!principal.isPresent()) {
+        throw new NotAuthorizedException("Basic");
+      }
+      return new BasicAuthorizationResultImpl(principal.get().hasExplicitPermission(ADMIN_PERMISSION));
+    }
+
+    @Override
     public boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName) {
-      Collection<String> tokens = getTokens(requesterIdentity);
-      return tokens.stream()
-          .map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
-          .map(_token2principal::get)
-          .filter(Objects::nonNull)
-          .findFirst()
-          // existence of principal required to allow access
+      return getPrincipal(requesterIdentity)
           .map(principal -> StringUtils.isEmpty(tableName) || principal.hasTable(
               TableNameBuilder.extractRawTableName(tableName)))
           .orElse(false);
     }
 
+    private Optional<BasicAuthPrincipal> getPrincipal(RequesterIdentity requesterIdentity) {
+      for (String token : getTokens(requesterIdentity)) {
+        String normalizedToken;
+        try {
+          normalizedToken = BasicAuthTokenUtils.normalizeBase64Token(token);
+        } catch (IllegalArgumentException e) {
+          continue;
+        }
+        BasicAuthPrincipal principal = _token2principal.get(normalizedToken);
+        if (principal != null) {
+          return Optional.of(principal);
+        }
+      }
+      return Optional.empty();
+    }
+
     private Collection<String> getTokens(RequesterIdentity requesterIdentity) {
+      Collection<String> tokens;
       if (requesterIdentity instanceof GrpcRequesterIdentity) {
         GrpcRequesterIdentity identity = (GrpcRequesterIdentity) requesterIdentity;
-        return identity.getGrpcMetadata().get(AUTHORIZATION_KEY);
-      }
-      if (requesterIdentity instanceof HttpRequesterIdentity) {
+        tokens = identity.getGrpcMetadata().get(AUTHORIZATION_KEY);
+      } else if (requesterIdentity instanceof HttpRequesterIdentity) {
         HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
-        return identity.getHttpHeaders().get(AUTHORIZATION_KEY);
+        tokens = identity.getHeaderValues(AUTHORIZATION_KEY);
+      } else {
+        return List.of();
       }
-      throw new UnsupportedOperationException("GrpcRequesterIdentity or HttpRequesterIdentity is required");
+      return tokens != null ? tokens : List.of();
     }
   }
 }

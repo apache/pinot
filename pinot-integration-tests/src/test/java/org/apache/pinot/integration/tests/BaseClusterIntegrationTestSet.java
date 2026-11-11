@@ -17,36 +17,42 @@
  * under the License.
  */
 package org.apache.pinot.integration.tests;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URL;
+import java.sql.Timestamp;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.http.HttpStatus;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.client.admin.PinotAdminException;
+import org.apache.pinot.client.admin.PinotAdminNotFoundException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.ServerRebalanceJobStatusResponse;
+import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
-import org.apache.pinot.controller.api.resources.TableViews;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
+import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
+import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -55,6 +61,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -71,10 +78,9 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Shared set of common tests for cluster integration tests.
- * <p>To enable the test, override it and add @Test annotation.
- */
+/// Shared set of common tests for cluster integration tests.
+///
+/// To enable the test, override it and add @Test annotation.
 public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTestSet.class);
 
@@ -88,53 +94,42 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     setUseMultiStageQueryEngine(false);
   }
 
-  /**
-   * Can be overridden to change default setting
-   */
+  /// Can be overridden to change default setting
   protected String getQueryFileName() {
     return DEFAULT_QUERY_FILE_NAME;
   }
 
-  /**
-   * Can be overridden to change default setting
-   */
+  /// Can be overridden to change default setting
   protected int getNumQueriesToGenerate() {
     return DEFAULT_NUM_QUERIES_TO_GENERATE;
   }
 
-  /**
-   * Test hard-coded queries.
-   * @throws Exception
-   */
+  /// Test hard-coded queries.
+  /// @throws Exception
   public void testHardcodedQueries()
       throws Exception {
     testHardcodedQueriesCommon();
+    testHardcodedIdSetQueries();
     if (useMultiStageQueryEngine()) {
       testHardcodedQueriesV2();
-    } else {
-      testHardCodedQueriesV1();
     }
   }
 
-  /**
-   * Test hardcoded queries.
-   * <p>NOTE:
-   * <p>For queries with <code>LIMIT</code>, need to remove limit or add <code>LIMIT 10000</code> to the H2 SQL query
-   * because the comparison only works on exhausted result with at most 10000 rows.
-   * <ul>
-   *   <li>
-   *     Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code>
-   *   </li>
-   * </ul>
-   * <p>For group-by queries, need to add group-by columns to the select clause for H2 queries.
-   * <ul>
-   *   <li>
-   *     Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code>
-   *   </li>
-   * </ul>
-   * TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
-   *  This list is very basic right now (aggregations only) and needs to be enriched
-   */
+  /// Test hardcoded queries.
+  ///
+  /// NOTE:
+  ///
+  /// For queries with `LIMIT`, need to remove limit or add `LIMIT 10000` to the H2 SQL query
+  /// because the comparison only works on exhausted result with at most 10000 rows.
+  ///
+  /// - Eg. `SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]`
+  ///
+  /// For group-by queries, need to add group-by columns to the select clause for H2 queries.
+  ///
+  /// - Eg. `SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]`
+  ///
+  /// TODO: Selection queries, Aggregation Group By queries, Order By, Distinct
+  ///  This list is very basic right now (aggregations only) and needs to be enriched
   private void testHardcodedQueriesCommon()
       throws Exception {
     String query;
@@ -367,9 +362,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query, h2Query);
   }
 
-  private void testHardCodedQueriesV1()
+  /// Tests IN_ID_SET and IN_SUBQUERY, which are not standard SQL.
+  private void testHardcodedIdSetQueries()
       throws Exception {
-    // Non-Standard SQL syntax:
     // IN_ID_SET
     {
       IdSet idSet = IdSets.create(FieldSpec.DataType.LONG);
@@ -406,9 +401,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  /**
-   * Test hardcoded queries on server partitioned data (all the segments for a partition is served by a single server).
-   */
+  /// Test hardcoded queries on server partitioned data (all the segments for a partition is served by a single server).
   public void testHardcodedServerPartitionedSqlQueries()
       throws Exception {
     // IN_PARTITIONED_SUBQUERY
@@ -430,11 +423,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  /**
-   * Test to ensure that broker response contains expected stats
-   *
-   * @throws Exception
-   */
+  /// Test to ensure that broker response contains expected stats
+  ///
+  /// @throws Exception
   public void testBrokerResponseMetadata()
       throws Exception {
     String[] queries = new String[]{
@@ -476,11 +467,48 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId = 5 limit 50");
     getPinotConnection().execute(
         "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId > 19998 limit 50");
+
+    // Segment metadata virtual columns. This method is the only place they are exercised against a table that can
+    // have CONSUMING segments, so assert the results rather than just checking that nothing throws.
+    long numTotalDocs = getCountStarResult();
+
+    // $totalDocs is the number of documents stored in the segment. On a hybrid table the broker's time boundary can
+    // hide some of them, so a segment's $totalDocs is at least the number of rows the query sees from it, never less.
+    ResultSet perSegment = getPinotConnection().execute(
+            "select $segmentName, max($totalDocs), count(*) from mytable group by $segmentName limit 10000")
+        .getResultSet(0);
+    assertTrue(perSegment.getRowCount() > 0);
+    long visibleRows = 0;
+    for (int i = 0; i < perSegment.getRowCount(); i++) {
+      String segmentName = perSegment.getString(i, 0);
+      // MAX()/COUNT() render as floating point values in the single-stage engine, so read them as doubles in both
+      long totalDocsInSegment = (long) Double.parseDouble(perSegment.getString(i, 1));
+      long rowsFromSegment = (long) Double.parseDouble(perSegment.getString(i, 2));
+      assertTrue(totalDocsInSegment > 0, "Unexpected $totalDocs: " + totalDocsInSegment + " for: " + segmentName);
+      assertTrue(totalDocsInSegment >= rowsFromSegment,
+          "$totalDocs: " + totalDocsInSegment + " is below the " + rowsFromSegment + " rows returned by: "
+              + segmentName);
+      visibleRows += rowsFromSegment;
+    }
+    assertEquals(visibleRows, numTotalDocs, "Grouping by $segmentName should cover every row exactly once");
+
+    // Every segment - CONSUMING included - is created with a creation time, so none of them falls back to the epoch
+    // placeholder used when the metadata is unavailable
+    ResultSet creationTimes = getPinotConnection()
+        .execute("select $segmentName, $creationTime from mytable group by $segmentName, $creationTime limit 10000")
+        .getResultSet(0);
+    assertTrue(creationTimes.getRowCount() > 0);
+    for (int i = 0; i < creationTimes.getRowCount(); i++) {
+      String creationTime = creationTimes.getString(i, 1);
+      assertTrue(Timestamp.valueOf(creationTime).getTime() > 0,
+          "Unexpected $creationTime: " + creationTime + " for segment: " + creationTimes.getString(i, 0));
+    }
+
+    // Selecting them must not fail on any segment type
+    getPinotConnection().execute("select $creationTime, $startTime, $endTime, $totalDocs, $crc from mytable limit 50");
   }
 
-  /**
-   * Test queries from the query file.
-   */
+  /// Test queries from the query file.
   public void testQueriesFromQueryFile()
       throws Exception {
     InputStream inputStream =
@@ -516,11 +544,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  /**
-   * Test queries generated by query generator.
-   *
-   * @throws Exception
-   */
+  /// Test queries generated by query generator.
+  ///
+  /// @throws Exception
   public void testGeneratedQueries()
       throws Exception {
     // default test with MV columns, without using multistage engine
@@ -549,11 +575,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  /**
-   * Test if routing table get updated when instance is shutting down.
-   *
-   * @throws Exception
-   */
+  /// Test if routing table get updated when instance is shutting down.
+  ///
+  /// @throws Exception
   public void testInstanceShutdown()
       throws Exception {
     List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
@@ -603,6 +627,111 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       // Check that it is in the routing table
       checkForInstanceInRoutingTable(instance, true);
     }
+  }
+
+  /// Test that:
+  ///
+  /// 1. setting `queriesDisabled` via the controller API removes and re-adds a server from broker routing;
+  /// 2. concurrent field-scoped updates to `shutdownInProgress` do not clobber `queriesDisabled`;
+  /// 3. a full-record `PUT /instances/{name}` (updateInstance) does NOT clobber the operational
+  ///    `queriesDisabled` flag, even when the request body's default value is `false`.
+  public void testQueriesDisabled()
+      throws Exception {
+    List<String> instances = _helixAdmin.getInstancesInCluster(getHelixClusterName());
+    // Iterate over all servers to find one that actually appears in the routing table for {@code getTableName()}.
+    // Picking the first server unconditionally can be flaky when multiple servers exist with different tags
+    // (e.g. hybrid clusters with offline/realtime tenants).
+    String serverInstance = null;
+    for (String candidate : instances) {
+      if (!InstanceTypeUtils.isServer(candidate)) {
+        continue;
+      }
+      if (isInstanceInRoutingTable(candidate)) {
+        serverInstance = candidate;
+        break;
+      }
+    }
+    assertNotNull(serverInstance,
+        "No server instance found in routing table for table: " + getTableName() + "; instances: " + instances);
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, getHelixClusterName())
+            .forParticipant(serverInstance).build();
+    try {
+      // Server should be in routing initially
+      checkForInstanceInRoutingTable(serverInstance, true);
+
+      // Disable query routing via the controller API
+      getOrCreateAdminClient().getInstanceClient().updateInstanceState(serverInstance, "QUERIES_DISABLE");
+
+      // Server should leave routing
+      checkForInstanceInRoutingTable(serverInstance, false);
+
+      // Re-enable query routing
+      getOrCreateAdminClient().getInstanceClient().updateInstanceState(serverInstance, "QUERIES_ENABLE");
+
+      // Server should re-enter routing
+      checkForInstanceInRoutingTable(serverInstance, true);
+
+      // Interleaving test: set queriesDisabled, then set shutdownInProgress, then clear shutdownInProgress.
+      // queriesDisabled must still be set (i.e. the server must remain out of routing) because we use
+      // field-scoped writes that do not clobber each other.
+      getOrCreateAdminClient().getInstanceClient().updateInstanceState(serverInstance, "QUERIES_DISABLE");
+      checkForInstanceInRoutingTable(serverInstance, false);
+
+      _helixAdmin.setConfig(scope,
+          Map.of(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.TRUE.toString()));
+      checkForInstanceInRoutingTable(serverInstance, false);
+
+      _helixAdmin.setConfig(scope,
+          Map.of(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString()));
+
+      // queriesDisabled was set via a separate field-scoped write, so the server must still be out of routing
+      checkForInstanceInRoutingTable(serverInstance, false);
+
+      // Full-record updateInstance test: round-trip the live config through PUT /instances/{name} with the
+      // request body's {@code queriesDisabled} defaulted to false. The operational flag must NOT be cleared,
+      // since it is owned by /state?state=QUERIES_DISABLE|QUERIES_ENABLE.
+      InstanceConfig liveInstanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), serverInstance);
+      Instance instanceBody = InstanceUtils.toInstance(liveInstanceConfig);
+      // Force the request-body flag to false to simulate an operator updating host/tags/ports without realizing
+      // that queriesDisabled is operationally owned by a different API.
+      Instance updateBody = new Instance(instanceBody.getHost(), instanceBody.getPort(), instanceBody.getType(),
+          instanceBody.getTags(), instanceBody.getPools(), instanceBody.getGrpcPort(), instanceBody.getAdminPort(),
+          instanceBody.getQueryServicePort(), instanceBody.getQueryMailboxPort(), false);
+      getOrCreateAdminClient().getInstanceClient().updateInstance(serverInstance, updateBody.toJsonString());
+      // Operational flag must survive a request-body-driven update.
+      checkForInstanceInRoutingTable(serverInstance, false);
+    } finally {
+      // Defensive cleanup: restore the server to the routing-eligible state regardless of which assertion failed.
+      // Each cleanup step is wrapped so a primary assertion failure isn't masked by a cleanup throw.
+      try {
+        getOrCreateAdminClient().getInstanceClient().updateInstanceState(serverInstance, "QUERIES_ENABLE");
+      } catch (Exception ignored) {
+      }
+      try {
+        _helixAdmin.setConfig(scope,
+            Map.of(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString()));
+      } catch (Exception ignored) {
+      }
+    }
+    // Verify routing is restored after cleanup.
+    checkForInstanceInRoutingTable(serverInstance, true);
+  }
+
+  /// Non-waiting check for whether `instance` appears in any routing table for the current table.
+  /// Used by [#testQueriesDisabled()] to pick a server that is actually serving queries.
+  private boolean isInstanceInRoutingTable(String instance) {
+    try {
+      JsonNode routingTables = getDebugInfo("debug/routingTable/" + getTableName());
+      for (JsonNode routingTable : routingTables) {
+        if (routingTable.has(instance)) {
+          return true;
+        }
+      }
+    } catch (Exception ignored) {
+      // Routing table not yet populated; treat as not present.
+    }
+    return false;
   }
 
   private void checkForInstanceInRoutingTable(String instance, boolean shouldExist) {
@@ -693,108 +822,178 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   public String reloadTableAndValidateResponse(String tableName, TableType tableType, boolean forceDownload)
-      throws IOException {
+      throws Exception {
     String response =
-        sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
+        getOrCreateAdminClient().getSegmentClient().reloadTable(tableName, tableType.name(), forceDownload);
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     JsonNode responseJson = JsonUtils.stringToJsonNode(response);
     JsonNode tableLevelDetails = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
     String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
     assertEquals(isZKWriteSuccess, "SUCCESS");
     String jobId = tableLevelDetails.get("reloadJobId").asText();
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(jobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
+    PinotTableReloadStatusResponse jobStatus =
+        getOrCreateAdminClient().getSegmentClient().getSegmentReloadStatusObject(jobId);
 
     // Validate all fields are present
-    assertEquals(jobStatus.get("metadata").get("jobId").asText(), jobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_SEGMENT");
-    assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
+    assertEquals(jobStatus.getMetadata().getJobId(), jobId);
+    assertEquals(jobStatus.getMetadata().getJobType(), "RELOAD_SEGMENT");
+    assertEquals(jobStatus.getMetadata().getTableNameWithType(), tableNameWithType);
     return jobId;
   }
 
   public boolean isReloadJobCompleted(String reloadJobId)
       throws Exception {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(reloadJobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
+    PinotTableReloadStatusResponse jobStatus = getOrCreateAdminClient().getSegmentClient()
+        .getSegmentReloadStatusObject(reloadJobId);
 
-    assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_SEGMENT");
-    return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
+    assertEquals(jobStatus.getMetadata().getJobId(), reloadJobId);
+    assertEquals(jobStatus.getMetadata().getJobType(), "RELOAD_SEGMENT");
+    return jobStatus.getTotalSegmentCount() == jobStatus.getSuccessCount();
   }
 
-  /**
-   * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
-   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns(boolean)}.
-   */
+  /// TODO: Unify this and [OfflineClusterIntegrationTest#testDefaultColumns(boolean)]
   public void testReload(boolean includeOfflineTable)
       throws Exception {
+    testReload(includeOfflineTable, false);
+    testReload(includeOfflineTable, true);
+  }
+
+  private void testReload(boolean includeOfflineTable, boolean forceDownload)
+      throws Exception {
     String rawTableName = getTableName();
-    Schema schema = getSchema(getTableName());
+    Schema oldSchema = getSchema(rawTableName);
 
     String selectStarQuery = "SELECT * FROM " + rawTableName;
     JsonNode queryResponse = postQuery(selectStarQuery);
-    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), schema.size());
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), oldSchema.size());
     long numTotalDocs = queryResponse.get("totalDocs").asLong();
 
-    addNewSchemaFields(schema);
-    String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+    Schema newSchema = createSchema();
+    addNewSchemaFields(newSchema);
+
+    // Without reload, select star should be able to include new added columns after schema change is propagated to both
+    // broker and server
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(selectStarQuery);
+        // If schema change is propagated to broker before server, server might not be able to find the column for a
+        // short period of time
+        if (!testQueryResponse.get("exceptions").isEmpty()) {
+          return false;
+        }
+        return testQueryResponse.get("resultTable").get("dataSchema").get("columnNames").size() == newSchema.size();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to generate default virtual columns without reload");
+
+    // Test reload needed, and trigger reload
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
-    String reloadJob;
-    // Tests that reload is needed on the table from controller api segments/{tableNameWithType}/needReload
+    testTableNeedReload(realtimeTableName, true);
+    String realtimeReloadJobId = reloadTableAndValidateResponse(rawTableName, TableType.REALTIME, forceDownload);
+    String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+    String offlineReloadJobId;
     if (includeOfflineTable) {
       testTableNeedReload(offlineTableName, true);
-      // Reload the table
-      reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.OFFLINE, false);
+      offlineReloadJobId = reloadTableAndValidateResponse(rawTableName, TableType.OFFLINE, forceDownload);
+    } else {
+      offlineReloadJobId = null;
     }
-    testTableNeedReload(realtimeTableName, true);
-    reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.REALTIME, false);
 
-    // Wait for all segments to finish reloading, and test filter on all newly added columns
-    // NOTE: Use count query to prevent schema inconsistency error
-    String testQuery = "SELECT COUNT(*) FROM " + rawTableName
+    // Wait for reload job to finish
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(selectStarQuery);
+        // Should not throw exception during reload
+        assertEquals(testQueryResponse.get("exceptions").size(), 0,
+            String.format("Found exceptions when testing reload for query: %s and response: %s", selectStarQuery,
+                testQueryResponse));
+        // Total docs should not change during reload
+        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs,
+            String.format("Total docs changed after reload, query: %s and response: %s", selectStarQuery,
+                testQueryResponse));
+        assertEquals(testQueryResponse.get("resultTable").get("dataSchema").get("columnNames").size(),
+            newSchema.size());
+        return isReloadJobCompleted(realtimeReloadJobId) && (offlineReloadJobId == null || isReloadJobCompleted(
+            offlineReloadJobId));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to finish reload job");
+
+    // Test reload not needed after previous reload completed
+    testTableNeedReload(realtimeTableName, false);
+    if (includeOfflineTable) {
+      testTableNeedReload(offlineTableName, false);
+    }
+
+    // Test filter on all newly added columns
+    String filterQuery = "SELECT COUNT(*) FROM " + rawTableName
         + " WHERE NewIntSVDimension < 0 AND NewLongSVDimension < 0 AND NewFloatSVDimension < 0 AND "
         + "NewDoubleSVDimension < 0 AND NewStringSVDimension = 'null' AND NewIntMVDimension < 0 AND "
         + "NewLongMVDimension < 0 AND NewFloatMVDimension < 0 AND NewDoubleMVDimension < 0 AND "
         + "NewStringMVDimension = 'null' AND NewIntMetric = 0 AND NewLongMetric = 0 AND NewFloatMetric = 0 "
         + "AND NewDoubleMetric = 0 AND NewBytesMetric = ''";
-    long countStarResult = getCountStarResult();
-    String finalReloadJob = reloadJob;
+    queryResponse = postQuery(filterQuery);
+    assertTrue(queryResponse.get("exceptions").isEmpty());
+    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
+
+    // Remove the extra columns
+    forceUpdateSchema(oldSchema);
+
+    // Wait for schema change being propagated to broker
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode testQueryResponse = postQuery(testQuery);
-        // Should not throw exception during reload
-        assertEquals(testQueryResponse.get("exceptions").size(), 0,
-            String.format("Found exceptions when testing reload for query: %s and response: %s", testQuery,
-                testQueryResponse));
-        // Total docs should not change during reload
-        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs,
-            String.format("Total docs changed after reload, query: %s and response: %s", testQuery, testQueryResponse));
-        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult
-            && isReloadJobCompleted(finalReloadJob);
+        JsonNode testQueryResponse = postQuery(selectStarQuery);
+        // If schema change is propagated to server before broker, server might not be able to find the column for a
+        // short period of time
+        if (!testQueryResponse.get("exceptions").isEmpty()) {
+          return false;
+        }
+        return testQueryResponse.get("resultTable").get("dataSchema").get("columnNames").size() == oldSchema.size();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 600_000L, "Failed to generate default values for new columns");
+    }, 60_000L, "Failed to propagate schema change to broker");
 
-    // Select star query should return all the columns
-    queryResponse = postQuery(selectStarQuery);
-    assertEquals(queryResponse.get("exceptions").size(), 0);
-    JsonNode resultTable = queryResponse.get("resultTable");
-    assertEquals(resultTable.get("dataSchema").get("columnNames").size(), schema.size());
-    assertEquals(resultTable.get("rows").size(), 10);
-    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+    // Test reload needed, and trigger reload
+    testTableNeedReload(realtimeTableName, true);
+    String realtimeReloadJobId2 = reloadTableAndValidateResponse(rawTableName, TableType.REALTIME, forceDownload);
+    String offlineReloadJobId2;
+    if (includeOfflineTable) {
+      testTableNeedReload(offlineTableName, true);
+      offlineReloadJobId2 = reloadTableAndValidateResponse(rawTableName, TableType.OFFLINE, forceDownload);
+    } else {
+      offlineReloadJobId2 = null;
+    }
 
-    // Test aggregation query to include querying all segemnts (including realtime)
-    String aggregationQuery = "SELECT SUMMV(NewIntMVDimension) FROM " + rawTableName;
-    queryResponse = postQuery(aggregationQuery);
-    assertEquals(queryResponse.get("exceptions").size(), 0);
+    // Wait for reload job to finish
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(selectStarQuery);
+        // Should not throw exception during reload
+        assertEquals(testQueryResponse.get("exceptions").size(), 0,
+            String.format("Found exceptions when testing reload for query: %s and response: %s", selectStarQuery,
+                testQueryResponse));
+        // Total docs should not change during reload
+        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs,
+            String.format("Total docs changed after reload, query: %s and response: %s", selectStarQuery,
+                testQueryResponse));
+        assertEquals(testQueryResponse.get("resultTable").get("dataSchema").get("columnNames").size(),
+            oldSchema.size());
+        return isReloadJobCompleted(realtimeReloadJobId2) && (offlineReloadJobId2 == null || isReloadJobCompleted(
+            offlineReloadJobId2));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to finish reload job");
 
-    // Tests that reload is not needed on the table after reloading all segments from controller api
-    // segments/{tableNameWithType}/needReload
+    // Test reload not needed after previous reload completed
+    testTableNeedReload(realtimeTableName, false);
     if (includeOfflineTable) {
       testTableNeedReload(offlineTableName, false);
     }
-    testTableNeedReload(realtimeTableName, false);
   }
 
   private void addNewSchemaFields(Schema schema)
@@ -815,19 +1014,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     schema.addField(constructNewMetric(FieldSpec.DataType.DOUBLE));
     schema.addField(constructNewMetric(FieldSpec.DataType.BYTES));
     // Upload the schema with extra columns
-    addSchema(schema);
+    updateSchema(schema);
   }
 
   private void testTableNeedReload(String tableNameWithType, boolean expectedNeedReload)
       throws IOException {
-    String needBeforeReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithType, false);
-    String needBeforeReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithType, true);
-    JsonNode jsonNeedReloadResponseWithNoVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithNoVerbose);
-    JsonNode jsonNeedReloadResponseWithVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithVerbose);
+    TableSegmentsReloadCheckResponse responseNoVerbose = checkIfReloadIsNeeded(tableNameWithType, false);
+    TableSegmentsReloadCheckResponse responseVerbose = checkIfReloadIsNeeded(tableNameWithType, true);
     // Tests if reload is needed on the table
-    assertEquals(jsonNeedReloadResponseWithNoVerbose.get("needReload").asBoolean(), expectedNeedReload);
-    assertEquals(jsonNeedReloadResponseWithVerbose.get("needReload").asBoolean(), expectedNeedReload);
-    assertFalse(jsonNeedReloadResponseWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
+    assertEquals(responseNoVerbose.isNeedReload(), expectedNeedReload);
+    assertEquals(responseVerbose.isNeedReload(), expectedNeedReload);
+    assertFalse(responseVerbose.getServerToSegmentsCheckReloadList().isEmpty());
   }
 
   private DimensionFieldSpec constructNewDimension(FieldSpec.DataType dataType, boolean singleValue) {
@@ -841,24 +1038,35 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     return new MetricFieldSpec(column, dataType);
   }
 
+  protected RebalanceResult triggerTableRebalance(RebalanceConfig rebalanceConfig, TableType tableType)
+      throws IOException, PinotAdminException {
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("type", tableType.toString());
+    String[] params = rebalanceConfig.toQueryString().split("&");
+    for (String param : params) {
+      String[] kv = param.split("=", 2);
+      if (kv.length == 2) {
+        queryParams.put(kv[0], kv[1]);
+      }
+    }
+    return getOrCreateAdminClient().getRebalanceClient()
+        .rebalanceTableObject(getTableName(), queryParams);
+  }
+
+  @Deprecated
   protected String getTableRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
-    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
-        + "?type=" + tableType.toString() + "&" + rebalanceConfig.toQueryString();
+    return controllerUrl(StringUtil.join("/", "tables", getTableName(), "rebalance"))
+        + "?type=" + tableType + "&" + rebalanceConfig.toQueryString();
   }
 
   protected void waitForRebalanceToComplete(String rebalanceJobId, long timeoutMs) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(rebalanceJobId);
-        SimpleHttpResponse httpResponse =
-            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        ServerRebalanceJobStatusResponse rebalanceStatus =
-            JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
+        ServerRebalanceJobStatusResponse rebalanceStatus = getOrCreateAdminClient().getRebalanceClient()
+            .getRebalanceStatusObject(rebalanceJobId);
         return rebalanceStatus.getTableRebalanceProgressStats().getStatus() == RebalanceResult.Status.DONE;
-      } catch (HttpErrorStatusException e) {
-        if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND) {
-          Assert.fail("Caught unexpected HTTP error while waiting for rebalance to complete: " + e.getMessage(), e);
-        }
+      } catch (PinotAdminNotFoundException e) {
+        // Job may not be registered in ZK yet; keep polling
         return null;
       } catch (Exception e) {
         Assert.fail("Caught exception while waiting for rebalance to complete", e);
@@ -870,17 +1078,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   protected void waitForTableEVISConverge(String tableName, long timeoutMs) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forIdealState(tableName);
-        SimpleHttpResponse httpResponse =
-            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-        TableViews.TableView idealState =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
-
-        requestUrl = getControllerRequestURLBuilder().forExternalView(tableName);
-        httpResponse = getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null);
-        TableViews.TableView externalView =
-            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
-        return idealState._realtime.equals(externalView._realtime) && idealState._offline.equals(externalView._offline);
+        TableView idealState =
+            getOrCreateAdminClient().getTableClient().getIdealStateObject(tableName);
+        TableView externalView =
+            getOrCreateAdminClient().getTableClient().getExternalViewObject(tableName);
+        return Objects.equals(idealState._realtime, externalView._realtime)
+            && Objects.equals(idealState._offline, externalView._offline);
       } catch (Exception e) {
         Assert.fail("Caught exception while waiting for table EV and IS to converge", e);
         return null;
@@ -888,10 +1091,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 1000L, timeoutMs, "Failed to converge EV and IS for table: " + tableName);
   }
 
-  /**
-   * Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
-   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
-   */
+  /// Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
+  /// Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
   protected void performForceCommitSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
       String newTenant,
       boolean shouldCommit, long timeoutMs)
@@ -899,11 +1100,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, false);
   }
 
-  /**
-   * Helper method to perform segment moving test regarding forceCommit in rebalance with EVIS convergence wait.
-   * Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance
-   * completion.
-   */
+  /// Helper method to perform segment moving test regarding forceCommit in rebalance with EVIS convergence wait.
+  /// Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance
+  /// completion.
   protected void performForceCommitSegmentMovingTestWithEVISConverge(RebalanceConfig rebalanceConfig,
       TableConfig tableConfig,
       String newTenant, boolean shouldCommit, long timeoutMs)
@@ -911,18 +1110,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, true);
   }
 
-  /**
-   * Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
-   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
-   *
-   * @param rebalanceConfig the rebalance configuration
-   * @param tableConfig the table configuration
-   * @param newTenant the new tenant to move segments to
-   * @param shouldCommit whether segments should be committed (affects verification)
-   * @param timeoutMs timeout in milliseconds
-   * @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for
-   *                            rebalance completion
-   */
+  /// Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
+  /// Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
+  ///
+  /// @param rebalanceConfig the rebalance configuration
+  /// @param tableConfig the table configuration
+  /// @param newTenant the new tenant to move segments to
+  /// @param shouldCommit whether segments should be committed (affects verification)
+  /// @param timeoutMs timeout in milliseconds
+  /// @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for
+  ///                            rebalance completion
   private void performForceCommitSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
       String newTenant,
       boolean shouldCommit, long timeoutMs, boolean waitForEVISConverge)
@@ -934,20 +1131,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     // Set force commit
     rebalanceConfig.setForceCommit(true);
 
-    // Execute rebalance
-    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
-    RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+    // Snapshot all consuming segments, including when includeConsuming is false and the rebalance summary has none.
+    String tableNameWithType = tableConfig.getTableName();
+    Set<String> originalConsumingSegments = _helixResourceManager.getConsumingSegments(tableNameWithType);
+    assertFalse(originalConsumingSegments.isEmpty(), "Expected consuming segments before rebalance");
+    Map<Integer, Integer> expectedSequences = originalConsumingSegments.stream().map(LLCSegmentName::new)
+        .collect(Collectors.toMap(LLCSegmentName::getPartitionGroupId,
+            segment -> segment.getSequenceNumber() + (shouldCommit ? 1 : 0)));
 
-    // Get original consuming segments (if present)
-    Set<String> originalConsumingSegmentsToMove = null;
-    if (rebalanceResult.getRebalanceSummaryResult() != null
-        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null
-        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
-      originalConsumingSegmentsToMove = rebalanceResult.getRebalanceSummaryResult().getSegmentInfo()
-          .getConsumingSegmentToBeMovedSummary()
-          .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
-          .keySet();
-    }
+    // Execute rebalance
+    RebalanceResult rebalanceResult = triggerTableRebalance(rebalanceConfig, TableType.REALTIME);
 
     // Wait for completion based on the flag
     if (waitForEVISConverge) {
@@ -956,21 +1149,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       waitForRebalanceToComplete(rebalanceResult.getJobId(), timeoutMs);
     }
 
-    // Check if segments were committed (only if there were consuming segments to move)
-    if (originalConsumingSegmentsToMove != null && !originalConsumingSegmentsToMove.isEmpty()) {
-      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
-      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
-          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
-      LLCSegmentName consumingSegmentNow = new LLCSegmentName(
-          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
-      LLCSegmentName consumingSegmentOriginal =
-          new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
-
-      if (shouldCommit) {
-        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
-      } else {
-        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber());
-      }
+    for (String originalSegment : originalConsumingSegments) {
+      SegmentZKMetadata metadata = _helixResourceManager.getSegmentZKMetadata(tableNameWithType, originalSegment);
+      assertNotNull(metadata, "Missing metadata for " + originalSegment);
+      assertEquals(metadata.getStatus(), shouldCommit ? Status.DONE : Status.IN_PROGRESS, originalSegment);
     }
+    Map<Integer, Integer> currentSequences = _helixResourceManager.getConsumingSegments(tableNameWithType).stream()
+        .map(LLCSegmentName::new)
+        .collect(Collectors.toMap(LLCSegmentName::getPartitionGroupId, LLCSegmentName::getSequenceNumber));
+    assertEquals(currentSequences, expectedSequences);
   }
 }

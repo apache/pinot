@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.segment.local.customobject;
 
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 
-/**
- * Serialized and comparable version of QuantileDigest. Compares QuantileDigest for a specific percentile value.
- */
+/// Serialized and comparable version of QuantileDigest. Compares QuantileDigest for a specific percentile value.
 public class SerializedQuantileDigest implements Comparable<SerializedQuantileDigest> {
   private final double _percentile;
   private final QuantileDigest _quantileDigest;
@@ -45,6 +42,6 @@ public class SerializedQuantileDigest implements Comparable<SerializedQuantileDi
 
   @Override
   public String toString() {
-    return BytesUtils.toHexString(CustomSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(_quantileDigest));
+    return BytesUtils.toHexString(_quantileDigest.toBytes());
   }
 }

@@ -3,11 +3,7 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
-    "replication": 2,
-    "replicaGroupStrategyConfig": {
-      "partitionColumn": "userUUID",
-      "numInstancesPerPartition": 2
-    }
+    "replication": 2
   },
   "tenants": {
     "broker": "DefaultTenant",

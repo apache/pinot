@@ -43,6 +43,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -436,6 +437,38 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     verifyAddSegmentAfterStop(HashFunction.MURMUR3);
   }
 
+  // skipSegmentOutOfTTL must not bump the watermark: caller does that after the rows are added, so a concurrent
+  // sweep cannot expire keys the in-flight add is about to insert.
+  @Test
+  public void testSkipSegmentOutOfTTLDoesNotBumpWatermark()
+      throws IOException {
+    _dedupContextBuilder.setHashFunction(HashFunction.NONE);
+    ConcurrentMapPartitionDedupMetadataManager metadataManager =
+        new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
+            _dedupContextBuilder.build());
+
+    metadataManager._largestSeenTime.set(5000);
+
+    IndexSegment segment = DedupTestUtils.mockSegment(1, 10);
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
+        this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
+      }});
+    when(segmentMetadata.getColumnMetadataFor(DEDUP_TIME_COLUMN_NAME)).thenReturn(columnMetadata);
+    doReturn(10000.0).when(columnMetadata).getMaxValue();
+    when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
+
+    assertFalse(metadataManager.skipSegmentOutOfTTL(segment));
+    assertEquals(metadataManager._largestSeenTime.get(), 5000.0);
+
+    metadataManager.updateLargestSeenTime(segment);
+    assertEquals(metadataManager._largestSeenTime.get(), 10000.0);
+
+    metadataManager.stop();
+    metadataManager.close();
+  }
+
   private void verifyAddSegmentAfterStop(HashFunction hashFunction) {
     _dedupContextBuilder.setHashFunction(hashFunction);
     ConcurrentMapPartitionDedupMetadataManager metadataManager =
@@ -446,9 +479,10 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
-      this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
-    }});
-    when(columnMetadata.getMaxValue()).thenReturn(System.currentTimeMillis());
+        this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
+      }});
+    when(segmentMetadata.getColumnMetadataFor(DEDUP_TIME_COLUMN_NAME)).thenReturn(columnMetadata);
+    doReturn(System.currentTimeMillis()).when(columnMetadata).getMaxValue();
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     // throws when not stopped
     assertThrows(RuntimeException.class, () -> metadataManager.addSegment(segment));

@@ -11,13 +11,14 @@
       "name": "name"
     }
   ],
-  "timeFieldSpec": {
-    "incomingGranularitySpec": {
-      "timeType": "DAYS",
+  "dateTimeFieldSpecs": [
+    {
+      "name": "DaysSinceEpoch",
       "dataType": "INT",
-      "name": "DaysSinceEpoch"
+      "format": "EPOCH|DAYS",
+      "granularity": "DAYS"
     }
-  },
+  ],
   "primaryKeyColumns": ["id"],
   "schemaName": "dedupSchema"
 }

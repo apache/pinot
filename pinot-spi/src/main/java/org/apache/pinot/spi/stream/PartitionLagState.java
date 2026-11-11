@@ -19,27 +19,21 @@
 
 package org.apache.pinot.spi.stream;
 
-/**
- * Container that can be used for holding per-partition consumer lag calculated along standard dimensions such as
- * record offset, ingestion time etc.
- */
+/// Container that can be used for holding per-partition consumer lag calculated along standard dimensions such as
+/// record offset, ingestion time etc.
 public class PartitionLagState {
   public final static String NOT_CALCULATED = "NOT_CALCULATED";
 
-  /**
-   * Defines how far behind the current record's offset / pointer is from upstream latest record
-   * The distance is based on actual record count.
-   */
+  /// Defines how far behind the current record's offset / pointer is from upstream latest record
+  /// The distance is based on actual record count.
   public String getRecordsLag() {
     return NOT_CALCULATED;
   }
 
-  /**
-   * Defines how soon after record ingestion was the record consumed by Pinot. That is, the difference between the
-   * time the record was consumed and the time at which the record was ingested upstream.
-   *
-   * @return Lag value in milliseconds
-   */
+  /// Defines how soon after record ingestion was the record consumed by Pinot. That is, the difference between the
+  /// time the record was consumed and the time at which the record was ingested upstream.
+  ///
+  /// @return Lag value in milliseconds
   public String getAvailabilityLagMs() {
     return NOT_CALCULATED;
   }

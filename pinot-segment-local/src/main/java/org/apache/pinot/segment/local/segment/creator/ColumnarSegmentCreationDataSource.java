@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.ColumnarSegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
-import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
+import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -31,41 +31,31 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SegmentCreationDataSource implementation that uses ColumnReaderFactory for columnar data access.
- *
- * <p>This data source enables columnar segment building by providing access to column readers
- * instead of row-based record readers. It supports:
- * <ul>
- *   <li>Columnar statistics collection</li>
- *   <li>Column-wise data access through ColumnReaderFactory</li>
- *   <li>Efficient handling of new columns with default values</li>
- *   <li>Data type conversions during schema evolution</li>
- * </ul>
- */
+/// SegmentCreationDataSource implementation that uses ColumnReaderFactory for columnar data access.
+///
+/// This data source enables columnar segment building by providing access to column readers
+/// instead of row-based record readers. It supports:
+///
+/// - Columnar statistics collection
+/// - Column-wise data access through ColumnReaderFactory
+/// - Efficient handling of new columns with default values
+/// - Data type conversions during schema evolution
 public class ColumnarSegmentCreationDataSource implements SegmentCreationDataSource, Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnarSegmentCreationDataSource.class);
 
   private final Map<String, ColumnReader> _columnReaders;
 
-  /**
-   * Create a ColumnarSegmentCreationDataSource.
-   *
-   * @param columnReaders Map of column name to ColumnReader instances
-   */
+  /// Create a ColumnarSegmentCreationDataSource.
+  ///
+  /// @param columnReaders Map of column name to ColumnReader instances
   public ColumnarSegmentCreationDataSource(Map<String, ColumnReader> columnReaders) {
     _columnReaders = columnReaders;
   }
 
   @Override
-  public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
+  public SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig) {
     LOGGER.info("Gathering stats using columnar approach for {} columns", _columnReaders.size());
-
-    // Use columnar stats container that efficiently collects statistics column-wise
-    ColumnarSegmentPreIndexStatsContainer columnarSegmentPreIndexStatsContainer =
-        new ColumnarSegmentPreIndexStatsContainer(_columnReaders, statsCollectorConfig);
-    columnarSegmentPreIndexStatsContainer.init();
-    return columnarSegmentPreIndexStatsContainer;
+    return new ColumnarSegmentPreIndexStatsContainer(statsCollectorConfig, _columnReaders);
   }
 
   @Override
@@ -76,11 +66,9 @@ public class ColumnarSegmentCreationDataSource implements SegmentCreationDataSou
         "RecordReader not supported in columnar mode. Use getColumnReaders() instead.");
   }
 
-  /**
-   * Get all column readers.
-   *
-   * @return Map of column name to ColumnReader
-   */
+  /// Get all column readers.
+  ///
+  /// @return Map of column name to ColumnReader
   public Map<String, ColumnReader> getColumnReaders() {
     return _columnReaders;
   }

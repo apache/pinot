@@ -37,12 +37,10 @@ import org.apache.pinot.query.planner.physical.v2.opt.PRelOptRule;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelOptRuleCall;
 
 
-/**
- * Often it might be possible to promote an aggregate on top of a leaf stage to be part of the leaf stage. This rule
- * handles that case. This is different from aggregate pushdown because pushdown is related to taking a decision about
- * whether we should split the aggregate over an exchange into two, whereas this rule is able to avoid the Exchange
- * altogether.
- */
+/// Often it might be possible to promote an aggregate on top of a leaf stage to be part of the leaf stage. This rule
+/// handles that case. This is different from aggregate pushdown because pushdown is related to taking a decision about
+/// whether we should split the aggregate over an exchange into two, whereas this rule is able to avoid the Exchange
+/// altogether.
 public class LeafStageAggregateRule extends PRelOptRule {
   private final PhysicalPlannerContext _physicalPlannerContext;
 

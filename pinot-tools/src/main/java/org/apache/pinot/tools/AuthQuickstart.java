@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.tools;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.auth.BasicAuthUtils;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.utils.AuthUtils;
@@ -32,12 +31,12 @@ import org.apache.pinot.tools.utils.AuthUtils;
 public class AuthQuickstart extends Quickstart {
   @Override
   public List<String> types() {
-    return Collections.singletonList("AUTH");
+    return List.of("AUTH");
   }
 
   @Override
   public AuthProvider getAuthProvider() {
-    return AuthProviderUtils.makeAuthProvider(BasicAuthUtils.toBasicAuthToken("admin", "verysecret"));
+    return AuthProviderUtils.makeAuthProvider(BasicAuthTokenUtils.toBasicAuthToken("admin", "verysecret"));
   }
 
   @Override

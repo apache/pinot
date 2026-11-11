@@ -18,17 +18,13 @@
  */
 package org.apache.pinot.perf;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -55,41 +51,34 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class BenchmarkObjectSerDe {
   private static final int NUM_VALUES = 5_000_000;
 
-  List<String> _stringList = new ArrayList<>(NUM_VALUES);
+  ObjectArrayList<String> _stringList = new ObjectArrayList<>(NUM_VALUES);
   Set<String> _stringSet = new ObjectOpenHashSet<>(NUM_VALUES);
-  Map<String, String> _stringToStringMap = new HashMap<>(HashUtil.getHashMapCapacity(NUM_VALUES));
   Set<ByteArray> _bytesSet = new ObjectOpenHashSet<>(NUM_VALUES);
 
   @Setup
   public void setUp()
       throws IOException {
     for (int i = 0; i < NUM_VALUES; i++) {
-      String stringValue = RandomStringUtils.randomAlphanumeric(10, 201);
+      String stringValue = RandomStringUtils.secure().nextAlphanumeric(10, 201);
       _stringList.add(stringValue);
       _stringSet.add(stringValue);
-      _stringToStringMap.put(stringValue, stringValue);
       _bytesSet.add(new ByteArray(stringValue.getBytes(UTF_8)));
     }
   }
 
   @Benchmark
   public int stringList() {
-    return ObjectSerDeUtils.serialize(_stringList).length;
+    return ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.serialize(_stringList).length;
   }
 
   @Benchmark
   public int stringSet() {
-    return ObjectSerDeUtils.serialize(_stringSet).length;
-  }
-
-  @Benchmark
-  public int stringToStringMap() {
-    return ObjectSerDeUtils.serialize(_stringToStringMap).length;
+    return ObjectSerDeUtils.STRING_SET_SER_DE.serialize(_stringSet).length;
   }
 
   @Benchmark
   public int bytesSet() {
-    return ObjectSerDeUtils.serialize(_bytesSet).length;
+    return ObjectSerDeUtils.BYTES_SET_SER_DE.serialize(_bytesSet).length;
   }
 
   public static void main(String[] args)

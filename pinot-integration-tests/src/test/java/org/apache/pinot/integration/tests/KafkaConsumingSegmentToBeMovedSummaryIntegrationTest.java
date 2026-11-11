@@ -21,155 +21,102 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-import org.apache.helix.model.HelixConfigScope;
-import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
-import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
+import org.apache.pinot.integration.tests.SharedKafkaRealtimeIntegrationTestSuite.ScenarioLease;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRealtimeClusterIntegrationTest {
-
-  @Override
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
-
-    // Start the Pinot cluster
-    startZk();
-    startController();
-
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    // Set max segment preprocess parallelism to 8
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
-    // Set max segment startree preprocess parallelism to 6
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
-
-    startBroker();
-    startServer();
-
-    // Start Kafka
-    startKafka();
-
-    // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
-
-    // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
-    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    Map<String, String> streamConfig = getStreamConfigs();
-    streamConfig.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE, "1000000");
-    streamConfig.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS);
-    indexingConfig.setStreamConfigs(streamConfig);
-    tableConfig.setIndexingConfig(indexingConfig);
-    addTableConfig(tableConfig);
-
-    // Push data into Kafka
-    pushAvroIntoKafka(avroFiles);
-
-    // create segments and upload them to controller
-    createSegmentsAndUpload(avroFiles, schema, tableConfig);
-
-    // Set up the H2 connection
-    setUpH2Connection(avroFiles);
-
-    // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
-
-    runValidationJob(600_000);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
-  }
+/// Final, topology-mutating scenario in the shared Kafka realtime suite.
+public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest {
+  private static final String TABLE_NAME = "mytableConsumingSegmentSummary";
+  private static final String TOPIC_NAME = "KafkaConsumingSegmentToBeMovedSummaryIntegrationTest";
 
   @Test
   public void testConsumingSegmentSummary()
+      throws Throwable {
+    SharedKafkaRealtimeIntegrationTestSuite owner =
+        SharedKafkaRealtimeIntegrationTestSuite.getSharedSuiteOwner();
+    ScenarioLease lease = owner.newScenario(TABLE_NAME, TOPIC_NAME);
+    Throwable primaryFailure = null;
+    try {
+      owner.createScenarioTopic(lease);
+      List<File> avroFiles = owner.unpackScenarioData(lease);
+      owner.addScenarioSchema(lease);
+
+      Map<String, String> streamConfigs = owner.getScenarioStreamConfigs(lease._topicName, false);
+      streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE, "1000000");
+      streamConfigs.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS);
+      TableConfig tableConfig = owner.createScenarioTableConfig(lease, avroFiles.get(0), streamConfigs);
+      owner.addScenarioTable(lease, tableConfig);
+
+      ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, owner.getKafkaBrokerList(), lease._topicName,
+          owner.getMaxNumKafkaMessagesPerBatch(), owner.getKafkaMessageHeader(), owner.getPartitionColumn(), false);
+      owner.waitForScenarioCount(lease, owner.getDefaultScenarioCount(), 600_000L);
+
+      assertEmptyConsumingMoveSummary(rebalance(owner, lease._tableName, true));
+
+      owner.startAdditionalServer();
+      assertSingleConsumingMoveSummary(rebalance(owner, lease._tableName, true));
+
+      assertEmptyConsumingMoveSummary(rebalance(owner, lease._tableName, false));
+
+      // Kafka loss is part of the contract under test. This scenario is last so stopping the suite-owned broker does
+      // not invalidate any following scenario.
+      owner.stopSharedKafkaForFinalScenario();
+      RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary summary =
+          getConsumingMoveSummary(rebalance(owner, lease._tableName, true));
+      Assert.assertEquals(summary.getNumConsumingSegmentsToBeMoved(), 1);
+      Assert.assertEquals(summary.getNumServersGettingConsumingSegmentsAdded(), 1);
+      Assert.assertNotNull(summary.getServerConsumingSegmentSummary());
+      Assert.assertNull(summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp());
+    } catch (Throwable t) {
+      primaryFailure = t;
+      throw t;
+    } finally {
+      owner.closeScenario(lease, primaryFailure, null);
+    }
+  }
+
+  private static RebalanceResult rebalance(SharedKafkaRealtimeIntegrationTestSuite owner, String tableName,
+      boolean includeConsuming)
       throws Exception {
-    String response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
-    RebalanceResult result = JsonUtils.stringToObject(response, RebalanceResult.class);
+    RebalanceResult result = owner.getOrCreateAdminClient().getRebalanceClient()
+        .rebalanceTable(tableName, "REALTIME", true, false, includeConsuming, false, -1);
     Assert.assertNotNull(result);
+    return result;
+  }
+
+  private static RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary getConsumingMoveSummary(
+      RebalanceResult result) {
     Assert.assertNotNull(result.getRebalanceSummaryResult());
     Assert.assertNotNull(result.getRebalanceSummaryResult().getSegmentInfo());
-    RebalanceSummaryResult.SegmentInfo segmentInfo = result.getRebalanceSummaryResult().getSegmentInfo();
-    RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary consumingSegmentToBeMovedSummary =
-        segmentInfo.getConsumingSegmentToBeMovedSummary();
-    Assert.assertNotNull(consumingSegmentToBeMovedSummary);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 0);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServersGettingConsumingSegmentsAdded(), 0);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(),
-        0);
+    RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary summary =
+        result.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary();
+    Assert.assertNotNull(summary);
+    return summary;
+  }
 
-    startServer();
-    response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
-    result = JsonUtils.stringToObject(response, RebalanceResult.class);
-    Assert.assertNotNull(result);
-    Assert.assertNotNull(result.getRebalanceSummaryResult());
-    Assert.assertNotNull(result.getRebalanceSummaryResult().getSegmentInfo());
-    segmentInfo = result.getRebalanceSummaryResult().getSegmentInfo();
-    consumingSegmentToBeMovedSummary = segmentInfo.getConsumingSegmentToBeMovedSummary();
-    Assert.assertNotNull(consumingSegmentToBeMovedSummary);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 1);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServersGettingConsumingSegmentsAdded(), 1);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(),
-        1);
-    Assert.assertTrue(consumingSegmentToBeMovedSummary
-        .getServerConsumingSegmentSummary()
-        .values()
-        .stream()
-        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 57801
-            || x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 0));
-    Assert.assertEquals(consumingSegmentToBeMovedSummary
-        .getServerConsumingSegmentSummary()
-        .values()
-        .stream()
-        .reduce(0L, (a, b) -> a + b.getTotalOffsetsToCatchUpAcrossAllConsumingSegments(), Long::sum), 57801);
+  private static void assertEmptyConsumingMoveSummary(RebalanceResult result) {
+    RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary summary = getConsumingMoveSummary(result);
+    Assert.assertEquals(summary.getNumConsumingSegmentsToBeMoved(), 0);
+    Assert.assertEquals(summary.getNumServersGettingConsumingSegmentsAdded(), 0);
+    Assert.assertEquals(summary.getServerConsumingSegmentSummary().size(), 0);
+  }
 
-    // set includeConsuming to false
-    response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, false, false, -1));
-    result = JsonUtils.stringToObject(response, RebalanceResult.class);
-    Assert.assertNotNull(result);
-    Assert.assertNotNull(result.getRebalanceSummaryResult());
-    Assert.assertNotNull(result.getRebalanceSummaryResult().getSegmentInfo());
-    segmentInfo = result.getRebalanceSummaryResult().getSegmentInfo();
-    consumingSegmentToBeMovedSummary = segmentInfo.getConsumingSegmentToBeMovedSummary();
-    Assert.assertNotNull(consumingSegmentToBeMovedSummary);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 0);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServersGettingConsumingSegmentsAdded(), 0);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(),
-        0);
-
-    stopKafka();
-    response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
-    RebalanceResult resultNoInfo = JsonUtils.stringToObject(response, RebalanceResult.class);
-    Assert.assertNotNull(resultNoInfo);
-    Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult());
-    Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult().getSegmentInfo());
-    segmentInfo = resultNoInfo.getRebalanceSummaryResult().getSegmentInfo();
-    consumingSegmentToBeMovedSummary = segmentInfo.getConsumingSegmentToBeMovedSummary();
-    Assert.assertNotNull(consumingSegmentToBeMovedSummary);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 1);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServersGettingConsumingSegmentsAdded(), 1);
-    Assert.assertNotNull(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary());
-    Assert.assertNull(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp());
+  private static void assertSingleConsumingMoveSummary(RebalanceResult result) {
+    RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary summary = getConsumingMoveSummary(result);
+    Assert.assertEquals(summary.getNumConsumingSegmentsToBeMoved(), 1);
+    Assert.assertEquals(summary.getNumServersGettingConsumingSegmentsAdded(), 1);
+    Assert.assertEquals(summary.getServerConsumingSegmentSummary().size(), 1);
+    Assert.assertTrue(summary.getServerConsumingSegmentSummary().values().stream()
+        .allMatch(value -> value.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 57_801L
+            || value.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 0L));
+    Assert.assertEquals(summary.getServerConsumingSegmentSummary().values().stream()
+        .reduce(0L, (total, value) -> total + value.getTotalOffsetsToCatchUpAcrossAllConsumingSegments(), Long::sum),
+        57_801L);
   }
 }

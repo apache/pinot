@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -30,16 +31,21 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class UpsertContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpsertContext.class);
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final List<String> _primaryKeyColumns;
   private final HashFunction _hashFunction;
   private final List<String> _comparisonColumns;
+  // Builds a handler for one partition. PartialUpsertHandler is not thread safe, so the context hands out a factory
+  // instead of a shared instance. Null for full upsert.
   @Nullable
-  private final PartialUpsertHandler _partialUpsertHandler;
+  private final Supplier<PartialUpsertHandler> _partialUpsertHandlerSupplier;
   @Nullable
   private final String _deleteRecordColumn;
   private final boolean _dropOutOfOrderRecord;
@@ -56,7 +62,7 @@ public class UpsertContext {
   @Nullable
   private final Map<String, String> _metadataManagerConfigs;
 
-  /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+  /// @deprecated use [org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)] instead.
   @Deprecated
   private final boolean _allowPartialUpsertConsumptionDuringCommit;
 
@@ -64,9 +70,9 @@ public class UpsertContext {
   @Nullable
   private final TableDataManager _tableDataManager;
   private final File _tableIndexDir;
-
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
-      HashFunction hashFunction, List<String> comparisonColumns, @Nullable PartialUpsertHandler partialUpsertHandler,
+      HashFunction hashFunction, List<String> comparisonColumns,
+      @Nullable Supplier<PartialUpsertHandler> partialUpsertHandlerSupplier,
       @Nullable String deleteRecordColumn, boolean dropOutOfOrderRecord, @Nullable String outOfOrderRecordColumn,
       boolean enableSnapshot, boolean enablePreload, double metadataTTL, double deletedKeysTTL,
       boolean enableDeletedKeysCompactionConsistency, UpsertConfig.ConsistencyMode consistencyMode,
@@ -78,7 +84,7 @@ public class UpsertContext {
     _primaryKeyColumns = primaryKeyColumns;
     _hashFunction = hashFunction;
     _comparisonColumns = comparisonColumns;
-    _partialUpsertHandler = partialUpsertHandler;
+    _partialUpsertHandlerSupplier = partialUpsertHandlerSupplier;
     _deleteRecordColumn = deleteRecordColumn;
     _dropOutOfOrderRecord = dropOutOfOrderRecord;
     _outOfOrderRecordColumn = outOfOrderRecordColumn;
@@ -116,13 +122,14 @@ public class UpsertContext {
     return _comparisonColumns;
   }
 
+  /// Returns a factory that builds a [PartialUpsertHandler] for one partition, or null for full upsert.
   @Nullable
-  public PartialUpsertHandler getPartialUpsertHandler() {
-    return _partialUpsertHandler;
+  public Supplier<PartialUpsertHandler> getPartialUpsertHandlerSupplier() {
+    return _partialUpsertHandlerSupplier;
   }
 
   public UpsertConfig.Mode getUpsertMode() {
-    return _partialUpsertHandler == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
+    return _partialUpsertHandlerSupplier == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
   }
 
   @Nullable
@@ -190,6 +197,14 @@ public class UpsertContext {
     return _tableIndexDir;
   }
 
+  /// Returns true if the table configuration has settings that can lead to inconsistent upsert metadata
+  /// during segment replacement after force commit. This happens when:
+  /// - Partial upsert is enabled (records need to be merged with previous values)
+  /// - dropOutOfOrderRecord is enabled with NONE consistency mode (records may have been dropped)
+  public boolean isTableTypeInconsistentDuringConsumption() {
+    return _dropOutOfOrderRecord || _outOfOrderRecordColumn != null || _partialUpsertHandlerSupplier != null;
+  }
+
   @Override
   public String toString() {
     return new ToStringBuilder(this)
@@ -220,9 +235,10 @@ public class UpsertContext {
     private List<String> _primaryKeyColumns;
     private HashFunction _hashFunction = HashFunction.NONE;
     private List<String> _comparisonColumns;
-    private PartialUpsertHandler _partialUpsertHandler;
+    private Supplier<PartialUpsertHandler> _partialUpsertHandlerSupplier;
     private String _deleteRecordColumn;
     private boolean _dropOutOfOrderRecord;
+    @Nullable
     private String _outOfOrderRecordColumn;
     private boolean _enableSnapshot;
     private boolean _enablePreload;
@@ -263,8 +279,10 @@ public class UpsertContext {
       return this;
     }
 
-    public Builder setPartialUpsertHandler(PartialUpsertHandler partialUpsertHandler) {
-      _partialUpsertHandler = partialUpsertHandler;
+    /// Sets the factory used to build one [PartialUpsertHandler] per partition. Null for full upsert.
+    public Builder setPartialUpsertHandlerSupplier(
+        @Nullable Supplier<PartialUpsertHandler> partialUpsertHandlerSupplier) {
+      _partialUpsertHandlerSupplier = partialUpsertHandlerSupplier;
       return this;
     }
 
@@ -349,15 +367,33 @@ public class UpsertContext {
       Preconditions.checkState(_schema != null, "Schema must be set");
       Preconditions.checkState(CollectionUtils.isNotEmpty(_primaryKeyColumns), "Primary key columns must be set");
       Preconditions.checkState(_hashFunction != null, "Hash function must be set");
-      Preconditions.checkState(CollectionUtils.isNotEmpty(_comparisonColumns), "Comparison columns must be set");
+      Preconditions.checkState(_comparisonColumns != null, "Comparison columns must be set");
       Preconditions.checkState(_consistencyMode != null, "Consistency mode must be set");
       if (_tableIndexDir == null) {
         Preconditions.checkState(_tableDataManager != null, "Either table data manager or table index dir must be set");
         _tableIndexDir = _tableDataManager.getTableDataDir();
       }
+      // dropOutOfOrderRecord and outOfOrderRecordColumn are not supported when consistencyMode is SYNC or SNAPSHOT.
+      // In these modes, records are indexed before metadata is updated, so we can't drop or mark out-of-order records.
+      // Disable them silently for backward compatibility with existing tables.
+      if (_consistencyMode != UpsertConfig.ConsistencyMode.NONE) {
+        if (_dropOutOfOrderRecord) {
+          _dropOutOfOrderRecord = false;
+          LOGGER.warn(
+              "dropOutOfOrderRecord is not supported when consistencyMode is set, disabling dropOutOfOrderRecord to get"
+                  + "consistent mode: {} for the table: {}", _consistencyMode, _tableConfig.getTableName());
+        }
+        if (_outOfOrderRecordColumn != null) {
+          _outOfOrderRecordColumn = null;
+          LOGGER.warn(
+              "outOfOrderRecordColumn is not supported when consistencyMode is set, removing outOfOrderRecordColumn "
+                  + "to get consistent mode: {} for the table: {}", _consistencyMode, _tableConfig.getTableName());
+        }
+      }
       return new UpsertContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _comparisonColumns,
-          _partialUpsertHandler, _deleteRecordColumn, _dropOutOfOrderRecord, _outOfOrderRecordColumn, _enableSnapshot,
-          _enablePreload, _metadataTTL, _deletedKeysTTL, _enableDeletedKeysCompactionConsistency, _consistencyMode,
+          _partialUpsertHandlerSupplier, _deleteRecordColumn, _dropOutOfOrderRecord, _outOfOrderRecordColumn,
+          _enableSnapshot, _enablePreload, _metadataTTL, _deletedKeysTTL,
+          _enableDeletedKeysCompactionConsistency, _consistencyMode,
           _upsertViewRefreshIntervalMs, _newSegmentTrackingTimeMs, _metadataManagerConfigs,
           _allowPartialUpsertConsumptionDuringCommit, _tableDataManager, _tableIndexDir);
     }

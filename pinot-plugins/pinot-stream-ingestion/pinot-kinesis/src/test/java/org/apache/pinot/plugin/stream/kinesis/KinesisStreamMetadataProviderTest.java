@@ -22,12 +22,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.mockito.ArgumentCaptor;
 import org.testng.Assert;
@@ -249,5 +253,49 @@ public class KinesisStreamMetadataProviderTest {
     Assert.assertEquals(result.size(), 1);
     Assert.assertEquals(result.get(0).getPartitionGroupId(), 0);
     Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
+  }
+
+  @Test
+  public void testGetCurrentPartitionLagStateHandlesInvalidIngestionTime() {
+    long lastProcessedTimeMs = 1_700_000_100_000L;
+
+    // Shard with a valid upstream ingestion time yields a numeric availability lag.
+    StreamMessageMetadata validMetadata = new StreamMessageMetadata.Builder()
+        .setOffset(new LongMsgOffset(5), new LongMsgOffset(6))
+        .setRecordIngestionTimeMs(lastProcessedTimeMs - 1000L)
+        .build();
+    // Shards whose ingestion time is missing/invalid: unset (Builder default Long.MIN_VALUE), NO_TIMESTAMP (-1),
+    // and epoch 0 (the exact boundary of the > 0 guard). These stand in for a stream that is unreachable/timing
+    // out or produces records without a timestamp.
+    StreamMessageMetadata unsetIngestionTime = new StreamMessageMetadata.Builder()
+        .setOffset(new LongMsgOffset(5), new LongMsgOffset(6))
+        .build();
+    StreamMessageMetadata noTimestampIngestionTime = new StreamMessageMetadata.Builder()
+        .setOffset(new LongMsgOffset(5), new LongMsgOffset(6))
+        .setRecordIngestionTimeMs(-1L)
+        .build();
+    StreamMessageMetadata zeroIngestionTime = new StreamMessageMetadata.Builder()
+        .setOffset(new LongMsgOffset(5), new LongMsgOffset(6))
+        .setRecordIngestionTimeMs(0L)
+        .build();
+
+    Map<String, ConsumerPartitionState> stateMap = new HashMap<>();
+    stateMap.put("0", new ConsumerPartitionState("0", new LongMsgOffset(5), lastProcessedTimeMs,
+        new LongMsgOffset(10), validMetadata));
+    stateMap.put("1", new ConsumerPartitionState("1", new LongMsgOffset(5), lastProcessedTimeMs,
+        new LongMsgOffset(10), unsetIngestionTime));
+    stateMap.put("2", new ConsumerPartitionState("2", new LongMsgOffset(5), lastProcessedTimeMs,
+        new LongMsgOffset(10), noTimestampIngestionTime));
+    stateMap.put("3", new ConsumerPartitionState("3", new LongMsgOffset(5), lastProcessedTimeMs,
+        new LongMsgOffset(10), zeroIngestionTime));
+
+    Map<String, PartitionLagState> lagState = _kinesisStreamMetadataProvider.getCurrentPartitionLagState(stateMap);
+
+    Assert.assertEquals(lagState.get("0").getAvailabilityLagMs(), "1000");
+    // Regression for issue #18836: an invalid ingestion time must report the NOT_CALCULATED sentinel instead of an
+    // epoch-sized value (lastProcessedTimeMs - Long.MIN_VALUE, or lastProcessedTimeMs - (-1) ~= now).
+    Assert.assertEquals(lagState.get("1").getAvailabilityLagMs(), PartitionLagState.NOT_CALCULATED);
+    Assert.assertEquals(lagState.get("2").getAvailabilityLagMs(), PartitionLagState.NOT_CALCULATED);
+    Assert.assertEquals(lagState.get("3").getAvailabilityLagMs(), PartitionLagState.NOT_CALCULATED);
   }
 }

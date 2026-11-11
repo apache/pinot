@@ -22,9 +22,7 @@ import java.io.IOException;
 import java.util.Base64;
 
 
-/**
- * The {@code IdSet} represents a collection of ids. It can be used to optimize the query with huge IN clause.
- */
+/// The `IdSet` represents a collection of ids. It can be used to optimize the query with huge IN clause.
 public interface IdSet {
 
   enum Type {
@@ -42,110 +40,79 @@ public interface IdSet {
     }
   }
 
-  /**
-   * Returns the type of the IdSet.
-   */
+  /// Returns the type of the IdSet.
   Type getType();
 
-  /**
-   * Adds an INT id into the IdSet.
-   */
+  /// Adds an INT id into the IdSet.
   default void add(int id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Adds a LONG id into the IdSet.
-   */
+  /// Adds a LONG id into the IdSet.
   default void add(long id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Adds a FLOAT id into the IdSet.
-   */
+  /// Adds a FLOAT id into the IdSet.
   default void add(float id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Adds a DOUBLE id into the IdSet.
-   */
+  /// Adds a DOUBLE id into the IdSet.
   default void add(double id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Adds a STRING id into the IdSet.
-   */
+  /// Adds a STRING id into the IdSet.
   default void add(String id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Adds a BYTES id into the IdSet.
-   */
+  /// Adds a BYTES id into the IdSet.
   default void add(byte[] id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns {@code true} if the IdSet contains the given INT id, {@code false} otherwise.
-   */
+  /// Returns `true` if the IdSet contains the given INT id, `false` otherwise.
   default boolean contains(int id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns {@code true} if the IdSet contains the given LONG id, {@code false} otherwise.
-   */
+  /// Returns `true` if the IdSet contains the given LONG id, `false` otherwise.
   default boolean contains(long id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns {@code true} if the IdSet contains the given FLOAT id, {@code false} otherwise.
-   */
+  /// Returns `true` if the IdSet contains the given FLOAT id, `false` otherwise.
   default boolean contains(float id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns {@code true} if the IdSet contains the given DOUBLE id, {@code false} otherwise.
-   */
+  /// Returns `true` if the IdSet contains the given DOUBLE id, `false` otherwise.
   default boolean contains(double id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns {@code true} if the IdSet contains the given STRING id, {@code false} otherwise.
-   */
+  /// Returns `true` if the IdSet contains the given STRING id, `false` otherwise.
   default boolean contains(String id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns {@code true} if the IdSet contains the given BYTES id, {@code false} otherwise.
-   */
+  /// Returns `true` if the IdSet contains the given BYTES id, `false` otherwise.
   default boolean contains(byte[] id) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns the number of bytes required to serialize the IdSet.
-   */
+  /// Returns the number of bytes required to serialize the IdSet.
   int getSerializedSizeInBytes();
 
-  /**
-   * Serializes the IdSet into a byte array.
-   */
+  /// Serializes the IdSet into a byte array.
   byte[] toBytes()
       throws IOException;
 
-  /**
-   * Serializes the IdSet into a Base64 string.
-   * <p>Use Base64 instead of Hex encoding for better compression.
-   */
+  /// Serializes the IdSet into a Base64 string.
+  ///
+  /// Use Base64 instead of Hex encoding for better compression.
   default String toBase64String()
       throws IOException {
     return Base64.getEncoder().encodeToString(toBytes());

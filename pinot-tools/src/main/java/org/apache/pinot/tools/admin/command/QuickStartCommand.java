@@ -55,6 +55,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       description = "Config file path to override default pinot configs")
   private String _configFilePath;
 
+  @CommandLine.Option(names = {"-kafkaBrokerList"}, required = false,
+      description = "Kafka broker list for streaming quickstarts (e.g. localhost:9092)")
+  private String _kafkaBrokerList;
+
   @Override
   public String getName() {
     return "QuickStart";
@@ -109,6 +113,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     _configFilePath = configFilePath;
   }
 
+  public void setKafkaBrokerList(String kafkaBrokerList) {
+    _kafkaBrokerList = kafkaBrokerList;
+  }
+
   @Override
   public String toString() {
     return ("QuickStart -type " + _type);
@@ -128,7 +136,14 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     Set<Class<? extends QuickStartBase>> quickStarts = allQuickStarts();
     for (Class<? extends QuickStartBase> quickStart : quickStarts) {
       QuickStartBase quickStartBase = quickStart.getDeclaredConstructor().newInstance();
-      if (quickStartBase.types().contains(type.toUpperCase())) {
+      String upperCaseType = type.toUpperCase();
+      if (quickStartBase.types().contains(upperCaseType)) {
+        if (quickStartBase.deprecatedTypes().contains(upperCaseType)) {
+          String canonicalType = quickStartBase.types().get(0);
+          LOGGER.warn("QuickStart type {} has been merged into {} and is kept only as an alias. "
+              + "Use -type {} instead; it runs these sample queries along with the rest", upperCaseType, canonicalType,
+              canonicalType);
+        }
         return quickStartBase;
       }
     }
@@ -166,6 +181,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       quickstart.setConfigFilePath(_configFilePath);
     }
 
+    if (_kafkaBrokerList != null) {
+      quickstart.setKafkaBrokerList(_kafkaBrokerList);
+    }
+
     quickstart.execute();
     return true;
   }
@@ -174,7 +193,13 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       throws InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
     List<String> validTypes = new ArrayList<>();
     for (Class<? extends QuickStartBase> quickStart : quickStarts) {
-      validTypes.addAll(quickStart.getDeclaredConstructor().newInstance().types());
+      QuickStartBase quickStartBase = quickStart.getDeclaredConstructor().newInstance();
+      // Deprecated aliases still resolve, but should not be advertised to someone picking a type for the first time.
+      for (String type : quickStartBase.types()) {
+        if (!quickStartBase.deprecatedTypes().contains(type)) {
+          validTypes.add(type);
+        }
+      }
     }
     return validTypes;
   }

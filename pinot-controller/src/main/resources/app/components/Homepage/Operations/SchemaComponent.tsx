@@ -22,7 +22,6 @@ import { createStyles, FormControl, Grid, IconButton, Input, InputLabel, makeSty
 import AddIcon from '@material-ui/icons/Add';
 import ClearIcon from '@material-ui/icons/Clear';
 import { Autocomplete } from '@material-ui/lab';
-import { debug } from 'webpack';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -107,8 +106,8 @@ export default function SchemaComponent({
     dateTimeFieldSpecs: []
   };
   const defaultDataTypeOptions = {
-    dimension: ["INT", "LONG", "STRING", "FLOAT", "DOUBLE", "BYTES", "BOOLEAN", "JSON"],
-    metric: ["INT", "LONG", "DOUBLE", "FLOAT", "BYTES"],
+    dimension: ["INT", "LONG", "STRING", "FLOAT", "DOUBLE", "BIG_DECIMAL", "BYTES", "BOOLEAN", "JSON", "UUID"],
+    metric: ["INT", "LONG", "DOUBLE", "FLOAT", "BIG_DECIMAL", "BYTES"],
     datetime: ["STRING", "INT", "LONG", "TIMESTAMP"]
   };
   const preFilledData = {

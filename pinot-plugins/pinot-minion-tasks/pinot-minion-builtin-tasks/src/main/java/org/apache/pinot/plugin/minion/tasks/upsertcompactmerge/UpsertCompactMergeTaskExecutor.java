@@ -20,10 +20,9 @@ package org.apache.pinot.plugin.minion.tasks.upsertcompactmerge;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -53,11 +52,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Minion task that compacts and merges multiple segments of an upsert table and uploads it back as one single
- * segment. This helps in keeping the segment count in check and also prevents a lot of small segments created over
- * time.
- */
+/// Minion task that compacts and merges multiple segments of an upsert table and uploads it back as one single
+/// segment. This helps in keeping the segment count in check and also prevents a lot of small segments created over
+/// time.
 public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactMergeTaskExecutor.class);
@@ -105,19 +102,28 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     long maxCreationTimeOfMergingSegments = getMaxZKCreationTimeFromConfig(configs);
 
     // validate if crc of deepstore copies is same as that in ZK of segments
-    List<String> originalSegmentCrcFromTaskGenerator =
-        List.of(configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY).split(","));
+    List<Long> originalSegmentCrcFromTaskGenerator =
+        Arrays.stream(configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY).split(",")).map(Long::parseLong)
+            .collect(Collectors.toList());
     validateCRCForInputSegments(segmentMetadataList, originalSegmentCrcFromTaskGenerator);
 
-    // Fetch validDocID snapshot from server and get record-reader for compacted reader.
+    // Executor-only: read comparison mode string from task config (no auth resolution or URL hits).
+    Map<String, String> taskConfigs =
+        tableConfig.getTaskConfig() != null ? tableConfig.getTaskConfig().getConfigsForTaskType(taskType) : null;
+    String consensusMode = taskConfigs != null ? taskConfigs.getOrDefault(
+        MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_CONSENSUS_MODE_KEY,
+        MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE)
+        : MinionConstants.UpsertCompactionTask.DEFAULT_VALID_DOC_IDS_CONSENSUS_MODE;
+
     List<RecordReader> recordReaders = segmentMetadataList.stream().map(x -> {
       RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, x.getName(),
-          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc());
+          ValidDocIdsType.SNAPSHOT.name(), MINION_CONTEXT, x.getCrc(), x.getDataCrc(), consensusMode);
       if (validDocIds == null) {
         // no valid crc match found or no validDocIds obtained from all servers
         // error out the task instead of silently failing so that we can track it via task-error metrics
-        String message = String.format("No validDocIds found from all servers. They either failed to download "
-            + "or did not match crc from segment copy obtained from deepstore / servers. " + "Expected crc: %s", "");
+        String message = "No validDocIds found from all servers for segment: " + x.getName()
+            + ". They either failed to download or did not match crc from segment copy obtained from "
+            + "deepstore/servers. Expected crc: " + x.getCrc();
         LOGGER.error(message);
         throw new IllegalStateException(message);
       }
@@ -133,7 +139,9 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     }
 
     // create new UploadedRealtimeSegment
-    segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments);
+    // set the creation time to maxCreationTimeOfMergingSegments + 1 to ensure that all records in merging
+    // segments are replaced with new merged segment
+    segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments + 1);
     segmentProcessorConfigBuilder.setSegmentNameGenerator(
         new UploadedRealtimeSegmentNameGenerator(TableNameBuilder.extractRawTableName(tableNameWithType), partitionID,
             System.currentTimeMillis(), MinionConstants.UpsertCompactMergeTask.MERGED_SEGMENT_NAME_PREFIX, null));
@@ -141,7 +149,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     List<File> outputSegmentDirs;
     _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
     SegmentProcessorFramework framework = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
-        recordReaderFileConfigs, Collections.emptyList(), new DefaultSegmentNumRowProvider(Integer.parseInt(
+        recordReaderFileConfigs, List.of(), new DefaultSegmentNumRowProvider(Integer.parseInt(
         configs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY))));
     outputSegmentDirs = framework.process();
     _eventObserver.notifyProgress(_pinotTaskConfig,
@@ -192,10 +200,10 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     return partitionIDSet.iterator().next();
   }
 
-  void validateCRCForInputSegments(List<SegmentMetadataImpl> segmentMetadataList, List<String> expectedCRCList) {
+  void validateCRCForInputSegments(List<SegmentMetadataImpl> segmentMetadataList, List<Long> expectedCRCList) {
     for (int i = 0; i < segmentMetadataList.size(); i++) {
       SegmentMetadataImpl segmentMetadata = segmentMetadataList.get(i);
-      if (!Objects.equals(segmentMetadata.getCrc(), expectedCRCList.get(i))) {
+      if (segmentMetadata.getCrc() != expectedCRCList.get(i)) {
         String message = String.format("Crc mismatched between ZK and deepstore copy of segment: %s. Expected crc "
                 + "from ZK: %s, crc from deepstore: %s", segmentMetadata.getName(), expectedCRCList.get(i),
             segmentMetadata.getCrc());
@@ -205,13 +213,11 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     }
   }
 
-  /**
-   * Retrieves the max ZK creation time from task configuration with proper null handling.
-   *
-   * @param configs Task configuration map
-   * @return Max ZK creation time in milliseconds
-   * @throws IllegalStateException if the configuration value is invalid
-   */
+  /// Retrieves the max ZK creation time from task configuration with proper null handling.
+  ///
+  /// @param configs Task configuration map
+  /// @return Max ZK creation time in milliseconds
+  /// @throws IllegalStateException if the configuration value is invalid
   long getMaxZKCreationTimeFromConfig(Map<String, String> configs) {
     String maxCreationTimeStr = configs.get(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY);
     if (maxCreationTimeStr == null) {

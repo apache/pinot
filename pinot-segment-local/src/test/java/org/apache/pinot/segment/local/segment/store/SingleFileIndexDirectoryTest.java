@@ -23,20 +23,22 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.index.Term;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -238,8 +240,7 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
   @Test
   public void testRemoveTextIndices()
       throws IOException, ConfigurationException {
-    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-        null, null, false, false, 0, false, null);
+    TextIndexConfig config = new TextIndexConfigBuilder().build();
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -252,24 +253,36 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
       buf.putChar(111, 'h');
 
       fooCreator.add("{\"clean\":\"this\"}");
+      fooCreator.add("{\"other\":\"that\"}");
+      // Keep valid nonidentity mappings so removal covers both the index and its required sidecar.
+      fooCreator.getIndexWriter().updateNumericDocValue(new Term("foo", "clean"),
+          LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, 1);
+      fooCreator.getIndexWriter().updateNumericDocValue(new Term("foo", "other"),
+          LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, 0);
       fooCreator.seal();
       barCreator.add("{\"retain\":\"this\"}");
       barCreator.add("{\"keep\":\"this\"}");
       barCreator.add("{\"hold\":\"this\"}");
+      barCreator.getIndexWriter().updateNumericDocValue(new Term("bar", "retain"),
+          LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, 2);
+      barCreator.getIndexWriter().updateNumericDocValue(new Term("bar", "hold"),
+          LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME, 0);
       barCreator.seal();
     }
 
     // Remove the Text index to trigger cleanup.
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
       assertTrue(sfd.hasIndexFor("foo", StandardIndexes.text()));
-      // Use TextIndex once to trigger the creation of mapping files.
-      try (LuceneTextIndexReader fooReader = new LuceneTextIndexReader("foo", TEMP_DIR, 1, new HashMap<>())) {
-        fooReader.getDocIds("clean");
+      // Verify that the persisted mappings translate the permuted IDs before cleanup.
+      try (LuceneTextIndexReader fooReader = new LuceneTextIndexReader("foo", TEMP_DIR, 2, new HashMap<>())) {
+        assertEquals(fooReader.getDocIds("clean", null).toArray(), new int[]{1});
       }
       try (LuceneTextIndexReader barReader = new LuceneTextIndexReader("bar", TEMP_DIR, 3, new HashMap<>())) {
-        barReader.getDocIds("retain hold");
+        assertEquals(barReader.getDocIds("retain", null).toArray(), new int[]{2});
       }
 
+      assertTrue(
+          new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
       // Both files for TextIndex should be removed.
       sfd.removeIndex("foo", StandardIndexes.text());
       assertFalse(new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists());
@@ -296,6 +309,7 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
 
       // Check if the text index still work.
       try (LuceneTextIndexReader barReader = new LuceneTextIndexReader("bar", TEMP_DIR, 3, new HashMap<>())) {
+        assertEquals(barReader.getDocIds("retain", null).toArray(), new int[]{2});
         MutableRoaringBitmap ids = barReader.getDocIds("retain hold");
         assertTrue(ids.contains(0));
         assertTrue(ids.contains(2));
@@ -354,8 +368,7 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
   @Test
   public void testGetColumnIndices()
       throws Exception {
-    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-        null, null, false, false, 0, false, null);
+    TextIndexConfig config = new TextIndexConfigBuilder().build();
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -387,10 +400,10 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.forward()),
           new HashSet<>(Arrays.asList("col1", "col3")));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.dictionary()),
-          new HashSet<>(Collections.singletonList("col2")));
+          new HashSet<>(List.of("col2")));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.inverted()),
-          new HashSet<>(Collections.singletonList("col4")));
-      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.singletonList("col5")));
+          new HashSet<>(List.of("col4")));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(List.of("col5")));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.text()), new HashSet<>(Arrays.asList("foo", "bar")));
 
       sfd.removeIndex("col1", StandardIndexes.forward());
@@ -400,13 +413,67 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
       sfd.removeIndex("col111", StandardIndexes.dictionary());
 
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.forward()),
-          new HashSet<>(Collections.singletonList("col3")));
-      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.dictionary()), new HashSet<>(Collections.emptySet()));
+          new HashSet<>(List.of("col3")));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.dictionary()), new HashSet<>(Set.of()));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.inverted()),
-          new HashSet<>(Collections.singletonList("col4")));
-      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.emptySet()));
+          new HashSet<>(List.of("col4")));
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Set.of()));
       assertEquals(sfd.getColumnsWithIndex(StandardIndexes.text()),
-          new HashSet<>(Collections.singletonList("bar")));
+          new HashSet<>(List.of("bar")));
     }
+  }
+
+  /// Vector indexes may live either as a sibling file next to `columns.psf` or as a typed entry
+  /// inside it, so `getColumnsWithIndex(vector())` has to union a filesystem view with
+  /// `_columnEntries`. Discovery is purely name-based (`<column><extension>`), which is what this
+  /// asserts — including the two ways a name-based scan can go wrong: crediting a sidecar to a column
+  /// that is not in the segment, and mis-parsing a file whose name merely *contains* an extension.
+  @Test
+  public void testGetColumnsWithVectorIndex()
+      throws Exception {
+    // Sidecar forms, one per extension family, to cover more than a single spelling.
+    createEmptyFile("hnswCol" + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION);
+    createEmptyFile("ivfCol" + V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+    // Lucene-backed vector indexes are directories, not files — both must be discovered.
+    FileUtils.forceMkdir(new File(TEMP_DIR, "dirCol" + V1Constants.Indexes.VECTOR_V912_INDEX_FILE_EXTENSION));
+    // A sidecar for a column the segment does not declare must not be reported.
+    createEmptyFile("strayCol" + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION);
+    // A name that merely contains an extension is not "<column><extension>" for any real column, so
+    // it must not be credited to anything. This is the case a suffix-stripping scan gets wrong.
+    createEmptyFile("notAColumn" + V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION + ".bak");
+
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      // A consolidated vector index — tracked in _columnEntries rather than on disk.
+      PinotDataBuffer buf = sfd.newBuffer("psfCol", StandardIndexes.vector(), 1024);
+      buf.putInt(0, 777);
+    }
+
+    when(_segmentMetadata.getAllColumns()).thenReturn(
+        new TreeSet<>(Arrays.asList("hnswCol", "ivfCol", "dirCol", "psfCol", "plainCol")));
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.vector()),
+          new HashSet<>(Arrays.asList("hnswCol", "ivfCol", "dirCol", "psfCol")));
+    }
+  }
+
+  /// A segment with no vector index anywhere reports none — the common case, and the one that used to
+  /// cost `columns × extensions` existence probes to answer.
+  @Test
+  public void testGetColumnsWithVectorIndexWhenAbsent()
+      throws Exception {
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      PinotDataBuffer buf = sfd.newBuffer("col1", StandardIndexes.forward(), 1024);
+      buf.putInt(0, 111);
+    }
+    when(_segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Arrays.asList("col1", "col2")));
+    try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.vector()), Set.of());
+      assertEquals(sfd.getColumnsWithIndex(StandardIndexes.text()), Set.of());
+    }
+  }
+
+  private static void createEmptyFile(String name)
+      throws IOException {
+    FileUtils.touch(new File(TEMP_DIR, name));
   }
 }

@@ -26,10 +26,8 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 
 
-/**
- * Sends blocks to a specific server, with the expectation that only one
- * server is ever on the receiving end.
- */
+/// Sends blocks to a specific server, with the expectation that only one
+/// server is ever on the receiving end.
 class SingletonExchange extends BlockExchange {
 
   SingletonExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,

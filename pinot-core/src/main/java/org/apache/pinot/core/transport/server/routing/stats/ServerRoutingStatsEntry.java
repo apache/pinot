@@ -20,16 +20,14 @@ package org.apache.pinot.core.transport.server.routing.stats;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.common.utils.ExponentialMovingAverage;
 
 
-/**
- *
- *  {@code ServerRoutingStatsEntry} contains the query routing stats for a server. All access to
- *  ServerRoutingStatsEntry should be made through ServerRoutingStatsManager.
- */
+/// `ServerRoutingStatsEntry` contains the query routing stats for a server. All access to
+/// ServerRoutingStatsEntry should be made through ServerRoutingStatsManager.
 public class ServerRoutingStatsEntry {
   String _serverInstanceId;
   private final ReentrantReadWriteLock _serverLock;
@@ -44,8 +42,11 @@ public class ServerRoutingStatsEntry {
   // Hybrid score exponent.
   private final int _hybridScoreExponent;
 
+  // Hybrid score queue size floor (added to A+B before exponentiation to avoid score collapsing to 0 when idle).
+  private final int _hybridScoreQueueFloor;
+
   public ServerRoutingStatsEntry(String serverInstanceId, double alphaEMA, long autoDecayWindowMsEMA,
-      long warmupDurationMsEMA, double avgInitializationValEMA, int scoreExponent,
+      long warmupDurationMsEMA, double avgInitializationValEMA, int scoreExponent, int queueFloor,
       ScheduledExecutorService periodicTaskExecutor) {
     _serverInstanceId = serverInstanceId;
     _serverLock = new ReentrantReadWriteLock();
@@ -58,6 +59,8 @@ public class ServerRoutingStatsEntry {
             periodicTaskExecutor);
 
     _hybridScoreExponent = scoreExponent;
+    Preconditions.checkArgument(queueFloor >= 0, "queueFloor must be non-negative, got: %s", queueFloor);
+    _hybridScoreQueueFloor = queueFloor;
   }
 
   @JsonIgnore
@@ -84,7 +87,7 @@ public class ServerRoutingStatsEntry {
 
   @JsonProperty("hybridScore")
   public double computeHybridScore() {
-    double estimatedQSize = _numInFlightRequests + _inFlighRequestsEMA.getAverage();
+    double estimatedQSize = _hybridScoreQueueFloor + _numInFlightRequests + _inFlighRequestsEMA.getAverage();
     return Math.pow(estimatedQSize, _hybridScoreExponent) * _latencyMsEMA.getAverage();
   }
 

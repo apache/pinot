@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -40,12 +41,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The instance replica-group/partition selector is responsible for selecting the instances for every replica-group/
- * partition, with each fault-domain mapping 1:1 to a server pool
- * Algorithm details and proof see
- * https://docs.google.com/document/d/1KmJ1DsYXVdzrojj_JYBHRJ2gRMQ5y-o63YqPs7ei7nI/edit#heading=h.nrxxvujq7ael
- */
+/// The instance replica-group/partition selector is responsible for selecting the instances for every replica-group/
+/// partition, with each fault-domain mapping 1:1 to a server pool
+/// Algorithm details and proof see
+/// https://docs.google.com/document/d/1KmJ1DsYXVdzrojj_JYBHRJ2gRMQ5y-o63YqPs7ei7nI/edit#heading=h.nrxxvujq7ael
 public class FDAwareInstancePartitionSelector extends InstancePartitionSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(FDAwareInstancePartitionSelector.class);
 
@@ -54,9 +53,7 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
     super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions, minimizeDataMovement);
   }
 
-  /**
-   * @return pair of (numFaultDomains, numTotalInstances)
-   */
+  /// @return pair of (numFaultDomains, numTotalInstances)
   private Pair<Integer, Integer> processFaultDomainPreconditions(
       Map<Integer, List<InstanceConfig>> faultDomainToInstanceConfigsMap) {
     int numFDs = faultDomainToInstanceConfigsMap.size();
@@ -76,9 +73,7 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
     return new ImmutablePair<>(numFDs, numTotalInstances);
   }
 
-  /**
-   * @return (numReplicaGroups, numInstancesPerReplicaGroup)
-   */
+  /// @return (numReplicaGroups, numInstancesPerReplicaGroup)
   private Pair<Integer, Integer> processReplicaGroupAssignmentPreconditions(int numFaultDomains, int numTotalInstances,
       InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
     int numReplicaGroups = replicaGroupPartitionConfig.getNumReplicaGroups();
@@ -134,8 +129,8 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       Map<Integer, LinkedHashSet<String>> faultDomainToCandidateInstancesMap = new TreeMap<>();
       faultDomainToInstanceConfigsMap.forEach(
           (k, v) -> faultDomainToCandidateInstancesMap.put(k, new LinkedHashSet<String>() {{
-            v.forEach(instance -> add(instance.getInstanceName()));
-          }}));
+              v.forEach(instance -> add(instance.getInstanceName()));
+            }}));
 
       // create an instance_name -> FD_id map, just for look up
       Map<String, Integer> aliveInstanceNameToFDMap = new HashMap<>();
@@ -190,7 +185,7 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       // preprocess the problem of numReplicaGroups >= numFaultDomains to a problem
       replicaGroupBasedAssignmentState.normalize(faultDomainToCandidateInstancesMap);
 
-      // fill the remaining vacant seats
+      // fill the remaining vacant seats if any
       replicaGroupBasedAssignmentState.fill(faultDomainToCandidateInstancesMap);
 
       // adjust the instance assignment to achieve the invariant state
@@ -291,7 +286,6 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
     int _mapDimInstancePerReplicaGroup;
     HashMap<String, Integer> _usedInstances = new HashMap<>();
     int _numFaultDomains;
-    int[][] _fdCounter;
 
     ReplicaGroupBasedAssignmentState(int numReplicaGroups, int numInstancesPerReplicaGroup,
         int numExistingReplicaGroups, int numExistingInstancesPerReplicaGroup, int numFaultDomains) {
@@ -305,16 +299,13 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       _mapDimInstancePerReplicaGroup = Math.max(numExistingInstancesPerReplicaGroup, numInstancesPerReplicaGroup);
 
       _replicaGroupIdToInstancesMap = new Instance[_mapDimReplicaGroup][_mapDimInstancePerReplicaGroup];
-      _fdCounter = new int[_mapDimInstancePerReplicaGroup][_numFaultDomains];
     }
 
     ReplicaGroupBasedAssignmentState(int numReplicaGroups, int numInstancesPerReplicaGroup, int numFaultDomains) {
       this(numReplicaGroups, numInstancesPerReplicaGroup, 0, numInstancesPerReplicaGroup, numFaultDomains);
     }
 
-    /**
-     * preprocess the downsizing and exclude unchanged existing assigment from the candidate list
-     */
+    /// preprocess the downsizing and exclude unchanged existing assigment from the candidate list
     public void preprocessing(Map<Integer, LinkedHashSet<String>> faultDomainToCandidateInstancesMap) {
       if (_numReplicaGroups < _numExistingReplicaGroups
           || _numInstancesPerReplicaGroup < _numExistingInstancesPerReplicaGroup) {
@@ -331,25 +322,19 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       Preconditions.checkState(instance.getExistingReplicaGroupId() == Instance.NEW_INSTANCE);
       _replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex] = instance;
       _usedInstances.put(instance.getInstanceName(), instance.getFaultDomainId());
-      _fdCounter[instanceIndex][instance.getFaultDomainId()] += 1;
     }
 
     private void setExistingInstance(int replicaGroupId, int instanceIndex, String instance, int fdId) {
       _replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex] = new Instance(instance, fdId, replicaGroupId);
       _usedInstances.put(instance, fdId);
-      _fdCounter[instanceIndex][fdId] += 1;
     }
 
     private void unSetInstance(int replicaGroupId, int instanceIndex) {
-      int fdId = _replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex].getFaultDomainId();
       _usedInstances.remove(_replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex].getInstanceName());
       _replicaGroupIdToInstancesMap[replicaGroupId][instanceIndex] = null;
-      _fdCounter[instanceIndex][fdId] -= 1;
     }
 
-    /**
-     * From an exising replica group, remove the instances that are gone and set them in _replicaGroupIdToInstancesMap
-     */
+    /// From an exising replica group, remove the instances that are gone and set them in \_replicaGroupIdToInstancesMap
     public void reconstructExistingAssignment(LinkedHashSet<String> existingReplicaGroup, int replicaGroupId,
         Map<String, Integer> aliveInstanceNameToFDMap) {
       int instanceIndex = 0;
@@ -372,10 +357,9 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       return _usedInstances;
     }
 
-    /**
-     * this function ensures that: for instances with the same instance id (_replicaGroupIdToInstancesMap[*][id]),
-     * there are at least ceil(numReplicaGroups/numFaultDomain) instances from each fault domain
-     */
+    /// this function ensures that: for instances with the same instance id
+    /// (\_replicaGroupIdToInstancesMap\[\*\]\[id\]),
+    /// there are at least ceil(numReplicaGroups/numFaultDomain) instances from each fault domain
     public void normalize(Map<Integer, LinkedHashSet<String>> faultDomainToCandidateInstancesMap) {
       LOGGER.info("Warning, normalizing isn't finished yet");
       //TODO: Finish normalizing for numReplicaGroups>numFaultDomains
@@ -385,10 +369,13 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       return _replicaGroupIdToInstancesMap[replicaGroupId][instanceId] == null;
     }
 
-    /**
-     * Fill the vacant instances
-     */
+    /// Fill the vacant instances
     public void fill(Map<Integer, LinkedHashSet<String>> faultDomainToCandidateInstancesMap) {
+      // skip filling if there is no candidate instance, which can happen when minimize data movement is enabled and
+      // no new instances are added to any pool
+      if (faultDomainToCandidateInstancesMap.values().stream().allMatch(Set::isEmpty)) {
+        return;
+      }
       // convert set to que and start to assign
       CandidateQueue candidateQueue = new CandidateQueue(faultDomainToCandidateInstancesMap);
       if (_numReplicaGroups != 0) { // uplift instance per replica group first if not a fresh new assignment

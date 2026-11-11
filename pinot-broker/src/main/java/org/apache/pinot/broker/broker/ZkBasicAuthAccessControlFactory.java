@@ -19,22 +19,24 @@
 package org.apache.pinot.broker.broker;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.ws.rs.NotAuthorizedException;
+import javax.ws.rs.core.HttpHeaders;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
@@ -43,15 +45,16 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Zookeeper Basic Authentication based on Pinot Controller UI.
- * The user role has been distinguished by user and admin. Only admin can have access to the
- * user console page in Pinot controller UI. And admin can change user info (table permission/
- * number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
- * and these changes happen immediately.
- * Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
- *
- */
+/// Zookeeper Basic Authentication based on Pinot Controller UI.
+/// The user role has been distinguished by user and admin. Only admin can have access to the
+/// user console page in Pinot controller UI. And admin can change user info (table permission/
+/// number of tables/password etc.) or add/delete user without restarting your Pinot clusters,
+/// and these changes happen immediately.
+/// Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
+///
+/// Users query the tables they have access to, matched by raw table name. Deleting rows with a SQL `DELETE` also
+/// requires the `DELETE` permission, granted explicitly: unlike on the controller, where a user without permissions
+/// has them all, a user without permissions does not delete rows through the broker.
 public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
   private AccessControl _accessControl;
@@ -70,9 +73,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
     return _accessControl;
   }
 
-  /**
-   * Access Control using header-based basic http authentication
-   */
+  /// Access Control using header-based basic http authentication
   private static class BasicAuthAccessControl implements AccessControl {
     private Map<String, ZkBasicAuthPrincipal> _name2principal;
     private final AccessControlUserCache _userCache;
@@ -94,7 +95,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
 
-      return authorize(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
+      return authorize(requesterIdentity, Set.of(brokerRequest.getQuerySource().getTableName()));
     }
 
     @Override
@@ -120,26 +121,50 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
       return new TableAuthorizationResult(failedTables);
     }
 
+    @Override
+    public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+        @Nullable HttpHeaders httpHeaders, String tableName) {
+      ZkBasicAuthPrincipal principal = getPrincipalAuth(requesterIdentity).orElse(null);
+      // The table is matched by raw name, as for queries
+      return BasicAuthPrincipalUtils.authorizeDeleteRows(principal, tableName,
+          principal != null && principal.hasTable(TableNameBuilder.extractRawTableName(tableName)));
+    }
+
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
       Collection<String> tokens = extractAuthorizationTokens(requesterIdentity);
-      if (tokens.isEmpty()) {
+      if (tokens == null || tokens.isEmpty()) {
         return Optional.empty();
       }
 
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig()).stream()
-          .collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
+      Map<String, ZkBasicAuthPrincipal> name2principal =
+          BasicAuthPrincipalUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig()).stream()
+              .collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
 
-      Map<String, String> name2password = tokens.stream().collect(
-          Collectors.toMap(
-              org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
-              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword,
-              (v1, v2) -> v2));
-      Map<String, ZkBasicAuthPrincipal> password2principal =
-          name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
+      for (String token : tokens) {
+        String username = BasicAuthTokenUtils.extractUsername(token);
+        String password = BasicAuthTokenUtils.extractPassword(token);
 
-      return password2principal.entrySet().stream().filter(
-          entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
-              _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
+        if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
+          continue;
+        }
+
+        ZkBasicAuthPrincipal principal = name2principal.get(username);
+        if (principal == null) {
+          continue;
+        }
+
+        if (passwordMatches(principal, password)) {
+          return Optional.of(principal);
+        }
+      }
+      return Optional.empty();
+    }
+
+    private boolean passwordMatches(ZkBasicAuthPrincipal principal, String password) {
+      return BcryptUtils.checkpwWithCache(
+          password,
+          principal.getPassword(),
+          _userCache.getUserPasswordAuthCache());
     }
   }
 }

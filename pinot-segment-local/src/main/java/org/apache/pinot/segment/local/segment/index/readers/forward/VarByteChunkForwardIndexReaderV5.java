@@ -19,18 +19,17 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Chunk-based raw (non-dictionary-encoded) forward index reader for values of SV variable length data types
- * (BIG_DECIMAL, STRING, BYTES), MV fixed length and MV variable length data types.
- * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriterV4}
- */
+/// Chunk-based raw (non-dictionary-encoded) forward index reader for values of SV variable length data types
+/// (BIG_DECIMAL, STRING, BYTES), MV fixed length and MV variable length data types.
+///
+/// For data layout, please refer to the documentation for
+/// [org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4]
 public class VarByteChunkForwardIndexReaderV5 extends VarByteChunkForwardIndexReaderV4 {
   public VarByteChunkForwardIndexReaderV5(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
@@ -85,9 +84,10 @@ public class VarByteChunkForwardIndexReaderV5 extends VarByteChunkForwardIndexRe
   @Override
   public int getNumValuesMV(int docId, ReaderContext context) {
     byte[] bytes = context.getValue(docId);
-    int valueSize = getStoredType().size();
-    if (valueSize > 0) {
-      return bytes.length / valueSize;
+    // Use isFixedWidth() instead of size() > 0 because size() throws for variable-length types (STRING, BYTES)
+    FieldSpec.DataType storedType = getStoredType();
+    if (storedType.isFixedWidth()) {
+      return bytes.length / storedType.size();
     } else {
       return ByteBuffer.wrap(bytes).getInt();
     }

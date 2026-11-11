@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -33,7 +33,7 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class CountAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
+public class CountAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
   private static final String COUNT_STAR_RESULT_COLUMN_NAME = "count(*)";
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
   // Special expression used by star-tree to pass in BlockValSet
@@ -67,7 +67,7 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
 
   @Override
   public List<ExpressionContext> getInputExpressions() {
-    return _nullHandlingEnabled ? super.getInputExpressions() : Collections.emptyList();
+    return _nullHandlingEnabled ? super.getInputExpressions() : List.of();
   }
 
   @Override
@@ -204,8 +204,8 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
   }
 
   @Override
-  public Long extractFinalResult(Long intermediateResult) {
-    return intermediateResult;
+  public Long extractFinalResult(@Nullable Long intermediateResult) {
+    return intermediateResult != null ? intermediateResult : 0L;
   }
 
   @Override

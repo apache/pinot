@@ -98,6 +98,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
 
     //init segment generation config
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setInstanceType(InstanceType.MINION);
     segmentGeneratorConfig.setTableName(tableName);
     segmentGeneratorConfig.setOutDir(_taskSpec.getOutputDirectoryPath());
     segmentGeneratorConfig.setSequenceId(_taskSpec.getSequenceId());
@@ -113,7 +114,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
 
     //build segment
     SegmentIndexCreationDriverImpl segmentIndexCreationDriver = new SegmentIndexCreationDriverImpl();
-    segmentIndexCreationDriver.init(segmentGeneratorConfig, InstanceType.MINION);
+    segmentIndexCreationDriver.init(segmentGeneratorConfig);
     segmentIndexCreationDriver.build();
     return segmentIndexCreationDriver.getSegmentName();
   }

@@ -39,16 +39,21 @@ import org.apache.pinot.spi.utils.ReadMode;
 
 
 class FilePerIndexDirectory extends ColumnIndexDirectory {
+  /// Suffix of the [IllegalArgumentException] message thrown when `getIndexFor` resolves
+  /// an on-disk artifact that is a directory (e.g. a legacy HNSW/text Lucene directory) rather than
+  /// a mappable regular file. `VectorIndexUtils#getConsolidatedVectorEntry` matches against
+  /// this constant (same package) to treat that case as "no consolidated entry" instead of failing
+  /// the caller — keep the precondition message wired to it so the two sides cannot drift.
+  static final String NOT_A_REGULAR_FILE_MESSAGE_SUFFIX = " must be a regular file";
+
   private final File _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
   private final Map<IndexKey, PinotDataBuffer> _indexBuffers = new HashMap<>();
 
-  /**
-   * @param segmentDirectory File pointing to segment directory
-   * @param segmentMetadata segment metadata. Metadata must be fully initialized
-   * @param readMode mmap vs heap mode
-   */
+  /// @param segmentDirectory File pointing to segment directory
+  /// @param segmentMetadata segment metadata. Metadata must be fully initialized
+  /// @param readMode mmap vs heap mode
   protected FilePerIndexDirectory(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode) {
     Preconditions.checkNotNull(segmentDirectory);
     Preconditions.checkNotNull(readMode);
@@ -99,8 +104,20 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
-    // TODO: this leaks the removed data buffer (it's not going to be freed in close() method)
-    _indexBuffers.remove(new IndexKey(columnName, indexType));
+    IndexKey key = new IndexKey(columnName, indexType);
+    // Fetch the buffer without removing it from the map first; the mapping is removed only after close() succeeds.
+    // If close() throws, the entry stays in _indexBuffers so a subsequent directory close() can attempt to release
+    // it on a best-effort basis (this class is not thread-safe; callers must serialize access).
+    PinotDataBuffer buffer = _indexBuffers.get(key);
+    if (buffer != null) {
+      try {
+        buffer.close();
+        _indexBuffers.remove(key);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            String.format("Failed to close index buffer for column: %s, indexType: %s", columnName, indexType), e);
+      }
+    }
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
     } else if (indexType == StandardIndexes.vector()) {
@@ -132,9 +149,11 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
     File file = getFileFor(key._name, key._type);
     if (!file.exists()) {
+      // Same "absent index" signal as SingleFileIndexDirectory; share its prefix so the
+      // VectorIndexUtils#getConsolidatedVectorEntry match stays valid for V1/V2-backed readers too.
       throw new RuntimeException(
-          "Could not find index for column: " + key._name + ", type: " + key._type + ", segment: " + _segmentDirectory
-              .toString());
+          SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX + ": " + key._name + ", type: " + key._type
+              + ", segment: " + _segmentDirectory.toString());
     }
     PinotDataBuffer buffer = mapForReads(file, key._type.getId() + ".reader");
     _indexBuffers.put(key, buffer);
@@ -189,7 +208,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     Preconditions.checkNotNull(file);
     Preconditions.checkNotNull(context);
     Preconditions.checkArgument(file.exists(), "File: " + file + " must exist");
-    Preconditions.checkArgument(file.isFile(), "File: " + file + " must be a regular file");
+    Preconditions.checkArgument(file.isFile(), "File: " + file + NOT_A_REGULAR_FILE_MESSAGE_SUFFIX);
     String allocationContext = allocationContext(file, context);
 
     // Backward-compatible: index file is always big-endian

@@ -19,9 +19,10 @@
 package org.apache.pinot.integration.tests.cursors;
 
 import com.google.auto.service.AutoService;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.CursorResponse;
@@ -33,8 +34,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 @AutoService(ResponseStore.class)
 public class MemoryResponseStore extends AbstractResponseStore {
-  private final Map<String, CursorResponse> _cursorResponseMap = new HashMap<>();
-  private final Map<String, ResultTable> _resultTableMap = new HashMap<>();
+  // ConcurrentHashMap required: broker cleanup cron and request-handling threads access these maps concurrently.
+  private final Map<String, CursorResponse> _cursorResponseMap = new ConcurrentHashMap<>();
+  private final Map<String, ResultTable> _resultTableMap = new ConcurrentHashMap<>();
 
   private static final String TYPE = "memory";
 
@@ -54,9 +56,14 @@ public class MemoryResponseStore extends AbstractResponseStore {
     return 0;
   }
 
+  // throws Exception required by ResponseStore SPI contract. RuntimeExceptions guard against concurrent deletion.
   @Override
-  public CursorResponse readResponse(String requestId) {
+  public CursorResponse readResponse(String requestId)
+      throws Exception {
     CursorResponse response = _cursorResponseMap.get(requestId);
+    if (response == null) {
+      throw new RuntimeException("Response not found for requestId=" + requestId);
+    }
     CursorResponse responseCopy = new CursorResponseNative(response);
 
     responseCopy.setBrokerHost(response.getBrokerHost());
@@ -67,10 +74,17 @@ public class MemoryResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  protected ResultTable readResultTable(String requestId, int offset, int numRows) {
+  protected ResultTable readResultTable(String requestId, int offset, int numRows)
+      throws Exception {
     CursorResponse response = _cursorResponseMap.get(requestId);
-    int totalTableRows = response.getNumRowsResultSet();
+    if (response == null) {
+      throw new RuntimeException("Response not found for requestId=" + requestId);
+    }
     ResultTable resultTable = _resultTableMap.get(requestId);
+    if (resultTable == null) {
+      throw new RuntimeException("ResultTable not found for requestId=" + requestId);
+    }
+    int totalTableRows = response.getNumRowsResultSet();
     int sliceEnd = offset + numRows;
     if (sliceEnd > totalTableRows) {
       sliceEnd = totalTableRows;
@@ -94,11 +108,11 @@ public class MemoryResponseStore extends AbstractResponseStore {
 
   @Override
   public Collection<String> getAllStoredRequestIds() {
-    return _cursorResponseMap.keySet();
+    return new ArrayList<>(_cursorResponseMap.keySet());
   }
 
   @Override
   protected boolean deleteResponseImpl(String requestId) {
-    return _cursorResponseMap.remove(requestId) != null && _resultTableMap.remove(requestId) != null;
+    return _cursorResponseMap.remove(requestId) != null & _resultTableMap.remove(requestId) != null;
   }
 }

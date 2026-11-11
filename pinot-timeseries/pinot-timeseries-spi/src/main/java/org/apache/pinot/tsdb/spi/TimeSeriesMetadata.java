@@ -23,31 +23,23 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Interface for accessing time series table metadata.
- */
+/// Interface for accessing time series table metadata.
 public interface TimeSeriesMetadata {
-  /**
-   * Get the table config for a given table name
-   * @param tableName name of the table
-   * @return table config or null if not found
-   */
+  /// Get the table config for a given table name
+  /// @param tableName name of the table
+  /// @return table config or null if not found
   @Nullable
   TableConfig getTableConfig(String tableName);
 
-  /**
-   * Get the schema for a given raw table name
-   * @param rawTableName raw table name without type suffix
-   * @return schema or null if not found
-   */
+  /// Get the schema for a given raw table name
+  /// @param rawTableName raw table name without type suffix
+  /// @return schema or null if not found
   @Nullable
   Schema getSchema(String rawTableName);
 
-  /**
-   * Get the actual table name for the given table name, handling case sensitivity
-   * @param tableName table name to look up
-   * @return actual table name or null if not found
-   */
+  /// Get the actual table name for the given table name, handling case sensitivity
+  /// @param tableName table name to look up
+  /// @return actual table name or null if not found
   @Nullable
   String getActualTableName(String tableName);
 }

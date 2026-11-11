@@ -25,92 +25,82 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The {@code BlockValSet} contains a block of values for a column (Projection layer) or a transform expression
- * (Transform layer).
- */
+/// The `BlockValSet` contains a block of values for a column (Projection layer) or a transform expression
+/// (Transform layer).
 public interface BlockValSet {
 
-  /**
-   * Returns the null value bitmap in the value set.
-   */
+  /// Returns the null value bitmap in the value set.
   @Nullable
   RoaringBitmap getNullBitmap();
 
-  /**
-   * Returns the data type of the values in the value set.
-   */
+  /// Returns the data type of the values in the value set.
   DataType getValueType();
 
-  /**
-   * Returns {@code true} if the value set is for a single-value column, {@code false} otherwise.
-   */
+  /// Returns `true` if the value set is for a single-value column, `false` otherwise.
   boolean isSingleValue();
 
-  /**
-   * Returns the dictionary for the column, or {@code null} if the column is not dictionary-encoded.
-   */
+  /// Returns the dictionary for the column if one exists, or `null` otherwise. The dictionary may live on disk
+  /// (segment-backed columns) or be built on the fly (transform functions). It may be present even when
+  /// [#isDictionaryEncoded()] returns `false` — a column declared as `EncodingType.RAW` with an
+  /// explicit `dictionaryIndex` carries a dictionary on disk but a RAW forward index, and a column with a
+  /// disabled forward index has no way to read dict IDs at all. Callers that select between a dictionary-id read
+  /// path ([#getDictionaryIdsSV()] / [#getDictionaryIdsMV()]) and a value read path MUST gate on
+  /// [#isDictionaryEncoded()], not `getDictionary() != null`.
   @Nullable
   Dictionary getDictionary();
 
-  /**
-   * SINGLE-VALUED COLUMN APIs
-   */
+  /// Returns `true` if the dict-id read path ([#getDictionaryIdsSV()] / [#getDictionaryIdsMV()])
+  /// is callable on this value set.
+  ///
+  /// The default implementation falls back to `getDictionary() != null`, which is correct for value sets
+  /// where dictionary presence and dict-id readability are coupled. Implementers MUST override this whenever the
+  /// two can diverge — most notably the segment projection layer, where a column can declare
+  /// `EncodingType.RAW` alongside an explicit `dictionaryIndex` (dictionary present, but
+  /// `readDictIds` throws), or where the forward index is disabled outright (no forward index to read).
+  default boolean isDictionaryEncoded() {
+    return getDictionary() != null;
+  }
 
-  /**
-   * Returns the dictionary Ids for a single-valued column.
-   *
-   * @return Array of dictionary Ids
-   */
+  /// SINGLE-VALUED COLUMN APIs
+
+  /// Returns the dictionary Ids for a single-valued column.
+  ///
+  /// @return Array of dictionary Ids
   int[] getDictionaryIdsSV();
 
-  /**
-   * Returns the int values for a single-valued column.
-   *
-   * @return Array of int values
-   */
+  /// Returns the int values for a single-valued column.
+  ///
+  /// @return Array of int values
   int[] getIntValuesSV();
 
-  /**
-   * Returns the long values for a single-valued column.
-   *
-   * @return Array of long values
-   */
+  /// Returns the long values for a single-valued column.
+  ///
+  /// @return Array of long values
   long[] getLongValuesSV();
 
-  /**
-   * Returns the float values for a single-valued column.
-   *
-   * @return Array of float values
-   */
+  /// Returns the float values for a single-valued column.
+  ///
+  /// @return Array of float values
   float[] getFloatValuesSV();
 
-  /**
-   * Returns the double values for a single-valued column.
-   *
-   * @return Array of double values
-   */
+  /// Returns the double values for a single-valued column.
+  ///
+  /// @return Array of double values
   double[] getDoubleValuesSV();
 
-  /**
-   * Returns the BigDecimal values for a single-valued column.
-   *
-   * @return Array of BigDecimal values
-   */
+  /// Returns the BigDecimal values for a single-valued column.
+  ///
+  /// @return Array of BigDecimal values
   BigDecimal[] getBigDecimalValuesSV();
 
-  /**
-   * Returns the string values for a single-valued column.
-   *
-   * @return Array of string values
-   */
+  /// Returns the string values for a single-valued column.
+  ///
+  /// @return Array of string values
   String[] getStringValuesSV();
 
-  /**
-   * Returns the byte[] values for a single-valued column.
-   *
-   * @return Array of byte[] values
-   */
+  /// Returns the byte\[\] values for a single-valued column.
+  ///
+  /// @return Array of byte\[\] values
   byte[][] getBytesValuesSV();
 
   default int[] get32BitsMurmur3HashValuesSV() {
@@ -125,63 +115,50 @@ public interface BlockValSet {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * MULTI-VALUED COLUMN APIs
-   */
+  /// MULTI-VALUED COLUMN APIs
 
-  /**
-   * Returns the dictionary Ids for a multi-valued column.
-   *
-   * @return Array of dictionary Ids
-   */
+  /// Returns the dictionary Ids for a multi-valued column.
+  ///
+  /// @return Array of dictionary Ids
   int[][] getDictionaryIdsMV();
 
-  /**
-   * Returns the int values for a multi-valued column.
-   *
-   * @return Array of int values
-   */
+  /// Returns the int values for a multi-valued column.
+  ///
+  /// @return Array of int values
   int[][] getIntValuesMV();
 
-  /**
-   * Returns the long values for a multi-valued column.
-   *
-   * @return Array of long values
-   */
+  /// Returns the long values for a multi-valued column.
+  ///
+  /// @return Array of long values
   long[][] getLongValuesMV();
 
-  /**
-   * Returns the float values for a multi-valued column.
-   *
-   * @return Array of float values
-   */
+  /// Returns the float values for a multi-valued column.
+  ///
+  /// @return Array of float values
   float[][] getFloatValuesMV();
 
-  /**
-   * Returns the double values for a multi-valued column.
-   *
-   * @return Array of double values
-   */
+  /// Returns the double values for a multi-valued column.
+  ///
+  /// @return Array of double values
   double[][] getDoubleValuesMV();
 
-  /**
-   * Returns the string values for a multi-valued column.
-   *
-   * @return Array of string values
-   */
+  /// Returns the BigDecimal values for a multi-valued column.
+  ///
+  /// @return Array of BigDecimal values
+  BigDecimal[][] getBigDecimalValuesMV();
+
+  /// Returns the string values for a multi-valued column.
+  ///
+  /// @return Array of string values
   String[][] getStringValuesMV();
 
-  /**
-   * Returns the byte[] values for a multi-valued column.
-   *
-   * @return Array of byte[] values
-   */
+  /// Returns the byte\[\] values for a multi-valued column.
+  ///
+  /// @return Array of byte\[\] values
   byte[][][] getBytesValuesMV();
 
-  /**
-   * Returns the number of MV entries for a multi-valued column.
-   *
-   * @return Array of number of MV entries
-   */
+  /// Returns the number of MV entries for a multi-valued column.
+  ///
+  /// @return Array of number of MV entries
   int[] getNumMVEntries();
 }

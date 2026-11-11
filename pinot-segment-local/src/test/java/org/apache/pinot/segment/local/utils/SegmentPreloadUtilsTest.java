@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.utils;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +82,7 @@ public class SegmentPreloadUtilsTest {
     when(tableConfig.getUpsertConfig()).thenReturn(upsertConfig);
     when(tableConfig.getTableName()).thenReturn(realtimeTableName);
     Schema schema = mock(Schema.class);
-    when(schema.getPrimaryKeyColumns()).thenReturn(Collections.singletonList("pk"));
+    when(schema.getPrimaryKeyColumns()).thenReturn(List.of("pk"));
     IndexLoadingConfig indexLoadingConfig = mock(IndexLoadingConfig.class);
     when(indexLoadingConfig.getTableConfig()).thenReturn(tableConfig);
 
@@ -132,7 +131,7 @@ public class SegmentPreloadUtilsTest {
 
     File seg02IdxDir = new File(tableDataDir, seg02Name);
     FileUtils.forceMkdir(seg02IdxDir);
-    FileUtils.touch(new File(new File(seg02IdxDir, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(new File(seg02IdxDir, "v3"), V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
     when(tableDataManager.getSegmentDataDir(seg02Name, null, tableConfig)).thenReturn(seg02IdxDir);
 
     try {

@@ -52,6 +52,21 @@ public class IntOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public DataType getValueType() {
+    return DataType.INT;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(Integer.valueOf(stringValue));
+  }
+
+  @Override
+  public int indexOf(int intValue) {
+    return getDictId(intValue);
+  }
+
+  @Override
   public int compare(int dictId1, int dictId2) {
     return Integer.compare(getIntValue(dictId1), getIntValue(dictId2));
   }
@@ -155,21 +170,6 @@ public class IntOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
     Arrays.sort(sortedValues);
     return sortedValues;
-  }
-
-  @Override
-  public DataType getValueType() {
-    return DataType.INT;
-  }
-
-  @Override
-  public int indexOf(String stringValue) {
-    return getDictId(Integer.valueOf(stringValue));
-  }
-
-  @Override
-  public int indexOf(int intValue) {
-    return getDictId(intValue);
   }
 
   @Override

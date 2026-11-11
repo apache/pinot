@@ -52,9 +52,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for On-Heap dictionary implementations.
- */
+/// Unit tests for On-Heap dictionary implementations.
 public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapDictionariesTest.class);
 
@@ -96,9 +94,7 @@ public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
     FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
   }
 
-  /**
-   * This test compares the on-heap and off-heap loaded dictionaries for the same segment.
-   */
+  /// This test compares the on-heap and off-heap loaded dictionaries for the same segment.
   @Test
   public void test() {
     testColumn(INT_COLUMN);
@@ -156,15 +152,13 @@ public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  /**
-   * Helper method to build a segment with random data as per the schema.
-   *
-   * @param segmentDirName Name of segment directory
-   * @param segmentName Name of segment
-   * @param schema Schema for segment
-   * @return Schema built for the segment
-   * @throws Exception
-   */
+  /// Helper method to build a segment with random data as per the schema.
+  ///
+  /// @param segmentDirName Name of segment directory
+  /// @param segmentName Name of segment
+  /// @param schema Schema for segment
+  /// @return Schema built for the segment
+  /// @throws Exception
   private Schema buildSegment(String segmentDirName, String segmentName, TableConfig tableConfig, Schema schema)
       throws Exception {
 
@@ -183,7 +177,7 @@ public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
       row.putValue(LONG_COLUMN, random.nextLong());
       row.putValue(FLOAT_COLUMN, random.nextFloat());
       row.putValue(DOUBLE_COLUMN, random.nextDouble());
-      row.putValue(STRING_COLUMN, RandomStringUtils.randomAscii(100));
+      row.putValue(STRING_COLUMN, RandomStringUtils.secure().nextAscii(100));
       rows.add(row);
     }
 
@@ -195,11 +189,9 @@ public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
     return schema;
   }
 
-  /**
-   * Helper method to build a schema with provided number of metric columns.
-   *
-   * @return Schema containing the given number of metric columns
-   */
+  /// Helper method to build a schema with provided number of metric columns.
+  ///
+  /// @return Schema containing the given number of metric columns
   private static Schema buildSchema() {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(INT_COLUMN, FieldSpec.DataType.INT, true));

@@ -39,9 +39,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
 
-/**
- * Integration test that checks the query cancellation feature.
- */
+/// Integration test that checks the query cancellation feature.
 public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 4;
@@ -153,7 +151,7 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testCancelByClientQueryId(boolean useMultiStageQueryEngine)
-    throws Exception {
+      throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String clientRequestId = UUID.randomUUID().toString();
     // tricky query: use sleep with some column data to avoid Calcite from optimizing it on compile time

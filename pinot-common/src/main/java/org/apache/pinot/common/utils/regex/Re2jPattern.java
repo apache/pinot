@@ -22,7 +22,7 @@ import com.google.re2j.Pattern;
 
 
 public class Re2jPattern implements org.apache.pinot.common.utils.regex.Pattern {
-  Pattern _pattern;
+  private final Pattern _pattern;
 
   public Re2jPattern(String regex) {
     this(regex, false);

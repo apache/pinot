@@ -32,7 +32,7 @@ type Props = {
   handleSearch?: Function;
   recordCount?: number;
   showTooltip?: boolean;
-  tooltipText?: string;
+  tooltipText?: React.ReactNode;
   additionalControls?: React.ReactNode;
 };
 
@@ -100,7 +100,7 @@ export default function TableToolbar({
         )}
 
         {showTooltip && (
-          <Tooltip title={tooltipText}>
+          <Tooltip title={tooltipText} interactive>
             <HelpOutlineIcon />
           </Tooltip>
         )}

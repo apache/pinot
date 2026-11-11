@@ -29,14 +29,13 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.TrackingScope;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code DataTableHandler} is the Netty inbound handler on Pinot Broker side to handle the serialized data table
- * responses sent from Pinot Server.
- */
+/// The `DataTableHandler` is the Netty inbound handler on Pinot Broker side to handle the serialized data table
+/// responses sent from Pinot Server.
 public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableHandler.class);
 
@@ -44,6 +43,9 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private final ThreadAccountant _threadAccountant;
   private final ServerRoutingInstance _serverRoutingInstance;
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
+  // Set before the broker closes this channel on purpose after a restart: queries still in flight fail as usual,
+  // but the server is not reported for the close
+  private volatile boolean _closedByBroker;
 
   public DataTableHandler(QueryRouter queryRouter, ThreadAccountant threadAccountant,
       ServerRoutingInstance serverRoutingInstance) {
@@ -55,17 +57,36 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   @Override
   public void channelActive(ChannelHandlerContext ctx) {
     LOGGER.info("Channel for server: {} is now active", _serverRoutingInstance);
+    _brokerMetrics.addMeteredValue(BrokerMeter.NETTY_CONNECTION_CHANNEL_ACTIVE, 1,
+        _serverRoutingInstance.getShortName());
+  }
+
+  /// See [#_closedByBroker]. Called by `ServerChannels` right before it closes the channel.
+  void markClosedByBroker() {
+    _closedByBroker = true;
   }
 
   @Override
   public void channelInactive(ChannelHandlerContext ctx) {
-    LOGGER.error("Channel for server: {} is now inactive, marking server down", _serverRoutingInstance);
-    _queryRouter.markServerDown(_serverRoutingInstance,
-        new RuntimeException(String.format("Channel for server: %s is inactive", _serverRoutingInstance)));
+    boolean closedByBroker = _closedByBroker;
+    if (closedByBroker) {
+      LOGGER.info("Channel for server: {} closed by the broker is now inactive, failing the queries still in flight "
+          + "on it", _serverRoutingInstance);
+    } else {
+      LOGGER.error("Channel for server: {} is now inactive, marking server unavailable", _serverRoutingInstance);
+    }
+    _brokerMetrics.addMeteredValue(BrokerMeter.NETTY_CONNECTION_CHANNEL_INACTIVE, 1,
+        _serverRoutingInstance.getShortName());
+    // Scoped to this channel: a channel the broker replaced must not take down the queries on its successor
+    _queryRouter.markServerUnavailable(_serverRoutingInstance, ctx.channel(),
+        new RuntimeException(String.format("Channel for server: %s is inactive", _serverRoutingInstance)),
+        !closedByBroker);
   }
 
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
+    // Before decoding: a frame proves the server alive even if it then fails to decode
+    _queryRouter.recordResponse(_serverRoutingInstance);
     int responseSize = msg.readableBytes();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
     try {
@@ -86,7 +107,9 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       }
       _threadAccountant.updateUntrackedResourceUsage(queryId, cpuTimeNs, allocatedBytes, TrackingScope.QUERY);
       // WORKLOAD scope - keyed by workload name
-      String workloadName = metadata.get(DataTable.MetadataKey.WORKLOAD_NAME.getName());
+      // Use default workload name if not present
+      String workloadName = metadata.getOrDefault(DataTable.MetadataKey.WORKLOAD_NAME.getName(),
+          CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
       _threadAccountant.updateUntrackedResourceUsage(workloadName, cpuTimeNs, allocatedBytes, TrackingScope.WORKLOAD);
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
@@ -99,5 +122,12 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
     LOGGER.error("Caught exception while handling response from server: {}", _serverRoutingInstance, cause);
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESPONSE_FETCH_EXCEPTIONS, 1);
+    /*
+     * No ctx.fireExceptionCaught() — this is the last handler in the pipeline.
+     * Firing would only reach Netty's TailContext which logs a redundant warning.
+     * Direct memory OOM from the upstream frame decoder is caught by DirectOOMHandler
+     * before it reaches here. Any OOM that arrives here is heap OOM from channelRead0()
+     * deserialization, which does not corrupt the channel's byte stream.
+     */
   }
 }

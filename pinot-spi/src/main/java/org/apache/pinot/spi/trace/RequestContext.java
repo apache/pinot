@@ -68,6 +68,8 @@ public interface RequestContext {
 
   void setQuery(String pql);
 
+  void setQueryFingerprint(QueryFingerprint queryFingerprint);
+
   void setTableName(String tableName);
 
   void setTableNames(List<String> tableNames);
@@ -97,6 +99,8 @@ public interface RequestContext {
   int getErrorCode();
 
   String getQuery();
+
+  QueryFingerprint getQueryFingerprint();
 
   String getTableName();
 
@@ -182,6 +186,8 @@ public interface RequestContext {
 
   void setNumGroupsLimitReached(boolean numGroupsLimitReached);
 
+  void setMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached);
+
   void setNumExceptions(int numExceptions);
 
   void setNumRowsResultSet(int numRowsResultSet);
@@ -240,16 +246,12 @@ public interface RequestContext {
 
   void setProcessingExceptions(List<String> processingExceptions);
 
-  /**
-   * @return Map of allowlisted request header keys (in lowercase) to list of header values
-   */
+  /// @return Map of allowlisted request header keys (in lowercase) to list of header values
   Map<String, List<String>> getRequestHttpHeaders();
 
-  /**
-   * While setting the http request headers here, we send the keys in lower-case to be in parity with the
-   * case-insensitive nature of Http.
-   * @param requestHttpHeaders Map of request header keys (in lowercase) to list of header values
-   */
+  /// While setting the http request headers here, we send the keys in lower-case to be in parity with the
+  /// case-insensitive nature of Http.
+  /// @param requestHttpHeaders Map of request header keys (in lowercase) to list of header values
   void setRequestHttpHeaders(Map<String, List<String>> requestHttpHeaders);
 
   enum FanoutType {

@@ -28,9 +28,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.SchemaValidatorResult;
 
 
-/**
- * Schema validator to validate pinot schema and avro schema
- */
+/// Schema validator to validate pinot schema and avro schema
 public class AvroIngestionSchemaValidator implements IngestionSchemaValidator {
   private org.apache.avro.Schema _avroSchema;
   private Schema _pinotSchema;
@@ -139,7 +137,7 @@ public class AvroIngestionSchemaValidator implements IngestionSchemaValidator {
         if (fieldSpec.getDataType() != dataTypeForSVColumn) {
           _dataTypeMismatch.addMismatchReason(String
               .format("The Pinot column: (%s: %s) doesn't match with the column (%s: %s) in input %s schema.",
-                  columnName, fieldSpec.getDataType().name(), avroColumnName, avroColumnType.name(),
+                  columnName, fieldSpec.getDataType().name(), avroColumnName, dataTypeForSVColumn.name(),
                   getInputSchemaType()));
         }
       } else {

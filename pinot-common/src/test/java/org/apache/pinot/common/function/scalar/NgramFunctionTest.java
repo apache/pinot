@@ -33,15 +33,15 @@ public class NgramFunctionTest {
         {"abcd", 0, 3, new String[]{"abc", "bcd"}, new String[]{"a", "b", "c", "d", "ab", "bc", "cd", "abc", "bcd"}},
         {"abcd", 2, 2, new String[]{"ab", "bc", "cd"}, new String[]{"ab", "bc", "cd"}}, {
         "abcd", 3, 0, new String[]{}, new String[]{}
-    }, {"abc", 0, 3, new String[]{"abc"}, new String[]{"a", "b", "c", "ab", "bc", "abc"}}, {
+      }, {"abc", 0, 3, new String[]{"abc"}, new String[]{"a", "b", "c", "ab", "bc", "abc"}}, {
         "abc", 3, 0, new String[]{}, new String[]{}
-    }, {"abc", 3, 3, new String[]{"abc"}, new String[]{"abc"}}, {
+      }, {"abc", 3, 3, new String[]{"abc"}, new String[]{"abc"}}, {
         "a", 0, 3, new String[]{}, new String[]{"a"}
-    }, {"a", 2, 3, new String[]{}, new String[]{}}, {
+      }, {"a", 2, 3, new String[]{}, new String[]{}}, {
         "a", 3, 3, new String[]{}, new String[]{}
-    }, {"", 3, 0, new String[]{}, new String[]{}}, {"", 3, 3, new String[]{}, new String[]{}}, {
+      }, {"", 3, 0, new String[]{}, new String[]{}}, {"", 3, 3, new String[]{}, new String[]{}}, {
         "", 0, 3, new String[]{}, new String[]{}
-    }
+      }
     };
   }
 
@@ -50,12 +50,12 @@ public class NgramFunctionTest {
     return new Object[][]{
         {new String[]{"ab", "bc"}, 2, new String[]{"ab", "bc"}}, {
         new String[]{"abcd", "bcd"}, 3, new String[]{
-        "abc", "bcd"
-    }
-    }, {new String[]{"a", ""}, 1, new String[]{"a"}}, {new String[]{"a", "b"}, 3, new String[]{}}, {new String[]{"aba"
-    }, 2, new String[]{"ab", "ba"}}, {new String[]{}, 2, new String[]{}}, {
+          "abc", "bcd"
+        }
+      }, {new String[]{"a", ""}, 1, new String[]{"a"}}, {new String[]{"a", "b"}, 3, new String[]{}}, {new String[]{"aba"
+      }, 2, new String[]{"ab", "ba"}}, {new String[]{}, 2, new String[]{}}, {
         new String[]{"abc"}, 0, new String[]{}
-    }
+      }
     };
   }
 
@@ -64,9 +64,9 @@ public class NgramFunctionTest {
     return new Object[][]{
         {new String[]{"abcd"}, 1, 2, new String[]{"a", "b", "c", "d", "ab", "bc", "cd"}}, {
         new String[]{"abc", "bc"}, 2, 3, new String[]{"ab", "bc", "abc"}
-    }, {new String[]{"", "a"}, 0, 3, new String[]{"a"}}, {
+      }, {new String[]{"", "a"}, 0, 3, new String[]{"a"}}, {
         new String[]{"a"}, 3, 3, new String[]{}
-    }, {new String[]{}, 1, 2, new String[]{}}
+      }, {new String[]{}, 1, 2, new String[]{}}
     };
   }
 

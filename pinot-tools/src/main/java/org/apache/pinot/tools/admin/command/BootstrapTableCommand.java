@@ -21,7 +21,6 @@ package org.apache.pinot.tools.admin.command;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.tools.BootstrapTableTool;
 import org.apache.pinot.tools.Command;
@@ -30,69 +29,48 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * The command to bootstrap a Pinot table from a directory with table schema/config/ingestionJobSpec/raw data files.
- *
- * Sample usage:
- * {@code pinot-admin.sh BootstrapTable -dir <path-to-table-configs-directory> }
- *
- * The directory structure is based on current example conventions:
- * For offline table:
- * ```
- * <table_name>/
- * <table_name>/<table_name>_schema.json
- * <table_name>/<table_name>_offline_table_config.json
- * <table_name>/ingestionJobSpec.yaml
- * <table_name>/rawdata/...
- * ```
- *
- * For realtime table:
- * ```
- * <table_name>/
- * <table_name>/<table_name>_schema.json
- * <table_name>/<table_name>_realtime_table_config.json
- * ```
- *
- * For hybrid table:
- * ```
- * <table_name>/
- * <table_name>/<table_name>_schema.json
- * <table_name>/<table_name>_offline_table_config.json
- * <table_name>/<table_name>_realtime_table_config.json
- * <table_name>/ingestionJobSpec.yaml
- * <table_name>/rawdata/...
- * ```
- */
+/// The command to bootstrap a Pinot table from a directory with table schema/config/ingestionJobSpec/raw data files.
+///
+/// Sample usage:
+/// `pinot-admin.sh BootstrapTable -dir <path-to-table-configs-directory>`
+///
+/// The directory structure is based on current example conventions:
+/// For offline table:
+/// ```
+/// <table_name>/
+/// <table_name>/<table_name>_schema.json
+/// <table_name>/<table_name>_offline_table_config.json
+/// <table_name>/ingestionJobSpec.yaml
+/// <table_name>/rawdata/...
+/// ```
+///
+/// For realtime table:
+/// ```
+/// <table_name>/
+/// <table_name>/<table_name>_schema.json
+/// <table_name>/<table_name>_realtime_table_config.json
+/// ```
+///
+/// For hybrid table:
+/// ```
+/// <table_name>/
+/// <table_name>/<table_name>_schema.json
+/// <table_name>/<table_name>_offline_table_config.json
+/// <table_name>/<table_name>_realtime_table_config.json
+/// <table_name>/ingestionJobSpec.yaml
+/// <table_name>/rawdata/...
+/// ```
 @CommandLine.Command(name = "BootstrapTable", mixinStandardHelpOptions = true)
-public class BootstrapTableCommand extends AbstractBaseAdminCommand implements Command {
+public class BootstrapTableCommand extends AbstractDatabaseBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(BootstrapTableCommand.class.getName());
-
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
-  private String _controllerHost;
-
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
-  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
-
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
-  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @CommandLine.Option(names = {"-dir", "-d", "-directory"}, required = false,
       description = "The directory contains all the configs and data to bootstrap a table")
   private String _dir;
 
-  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
-  private String _user;
-
-  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
-  private String _password;
-
-  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
-  private String _authToken;
-
-  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
-  private String _authTokenUrl;
-
-  private AuthProvider _authProvider;
+  public BootstrapTableCommand() {
+    _exec = true;
+  }
 
   @Override
   public String getName() {
@@ -105,7 +83,7 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
   }
 
   public BootstrapTableCommand setAuthProvider(AuthProvider authProvider) {
-    _authProvider = authProvider;
+    super.setAuthProvider(authProvider);
     return this;
   }
 

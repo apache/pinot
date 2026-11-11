@@ -23,11 +23,9 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 
-/**
- * Request object for revertReplaceSegments API.
- *
- * customMap : custom map.
- */
+/// Request object for revertReplaceSegments API.
+///
+/// customMap : custom map.
 public class RevertReplaceSegmentsRequest {
   private final Map<String, String> _customMap;
 

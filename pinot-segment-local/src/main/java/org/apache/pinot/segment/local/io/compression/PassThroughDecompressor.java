@@ -22,11 +22,9 @@ import java.nio.ByteBuffer;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
-/**
- * A pass-through implementation of {@link ChunkDecompressor}, that simply returns the input data without
- * performing any de-compression. This is useful for cases where cost of de-compression out-weighs the benefits
- * of compression.
- */
+/// A pass-through implementation of [ChunkDecompressor], that simply returns the input data without
+/// performing any de-compression. This is useful for cases where cost of de-compression out-weighs the benefits
+/// of compression.
 class PassThroughDecompressor implements ChunkDecompressor {
 
   static final PassThroughDecompressor INSTANCE = new PassThroughDecompressor();

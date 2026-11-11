@@ -30,10 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Builds case-sensitive FST using lucene org.apache.lucene.util.fst.Builder library. FSTBuilder requires all the
- * key/values be added in sorted order.
- */
+/// Builds case-sensitive FST using lucene org.apache.lucene.util.fst.Builder library. FSTBuilder requires all the
+/// key/values be added in sorted order.
 public class FSTBuilder {
   public static final Logger LOGGER = LoggerFactory.getLogger(FSTBuilder.class);
 

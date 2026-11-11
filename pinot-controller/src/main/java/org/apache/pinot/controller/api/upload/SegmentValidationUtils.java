@@ -18,20 +18,26 @@
  */
 package org.apache.pinot.controller.api.upload;
 
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SegmentValidationUtils provides utility methods to validate the segment during segment upload.
- */
+/// SegmentValidationUtils provides utility methods to validate the segment during segment upload.
 public class SegmentValidationUtils {
   private SegmentValidationUtils() {
   }
@@ -57,6 +63,46 @@ public class SegmentValidationUtils {
     }
   }
 
+  public static void validateUpsertSegmentPartitionMetadata(SegmentMetadata segmentMetadata, TableConfig tableConfig) {
+    // Scope this upload guard to offline upsert. Realtime upsert upload flows need CONSUMING/COMPLETED
+    // partition-column resolution, so avoid applying the OFFLINE lookup below to realtime tables.
+    if (tableConfig.getTableType() != TableType.OFFLINE || !tableConfig.isUpsertEnabled()) {
+      return;
+    }
+
+    String partitionColumn = getPartitionColumn(tableConfig);
+    if (partitionColumn == null) {
+      return;
+    }
+
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(partitionColumn);
+    Set<Integer> partitions = columnMetadata != null ? columnMetadata.getPartitions() : null;
+    if (partitions == null || partitions.size() != 1) {
+      throw new ControllerApplicationException(LOGGER,
+          "Uploaded segment: " + segmentMetadata.getName() + " for offline upsert table: "
+              + tableConfig.getTableName() + " must contain exactly one partition id for column: " + partitionColumn
+              + ", got: " + partitions, Response.Status.BAD_REQUEST);
+    }
+  }
+
+  /// Returns the partition column configured for segment assignment, falling back to the single column of the segment
+  /// partition config, or `null` if neither is available.
+  @Nullable
+  private static String getPartitionColumn(TableConfig tableConfig) {
+    String partitionColumn = TableConfigUtils.getPartitionColumn(tableConfig);
+    if (partitionColumn != null) {
+      return partitionColumn;
+    }
+    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (segmentPartitionConfig != null) {
+      Map<String, ?> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
+      if (columnPartitionMap.size() == 1) {
+        return columnPartitionMap.keySet().iterator().next();
+      }
+    }
+    return null;
+  }
+
   public static void checkStorageQuota(String segmentName, long tarSegmentSizeInBytes, long untarredSegmentSizeInBytes,
       TableConfig tableConfig,
       StorageQuotaChecker quotaChecker) {
@@ -70,6 +116,12 @@ public class SegmentValidationUtils {
               tableConfig.getTableName()), Response.Status.INTERNAL_SERVER_ERROR);
     }
     if (!response._isSegmentWithinQuota) {
+      QuotaEnforcementMode enforcementMode = quotaChecker.getEnforcementMode(tableConfig);
+      if (enforcementMode != QuotaEnforcementMode.ENFORCED) {
+        LOGGER.warn("Storage quota check failed for segment: {} of table: {} in {} mode, reason: {}", segmentName,
+            tableConfig.getTableName(), enforcementMode, response._reason);
+        return;
+      }
       throw new ControllerApplicationException(LOGGER,
           String.format("Storage quota check failed for segment: %s of table: %s, reason: %s", segmentName,
               tableConfig.getTableName(), response._reason), Response.Status.FORBIDDEN);

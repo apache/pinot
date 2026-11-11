@@ -34,10 +34,27 @@
   <build>
     <pluginManagement>
       <plugins>
+        <!-- Use the plugin versions of the outer Pinot build so that they resolve from its local repository
+             (maven.repo.local.tail in the invoker configuration) instead of being downloaded for every IT run. -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>@version.maven-compiler-plugin@</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>@version.maven-jar-plugin@</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>@version.maven-resources-plugin@</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>@version.maven-surefire-plugin@</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -45,7 +62,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-assembly-plugin</artifactId>
-        <version>3.7.1</version>
+        <version>@version.maven-assembly-plugin@</version>
         <dependencies>
           <dependency>
             <groupId>@project.groupId@</groupId>

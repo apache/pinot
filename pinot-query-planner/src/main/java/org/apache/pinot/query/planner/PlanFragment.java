@@ -23,11 +23,8 @@ import java.util.List;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
-/**
- * The {@code PlanFragment} is the logical sub query plan that should be scheduled together from the result of
- * {@link org.apache.pinot.query.planner.logical.PlanFragmenter}.
- *
- */
+/// The `PlanFragment` is the logical sub query plan that should be scheduled together from the result of
+/// [org.apache.pinot.query.planner.logical.PlanFragmenter].
 public class PlanFragment {
 
   private final int _fragmentId;
@@ -43,11 +40,9 @@ public class PlanFragment {
     _children = children;
   }
 
-  /**
-   * Returns the fragment id
-   *
-   * <p>Fragment id is the stage id of the fragment root.
-   */
+  /// Returns the fragment id
+  ///
+  /// Fragment id is the stage id of the fragment root.
   public int getFragmentId() {
     return _fragmentId;
   }

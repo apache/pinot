@@ -21,6 +21,7 @@ package org.apache.pinot.sql.parsers.rewriter;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -44,17 +45,17 @@ public class PredicateComparisonRewriter implements QueryRewriter {
     return pinotQuery;
   }
 
-  /**
-   * This method converts an expression to what Pinot could evaluate.
-   * 1. For comparison expression, left operand could be any expression, but right operand only
-   *    supports literal. E.g. 'WHERE a > b' will be converted to 'WHERE a - b > 0'
-   * 2. Updates boolean predicates (literals and scalar functions) that are missing an EQUALS filter.
-   *    E.g. 1:  'WHERE a' will be updated to 'WHERE a = true'
-   *    E.g. 2: "WHERE startsWith(col, 'str')" will be updated to "WHERE startsWith(col, 'str') = true"
-   *
-   * @param expression current expression in the expression tree
-   * @return re-written expression.
-   */
+  /// This method converts an expression to what Pinot could evaluate.
+  /// 1. For comparison expressions, the right operand should be a literal. If the left operand is a
+  ///    literal and the right is not, they are swapped. If the right operand is still non-literal
+  ///    (column-to-column comparison), the predicate is rewritten using a comparison transform
+  ///    function: e.g. 'WHERE a = b' becomes 'WHERE equals(a, b) = true'.
+  /// 2. Updates boolean predicates (literals and scalar functions) that are missing an EQUALS filter.
+  ///    E.g. 1:  'WHERE a' will be updated to 'WHERE a = true'
+  ///    E.g. 2: "WHERE startsWith(col, 'str')" will be updated to "WHERE startsWith(col, 'str') = true"
+  ///
+  /// @param expression current expression in the expression tree
+  /// @return re-written expression.
   private static Expression updatePredicate(Expression expression) {
     ExpressionType type = expression.getType();
 
@@ -71,12 +72,10 @@ public class PredicateComparisonRewriter implements QueryRewriter {
     }
   }
 
-  /**
-   * Rewrites a function expression.
-   *
-   * @param expression
-   * @return re-written expression
-   */
+  /// Rewrites a function expression.
+  ///
+  /// @param expression
+  /// @return re-written expression
   private static Expression updateFunctionExpression(Expression expression) {
     Function function = expression.getFunctionCall();
     String functionOperator = function.getOperator();
@@ -115,14 +114,21 @@ public class PredicateComparisonRewriter implements QueryRewriter {
             break;
           }
 
-          // Handle predicate like 'a > b' -> 'a - b > 0'
           if (!secondOperand.isSetLiteral()) {
-            Expression minusExpression = RequestUtils.getFunctionExpression("minus", firstOperand, secondOperand);
-            operands.set(0, minusExpression);
-            operands.set(1, RequestUtils.getLiteralExpression(0));
+            Expression comparisonExpression = RequestUtils.getFunctionExpression(
+                getComparisonFunctionName(filterKind), firstOperand, secondOperand);
+            function.setOperator(FilterKind.EQUALS.name());
+            operands.set(0, comparisonExpression);
+            operands.set(1, RequestUtils.getLiteralExpression(true));
             break;
           }
           break;
+        case SEMANTIC_MATCH: {
+          // SEMANTIC_MATCH(column, 'query text', topK) — pass through, rewritten by semantic rewriter
+          Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
+              "For %s predicate, the number of operands must be 2 or 3, got: %s", filterKind, expression);
+          break;
+        }
         case VECTOR_SIMILARITY: {
           Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
               "For %s predicate, the number of operands must be at either 2 or 3, got: %s", filterKind, expression);
@@ -132,6 +138,25 @@ public class PredicateComparisonRewriter implements QueryRewriter {
            * 2. a float/double array literals
            * Also check in {@link org.apache.pinot.sql.parsers.CalciteSqlParser#validateFilter(Expression)}}
            */
+          if ((operands.get(1).getFunctionCall() != null && !operands.get(1).getFunctionCall().getOperator()
+              .equalsIgnoreCase("arrayvalueconstructor"))
+              || (operands.get(1).getLiteral() != null && !operands.get(1).getLiteral().isSetFloatArrayValue()
+                  && !operands.get(1).getLiteral().isSetDoubleArrayValue())) {
+            throw new SqlCompilationException(
+                String.format("For %s predicate, the second operand must be a float/double array literal, got: %s",
+                    filterKind,
+                    expression));
+          }
+          if (operands.size() == 3 && operands.get(2).getLiteral() == null) {
+            throw new SqlCompilationException(
+                String.format("For %s predicate, the third operand must be a literal, got: %s", filterKind,
+                    expression));
+          }
+          break;
+        }
+        case VECTOR_SIMILARITY_RADIUS: {
+          Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
+              "For %s predicate, the number of operands must be at either 2 or 3, got: %s", filterKind, expression);
           if ((operands.get(1).getFunctionCall() != null && !operands.get(1).getFunctionCall().getOperator()
               .equalsIgnoreCase("arrayvalueconstructor"))
               || (operands.get(1).getLiteral() != null && !operands.get(1).getLiteral().isSetFloatArrayValue()
@@ -164,29 +189,44 @@ public class PredicateComparisonRewriter implements QueryRewriter {
     return expression;
   }
 
-  /**
-   * Rewrite predicates to boolean expressions with EQUALS operator
-   *     Example1: "select * from table where col1" converts to
-   *               "select * from table where col1 = true"
-   *     Example2: "select * from table where startsWith(col1, 'str')" converts to
-   *               "select * from table where startsWith(col1, 'str') = true"
-   *
-   * @param expression Expression
-   * @return Rewritten expression
-   */
+  /// Rewrite predicates to boolean expressions with EQUALS operator
+  ///     Example1: "select \* from table where col1" converts to
+  ///               "select \* from table where col1 = true"
+  ///     Example2: "select \* from table where startsWith(col1, 'str')" converts to
+  ///               "select \* from table where startsWith(col1, 'str') = true"
+  ///
+  /// @param expression Expression
+  /// @return Rewritten expression
   private static Expression convertPredicateToEqualsBooleanExpression(Expression expression) {
     return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), expression,
         RequestUtils.getLiteralExpression(true));
   }
 
-  /**
-   * The purpose of this method is to convert expression "0 < columnA" to "columnA > 0".
-   * The conversion would be:
-   *  from ">" to "<",
-   *  from "<" to ">",
-   *  from ">=" to "<=",
-   *  from "<=" to ">=".
-   */
+  private static String getComparisonFunctionName(FilterKind filterKind) {
+    switch (filterKind) {
+      case EQUALS:
+        return TransformFunctionType.EQUALS.getName();
+      case NOT_EQUALS:
+        return TransformFunctionType.NOT_EQUALS.getName();
+      case GREATER_THAN:
+        return TransformFunctionType.GREATER_THAN.getName();
+      case GREATER_THAN_OR_EQUAL:
+        return TransformFunctionType.GREATER_THAN_OR_EQUAL.getName();
+      case LESS_THAN:
+        return TransformFunctionType.LESS_THAN.getName();
+      case LESS_THAN_OR_EQUAL:
+        return TransformFunctionType.LESS_THAN_OR_EQUAL.getName();
+      default:
+        throw new IllegalStateException("Unsupported comparison operator: " + filterKind);
+    }
+  }
+
+  /// The purpose of this method is to convert expression "0 < columnA" to "columnA > 0".
+  /// The conversion would be:
+  ///  from ">" to "<",
+  ///  from "<" to ">",
+  ///  from ">=" to "<=",
+  ///  from "<=" to ">=".
   private static FilterKind getOppositeOperator(FilterKind filterKind) {
     switch (filterKind) {
       case GREATER_THAN:

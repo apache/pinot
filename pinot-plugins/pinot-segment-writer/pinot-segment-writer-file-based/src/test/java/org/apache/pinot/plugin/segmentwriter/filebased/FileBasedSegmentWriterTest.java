@@ -21,15 +21,17 @@ package org.apache.pinot.plugin.segmentwriter.filebased;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -49,13 +51,15 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for {@link FileBasedSegmentWriter}
- */
+/// Tests for [FileBasedSegmentWriter]
 public class FileBasedSegmentWriterTest {
 
   private static final String TABLE_NAME = "segmentWriter";
   private static final String TIME_COLUMN_NAME = "aLong";
+  private static final long TIMESTAMP_VALUE = 1609491661001L;
+  // Beyond long precision and with a non-trivial scale, to prove the Avro buffer's `big-decimal` logical type carries
+  // arbitrary precision and the value's own scale. Trailing zeros are avoided because ingestion strips them.
+  private static final BigDecimal BIG_DECIMAL_VALUE = new BigDecimal("-9999999999999999999999.12345");
 
   private File _tmpDir;
   private File _outputDir;
@@ -71,8 +75,8 @@ public class FileBasedSegmentWriterTest {
     _outputDir = new File(_tmpDir, "segmentWriterOutputDir");
 
     _ingestionConfig = new IngestionConfig();
-    _ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(Collections.singletonList(
-        Collections.singletonMap(BatchConfigProperties.OUTPUT_DIR_URI, _outputDir.getAbsolutePath())), "APPEND",
+    _ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(List.of(
+        Map.of(BatchConfigProperties.OUTPUT_DIR_URI, _outputDir.getAbsolutePath())), "APPEND",
         "HOURLY"));
     _ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("aSimpleMap_str", "jsonFormat(aSimpleMap)"),
         new TransformConfig("anAdvancedMap_str", "jsonFormat(anAdvancedMap)")));
@@ -85,6 +89,8 @@ public class FileBasedSegmentWriterTest {
         .addSingleValueDimension("anAdvancedMap_str", FieldSpec.DataType.STRING)
         .addSingleValueDimension("nullString", FieldSpec.DataType.STRING)
         .addSingleValueDimension("aBoolean", FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension("aTimestamp", FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension("aBigDecimal", FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension("aBytes", FieldSpec.DataType.BYTES)
         .addMultiValueDimension("aStringList", FieldSpec.DataType.STRING)
         .addMultiValueDimension("anIntList", FieldSpec.DataType.INT)
@@ -94,9 +100,7 @@ public class FileBasedSegmentWriterTest {
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
   }
 
-  /**
-   * Tests init on batchConfig combinations
-   */
+  /// Tests init on batchConfig combinations
   @Test
   public void testBatchConfigs()
       throws Exception {
@@ -127,7 +131,7 @@ public class FileBasedSegmentWriterTest {
       // expected
     }
 
-    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(Collections.emptyList(), "APPEND", "HOURLY"));
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(List.of(), "APPEND", "HOURLY"));
     try {
       segmentWriter.init(tableConfig, _schema);
       Assert.fail("Should fail due to missing batchConfigMaps");
@@ -136,7 +140,7 @@ public class FileBasedSegmentWriterTest {
     }
 
     ingestionConfig.setBatchIngestionConfig(
-        new BatchIngestionConfig(Collections.singletonList(Collections.emptyMap()), "APPEND", "HOURLY"));
+        new BatchIngestionConfig(List.of(Map.of()), "APPEND", "HOURLY"));
     try {
       segmentWriter.init(tableConfig, _schema);
       Assert.fail("Should fail due to missing outputDirURI in batchConfigMap");
@@ -144,16 +148,14 @@ public class FileBasedSegmentWriterTest {
       // expected
     }
 
-    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(Collections.singletonList(
-        Collections.singletonMap(BatchConfigProperties.OUTPUT_DIR_URI, _outputDir.getAbsolutePath())), "APPEND",
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(List.of(
+        Map.of(BatchConfigProperties.OUTPUT_DIR_URI, _outputDir.getAbsolutePath())), "APPEND",
         "HOURLY"));
     segmentWriter.init(tableConfig, _schema);
     segmentWriter.close();
   }
 
-  /**
-   * Tests that {@link SegmentWriter} generates segments as expected
-   */
+  /// Tests that [SegmentWriter] generates segments as expected
   @Test
   public void testSegmentWriter()
       throws Exception {
@@ -197,9 +199,42 @@ public class FileBasedSegmentWriterTest {
     FileUtils.deleteQuietly(_outputDir);
   }
 
-  /**
-   * Tests flushing on empty collection
-   */
+  /// The writer buffers rows in an Avro file and then builds the segment from it, so every column has to survive a
+  /// full write/read round trip through the generated Avro schema and the shared data model. This covers the logical
+  /// types that carry an Avro logical type (or, for BOOLEAN, a stored-int-to-Boolean coercion) rather than being
+  /// written in their physical storage form.
+  @Test
+  public void testLogicalTypesRoundTripThroughAvroBuffer()
+      throws Exception {
+    FileUtils.deleteQuietly(_outputDir);
+    SegmentWriter segmentWriter = new FileBasedSegmentWriter();
+    segmentWriter.init(_tableConfig, _schema);
+    segmentWriter.collect(getGenericRow("record1", 1616238000000L));
+    segmentWriter.flush();
+    segmentWriter.close();
+
+    File segmentTar = new File(_outputDir, "segmentWriter_1616238000000_1616238000000.tar.gz");
+    Assert.assertTrue(segmentTar.exists());
+    TarCompressionUtils.untar(segmentTar, _outputDir);
+    File segmentDir = new File(_outputDir, "segmentWriter_1616238000000_1616238000000");
+
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(segmentDir)) {
+      Assert.assertTrue(recordReader.hasNext());
+      GenericRow row = recordReader.next();
+      // The segment stores Pinot's internal form: int 0/1 for BOOLEAN and epoch millis for TIMESTAMP.
+      Assert.assertEquals(row.getValue("aBoolean"), 1);
+      Assert.assertEquals(row.getValue("aTimestamp"), TIMESTAMP_VALUE);
+      Assert.assertEquals(row.getValue("aBigDecimal"), BIG_DECIMAL_VALUE);
+      Assert.assertEquals(((BigDecimal) row.getValue("aBigDecimal")).scale(), BIG_DECIMAL_VALUE.scale(),
+          "big-decimal must preserve the value's own scale");
+      Assert.assertEquals((byte[]) row.getValue("aBytes"), "foo".getBytes(StandardCharsets.UTF_8));
+      Assert.assertEquals(row.getValue("aString"), "record1");
+      Assert.assertFalse(recordReader.hasNext());
+    }
+    FileUtils.deleteQuietly(_outputDir);
+  }
+
+  /// Tests flushing on empty collection
   @Test
   public void testEmptySegment()
       throws Exception {
@@ -226,9 +261,7 @@ public class FileBasedSegmentWriterTest {
     FileUtils.deleteQuietly(_outputDir);
   }
 
-  /**
-   * Tests various {@link org.apache.pinot.spi.ingestion.batch.BatchConfigProperties.SegmentNameGeneratorType}
-   */
+  /// Tests various [org.apache.pinot.spi.ingestion.batch.BatchConfigProperties.SegmentNameGeneratorType]
   @Test
   public void testSegmentNameGenerator()
       throws Exception {
@@ -243,7 +276,7 @@ public class FileBasedSegmentWriterTest {
         BatchConfigProperties.SEGMENT_NAME), "customSegmentName");
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(
-        new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "APPEND", "HOURLY"));
+        new BatchIngestionConfig(List.of(batchConfigMap), "APPEND", "HOURLY"));
     ingestionConfig.setTransformConfigs(_ingestionConfig.getTransformConfigs());
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
@@ -301,9 +334,7 @@ public class FileBasedSegmentWriterTest {
     FileUtils.deleteQuietly(_outputDir);
   }
 
-  /**
-   * Tests segment overwrite config
-   */
+  /// Tests segment overwrite config
   @Test
   public void testOverwrite()
       throws Exception {
@@ -314,7 +345,7 @@ public class FileBasedSegmentWriterTest {
     batchConfigMap.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(
-        new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "APPEND", "HOURLY"));
+        new BatchIngestionConfig(List.of(batchConfigMap), "APPEND", "HOURLY"));
     ingestionConfig.setTransformConfigs(_ingestionConfig.getTransformConfigs());
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
@@ -382,6 +413,8 @@ public class FileBasedSegmentWriterTest {
     row.putValue("aDouble", 10.5);
     row.putValue("aFloat", 2.0);
     row.putValue("aBoolean", true);
+    row.putValue("aTimestamp", new Timestamp(TIMESTAMP_VALUE));
+    row.putValue("aBigDecimal", BIG_DECIMAL_VALUE);
     row.putValue("aBytes", "foo".getBytes(StandardCharsets.UTF_8));
     List<String> stringList = new ArrayList<>();
     stringList.add("a");

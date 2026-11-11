@@ -25,9 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * Configs related to filtering records during ingestion
- */
+/// Configs related to filtering records during ingestion
 public class FilterConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Filter function string. Filter out records during ingestion, if this evaluates to true")

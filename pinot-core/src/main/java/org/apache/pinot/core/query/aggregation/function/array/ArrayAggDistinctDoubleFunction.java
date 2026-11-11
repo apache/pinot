@@ -24,14 +24,23 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
 public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<DoubleSet> {
+  private static final int DOUBLE_SET_TYPE = 17;
+
   public ArrayAggDistinctDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    return true;
   }
 
   @Override
@@ -40,6 +49,18 @@ public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<D
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     DoubleOpenHashSet valueSet = aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
         : new DoubleOpenHashSet(length);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set to merge in.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          valueSet.addAll(ObjectSerDeUtils.DOUBLE_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.DOUBLE)));
+        }
+      });
+      aggregationResultHolder.setValue(valueSet);
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       double[] values = blockValSet.getDoubleValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -72,9 +93,8 @@ public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<D
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(DoubleSet doubleOpenHashSet) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleSet.getValue(),
-        ObjectSerDeUtils.DOUBLE_SET_SER_DE.serialize(doubleOpenHashSet));
+  public SerializedResult serializeIntermediateResult(DoubleSet doubleSet) {
+    return new SerializedValue<>(DOUBLE_SET_TYPE, doubleSet, ObjectSerDeUtils.DOUBLE_SET_SER_DE);
   }
 
   @Override

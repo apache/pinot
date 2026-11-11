@@ -43,12 +43,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * LogicalTableMetadataCache maintains the cache for logical tables, that includes the logical table configs,
- * logical table schemas, and reference offline and realtime table configs.
- * It listens to changes in the ZK property store for all the logical table configs and updates the cache accordingly.
- * For schema and table configs, it listens to only those configs that are required by the logical tables.
- */
+/// LogicalTableMetadataCache maintains the cache for logical tables, that includes the logical table configs,
+/// logical table schemas, and reference offline and realtime table configs.
+/// It listens to changes in the ZK property store for all the logical table configs and updates the cache accordingly.
+/// For schema and table configs, it listens to only those configs that are required by the logical tables.
 public class LogicalTableMetadataCache {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableMetadataCache.class);
@@ -71,6 +69,14 @@ public class LogicalTableMetadataCache {
 
     // Add child listeners to the property store for logical table config changes
     _propertyStore.subscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
+
+    // Initialize the cache with existing logical table configs.
+    List<String> existingLogicalTables = _propertyStore.getChildNames(ZkPaths.LOGICAL_TABLE_PARENT_PATH,
+        AccessOption.PERSISTENT);
+    if (CollectionUtils.isNotEmpty(existingLogicalTables)) {
+      LOGGER.info("Found {} existing logical tables in the property store, initializing", existingLogicalTables.size());
+      _zkLogicalTableConfigChangeListener.handleChildChange(ZkPaths.LOGICAL_TABLE_PARENT_PATH, existingLogicalTables);
+    }
 
     LOGGER.info("Logical table metadata cache initialized");
   }

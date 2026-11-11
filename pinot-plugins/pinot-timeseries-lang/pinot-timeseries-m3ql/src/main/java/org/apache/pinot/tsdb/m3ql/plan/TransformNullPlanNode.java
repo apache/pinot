@@ -54,7 +54,7 @@ public class TransformNullPlanNode extends BaseTimeSeriesPlanNode {
 
   @Override
   public String getExplainName() {
-    return "TRANSFORM_NULL";
+    return "TRANSFORM_NULL(defaultValue=" + _defaultValue + ")";
   }
 
   @Override

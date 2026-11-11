@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -45,6 +46,7 @@ public class DefaultNullValueVirtualColumnProviderTest {
   private static final FieldSpec SV_STRING_WITH_DEFAULT =
       new DimensionFieldSpec("svStringColumn", DataType.STRING, true, "default");
   private static final FieldSpec SV_BYTES = new DimensionFieldSpec("svBytesColumn", DataType.BYTES, true);
+  private static final FieldSpec SV_UUID = new DimensionFieldSpec("svUuidColumn", DataType.UUID, true);
   private static final FieldSpec MV_INT = new DimensionFieldSpec("mvIntColumn", DataType.INT, false);
   private static final FieldSpec MV_LONG = new DimensionFieldSpec("mvLongColumn", DataType.LONG, false);
   private static final FieldSpec MV_FLOAT = new DimensionFieldSpec("mvFloatColumn", DataType.FLOAT, false);
@@ -54,64 +56,142 @@ public class DefaultNullValueVirtualColumnProviderTest {
   @Test
   public void testBuildMetadata() {
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(SV_INT, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(SV_INT).setTotalDocs(1).setCardinality(1).setSorted(true)
-            .setHasDictionary(true).setMinValue((int) SV_INT.getDefaultNullValue())
-            .setMaxValue((int) SV_INT.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(SV_INT)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(true)
+            .setHasDictionary(true)
+            .setMinValue((int) SV_INT.getDefaultNullValue())
+            .setMaxValue((int) SV_INT.getDefaultNullValue())
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(SV_LONG, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(SV_LONG).setTotalDocs(1).setCardinality(1).setSorted(true)
-            .setHasDictionary(true).setMinValue((long) SV_LONG.getDefaultNullValue())
-            .setMaxValue((long) SV_LONG.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(SV_LONG)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(true)
+            .setHasDictionary(true)
+            .setMinValue((long) SV_LONG.getDefaultNullValue())
+            .setMaxValue((long) SV_LONG.getDefaultNullValue())
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(SV_FLOAT, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(SV_FLOAT).setTotalDocs(1).setCardinality(1).setSorted(true)
-            .setHasDictionary(true).setMinValue((float) SV_FLOAT.getDefaultNullValue())
-            .setMaxValue((float) SV_FLOAT.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(SV_FLOAT)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(true)
+            .setHasDictionary(true)
+            .setMinValue((float) SV_FLOAT.getDefaultNullValue())
+            .setMaxValue((float) SV_FLOAT.getDefaultNullValue())
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(SV_DOUBLE, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(SV_DOUBLE).setTotalDocs(1).setCardinality(1).setSorted(true)
-            .setHasDictionary(true).setMinValue((double) SV_DOUBLE.getDefaultNullValue())
-            .setMaxValue((double) SV_DOUBLE.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(SV_DOUBLE)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(true)
+            .setHasDictionary(true)
+            .setMinValue((double) SV_DOUBLE.getDefaultNullValue())
+            .setMaxValue((double) SV_DOUBLE.getDefaultNullValue())
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(SV_STRING, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(SV_STRING).setTotalDocs(1).setCardinality(1).setSorted(true)
-            .setHasDictionary(true).setMinValue((String) SV_STRING.getDefaultNullValue())
-            .setMaxValue((String) SV_STRING.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(SV_STRING)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(true)
+            .setHasDictionary(true)
+            .setMinValue((String) SV_STRING.getDefaultNullValue())
+            .setMaxValue((String) SV_STRING.getDefaultNullValue())
+            .build());
 
     assertEquals(
         new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(SV_STRING_WITH_DEFAULT, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(SV_STRING_WITH_DEFAULT).setTotalDocs(1).setCardinality(1)
-            .setSorted(true).setHasDictionary(true).setMinValue("default").setMaxValue("default").build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(SV_STRING_WITH_DEFAULT)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(true)
+            .setHasDictionary(true)
+            .setMinValue("default")
+            .setMaxValue("default")
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(SV_BYTES, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(SV_BYTES).setTotalDocs(1).setCardinality(1).setSorted(true)
-            .setHasDictionary(true).setMinValue(new ByteArray((byte[]) SV_BYTES.getDefaultNullValue()))
-            .setMaxValue(new ByteArray((byte[]) SV_BYTES.getDefaultNullValue())).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(SV_BYTES)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(true)
+            .setHasDictionary(true)
+            .setMinValue(new ByteArray((byte[]) SV_BYTES.getDefaultNullValue()))
+            .setMaxValue(new ByteArray((byte[]) SV_BYTES.getDefaultNullValue()))
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_INT, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(MV_INT).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).setMaxNumberOfMultiValues(1).setMinValue((int) MV_INT.getDefaultNullValue())
-            .setMaxValue((int) MV_INT.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(MV_INT)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(false)
+            .setHasDictionary(true)
+            .setMaxNumberOfMultiValues(1)
+            .setMinValue((int) MV_INT.getDefaultNullValue())
+            .setMaxValue((int) MV_INT.getDefaultNullValue())
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_LONG, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(MV_LONG).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).setMaxNumberOfMultiValues(1).setMinValue((long) MV_LONG.getDefaultNullValue())
-            .setMaxValue((long) MV_LONG.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(MV_LONG)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(false)
+            .setHasDictionary(true)
+            .setMaxNumberOfMultiValues(1)
+            .setMinValue((long) MV_LONG.getDefaultNullValue())
+            .setMaxValue((long) MV_LONG.getDefaultNullValue())
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_FLOAT, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(MV_FLOAT).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).setMaxNumberOfMultiValues(1).setMinValue((float) MV_FLOAT.getDefaultNullValue())
-        .setMaxValue((float) MV_FLOAT.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(MV_FLOAT)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(false)
+            .setHasDictionary(true)
+            .setMaxNumberOfMultiValues(1)
+            .setMinValue((float) MV_FLOAT.getDefaultNullValue())
+            .setMaxValue((float) MV_FLOAT.getDefaultNullValue())
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_DOUBLE, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(MV_DOUBLE).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).setMaxNumberOfMultiValues(1).setMinValue((double) MV_DOUBLE.getDefaultNullValue())
-            .setMaxValue((double) MV_DOUBLE.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(MV_DOUBLE)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(false)
+            .setHasDictionary(true)
+            .setMaxNumberOfMultiValues(1)
+            .setMinValue((double) MV_DOUBLE.getDefaultNullValue())
+            .setMaxValue((double) MV_DOUBLE.getDefaultNullValue())
+            .build());
 
     assertEquals(new DefaultNullValueVirtualColumnProvider().buildMetadata(new VirtualColumnContext(MV_STRING, 1)),
-        new ColumnMetadataImpl.Builder().setFieldSpec(MV_STRING).setTotalDocs(1).setCardinality(1).setSorted(false)
-            .setHasDictionary(true).setMaxNumberOfMultiValues(1).setMinValue((String) MV_STRING.getDefaultNullValue())
-            .setMaxValue((String) MV_STRING.getDefaultNullValue()).build());
+        new ColumnMetadataImpl.Builder().setFieldSpec(MV_STRING)
+            .setTotalDocs(1)
+            .setTotalNumberOfEntries(1)
+            .setCardinality(1)
+            .setSorted(false)
+            .setHasDictionary(true)
+            .setMaxNumberOfMultiValues(1)
+            .setMinValue((String) MV_STRING.getDefaultNullValue())
+            .setMaxValue((String) MV_STRING.getDefaultNullValue())
+            .build());
   }
 
   @Test
@@ -145,6 +225,14 @@ public class DefaultNullValueVirtualColumnProviderTest {
     dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
     assertEquals(dictionary.getClass(), ConstantValueBytesDictionary.class);
     assertEquals(dictionary.getBytesValue(0), new byte[0]);
+
+    virtualColumnContext = new VirtualColumnContext(SV_UUID, 1);
+    dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);
+    assertEquals(dictionary.getClass(), ConstantValueBytesDictionary.class);
+    byte[] uuidDefaultNullValue = (byte[]) SV_UUID.getDefaultNullValue();
+    assertEquals(dictionary.getBytesValue(0), uuidDefaultNullValue);
+    assertEquals(dictionary.getStringValue(0), BytesUtils.toHexString(uuidDefaultNullValue));
+    assertEquals(dictionary.indexOf(BytesUtils.toHexString(uuidDefaultNullValue)), 0);
 
     virtualColumnContext = new VirtualColumnContext(MV_INT, 1);
     dictionary = new DefaultNullValueVirtualColumnProvider().buildDictionary(virtualColumnContext);

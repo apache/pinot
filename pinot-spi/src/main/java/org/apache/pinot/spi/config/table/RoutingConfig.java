@@ -29,10 +29,11 @@ public class RoutingConfig extends BaseJsonConfig {
   public static final String PARTITION_SEGMENT_PRUNER_TYPE = "partition";
   public static final String TIME_SEGMENT_PRUNER_TYPE = "time";
   public static final String EMPTY_SEGMENT_PRUNER_TYPE = "empty";
-  public static final String DEFAULT_INSTANCE_SELECTOR_TYPE = "balanced";
+  public static final String BALANCED_INSTANCE_SELECTOR_TYPE = "balanced";
   public static final String REPLICA_GROUP_INSTANCE_SELECTOR_TYPE = "replicaGroup";
   public static final String STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE = "strictReplicaGroup";
   public static final String MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE = "multiStageReplicaGroup";
+  public static final String DEFAULT_INSTANCE_SELECTOR_TYPE = BALANCED_INSTANCE_SELECTOR_TYPE;
 
   // Replaced by _segmentPrunerTypes and _instanceSelectorType
   @Deprecated
@@ -41,19 +42,31 @@ public class RoutingConfig extends BaseJsonConfig {
   private final List<String> _segmentPrunerTypes;
   private final String _instanceSelectorType;
   private final Boolean _useFixedReplica;
+  private final Integer _partitionPruningPreparationThreshold;
+
+  public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
+      @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
+      @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType,
+      @JsonProperty("useFixedReplica") @Nullable Boolean useFixedReplica) {
+    this(routingTableBuilderName, segmentPrunerTypes, instanceSelectorType, useFixedReplica, null);
+  }
 
   @JsonCreator
   public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
       @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
       @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType,
-      @JsonProperty("useFixedReplica") @Nullable Boolean useFixedReplica) {
+      @JsonProperty("useFixedReplica") @Nullable Boolean useFixedReplica,
+      @JsonProperty("partitionPruningPreparationThreshold") @Nullable Integer partitionPruningPreparationThreshold) {
     _routingTableBuilderName = routingTableBuilderName;
     _segmentPrunerTypes = segmentPrunerTypes;
     _instanceSelectorType = instanceSelectorType;
     _useFixedReplica = useFixedReplica;
+    _partitionPruningPreparationThreshold = partitionPruningPreparationThreshold;
   }
 
+  /// @deprecated Use `routing.segmentPrunerTypes` and `routing.instanceSelectorType` instead.
   @Nullable
+  @Deprecated(since = "0.3.0", forRemoval = true)
   public String getRoutingTableBuilderName() {
     return _routingTableBuilderName;
   }
@@ -71,5 +84,12 @@ public class RoutingConfig extends BaseJsonConfig {
   @Nullable
   public Boolean getUseFixedReplica() {
     return _useFixedReplica;
+  }
+
+  /// Returns the table-level override for the minimum candidate segments needed to prepare a partition-pruning
+  /// predicate. A negative value disables preparation. Null means use the cluster-level value.
+  @Nullable
+  public Integer getPartitionPruningPreparationThreshold() {
+    return _partitionPruningPreparationThreshold;
   }
 }

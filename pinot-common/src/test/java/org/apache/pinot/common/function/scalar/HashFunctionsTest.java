@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.nio.charset.StandardCharsets;
+import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -132,6 +134,30 @@ public class HashFunctionsTest {
     String input = "testString";
     assertEquals(HashFunctions.murmurHash3X64Bit128(input.getBytes(), 0),
         new byte[]{-66, -99, 81, 77, -7, 29, 124, 76, 42, 38, -34, -42, -92, -83, 83, 13});
+  }
+
+  @Test
+  public void testFnvHash32() {
+    byte[] input = "testString".getBytes(StandardCharsets.UTF_8);
+    assertEquals(HashFunctions.fnv1Hash32(input), FnvHashFunctions.fnv1Hash32(input));
+    assertEquals(HashFunctions.fnv1aHash32(input), FnvHashFunctions.fnv1aHash32(input));
+  }
+
+  @Test
+  public void testFnvHash64() {
+    byte[] input = "testString".getBytes(StandardCharsets.UTF_8);
+    assertEquals(HashFunctions.fnv1Hash64(input), FnvHashFunctions.fnv1Hash64(input));
+    assertEquals(HashFunctions.fnv1aHash64(input), FnvHashFunctions.fnv1aHash64(input));
+  }
+
+  @Test
+  public void testFnvHashUTF8() {
+    String input = "Piñot-哈希";
+    byte[] utf8Bytes = input.getBytes(StandardCharsets.UTF_8);
+    assertEquals(HashFunctions.fnv1Hash32UTF8(input), FnvHashFunctions.fnv1Hash32(utf8Bytes));
+    assertEquals(HashFunctions.fnv1aHash32UTF8(input), FnvHashFunctions.fnv1aHash32(utf8Bytes));
+    assertEquals(HashFunctions.fnv1Hash64UTF8(input), FnvHashFunctions.fnv1Hash64(utf8Bytes));
+    assertEquals(HashFunctions.fnv1aHash64UTF8(input), FnvHashFunctions.fnv1aHash64(utf8Bytes));
   }
 
   @Test

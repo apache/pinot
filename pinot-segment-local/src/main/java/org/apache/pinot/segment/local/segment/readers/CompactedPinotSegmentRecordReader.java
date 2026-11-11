@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.MutableSegment;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -33,9 +32,7 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Compacted Pinot Segment Record Reader used for upsert compaction
- */
+/// Compacted Pinot Segment Record Reader used for upsert compaction
 public class CompactedPinotSegmentRecordReader implements RecordReader {
   private final PinotSegmentRecordReader _pinotSegmentRecordReader;
   private final RoaringBitmap _validDocIdsBitmap;
@@ -64,19 +61,6 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     _deleteRecordColumn = deleteRecordColumn;
   }
 
-  public CompactedPinotSegmentRecordReader(ThreadSafeMutableRoaringBitmap validDocIds) {
-    this(validDocIds, null);
-  }
-
-  public CompactedPinotSegmentRecordReader(ThreadSafeMutableRoaringBitmap validDocIds,
-      @Nullable String deleteRecordColumn) {
-    Preconditions.checkNotNull(validDocIds, "Valid document IDs cannot be null");
-    _pinotSegmentRecordReader = new PinotSegmentRecordReader();
-    _validDocIdsBitmap = validDocIds.getMutableRoaringBitmap().toRoaringBitmap();
-    _validDocIdsIterator = _validDocIdsBitmap.getIntIterator();
-    _deleteRecordColumn = deleteRecordColumn;
-  }
-
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
@@ -85,22 +69,18 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     prepareSortedValidDocIds();
   }
 
-  /**
-   * Initializes the record reader from a mutable segment with valid document ids and optional sorted document ids.
-   *
-   * @param mutableSegment Mutable segment
-   * @param sortedDocIds Array of sorted document ids (can be null)
-   */
+  /// Initializes the record reader from a mutable segment with valid document ids and optional sorted document ids.
+  ///
+  /// @param mutableSegment Mutable segment
+  /// @param sortedDocIds Array of sorted document ids (can be null)
   public void init(MutableSegment mutableSegment, @Nullable int[] sortedDocIds) {
     _pinotSegmentRecordReader.init(mutableSegment, sortedDocIds);
     prepareSortedValidDocIds();
   }
 
-  /**
-   * Prepares the sorted valid document IDs array based on whether sorted document IDs are available.
-   * If sorted document IDs are available, creates an array of valid document IDs in sorted order.
-   * If not available, falls back to bitmap iteration order.
-   */
+  /// Prepares the sorted valid document IDs array based on whether sorted document IDs are available.
+  /// If sorted document IDs are available, creates an array of valid document IDs in sorted order.
+  /// If not available, falls back to bitmap iteration order.
   private void prepareSortedValidDocIds() {
     int[] sortedDocIds = _pinotSegmentRecordReader.getSortedDocIds();
     if (sortedDocIds != null) {
@@ -118,9 +98,7 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     }
   }
 
-  /**
-   * Returns the sorted document ids from the underlying PinotSegmentRecordReader.
-   */
+  /// Returns the sorted document ids from the underlying PinotSegmentRecordReader.
   @Nullable
   public int[] getSortedDocIds() {
     return _pinotSegmentRecordReader.getSortedDocIds();
@@ -154,9 +132,7 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     }
   }
 
-  /**
-   * Gets the next row using sorted valid document IDs.
-   */
+  /// Gets the next row using sorted valid document IDs.
   private boolean getNextRowFromSortedValidDocIds() {
     while (_currentDocIndex < _sortedValidDocIds.length) {
       int docId = _sortedValidDocIds[_currentDocIndex++];
@@ -167,9 +143,7 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     return false;
   }
 
-  /**
-   * Gets the next row using bitmap iterator (fallback for non-sorted case).
-   */
+  /// Gets the next row using bitmap iterator (fallback for non-sorted case).
   private boolean getNextRowFromBitmapIterator() {
     while (_validDocIdsIterator.hasNext()) {
       int docId = _validDocIdsIterator.next();
@@ -180,11 +154,9 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     return false;
   }
 
-  /**
-   * Common method to process and validate a record for the given document ID.
-   * @param docId The document ID to process
-   * @return true if the record is valid and should be returned, false if it should be skipped
-   */
+  /// Common method to process and validate a record for the given document ID.
+  /// @param docId The document ID to process
+  /// @return true if the record is valid and should be returned, false if it should be skipped
   private boolean processAndValidateRecord(int docId) {
     _nextRow.clear();
     _pinotSegmentRecordReader.getRecord(docId, _nextRow);

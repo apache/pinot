@@ -25,14 +25,12 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 
 
-/**
- * The ArrayAverageTransformFunction class implements arrayAverage function for multi-valued columns
- *
- * Sample queries:
- * SELECT COUNT(*) FROM table WHERE arrayAverage(mvColumn) > 2
- * SELECT COUNT(*) FROM table GROUP BY arrayAverage(mvColumn)
- * SELECT SUM(arrayAverage(mvColumn)) FROM table
- */
+/// The ArrayAverageTransformFunction class implements arrayAverage function for multi-valued columns
+///
+/// Sample queries:
+/// SELECT COUNT(\*) FROM table WHERE arrayAverage(mvColumn) > 2
+/// SELECT COUNT(\*) FROM table GROUP BY arrayAverage(mvColumn)
+/// SELECT SUM(arrayAverage(mvColumn)) FROM table
 public class ArrayAverageTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "arrayAverage";
 

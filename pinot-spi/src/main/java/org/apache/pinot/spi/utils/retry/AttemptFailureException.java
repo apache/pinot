@@ -18,13 +18,9 @@
  */
 package org.apache.pinot.spi.utils.retry;
 
-import java.util.concurrent.Callable;
-
-
-/**
- * The <code>AttemptFailureException</code> indicates that the {@link RetryPolicy#attempt(Callable)} failed because of
- * either operation throwing an exception or running out of attempts.
- */
+/// The `AttemptFailureException` indicates that the
+/// [RetryPolicy#attempt(java.util.concurrent.Callable)] failed because of either operation throwing an
+/// exception or running out of attempts.
 public class AttemptFailureException extends Exception {
   private final int _attempts;
 

@@ -36,9 +36,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Tests for {@link Partitioner}
- */
+/// Tests for [Partitioner]
 public class PartitionerTest {
 
   @Test
@@ -106,7 +104,7 @@ public class PartitionerTest {
     GenericRow row = new GenericRow();
     int expectedPartition = 0;
     for (int i = 0; i < 10; i++) {
-      row.putValue("dim", RandomStringUtils.randomAlphabetic(3));
+      row.putValue("dim", RandomStringUtils.secure().nextAlphabetic(3));
       int partition = Integer.parseInt(partitioner.getPartition(row));
       assertEquals(partition, expectedPartition);
       expectedPartition = (expectedPartition + 1) % numPartitions;
@@ -141,7 +139,7 @@ public class PartitionerTest {
 
     GenericRow row = new GenericRow();
     for (int i = 0; i < 10; i++) {
-      row.putValue("foo", RandomStringUtils.randomAlphabetic(3));
+      row.putValue("foo", RandomStringUtils.secure().nextAlphabetic(3));
       int partition = Integer.parseInt(partitioner.getPartition(row));
       assertTrue(partition >= 0 && partition < 3);
     }

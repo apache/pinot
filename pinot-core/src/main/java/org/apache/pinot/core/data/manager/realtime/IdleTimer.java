@@ -19,12 +19,10 @@
 
 package org.apache.pinot.core.data.manager.realtime;
 
-/**
- * The IdleTimer is responsible for keeping track of 2 different idle times:
- *  - The stream idle time which resets every time we remake the stream consumer.
- *    This depends on the user configured "idle.timeout.millis" stream config.
- *  - the total idle time which only resets when we consume something.
- */
+/// The IdleTimer is responsible for keeping track of 2 different idle times:
+///  - The stream idle time which resets every time we remake the stream consumer.
+///    This depends on the user configured "idle.timeout.millis" stream config.
+///  - the total idle time which only resets when we consume something.
 public class IdleTimer {
 
   private volatile long _timeWhenStreamLastCreatedOrConsumedMs = 0;

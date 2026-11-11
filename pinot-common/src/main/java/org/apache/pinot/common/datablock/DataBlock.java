@@ -50,10 +50,8 @@ public interface DataBlock {
 
   Map<Integer, String> getExceptions();
 
-  /**
-   * This is a wrapper on top of {@link DataBlockUtils#serialize(DataBlock)} but implementations can cache
-   * the result so messages that are sent to more than one receiving mailbox don't need to be serialized as many times.
-   */
+  /// This is a wrapper on top of [DataBlockUtils#serialize(DataBlock)] but implementations can cache
+  /// the result so messages that are sent to more than one receiving mailbox don't need to be serialized as many times.
   List<ByteBuffer> serialize()
       throws IOException;
 
@@ -83,7 +81,11 @@ public interface DataBlock {
 
   double[] getDoubleArray(int rowId, int colId);
 
+  BigDecimal[] getBigDecimalArray(int rowId, int colId);
+
   String[] getStringArray(int rowId, int colId);
+
+  ByteArray[] getBytesArray(int rowId, int colId);
 
   Map<String, Object> getMap(int rowId, int colId);
 
@@ -120,38 +122,30 @@ public interface DataBlock {
     }
   }
 
-  /**
-   * Returns the dictionary for the given column.
-   *
-   * This is a break in the interface abstraction that assumes all implementations will use a dictionary only for
-   * string columns. This may change in the future.
-   */
+  /// Returns the dictionary for the given column.
+  ///
+  /// This is a break in the interface abstraction that assumes all implementations will use a dictionary only for
+  /// string columns. This may change in the future.
   @Nullable
   String[] getStringDictionary();
 
-  /**
-   * The actual content is different depending on whether this is a row-based or columnar data block.
-   *
-   * This is an abstraction leak that assumes all implementations derive from {@link BaseDataBlock}.
-   */
+  /// The actual content is different depending on whether this is a row-based or columnar data block.
+  ///
+  /// This is an abstraction leak that assumes all implementations derive from [BaseDataBlock].
   @Nullable
   DataBuffer getFixedData();
 
-  /**
-   * The actual content is different depending on whether this is a row-based or columnar data block.
-   *
-   * This is an abstraction leak that assumes all implementations derive from {@link BaseDataBlock}.
-   */
+  /// The actual content is different depending on whether this is a row-based or columnar data block.
+  ///
+  /// This is an abstraction leak that assumes all implementations derive from [BaseDataBlock].
   @Nullable
   DataBuffer getVarSizeData();
 
-  /**
-   * Returns the list of serialized stats.
-   * <p>
-   * The returned list may contain nulls, which would mean that no stats were available for that stage.
-   * <p>
-   * The list itself may also be null.
-   */
+  /// Returns the list of serialized stats.
+  ///
+  /// The returned list may contain nulls, which would mean that no stats were available for that stage.
+  ///
+  /// The list itself may also be null.
   @Nullable
   List<DataBuffer> getStatsByStage();
 }

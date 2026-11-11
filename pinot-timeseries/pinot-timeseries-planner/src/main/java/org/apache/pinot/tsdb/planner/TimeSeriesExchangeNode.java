@@ -25,17 +25,15 @@ import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
-/**
- * This node exists in the logical plan, but not in the physical/dispatchable plans. Similar to the
- * {@link LeafTimeSeriesPlanNode}, a physical plan visitor will convert to its equivalent physical plan node, which will
- * be capable of returning an executable operator with the {@link #run()} method.
- * <br />
- * <b>Note:</b> This node doesn't exist in the pinot-timeseries-spi because we don't want to let language developers
- *   control how and when exchange will be run (as of now).
- */
+/// This node exists in the logical plan, but not in the physical/dispatchable plans. Similar to the
+/// [org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode], a physical plan visitor will convert to its
+/// equivalent physical plan node, which will be capable of returning an executable operator with the [#run()]
+/// method.
+///
+/// **Note:** This node doesn't exist in the pinot-timeseries-spi because we don't want to let language developers
+///   control how and when exchange will be run (as of now).
 public class TimeSeriesExchangeNode extends BaseTimeSeriesPlanNode {
   @Nullable
   private final AggInfo _aggInfo;

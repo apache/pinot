@@ -24,19 +24,20 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.net.URLEncodedUtils;
-import org.apache.pinot.common.auth.BasicAuthUtils;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -79,7 +80,7 @@ public class DriverUtils {
       if (StringUtils.isAnyEmpty(username, password)) {
         throw new SQLException("Empty username or password provided.");
       }
-      String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
+      String authToken = BasicAuthTokenUtils.toBasicAuthToken(username, password);
       headers.put(AUTH_HEADER, authToken);
       info.setProperty(AUTH_HEADER_CONFIG_KEY, authToken);
     }
@@ -101,7 +102,7 @@ public class DriverUtils {
 
   public static List<String> getBrokersFromURI(URI uri) {
     String brokerUrl = String.format("%s:%d", uri.getHost(), uri.getPort());
-    List<String> brokerList = Collections.singletonList(brokerUrl);
+    List<String> brokerList = List.of(brokerUrl);
     return brokerList;
   }
 
@@ -153,6 +154,12 @@ public class DriverUtils {
     if (columnDataType == null) {
       return Types.VARCHAR;
     }
+    if (ColumnDataType.isArray(columnDataType)) {
+      return Types.JAVA_OBJECT;
+    }
+    if (ColumnDataType.MAP.name().equals(columnDataType)) {
+      return Types.JAVA_OBJECT;
+    }
     Integer columnsSQLDataType;
     switch (columnDataType) {
       case "STRING":
@@ -182,6 +189,9 @@ public class DriverUtils {
       case "TIMESTAMP":
         columnsSQLDataType = Types.TIMESTAMP;
         break;
+      case "UUID":
+        columnsSQLDataType = Types.OTHER;
+        break;
       default:
         columnsSQLDataType = Types.NULL;
         break;
@@ -192,6 +202,12 @@ public class DriverUtils {
   public static String getJavaClassName(String columnDataType) {
     if (columnDataType == null) {
       return String.class.getTypeName();
+    }
+    if (ColumnDataType.isArray(columnDataType)) {
+      return List.class.getTypeName();
+    }
+    if (ColumnDataType.MAP.name().equals(columnDataType)) {
+      return Map.class.getTypeName();
     }
     String columnsJavaClassName;
     switch (columnDataType) {
@@ -221,6 +237,9 @@ public class DriverUtils {
         break;
       case "TIMESTAMP":
         columnsJavaClassName = Timestamp.class.getTypeName();
+        break;
+      case "UUID":
+        columnsJavaClassName = UUID.class.getTypeName();
         break;
       default:
         columnsJavaClassName = String.class.getTypeName();
@@ -276,6 +295,7 @@ public class DriverUtils {
           return numVal;
         }
       } catch (NumberFormatException e) {
+        // Not a Long, try the next format
       }
 
       try {
@@ -284,6 +304,7 @@ public class DriverUtils {
           return numVal;
         }
       } catch (NumberFormatException e) {
+        // Not a Double, try the next format
       }
 
       Boolean boolVal = Boolean.valueOf(str.toLowerCase());

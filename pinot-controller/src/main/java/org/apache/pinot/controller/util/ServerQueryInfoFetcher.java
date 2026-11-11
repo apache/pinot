@@ -31,10 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is a helper class that fetch server information from Helix/ZK. It caches the server information to avoid
- * repeated ZK access. This class is NOT thread-safe.
- */
+/// This is a helper class that fetch server information from Helix/ZK. It caches the server information to avoid
+/// repeated ZK access. This class is NOT thread-safe.
 public class ServerQueryInfoFetcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryInfoFetcher.class);
   private final PinotHelixResourceManager _pinotHelixResourceManager;

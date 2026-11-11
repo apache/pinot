@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -32,8 +31,10 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -43,18 +44,17 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 
 
-/**
- * Special rule for Pinot, this rule is fixed to always insert an exchange or sort exchange below the WINDOW node.
- * TODO:
- *     1. Add support for more than one window group
- *     2. Add support for functions other than:
- *        a. Aggregation functions (AVG, COUNT, MAX, MIN, SUM, BOOL_AND, BOOL_OR)
- *        b. Ranking functions (ROW_NUMBER, RANK, DENSE_RANK)
- */
+/// Special rule for Pinot, this rule is fixed to always insert an exchange or sort exchange below the WINDOW node.
+/// TODO:
+///     1. Add support for more than one window group
+///     2. Add support for functions other than:
+///        a. Aggregation functions (AVG, COUNT, MAX, MIN, SUM, BOOL_AND, BOOL_OR)
+///        b. Ranking functions (ROW_NUMBER, RANK, DENSE_RANK)
 public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   public static final PinotWindowExchangeNodeInsertRule INSTANCE =
       new PinotWindowExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -73,7 +73,22 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   @Override
   public boolean matches(RelOptRuleCall call) {
     Window window = call.rel(0);
-    return !PinotRuleUtils.isExchange(window.getInput());
+    RelNode input = PinotRuleUtils.unboxRel(window.getInput());
+    if (input instanceof Exchange) {
+      return false;
+    }
+    // This rule leaves a Sort over the exchange when the window needs ordered input (see onMatch), so that shape also
+    // means the window has already been processed. Without this the rule re-fires on its own output forever.
+    //
+    // The shape has to match exactly. A Sort that orders by something else, or that trims, belongs to another part of
+    // the plan - treating it as this rule's own output would leave the window with neither its exchange nor the
+    // ordering it requires, because WindowAggregateOperator does no ordering of its own.
+    if (!(input instanceof Sort) || window.groups.size() != 1) {
+      return true;
+    }
+    Sort sort = (Sort) input;
+    return !(PinotRuleUtils.isExchange(sort.getInput()) && sort.fetch == null && sort.offset == null
+        && sort.getCollation().equals(window.groups.get(0).orderKeys));
   }
 
   @Override
@@ -105,38 +120,45 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         exchange = PinotLogicalExchange.create(input, RelDistributions.hash(List.of()));
       } else {
         // Only ORDER BY
-        // Add a LogicalSortExchange with collation on the order by key(s) and an empty hash partition key
-        // TODO: ORDER BY only type queries need to be sorted on both sender and receiver side for better performance.
-        //       Sorted input data can use a k-way merge instead of a PriorityQueue for sorting. For now support to
-        //       sort on the sender side is not available thus setting this up to only sort on the receiver.
+        // Add a LogicalSortExchange with collation on the order by key(s) and an empty hash partition key.
+        // The ordering itself is established by the Sort placed over the exchange below, not by the receive
+        // operator - see the comment at the transformTo call.
         // TODO: Revisit whether we should use hash distribution
         exchange =
             PinotLogicalSortExchange.create(input, RelDistributions.hash(List.of()), windowGroup.orderKeys, false,
-                true);
+                false);
       }
     } else {
       // All other variants
       // Assess whether this is a PARTITION BY only query or not (includes queries of the type where PARTITION BY and
       // ORDER BY key(s) are the same)
       boolean isPartitionByOnly = isPartitionByOnlyQuery(windowGroup);
-
+      // Force pre-partitioned exchange when 'is_partitioned_by_window_keys' hint is provided
+      Boolean prePartitioned = PinotHintOptions.WindowHintOptions.isPartitionedByWindowKeys(window);
       if (isPartitionByOnly) {
         // Only PARTITION BY or PARTITION BY and ORDER BY on the same key(s)
         // Add an Exchange hashed on the partition by keys
-        exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()));
+        exchange = PinotLogicalExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()), prePartitioned);
       } else {
         // PARTITION BY and ORDER BY on different key(s)
-        // Add a LogicalSortExchange hashed on the partition by keys and collation based on order by keys
-        // TODO: ORDER BY only type queries need to be sorted only on the receiver side unless a hint is set indicating
-        //       that the data is already partitioned and sorting can be done on the sender side instead. This way
-        //       sorting on the receiver side can be a no-op. Add support for this hint and pass it on. Until sender
-        //       side sorting is implemented, setting this hint will throw an error on execution.
+        // Add a LogicalSortExchange hashed on the partition by keys and collation based on order by keys.
+        // The ordering itself is established by the Sort placed over the exchange below, not by the receive
+        // operator - see the comment at the transformTo call.
         exchange = PinotLogicalSortExchange.create(input, RelDistributions.hash(windowGroup.keys.toList()),
-            windowGroup.orderKeys, false, true);
+            windowGroup.orderKeys, false, false, prePartitioned);
       }
     }
+    // WindowAggregateOperator requires its input ordered on the ORDER BY keys and does no ordering of its own, so
+    // where the exchange carries a collation the ordering has to be established above it. Place an explicit Sort
+    // rather than asking the receive operator to sort: SortOperator is the operator that knows fetch/offset, and
+    // SortedMailboxReceiveOperator is deprecated. The Sort carries no fetch, so it keeps every row - the same
+    // semantics as the unbounded list the receive operator used.
+    // PinotSortExchangeNodeInsertRule does not re-fire on it: its matches() rejects a Sort whose input is an
+    // exchange. PinotSortExchangeCopyRule does not either: it declines when there is no fetch.
+    RelNode windowInput = exchange instanceof PinotLogicalSortExchange
+        ? LogicalSort.create(exchange, ((PinotLogicalSortExchange) exchange).getCollation(), null, null) : exchange;
     // NOTE: Need to create a new LogicalWindow to use the modified window group.
-    call.transformTo(LogicalWindow.create(window.getTraitSet(), exchange, window.constants, window.getRowType(),
+    call.transformTo(LogicalWindow.create(window.getTraitSet(), windowInput, window.constants, window.getRowType(),
         List.of(windowGroup)));
   }
 
@@ -154,33 +176,31 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     return isPartitionByOnly;
   }
 
-  /**
-   * Only empty OVER() type queries using window functions that take no columns as arguments can result in a situation
-   * where the LogicalProject below the LogicalWindow is an empty LogicalProject (i.e. no columns are projected).
-   * The 'ProjectWindowTransposeRule' looks at the columns present in the LogicalProject above the LogicalWindow and
-   * LogicalWindow to decide what to add to the lower LogicalProject when it does the transpose and for such queries
-   * if nothing is referenced an empty LogicalProject gets created. Some example queries where this can occur are:
-   *
-   * SELECT COUNT(*) OVER() from tableName
-   * SELECT 42, COUNT(*) OVER() from tableName
-   * SELECT ROW_NUMBER() OVER() from tableName
-   *
-   * This function modifies the empty LogicalProject below the LogicalWindow to add a literal and adds a LogicalProject
-   * above LogicalWindow to remove the additional literal column from being projected any further. This also handles
-   * the addition of the Exchange under the LogicalWindow.
-   *
-   * TODO: Explore an option to handle empty LogicalProject by actually projecting empty rows for each entry. This way
-   *       there will no longer be a need to add a literal to the empty LogicalProject, but just traverse the number of
-   *       rows
-   */
+  /// Only empty OVER() type queries using window functions that take no columns as arguments can result in a situation
+  /// where the LogicalProject below the LogicalWindow is an empty LogicalProject (i.e. no columns are projected).
+  /// The 'ProjectWindowTransposeRule' looks at the columns present in the LogicalProject above the LogicalWindow and
+  /// LogicalWindow to decide what to add to the lower LogicalProject when it does the transpose and for such queries
+  /// if nothing is referenced an empty LogicalProject gets created. Some example queries where this can occur are:
+  ///
+  /// SELECT COUNT(\*) OVER() from tableName
+  /// SELECT 42, COUNT(\*) OVER() from tableName
+  /// SELECT ROW_NUMBER() OVER() from tableName
+  ///
+  /// This function modifies the empty LogicalProject below the LogicalWindow to add a literal and adds a LogicalProject
+  /// above LogicalWindow to remove the additional literal column from being projected any further. This also handles
+  /// the addition of the Exchange under the LogicalWindow.
+  ///
+  /// TODO: Explore an option to handle empty LogicalProject by actually projecting empty rows for each entry. This way
+  ///       there will no longer be a need to add a literal to the empty LogicalProject, but just traverse the number of
+  ///       rows
   private RelNode handleEmptyProjectBelowWindow(Window window, Project project) {
     RelOptCluster cluster = window.getCluster();
     RexBuilder rexBuilder = cluster.getRexBuilder();
 
     // Construct the project that goes below the window (which projects a literal)
-    final List<RexNode> expsForProjectBelowWindow = Collections.singletonList(
+    final List<RexNode> expsForProjectBelowWindow = List.of(
         rexBuilder.makeLiteral(0, cluster.getTypeFactory().createSqlType(SqlTypeName.INTEGER)));
-    final List<String> expsFieldNamesBelowWindow = Collections.singletonList("winLiteral");
+    final List<String> expsFieldNamesBelowWindow = List.of("winLiteral");
     Project projectBelowWindow =
         LogicalProject.create(project.getInput(), project.getHints(), expsForProjectBelowWindow,
             expsFieldNamesBelowWindow);
@@ -193,7 +213,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     // This scenario is only possible for empty OVER() which uses functions that have no arguments such as COUNT(*) or
     // ROW_NUMBER(). Add an Exchange with empty hash distribution list
     PinotLogicalExchange exchange =
-        PinotLogicalExchange.create(projectBelowWindow, RelDistributions.hash(Collections.emptyList()));
+        PinotLogicalExchange.create(projectBelowWindow, RelDistributions.hash(List.of()));
     Window newWindow = new LogicalWindow(window.getCluster(), window.getTraitSet(), exchange, window.getConstants(),
         outputBuilder.build(), window.groups);
 

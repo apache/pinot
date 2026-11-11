@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Throwables;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,8 +51,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class WindowAggregateOperatorTest {
@@ -137,6 +140,10 @@ public class WindowAggregateOperatorTest {
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 1, 1.0});
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+    StatMap<WindowAggregateOperator.StatKey> windowStats =
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 1,
+        "Max rows in window should equal number of input rows");
   }
 
   @Test
@@ -233,7 +240,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of("Aa", List.<Object[]>of(new Object[]{1, "Aa", 1.0}), "BB",
-        List.of(new Object[]{2, "BB", 5.0}, new Object[]{3, "BB", 5.0})));
+        List.<Object[]>of(new Object[]{2, "BB", 5.0}, new Object[]{3, "BB", 5.0})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
@@ -253,10 +260,8 @@ public class WindowAggregateOperatorTest {
         Integer.MIN_VALUE, Integer.MAX_VALUE, input);
   }
 
-  @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Failed to instantiate "
-      + "WindowFunction for function: NTILE.*")
-  public void testShouldThrowOnUnknownRankAggFunction() {
-    // TODO: Remove this test when support is added for NTILE function
+  @Test
+  public void testShouldThrowOnNtileWithoutOperand() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
     MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema).buildWithEos();
@@ -266,8 +271,12 @@ public class WindowAggregateOperatorTest {
         List.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.NTILE.name(), List.of()));
 
     // When:
-    getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-        Integer.MIN_VALUE, Integer.MAX_VALUE, input);
+    RuntimeException exception = expectThrows(RuntimeException.class,
+        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input));
+    Throwable rootCause = Throwables.getRootCause(exception);
+    assertEquals(rootCause.getClass(), IllegalArgumentException.class);
+    assertEquals(rootCause.getMessage(), "NTILE function must have exactly 1 operand");
   }
 
   @Test
@@ -304,12 +313,12 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys,
-        Map.of(1, List.of(new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "foo", 1L, 1L}, new Object[]{
-                1, "numb", 3L, 2L
-            }), 2, List.of(new Object[]{2, "bar", 1L, 1L}, new Object[]{2, "foo", 2L, 2L}, new Object[]{
+        Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "foo", 1L, 1L}, new Object[]{
+          1, "numb", 3L, 2L
+            }), 2, List.<Object[]>of(new Object[]{2, "bar", 1L, 1L}, new Object[]{2, "foo", 2L, 2L}, new Object[]{
                 2, "foo", 2L, 2L
             }, new Object[]{2, "the", 4L, 3L}), 3,
-            List.of(new Object[]{3, "and", 1L, 1L}, new Object[]{3, "true", 2L, 2L})));
+            List.<Object[]>of(new Object[]{3, "and", 1L, 1L}, new Object[]{3, "true", 2L, 2L})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
@@ -344,8 +353,9 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1L}), 2,
-        List.of(new Object[]{2, "bar", 1L}, new Object[]{2, "foo", 2L}, new Object[]{2, "foo", 3L},
-            new Object[]{2, "the", 4L}), 3, List.of(new Object[]{3, "and", 1L}, new Object[]{3, "true", 2L})));
+        List.<Object[]>of(new Object[]{2, "bar", 1L}, new Object[]{2, "foo", 2L}, new Object[]{2, "foo", 3L},
+            new Object[]{2, "the", 4L}), 3,
+        List.<Object[]>of(new Object[]{3, "and", 1L}, new Object[]{3, "true", 2L})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
@@ -379,8 +389,8 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1.0}), 2,
-        List.of(new Object[]{2, "bar", 2.0}, new Object[]{2, "foo", 6.0}, new Object[]{2, "foo", 6.0}), 3,
-        List.of(new Object[]{3, "and", 3.0}, new Object[]{3, "true", 6.0})));
+        List.<Object[]>of(new Object[]{2, "bar", 2.0}, new Object[]{2, "foo", 6.0}, new Object[]{2, "foo", 6.0}), 3,
+        List.<Object[]>of(new Object[]{3, "and", 3.0}, new Object[]{3, "true", 6.0})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
@@ -439,7 +449,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of("bar", List.<Object[]>of(new Object[]{2, "bar", 2.0}), "foo",
-        List.of(new Object[]{2, "foo", 5.0}, new Object[]{3, "foo", 5.0})));
+        List.<Object[]>of(new Object[]{2, "foo", 5.0}, new Object[]{3, "foo", 5.0})));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
@@ -498,6 +508,10 @@ public class WindowAggregateOperatorTest {
     assertTrue(block.isError(), "expected ERROR block from window overflow");
     assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED)
         .contains("reach number of rows limit"));
+    StatMap<WindowAggregateOperator.StatKey> windowStats =
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 2,
+        "Max rows in window should be recorded even on THROW");
   }
 
   @Test
@@ -533,6 +547,8 @@ public class WindowAggregateOperatorTest {
         OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
     assertTrue(windowStats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED),
         "Max rows in window should be reached");
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 1,
+        "Max rows in window value should match the number of cached rows");
   }
 
   @Test
@@ -690,6 +706,454 @@ public class WindowAggregateOperatorTest {
             new Object[]{2, "foo", null, null, 9999, 8888}),
         3, List.<Object[]>of(
             new Object[]{3, "single", null, null, 9999, 8888})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLeadIgnoreNullsWithDefaultOffset() {
+    // Given: LEAD(value) IGNORE NULLS - should find next non-null value
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, null)
+        .addRow(1, null)
+        .addRow(1, 10)
+        .addRow(1, 20)
+        .addRow(1, null)
+        .addRow(2, 10)
+        .addRow(2, null)
+        .addRow(2, 20)
+        .addRow(3, null)
+        .addRow(3, null)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lead"}, new ColumnDataType[]{INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(1)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, null, 10},
+            new Object[]{1, null, 10},
+            new Object[]{1, 10, 20},
+            new Object[]{1, 20, null},
+            new Object[]{1, null, null}),
+        2, List.of(
+            new Object[]{2, 10, 20},
+            new Object[]{2, null, 20},
+            new Object[]{2, 20, null}),
+        3, List.of(
+            new Object[]{3, null, null},
+            new Object[]{3, null, null})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLeadIgnoreNullsWithOffset() {
+    // Given: LEAD(value, 2) IGNORE NULLS - should find 2nd non-null value ahead
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, 10)
+        .addRow(1, null)
+        .addRow(1, 20)
+        .addRow(1, null)
+        .addRow(1, 30)
+        .addRow(1, null)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lead"}, new ColumnDataType[]{INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(1), new RexExpression.Literal(ColumnDataType.INT, 2)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, 10, 30},
+            new Object[]{1, null, 30},
+            new Object[]{1, 20, null},
+            new Object[]{1, null, null},
+            new Object[]{1, 30, null},
+            new Object[]{1, null, null})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLeadIgnoreNullsWithOffsetAndDefault() {
+    // Given: LEAD(value, 2, 99) IGNORE NULLS - 2nd non-null value ahead, or 99 if not enough non-nulls
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, 10)
+        .addRow(1, null)
+        .addRow(1, 20)
+        .addRow(1, null)
+        .addRow(1, 30)
+        .addRow(1, null)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lead"}, new ColumnDataType[]{INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(1), new RexExpression.Literal(ColumnDataType.INT, 2),
+                new RexExpression.Literal(ColumnDataType.INT, 99)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, 10, 30},
+            new Object[]{1, null, 30},
+            new Object[]{1, 20, 99},
+            new Object[]{1, null, 99},
+            new Object[]{1, 30, 99},
+            new Object[]{1, null, 99})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLagIgnoreNullsWithDefaultOffset() {
+    // Given: LAG(value) IGNORE NULLS - should find previous non-null value
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, null)
+        .addRow(1, null)
+        .addRow(1, 10)
+        .addRow(1, 20)
+        .addRow(1, null)
+        .addRow(2, 10)
+        .addRow(2, null)
+        .addRow(2, 20)
+        .addRow(3, null)
+        .addRow(3, null)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lag"}, new ColumnDataType[]{INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(1)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, null, null},
+            new Object[]{1, null, null},
+            new Object[]{1, 10, null},
+            new Object[]{1, 20, 10},
+            new Object[]{1, null, 20}),
+        2, List.of(
+            new Object[]{2, 10, null},
+            new Object[]{2, null, 10},
+            new Object[]{2, 20, 10}),
+        3, List.of(
+            new Object[]{3, null, null},
+            new Object[]{3, null, null})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLagIgnoreNullsWithOffset() {
+    // Given: LAG(value, 2) IGNORE NULLS - should find 2nd non-null value behind
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, 10)
+        .addRow(1, null)
+        .addRow(1, 20)
+        .addRow(1, null)
+        .addRow(1, 30)
+        .addRow(1, null)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lag"}, new ColumnDataType[]{INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(1), new RexExpression.Literal(ColumnDataType.INT, 2)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, 10, null},
+            new Object[]{1, null, null},
+            new Object[]{1, 20, null},
+            new Object[]{1, null, 10},
+            new Object[]{1, 30, 10},
+            new Object[]{1, null, 20})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLagIgnoreNullsWithOffsetAndDefault() {
+    // Given: LAG(value, 2, 99) IGNORE NULLS - 2nd non-null value behind, or 99 if not enough non-nulls
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, 10)
+        .addRow(1, null)
+        .addRow(1, 20)
+        .addRow(1, null)
+        .addRow(1, 30)
+        .addRow(1, null)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lag"}, new ColumnDataType[]{INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(1), new RexExpression.Literal(ColumnDataType.INT, 2),
+                new RexExpression.Literal(ColumnDataType.INT, 99)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, 10, 99},
+            new Object[]{1, null, 99},
+            new Object[]{1, 20, 99},
+            new Object[]{1, null, 10},
+            new Object[]{1, 30, 10},
+            new Object[]{1, null, 20})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLeadIgnoreNullsAllNulls() {
+    // Given: LEAD(value) IGNORE NULLS where all values are null
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, null)
+        .addRow(1, null)
+        .addRow(1, null)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lead"}, new ColumnDataType[]{INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(1)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, null, null},
+            new Object[]{1, null, null},
+            new Object[]{1, null, null})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLeadIgnoreNullsStringValueWithDefault() {
+    // Given: LEAD(value, 2, '99') IGNORE NULLS over a STRING value column. The value argument is column 1 while the
+    // partition/group column (column 0) is INT, so this also verifies the default value is coerced to the argument's
+    // type (STRING) rather than to the first input column's type (INT).
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, STRING});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, "a")
+        .addRow(1, null)
+        .addRow(1, "b")
+        .addRow(1, null)
+        .addRow(1, "c")
+        .addRow(1, null)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lead"}, new ColumnDataType[]{INT, STRING, STRING});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.STRING, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(1), new RexExpression.Literal(ColumnDataType.INT, 2),
+                new RexExpression.Literal(ColumnDataType.STRING, "99")), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then: the default is emitted as the STRING "99" (not coerced to an INT), matching the value column type.
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, "a", "c"},
+            new Object[]{1, null, "c"},
+            new Object[]{1, "b", "99"},
+            new Object[]{1, null, "99"},
+            new Object[]{1, "c", "99"},
+            new Object[]{1, null, "99"})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLagIgnoreNullsDoubleValue() {
+    // Given: LAG(value) IGNORE NULLS over a DOUBLE value column - previous non-null value.
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, DOUBLE});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, null)
+        .addRow(1, null)
+        .addRow(1, 10.5)
+        .addRow(1, 20.5)
+        .addRow(1, null)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lag"}, new ColumnDataType[]{INT, DOUBLE, DOUBLE});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(1)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, null, null},
+            new Object[]{1, null, null},
+            new Object[]{1, 10.5, null},
+            new Object[]{1, 20.5, 10.5},
+            new Object[]{1, null, 20.5})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLagIgnoreNullsZeroOffset() {
+    // Given: LAG(value, 0) IGNORE NULLS. Offset 0 has no null-skipping semantics (there is no preceding row to skip
+    // to), so it must return the current row's value - including nulls - exactly like RESPECT NULLS, rather than
+    // treating every row as having "not enough" non-null predecessors and emitting the (absent) default.
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, 10)
+        .addRow(1, null)
+        .addRow(1, 20)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lag"}, new ColumnDataType[]{INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(1), new RexExpression.Literal(ColumnDataType.INT, 0)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then: each row's LAG is its own value (the current row).
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, 10, 10},
+            new Object[]{1, null, null},
+            new Object[]{1, 20, 20})
+    ));
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLeadIgnoreNullsZeroOffset() {
+    // Given: LEAD(value, 0) IGNORE NULLS. As with LAG, offset 0 has no null-skipping semantics, so it must return the
+    // current row's value (including nulls), matching RESPECT NULLS, rather than emitting the (absent) default.
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(1, 10)
+        .addRow(1, null)
+        .addRow(1, 20)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "value", "lead"}, new ColumnDataType[]{INT, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(1), new RexExpression.Literal(ColumnDataType.INT, 0)), false, true));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then: each row's LEAD is its own value (the current row).
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, 10, 10},
+            new Object[]{1, null, null},
+            new Object[]{1, 20, 20})
     ));
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
@@ -2987,13 +3451,70 @@ public class WindowAggregateOperatorTest {
     assertEquals(e.getMessage(), "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
   }
 
+  @Test
+  public void testShouldRecordMaxRowsInWindowWhenInputFitsExactlyAtLimit() {
+    // Given: 1 input row, limit = 1 — fits exactly, no overflow
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(new Object[]{2, 1})
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
+    List<Integer> keys = List.of(0);
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.WINDOW_HINT_OPTIONS,
+        Map.of(PinotHintOptions.WindowHintOptions.WINDOW_OVERFLOW_MODE, "BREAK",
+            PinotHintOptions.WindowHintOptions.MAX_ROWS_IN_WINDOW, "1")));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, Integer.MAX_VALUE, nodeHint, input);
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    assertEquals(resultRows.size(), 1);
+    assertTrue(operator.nextBlock().isSuccess());
+    StatMap<WindowAggregateOperator.StatKey> windowStats =
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
+    assertFalse(windowStats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED),
+        "Max rows in window should not be reached when input fits exactly at limit");
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 1,
+        "Max rows in window should equal number of input rows");
+  }
+
+  @Test
+  public void testShouldRecordZeroMaxRowsInWindowWhenInputIsEmpty() {
+    // Given: 0 input rows (just EOS)
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .buildWithEos();
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
+    List<Integer> keys = List.of(0);
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
+
+    // When:
+    MseBlock block = operator.nextBlock();
+
+    // Then:
+    assertTrue(block.isEos());
+    StatMap<WindowAggregateOperator.StatKey> windowStats =
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
+    assertEquals(windowStats.getLong(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW), 0,
+        "Max rows in window should be 0 when input is empty");
+  }
+
   private WindowAggregateOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<Integer> keys,
       List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls,
       WindowNode.WindowFrameType windowFrameType, int lowerBound, int upperBound, PlanNode.NodeHint nodeHint,
       MultiStageOperator input) {
     return new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), input, inputSchema,
         new WindowNode(-1, resultSchema, nodeHint, List.of(), keys, collations, aggCalls, windowFrameType, lowerBound,
-            upperBound, List.of()));
+            upperBound, WindowNode.WindowExclusion.NO_OTHERS, List.of()));
   }
 
   private WindowAggregateOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<Integer> keys,

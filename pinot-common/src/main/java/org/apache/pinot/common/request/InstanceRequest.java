@@ -37,6 +37,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   private static final org.apache.thrift.protocol.TField OPTIONAL_SEGMENTS_FIELD_DESC = new org.apache.thrift.protocol.TField("optionalSegments", org.apache.thrift.protocol.TType.LIST, (short)6);
   private static final org.apache.thrift.protocol.TField CID_FIELD_DESC = new org.apache.thrift.protocol.TField("cid", org.apache.thrift.protocol.TType.STRING, (short)7);
   private static final org.apache.thrift.protocol.TField TABLE_SEGMENTS_INFO_LIST_FIELD_DESC = new org.apache.thrift.protocol.TField("tableSegmentsInfoList", org.apache.thrift.protocol.TType.LIST, (short)8);
+  private static final org.apache.thrift.protocol.TField PING_FIELD_DESC = new org.apache.thrift.protocol.TField("ping", org.apache.thrift.protocol.TType.BOOL, (short)9);
 
   private static final org.apache.thrift.scheme.SchemeFactory STANDARD_SCHEME_FACTORY = new InstanceRequestStandardSchemeFactory();
   private static final org.apache.thrift.scheme.SchemeFactory TUPLE_SCHEME_FACTORY = new InstanceRequestTupleSchemeFactory();
@@ -49,6 +50,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   private @org.apache.thrift.annotation.Nullable java.util.List<java.lang.String> optionalSegments; // optional
   private @org.apache.thrift.annotation.Nullable java.lang.String cid; // optional
   private @org.apache.thrift.annotation.Nullable java.util.List<TableSegmentsInfo> tableSegmentsInfoList; // optional
+  private boolean ping; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -59,7 +61,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     BROKER_ID((short)5, "brokerId"),
     OPTIONAL_SEGMENTS((short)6, "optionalSegments"),
     CID((short)7, "cid"),
-    TABLE_SEGMENTS_INFO_LIST((short)8, "tableSegmentsInfoList");
+    TABLE_SEGMENTS_INFO_LIST((short)8, "tableSegmentsInfoList"),
+    PING((short)9, "ping");
 
     private static final java.util.Map<java.lang.String, _Fields> byName = new java.util.HashMap<java.lang.String, _Fields>();
 
@@ -91,6 +94,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
           return CID;
         case 8: // TABLE_SEGMENTS_INFO_LIST
           return TABLE_SEGMENTS_INFO_LIST;
+        case 9: // PING
+          return PING;
         default:
           return null;
       }
@@ -136,8 +141,9 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   // isset id assignments
   private static final int __REQUESTID_ISSET_ID = 0;
   private static final int __ENABLETRACE_ISSET_ID = 1;
+  private static final int __PING_ISSET_ID = 2;
   private byte __isset_bitfield = 0;
-  private static final _Fields optionals[] = {_Fields.SEARCH_SEGMENTS,_Fields.ENABLE_TRACE,_Fields.BROKER_ID,_Fields.OPTIONAL_SEGMENTS,_Fields.CID,_Fields.TABLE_SEGMENTS_INFO_LIST};
+  private static final _Fields optionals[] = {_Fields.SEARCH_SEGMENTS,_Fields.ENABLE_TRACE,_Fields.BROKER_ID,_Fields.OPTIONAL_SEGMENTS,_Fields.CID,_Fields.TABLE_SEGMENTS_INFO_LIST,_Fields.PING};
   public static final java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     java.util.Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new java.util.EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -160,6 +166,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     tmpMap.put(_Fields.TABLE_SEGMENTS_INFO_LIST, new org.apache.thrift.meta_data.FieldMetaData("tableSegmentsInfoList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, TableSegmentsInfo.class))));
+    tmpMap.put(_Fields.PING, new org.apache.thrift.meta_data.FieldMetaData("ping", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
     metaDataMap = java.util.Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(InstanceRequest.class, metaDataMap);
   }
@@ -208,6 +216,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       }
       this.tableSegmentsInfoList = __this__tableSegmentsInfoList;
     }
+    this.ping = other.ping;
   }
 
   @Override
@@ -227,6 +236,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     this.optionalSegments = null;
     this.cid = null;
     this.tableSegmentsInfoList = null;
+    setPingIsSet(false);
+    this.ping = false;
   }
 
   public long getRequestId() {
@@ -465,6 +476,28 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     }
   }
 
+  public boolean isPing() {
+    return this.ping;
+  }
+
+  public void setPing(boolean ping) {
+    this.ping = ping;
+    setPingIsSet(true);
+  }
+
+  public void unsetPing() {
+    __isset_bitfield = org.apache.thrift.EncodingUtils.clearBit(__isset_bitfield, __PING_ISSET_ID);
+  }
+
+  /** Returns true if field ping is set (has been assigned a value) and false otherwise */
+  public boolean isSetPing() {
+    return org.apache.thrift.EncodingUtils.testBit(__isset_bitfield, __PING_ISSET_ID);
+  }
+
+  public void setPingIsSet(boolean value) {
+    __isset_bitfield = org.apache.thrift.EncodingUtils.setBit(__isset_bitfield, __PING_ISSET_ID, value);
+  }
+
   @Override
   public void setFieldValue(_Fields field, @org.apache.thrift.annotation.Nullable java.lang.Object value) {
     switch (field) {
@@ -532,6 +565,14 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       }
       break;
 
+    case PING:
+      if (value == null) {
+        unsetPing();
+      } else {
+        setPing((java.lang.Boolean)value);
+      }
+      break;
+
     }
   }
 
@@ -563,6 +604,9 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     case TABLE_SEGMENTS_INFO_LIST:
       return getTableSegmentsInfoList();
 
+    case PING:
+      return isPing();
+
     }
     throw new java.lang.IllegalStateException();
   }
@@ -591,6 +635,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       return isSetCid();
     case TABLE_SEGMENTS_INFO_LIST:
       return isSetTableSegmentsInfoList();
+    case PING:
+      return isSetPing();
     }
     throw new java.lang.IllegalStateException();
   }
@@ -680,6 +726,15 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
         return false;
     }
 
+    boolean this_present_ping = true && this.isSetPing();
+    boolean that_present_ping = true && that.isSetPing();
+    if (this_present_ping || that_present_ping) {
+      if (!(this_present_ping && that_present_ping))
+        return false;
+      if (this.ping != that.ping)
+        return false;
+    }
+
     return true;
   }
 
@@ -716,6 +771,10 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     hashCode = hashCode * 8191 + ((isSetTableSegmentsInfoList()) ? 131071 : 524287);
     if (isSetTableSegmentsInfoList())
       hashCode = hashCode * 8191 + tableSegmentsInfoList.hashCode();
+
+    hashCode = hashCode * 8191 + ((isSetPing()) ? 131071 : 524287);
+    if (isSetPing())
+      hashCode = hashCode * 8191 + ((ping) ? 131071 : 524287);
 
     return hashCode;
   }
@@ -804,6 +863,16 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     }
     if (isSetTableSegmentsInfoList()) {
       lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.tableSegmentsInfoList, other.tableSegmentsInfoList);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = java.lang.Boolean.compare(isSetPing(), other.isSetPing());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetPing()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.ping, other.ping);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -897,6 +966,12 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       } else {
         sb.append(this.tableSegmentsInfoList);
       }
+      first = false;
+    }
+    if (isSetPing()) {
+      if (!first) sb.append(", ");
+      sb.append("ping:");
+      sb.append(this.ping);
       first = false;
     }
     sb.append(")");
@@ -1053,6 +1128,14 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 9: // PING
+            if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
+              struct.ping = iprot.readBool();
+              struct.setPingIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1136,6 +1219,11 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
           oprot.writeFieldEnd();
         }
       }
+      if (struct.isSetPing()) {
+        oprot.writeFieldBegin(PING_FIELD_DESC);
+        oprot.writeBool(struct.ping);
+        oprot.writeFieldEnd();
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -1175,7 +1263,10 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       if (struct.isSetTableSegmentsInfoList()) {
         optionals.set(5);
       }
-      oprot.writeBitSet(optionals, 6);
+      if (struct.isSetPing()) {
+        optionals.set(6);
+      }
+      oprot.writeBitSet(optionals, 7);
       if (struct.isSetSearchSegments()) {
         {
           oprot.writeI32(struct.searchSegments.size());
@@ -1212,6 +1303,9 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
           }
         }
       }
+      if (struct.isSetPing()) {
+        oprot.writeBool(struct.ping);
+      }
     }
 
     @Override
@@ -1222,7 +1316,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       struct.query = new BrokerRequest();
       struct.query.read(iprot);
       struct.setQueryIsSet(true);
-      java.util.BitSet incoming = iprot.readBitSet(6);
+      java.util.BitSet incoming = iprot.readBitSet(7);
       if (incoming.get(0)) {
         {
           org.apache.thrift.protocol.TList _list31 = iprot.readListBegin(org.apache.thrift.protocol.TType.STRING);
@@ -1274,6 +1368,10 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
           }
         }
         struct.setTableSegmentsInfoListIsSet(true);
+      }
+      if (incoming.get(6)) {
+        struct.ping = iprot.readBool();
+        struct.setPingIsSet(true);
       }
     }
   }

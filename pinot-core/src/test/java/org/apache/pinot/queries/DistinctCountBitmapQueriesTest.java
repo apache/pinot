@@ -60,9 +60,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for DISTINCT_COUNT_BITMAP queries.
- */
+/// Queries test for DISTINCT_COUNT_BITMAP queries.
 @SuppressWarnings("unchecked")
 public class DistinctCountBitmapQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DistinctCountBitmapQueriesTest");

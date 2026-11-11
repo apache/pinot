@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import com.tdunning.math.stats.TDigest;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.NonFiniteAwareTDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -60,36 +60,49 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
       initialValue = deserializeAggregatedValue(bytes);
-      _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
-      initialValue = TDigest.createMergingDigest(_compressionFactor);
-      initialValue.add(ValueAggregatorUtils.toDouble(rawValue));
-      _maxByteSize = Math.max(_maxByteSize, initialValue.byteSize());
+      initialValue = NonFiniteAwareTDigest.forLegacyAggregation(_compressionFactor);
+      addToDigest(initialValue, rawValue);
     }
+    updateMaxByteSize(initialValue);
     return initialValue;
   }
 
   @Override
   public TDigest applyRawValue(TDigest value, Object rawValue) {
+    value = asNonFiniteAware(value);
     if (rawValue instanceof byte[]) {
       value.add(deserializeAggregatedValue((byte[]) rawValue));
     } else {
-      value.add(ValueAggregatorUtils.toDouble(rawValue));
+      addToDigest(value, rawValue);
     }
-    _maxByteSize = Math.max(_maxByteSize, value.byteSize());
+    updateMaxByteSize(value);
     return value;
+  }
+
+  /// Adds a raw value (single value or multi-value array) to the TDigest.
+  protected void addToDigest(TDigest digest, Object rawValue) {
+    if (rawValue instanceof Object[]) {
+      Object[] values = (Object[]) rawValue;
+      for (Object value : values) {
+        digest.add(ValueAggregatorUtils.toDouble(value));
+      }
+    } else {
+      digest.add(ValueAggregatorUtils.toDouble(rawValue));
+    }
   }
 
   @Override
   public TDigest applyAggregatedValue(TDigest value, TDigest aggregatedValue) {
+    value = asNonFiniteAware(value);
     value.add(aggregatedValue);
-    _maxByteSize = Math.max(_maxByteSize, value.byteSize());
+    updateMaxByteSize(value);
     return value;
   }
 
   @Override
   public TDigest cloneAggregatedValue(TDigest value) {
-    return deserializeAggregatedValue(serializeAggregatedValue(value));
+    return NonFiniteAwareTDigest.copyOf(value);
   }
 
   @Override
@@ -104,11 +117,29 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public byte[] serializeAggregatedValue(TDigest value) {
-    return CustomSerDeUtils.TDIGEST_SER_DE.serialize(value);
+    NonFiniteAwareTDigest wrapped = asNonFiniteAware(value);
+    updateMaxByteSize(wrapped);
+    byte[] bytes = wrapped.serialize();
+    _maxByteSize = Math.max(_maxByteSize, bytes.length);
+    return bytes;
   }
 
   @Override
   public TDigest deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.TDIGEST_SER_DE.deserialize(bytes);
+    _maxByteSize = Math.max(_maxByteSize, bytes.length);
+    return NonFiniteAwareTDigest.fromBytes(bytes);
+  }
+
+  private static NonFiniteAwareTDigest asNonFiniteAware(TDigest value) {
+    if (value instanceof NonFiniteAwareTDigest) {
+      return (NonFiniteAwareTDigest) value;
+    }
+    NonFiniteAwareTDigest wrapper = NonFiniteAwareTDigest.forLegacyAggregation(value.compression());
+    wrapper.add(value);
+    return wrapper;
+  }
+
+  private void updateMaxByteSize(TDigest value) {
+    _maxByteSize = Math.max(_maxByteSize, value.maxSerializedByteSize());
   }
 }

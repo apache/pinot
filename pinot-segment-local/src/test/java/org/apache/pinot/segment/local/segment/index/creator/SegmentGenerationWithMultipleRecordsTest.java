@@ -42,9 +42,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests many to one flattening based on presence of MULTIPLE_RECORDS_KEY in GenericRow
- */
+/// Tests many to one flattening based on presence of MULTIPLE_RECORDS_KEY in GenericRow
 public class SegmentGenerationWithMultipleRecordsTest {
   private static final String SUB_COLUMN_1 = "sub1";
   private static final String SUB_COLUMN_2 = "sub2";
@@ -106,7 +104,7 @@ public class SegmentGenerationWithMultipleRecordsTest {
   private GenericRow getRandomArrayElement() {
     GenericRow element = new GenericRow();
     Random random = new Random();
-    element.putValue(SUB_COLUMN_1, RandomStringUtils.randomAlphabetic(4));
+    element.putValue(SUB_COLUMN_1, RandomStringUtils.secure().nextAlphabetic(4));
     element.putValue(SUB_COLUMN_2, random.nextLong());
     return element;
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.MVScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -27,13 +28,19 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public final class MVScanDocIdSet implements BlockDocIdSet {
   private final MVScanDocIdIterator _docIdIterator;
 
-  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
-    _docIdIterator = new MVScanDocIdIterator(predicateEvaluator, dataSource, numDocs);
+  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      Map<String, String> queryOptions) {
+    _docIdIterator = new MVScanDocIdIterator(predicateEvaluator, dataSource, numDocs, queryOptions);
   }
 
   @Override
   public MVScanDocIdIterator iterator() {
     return _docIdIterator;
+  }
+
+  @Override
+  public boolean isScanBased() {
+    return true;
   }
 
   @Override

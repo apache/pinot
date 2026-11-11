@@ -21,19 +21,15 @@ package org.apache.pinot.common.utils;
 import org.apache.commons.lang3.ArrayUtils;
 
 
-/**
- * Utility functions for primitive arrays.
- */
+/// Utility functions for primitive arrays.
 public class PrimitiveArrayUtils {
   private PrimitiveArrayUtils() {
   }
 
-  /**
-   * Turns the passed array into a primitive array, if necessary.
-   *
-   * @param array The array to convert
-   * @return A primitive array
-   */
+  /// Turns the passed array into a primitive array, if necessary.
+  ///
+  /// @param array The array to convert
+  /// @return A primitive array
   public static Object toPrimitive(Object array) {
     if (array instanceof int[] || array instanceof long[] || array instanceof short[] || array instanceof byte[]
         || array instanceof char[] || array instanceof float[] || array instanceof double[]

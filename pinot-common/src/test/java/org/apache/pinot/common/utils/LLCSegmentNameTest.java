@@ -27,9 +27,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for the realtime segment name builder.
- */
+/// Tests for the realtime segment name builder.
 public class LLCSegmentNameTest {
 
   @Test

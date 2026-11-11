@@ -22,22 +22,21 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Class to check if a new segment is within the configured storage quota for the table
- *
- */
+/// Class to check if a new segment is within the configured storage quota for the table
 public class StorageQuotaChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(StorageQuotaChecker.class);
 
@@ -60,6 +59,19 @@ public class StorageQuotaChecker {
     Preconditions.checkArgument(_timeoutMs > 0, "Timeout value must be > 0, input: %s", _timeoutMs);
   }
 
+  /// Resolves the effective storage quota enforcement mode for a table: DISABLED if the controller-wide storage quota
+  /// check is turned off, otherwise the table's own mode, defaulting to ENFORCED when the table does not set one.
+  public QuotaEnforcementMode getEnforcementMode(TableConfig tableConfig) {
+    if (!_isEnabled) {
+      return QuotaEnforcementMode.DISABLED;
+    }
+    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    if (quotaConfig != null && quotaConfig.getStorageQuotaEnforcementMode() != null) {
+      return quotaConfig.getStorageQuotaEnforcementMode();
+    }
+    return QuotaEnforcementMode.ENFORCED;
+  }
+
   public static class QuotaCheckerResponse {
     public boolean _isSegmentWithinQuota;
     public String _reason;
@@ -78,13 +90,14 @@ public class StorageQuotaChecker {
     return new QuotaCheckerResponse(false, msg);
   }
 
-  /**
-   * Returns whether the new added segment is within the storage quota.
-   */
+  /// Returns whether the new added segment is within the storage quota. Note: this reflects the actual quota state
+  /// regardless of enforcement mode; callers should use [#getEnforcementMode(TableConfig)] to decide whether to act on
+  /// a breach (see [QuotaEnforcementMode#SHADOW]).
   public QuotaCheckerResponse isSegmentStorageWithinQuota(TableConfig tableConfig, String segmentName,
       long tarSegmentSizeInBytes, long untarredSegmentSizeInBytes)
       throws InvalidConfigException {
-    if (!_isEnabled) {
+    QuotaEnforcementMode enforcementMode = getEnforcementMode(tableConfig);
+    if (enforcementMode == QuotaEnforcementMode.DISABLED) {
       return success("Storage quota check is disabled, skipping the check");
     }
 
@@ -128,6 +141,7 @@ public class StorageQuotaChecker {
     if (untarredSegmentSizeInBytes == 0 || tableSubtypeSize._missingSegments > 0) {
       emitStorageQuotaUtilizationMetric(tableNameWithType, tableSubtypeSize, allowedStorageBytes);
       if (tableSubtypeSize._estimatedSizeInBytes > allowedStorageBytes) {
+        recordBreach(tableNameWithType);
         return failure("Table " + tableNameWithType + " already over quota. Estimated size for all replicas is "
             + DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes) + ". Configured size for " + numReplicas
             + " is " + DataSizeUtils.fromBytes(allowedStorageBytes));
@@ -222,8 +236,13 @@ public class StorageQuotaChecker {
             numReplicas, quotaConfig.getStorage(), numReplicas);
       }
       LOGGER.warn(message);
+      recordBreach(tableNameWithType);
       return failure(message);
     }
+  }
+
+  private void recordBreach(String tableNameWithType) {
+    _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.STORAGE_QUOTA_EXCEEDED, 1L);
   }
 
   private void emitStorageQuotaUtilizationMetric(String tableNameWithType, TableSizeReader.TableSubTypeSizeDetails
@@ -238,10 +257,8 @@ public class StorageQuotaChecker {
     }
   }
 
-  /**
-   * Checks whether the table is within the storage quota.
-   * @return true if storage quota is exceeded by the table, else false.
-   */
+  /// Checks whether the table is within the storage quota.
+  /// @return true if storage quota is exceeded by the table, else false.
   public boolean isTableStorageQuotaExceeded(TableConfig tableConfig) {
     try {
       return !isSegmentStorageWithinQuota(tableConfig, null, 0, 0)._isSegmentWithinQuota;

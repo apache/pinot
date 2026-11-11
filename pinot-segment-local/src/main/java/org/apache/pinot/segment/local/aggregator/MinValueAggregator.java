@@ -84,9 +84,7 @@ public class MinValueAggregator implements ValueAggregator<Object, Double> {
       Object[] values = (Object[]) rawValue;
       double min = Double.POSITIVE_INFINITY;
       for (Object value : values) {
-        if (value != null) {
-          min = Math.min(min, ValueAggregatorUtils.toDouble(value));
-        }
+        min = Math.min(min, ValueAggregatorUtils.toDouble(value));
       }
       return min;
     } else {

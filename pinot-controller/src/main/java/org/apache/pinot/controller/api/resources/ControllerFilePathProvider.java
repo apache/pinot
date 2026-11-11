@@ -37,13 +37,12 @@ public class ControllerFilePathProvider {
   private static final String FILE_UPLOAD_TEMP_DIR = "fileUploadTemp";
   private static final String UNTARRED_FILE_TEMP_DIR = "untarredFileTemp";
   private static final String FILE_DOWNLOAD_TEMP_DIR = "fileDownloadTemp";
+  private static final String MULTIPART_TEMP_DIR = "multipartTemp";
 
   private static ControllerFilePathProvider _instance;
 
-  /**
-   * NOTE: this should be called only once when starting the controller. We don't check whether _instance is null
-   * because we might start multiple controllers in the same JVM for testing.
-   */
+  /// NOTE: this should be called only once when starting the controller. We don't check whether \_instance is null
+  /// because we might start multiple controllers in the same JVM for testing.
   public static void init(ControllerConf controllerConf)
       throws InvalidControllerConfigException {
     _instance = new ControllerFilePathProvider(controllerConf);
@@ -58,6 +57,7 @@ public class ControllerFilePathProvider {
   private final File _fileUploadTempDir;
   private final File _untarredFileTempDir;
   private final File _fileDownloadTempDir;
+  private final File _multiPartTempDir;
   private final String _vip;
 
   private ControllerFilePathProvider(ControllerConf controllerConf)
@@ -109,6 +109,11 @@ public class ControllerFilePathProvider {
       LOGGER.info("File download temporary directory: {}", _fileDownloadTempDir);
       initDir(_fileDownloadTempDir);
 
+      // Backing store for the multipart parts that Jersey buffers to disk.
+      _multiPartTempDir = new File(localTempDir, MULTIPART_TEMP_DIR);
+      LOGGER.info("Multipart temporary directory: {}", _multiPartTempDir);
+      initDir(_multiPartTempDir);
+
       _vip = controllerConf.generateVipUrl();
     } catch (Exception e) {
       throw new InvalidControllerConfigException("Caught exception while initializing file upload path provider", e);
@@ -145,5 +150,10 @@ public class ControllerFilePathProvider {
   public File getFileDownloadTempDir() {
     org.apache.pinot.common.utils.FileUtils.ensureDirectoryExists(_fileDownloadTempDir.toPath());
     return _fileDownloadTempDir;
+  }
+
+  public File getMultiPartTempDir() {
+    org.apache.pinot.common.utils.FileUtils.ensureDirectoryExists(_multiPartTempDir.toPath());
+    return _multiPartTempDir;
   }
 }

@@ -25,14 +25,12 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
-/**
- * Implementation of BIG_DECIMAL dictionary that cache all values on-heap.
- * <p>This is useful for BIG_DECIMAL columns that:
- * <ul>
- *   <li>Has low cardinality BIG_DECIMAL dictionary where memory footprint on-heap is acceptably small</li>
- *   <li>Is heavily queried</li>
- * </ul>
- */
+/// Implementation of BIG_DECIMAL dictionary that cache all values on-heap.
+///
+/// This is useful for BIG_DECIMAL columns that:
+///
+/// - Has low cardinality BIG_DECIMAL dictionary where memory footprint on-heap is acceptably small
+/// - Is heavily queried
 public class OnHeapBigDecimalDictionary extends BaseImmutableDictionary {
   // NOTE: Always do binary search because BigDecimal's compareTo() is not consistent with equals()
   //       E.g. compareTo(3.0, 3) returns 0 but equals(3.0, 3) returns false
@@ -100,5 +98,10 @@ public class OnHeapBigDecimalDictionary extends BaseImmutableDictionary {
   @Override
   public byte[] getBytesValue(int dictId) {
     return BigDecimalUtils.serialize(_dictIdToVal[dictId]);
+  }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return BigDecimalUtils.byteSize(_dictIdToVal[dictId]);
   }
 }

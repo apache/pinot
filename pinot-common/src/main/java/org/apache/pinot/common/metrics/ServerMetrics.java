@@ -20,7 +20,7 @@ package org.apache.pinot.common.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
@@ -29,19 +29,14 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ENABLE_T
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_METRICS_PREFIX;
 
 
-/**
- * Utility class to centralize all metrics reporting for the Pinot server.
- *
- */
+/// Utility class to centralize all metrics reporting for the Pinot server.
 public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter, ServerGauge, ServerTimer> {
 
   private static final ServerMetrics NOOP = new ServerMetrics(new NoopPinotMetricsRegistry());
 
   private static final AtomicReference<ServerMetrics> SERVER_METRICS_INSTANCE = new AtomicReference<>(NOOP);
 
-  /**
-   * register the serverMetrics onto this class, so that we don't need to pass it down as a parameter
-   */
+  /// register the serverMetrics onto this class, so that we don't need to pass it down as a parameter
   public static boolean register(ServerMetrics serverMetrics) {
     return SERVER_METRICS_INSTANCE.compareAndSet(NOOP, serverMetrics);
   }
@@ -51,15 +46,13 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
     SERVER_METRICS_INSTANCE.set(NOOP);
   }
 
-  /**
-   * should always call after registration
-   */
+  /// should always call after registration
   public static ServerMetrics get() {
     return SERVER_METRICS_INSTANCE.get();
   }
 
   public ServerMetrics(PinotMetricsRegistry metricsRegistry) {
-    this(DEFAULT_METRICS_PREFIX, metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptySet());
+    this(DEFAULT_METRICS_PREFIX, metricsRegistry, DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Set.of());
   }
 
   public ServerMetrics(PinotMetricsRegistry metricsRegistry, boolean isTableLevelMetricsEnabled,

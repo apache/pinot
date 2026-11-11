@@ -18,19 +18,16 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark3;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
@@ -39,7 +36,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
@@ -107,6 +103,9 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
 
     // Collect files to process
     List<String> segmentsToPush = getSegmentsToPush(outputDirFS, outputDirURI);
+    if (segmentsToPush.isEmpty()) {
+      return;
+    }
 
     // Ensure tableConfigURI is set if missing
     setupTableConfigURI();
@@ -151,7 +150,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       if (_spec.getPushJobSpec().isBatchSegmentUpload()) {
         // Process segments in batch mode using foreachPartition
         pathRDD.foreachPartition(segmentIterator -> {
-          setupFileSystems();
+          setupFileSystemsIfNeeded();
           List<String> segmentsInPartition = new ArrayList<>();
           segmentIterator.forEachRemaining(segmentsInPartition::add);
 
@@ -164,7 +163,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       } else {
         // Process segments one by one using foreach
         pathRDD.foreach(segmentTarPath -> {
-          setupFileSystems();
+          setupFileSystemsIfNeeded();
           Map<String, String> segmentUriToTarPathMap =
               SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
                   new String[]{segmentTarPath});
@@ -198,7 +197,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
           @Override
           public void call(Iterator<String> segmentIterator) throws Exception {
             PluginManager.get().init();
-            setupFileSystems();
+            setupFileSystemsIfNeeded();
 
             List<String> segmentsInPartition = new ArrayList<>();
             segmentIterator.forEachRemaining(segmentsInPartition::add);
@@ -220,7 +219,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
           @Override
           public void call(String segmentTarPath) throws Exception {
             PluginManager.get().init();
-            setupFileSystems();
+            setupFileSystemsIfNeeded();
             try {
               Map<String, String> segmentUriToTarPathMap =
                   SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
@@ -239,13 +238,22 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
 
   private List<String> getSegmentsToPush(PinotFS outputDirFS, URI outputDirURI) {
     String[] files = listFiles(outputDirFS, outputDirURI);
-    return Arrays.stream(files).filter(file -> file.endsWith(Constants.TAR_GZ_FILE_EXT)).collect(Collectors.toList());
+    return new ArrayList<>(
+        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), files).values());
   }
 
   private void setupFileSystems() {
     List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
     for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+    }
+  }
+
+  private void setupFileSystemsIfNeeded() {
+    List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
+    for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
+      PinotFSFactory.registerIfNeeded(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+          new PinotConfiguration(pinotFSSpec));
     }
   }
 
@@ -292,21 +300,15 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     }
   }
 
-  /**
-   * Returns segment names, which will be supplied to the segment replacement protocol as the new set of segments to
-   * atomically update when consistent data push is enabled.
-   * @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
-   *                                tarPaths (values), or both may be used depending on upload mode.
-   */
+  /// Returns segment names, which will be supplied to the segment replacement protocol as the new set of segments to
+  /// atomically update when consistent data push is enabled.
+  /// @param segmentsUriToTarPathMap Map from segment URI to corresponding tar path. Either the URIs (keys), the
+  ///                                tarPaths (values), or both may be used depending on upload mode.
   public List<String> getSegmentsToReplace(Map<String, String> segmentsUriToTarPathMap) {
     Collection<String> tarFilePaths = segmentsUriToTarPathMap.values();
     List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
     for (String tarFilePath : tarFilePaths) {
-      File tarFile = new File(tarFilePath);
-      String fileName = tarFile.getName();
-      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
-      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
-      segmentNames.add(segmentName);
+      segmentNames.add(SegmentPushUtils.getSegmentNameFromTarFile(tarFilePath));
     }
     return segmentNames;
   }

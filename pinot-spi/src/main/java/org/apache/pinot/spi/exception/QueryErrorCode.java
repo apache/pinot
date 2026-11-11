@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.exception;
 
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
 import javax.annotation.Nonnegative;
 import javax.ws.rs.core.Response;
@@ -46,6 +47,7 @@ public enum QueryErrorCode {
   SERVER_SEGMENT_MISSING(235, "ServerSegmentMissing", Response.Status.NOT_FOUND),
   QUERY_SCHEDULING_TIMEOUT(240, "QuerySchedulingTimeoutError", Response.Status.REQUEST_TIMEOUT),
   SERVER_RESOURCE_LIMIT_EXCEEDED(245, "ServerResourceLimitExceededError", Response.Status.SERVICE_UNAVAILABLE),
+  QUERY_SCAN_LIMIT_EXCEEDED(246, "QueryScanLimitExceededError", Response.Status.BAD_REQUEST),
   EXECUTION_TIMEOUT(250, "ExecutionTimeoutError", Response.Status.REQUEST_TIMEOUT),
   BROKER_SEGMENT_UNAVAILABLE(305, "", Response.Status.SERVICE_UNAVAILABLE),
   BROKER_TIMEOUT(400, "BrokerTimeoutError", Response.Status.REQUEST_TIMEOUT),
@@ -54,19 +56,37 @@ public enum QueryErrorCode {
   BROKER_REQUEST_SEND(425, "BrokerRequestSend", Response.Status.SERVICE_UNAVAILABLE),
   SERVER_NOT_RESPONDING(427, "ServerNotResponding", Response.Status.SERVICE_UNAVAILABLE),
   TOO_MANY_REQUESTS(429, "TooManyRequests", Response.Status.TOO_MANY_REQUESTS),
-  WORKLOAD_BUDGET_EXCEEDED(429, "WorkloadBudgetExceededError", Response.Status.TOO_MANY_REQUESTS),
+  WORKLOAD_BUDGET_EXCEEDED(430, "WorkloadBudgetExceededError", Response.Status.TOO_MANY_REQUESTS),
   INTERNAL(450, "InternalError", Response.Status.INTERNAL_SERVER_ERROR),
   MERGE_RESPONSE(500, "MergeResponseError", Response.Status.INTERNAL_SERVER_ERROR),
   QUERY_CANCELLATION(503, "QueryCancellationError", Response.Status.SERVICE_UNAVAILABLE),
+  REMOTE_CLUSTER_UNAVAILABLE(510, "RemoteClusterUnavailable", Response.Status.SERVICE_UNAVAILABLE),
   /// Error detected at validation time. For example, type mismatch.
   QUERY_VALIDATION(700, "QueryValidationError", Response.Status.BAD_REQUEST),
   UNKNOWN_COLUMN(710, "UnknownColumnError", Response.Status.BAD_REQUEST),
-  ///  Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
+  /// Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
   QUERY_PLANNING(720, "QueryPlanningError", Response.Status.BAD_REQUEST),
   UNKNOWN(1000, "UnknownError", Response.Status.INTERNAL_SERVER_ERROR);
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryErrorCode.class);
 
   private static final QueryErrorCode[] BY_ID;
+
+  // Static set of SLA-critical (system) error codes
+  private static final EnumSet<QueryErrorCode> CRITICAL_ERROR_CODES = EnumSet.of(
+      SQL_RUNTIME,
+      INTERNAL,
+      QUERY_SCHEDULING_TIMEOUT,
+      EXECUTION_TIMEOUT,
+      BROKER_TIMEOUT,
+      SERVER_SEGMENT_MISSING,
+      BROKER_SEGMENT_UNAVAILABLE,
+      SERVER_NOT_RESPONDING,
+      BROKER_REQUEST_SEND,
+      MERGE_RESPONSE,
+      QUERY_CANCELLATION,
+      SERVER_SHUTTING_DOWN,
+      QUERY_PLANNING
+  );
 
   static {
     int maxId = -1;
@@ -105,13 +125,11 @@ public enum QueryErrorCode {
     return _httpResponseStatus;
   }
 
-  /**
-   * Returns the {@link QueryErrorCode} for the given error code.
-   *
-   * @param errorCode Error code
-   * @return {@link QueryErrorCode} for the given error code or {@link QueryErrorCode#UNKNOWN} if the error code is not
-   *        recognized
-   */
+  /// Returns the [QueryErrorCode] for the given error code.
+  ///
+  /// @param errorCode Error code
+  /// @return [QueryErrorCode] for the given error code or [QueryErrorCode#UNKNOWN] if the error code is not
+  ///        recognized
   public static QueryErrorCode fromErrorCode(int errorCode) {
     if (errorCode < 0 || errorCode >= BY_ID.length) {
       throw new IllegalArgumentException("Invalid error code: " + errorCode);
@@ -122,6 +140,12 @@ public enum QueryErrorCode {
       return UNKNOWN;
     }
     return queryErrorCode;
+  }
+
+  /// Returns the error code carried by the given throwable when it is a [QueryException], or the given default
+  /// otherwise.
+  public static QueryErrorCode fromThrowable(Throwable t, QueryErrorCode defaultErrorCode) {
+    return t instanceof QueryException ? ((QueryException) t).getErrorCode() : defaultErrorCode;
   }
 
   public static <T> Map<QueryErrorCode, T> fromKeyMap(Map<Integer, T> originalMap) {
@@ -172,5 +196,11 @@ public enum QueryErrorCode {
       default:
         return false;
     }
+  }
+
+  /// Returns true if the error is considered critical for SLA accounting.
+  /// Critical errors represent system-side failures (timeouts, internal errors, infra issues, etc.).
+  public boolean isCriticalError() {
+    return CRITICAL_ERROR_CODES.contains(this);
   }
 }

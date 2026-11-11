@@ -39,39 +39,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains variable number of docs, and
- * the entries are variable length.
- *
- * <p>The layout of the file is as follows:
- * <ul>
- *   <li>Header Section
- *   <ul>
- *     <li>File format version (int)</li>
- *     <li>Target decompressed chunk size (int)</li>
- *     <li>Compression type enum value (int)</li>
- *     <li>Start offset of chunk data (int)</li>
- *     <li>Data header (for each chunk)
- *     <ul>
- *       <li>First docId in the chunk (int), where MSB is used to mark huge chunk</li>
- *       <li>Start offset of the chunk (unsigned int)</li>
- *     </ul>
- *     </li>
- *   </ul>
- *   </li>
- *   <li>Individual Chunks
- *   <ul>
- *     <li>Regular chunk
- *     <ul>
- *       <li>Header Section: start offsets (stored as int) of the entry within the data section</li>
- *       <li>Data Section</li>
- *     </ul>
- *     </li>
- *     <li>Huge chunk: contains one single value</li>
- *   </ul>
- *   </li>
- * </ul>
- */
+/// Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains variable number of docs, and
+/// the entries are variable length.
+///
+/// The layout of the file is as follows:
+///
+/// - Header Section
+///   - File format version (int)
+///   - Target decompressed chunk size (int)
+///   - Compression type enum value (int)
+///   - Start offset of chunk data (int)
+///   - Data header (for each chunk)
+///     - First docId in the chunk (int), where MSB is used to mark huge chunk
+///     - Start offset of the chunk (unsigned int)
+/// - Individual Chunks
+///   - Regular chunk
+///     - Header Section: start offsets (stored as int) of the entry within the data section
+///     - Data Section
+///   - Huge chunk: contains one single value
 @NotThreadSafe
 public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   public static final int VERSION = 4;
@@ -84,7 +69,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   private final File _dataBuffer;
   private final RandomAccessFile _output;
   private final FileChannel _dataChannel;
-  private final ByteBuffer _chunkBuffer;
+  protected final ByteBuffer _chunkBuffer;
   private final ByteBuffer _compressionBuffer;
   private final ChunkCompressor _chunkCompressor;
 
@@ -92,6 +77,8 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   private int _nextDocId = 0;
   private int _metadataSize = 0;
   private long _chunkOffset = 0;
+  private long _uncompressedValueSize = 0;
+  private boolean _trackUncompressedValueSize = false;
 
   public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize)
       throws IOException {
@@ -172,6 +159,11 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   }
 
   @Override
+  public void putBigDecimalMV(BigDecimal[] values) {
+    putBytes(ArraySerDeUtils.serializeBigDecimalArray(values));
+  }
+
+  @Override
   public void putStringMV(String[] values) {
     putBytes(ArraySerDeUtils.serializeStringArray(values));
   }
@@ -197,6 +189,9 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
       buffer = ByteBuffer.wrap(bytes);
     }
     try {
+      if (_trackUncompressedValueSize) {
+        _uncompressedValueSize += bytes.length;
+      }
       _nextDocId++;
       write(buffer, true);
     } finally {
@@ -210,7 +205,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     }
   }
 
-  private void writeChunk() {
+  protected void writeChunk() {
     /*
     This method translates from the current state of the buffer, assuming there are 3 values of lengths a,b, and c:
     [-][a][a bytes][b][b bytes][c][c bytes]
@@ -219,6 +214,10 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     [------16-bytes-----][----a+b+c bytes----------]
      */
     int numDocs = _nextDocId - _docIdOffset;
+    int logicalDataSize = _chunkBuffer.position() - Integer.BYTES - numDocs * Integer.BYTES;
+    if (_trackUncompressedValueSize) {
+      _uncompressedValueSize += logicalDataSize;
+    }
     _chunkBuffer.putInt(0, numDocs);
     // collect offsets
     int[] offsets = new int[numDocs];
@@ -243,13 +242,20 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
       accumulatedOffset += Integer.BYTES;
     }
     offsets[0] = Integer.BYTES * (numDocs + 1);
-    // write the offsets into the space created at the front
-    _chunkBuffer.position(Integer.BYTES);
-    _chunkBuffer.asIntBuffer().put(offsets);
+    // write the chunk header — V4 writes offsets, subclasses (V6) may override
+    writeChunkHeader(numDocs, offsets, limit);
     _chunkBuffer.position(0);
     _chunkBuffer.limit(limit);
     write(_chunkBuffer, false);
     clearChunkBuffer();
+  }
+
+  /// Writes the per-entry metadata into the chunk buffer header (positions 4 through (numDocs+1)\*4).
+  /// V4 writes cumulative byte offsets for O(1) random access.
+  /// Subclasses (e.g. V6) may override to delta-encode offsets into individual entry sizes.
+  protected void writeChunkHeader(int numDocs, int[] offsets, int limit) {
+    _chunkBuffer.position(Integer.BYTES);
+    _chunkBuffer.asIntBuffer().put(offsets);
   }
 
   private void write(ByteBuffer buffer, boolean huge) {
@@ -317,5 +323,21 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     CleanerUtil.cleanQuietly(_chunkBuffer);
     FileUtils.deleteQuietly(_dataBuffer);
     _chunkCompressor.close();
+  }
+
+  /// Returns the total uncompressed size of data written so far, or `-1` when tracking is disabled.
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    if (!_trackUncompressedValueSize) {
+      return -1;
+    }
+    int bufferedDocs = _nextDocId - _docIdOffset;
+    return _uncompressedValueSize + _chunkBuffer.position() - Integer.BYTES - bufferedDocs * Integer.BYTES;
+  }
+
+  /// Enables uncompressed-size tracking before the first value is written.
+  public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    Preconditions.checkState(_nextDocId == 0,
+        "Uncompressed-size tracking must be enabled before writing values");
+    _trackUncompressedValueSize = true;
   }
 }

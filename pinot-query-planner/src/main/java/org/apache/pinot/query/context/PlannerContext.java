@@ -18,13 +18,15 @@
  */
 package org.apache.pinot.query.context;
 
-import java.util.Collections;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.calcite.plan.Contexts;
+import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.PlannerImpl;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelDistributionTraitDef;
@@ -32,18 +34,22 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.pinot.calcite.rex.SearchSealer;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
 
 
-/**
- * PlannerContext is an object that holds all contextual information during planning phase.
- *
- * TODO: currently we don't support option or query rewrite.
- * It is used to hold per query context for query planning, which cannot be shared across queries.
- */
-public class PlannerContext implements AutoCloseable {
+/// Holds all per-query contextual information used during the planning phase.
+///
+/// This class implements [Context] so that Calcite rules can retrieve it directly from the
+/// planner: `call.getPlanner().getContext().unwrap(PlannerContext.class)`. Both the opt planner
+/// and the trait planner expose this instance as their context.
+///
+/// Callers may also unwrap [QueryEnvironment.Config] to access broker-wide defaults:
+/// `call.getPlanner().getContext().unwrap(QueryEnvironment.Config.class)`.
+public class PlannerContext implements AutoCloseable, Context {
   private final PlannerImpl _planner;
 
   private final SqlValidator _validator;
@@ -57,20 +63,50 @@ public class PlannerContext implements AutoCloseable {
   private final SqlExplainFormat _sqlExplainFormat;
   @Nullable
   private final PhysicalPlannerContext _physicalPlannerContext;
+  private final SearchSealer _searchSealer;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
       SqlExplainFormat sqlExplainFormat, @Nullable PhysicalPlannerContext physicalPlannerContext) {
     _planner = new PlannerImpl(config);
     _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
-    _relOptPlanner = new LogicalPlanner(optProgram, Contexts.EMPTY_CONTEXT, config.getTraitDefs());
-    _relTraitPlanner = new LogicalPlanner(traitProgram, Contexts.of(envConfig),
-        Collections.singletonList(RelDistributionTraitDef.INSTANCE));
     _options = options;
     _envConfig = envConfig;
+    _relOptPlanner = new LogicalPlanner(optProgram, this, config.getTraitDefs());
+    _relTraitPlanner = new LogicalPlanner(traitProgram, this,
+        List.of(RelDistributionTraitDef.INSTANCE));
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = sqlExplainFormat;
     _physicalPlannerContext = physicalPlannerContext;
+    _searchSealer = createSearchSealer(options, envConfig);
+  }
+
+  /// Test factory: creates a minimal [PlannerContext] without going through
+  /// [org.apache.pinot.query.QueryEnvironment], suitable for unit tests.
+  @VisibleForTesting
+  public static PlannerContext forTesting(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    return new PlannerContext(options, envConfig);
+  }
+
+  /// Minimal constructor for use in unit tests. Creates no-op planners backed by an empty HEP program.
+  @VisibleForTesting
+  PlannerContext(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    _planner = null;
+    _validator = null;
+    _options = options;
+    _envConfig = envConfig;
+    HepProgram emptyProgram = new HepProgramBuilder().build();
+    _relOptPlanner = new LogicalPlanner(emptyProgram, this);
+    _relTraitPlanner = new LogicalPlanner(emptyProgram, this);
+    _plannerOutput = new HashMap<>();
+    _sqlExplainFormat = null;
+    _physicalPlannerContext = null;
+    _searchSealer = createSearchSealer(options, envConfig);
+  }
+
+  private static SearchSealer createSearchSealer(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    return new SearchSealer(
+        QueryOptionsUtils.getSealedInListThreshold(options, envConfig.defaultSealedInListThreshold()));
   }
 
   public PlannerImpl getPlanner() {
@@ -97,9 +133,26 @@ public class PlannerContext implements AutoCloseable {
     return _envConfig;
   }
 
+  /// Unwraps this context. Returns `this` when asked for [PlannerContext] or
+  /// [Context], and delegates to [#_envConfig] when asked for
+  /// [QueryEnvironment.Config] so that existing rules remain compatible.
+  @Override
+  @Nullable
+  public <C> C unwrap(Class<C> clazz) {
+    if (clazz.isInstance(this)) {
+      return clazz.cast(this);
+    }
+    if (clazz.isInstance(_envConfig)) {
+      return clazz.cast(_envConfig);
+    }
+    return null;
+  }
+
   @Override
   public void close() {
-    _planner.close();
+    if (_planner != null) {
+      _planner.close();
+    }
   }
 
   public Map<String, String> getPlannerOutput() {
@@ -113,6 +166,11 @@ public class PlannerContext implements AutoCloseable {
   @Nullable
   public PhysicalPlannerContext getPhysicalPlannerContext() {
     return _physicalPlannerContext;
+  }
+
+  /// Returns the query's [SearchSealer], which hides large IN lists from Calcite during optimization.
+  public SearchSealer getSearchSealer() {
+    return _searchSealer;
   }
 
   public boolean isUsePhysicalOptimizer() {

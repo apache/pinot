@@ -149,29 +149,29 @@ public class MultiStageEngineSmallBufferTest extends BaseClusterIntegrationTestS
 
     CountDownLatch startLatch = new CountDownLatch(1);
     CountDownLatch doneLatch = new CountDownLatch(numClients);
-      for (int i = 0; i < numClients; i++) {
-        new Thread(() -> {
-          try {
-            startLatch.await();
-            JsonNode jsonNode = postQuery(query);
-            assertNotNull(jsonNode);
-            String actual = jsonNode.get("resultTable").get("rows").toString();
-            results.add(actual);
-          } catch (Exception e) {
-            results.add("Error: " + e.getMessage());
-            e.printStackTrace();
-          } finally {
-            doneLatch.countDown();
-          }
-        }).start();
-      }
-
-      startLatch.countDown();
-      doneLatch.await();
-
-      assertEquals(results.size(), numClients);
-      for (String result : results) {
-        assertEquals(result, expected);
-      }
+    for (int i = 0; i < numClients; i++) {
+      new Thread(() -> {
+        try {
+          startLatch.await();
+          JsonNode jsonNode = postQuery(query);
+          assertNotNull(jsonNode);
+          String actual = jsonNode.get("resultTable").get("rows").toString();
+          results.add(actual);
+        } catch (Exception e) {
+          results.add("Error: " + e.getMessage());
+          e.printStackTrace();
+        } finally {
+          doneLatch.countDown();
+        }
+      }).start();
     }
+
+    startLatch.countDown();
+    doneLatch.await();
+
+    assertEquals(results.size(), numClients);
+    for (String result : results) {
+      assertEquals(result, expected);
+    }
+  }
 }

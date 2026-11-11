@@ -26,17 +26,16 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * A class to hold the details regarding a request and the statistics.
- * This object can be used to publish the query processing statistics to a stream for
- * post-processing at a finer level than metrics.
- */
+/// A class to hold the details regarding a request and the statistics.
+/// This object can be used to publish the query processing statistics to a stream for
+/// post-processing at a finer level than metrics.
 public class DefaultRequestContext implements RequestScope {
 
   private static final String DEFAULT_TABLE_NAME = "NotYetParsed";
 
   private int _errorCode = 0;
   private String _query;
+  private QueryFingerprint _queryFingerprint;
   private List<String> _tableNames = new ArrayList<>();
   private long _processingTimeMillis = -1;
   private long _totalDocs;
@@ -194,6 +193,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public void setQueryFingerprint(QueryFingerprint queryFingerprint) {
+    _queryFingerprint = queryFingerprint;
+  }
+
+  @Override
   public void setTableName(String tableName) {
     _tableNames.add(tableName);
   }
@@ -266,6 +270,11 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public String getQuery() {
     return _query;
+  }
+
+  @Override
+  public QueryFingerprint getQueryFingerprint() {
+    return _queryFingerprint;
   }
 
   @Override
@@ -494,6 +503,11 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _isNumGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @Override
+  public void setMseLiteLeafStageLimitReached(boolean mseLiteLeafStageLimitReached) {
+    // No-op: not tracked in default context
   }
 
   @Override

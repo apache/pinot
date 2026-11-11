@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.tuner;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -52,7 +51,7 @@ public class TunerRegistryTest {
         .setTableName("test").setTunerConfigList(Arrays.asList(_tunerConfig)).build();
     TableConfigTunerRegistry.init(Arrays.asList(DEFAULT_TABLE_CONFIG_TUNER_PACKAGES));
     TableConfigTuner tuner = TableConfigTunerRegistry.getTuner(TUNER_NAME);
-    TableConfig result = tuner.apply(null, tableConfig, schema, Collections.emptyMap());
+    TableConfig result = tuner.apply(null, tableConfig, schema, Map.of());
     Assert.assertEquals(result, tableConfig);
   }
 }

@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.combine.merger;
 import java.util.List;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -44,7 +45,8 @@ public class AggregationResultsBlockMerger implements ResultsBlockMerger<Aggrega
 
     int numAggregationFunctions = aggregationFunctions.length;
     for (int i = 0; i < numAggregationFunctions; i++) {
-      mergedResults.set(i, aggregationFunctions[i].merge(mergedResults.get(i), resultsToMerge.get(i)));
+      mergedResults.set(i,
+          AggregationFunctionUtils.merge(aggregationFunctions[i], mergedResults.get(i), resultsToMerge.get(i)));
     }
   }
 }

@@ -44,10 +44,8 @@ import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.glassfish.grizzly.http.server.Request;
 
 
-/**
- * A container filter class responsible for automatic authentication of REST endpoints. Any rest endpoints not annotated
- * with {@link org.apache.pinot.core.auth.ManualAuthorization} annotation, will go through authentication.
- */
+/// A container filter class responsible for automatic authentication of REST endpoints. Any rest endpoints not
+/// annotated with [org.apache.pinot.core.auth.ManualAuthorization] annotation, will go through authentication.
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
   private static final Set<String> UNPROTECTED_PATHS =

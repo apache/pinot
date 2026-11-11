@@ -36,9 +36,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
- */
+/// Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
 public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass
@@ -48,6 +46,8 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
 
     // Start the Pinot cluster
     startZk();
+    // Start Kafka
+    startKafka();
     startController();
 
     HelixConfigScope scope =
@@ -63,9 +63,6 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     startBroker();
     startServer();
 
-    // Start Kafka
-    startKafka();
-
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
@@ -74,6 +71,8 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     addSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
     addTableConfig(tableConfig);
+    waitForAllRealtimePartitionsConsuming(TableNameBuilder.REALTIME.tableNameWithType(getTableName()),
+        getRealtimePartitionsReadyTimeoutMs());
 
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
@@ -90,7 +89,15 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     runValidationJob(600_000);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L);
+    waitForAllDocsLoaded(getDocsLoadedTimeoutMs());
+  }
+
+  protected long getDocsLoadedTimeoutMs() {
+    return useKafkaTransaction() ? 900_000L : 600_000L;
+  }
+
+  protected long getRealtimePartitionsReadyTimeoutMs() {
+    return useKafkaTransaction() ? 300_000L : 120_000L;
   }
 
   protected void runValidationJob(long timeoutMs)
@@ -117,14 +124,12 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     return noDictionaryColumns;
   }
 
-  /**
-   * In realtime consuming segments, the dictionary is not sorted,
-   * and the dictionary based operator should not be used
-   *
-   * Adding explicit queries to test dictionary based functions,
-   * to ensure the right result is computed, wherein dictionary is not read if it is mutable
-   * @throws Exception
-   */
+  /// In realtime consuming segments, the dictionary is not sorted,
+  /// and the dictionary based operator should not be used
+  ///
+  /// Adding explicit queries to test dictionary based functions,
+  /// to ensure the right result is computed, wherein dictionary is not read if it is mutable
+  /// @throws Exception
   @Test(dataProvider = "useBothQueryEngines")
   public void testDictionaryBasedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -191,6 +196,13 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
   public void testInstanceShutdown()
       throws Exception {
     super.testInstanceShutdown();
+  }
+
+  @Test
+  @Override
+  public void testQueriesDisabled()
+      throws Exception {
+    super.testQueriesDisabled();
   }
 
   @AfterClass

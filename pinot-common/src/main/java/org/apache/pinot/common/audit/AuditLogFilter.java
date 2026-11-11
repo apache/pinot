@@ -34,11 +34,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Jersey filter for audit logging of API requests and responses.
- * Implements both request and response filters to capture full request-response cycle.
- * Supports dynamic configuration through injected AuditConfigManager.
- */
+/// Jersey filter for audit logging of API requests and responses.
+/// Implements both request and response filters to capture full request-response cycle.
+/// Supports dynamic configuration through injected AuditConfigManager.
 @javax.ws.rs.ext.Provider
 @Singleton
 public class AuditLogFilter implements ContainerRequestFilter, ContainerResponseFilter {

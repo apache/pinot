@@ -19,7 +19,7 @@
 package org.apache.pinot.core.data.manager;
 
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -49,7 +49,7 @@ public class DuoSegmentDataManagerTest {
     when(sdm1.getReferenceCount()).thenReturn(0);
     assertTrue(dsdm.hasMultiSegments());
     assertSame(dsdm.getSegment(), sdm1.getSegment());
-    assertEquals(dsdm.getSegments(), Collections.singletonList(sdm2.getSegment()));
+    assertEquals(dsdm.getSegments(), List.of(sdm2.getSegment()));
 
     when(sdm2.getReferenceCount()).thenReturn(0);
     assertTrue(dsdm.hasMultiSegments());

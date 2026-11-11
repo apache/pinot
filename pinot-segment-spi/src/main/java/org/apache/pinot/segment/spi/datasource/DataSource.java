@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -35,107 +36,81 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 
 
-/**
- * The {@code DataSource} contains all the indexes and metadata for a column for query execution purpose.
- */
+/// The `DataSource` contains all the indexes and metadata for a column for query execution purpose.
 public interface DataSource {
 
-  /**
-   * Returns the metadata for the column.
-   */
+  /// Returns the metadata for the column.
   DataSourceMetadata getDataSourceMetadata();
 
-  /**
-   * Returns the index container for the column.
-   */
+  /// Returns the index container for the column.
   ColumnIndexContainer getIndexContainer();
 
   <R extends IndexReader> R getIndex(IndexType<?, R, ?> type);
 
-  /**
-   * Returns the forward index for the column. The forward index can be either dictionary-encoded or raw.
-   */
+  /// Returns the forward index for the column. The forward index can be either dictionary-encoded or raw.
   ForwardIndexReader<?> getForwardIndex();
 
-  /**
-   * Returns the column name to which this data source pertains
-   */
+  /// Returns the column name to which this data source pertains
   default String getColumnName() {
     return getDataSourceMetadata().getFieldSpec().getName();
   }
 
-  /**
-   * Returns the dictionary for the column if it is dictionary-encoded, or {@code null} if not.
-   */
+  /// Returns the dictionary for the column if it is dictionary-encoded, or `null` if not.
   @Nullable
   Dictionary getDictionary();
 
-  /**
-   * Returns the inverted index for the column if exists, or {@code null} if not.
-   */
+  /// Returns the inverted index for the column if exists, or `null` if not.
   @Nullable
   InvertedIndexReader<?> getInvertedIndex();
 
-  /**
-   * Returns the range index for the column if exists, or {@code null} if not.
-   * <p>TODO: Have a separate interface for range index.
-   */
+  /// Returns the range index for the column if exists, or `null` if not.
+  ///
+  /// TODO: Have a separate interface for range index.
   @Nullable
   RangeIndexReader<?> getRangeIndex();
 
-  /**
-   * Returns the text index for the column if exists, or {@code null} if not.
-   */
+  /// Returns the text index for the column if exists, or `null` if not.
   @Nullable
   TextIndexReader getTextIndex();
 
-  /**
-   * Returns the text index for the column if exists, or {@code null} if not.
-   */
+  /// Returns the text index for the column if exists, or `null` if not.
   @Nullable
   default MultiColumnTextIndexReader getMultiColumnTextIndex() {
     return null;
   }
 
-  /**
-   * Returns the FST index for the column if exists, or {@code null} if not.
-   */
+  /// Returns the FST index for the column if exists, or `null` if not.
   @Nullable
   TextIndexReader getFSTIndex();
 
-  /**
-   * Returns the IFST index for the column if exists, or {@code null} if not.
-   */
+  /// Returns the IFST index for the column if exists, or `null` if not.
   @Nullable
   TextIndexReader getIFSTIndex();
 
-  /**
-   * Returns the json index for the column if exists, or {@code null} if not.
-   */
+  /// Returns the json index for the column if exists, or `null` if not.
   @Nullable
   JsonIndexReader getJsonIndex();
 
-  /**
-   * Returns the H3 index for the geospatial column if exists, or {@code null} if not.
-   */
+  /// Returns the H3 index for the geospatial column if exists, or `null` if not.
   @Nullable
   H3IndexReader getH3Index();
 
-  /**
-   * Returns the bloom filter for the column if exists, or {@code null} if not.
-   */
+  /// Returns the bloom filter for the column if exists, or `null` if not.
   @Nullable
   BloomFilterReader getBloomFilter();
 
-  /**
-   * Returns null value vector for the column if exists, or {@code null} if not.
-   */
+  /// Returns null value vector for the column if exists, or `null` if not.
   @Nullable
   NullValueVectorReader getNullValueVector();
 
-  /**
-   * Returns the vector index for the column if exists, or {@code null} if not.
-   */
+  /// Returns the vector index for the column if exists, or `null` if not.
   @Nullable
   VectorIndexReader getVectorIndex();
+
+  /// Returns the configured vector index config for the column if present in table/index loading config,
+  /// even when the segment does not currently have an ANN artifact on disk.
+  @Nullable
+  default VectorIndexConfig getVectorIndexConfig() {
+    return null;
+  }
 }

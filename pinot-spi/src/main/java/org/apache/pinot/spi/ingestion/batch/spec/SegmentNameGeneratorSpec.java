@@ -23,19 +23,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-/**
- * SegmentNameGeneratorSpec defines how to init a SegmentNameGenerator.
- */
+/// SegmentNameGeneratorSpec defines how to init a SegmentNameGenerator.
 public class SegmentNameGeneratorSpec implements Serializable {
 
-  /**
-   * Current supported type is 'simple' and 'normalizedDate'.
-   */
+  /// Current supported type is 'simple' and 'normalizedDate'.
   private String _type = null;
 
-  /**
-   * Configs to init SegmentNameGenerator.
-   */
+  /// Configs to init SegmentNameGenerator.
   private Map<String, String> _configs = new HashMap<>();
 
   public String getType() {

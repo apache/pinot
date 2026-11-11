@@ -24,7 +24,7 @@ import org.jvnet.hk2.annotations.Service;
 @Service
 @Singleton
 public class AutoLoadedServiceForTest {
-    public String echo(String echoText) {
-        return echoText;
-    }
+  public String echo(String echoText) {
+    return echoText;
+  }
 }

@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -33,7 +34,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
-import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -127,18 +127,16 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     checkSpoolSame(parsed, 4, 3, 7);
   }
 
-  /**
-   * Test a complex with nested spools.
-   * <p>
-   * Don't try to understand the query, just check that the spools are correct.
-   * This query is an actual simplification of a query used in production.
-   * It was the way we detected problems fixed in <a href="https://github.com/apache/pinot/pull/15135">#15135</a>.
-   * <p>
-   * This test was disabled after upgrading Calcite to 1.39.0 which introduces an optimization that removes some of the
-   * "nested spools" that this test expects. We should consider replacing the query in this test with a different one
-   * that doesn't get optimized similarly. In the long term, we should allow providing hints that disable such
-   * optimizations that would prevent spooling.
-   */
+  /// Test a complex with nested spools.
+  ///
+  /// Don't try to understand the query, just check that the spools are correct.
+  /// This query is an actual simplification of a query used in production.
+  /// It was the way we detected problems fixed in [#15135](https://github.com/apache/pinot/pull/15135).
+  ///
+  /// This test was disabled after upgrading Calcite to 1.39.0 which introduces an optimization that removes some of the
+  /// "nested spools" that this test expects. We should consider replacing the query in this test with a different one
+  /// that doesn't get optimized similarly. In the long term, we should allow providing hints that disable such
+  /// optimizations that would prevent spooling.
   @Test(enabled = false)
   public void testNestedSpools()
       throws Exception {
@@ -239,11 +237,9 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     checkSpoolSame(parsed, 4, 3, 7, 9, 12, 18);
   }
 
-  /**
-   * Returns the nodes that have the given descendant id and also have the given parent id as one of their ancestors.
-   * @param parent the parent id
-   * @param descendant the descendant id
-   */
+  /// Returns the nodes that have the given descendant id and also have the given parent id as one of their ancestors.
+  /// @param parent the parent id
+  /// @param descendant the descendant id
   private List<Map<String, Object>> findDescendantById(DocumentContext stats, int parent, int descendant) {
     @Language("jsonpath")
     String jsonPath = "$..[?(@.stage == " + parent + ")]..[?(@.stage == " + descendant + ")]";

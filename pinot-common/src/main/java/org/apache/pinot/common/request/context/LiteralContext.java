@@ -26,35 +26,39 @@ import java.util.Arrays;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * The {@code LiteralContext} class represents a literal in the query.
- * <p>This includes both value and type information. We translate thrift literal to this representation in server.
- */
+/// The {@code LiteralContext} class represents a literal in the query.
+///
+/// This includes both value and type information. We translate thrift literal to this representation in server.
 public class LiteralContext {
   // TODO: Support all of the types for sql.
   private final DataType _type;
   private final Object _value;
 
-  /**
-   * This is used for type conversion, and is not included in {@link #equals} and {@link #hashCode}.
-   */
+  /// This is used for type conversion, and is not included in {@link #equals} and {@link #hashCode}.
   private final PinotDataType _pinotDataType;
 
-  private Boolean _booleanValue;
-  private Integer _intValue;
-  private Long _longValue;
-  private Float _floatValue;
-  private Double _doubleValue;
-  private BigDecimal _bigDecimalValue;
-  private String _stringValue;
-  private byte[] _bytesValue;
+  /// Lazily converted caches of the value, one per stored type.
+  ///
+  /// `volatile` is required, not just for the null checks in the getters: a literal belongs to the query's expression
+  /// tree, which is built once per query and then read concurrently by the threads that build and run the per-segment
+  /// plans. Without it the values are published unsafely, and a racing thread can read a non-null reference whose
+  /// contents are not yet visible to it.
+  private volatile Boolean _booleanValue;
+  private volatile Integer _intValue;
+  private volatile Long _longValue;
+  private volatile Float _floatValue;
+  private volatile Double _doubleValue;
+  private volatile BigDecimal _bigDecimalValue;
+  private volatile String _stringValue;
+  private volatile byte[] _bytesValue;
 
   public LiteralContext(Literal literal) {
     switch (literal.getSetField()) {
@@ -71,7 +75,7 @@ public class LiteralContext {
       case INT_VALUE:
         _type = DataType.INT;
         _value = literal.getIntValue();
-        _pinotDataType = PinotDataType.INTEGER;
+        _pinotDataType = PinotDataType.INT;
         break;
       case LONG_VALUE:
         _type = DataType.LONG;
@@ -132,6 +136,11 @@ public class LiteralContext {
         _value = RequestUtils.getStringArrayValue(literal);
         _pinotDataType = PinotDataType.STRING_ARRAY;
         break;
+      case BYTES_ARRAY_VALUE:
+        _type = DataType.BYTES;
+        _value = RequestUtils.getBytesArrayValue(literal);
+        _pinotDataType = PinotDataType.BYTES_ARRAY;
+        break;
       default:
         throw new IllegalStateException("Unsupported field type: " + literal.getSetField());
     }
@@ -144,14 +153,18 @@ public class LiteralContext {
     _pinotDataType = getPinotDataType(type, value);
   }
 
+  // TODO: Revisit MV support for BOOLEAN, BIG_DECIMAL and UUID.
+  //       https://github.com/apache/pinot/issues/19338
   @Nullable
   private static PinotDataType getPinotDataType(DataType type, @Nullable Object value) {
     if (value == null) {
       return null;
     }
     if (type == DataType.BYTES) {
-      Preconditions.checkState(value.getClass().getComponentType() == byte.class, "Bytes array is not supported");
-      return PinotDataType.BYTES;
+      Class<?> componentType = value.getClass().getComponentType();
+      Preconditions.checkState(componentType == byte.class || componentType == byte[].class,
+          "Expected byte[] or byte[][], got: %s", value.getClass());
+      return componentType == byte.class ? PinotDataType.BYTES : PinotDataType.BYTES_ARRAY;
     }
     boolean singleValue = !value.getClass().isArray();
     switch (type) {
@@ -159,7 +172,7 @@ public class LiteralContext {
         Preconditions.checkState(singleValue, "Boolean array is not supported");
         return PinotDataType.BOOLEAN;
       case INT:
-        return singleValue ? PinotDataType.INTEGER : PinotDataType.PRIMITIVE_INT_ARRAY;
+        return singleValue ? PinotDataType.INT : PinotDataType.PRIMITIVE_INT_ARRAY;
       case LONG:
         return singleValue ? PinotDataType.LONG : PinotDataType.PRIMITIVE_LONG_ARRAY;
       case FLOAT:
@@ -171,6 +184,9 @@ public class LiteralContext {
         return PinotDataType.BIG_DECIMAL;
       case STRING:
         return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case UUID:
+        Preconditions.checkState(singleValue, "UUID array is not supported");
+        return PinotDataType.UUID;
       default:
         throw new IllegalStateException("Unsupported DataType: " + type);
     }
@@ -290,7 +306,7 @@ public class LiteralContext {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_value, _type);
+    return Arrays.deepHashCode(new Object[]{_value, _type});
   }
 
   @Override
@@ -302,7 +318,7 @@ public class LiteralContext {
       return false;
     }
     LiteralContext that = (LiteralContext) o;
-    return _type.equals(that._type) && Objects.equals(_value, that._value);
+    return _type.equals(that._type) && Objects.deepEquals(_value, that._value);
   }
 
   @Override
@@ -324,6 +340,16 @@ public class LiteralContext {
         return "'" + Arrays.toString((float[]) _value) + "'";
       case PRIMITIVE_DOUBLE_ARRAY:
         return "'" + Arrays.toString((double[]) _value) + "'";
+      case STRING_ARRAY:
+        return "'" + Arrays.toString((String[]) _value) + "'";
+      case BYTES_ARRAY: {
+        byte[][] bytesArray = (byte[][]) _value;
+        String[] hexValues = new String[bytesArray.length];
+        for (int i = 0; i < bytesArray.length; i++) {
+          hexValues[i] = BytesUtils.toHexString(bytesArray[i]);
+        }
+        return "'" + Arrays.toString(hexValues) + "'";
+      }
       default:
         throw new IllegalStateException("Unsupported PinotDataType: " + _pinotDataType);
     }

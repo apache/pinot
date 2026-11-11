@@ -29,10 +29,34 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class EmptyResponseUtilsTest {
+
+  /// An aggregation whose answer over no input is `NULL` has to survive the whole empty-response path.
+  ///
+  /// This is the path that produced the NPE this contract exists to prevent: the result table is built by calling
+  /// `extractFinalResult(extractAggregationResult(createAggregationResultHolder()))` on an untouched holder, and the
+  /// value it returns is then passed to [ColumnDataType#convert]. A function that wraps the `null` in a serializer
+  /// rather than resolving it fails at one of those two steps, not at extraction.
+  @Test
+  public void testBuildEmptyResultTableWithNullFinalResults() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT PERCENTILERAWKLL(a, 50), MAXSTRING(b), MINSTRING(b) FROM testTable WHERE foo = 'bar'");
+    ResultTable resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    DataSchema dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING
+    });
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    Object[] row = rows.get(0);
+    assertNull(row[0]);
+    assertNull(row[1]);
+    assertNull(row[2]);
+  }
 
   @Test
   public void testBuildEmptyResultTable() {
@@ -137,6 +161,40 @@ public class EmptyResponseUtilsTest {
         ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.LONG,
         ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
     });
+    assertTrue(resultTable.getRows().isEmpty());
+  }
+
+  @Test
+  public void testBuildEmptyResultTableWithPostAggregation() {
+    // Aggregation with post-aggregation expression and aliases
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT SUM(a) * 1.0 / COUNT(*) AS rate, SUM(a) AS total FROM testTable WHERE foo = 'bar'");
+    ResultTable resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    DataSchema dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"rate", "total"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+
+    // Aggregation with post-aggregation expression without alias
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT SUM(a) + MAX(b) FROM testTable WHERE foo = 'bar'");
+    resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.size(), 1);
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.DOUBLE});
+    rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+
+    // Group-by with post-aggregation expression
+    queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT c, SUM(a) * 1.0 / COUNT(*) AS rate FROM testTable WHERE foo = 'bar' GROUP BY c");
+    resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnNames(), new String[]{"c", "rate"});
+    assertEquals(dataSchema.getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.DOUBLE});
     assertTrue(resultTable.getRows().isEmpty());
   }
 

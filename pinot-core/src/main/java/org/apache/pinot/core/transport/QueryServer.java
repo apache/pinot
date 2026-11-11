@@ -37,6 +37,7 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.internal.PlatformDependent;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.NettyConfig;
@@ -48,10 +49,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code QueryServer} is the Netty server that runs on Pinot Server to handle the instance requests sent from Pinot
- * Brokers.
- */
+/// The `QueryServer` is the Netty server that runs on Pinot Server to handle the instance requests sent from
+/// Pinot Brokers.
 public class QueryServer {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
   private final int _port;
@@ -63,25 +62,22 @@ public class QueryServer {
   private final ChannelHandler _instanceRequestHandler;
   private ServerSocketChannel _channel;
   private final ConcurrentHashMap<SocketChannel, Boolean> _allChannels = new ConcurrentHashMap<>();
+  private volatile boolean _shuttingDown;
 
 
-  /**
-   * Create an unsecured server instance
-   *
-   * @param port bind port
-   * @param nettyConfig configurations for netty library
-   */
+  /// Create an unsecured server instance
+  ///
+  /// @param port bind port
+  /// @param nettyConfig configurations for netty library
   public QueryServer(int port, NettyConfig nettyConfig, ChannelHandler instanceRequestHandler) {
     this(port, nettyConfig, null, instanceRequestHandler);
   }
 
-  /**
-   * Create a server instance with TLS config
-   *
-   * @param port bind port
-   * @param nettyConfig configurations for netty library
-   * @param tlsConfig TLS/SSL config
-   */
+  /// Create a server instance with TLS config
+  ///
+  /// @param port bind port
+  /// @param nettyConfig configurations for netty library
+  /// @param tlsConfig TLS/SSL config
   public QueryServer(int port, NettyConfig nettyConfig, TlsConfig tlsConfig, ChannelHandler instanceRequestHandler) {
     _port = port;
     _tlsConfig = tlsConfig;
@@ -117,12 +113,10 @@ public class QueryServer {
     try {
       ServerBootstrap serverBootstrap = new ServerBootstrap();
 
-      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
-      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
-      ServerMetrics metrics = ServerMetrics.get();
       PooledByteBufAllocator bufAllocatorWithLimits =
-          PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
-      metric = bufAllocatorWithLimits.metric();
+          PooledByteBufAllocatorWithLimits.getSharedBufferAllocatorWithLimits();
+      PooledByteBufAllocatorMetric metric = bufAllocatorWithLimits.metric();
+      ServerMetrics metrics = ServerMetrics.get();
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
@@ -142,7 +136,13 @@ public class QueryServer {
           .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
+              // Register first so shutdown sees this channel, or the check below closes a late registration.
               _allChannels.put(ch, true);
+              ch.closeFuture().addListener(f -> _allChannels.remove(ch));
+              if (_shuttingDown) {
+                ch.close();
+                return;
+              }
 
               ch.pipeline()
                   .addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, _channel));
@@ -166,8 +166,13 @@ public class QueryServer {
   }
 
   public void shutDown() {
+    _shuttingDown = true;
     try {
       _channel.close().sync();
+      // Close accepted connections explicitly, including registrations racing with listener shutdown.
+      for (SocketChannel channel : _allChannels.keySet()) {
+        channel.close();
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     } finally {
@@ -179,5 +184,15 @@ public class QueryServer {
   @VisibleForTesting
   ServerSocketChannel getChannel() {
     return _channel;
+  }
+
+  @VisibleForTesting
+  int getConnectedChannelCount() {
+    return _allChannels.size();
+  }
+
+  @VisibleForTesting
+  Set<SocketChannel> getConnectedChannels() {
+    return _allChannels.keySet();
   }
 }

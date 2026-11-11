@@ -51,26 +51,24 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * TODO: Find a good way to consolidate this with ForwardIndexDisabledMultiValueQueriesTest
- * The <code>ForwardIndexDisabledMultiValueQueriesWithReloadTest</code> class sets up the index segment for the
- * no forward index multi-value queries test with reload.
- * <p>There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
- * the index segment. Selected columns information are as following:
- * <ul>
- *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, IsMultiValue, FwdIndexDisabled: S1, S2
- *   <li>column1, METRIC, INT, 51594, F, F, F, F, F</li>
- *   <li>column2, METRIC, INT, 42242, F, F, F, F, F</li>
- *   <li>column3, DIMENSION, STRING, 5, F, T, F, F, F</li>
- *   <li>column5, DIMENSION, STRING, 9, F, F, F, F, F</li>
- *   <li>column6, DIMENSION, INT, 18499, F, T, T, T, T</li>
- *   <li>column7, DIMENSION, INT, 359, F, F, T, F, F</li>
- *   <li>column8, DIMENSION, INT, 850, F, T, F, F, F</li>
- *   <li>column9, METRIC, INT, 146, F, T, F, F, F</li>
- *   <li>column10, METRIC, INT, 3960, F, F, F, F, F</li>
- *   <li>daysSinceEpoch, TIME, INT, 1, T, F, F, F, F</li>
- * </ul>
- */
+/// TODO: Find a good way to consolidate this with ForwardIndexDisabledMultiValueQueriesTest
+/// The `ForwardIndexDisabledMultiValueQueriesWithReloadTest` class sets up the index segment for the
+/// no forward index multi-value queries test with reload.
+///
+/// There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
+/// the index segment. Selected columns information are as following:
+///
+///   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, IsMultiValue, FwdIndexDisabled: S1, S2
+/// - column1, METRIC, INT, 51594, F, F, F, F, F
+/// - column2, METRIC, INT, 42242, F, F, F, F, F
+/// - column3, DIMENSION, STRING, 5, F, T, F, F, F
+/// - column5, DIMENSION, STRING, 9, F, F, F, F, F
+/// - column6, DIMENSION, INT, 18499, F, T, T, T, T
+/// - column7, DIMENSION, INT, 359, F, F, T, F, F
+/// - column8, DIMENSION, INT, 850, F, T, F, F, F
+/// - column9, METRIC, INT, 146, F, T, F, F, F
+/// - column10, METRIC, INT, 3960, F, F, F, F, F
+/// - daysSinceEpoch, TIME, INT, 1, T, F, F, F, F
 public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQueriesTest {
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), ForwardIndexDisabledMultiValueQueriesWithReloadTest.class.getSimpleName());
@@ -152,9 +150,12 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
       fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
           Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
     }
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
-        .setNoDictionaryColumns(noDictionaryColumns).setInvertedIndexColumns(invertedIndexColumns)
-        .setCreateInvertedIndexDuringSegmentGeneration(true).setFieldConfigList(fieldConfigs).build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("daysSinceEpoch")
+        .setNoDictionaryColumns(noDictionaryColumns)
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setFieldConfigList(fieldConfigs)
+        .build();
   }
 
   @AfterMethod

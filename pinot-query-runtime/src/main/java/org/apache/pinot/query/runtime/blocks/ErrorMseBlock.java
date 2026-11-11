@@ -21,8 +21,8 @@ package org.apache.pinot.query.runtime.blocks;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.EnumMap;
+import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.response.ProcessingException;
@@ -34,7 +34,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// A block that represents a failed execution.
-///
 public class ErrorMseBlock implements MseBlock.Eos {
   private final int _stageId;
   private final int _workerId;
@@ -86,11 +85,11 @@ public class ErrorMseBlock implements MseBlock.Eos {
       extractTrace = true;
     }
     String errorMessage = extractTrace ? ExceptionUtils.consolidateExceptionMessages(e) : e.getMessage();
-    return fromMap(Collections.singletonMap(errorCode, errorMessage));
+    return fromMap(Map.of(errorCode, errorMessage));
   }
 
   public static ErrorMseBlock fromError(QueryErrorCode errorCode, String errorMessage) {
-    return fromMap(Collections.singletonMap(errorCode, errorMessage));
+    return fromMap(Map.of(errorCode, errorMessage));
   }
 
   @Override
@@ -131,10 +130,29 @@ public class ErrorMseBlock implements MseBlock.Eos {
     try {
       ObjectNode root = JsonUtils.newObjectNode();
       root.put("type", "error");
-      root.put("errorMessages", JsonUtils.objectToJsonNode(_errorMessages));
+      // Provenance of the error: the stage, worker and server where the error originated. This is mostly useful when
+      // the block reaches downstream logs (e.g. the broker or an intermediate stage), so operators can quickly find
+      // where the failure actually happened. -1 / null means the origin could not be determined (see #fromMap).
+      root.put("stageId", _stageId);
+      root.put("workerId", _workerId);
+      root.put("serverId", _serverId);
+      root.set("errorMessages", JsonUtils.objectToJsonNode(_errorMessages));
       return JsonUtils.objectToString(root);
     } catch (JsonProcessingException e) {
       return "{\"type\": \"error\", \"errorMessages\": \"not serializable\"}";
     }
+  }
+
+  /// Returns the main error code of the block.
+  ///
+  /// Right now this just returns the first error code in the map or UNKNOWN if the map is empty,
+  /// but in the future we might want to have a more sophisticated technique.
+  /// Alternatively, we can change the error blocks to only have one error code.
+  public QueryErrorCode getMainErrorCode() {
+    Iterator<QueryErrorCode> iterator = _errorMessages.keySet().iterator();
+    if (!iterator.hasNext()) {
+      return QueryErrorCode.UNKNOWN;
+    }
+    return iterator.next();
   }
 }

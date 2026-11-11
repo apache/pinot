@@ -23,14 +23,16 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ArrayAggLongFunction extends BaseArrayAggLongFunction<LongArrayList> {
-  public ArrayAggLongFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
+  private static final int LONG_ARRAY_LIST_TYPE = 43;
+
+  public ArrayAggLongFunction(ExpressionContext expression, DataType dataType, boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }
 
@@ -72,9 +74,8 @@ public class ArrayAggLongFunction extends BaseArrayAggLongFunction<LongArrayList
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(LongArrayList longArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongArrayList.getValue(),
-        ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(longArrayList));
+  public SerializedResult serializeIntermediateResult(LongArrayList longArrayList) {
+    return new SerializedValue<>(LONG_ARRAY_LIST_TYPE, longArrayList, ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE);
   }
 
   @Override

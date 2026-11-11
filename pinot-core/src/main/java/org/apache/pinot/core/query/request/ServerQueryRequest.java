@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -44,15 +45,14 @@ import org.apache.thrift.TDeserializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 
 
-/**
- * The <code>ServerQueryRequest</code> class encapsulates the <b>SSE</b> query related information as well as the query
- * processing context.
- * <p>All segment independent information should be pre-computed and stored in this class to avoid repetitive work on a
- * per segment basis.
- *
- * Please notice that although given the name of this class seems to indicate that it applies to all request, in fact it
- * is only used for SSE queries or the leaf stages in MSE.
- */
+/// The `ServerQueryRequest` class encapsulates the **SSE** query related information as well as the query
+/// processing context.
+///
+/// All segment independent information should be pre-computed and stored in this class to avoid repetitive work on a
+/// per segment basis.
+///
+/// Please notice that although given the name of this class seems to indicate that it applies to all request, in
+/// fact it is only used for SSE queries or the leaf stages in MSE.
 public class ServerQueryRequest {
   private final long _requestId;
   private final String _cid;
@@ -69,19 +69,18 @@ public class ServerQueryRequest {
   // a unique query id from broker id, request id and table type.
   private final String _queryId;
 
+  // Hash of the query fingerprint.
+  private final String _queryHash;
+
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
 
-  /**
-   * This is called from the Netty server to create a ServerQueryRequest from the InstanceRequest
-   */
+  /// This is called from the Netty server to create a ServerQueryRequest from the InstanceRequest
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
     this(instanceRequest, serverMetrics, queryArrivalTimeMs, false);
   }
 
-  /**
-   * This is called from by MSE to create a ServerQueryRequest to be used in the leaf stages.
-   */
+  /// This is called from by MSE to create a ServerQueryRequest to be used in the leaf stages.
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs,
       boolean enableStreaming) {
     _requestId = instanceRequest.getRequestId();
@@ -94,6 +93,7 @@ public class ServerQueryRequest {
     _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
     _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
+    _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     if (instanceRequest.getTableSegmentsInfoListSize() > 0) {
       _tableSegmentsContexts = new ArrayList<>(instanceRequest.getTableSegmentsInfoListSize());
@@ -107,12 +107,10 @@ public class ServerQueryRequest {
     }
   }
 
-  /**
-   * This is called from the grpc SSE server to create a ServerQueryRequest from the grpc request.
-   *
-   * Notice that this is not used for MSE, which only build ServerQueryRequest using
-   * {@link #ServerQueryRequest(InstanceRequest, ServerMetrics, long, boolean)}.
-   */
+  /// This is called from the grpc SSE server to create a ServerQueryRequest from the grpc request.
+  ///
+  /// Notice that this is not used for MSE, which only build ServerQueryRequest using
+  /// [#ServerQueryRequest(InstanceRequest, ServerMetrics, long, boolean)].
   public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)
       throws Exception {
     long queryArrivalTimeMs = System.currentTimeMillis();
@@ -142,6 +140,7 @@ public class ServerQueryRequest {
     _queryContext = getQueryContext(brokerRequest.getPinotQuery());
     _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
+    _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     if (serverRequest.getTableSegmentsInfoCount() > 0) {
       _tableSegmentsContexts = new ArrayList<>(serverRequest.getTableSegmentsInfoCount());
@@ -156,9 +155,7 @@ public class ServerQueryRequest {
     }
   }
 
-  /**
-   * To be used by Time Series Query Engine.
-   */
+  /// To be used by Time Series Query Engine.
   public ServerQueryRequest(QueryContext queryContext, List<String> segmentsToQuery, Map<String, String> metadata,
       ServerMetrics serverMetrics) {
     long queryArrivalTimeMs = System.currentTimeMillis();
@@ -172,6 +169,7 @@ public class ServerQueryRequest {
     _enableTrace = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_TRACE, "false"));
     _enableStreaming = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_STREAMING, "false"));
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId, _tableType);
+    _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
 
     _segmentsToQuery = segmentsToQuery;
     _optionalSegments = null;
@@ -208,8 +206,30 @@ public class ServerQueryRequest {
     return _queryContext.getTableName();
   }
 
+  /// The segments assigned to this worker, or null when the request carries them per referenced table in
+  /// [#getTableSegmentsContexts()] instead, as it does for a logical table. Callers must check that one first, the
+  /// way `ServerQueryExecutorV1Impl` does, or use [#hasSegmentsToQuery()] when all they need is whether this
+  /// request has any segment at all.
+  @Nullable
   public List<String> getSegmentsToQuery() {
     return _segmentsToQuery;
+  }
+
+  /// Whether this request has at least one segment to read, whichever of the two representations carries them.
+  ///
+  /// A request holds its segments either flat in [#getSegmentsToQuery()], for a plain table, or grouped per
+  /// referenced table in [#getTableSegmentsContexts()], for a logical table; the other one is null. Resolving that
+  /// here keeps callers that only need the question answered from having to know which representation applies.
+  public boolean hasSegmentsToQuery() {
+    if (_tableSegmentsContexts != null) {
+      for (TableSegmentsContext tableSegmentsContext : _tableSegmentsContexts) {
+        if (CollectionUtils.isNotEmpty(tableSegmentsContext.getSegments())) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return CollectionUtils.isNotEmpty(_segmentsToQuery);
   }
 
   public List<String> getOptionalSegments() {
@@ -233,6 +253,10 @@ public class ServerQueryRequest {
     return _queryId;
   }
 
+  public String getQueryHash() {
+    return _queryHash;
+  }
+
   public TimerContext getTimerContext() {
     return _timerContext;
   }
@@ -253,6 +277,7 @@ public class ServerQueryRequest {
     // TODO: Revisit the handling for logical table when multiple tables are queries with the same cid.
     String cid = QueryIdUtils.withTypeSuffix(_cid, _tableType);
     return new QueryExecutionContext(QueryExecutionContext.QueryType.SSE, _requestId, cid,
-        QueryOptionsUtils.getWorkloadName(queryOptions), startTimeMs, deadlineMs, deadlineMs, _brokerId, instanceId);
+        QueryOptionsUtils.getWorkloadName(queryOptions), startTimeMs, deadlineMs, deadlineMs, _brokerId, instanceId,
+        _queryHash);
   }
 }

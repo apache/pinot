@@ -20,20 +20,28 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import org.apache.helix.model.IdealState;
 
 
 public class SegmentAssignmentTestUtils {
   private SegmentAssignmentTestUtils() {
   }
 
-  /**
-   * Returns a list of names.
-   */
+  /// Returns a list of names.
   public static List<String> getNameList(String namePrefix, int numNames) {
     List<String> names = new ArrayList<>(numNames);
     for (int nameId = 0; nameId < numNames; nameId++) {
       names.add(namePrefix + nameId);
     }
     return names;
+  }
+
+  /// Returns an ideal state holding the given segment assignment (the same map, not a copy) and no partition
+  /// assignment.
+  public static IdealState toIdealState(Map<String, Map<String, String>> segmentAssignment) {
+    IdealState idealState = new IdealState("testTable");
+    idealState.getRecord().setMapFields(segmentAssignment);
+    return idealState;
   }
 }

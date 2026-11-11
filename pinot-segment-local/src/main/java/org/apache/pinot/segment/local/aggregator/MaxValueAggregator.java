@@ -84,9 +84,7 @@ public class MaxValueAggregator implements ValueAggregator<Object, Double> {
       Object[] values = (Object[]) rawValue;
       double max = Double.NEGATIVE_INFINITY;
       for (Object value : values) {
-        if (value != null) {
-          max = Math.max(max, ValueAggregatorUtils.toDouble(value));
-        }
+        max = Math.max(max, ValueAggregatorUtils.toDouble(value));
       }
       return max;
     } else {

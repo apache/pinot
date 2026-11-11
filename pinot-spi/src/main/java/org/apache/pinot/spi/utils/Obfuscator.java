@@ -29,70 +29,75 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 
-/**
- * Simple obfuscator for object trees and configuration containers with key-value pairs. Matches a configurable set of
- * patterns and replaces sensitive values with a pre-defined masked value for output.
- *
- * Example input:
- * <pre>
- *   {
- *     "type": "sample object",
- *     "nestedCredentials": {
- *       "user": "admin",
- *       "password": "verysecret"
- *     }
- *   }
- * </pre>
- *
- * Example output
- * <pre>
- *   {
- *     "type": "sample object",
- *     "nestedCredentials": {
- *       "user": "admin",
- *       "password": "*****"
- *     }
- *   }
- * </pre>
- */
+/// Simple obfuscator for object trees and configuration containers with key-value pairs. Matches a configurable set of
+/// patterns and replaces sensitive values with a pre-defined masked value for output.
+///
+/// Example input:
+///
+/// ```
+/// {
+///   "type": "sample object",
+///   "connection": {
+///     "user": "admin",
+///     "password": "verysecret"
+///   }
+/// }
+/// ```
+///
+/// Example output
+///
+/// ```
+/// {
+///   "type": "sample object",
+///   "connection": {
+///     "user": "admin",
+///     "password": "*****"
+///   }
+/// }
+/// ```
 public final class Obfuscator {
 
   private static final String DEFAULT_MASKED_VALUE = "*****";
+  /// Suffix-anchored, so that a key is masked for what it ends in and a structural name such as
+  /// `pinot.broker.auth.provider.class` stays readable. Beyond the generic credential words, this covers
+  /// credentials whose key does not end in one: the AWS access and secret key pair, dotted or not (as in
+  /// `input.fs.prop.accessKey`, `fs.s3a.access.key` and `fs.s3a.secret.key`), the Azure storage
+  /// `account.key`, Kafka's `sasl.jaas.config`, Confluent's `basic.auth.user.info` (a literal
+  /// `user:password`), and inline private or service-account key material. Key *file* names are not
+  /// masked, because their values are paths rather than secrets.
   private static final List<Pattern> DEFAULT_PATTERNS =
-      Stream.of("(?i).*secret$", "(?i).*secret[\\s_-]*key$", "(?i).*api[\\s_-]*key$", "(?i).*password$",
-              "(?i).*keytab$", "(?i).*token$")
+      Stream.of("(?i).*secret$", "(?i).*secret[\\s._-]*key$", "(?i).*api[\\s._-]*key$", "(?i).*password$",
+              "(?i).*passwd$", "(?i).*passphrase$", "(?i).*keytab$", "(?i).*token$", "(?i).*credentials?$",
+              "(?i).*access[\\s._-]*key([\\s._-]*id)?$", "(?i).*private[\\s._-]*key([\\s._-]*id)?$",
+              "(?i).*account[\\s._-]*key$", "(?i).*jaas[\\s._-]*config$", "(?i).*user[\\s._-]*info$",
+              "(?i).*json[\\s._-]*key$", "(?i).*key[\\s._-]*content([\\s._-]*base64)?$")
           .map(Pattern::compile).collect(Collectors.toList());
   public static final Obfuscator DEFAULT = new Obfuscator();
 
   private final String _maskedValue;
   private final List<Pattern> _patterns;
 
-  /**
-   * Obfuscator with default behavior matching (ignore case) "secret", "password", and "token" suffixes. Masks any
-   * values with '*****'
-   */
+  /// Obfuscator with default behavior matching (ignore case) credential suffixes such as "secret", "password",
+  /// "token" and "accessKey" - see [#DEFAULT_PATTERNS]. Masks any
+  /// values with '\*\*\*\*\*'
   public Obfuscator() {
     this(DEFAULT_MASKED_VALUE, DEFAULT_PATTERNS);
   }
 
-  /**
-   * Obfuscator with customized masking behavior. Defaults do not apply! Please ensure case-insensitive regex matching.
-   *
-   * @param maskedValue replacement value
-   * @param patterns key patterns to obfuscate
-   */
+  /// Obfuscator with customized masking behavior. Defaults do not apply! Please ensure case-insensitive regex matching.
+  ///
+  /// @param maskedValue replacement value
+  /// @param patterns key patterns to obfuscate
   public Obfuscator(String maskedValue, List<Pattern> patterns) {
     _maskedValue = maskedValue;
     _patterns = patterns;
   }
 
-  /**
-   * Serialize an object tree to JSON and obfuscate matching keys. This method handles special cases for JsonNode and
-   * String objects separately to minimize surprises.
-   *
-   * @param object input tree
-   * @return obfuscated JSON tree
-   */
+  /// Serialize an object tree to JSON and obfuscate matching keys. This method handles special cases for JsonNode and
+  /// String objects separately to minimize surprises.
+  ///
+  /// @param object input tree
+  /// @return obfuscated JSON tree
   public JsonNode toJson(Object object) {
     // NOTE: jayway json path 2.4.0 seems to have issues with '@.name' so we'll do this manually
     // as determined by a cursory and purely subjective investigation by alex
@@ -114,12 +119,10 @@ public final class Obfuscator {
     }
   }
 
-  /**
-   * Serialize an object tree to a JSON string and obfuscate matching keys.
-   *
-   * @param object input tree
-   * @return obfuscated JSON string
-   */
+  /// Serialize an object tree to a JSON string and obfuscate matching keys.
+  ///
+  /// @param object input tree
+  /// @return obfuscated JSON string
   public String toJsonString(Object object) {
     return String.valueOf(toJson(object));
   }
@@ -129,12 +132,12 @@ public final class Obfuscator {
       node.fieldNames().forEachRemaining(field -> {
         if (_patterns.stream().anyMatch(pattern -> pattern.matcher(field).matches())) {
           ((ObjectNode) node).put(field, _maskedValue);
-        } else if (node.isArray()) {
-          IntStream.range(0, node.size()).forEach(i -> ((ArrayNode) node).set(i, toJsonRecursive(node.get(i))));
-        } else if (node.isObject()) {
-          ((ObjectNode) node).put(field, toJsonRecursive(node.get(field)));
+        } else {
+          ((ObjectNode) node).set(field, toJsonRecursive(node.get(field)));
         }
       });
+    } else if (node.isArray()) {
+      IntStream.range(0, node.size()).forEach(i -> ((ArrayNode) node).set(i, toJsonRecursive(node.get(i))));
     }
 
     return node;

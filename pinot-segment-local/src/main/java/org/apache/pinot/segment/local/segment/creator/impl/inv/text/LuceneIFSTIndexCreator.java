@@ -29,19 +29,15 @@ import org.apache.pinot.segment.local.segment.index.fst.FstIndexType;
 import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.local.utils.fst.IFSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Case-insensitive FST index creator that works only for dictionary enabled columns.
- * It requires entries be added into this index in sorted order and it creates a mapping
- * from sorted entry to the index underneath. This index stores key (column value)
- * to dictionary id as an entry, with case-insensitive handling.
- *
- */
+/// Case-insensitive FST index creator that works only for dictionary enabled columns.
+/// It requires entries be added into this index in sorted order and it creates a mapping
+/// from sorted entry to the index underneath. This index stores key (column value)
+/// to dictionary id as an entry, with case-insensitive handling.
 public class LuceneIFSTIndexCreator implements FSTIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneIFSTIndexCreator.class);
 
@@ -53,18 +49,16 @@ public class LuceneIFSTIndexCreator implements FSTIndexCreator {
 
   private int _dictId;
 
-  /**
-   * This index requires values of the column be added in sorted order. Sorted entries could be passed in through
-   * constructor or added through addSortedDictIds function. Index of the sorted entry should correspond to the
-   * dictionary id.
-   *
-   * @param indexDir  Index directory
-   * @param columnName Column name for which index is being created
-   * @param tableNameWithType table name with type
-   * @param continueOnError if true, don't throw exception on add() failures
-   * @param sortedEntries Sorted entries of the unique values of the column.
-   * @throws IOException
-   */
+  /// This index requires values of the column be added in sorted order. Sorted entries could be passed in through
+  /// constructor or added through addSortedDictIds function. Index of the sorted entry should correspond to the
+  /// dictionary id.
+  ///
+  /// @param indexDir  Index directory
+  /// @param columnName Column name for which index is being created
+  /// @param tableNameWithType table name with type
+  /// @param continueOnError if true, don't throw exception on add() failures
+  /// @param sortedEntries Sorted entries of the unique values of the column.
+  /// @throws IOException
   public LuceneIFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
       @Nullable String[] sortedEntries)
       throws IOException {
@@ -88,12 +82,6 @@ public class LuceneIFSTIndexCreator implements FSTIndexCreator {
         }
       }
     }
-  }
-
-  public LuceneIFSTIndexCreator(IndexCreationContext context)
-      throws IOException {
-    this(context.getIndexDir(), context.getFieldSpec().getName(), context.getTableNameWithType(),
-        context.isContinueOnError(), (String[]) context.getSortedUniqueElementsArray());
   }
 
   // Expects dictionary entries in sorted order.

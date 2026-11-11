@@ -61,12 +61,12 @@ public class DedupConfig extends BaseJsonConfig {
   @Nullable
   private Map<String, String> _metadataManagerConfigs;
 
-  /// @deprecated use {@link #_preload} instead. This is kept here for backward compatibility.
+  /// @deprecated use [#_preload] instead. This is kept here for backward compatibility.
   @Deprecated
   @JsonPropertyDescription("Whether to preload segments for fast dedup metadata recovery.")
   private boolean _enablePreload;
 
-  /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+  /// @deprecated use [org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)] instead.
   @Deprecated
   @JsonPropertyDescription("Whether to pause dedup table's partition consumption during commit")
   private boolean _allowDedupConsumptionDuringCommit;
@@ -164,7 +164,8 @@ public class DedupConfig extends BaseJsonConfig {
     _metadataManagerConfigs = metadataManagerConfigs;
   }
 
-  @Deprecated
+  /// @deprecated Use `dedupConfig.preload` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isEnablePreload() {
     return _enablePreload;
   }
@@ -177,7 +178,8 @@ public class DedupConfig extends BaseJsonConfig {
     }
   }
 
-  @Deprecated
+  /// @deprecated Use `ingestionConfig.streamIngestionConfig.parallelSegmentConsumptionPolicy` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isAllowDedupConsumptionDuringCommit() {
     return _allowDedupConsumptionDuringCommit;
   }

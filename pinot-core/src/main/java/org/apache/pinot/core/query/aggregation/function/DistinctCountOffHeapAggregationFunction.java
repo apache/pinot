@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -41,10 +42,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 /// Aggregation function to compute the count of distinct values for a column using off-heap memory.
 public class DistinctCountOffHeapAggregationFunction
-    extends NullableSingleInputAggregationFunction<BaseOffHeapSet, Integer> {
+    extends BaseSingleInputAggregationFunction<BaseOffHeapSet, Integer> {
   // Use empty OffHeap32BitSet as a placeholder for empty result
   // NOTE: It is okay to close it (multiple times) since we are never adding values into it
-  private static final OffHeap32BitSet EMPTY_PLACEHOLDER = new OffHeap32BitSet(0);
 
   private final int _initialCapacity;
   private final int _hashBits;
@@ -81,7 +81,7 @@ public class DistinctCountOffHeapAggregationFunction
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       // For dictionary-encoded expression, store dictionary ids into the bitmap
       if (blockValSet.isSingleValue()) {
@@ -281,11 +281,12 @@ public class DistinctCountOffHeapAggregationFunction
     throw new UnsupportedOperationException();
   }
 
+  @Nullable
   @Override
   public BaseOffHeapSet extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      return EMPTY_PLACEHOLDER;
+      return null;
     }
     if (result instanceof DictIdsWrapper) {
       return extractAggregationResult((DictIdsWrapper) result);
@@ -430,7 +431,7 @@ public class DistinctCountOffHeapAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(BaseOffHeapSet set) {
+  public SerializedResult serializeIntermediateResult(BaseOffHeapSet set) {
     int type;
     if (set instanceof OffHeap32BitSet) {
       type = 0;
@@ -443,7 +444,7 @@ public class DistinctCountOffHeapAggregationFunction
     }
     byte[] bytes = set.serialize();
     set.close();
-    return new SerializedIntermediateResult(type, bytes);
+    return new SerializedBytes(type, bytes);
   }
 
   @Override
@@ -466,8 +467,10 @@ public class DistinctCountOffHeapAggregationFunction
   }
 
   @Override
-  public Integer extractFinalResult(BaseOffHeapSet set) {
-    assert set != null;
+  public Integer extractFinalResult(@Nullable BaseOffHeapSet set) {
+    if (set == null) {
+      return 0;
+    }
     int size = set.size();
     set.close();
     return size;

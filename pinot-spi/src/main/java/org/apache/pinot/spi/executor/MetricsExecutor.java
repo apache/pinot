@@ -24,9 +24,7 @@ import java.util.concurrent.ExecutorService;
 import org.apache.pinot.spi.metrics.PinotMeter;
 
 
-/**
- * An executor that keeps track of the number of tasks that have been started and finished
- */
+/// An executor that keeps track of the number of tasks that have been started and finished
 public class MetricsExecutor extends DecoratorExecutorService {
 
   private final PinotMeter _startedTasks;

@@ -28,6 +28,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
@@ -81,18 +82,18 @@ public class ConsumerCoordinatorTest {
         RealtimeTableDataManager realtimeTableDataManager) {
       super(enforceConsumptionInOrder, realtimeTableDataManager);
       Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
-        put("server_1", "ONLINE");
-        put("server_3", "ONLINE");
-      }};
+          put("server_1", "ONLINE");
+          put("server_3", "ONLINE");
+        }};
       _segmentAssignmentMap = new HashMap<>() {{
-        put("tableTest_REALTIME__1__101__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__2__101__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__2__100__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__1__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__14__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__91__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__90__20250304T0035Z", serverSegmentStatusMap);
-      }};
+          put("tableTest_REALTIME__1__101__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__2__101__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__2__100__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__1__1__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__1__14__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__1__91__20250304T0035Z", serverSegmentStatusMap);
+          put("tableTest_REALTIME__1__90__20250304T0035Z", serverSegmentStatusMap);
+        }};
     }
 
     @Override
@@ -149,9 +150,9 @@ public class ConsumerCoordinatorTest {
     ReentrantLock lock = (ReentrantLock) consumerCoordinator.getLock();
     RealtimeSegmentDataManager mockedRealtimeSegmentDataManager = getMockedRealtimeSegmentDataManager();
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
-      put("server_1", "ONLINE");
-      put("server_3", "ONLINE");
-    }};
+        put("server_1", "ONLINE");
+        put("server_3", "ONLINE");
+      }};
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(100), serverSegmentStatusMap);
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(102), serverSegmentStatusMap);
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(104), serverSegmentStatusMap);
@@ -360,9 +361,9 @@ public class ConsumerCoordinatorTest {
 
     // 3. test that segment 103 will be blocked.
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
-      put("server_1", "ONLINE");
-      put("server_3", "ONLINE");
-    }};
+        put("server_1", "ONLINE");
+        put("server_3", "ONLINE");
+      }};
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(102), serverSegmentStatusMap);
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(103), serverSegmentStatusMap);
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(104), serverSegmentStatusMap);
@@ -423,6 +424,30 @@ public class ConsumerCoordinatorTest {
   }
 
   @Test
+  public void testUnsealedRelease()
+      throws Exception {
+    RealtimeTableDataManager realtimeTableDataManager = Mockito.mock(RealtimeTableDataManager.class);
+    Mockito.when(realtimeTableDataManager.getTableName()).thenReturn("tableTest_REALTIME");
+    ConsumerCoordinator consumerCoordinator = new ConsumerCoordinator(false, realtimeTableDataManager);
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(getSegmentName(101));
+    Assert.assertNotNull(llcSegmentName);
+    consumerCoordinator.acquire(llcSegmentName);
+
+    consumerCoordinator.releaseUnsealed(getSegmentName(101), new LongMsgOffset(250));
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
+    ConsumerCoordinator.UnsealedRelease unsealedRelease = consumerCoordinator.getUnsealedRelease();
+    Assert.assertNotNull(unsealedRelease);
+    Assert.assertEquals(unsealedRelease.segmentName(), getSegmentName(101));
+    Assert.assertEquals(unsealedRelease.stoppedAtOffset().toString(), "250");
+
+    // Only the segment that recorded the release can clear it.
+    consumerCoordinator.clearUnsealedRelease(getSegmentName(100));
+    Assert.assertNotNull(consumerCoordinator.getUnsealedRelease());
+    consumerCoordinator.clearUnsealedRelease(getSegmentName(101));
+    Assert.assertNull(consumerCoordinator.getUnsealedRelease());
+  }
+
+  @Test
   public void testPreviousSegment() {
     RealtimeTableDataManager realtimeTableDataManager = Mockito.mock(RealtimeTableDataManager.class);
     Mockito.when(realtimeTableDataManager.getTableName()).thenReturn("tableTest_REALTIME");
@@ -439,8 +464,8 @@ public class ConsumerCoordinatorTest {
 
     consumerCoordinator.getSegmentAssignment().clear();
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
-      put("server_3", "ONLINE");
-    }};
+        put("server_3", "ONLINE");
+      }};
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(100), serverSegmentStatusMap);
     previousSegmentSequenceNumber = consumerCoordinator.getPreviousSegmentSequenceNumberFromIdealState(llcSegmentName);
     Assert.assertEquals(previousSegmentSequenceNumber, -1);

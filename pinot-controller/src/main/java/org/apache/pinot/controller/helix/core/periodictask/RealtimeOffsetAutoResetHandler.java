@@ -26,33 +26,23 @@ import org.apache.pinot.spi.stream.StreamConfig;
 
 public interface RealtimeOffsetAutoResetHandler {
 
-  /**
-   * Initialize the handler with the PinotLLCRealtimeSegmentManager and PinotHelixResourceManager.
-   * This is called once in constructor.
-   */
-  public abstract void init(
-      PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, PinotHelixResourceManager pinotHelixResourceManager);
+  /// Initialize the handler with the PinotLLCRealtimeSegmentManager and PinotHelixResourceManager.
+  /// This is called once after instantiation.
+  void init(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
+      PinotHelixResourceManager pinotHelixResourceManager);
 
-  /**
-   * Trigger the job to backfill the skipped interval due to offset auto reset.
-   * It is expected to backfill the [fromOffset, toOffset) interval.
-   * @return if successfully started the backfill job
-   */
-  public abstract boolean triggerBackfillJob(
-      String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId, long fromOffset,
-      long toOffset);
+  /// Trigger the job to backfill the skipped interval due to offset auto reset.
+  /// It is expected to backfill the \[fromOffset, toOffset) interval.
+  /// @return if successfully started the backfill job
+  boolean triggerBackfillJob(String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId,
+      long fromOffset, long toOffset);
 
-  /**
-   * Ensure all topics under the table are being backfilled. It is the caller's responsibility to figure out what
-   * topic set it should check.
-   */
-  public abstract void ensureBackfillJobsRunning(String tableNameWithType, Collection<String> topicNames);
+  /// Ensure all topics under the table are being backfilled. It is the caller's responsibility to figure out what
+  /// topic set it should check.
+  void ensureBackfillJobsRunning(String tableNameWithType, Collection<String> topicNames);
 
-  /**
-   * Return the Collection of completed and cleaned up topicNames from the input.
-   */
-  public abstract Collection<String> cleanupCompletedBackfillJobs(
-      String tableNameWithType, Collection<String> topicNames);
+  /// Return the Collection of completed and cleaned up topicNames from the input.
+  Collection<String> cleanupCompletedBackfillJobs(String tableNameWithType, Collection<String> topicNames);
 
-  public abstract void close();
+  void close();
 }

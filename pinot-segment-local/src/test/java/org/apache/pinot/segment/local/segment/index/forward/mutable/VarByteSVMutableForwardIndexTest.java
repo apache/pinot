@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.segment.index.forward.mutable;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
@@ -26,6 +28,8 @@ import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -64,7 +68,7 @@ public class VarByteSVMutableForwardIndexTest implements PinotBuffersAfterClassC
       for (int i = 0; i < rows; i++) {
         // generate a random string of length between 10 and 100
         int length = 10 + random.nextInt(100 - 10);
-        data[i] = RandomStringUtils.randomAlphanumeric(length);
+        data[i] = RandomStringUtils.secure().nextAlphanumeric(length);
         readerWriter.setString(i, data[i]);
       }
 
@@ -88,7 +92,7 @@ public class VarByteSVMutableForwardIndexTest implements PinotBuffersAfterClassC
 
       for (int i = 0; i < rows; i++) {
         int length = 10 + random.nextInt(100 - 10);
-        data[i] = RandomStringUtils.randomAlphanumeric(length);
+        data[i] = RandomStringUtils.secure().nextAlphanumeric(length);
         readerWriter.setBytes(i, data[i].getBytes(UTF_8));
       }
 
@@ -96,6 +100,24 @@ public class VarByteSVMutableForwardIndexTest implements PinotBuffersAfterClassC
         Assert.assertEquals(new String(readerWriter.getBytes(i), UTF_8), data[i]);
       }
       Assert.assertTrue(readerWriter.canAddMore());
+    }
+  }
+
+  @Test
+  public void testMapValue()
+      throws IOException {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("first", "value");
+    map.put("k8s.workload.name", "pinot-server");
+    map.put("last", 42);
+    try (VarByteSVMutableForwardIndex readerWriter = new VarByteSVMutableForwardIndex(DataType.MAP, _memoryManager,
+        "MapColumn", 1, 64)) {
+      readerWriter.setBytes(0, MapUtils.serializeMap(map));
+
+      Assert.assertEquals(readerWriter.getMapEntryValue(0, null, new PreparedMapKey("k8s.workload.name")),
+          "pinot-server");
+      Assert.assertNull(readerWriter.getMapEntryValue(0, null, new PreparedMapKey("missing")));
+      Assert.assertEquals(readerWriter.getMap(0, null), map);
     }
   }
 }

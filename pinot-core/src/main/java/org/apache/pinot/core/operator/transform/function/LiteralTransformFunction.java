@@ -27,14 +27,11 @@ import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>LiteralTransformFunction</code> class is a special transform function which is a wrapper on top of a
- * LITERAL. The data type is inferred from the literal string.
- */
+/// The `LiteralTransformFunction` class is a special transform function which is a wrapper on top of a
+/// LITERAL. The data type is inferred from the literal string.
 public class LiteralTransformFunction implements TransformFunction {
   public static final String FUNCTION_NAME = "literal";
 
@@ -108,11 +105,6 @@ public class LiteralTransformFunction implements TransformFunction {
   @Override
   public TransformResultMetadata getResultMetadata() {
     return new TransformResultMetadata(_literalContext.getType(), true, false);
-  }
-
-  @Override
-  public Dictionary getDictionary() {
-    return null;
   }
 
   @Override
@@ -238,6 +230,11 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 

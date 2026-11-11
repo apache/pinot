@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -36,23 +37,22 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 
 
 public class QueryContextConverterUtils {
   private QueryContextConverterUtils() {
   }
 
-  /**
-   * Converts the given query into a {@link QueryContext}.
-   */
+  /// Converts the given query into a [QueryContext].
   public static QueryContext getQueryContext(String query) {
     return getQueryContext(CalciteSqlParser.compileToPinotQuery(query));
   }
 
-  /**
-   * Converts the given {@link PinotQuery} into a {@link QueryContext}.
-   */
+  /// Converts the given [PinotQuery] into a [QueryContext].
   public static QueryContext getQueryContext(PinotQuery pinotQuery) {
     // FROM
     String tableName;
@@ -104,6 +104,10 @@ public class QueryContextConverterUtils {
       }
     }
 
+    // Row-level security filter
+    Expression rowFilterExpression = getRowFilterExpression(tableName, pinotQuery.getQueryOptions());
+    FilterContext rowFilter = rowFilterExpression != null ? RequestContextUtils.getFilter(rowFilterExpression) : null;
+
     // GROUP BY
     List<ExpressionContext> groupByExpressions = null;
     List<Expression> groupByList = pinotQuery.getGroupByList();
@@ -111,6 +115,48 @@ public class QueryContextConverterUtils {
       groupByExpressions = new ArrayList<>(groupByList.size());
       for (Expression thriftExpression : groupByList) {
         groupByExpressions.add(RequestContextUtils.getExpression(thriftExpression));
+      }
+    }
+
+    /// GROUP BY GROUPING SETS / ROLLUP / CUBE: the wire carries, per grouping set (in ordinal order), the
+    /// list of participating column indexes into groupByExpressions (the union of all grouping columns). An
+    /// empty inner list is the grand-total set (). Null when this is a plain GROUP BY query.
+    List<int[]> groupingSets = null;
+    List<List<Integer>> thriftGroupingSets = pinotQuery.getGroupingSets();
+    if (thriftGroupingSets != null) {
+      // Guard against malformed requests: an empty set list would silently produce empty results, and an
+      // out-of-range column index would cause out-of-bounds access deep in the group key generator.
+      if (thriftGroupingSets.isEmpty()) {
+        throw new IllegalStateException("Grouping sets must not be empty");
+      }
+      int numGroupByExpressions = groupByExpressions != null ? groupByExpressions.size() : 0;
+      if (numGroupByExpressions == 0) {
+        // A grouping-sets clause with no grouping columns can only be the grand-total-only set () — semantically
+        // identical to a plain aggregation (a single group over all rows, with GROUPING() resolving to 0). Leave
+        // groupingSets null so the no-group-by aggregation path runs; otherwise the reducer would expect a
+        // $groupingId key column the server never emits, and index past the result schema. A non-empty set here is
+        // malformed (its indexes reference nonexistent group-by expressions), so reject it rather than degrade.
+        for (List<Integer> set : thriftGroupingSets) {
+          if (!set.isEmpty()) {
+            throw new IllegalStateException(
+                "Grouping set references column index " + set.get(0) + " but there are no group-by expressions");
+          }
+        }
+      } else {
+        groupingSets = new ArrayList<>(thriftGroupingSets.size());
+        for (List<Integer> set : thriftGroupingSets) {
+          int[] indexes = new int[set.size()];
+          int idx = 0;
+          for (int columnIndex : set) {
+            if (columnIndex < 0 || columnIndex >= numGroupByExpressions) {
+              throw new IllegalStateException(
+                  "Invalid grouping set column index: " + columnIndex + " for " + numGroupByExpressions
+                      + " group-by expressions");
+            }
+            indexes[idx++] = columnIndex;
+          }
+          groupingSets.add(indexes);
+        }
       }
     }
 
@@ -148,9 +194,16 @@ public class QueryContextConverterUtils {
     }
 
     // EXPRESSION OVERRIDE HINTS
-    Map<ExpressionContext, ExpressionContext> expressionContextOverrideHints = new HashMap<>();
+    Map<ExpressionContext, ExpressionContext> expressionContextOverrideHints;
     Map<Expression, Expression> expressionOverrideHints = pinotQuery.getExpressionOverrideHints();
-    if (expressionOverrideHints != null) {
+    if (expressionOverrideHints == null || expressionOverrideHints.isEmpty()) {
+      expressionContextOverrideHints = Map.of();
+    } else if (expressionOverrideHints.size() == 1) {
+      Map.Entry<Expression, Expression> entry = expressionOverrideHints.entrySet().iterator().next();
+      expressionContextOverrideHints = Map.of(RequestContextUtils.getExpression(entry.getKey()),
+          RequestContextUtils.getExpression(entry.getValue()));
+    } else {
+      expressionContextOverrideHints = new HashMap<>();
       for (Map.Entry<Expression, Expression> entry : expressionOverrideHints.entrySet()) {
         expressionContextOverrideHints.put(RequestContextUtils.getExpression(entry.getKey()),
             RequestContextUtils.getExpression(entry.getValue()));
@@ -173,7 +226,9 @@ public class QueryContextConverterUtils {
         .setDistinct(distinct)
         .setAliasList(aliasList)
         .setFilter(filter)
+        .setRowFilter(rowFilterExpression, rowFilter)
         .setGroupByExpressions(groupByExpressions)
+        .setGroupingSets(groupingSets)
         .setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter)
         .setLimit(pinotQuery.getLimit())
@@ -182,6 +237,38 @@ public class QueryContextConverterUtils {
         .setExpressionOverrideHints(expressionContextOverrideHints)
         .setExplain(explainMode)
         .build();
+  }
+
+  /// Returns the row-level security (RLS) filter for the table, or `null` if the query options hold none.
+  ///
+  /// The lookup and the parse follow [org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter], which ANDs the same
+  /// filter into the WHERE clause: the key is `rlsFilters-<rawTableName>` and the value is parsed with
+  /// [CalciteSqlParser#compileToExpression(String)]. The server later optimizes this filter with the schema of the
+  /// table, as the WHERE clause (see `InstancePlanMakerImplV2`). Then the RLS bitmap and the WHERE clause use the same
+  /// predicate.
+  ///
+  /// Fails the query when the filter is set but cannot be parsed, because the query must not run without it.
+  @Nullable
+  private static Expression getRowFilterExpression(@Nullable String tableName,
+      @Nullable Map<String, String> queryOptions) {
+    if (tableName == null || queryOptions == null || queryOptions.isEmpty()) {
+      return null;
+    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    String rowFilterString = RlsUtils.getRlsFilterForTable(queryOptions, rawTableName);
+    if (rowFilterString == null || rowFilterString.isEmpty()) {
+      return null;
+    }
+    Expression rowFilterExpression;
+    FilterContext rowFilter;
+    try {
+      rowFilterExpression = CalciteSqlParser.compileToExpression(rowFilterString);
+      rowFilter = RequestContextUtils.getFilter(rowFilterExpression);
+    } catch (Exception e) {
+      // Do not put the filter or the parse error in the message: they can show the RLS policy to the user
+      throw new BadQueryRequestException("Cannot apply the row-level security filter for table: " + rawTableName);
+    }
+    return rowFilter.isConstantTrue() ? null : rowFilterExpression;
   }
 
   private static boolean isMultiStage(PinotQuery pinotQuery) {

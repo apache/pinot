@@ -22,9 +22,7 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Max value aggregator
- */
+/// Max value aggregator
 public class MaxValueAggregator implements ValueAggregator {
 
   private final FieldSpec.DataType _dataType;

@@ -25,9 +25,18 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
+import java.util.concurrent.TimeUnit;
 
 
 public class TimestampUtils {
+  private TimestampUtils() {
+  }
+
+  private static final long MICROS_PER_SECOND = TimeUnit.SECONDS.toMicros(1);
+  private static final long NANOS_PER_SECOND = TimeUnit.SECONDS.toNanos(1);
+  private static final int NANOS_PER_MICRO = (int) TimeUnit.MICROSECONDS.toNanos(1);
+  private static final long MILLIS_PER_SECOND = TimeUnit.SECONDS.toMillis(1);
+
   private static final DateTimeFormatter UNIVERSAL_DATE_TIME_FORMATTER = new DateTimeFormatterBuilder()
       // Date part
       .appendPattern("yyyy-MM-dd")
@@ -63,19 +72,14 @@ public class TimestampUtils {
       .parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0)
       .toFormatter();
 
-  private TimestampUtils() {
-  }
-
-  /**
-   * Parses the given timestamp string into {@link Timestamp}.
-   * <p>Below formats of timestamp are supported:
-   * <ul>
-   *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
-   *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
-   *   <li>Millis since epoch</li>
-   *   <li>ISO8601 format</li>
-   * </ul>
-   */
+  /// Parses the given timestamp string into [Timestamp].
+  ///
+  /// Below formats of timestamp are supported:
+  ///
+  /// - 'yyyy-mm-dd hh:mm:ss\[.fffffffff\]'
+  /// - 'yyyy-MM-dd\[ HH:mm\[:ss\]\]'
+  /// - Millis since epoch
+  /// - ISO8601 format
   public static Timestamp toTimestamp(String timestampString) {
     try {
       return Timestamp.valueOf(timestampString);
@@ -85,6 +89,7 @@ public class TimestampUtils {
     try {
       return new Timestamp(Long.parseLong(timestampString));
     } catch (Exception e) {
+      // Try the next format
     }
     try {
       return Timestamp.from(ZonedDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER).toInstant());
@@ -99,16 +104,14 @@ public class TimestampUtils {
     }
   }
 
-  /**
-   * Parses the given timestamp string into millis since epoch.
-   * <p>Below formats of timestamp are supported:
-   * <ul>
-   *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
-   *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
-   *   <li>Millis since epoch</li>
-   *   <li>ISO8601 format</li>
-   * </ul>
-   */
+  /// Parses the given timestamp string into millis since epoch.
+  ///
+  /// Below formats of timestamp are supported:
+  ///
+  /// - 'yyyy-mm-dd hh:mm:ss\[.fffffffff\]'
+  /// - 'yyyy-MM-dd\[ HH:mm\[:ss\]\]'
+  /// - Millis since epoch
+  /// - ISO8601 format
   public static long toMillisSinceEpoch(String timestampString) {
     try {
       return Timestamp.valueOf(timestampString).getTime();
@@ -131,5 +134,29 @@ public class TimestampUtils {
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid timestamp: '" + timestampString + "'");
     }
+  }
+
+  /// Converts microseconds since epoch to [Timestamp], preserving sub-millisecond nanos via
+  /// [Timestamp#setNanos]. [Math#floorDiv] / [Math#floorMod] split the signed `micros` into
+  /// (epoch-seconds, sub-second nanos) so pre-epoch (negative) values round consistently.
+  public static Timestamp fromMicrosSinceEpoch(long micros) {
+    long epochSecond = Math.floorDiv(micros, MICROS_PER_SECOND);
+    int nanoOfSecond = (int) Math.floorMod(micros, MICROS_PER_SECOND) * NANOS_PER_MICRO;
+    return toTimestamp(epochSecond, nanoOfSecond);
+  }
+
+  /// Converts nanoseconds since epoch to [Timestamp], preserving full nanosecond precision via
+  /// [Timestamp#setNanos]. [Math#floorDiv] / [Math#floorMod] split the signed `nanos` into
+  /// (epoch-seconds, sub-second nanos) so pre-epoch (negative) values round consistently.
+  public static Timestamp fromNanosSinceEpoch(long nanos) {
+    long epochSecond = Math.floorDiv(nanos, NANOS_PER_SECOND);
+    int nanoOfSecond = (int) Math.floorMod(nanos, NANOS_PER_SECOND);
+    return toTimestamp(epochSecond, nanoOfSecond);
+  }
+
+  private static Timestamp toTimestamp(long epochSecond, int nanoOfSecond) {
+    Timestamp ts = new Timestamp(epochSecond * MILLIS_PER_SECOND);
+    ts.setNanos(nanoOfSecond);
+    return ts;
   }
 }

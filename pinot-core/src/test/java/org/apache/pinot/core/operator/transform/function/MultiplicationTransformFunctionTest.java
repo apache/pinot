@@ -126,7 +126,7 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
     return new Object[][]{
         new Object[]{String.format("mult(%s)", INT_SV_COLUMN)}, new Object[]{
         String.format("mult(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)
-    }
+        }
     };
   }
 }

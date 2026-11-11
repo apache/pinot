@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.file.Files;
@@ -31,23 +33,27 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
-import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
-import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
+import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -60,6 +66,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -78,9 +85,11 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
@@ -136,6 +145,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private static final String NEW_COLUMNS_SCHEMA_WITH_FST = "data/newColumnsSchemaWithFST.json";
   private static final String NEW_COLUMNS_SCHEMA_WITH_TEXT = "data/newColumnsSchemaWithText.json";
   private static final String NEW_COLUMNS_SCHEMA_WITH_H3_JSON = "data/newColumnsSchemaWithH3Json.json";
+  private static final String NEW_COLUMNS_SCHEMA_WITH_H3_EMPTY_DEFAULT =
+      "data/newColumnsSchemaWithH3EmptyDefault.json";
   private static final String NEW_COLUMNS_SCHEMA_WITH_NO_FORWARD_INDEX =
       "data/newColumnsSchemaWithForwardIndexDisabled.json";
   private static final String NEW_INT_METRIC_COLUMN_NAME = "newIntMetric";
@@ -151,10 +162,10 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private static final String NEW_HLL_BYTE_METRIC_COLUMN_NAME = "newHLLByteMetric";
   private static final String NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME = "newTDigestByteMetric";
 
-  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER =
-      new SegmentOperationsThrottler(new SegmentAllIndexPreprocessThrottler(2, 4, true),
-          new SegmentStarTreePreprocessThrottler(1, 2, true), new SegmentDownloadThrottler(2, 4, true),
-          new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
+  private static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER =
+      new SegmentOperationsThrottlerSet(new SegmentOperationsThrottler(2, 4, true),
+          new SegmentOperationsThrottler(1, 2, true), new SegmentOperationsThrottler(2, 4, true),
+          new SegmentOperationsThrottler(1, 2, true));
 
   private final File _avroFile;
   private final Schema _schema;
@@ -164,6 +175,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private final Schema _newColumnsSchemaWithFST;
   private final Schema _newColumnsSchemaWithText;
   private final Schema _newColumnsSchemaWithH3Json;
+  private final Schema _newColumnsSchemaWithH3EmptyDefault;
   private final Schema _newColumnsSchemaWithForwardIndexDisabled;
 
   private Set<String> _noDictionaryColumns;
@@ -176,6 +188,8 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
+  private boolean _compressionStatsEnabled;
+  private boolean _nullHandlingEnabled;
 
   public SegmentPreProcessorTest()
       throws IOException {
@@ -207,6 +221,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_H3_JSON);
     assertNotNull(resourceUrl);
     _newColumnsSchemaWithH3Json = Schema.fromFile(new File(resourceUrl.getFile()));
+    resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_H3_EMPTY_DEFAULT);
+    assertNotNull(resourceUrl);
+    _newColumnsSchemaWithH3EmptyDefault = Schema.fromFile(new File(resourceUrl.getFile()));
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA_WITH_NO_FORWARD_INDEX);
     assertNotNull(resourceUrl);
     _newColumnsSchemaWithForwardIndexDisabled = Schema.fromFile(new File(resourceUrl.getFile()));
@@ -238,12 +255,15 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _ingestionConfig = new IngestionConfig();
     _ingestionConfig.setRowTimeValueCheck(false);
     _ingestionConfig.setSegmentTimeValueCheck(false);
+    _ingestionConfig.setContinueOnError(true);
 
     _columnMinMaxValueGeneratorMode = null;
     _bloomFilterConfigs = null;
     _jsonIndexConfigs = null;
     _starTreeIndexConfigs = null;
     _enableDefaultStarTree = false;
+    _compressionStatsEnabled = false;
+    _nullHandlingEnabled = true;
   }
 
   @AfterMethod
@@ -260,17 +280,33 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
   }
 
+  /// Builds a segment whose own generation applies the schema given -- including any transform config in
+  /// `_ingestionConfig`, which is how a derived column is produced on the ingestion path rather than at load.
+  private void buildSegment(SegmentVersion segmentVersion, Schema schema)
+      throws Exception {
+    buildV1Segment(schema);
+    if (segmentVersion == SegmentVersion.v3) {
+      convertV1SegmentToV3();
+    }
+  }
+
   private void buildV1Segment()
+      throws Exception {
+    buildV1Segment(_schema);
+  }
+
+  private void buildV1Segment(Schema schema)
       throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
 
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, TEMP_DIR, RAW_TABLE_NAME, createTableConfig(),
-            _schema);
+            schema);
+    config.setInstanceType(InstanceType.SERVER);
     config.setOutDir(TEMP_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, InstanceType.SERVER);
+    driver.init(config);
     driver.build();
   }
 
@@ -290,10 +326,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         .setTimeColumnName("daysSinceEpoch")
         .setNoDictionaryColumns(new ArrayList<>(_noDictionaryColumns))
         .setInvertedIndexColumns(new ArrayList<>(_invertedIndexColumns))
-        .setCreateInvertedIndexDuringSegmentGeneration(true)
         .setRangeIndexColumns(new ArrayList<>(_rangeIndexColumns))
         .setFieldConfigList(new ArrayList<>(_fieldConfigMap.values()))
-        .setNullHandlingEnabled(true)
+        .setNullHandlingEnabled(_nullHandlingEnabled)
         .setOptimizeNoDictStatsCollection(true)
         .setIngestionConfig(_ingestionConfig)
         .build();
@@ -303,6 +338,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
     indexingConfig.setBloomFilterConfigs(_bloomFilterConfigs);
     indexingConfig.setJsonIndexConfigs(_jsonIndexConfigs);
+    indexingConfig.setCompressionStatsEnabled(_compressionStatsEnabled);
     if (_starTreeIndexConfigs != null || _enableDefaultStarTree) {
       indexingConfig.setEnableDynamicStarTreeCreation(true);
       indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
@@ -333,14 +369,38 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     return new SegmentVersion[][]{{SegmentVersion.v1}, {SegmentVersion.v3}};
   }
 
-  /**
-   * Test to check for default column handling and text index creation during
-   * segment load after a new raw column is added to the schema with text index
-   * creation enabled.
-   * This will exercise both code paths in SegmentPreprocessor (segment load):
-   * (1) Default column handler to add forward index and dictionary
-   * (2) Text index handler to add text index
-   */
+  /// Cartesian product of segment version (v1/v3) and geo-column encoding (DICTIONARY/RAW), so the H3 reload test
+  /// exercises both [org.apache.pinot.segment.local.segment.index.loader.invertedindex.H3IndexHandler]
+  /// paths: the dictionary path and the raw `forwardIndexReader.getBytes(...)` path.
+  /// Cartesian product of segment version (v1/v3) and the table's null handling flag, for the derived-column tests
+  /// that have to behave the same either way: a transform expression yields null regardless of the flag, which only
+  /// decides whether a null vector is written alongside the column.
+  @DataProvider(name = "versionAndNullHandling")
+  public Object[][] versionAndNullHandling() {
+    return new Object[][]{
+        {SegmentVersion.v1, true},
+        {SegmentVersion.v3, true},
+        {SegmentVersion.v1, false},
+        {SegmentVersion.v3, false}
+    };
+  }
+
+  @DataProvider(name = "h3VersionAndEncoding")
+  public Object[][] h3VersionAndEncoding() {
+    return new Object[][]{
+        {SegmentVersion.v1, FieldConfig.EncodingType.DICTIONARY},
+        {SegmentVersion.v3, FieldConfig.EncodingType.DICTIONARY},
+        {SegmentVersion.v1, FieldConfig.EncodingType.RAW},
+        {SegmentVersion.v3, FieldConfig.EncodingType.RAW}
+    };
+  }
+
+  /// Test to check for default column handling and text index creation during
+  /// segment load after a new raw column is added to the schema with text index
+  /// creation enabled.
+  /// This will exercise both code paths in SegmentPreprocessor (segment load):
+  /// (1) Default column handler to add forward index and dictionary
+  /// (2) Text index handler to add text index
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnNewColumnRaw(SegmentVersion segmentVersion)
       throws Exception {
@@ -351,20 +411,31 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(NEWLY_ADDED_STRING_MV_COL_RAW,
         new FieldConfig(NEWLY_ADDED_STRING_MV_COL_RAW, FieldConfig.EncodingType.RAW,
             List.of(FieldConfig.IndexType.TEXT), null, null));
-    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
-    checkTextIndexCreation(NEWLY_ADDED_STRING_MV_COL_RAW, 1, 1, _newColumnsSchemaWithText, true, true, false, 4, false,
-        1);
+    checkTextIndexCreation(_newColumnsSchemaWithText, NEWLY_ADDED_STRING_COL_RAW, 1, true, true, 4, true);
+    checkTextIndexCreation(_newColumnsSchemaWithText, NEWLY_ADDED_STRING_MV_COL_RAW, false, 1, true, false, 4, 1, true);
   }
 
-  @Test(dataProvider = "bothV1AndV3", expectedExceptions = UnsupportedOperationException.class,
-      expectedExceptionsMessageRegExp = "FST index is currently only supported on dictionary encoded columns: column4")
+  @Test(dataProvider = "bothV1AndV3")
   public void testEnableFSTIndexOnExistingColumnRaw(SegmentVersion segmentVersion)
       throws Exception {
     buildSegment(segmentVersion);
+    // FST on RAW column requires explicit dictionary config.
+    // Must remove from noDictionaryColumns to avoid ConfigDeclaredTwiceException.
+    _noDictionaryColumns.remove(EXISTING_STRING_COL_RAW);
+    ObjectNode fstIndexes = org.apache.pinot.spi.utils.JsonUtils.newObjectNode();
+    fstIndexes.set("dictionary", org.apache.pinot.spi.utils.JsonUtils.newObjectNode());
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
-        new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.FST), null,
-            null));
+        new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST,
+            null, null, null, fstIndexes, null, null));
+    if (segmentVersion == SegmentVersion.v1) {
+      assertThrows(UnsupportedOperationException.class, this::runPreProcessor);
+      return;
+    }
     runPreProcessor();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
+    assertTrue(columnMetadata.hasDictionary());
+    assertTrue(columnMetadata.getIndexSizeFor(StandardIndexes.fst()) > 0);
   }
 
   @Test(dataProvider = "bothV1AndV3")
@@ -374,7 +445,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(NEWLY_ADDED_FST_COL_DICT,
         new FieldConfig(NEWLY_ADDED_FST_COL_DICT, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.FST), null, null));
-    checkFSTIndexCreation(NEWLY_ADDED_FST_COL_DICT, 1, 1, _newColumnsSchemaWithFST, true, true, 4);
+    checkFSTIndexCreation(_newColumnsSchemaWithFST, NEWLY_ADDED_FST_COL_DICT, 1, true, 4, true);
   }
 
   @Test(dataProvider = "bothV1AndV3")
@@ -384,7 +455,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_DICT,
         new FieldConfig(EXISTING_STRING_COL_DICT, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.FST), null, null));
-    checkFSTIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _newColumnsSchemaWithFST, false, false, 26);
+    checkFSTIndexCreation(_newColumnsSchemaWithFST, EXISTING_STRING_COL_DICT, 9, false, 26, false);
   }
 
   @Test
@@ -394,25 +465,24 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     int approxCardinalityStr = 5; // derived via NoDictColumnStatisticsCollector
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
-        false, false, 0, ChunkCompressionType.LZ4,
-        true, 0, DataType.STRING, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_STRING_COL_RAW, DataType.STRING, true, approxCardinalityStr, false,
+        false, 4, 100000, 0, false, ChunkCompressionType.LZ4);
     // since dictionary is disabled, the cardinality will be approximate cardinality.
-    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, approxCardinality, 16, false, false, false, 0,
-        true, 0, ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW, DataType.INT, true, approxCardinality, false, false,
+        4, 100000, 0, false, ChunkCompressionType.LZ4, false);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
 
     // TEST 2: Enable dictionary on EXISTING_STRING_COL_RAW
     _noDictionaryColumns.remove(EXISTING_STRING_COL_RAW);
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, null, true, 0,
-        DataType.STRING, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_STRING_COL_RAW, DataType.STRING, true, 5, true, false, 4, 100000, 0,
+        false, null);
 
     // TEST 3: Enable dictionary on EXISTING_INT_COL_RAW
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, null, true, 0,
-        DataType.INT, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW, DataType.INT, true, 42242, true, false, 4, 100000, 0,
+        false, null);
   }
 
   @Test
@@ -422,16 +492,16 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing raw columns.
     buildV1Segment();
     // since dictionary is disabled, the cardinality will be approximate cardinality.
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, approxCardinality, 15, _schema, false, false, false, 0,
-        ChunkCompressionType.LZ4, false, 13, DataType.INT, 106688);
+    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW_MV, DataType.INT, false, approxCardinality, false, false, 4,
+        106688, 13, false, ChunkCompressionType.LZ4);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
 
     // TEST 2: Enable dictionary on EXISTING_STRING_COL_RAW
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
-        DataType.INT, 106688);
+    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688, 13,
+        false, null);
   }
 
   @Test
@@ -447,12 +517,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.TEXT), null, null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, null, true, 0,
-        DataType.STRING, 100000);
-    validateIndex(StandardIndexes.inverted(), EXISTING_STRING_COL_RAW, 5, 3, false, true, false, 4, true, 0, null,
-        false, DataType.STRING, 100000);
-    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3, false, true, false, 4, true, 0, null, false,
-        DataType.STRING, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_STRING_COL_RAW, DataType.STRING, true, 5, true, false, 4, 100000, 0,
+        false, null);
+    validateIndex(StandardIndexes.inverted(), EXISTING_STRING_COL_RAW, DataType.STRING, true, 5, true, false, 4, 100000,
+        0, false, null, false);
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, DataType.STRING, true, 5, true, false, 4, 100000, 0,
+        false, null, false);
 
     // TEST 2: EXISTING_STRING_COL_RAW. Enable dictionary on a raw column that already has text index.
     resetIndexConfigs();
@@ -461,36 +531,35 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
     buildV3Segment();
-    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, false, false,
-        false, 0, true, 0, null, false,
-        DataType.STRING, 100000);
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, DataType.STRING, true, approxCardinalityStr, false,
+        false, 4, 100000, 0, false, null, false);
 
     // At this point, the segment has text index. Now, the reload path should create a dictionary.
     _noDictionaryColumns.remove(EXISTING_STRING_COL_RAW);
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.TEXT), null, null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, true, false, 4, null, true, 0,
-        DataType.STRING, 100000);
-    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, 5, 3, false, true, false, 4, true, 0, null, false,
-        DataType.STRING, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_STRING_COL_RAW, DataType.STRING, true, 5, true, false, 4, 100000, 0,
+        false, null);
+    validateIndex(StandardIndexes.text(), EXISTING_STRING_COL_RAW, DataType.STRING, true, 5, true, false, 4, 100000, 0,
+        false, null, false);
 
     // TEST 3: EXISTING_INT_COL_RAW. Enable dictionary on a column that already has range index.
     resetIndexConfigs();
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW);
     buildV3Segment();
     // Since dictionary is disabled, the cardinality will be approximate cardinality.
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, approxCardinality, 16, false, false, false, 0, true, 0,
-        ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, DataType.INT, true, approxCardinality, false, false, 4,
+        100000, 0, false, ChunkCompressionType.LZ4, false);
     long oldRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW)
         .getIndexSizeFor(StandardIndexes.range());
     // At this point, the segment has range index. Now the reload path should create a dictionary and rewrite the
     // range index.
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW, 42242, 16, _schema, false, true, false, 0, null, true, 0,
-        DataType.INT, 100000);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, 42242, 16, false, true, false, 0, true, 0, null, false,
-        DataType.INT, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW, DataType.INT, true, 42242, true, false, 4, 100000, 0,
+        false, null);
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW, DataType.INT, true, 42242, true, false, 4, 100000, 0,
+        false, null, false);
     long newRangeIndexSize = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW)
         .getIndexSizeFor(StandardIndexes.range());
     assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
@@ -506,29 +575,29 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
     _invertedIndexColumns.add(EXISTING_INT_COL_RAW_MV);
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW_MV);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
-        DataType.INT, 106688);
-    validateIndex(StandardIndexes.inverted(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, true, false, 0, false, 13,
-        null, false, DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, true, false, 0, false, 13, null,
-        false, DataType.INT, 106688);
+    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688, 13,
+        false, null);
+    validateIndex(StandardIndexes.inverted(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4,
+        106688, 13, false, null, false);
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688,
+        13, false, null, false);
 
     // TEST 2: EXISTING_INT_COL_RAW_MV. Enable dictionary for an MV column that already has range index.
     resetIndexConfigs();
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW_MV);
     buildV3Segment();
     // Since dictionary is disabled, the cardinality will be approximate cardinality.
-    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, approxCardinality, 15, false, false, false, 0,
-        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, approxCardinality, 15, false, false, false, 0,
-        false, 13, ChunkCompressionType.LZ4, false, DataType.INT, 106688);
+    validateIndex(StandardIndexes.forward(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, approxCardinality, false,
+        false, 4, 106688, 13, false, ChunkCompressionType.LZ4, false);
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, approxCardinality, false,
+        false, 4, 106688, 13, false, ChunkCompressionType.LZ4, false);
 
     // Enable dictionary.
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
-        DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, true, false, 0, false, 13, null,
-        false, DataType.INT, 106688);
+    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688, 13,
+        false, null);
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688,
+        13, false, null, false);
   }
 
   @Test
@@ -536,23 +605,23 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       throws Exception {
     // TEST 1. Check running forwardIndexHandler on a V1 segment. No-op for all existing dict columns.
     buildV1Segment();
-    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26, null, true, 0,
-        DataType.STRING, 100000);
-    validateIndex(StandardIndexes.forward(), COLUMN10_NAME, 3960, 12, false, true, false, 0, true, 0, null, false,
-        DataType.INT, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_STRING_COL_DICT, DataType.STRING, true, 9, true, false, 26, 100000, 0,
+        false, null);
+    validateIndex(StandardIndexes.forward(), COLUMN10_NAME, DataType.INT, true, 3960, true, false, 4, 100000, 0, false,
+        null, false);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
 
     // TEST 2: Disable dictionary for EXISTING_STRING_COL_DICT.
     _noDictionaryColumns.add(EXISTING_STRING_COL_DICT);
-    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
-        true, 0, DataType.STRING, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_STRING_COL_DICT, DataType.STRING, true, 9, false, false, 26, 100000, 0,
+        false, ChunkCompressionType.LZ4);
 
     // TEST 3: Disable dictionary for COLUMN10_NAME
     _noDictionaryColumns.add(COLUMN10_NAME);
-    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4, true,
-        0, DataType.INT, 100000);
+    checkForwardIndexCreation(_schema, COLUMN10_NAME, DataType.INT, true, 3960, false, false, 4, 100000, 0, false,
+        ChunkCompressionType.LZ4);
   }
 
   @Test
@@ -563,43 +632,40 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _invertedIndexColumns.add(COLUMN1_NAME);
     buildV3Segment();
     _noDictionaryColumns.add(COLUMN1_NAME);
-    checkForwardIndexCreation(COLUMN1_NAME, 51594, 16, _schema, false, true, false, 0, null, true, 0, DataType.INT,
-        100000);
+    checkForwardIndexCreation(_schema, COLUMN1_NAME, DataType.INT, true, 51594, true, false, 4, 100000, 0, false, null);
 
     // TEST 2: Disable dictionary. Also remove inverted index on column1.
     _invertedIndexColumns.remove(COLUMN1_NAME);
-    checkForwardIndexCreation(COLUMN1_NAME, 51594, 16, _schema, false, false, false, 0, null, true, 0, DataType.INT,
-        100000);
+    checkForwardIndexCreation(_schema, COLUMN1_NAME, DataType.INT, true, 51594, false, false, 4, 100000, 0, false,
+        null);
 
     // TEST 3: Disable dictionary for a column (Column10) that has range index.
     _rangeIndexColumns.add(COLUMN10_NAME);
     buildV3Segment();
-    validateIndex(StandardIndexes.forward(), COLUMN10_NAME, 3960, 12, false, true, false, 0, true, 0, null, false,
-        DataType.INT, 100000);
-    validateIndex(StandardIndexes.range(), COLUMN10_NAME, 3960, 12, false, true, false, 0, true, 0, null, false,
-        DataType.INT, 100000);
+    validateIndex(StandardIndexes.forward(), COLUMN10_NAME, DataType.INT, true, 3960, true, false, 4, 100000, 0, false,
+        null, false);
+    validateIndex(StandardIndexes.range(), COLUMN10_NAME, DataType.INT, true, 3960, true, false, 4, 100000, 0, false,
+        null, false);
     long oldRangeIndexSize =
         new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeFor(StandardIndexes.range());
     _noDictionaryColumns.add(COLUMN10_NAME);
-    checkForwardIndexCreation(COLUMN10_NAME, 3960, 12, _schema, false, false, false, 0, ChunkCompressionType.LZ4, true,
-        0, DataType.INT, 100000);
-    validateIndex(StandardIndexes.range(), COLUMN10_NAME, 3960, 12, false, false, false, 0, true, 0,
-        ChunkCompressionType.LZ4, false, DataType.INT, 100000);
+    checkForwardIndexCreation(_schema, COLUMN10_NAME, DataType.INT, true, 3960, false, false, 4, 100000, 0, false,
+        ChunkCompressionType.LZ4);
+    validateIndex(StandardIndexes.range(), COLUMN10_NAME, DataType.INT, true, 3960, false, false, 4, 100000, 0, false,
+        ChunkCompressionType.LZ4, false);
     long newRangeIndexSize =
         new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeFor(StandardIndexes.range());
     assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
 
     // TEST4: Disable dictionary but add text index.
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, false, true, false, 26, true, 0, null,
-        false, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, DataType.STRING, true, 9, true, false, 26,
+        100000, 0, false, null, false);
     _noDictionaryColumns.add(EXISTING_STRING_COL_DICT);
     _fieldConfigMap.put(EXISTING_STRING_COL_DICT,
         new FieldConfig(EXISTING_STRING_COL_DICT, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, false, false, 0, ChunkCompressionType.LZ4,
-        true, 0, DataType.STRING, 100000);
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, 9, 4, false, false, false, 0, true, 0, null,
-        false, DataType.STRING, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_STRING_COL_DICT, DataType.STRING, true, 9, false, false, 26, 100000, 0,
+        false, ChunkCompressionType.LZ4);
   }
 
   @Test
@@ -609,33 +675,134 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     buildV3Segment();
     _noDictionaryColumns.remove(EXISTING_INT_COL_RAW_MV);
     _rangeIndexColumns.add(EXISTING_INT_COL_RAW_MV);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, true, false, 0, null, false, 13,
-        DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, true, false, 0, false, 13, null,
-        false, DataType.INT, 106688);
+    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688, 13,
+        false, null);
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688,
+        13, false, null, false);
 
     // TEST 1: Disable dictionary on a column where range index is already enabled.
     _noDictionaryColumns.add(EXISTING_INT_COL_RAW_MV);
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, 18499, 15, _schema, false, false, false, 0, null, false, 13,
-        DataType.INT, 106688);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, 18499, 15, false, false, false, 0, false, 13, null,
-        false, DataType.INT, 106688);
+    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, false, false, 4, 106688, 13,
+        false, null);
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, false, false, 4, 106688,
+        13, false, null, false);
 
     // TEST 2. Disable dictionary on a column where inverted index is enabled. Should be a no-op.
-    validateIndex(StandardIndexes.forward(), COLUMN7_NAME, 359, 9, false, true, false, 0, false, 24, null, false,
-        DataType.INT, 134090);
-    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, 359, 9, false, true, false, 0, false, 24, null, false,
-        DataType.INT, 134090);
+    validateIndex(StandardIndexes.forward(), COLUMN7_NAME, DataType.INT, false, 359, true, false, 4, 134090, 24, false,
+        null, false);
+    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, DataType.INT, false, 359, true, false, 4, 134090, 24, false,
+        null, false);
     _noDictionaryColumns.add(COLUMN7_NAME);
-    checkForwardIndexCreation(COLUMN7_NAME, 359, 9, _schema, false, true, false, 0, null, false, 24, DataType.INT,
-        134090);
-    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, 359, 9, false, true, false, 0, false, 24, null, false,
-        DataType.INT, 134090);
+    checkForwardIndexCreation(_schema, COLUMN7_NAME, DataType.INT, false, 359, true, false, 4, 134090, 24, false, null);
+    validateIndex(StandardIndexes.inverted(), COLUMN7_NAME, DataType.INT, false, 359, true, false, 4, 134090, 24, false,
+        null, false);
 
     // TEST 3: Disable dictionary and disable inverted index on column7.
     _invertedIndexColumns.remove(COLUMN7_NAME);
-    checkForwardIndexCreation(COLUMN7_NAME, 359, 9, _schema, false, false, false, 0, null, false, 24, DataType.INT,
-        134090);
+    checkForwardIndexCreation(_schema, COLUMN7_NAME, DataType.INT, false, 359, false, false, 4, 134090, 24, false,
+        null);
+  }
+
+  /// Verifies that the range index is rebuilt every time the dictionary state of a column changes — both via
+  /// the explicit toggle path and via the auto-toggle path triggered by an index that requires a dictionary
+  /// (e.g. inverted). The on-disk range index format differs between dict-id-based (when a dictionary exists)
+  /// and raw-value-based (when not), so the index size must change in lockstep with the dictionary state.
+  @Test
+  public void testRangeIndexRebuiltOnDictionaryToggle()
+      throws Exception {
+    // Setup: V3 segment with a raw INT column carrying a range index. The range index is built against raw
+    // values at this point.
+    buildV3Segment();
+    _rangeIndexColumns.add(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    long rawRangeSize1 = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertTrue(rawRangeSize1 > 0, "Range index must exist before toggling dictionary state");
+    assertFalse(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Column must start without a dictionary");
+
+    // (1) Auto-enable dictionary by adding an inverted index. ForwardIndexHandler now queues
+    // ENABLE_DICTIONARY because the inverted index requires a dictionary. The range index must be rebuilt
+    // against dict ids — its forward-index storage size therefore changes.
+    _invertedIndexColumns.add(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    SegmentMetadataImpl afterAutoEnable = new SegmentMetadataImpl(INDEX_DIR);
+    long dictRangeSize = afterAutoEnable.getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertTrue(afterAutoEnable.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Dictionary must be auto-created when inverted index requires it");
+    assertNotEquals(dictRangeSize, rawRangeSize1,
+        "Range index must be rebuilt with dict-id format when dictionary is auto-enabled");
+
+    // (2) Auto-disable dictionary by removing the inverted index. The dictionary is no longer required and
+    // gets dropped; the range index must be rebuilt against raw values again.
+    _invertedIndexColumns.remove(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    SegmentMetadataImpl afterAutoDisable = new SegmentMetadataImpl(INDEX_DIR);
+    long rawRangeSize2 = afterAutoDisable.getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertFalse(afterAutoDisable.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Dictionary must be auto-removed when no enabled index requires it");
+    assertNotEquals(rawRangeSize2, dictRangeSize,
+        "Range index must be rebuilt with raw-value format when dictionary is auto-disabled");
+
+    // (3) Explicit toggle path: enable dictionary by removing the column from noDictionaryColumns. Range
+    // index must be rebuilt yet again.
+    _noDictionaryColumns.remove(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    SegmentMetadataImpl afterExplicitEnable = new SegmentMetadataImpl(INDEX_DIR);
+    long dictRangeSize2 = afterExplicitEnable.getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertTrue(afterExplicitEnable.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Dictionary must exist after explicit ENABLE_DICTIONARY");
+    assertNotEquals(dictRangeSize2, rawRangeSize2,
+        "Range index must be rebuilt with dict-id format when dictionary is explicitly enabled");
+
+    // (4) Explicit disable: re-add to noDictionaryColumns. Range index rebuilt back to raw-value format.
+    _noDictionaryColumns.add(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    SegmentMetadataImpl afterExplicitDisable = new SegmentMetadataImpl(INDEX_DIR);
+    long rawRangeSize3 = afterExplicitDisable.getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertFalse(afterExplicitDisable.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Dictionary must be removed after explicit DISABLE_DICTIONARY");
+    assertNotEquals(rawRangeSize3, dictRangeSize2,
+        "Range index must be rebuilt with raw-value format when dictionary is explicitly disabled");
+  }
+
+  /// Verifies the encoding-flip transition where the forward index goes from dict-encoded to raw, while the
+  /// dictionary stays because an inverted index requires it. End state: dict + inverted + raw forward index.
+  @Test
+  public void testFlipDictForwardToRawForwardKeepingDictionaryForInvertedIndex()
+      throws Exception {
+    // Set up: COLUMN1 starts as dict-encoded INT with an inverted index.
+    _invertedIndexColumns.add(COLUMN1_NAME);
+    buildV3Segment();
+    SegmentMetadataImpl initial = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(initial.getColumnMetadataFor(COLUMN1_NAME).getForwardIndexEncoding(),
+        FieldConfig.EncodingType.DICTIONARY,
+        "Pre-condition: COLUMN1 must start dict-encoded so the encoding flip is meaningful");
+    assertTrue(initial.getColumnMetadataFor(COLUMN1_NAME).hasDictionary());
+
+    // Flip encoding to RAW while keeping the inverted index. The inverted index requires a dictionary, so
+    // the auto-keep-dictionary-when-required-by-index logic must keep the dictionary across the flip.
+    _noDictionaryColumns.add(COLUMN1_NAME);
+    runPreProcessor(_schema);
+
+    SegmentMetadataImpl afterFlip = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(afterFlip.getColumnMetadataFor(COLUMN1_NAME).getForwardIndexEncoding(),
+        FieldConfig.EncodingType.RAW, "Forward index must be raw after the flip");
+    assertTrue(afterFlip.getColumnMetadataFor(COLUMN1_NAME).hasDictionary(),
+        "Dictionary must be kept because the inverted index still requires it");
+    try (SegmentDirectory dir = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = dir.createReader()) {
+      assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.dictionary()),
+          "Dictionary file must remain on disk");
+      assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.inverted()),
+          "Inverted index must remain on disk and continue to point at the same dict ids");
+      assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.forward()),
+          "Raw forward index must exist after the flip");
+    }
   }
 
   @Test
@@ -649,27 +816,23 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.ZSTANDARD,
             null));
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
-        false, false, 0, ChunkCompressionType.LZ4,
-        true, 0, DataType.STRING, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_STRING_COL_RAW, DataType.STRING, true, approxCardinalityStr, false,
+        false, 4, 100000, 0, false, ChunkCompressionType.LZ4);
 
     // Convert the segment to V3.
     convertV1SegmentToV3();
 
     // Test2: Now forward index will be rewritten with ZSTANDARD compressionType.
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
-        false, false, 0,
-        ChunkCompressionType.ZSTANDARD, true, 0, DataType.STRING, 100000);
+    checkForwardIndexCreation(_schema, EXISTING_STRING_COL_RAW, DataType.STRING, true, approxCardinalityStr, false,
+        false, 4, 100000, 0, false, ChunkCompressionType.ZSTANDARD);
 
     // Test3: Change compression on existing raw index column. Also add text index on same column. Check correctness.
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             CompressionCodec.SNAPPY, null));
-    checkTextIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
-        false, false, 0);
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, false,
-        false, false, 0, true, 0,
-        ChunkCompressionType.SNAPPY, false, DataType.STRING, 100000);
+    checkTextIndexCreation(_schema, EXISTING_STRING_COL_RAW, approxCardinalityStr, false, false, 4, false);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, DataType.STRING, true, approxCardinalityStr,
+        false, false, 4, 100000, 0, false, ChunkCompressionType.SNAPPY, false);
 
     // Test4: Change compression on RAW index column. Change another index on another column. Check correctness.
     resetIndexConfigs();
@@ -681,29 +844,26 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         new FieldConfig(EXISTING_STRING_COL_DICT, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.FST), null, null));
     // Check FST index
-    checkFSTIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _newColumnsSchemaWithFST, false, false, 26);
+    checkFSTIndexCreation(_newColumnsSchemaWithFST, EXISTING_STRING_COL_DICT, 9, false, 26, false);
     // Check forward index.
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, false,
-        false, false, 0, true, 0,
-        ChunkCompressionType.ZSTANDARD, false, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, DataType.STRING, true, approxCardinalityStr,
+        false, false, 4, 100000, 0, false, ChunkCompressionType.ZSTANDARD, false);
 
     // Test5: Change compressionType for an MV column
     _fieldConfigMap.put(EXISTING_INT_COL_RAW_MV,
         new FieldConfig(EXISTING_INT_COL_RAW_MV, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.ZSTANDARD,
             null));
     // Since dictionary is disabled, the cardinality will be approximate cardinality.
-    checkForwardIndexCreation(EXISTING_INT_COL_RAW_MV, approximateCardinality, 15, _schema, false, false, false, 0,
-        ChunkCompressionType.ZSTANDARD, false, 13, DataType.INT, 106688);
+    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW_MV, DataType.INT, false, approximateCardinality, false,
+        false, 4, 106688, 13, false, ChunkCompressionType.ZSTANDARD);
   }
 
-  /**
-   * Test to check for default column handling and text index creation during
-   * segment load after a new dictionary encoded column is added to the schema
-   * with text index creation enabled.
-   * This will exercise both code paths in SegmentPreprocessor (segment load):
-   * (1) Default column handler to add forward index and dictionary
-   * (2) Text index handler to add text index
-   */
+  /// Test to check for default column handling and text index creation during
+  /// segment load after a new dictionary encoded column is added to the schema
+  /// with text index creation enabled.
+  /// This will exercise both code paths in SegmentPreprocessor (segment load):
+  /// (1) Default column handler to add forward index and dictionary
+  /// (2) Text index handler to add text index
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnNewColumnDictEncoded(SegmentVersion segmentVersion)
       throws Exception {
@@ -714,16 +874,14 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(NEWLY_ADDED_STRING_MV_COL_DICT,
         new FieldConfig(NEWLY_ADDED_STRING_MV_COL_DICT, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.TEXT), null, null));
-    checkTextIndexCreation(NEWLY_ADDED_STRING_COL_DICT, 1, 1, _newColumnsSchemaWithText, true, true, true, 4);
-    validateIndex(StandardIndexes.text(), NEWLY_ADDED_STRING_MV_COL_DICT, 1, 1, true, true, false, 4, false, 1, null,
-        false, DataType.STRING, 100000);
+    checkTextIndexCreation(_newColumnsSchemaWithText, NEWLY_ADDED_STRING_COL_DICT, 1, true, true, 4, true);
+    validateIndex(StandardIndexes.text(), NEWLY_ADDED_STRING_MV_COL_DICT, DataType.STRING, false, 1, true, false, 4,
+        100000, 1, true, null, false);
   }
 
-  /**
-   * Test to check text index creation during segment load after text index
-   * creation is enabled on an existing raw column.
-   * This will exercise the SegmentPreprocessor code path during segment load
-   */
+  /// Test to check text index creation during segment load after text index
+  /// creation is enabled on an existing raw column.
+  /// This will exercise the SegmentPreprocessor code path during segment load
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnExistingRawColumn(SegmentVersion segmentVersion)
       throws Exception {
@@ -732,15 +890,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_RAW,
         new FieldConfig(EXISTING_STRING_COL_RAW, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.TEXT),
             null, null));
-    checkTextIndexCreation(EXISTING_STRING_COL_RAW, approxCardinalityStr, 3, _schema, false,
-        false, false, 0);
+    checkTextIndexCreation(_schema, EXISTING_STRING_COL_RAW, approxCardinalityStr, false, false, 4, false);
   }
 
-  /**
-   * Test to check text index creation during segment load after text index
-   * creation is enabled on an existing dictionary encoded column.
-   * This will exercise the SegmentPreprocessor code path during segment load
-   */
+  /// Test to check text index creation during segment load after text index
+  /// creation is enabled on an existing dictionary encoded column.
+  /// This will exercise the SegmentPreprocessor code path during segment load
   @Test(dataProvider = "bothV1AndV3")
   public void testEnableTextIndexOnExistingDictEncodedColumn(SegmentVersion segmentVersion)
       throws Exception {
@@ -748,69 +903,69 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(EXISTING_STRING_COL_DICT,
         new FieldConfig(EXISTING_STRING_COL_DICT, FieldConfig.EncodingType.DICTIONARY,
             List.of(FieldConfig.IndexType.TEXT), null, null));
-    checkTextIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _schema, false, true, false, 26);
+    checkTextIndexCreation(_schema, EXISTING_STRING_COL_DICT, 9, true, false, 26, false);
   }
 
-  private void checkFSTIndexCreation(String column, int cardinality, int bits, Schema schema, boolean isAutoGenerated,
-      boolean isSorted, int dictionaryElementSize)
+  private void checkFSTIndexCreation(Schema schema, String column, int cardinality, boolean isSorted,
+      int lengthOfLongestElement, boolean isAutoGenerated)
       throws Exception {
-    createAndValidateIndex(StandardIndexes.fst(), column, cardinality, bits, schema, isAutoGenerated, true, isSorted,
-        dictionaryElementSize, true, 0, null, false, DataType.STRING, 100000);
+    createAndValidateIndex(schema, StandardIndexes.fst(), column, DataType.STRING, true, cardinality, true, isSorted,
+        lengthOfLongestElement, 100000, 0, isAutoGenerated, null, false);
   }
 
-  private void checkTextIndexCreation(String column, int cardinality, int bits, Schema schema, boolean isAutoGenerated,
-      boolean hasDictionary, boolean isSorted, int dictionaryElementSize)
+  private void checkTextIndexCreation(Schema schema, String column, int cardinality, boolean hasDictionary,
+      boolean isSorted, int lengthOfLongestElement, boolean isAutoGenerated)
       throws Exception {
-    createAndValidateIndex(StandardIndexes.text(), column, cardinality, bits, schema, isAutoGenerated, hasDictionary,
-        isSorted, dictionaryElementSize, true, 0, null, false, DataType.STRING, 100000);
+    checkTextIndexCreation(schema, column, true, cardinality, hasDictionary, isSorted, lengthOfLongestElement, 0,
+        isAutoGenerated);
   }
 
-  private void checkTextIndexCreation(String column, int cardinality, int bits, Schema schema, boolean isAutoGenerated,
-      boolean hasDictionary, boolean isSorted, int dictionaryElementSize, boolean isSingleValue,
-      int maxNumberOfMultiValues)
+  private void checkTextIndexCreation(Schema schema, String column, boolean isSingleValue, int cardinality,
+      boolean hasDictionary, boolean isSorted, int lengthOfLongestElement, int maxNumberOfMultiValues,
+      boolean isAutoGenerated)
       throws Exception {
-    createAndValidateIndex(StandardIndexes.text(), column, cardinality, bits, schema, isAutoGenerated, hasDictionary,
-        isSorted, dictionaryElementSize, isSingleValue, maxNumberOfMultiValues, null, false, DataType.STRING, 100000);
+    createAndValidateIndex(schema, StandardIndexes.text(), column, DataType.STRING, isSingleValue, cardinality,
+        hasDictionary, isSorted, lengthOfLongestElement, 100000, maxNumberOfMultiValues, isAutoGenerated, null, false);
   }
 
-  private void checkForwardIndexCreation(String column, int cardinality, int bits, Schema schema,
-      boolean isAutoGenerated, boolean hasDictionary, boolean isSorted, int dictionaryElementSize,
-      ChunkCompressionType expectedCompressionType, boolean isSingleValue, int maxNumberOfMultiValues,
-      DataType dataType, int totalNumberOfEntries)
+  private void checkForwardIndexCreation(Schema schema, String column, DataType dataType, boolean isSingleValue,
+      int cardinality, boolean hasDictionary, boolean isSorted, int lengthOfLongestElement, int totalNumberOfEntries,
+      int maxNumberOfMultiValues, boolean isAutoGenerated, @Nullable ChunkCompressionType expectedCompressionType)
       throws Exception {
-    createAndValidateIndex(StandardIndexes.forward(), column, cardinality, bits, schema, isAutoGenerated, hasDictionary,
-        isSorted, dictionaryElementSize, isSingleValue, maxNumberOfMultiValues, expectedCompressionType, false,
-        dataType, totalNumberOfEntries);
+    createAndValidateIndex(schema, StandardIndexes.forward(), column, dataType, isSingleValue, cardinality,
+        hasDictionary, isSorted, lengthOfLongestElement, totalNumberOfEntries, maxNumberOfMultiValues, isAutoGenerated,
+        expectedCompressionType, false);
   }
 
-  private void createAndValidateIndex(IndexType<?, ?, ?> indexType, String column, int cardinality, int bits,
-      Schema schema, boolean isAutoGenerated, boolean hasDictionary, boolean isSorted, int dictionaryElementSize,
-      boolean isSingleValued, int maxNumberOfMultiValues, ChunkCompressionType expectedCompressionType,
-      boolean forwardIndexDisabled, DataType dataType, int totalNumberOfEntries)
+  private void createAndValidateIndex(Schema schema, IndexType<?, ?, ?> indexType, String column, DataType dataType,
+      boolean isSingleValue, int cardinality, boolean hasDictionary, boolean isSorted, int lengthOfLongestElement,
+      int totalNumberOfEntries, int maxNumberOfMultiValues, boolean isAutoGenerated,
+      @Nullable ChunkCompressionType expectedCompressionType, boolean forwardIndexDisabled)
       throws Exception {
     runPreProcessor(schema);
-    validateIndex(indexType, column, cardinality, bits, isAutoGenerated, hasDictionary, isSorted, dictionaryElementSize,
-        isSingleValued, maxNumberOfMultiValues, expectedCompressionType, forwardIndexDisabled, dataType,
-        totalNumberOfEntries);
+    validateIndex(indexType, column, dataType, isSingleValue, cardinality, hasDictionary, isSorted,
+        lengthOfLongestElement, totalNumberOfEntries, maxNumberOfMultiValues, isAutoGenerated, expectedCompressionType,
+        forwardIndexDisabled);
   }
 
-  private void validateIndex(IndexType<?, ?, ?> indexType, String column, int cardinality, int bits,
-      boolean isAutoGenerated, boolean hasDictionary, boolean isSorted, int dictionaryElementSize,
-      boolean isSingleValued, int maxNumberOfMultiValues, ChunkCompressionType expectedCompressionType,
-      boolean forwardIndexDisabled, DataType dataType, int totalNumberOfEntries)
+  private void validateIndex(IndexType<?, ?, ?> indexType, String column, DataType dataType, boolean isSingleValue,
+      int cardinality, boolean hasDictionary, boolean isSorted, int lengthOfLongestElement, int totalNumberOfEntries,
+      int maxNumberOfMultiValues, boolean isAutoGenerated, @Nullable ChunkCompressionType expectedCompressionType,
+      boolean forwardIndexDisabled)
       throws Exception {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-    assertEquals(columnMetadata.hasDictionary(), hasDictionary);
-    assertEquals(columnMetadata.getFieldSpec(),
-        new DimensionFieldSpec(column, dataType, isSingleValued, columnMetadata.getFieldSpec().getMaxLength(), null));
-    assertEquals(columnMetadata.getCardinality(), cardinality);
+    assertEquals(columnMetadata.getDataType(), dataType);
+    assertEquals(columnMetadata.isSingleValue(), isSingleValue);
     assertEquals(columnMetadata.getTotalDocs(), 100000);
-    assertEquals(columnMetadata.getBitsPerElement(), bits);
-    assertEquals(columnMetadata.getColumnMaxLength(), dictionaryElementSize);
+    assertEquals(columnMetadata.getCardinality(), cardinality);
+    assertEquals(columnMetadata.hasDictionary(), hasDictionary);
     assertEquals(columnMetadata.isSorted(), isSorted);
-    assertEquals(columnMetadata.getMaxNumberOfMultiValues(), maxNumberOfMultiValues);
+    assertEquals(columnMetadata.getLengthOfLongestElement(), lengthOfLongestElement);
     assertEquals(columnMetadata.getTotalNumberOfEntries(), totalNumberOfEntries);
+    assertEquals(columnMetadata.getMaxNumberOfMultiValues(), maxNumberOfMultiValues);
+    assertEquals(columnMetadata.getBitsPerElement(),
+        hasDictionary ? PinotDataBitSet.getNumBitsPerValue(cardinality - 1) : ColumnMetadata.UNAVAILABLE);
     assertEquals(columnMetadata.isAutoGenerated(), isAutoGenerated);
 
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
@@ -837,9 +992,10 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       if (expectedCompressionType != null) {
         assertFalse(hasDictionary);
         IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-        FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
-            .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
-            .build();
+        FieldIndexConfigs fieldIndexConfigs =
+            new FieldIndexConfigs.Builder()
+                .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault(columnMetadata.getForwardIndexEncoding()))
+                .build();
         try (ForwardIndexReader fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
             columnMetadata)) {
           ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();
@@ -850,7 +1006,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         assertFalse(inProgressFile.exists());
 
         String fwdIndexFileExtension;
-        if (isSingleValued) {
+        if (isSingleValue) {
           fwdIndexFileExtension = V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
         } else {
           fwdIndexFileExtension = V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
@@ -873,7 +1029,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
   }
 
-  private void validateIndexDoesNotExist(String column, IndexType<?, ?, ?> indexType)
+  private void validateIndexDoesNotExist(IndexType<?, ?, ?> indexType, String column)
       throws Exception {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
@@ -881,7 +1037,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
   }
 
-  private void validateIndexExists(String column, IndexType<?, ?, ?> indexType)
+  private void validateIndexExists(IndexType<?, ?, ?> indexType, String column)
       throws Exception {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
@@ -976,7 +1132,15 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // Create inverted index the second time.
     checkInvertedIndexCreation(true);
-    assertEquals(Files.getLastModifiedTime(singleFileIndex.toPath()), newLastModifiedTime);
+    // The second (no-op) creation must not rewrite the file. Assert the mtime did not advance
+    // meaningfully rather than requiring exact equality: the 2s sleeps above guarantee a real
+    // rewrite would move the mtime by ~2000ms, whereas an untouched file can still report a
+    // sub-millisecond-to-millisecond delta between two getLastModifiedTime reads (filesystem
+    // timestamp granularity / metadata flush), which made exact equality flaky under CPU load.
+    long mtimeDeltaMs =
+        Files.getLastModifiedTime(singleFileIndex.toPath()).toMillis() - newLastModifiedTime.toMillis();
+    assertTrue(Math.abs(mtimeDeltaMs) < 1000,
+        "columns.psf was rewritten by the no-op index recreation (mtime moved " + mtimeDeltaMs + " ms)");
     assertEquals(singleFileIndex.length(), newFileSize);
   }
 
@@ -1042,20 +1206,56 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertNull(segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME));
 
     ColumnMetadata hllMetricMetadata = segmentMetadata.getColumnMetadataFor(NEW_HLL_BYTE_METRIC_COLUMN_NAME);
-    FieldSpec expectedHllMetricFieldSpec = _newColumnsSchema3.getFieldSpecFor(NEW_HLL_BYTE_METRIC_COLUMN_NAME);
-    expectedHllMetricFieldSpec.setMaxLength(hllMetricMetadata.getFieldSpec().getMaxLength());
-    assertEquals(hllMetricMetadata.getFieldSpec(), expectedHllMetricFieldSpec);
-    ByteArray expectedDefaultValue = new ByteArray((byte[]) expectedHllMetricFieldSpec.getDefaultNullValue());
+    FieldSpec hllMetricFieldSpec = hllMetricMetadata.getFieldSpec();
+    assertEquals(hllMetricFieldSpec, _newColumnsSchema3.getFieldSpecFor(NEW_HLL_BYTE_METRIC_COLUMN_NAME));
+    ByteArray expectedDefaultValue = new ByteArray((byte[]) hllMetricFieldSpec.getDefaultNullValue());
     assertEquals(hllMetricMetadata.getMinValue(), expectedDefaultValue);
     assertEquals(hllMetricMetadata.getMaxValue(), expectedDefaultValue);
 
     ColumnMetadata tDigestMetricMetadata = segmentMetadata.getColumnMetadataFor(NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME);
-    FieldSpec expectedTDigestMetricFieldSpec = _newColumnsSchema3.getFieldSpecFor(NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME);
-    expectedTDigestMetricFieldSpec.setMaxLength(tDigestMetricMetadata.getFieldSpec().getMaxLength());
-    assertEquals(tDigestMetricMetadata.getFieldSpec(), expectedTDigestMetricFieldSpec);
-    expectedDefaultValue = new ByteArray((byte[]) expectedTDigestMetricFieldSpec.getDefaultNullValue());
+    FieldSpec tDigestMetricFieldSpec = tDigestMetricMetadata.getFieldSpec();
+    assertEquals(tDigestMetricFieldSpec, _newColumnsSchema3.getFieldSpecFor(NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME));
+    expectedDefaultValue = new ByteArray((byte[]) tDigestMetricFieldSpec.getDefaultNullValue());
     assertEquals(tDigestMetricMetadata.getMinValue(), expectedDefaultValue);
     assertEquals(tDigestMetricMetadata.getMaxValue(), expectedDefaultValue);
+  }
+
+  @Test(dataProvider = "bothV1AndV3")
+  public void testCompressionStatsForDefaultAndDerivedColumns(SegmentVersion segmentVersion)
+      throws Exception {
+    _compressionStatsEnabled = true;
+    buildSegment(segmentVersion);
+
+    _noDictionaryColumns.add(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
+            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata defaultInt = segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME);
+    assertTrue(defaultInt.hasDictionary());
+    assertEquals(defaultInt.getDictionaryEncodedUncompressedValueSizeInBytes(), 100000L * Integer.BYTES,
+        "Default fixed-width columns should report one raw value per row");
+    assertEquals(defaultInt.getRawForwardIndexUncompressedValueSizeInBytes(), ColumnMetadata.UNAVAILABLE);
+
+    ColumnMetadata defaultStringMv = segmentMetadata.getColumnMetadataFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
+    assertTrue(defaultStringMv.hasDictionary());
+    assertEquals(defaultStringMv.getDictionaryEncodedUncompressedValueSizeInBytes(), 100000L * "null".length(),
+        "Default MV columns should report the raw bytes for their single default entry per row");
+
+    ColumnMetadata derivedInt = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    assertTrue(derivedInt.hasDictionary());
+    assertEquals(derivedInt.getDictionaryEncodedUncompressedValueSizeInBytes(), 100000L * Integer.BYTES,
+        "Dictionary-encoded derived columns should persist uncompressed value bytes");
+
+    ColumnMetadata derivedRawString =
+        segmentMetadata.getColumnMetadataFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    assertFalse(derivedRawString.hasDictionary());
+    assertEquals(derivedRawString.getRawForwardIndexChunkCompressionType(), ChunkCompressionType.LZ4);
+    assertTrue(derivedRawString.getRawForwardIndexUncompressedValueSizeInBytes() > 0,
+        "Raw derived columns should persist their exact writer input size");
+    assertEquals(derivedRawString.getDictionaryEncodedUncompressedValueSizeInBytes(), ColumnMetadata.UNAVAILABLE);
   }
 
   private void checkUpdateDefaultColumns()
@@ -1068,17 +1268,19 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Check all field for one column, and do necessary checks for other columns.
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME);
     assertEquals(columnMetadata.getFieldSpec(), _newColumnsSchema1.getFieldSpecFor(NEW_INT_METRIC_COLUMN_NAME));
-    assertEquals(columnMetadata.getCardinality(), 1);
     assertEquals(columnMetadata.getTotalDocs(), 100000);
-    assertEquals(columnMetadata.getBitsPerElement(), 1);
-    assertEquals(columnMetadata.getColumnMaxLength(), 0);
-    assertTrue(columnMetadata.isSorted());
+    assertEquals(columnMetadata.getCardinality(), 1);
     assertTrue(columnMetadata.hasDictionary());
-    assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 0);
-    assertEquals(columnMetadata.getTotalNumberOfEntries(), 100000);
-    assertTrue(columnMetadata.isAutoGenerated());
+    assertTrue(columnMetadata.isSorted());
     assertEquals(columnMetadata.getMinValue(), 1);
     assertEquals(columnMetadata.getMaxValue(), 1);
+    assertEquals(columnMetadata.getLengthOfShortestElement(), 4);
+    assertEquals(columnMetadata.getLengthOfLongestElement(), 4);
+    assertFalse(columnMetadata.isAscii());
+    assertEquals(columnMetadata.getTotalNumberOfEntries(), 100000);
+    assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 0);
+    assertEquals(columnMetadata.getBitsPerElement(), 1);
+    assertTrue(columnMetadata.isAutoGenerated());
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_LONG_METRIC_COLUMN_NAME);
     assertEquals(columnMetadata.getFieldSpec(), _newColumnsSchema1.getFieldSpecFor(NEW_LONG_METRIC_COLUMN_NAME));
@@ -1098,56 +1300,60 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME);
     assertEquals(columnMetadata.getFieldSpec(),
         _newColumnsSchema1.getFieldSpecFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME));
-    assertEquals(columnMetadata.getColumnMaxLength(), 0);
     assertEquals(columnMetadata.getMinValue(), 0);
     assertEquals(columnMetadata.getMaxValue(), 0);
+    assertEquals(columnMetadata.getLengthOfShortestElement(), 4);
+    assertEquals(columnMetadata.getLengthOfLongestElement(), 4);
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
-    FieldSpec spec = _newColumnsSchema1.getFieldSpecFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
-    spec.setMaxLength(columnMetadata.getFieldSpec().getMaxLength());
-    assertEquals(columnMetadata.getFieldSpec(), spec);
-    assertEquals(columnMetadata.getColumnMaxLength(), 4);
+    assertEquals(columnMetadata.getFieldSpec(),
+        _newColumnsSchema1.getFieldSpecFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME));
     assertFalse(columnMetadata.isSorted());
-    assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 1);
-    assertEquals(columnMetadata.getTotalNumberOfEntries(), 100000);
     assertEquals(columnMetadata.getMinValue(), "null");
     assertEquals(columnMetadata.getMaxValue(), "null");
+    assertEquals(columnMetadata.getLengthOfShortestElement(), 4);
+    assertEquals(columnMetadata.getLengthOfLongestElement(), 4);
+    assertTrue(columnMetadata.isAscii());
+    assertEquals(columnMetadata.getTotalNumberOfEntries(), 100000);
+    assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 1);
 
     // Derived column
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
     assertEquals(columnMetadata.getFieldSpec(), _newColumnsSchema1.getFieldSpecFor(NEW_INT_SV_DIMENSION_COLUMN_NAME));
-    assertTrue(columnMetadata.isAutoGenerated());
     ColumnMetadata originalColumnMetadata = segmentMetadata.getColumnMetadataFor(COLUMN1_NAME);
     assertEquals(columnMetadata.getCardinality(), originalColumnMetadata.getCardinality());
-    assertEquals(columnMetadata.getBitsPerElement(), originalColumnMetadata.getBitsPerElement());
     assertEquals(columnMetadata.isSorted(), originalColumnMetadata.isSorted());
-    assertEquals(columnMetadata.getMinValue(), (int) originalColumnMetadata.getMinValue() + 1);
-    assertEquals(columnMetadata.getMaxValue(), (int) originalColumnMetadata.getMaxValue() + 1);
+    assertEquals(columnMetadata.getMinValue(), (Integer) originalColumnMetadata.getMinValue() + 1);
+    assertEquals(columnMetadata.getMaxValue(), (Integer) originalColumnMetadata.getMaxValue() + 1);
+    assertEquals(columnMetadata.getBitsPerElement(), originalColumnMetadata.getBitsPerElement());
+    assertTrue(columnMetadata.isAutoGenerated());
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
-    spec = _newColumnsSchema1.getFieldSpecFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
-    spec.setMaxLength(columnMetadata.getFieldSpec().getMaxLength());
-    assertEquals(columnMetadata.getFieldSpec(), spec);
-    assertTrue(columnMetadata.isAutoGenerated());
+    assertEquals(columnMetadata.getFieldSpec(),
+        _newColumnsSchema1.getFieldSpecFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME));
     originalColumnMetadata = segmentMetadata.getColumnMetadataFor("column3");
     // exact cardinality for small-N via NoDictColumnStatisticsCollector
     assertEquals(columnMetadata.getCardinality(), 5);
-    assertEquals(columnMetadata.getBitsPerElement(), originalColumnMetadata.getBitsPerElement());
     assertEquals(columnMetadata.getTotalNumberOfEntries(), originalColumnMetadata.getTotalNumberOfEntries());
+    assertEquals(columnMetadata.getBitsPerElement(), ColumnMetadata.UNAVAILABLE);
+    assertTrue(columnMetadata.isAutoGenerated());
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_NULL_RETURN_STRING_SV_DIMENSION_COLUMN_NAME);
     // All the values should be the default null value
     assertEquals(columnMetadata.getCardinality(), 1);
-    assertTrue(columnMetadata.isAutoGenerated());
     assertEquals(columnMetadata.getMinValue(), "nil");
     assertEquals(columnMetadata.getMaxValue(), "nil");
+    assertEquals(columnMetadata.getLengthOfShortestElement(), 3);
+    assertEquals(columnMetadata.getLengthOfLongestElement(), 3);
+    assertTrue(columnMetadata.isAscii());
+    assertTrue(columnMetadata.isAutoGenerated());
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_WRONG_ARG_DATE_TRUNC_DERIVED_COLUMN_NAME);
     // All the values should be the default null value
     assertEquals(columnMetadata.getCardinality(), 1);
-    assertTrue(columnMetadata.isAutoGenerated());
     assertEquals(columnMetadata.getMinValue(), Long.MIN_VALUE);
     assertEquals(columnMetadata.getMaxValue(), Long.MIN_VALUE);
+    assertTrue(columnMetadata.isAutoGenerated());
 
     // Check dictionary and forward index exist.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
@@ -1195,14 +1401,14 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
     // Check column metadata.
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME);
+    assertEquals(columnMetadata.getFieldSpec().getDefaultNullValue(), 2);
     assertEquals(columnMetadata.getMinValue(), 2);
     assertEquals(columnMetadata.getMaxValue(), 2);
-    assertEquals(columnMetadata.getFieldSpec().getDefaultNullValue(), 2);
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
+    assertEquals(columnMetadata.getFieldSpec().getDefaultNullValue(), "abcd");
     assertEquals(columnMetadata.getMinValue(), "abcd");
     assertEquals(columnMetadata.getMaxValue(), "abcd");
-    assertEquals(columnMetadata.getFieldSpec().getDefaultNullValue(), "abcd");
   }
 
   @Test(dataProvider = "bothV1AndV3")
@@ -1342,6 +1548,72 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   }
 
   @Test
+  public void testV1ReplaceLegacyNativeFstIndex()
+      throws Exception {
+    buildV1Segment();
+
+    String strColumn = "column3";
+    _fieldConfigMap.put(strColumn,
+        new FieldConfig(strColumn, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
+            null));
+
+    File fstFile = new File(INDEX_DIR, strColumn + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
+
+    runPreProcessor();
+    assertTrue(fstFile.exists());
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "rw")) {
+      randomAccessFile.seek(0);
+      // Write the legacy native FST magic header: '\fsa'
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      randomAccessFile.writeInt(nativeFstMagic);
+    }
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      assertEquals(randomAccessFile.readInt(), nativeFstMagic);
+    }
+
+    runPreProcessor();
+
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(fstFile, "r")) {
+      int nativeFstMagic = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
+      assertNotEquals(randomAccessFile.readInt(), nativeFstMagic);
+    }
+  }
+
+  @Test
+  public void testV3ReplaceLegacyNativeTextIndex()
+      throws Exception {
+    buildV3Segment();
+
+    String strColumn = "column3";
+    _fieldConfigMap.put(strColumn,
+        new FieldConfig(strColumn, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT), null,
+            Map.of("storeInSegmentFile", "false")));
+
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(INDEX_DIR, SegmentVersion.v3);
+    File nativeTextFile =
+        new File(segmentDirectory, strColumn + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION);
+    File luceneTextFile =
+        new File(segmentDirectory, strColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+    File staleLuceneFile = new File(luceneTextFile, "leftover.tmp");
+
+    runPreProcessor();
+    assertTrue(luceneTextFile.exists());
+
+    Files.writeString(staleLuceneFile.toPath(), "stale");
+    Files.writeString(nativeTextFile.toPath(), "legacy native text");
+    assertTrue(nativeTextFile.exists());
+
+    runPreProcessor();
+
+    assertFalse(nativeTextFile.exists());
+    assertFalse(staleLuceneFile.exists());
+    assertTrue(luceneTextFile.exists());
+  }
+
+  @Test
   public void testV3CleanupIndices()
       throws Exception {
     buildV3Segment();
@@ -1451,6 +1723,59 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertEquals(singleFileIndex.length(), initFileSize);
   }
 
+  /// Regression test for the H3 index builder crashing a segment on empty/default geometry values,
+  /// covering both the dictionary and the raw reload paths across v1/v3 segments.
+  ///
+  /// When a geo column is added to the schema after a segment was built, old segments have no source
+  /// data to derive it from, so the derived BYTES column is filled with its default null value -- the
+  /// empty byte array. Building an H3 index over those rows used to call
+  /// [org.apache.pinot.segment.local.utils.GeometrySerializer#deserialize(byte\[\])] directly on the
+  /// empty bytes, throwing a `BufferUnderflowException` that propagated out of the reload and parked
+  /// the segment in an ERROR state. The handler now routes through the creator's tolerant path, which
+  /// fast-paths the empty default value and skips undeserializable values when `continueOnError` is
+  /// enabled (set by [#resetIndexConfigs()]), exactly like the segment-creation path.
+  ///
+  /// The `DICTIONARY` case is the empty-default column itself (auto-generated columns are always
+  /// dictionary-encoded, so their `cardinality == 1` value cannot be stored raw). The `RAW` case
+  /// derives a non-dictionary BYTES column holding values that are not decodable as geometry, so the
+  /// raw `forwardIndexReader.getBytes(...)` path is exercised and its values are tolerated (skipped)
+  /// the same way empty defaults are.
+  @Test(dataProvider = "h3VersionAndEncoding")
+  public void testH3IndexCreationOnEmptyDefaultValue(SegmentVersion segmentVersion,
+      FieldConfig.EncodingType encodingType)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    boolean rawEncoding = encodingType == FieldConfig.EncodingType.RAW;
+    if (rawEncoding) {
+      // Auto-generated empty-default columns are always dictionary-encoded, so to exercise the raw reload path
+      // derive newH3Col from an existing column as raw BYTES. The values are not valid serialized geometry, so the
+      // handler must skip them (like empty defaults) rather than fail.
+      _noDictionaryColumns.add("newH3Col");
+      _ingestionConfig.setTransformConfigs(List.of(new TransformConfig("newH3Col", "toUtf8(column3)")));
+    }
+
+    // Add newH3Col. For DICTIONARY it is a pure default column whose default null value is the empty byte array (no
+    // explicit defaultNullValue in the schema), mirroring old segments reloaded after a geo column was added.
+    runPreProcessor(_newColumnsSchemaWithH3EmptyDefault);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata newH3ColMetadata = segmentMetadata.getColumnMetadataFor("newH3Col");
+    assertNotNull(newH3ColMetadata);
+    assertEquals(newH3ColMetadata.hasDictionary(), !rawEncoding);
+
+    // Build the H3 index over the values. This must not throw and must produce the index.
+    _fieldConfigMap.put("newH3Col",
+        new FieldConfig("newH3Col", encodingType, List.of(FieldConfig.IndexType.H3), null,
+            Map.of("resolutions", "5")));
+    runPreProcessor(_newColumnsSchemaWithH3EmptyDefault);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      assertTrue(reader.hasIndexFor("newH3Col", StandardIndexes.h3()));
+      assertEquals(reader.hasIndexFor("newH3Col", StandardIndexes.dictionary()), !rawEncoding);
+    }
+  }
+
   @Test(dataProvider = "bothV1AndV3") @io.tesseracta.annotation.TesseractaDisabledTest
   public void testIfNeedProcess(SegmentVersion segmentVersion)
       throws Exception {
@@ -1459,8 +1784,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Require to add some default columns with new schema.
     verifyProcessNeeded();
 
-    // No preprocessing needed if required to add certain index on non-existing or sorted column.
-    // Note: Inverted indexes on raw columns are now supported and will require processing.
+    // No preprocessing needed if required to add certain index on non-existing, sorted or raw column.
     // Add inverted index to sorted column
     _invertedIndexColumns.add("daysSinceEpoch");
     verifyProcessNotNeeded();
@@ -1469,6 +1793,22 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _rangeIndexColumns.add("daysSinceEpoch");
     verifyProcessNotNeeded();
     _rangeIndexColumns.remove("daysSinceEpoch");
+    // Add inverted index to raw column. On v3 segments the inverted index requires a dictionary, so the
+    // auto-create-dictionary path now triggers ENABLE_DICTIONARY (and InvertedIndexHandler then builds the
+    // inverted index against it). v1 segments still skip ForwardIndexHandler entirely, so the result is a
+    // no-op there. Pre-PR behavior on v3 was the same silent no-op as v1, leaving the inverted-index request
+    // orphaned. Removing inverted on v3 then triggers DISABLE_DICTIONARY to put the column back to its
+    // original raw-no-dict state so the rest of this test's "no processing needed" assertions hold.
+    _invertedIndexColumns.add(EXISTING_STRING_COL_RAW);
+    if (segmentVersion == SegmentVersion.v3) {
+      verifyProcessNeeded();
+    } else {
+      verifyProcessNotNeeded();
+    }
+    _invertedIndexColumns.remove(EXISTING_STRING_COL_RAW);
+    if (segmentVersion == SegmentVersion.v3) {
+      verifyProcessNeeded();
+    }
     // Add inverted index to non-existing column
     _invertedIndexColumns.add("newColumnX");
     verifyProcessNotNeeded();
@@ -1634,7 +1974,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testNeedAddMinMaxValueOnLongString()
       throws Exception {
-    String longString = RandomStringUtils.randomAlphanumeric(1000);
+    String longString = RandomStringUtils.secure().nextAlphanumeric(1000);
     String[] stringValuesValid = {"B", "C", "D", "E", longString};
     long[] longValues = {1588316400000L, 1588489200000L, 1588662000000L, 1588834800000L, 1589007600000L};
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
@@ -1724,6 +2064,330 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
   }
 
+  /// A star-tree dimension column that is moved to 'noDictionaryColumns' without the star-tree being rebuilt leaves
+  /// the star-tree unreadable: its dimension forward index stores dictionary ids in a fixed-bit encoding whose width
+  /// is read from the main column metadata, which is now raw. The stale star-tree must be dropped so the segment
+  /// stays loadable, even when dynamic star-tree creation is disabled.
+  @Test
+  public void testStarTreeDimensionConvertedToNoDictionary()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    // Drift the config: the star-tree dimension is moved to noDictionaryColumns and the star-tree config is dropped,
+    // while dynamic star-tree creation stays disabled.
+    indexingConfig.setNoDictionaryColumns(List.of("stringCol"));
+    indexingConfig.setStarTreeIndexConfigs(null);
+    indexingConfig.setEnableDynamicStarTreeCreation(false);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+    assertSegmentLoadsWithoutStarTree(indexLoadingConfig);
+
+    // The stale star-tree is gone, so there is nothing left to process
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertFalse(processor.needProcess());
+    }
+  }
+
+  /// Same drift as [#testStarTreeDimensionConvertedToNoDictionary()], but the dict-to-raw conversion has already been
+  /// persisted by an earlier pre-processing round, so the segment on disk is already inconsistent and nothing else
+  /// needs updating. Pre-processing must still detect and repair it.
+  @Test
+  public void testStarTreeDimensionAlreadyConvertedToNoDictionary()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    // Convert the dimension column to raw while leaving the star-tree in place, reproducing the state an earlier
+    // pre-processing round leaves behind.
+    indexingConfig.setNoDictionaryColumns(List.of("stringCol"));
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      new ForwardIndexHandler(segmentDirectory, indexLoadingConfig).updateIndices(segmentDirectory.createWriter());
+    }
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertFalse(segmentDirectory.getSegmentMetadata().getColumnMetadataFor("stringCol").hasDictionary());
+      assertNotNull(segmentDirectory.getSegmentMetadata().getStarTreeV2MetadataList());
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+    assertSegmentLoadsWithoutStarTree(indexLoadingConfig);
+  }
+
+  /// The loader must not fail the whole segment over a stale star-tree even when pre-processing never gets a chance to
+  /// repair it, e.g. because it is skipped for the table.
+  @Test
+  public void testStarTreeDimensionConvertedToNoDictionaryWithoutPreprocess()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    indexingConfig.setNoDictionaryColumns(List.of("stringCol"));
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      new ForwardIndexHandler(segmentDirectory, indexLoadingConfig).updateIndices(segmentDirectory.createWriter());
+    }
+
+    // Pre-processing would repair the segment, so it has to be off for the loader to ever see the stale star-tree.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertTrue(ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig));
+    }
+
+    // 'skipSegmentPreprocess' is the knob that turns it off, and it takes effect through
+    // ImmutableSegmentLoader#needPreprocess, not SegmentPreProcessor#needProcess. IndexLoadingConfig snapshots it,
+    // so it needs a fresh config rather than an in-place edit of the table config.
+    indexingConfig.setSkipSegmentPreprocess(true);
+    IndexLoadingConfig skipPreprocessLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, skipPreprocessLoadingConfig));
+    }
+
+    // Ask the loader to pre-process, as the server does: it gates on needPreprocess() itself, so the flag keeps the
+    // stale star-tree in place and the star-tree loader has to cope with it rather than fail the load.
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, skipPreprocessLoadingConfig, true);
+    try {
+      assertEquals(segment.getSegmentMetadata().getTotalDocs(), 5);
+      // The stale star-tree is still on disk; it is skipped at load time, not removed
+      assertNotNull(segment.getSegmentMetadata().getStarTreeV2MetadataList());
+      List<StarTreeV2> starTrees = segment.getStarTrees();
+      assertNotNull(starTrees);
+      assertTrue(starTrees.isEmpty());
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  /// With dynamic star-tree creation enabled, the stale star-tree is not just dropped but rebuilt from the current
+  /// config, which no longer splits on the re-encoded column.
+  @Test
+  public void testStarTreeDimensionConvertedToNoDictionaryWithDynamicCreation()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addSingleValueDimension("intCol", DataType.INT)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol", "intCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    // 'stringCol' becomes raw and drops out of the split order, and the star-tree is rebuilt on 'intCol' alone
+    indexingConfig.setNoDictionaryColumns(List.of("stringCol"));
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("intCol"), null, List.of("SUM__longCol"), null, 1000)));
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    try {
+      List<StarTreeV2> starTrees = segment.getStarTrees();
+      assertNotNull(starTrees);
+      assertEquals(starTrees.size(), 1);
+      assertEquals(starTrees.get(0).getMetadata().getDimensionsSplitOrder(), List.of("intCol"));
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  /// Apache Pinot PR #19153 added star-tree support for dimensions stored as a `RAW` forward index with a separated
+  /// dictionary. Such a column still has a dictionary, so its star-tree stays readable and must NOT be treated as
+  /// stale: pre-processing has to flip the forward index to raw, keep the dictionary, and leave the star-tree alone.
+  @Test
+  public void testStarTreeDimensionConvertedToRawWithSeparatedDictionary()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", DataType.STRING)
+        .addMetric("longCol", DataType.LONG)
+        .build();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    indexingConfig.setStarTreeIndexConfigs(
+        List.of(new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000)));
+    buildStarTreeTestSegment(tableConfig, schema);
+
+    // Keep the star-tree config, but store the dimension as RAW forward index with the dictionary kept alongside
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    ObjectNode forwardConfig = JsonUtils.newObjectNode();
+    forwardConfig.put("encodingType", "RAW");
+    indexes.set("forward", forwardConfig);
+    ObjectNode dictionaryConfig = JsonUtils.newObjectNode();
+    dictionaryConfig.put("disabled", false);
+    indexes.set("dictionary", dictionaryConfig);
+    tableConfig.setFieldConfigList(List.of(
+        new FieldConfig.Builder("stringCol").withEncodingType(FieldConfig.EncodingType.RAW)
+            .withIndexes(indexes)
+            .build()));
+    indexingConfig.setEnableDynamicStarTreeCreation(false);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      // The forward index still has to be flipped to RAW, so there is work to do
+      assertTrue(processor.needProcess());
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor("stringCol");
+      assertEquals(columnMetadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
+      assertTrue(columnMetadata.hasDictionary());
+      // The star-tree is still loadable, so it must be left in place
+      assertNotNull(segmentMetadata.getStarTreeV2MetadataList());
+      assertTrue(StarTreeBuilderUtils.findUnloadableDimensions(segmentMetadata.getStarTreeV2MetadataList(),
+          segmentMetadata).isEmpty());
+    }
+
+    // Pre-processing must be idempotent here: neither the star-tree nor the forward index and dictionary handlers
+    // may ask for more work on a second round.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      assertFalse(processor.needProcess());
+    }
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    try {
+      List<StarTreeV2> starTrees = segment.getStarTrees();
+      assertNotNull(starTrees);
+      assertEquals(starTrees.size(), 1);
+      assertEquals(starTrees.get(0).getMetadata().getDimensionsSplitOrder(), List.of("stringCol"));
+      assertNotNull(segment.getDataSource("stringCol").getDictionary());
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  /// A column derived at load must see the source's nulls the way ingestion does: a null source value is a null input
+  /// to the function, not the default value stored in its place, so the derived value is null too.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testDerivedColumnFromNullableSourceKeepsNulls(SegmentVersion segmentVersion)
+      throws Exception {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addMetric("source", DataType.DOUBLE).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNullHandlingEnabled(true).build();
+    Double[] sourceValues = {1.5, null, 3.0, null, 5.0};
+    List<GenericRow> rows = new ArrayList<>(sourceValues.length);
+    for (Double value : sourceValues) {
+      GenericRow row = new GenericRow();
+      row.putValue("source", value);
+      rows.add(row);
+    }
+    FileUtils.deleteQuietly(TEMP_DIR);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.SERVER);
+    config.setOutDir(TEMP_DIR.getAbsolutePath());
+    config.setSegmentName(SEGMENT_NAME);
+    config.setSegmentVersion(segmentVersion);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    Schema derivedSchema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addMetric("source", DataType.DOUBLE)
+        .addMetric("derived", DataType.DOUBLE)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("derived", "times(source, 2)")));
+    TableConfig derivedTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(derivedTableConfig, derivedSchema);
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig)) {
+      processor.process(SEGMENT_OPERATIONS_THROTTLER);
+    }
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    try (PinotSegmentColumnReader reader = new PinotSegmentColumnReader(segment, "derived")) {
+      for (int docId = 0; docId < sourceValues.length; docId++) {
+        if (sourceValues[docId] == null) {
+          assertTrue(reader.isNull(docId), "Derived value must be null where the source is null, doc: " + docId);
+        } else {
+          assertFalse(reader.isNull(docId), "Derived value must not be null, doc: " + docId);
+          assertEquals(reader.getValue(docId), sourceValues[docId] * 2);
+        }
+      }
+    } finally {
+      segment.destroy();
+    }
+  }
+
+  private void buildStarTreeTestSegment(TableConfig tableConfig, Schema schema)
+      throws Exception {
+    FileUtils.deleteQuietly(TEMP_DIR);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.SERVER);
+    config.setOutDir(TEMP_DIR.getAbsolutePath());
+    config.setSegmentName(SEGMENT_NAME);
+
+    String[] stringValues = {"A", "C", "B", "C", "D"};
+    long[] longValues = {2, 1, 2, 3, 4};
+    List<GenericRow> rows = new ArrayList<>(stringValues.length);
+    for (int i = 0; i < stringValues.length; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue("stringCol", stringValues[i]);
+      row.putValue("intCol", i % 3);
+      row.putValue("longCol", longValues[i]);
+      rows.add(row);
+    }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertNotNull(segmentDirectory.getSegmentMetadata().getStarTreeV2MetadataList());
+    }
+  }
+
+  private void assertSegmentLoadsWithoutStarTree(IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap)) {
+      assertNull(segmentDirectory.getSegmentMetadata().getStarTreeV2MetadataList());
+    }
+    ImmutableSegment segment = ImmutableSegmentLoader.load(INDEX_DIR, indexLoadingConfig, false);
+    try {
+      assertEquals(segment.getSegmentMetadata().getTotalDocs(), 5);
+      assertTrue(segment.getStarTrees() == null || segment.getStarTrees().isEmpty());
+    } finally {
+      segment.destroy();
+    }
+  }
+
   @Test
   public void testStarTreeCreationWithInvalidFunctionColumnPair()
       throws Exception {
@@ -1751,7 +2415,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             new IndexLoadingConfig(tableConfig, schema))) {
       // Should need processing due to new star-tree config
       assertTrue(processor.needProcess());
-      // Process should complete without throwing exception, but star-tree should not be created
+      // Process logs error and skips invalid star-tree config; no exception is thrown
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
@@ -1805,7 +2469,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             new IndexLoadingConfig(tableConfig, schema))) {
       // Should need processing due to changed star-tree config
       assertTrue(processor.needProcess());
-      // Process should complete without throwing exception, but star-tree should not be updated
+      // Process logs error and skips invalid star-tree config; no exception is thrown
       processor.process(SEGMENT_OPERATIONS_THROTTLER);
     }
 
@@ -1937,6 +2601,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     FileUtils.deleteQuietly(TEMP_DIR);
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.SERVER);
     config.setOutDir(TEMP_DIR.getAbsolutePath());
     config.setSegmentName(SEGMENT_NAME);
 
@@ -1949,7 +2614,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows), InstanceType.SERVER);
+    driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
   }
 
@@ -1972,9 +2637,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     SegmentMetadataUtils.savePropertiesConfiguration(configuration, INDEX_DIR);
   }
 
-  /**
-   * Test to check the behavior of the forward index disabled feature when enabled on a new SV column
-   */
+  /// Test to check the behavior of the forward index disabled feature when enabled on a new SV column
   @Test(dataProvider = "bothV1AndV3")
   public void testForwardIndexDisabledOnNewColumnsSV(SegmentVersion segmentVersion)
       throws Exception {
@@ -1986,8 +2649,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
     // Forward index is always going to be present for default SV columns with forward index disabled. This is because
     // such default columns are going to be sorted and the forwardIndexDisabled flag is a no-op for sorted columns
-    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
-        _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, true, DataType.STRING, 100000);
+    createAndValidateIndex(_newColumnsSchemaWithForwardIndexDisabled, StandardIndexes.forward(),
+        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, DataType.STRING, true, 1, true, true, 4, 100000, 0, true, null,
+        true);
 
     // Add a new raw column with no forward index
     resetIndexConfigs();
@@ -1999,8 +2663,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Forward index is always going to be present for default SV columns with forward index disabled. This is because
     // such default columns are going to be sorted and the forwardIndexDisabled flag is a no-op for sorted columns
     // Even raw columns are created with dictionary and forward index
-    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
-        _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, true, DataType.STRING, 100000);
+    createAndValidateIndex(_newColumnsSchemaWithForwardIndexDisabled, StandardIndexes.forward(),
+        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, DataType.STRING, true, 1, true, true, 4, 100000, 0, true, null,
+        true);
 
     // Add a new column with no forward index or inverted index
     resetIndexConfigs();
@@ -2009,13 +2674,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         new FieldConfig(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
             Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
     // Disabling inverted index should be fine for disabling the forward index
-    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, 1, 1,
-        _newColumnsSchemaWithForwardIndexDisabled, true, true, true, 4, true, 0, null, true, DataType.STRING, 100000);
+    createAndValidateIndex(_newColumnsSchemaWithForwardIndexDisabled, StandardIndexes.forward(),
+        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_SV, DataType.STRING, true, 1, true, true, 4, 100000, 0, true, null,
+        true);
   }
 
-  /**
-   * Test to check the behavior of the forward index disabled feature when enabled on a new MV column
-   */
+  /// Test to check the behavior of the forward index disabled feature when enabled on a new MV column
   @Test(dataProvider = "bothV1AndV3")
   public void testForwardIndexDisabledOnNewColumnsMV(SegmentVersion segmentVersion)
       throws Exception {
@@ -2025,10 +2689,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV,
         new FieldConfig(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
             Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
-    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
-        _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, true, DataType.STRING, 100000);
-    validateIndex(StandardIndexes.inverted(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1, true, true, false, 4,
-        false, 1, null, true, DataType.STRING, 100000);
+    createAndValidateIndex(_newColumnsSchemaWithForwardIndexDisabled, StandardIndexes.forward(),
+        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, DataType.STRING, false, 1, true, false, 4, 100000, 1, true, null,
+        true);
+    validateIndex(StandardIndexes.inverted(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, DataType.STRING, false, 1,
+        true, false, 4, 100000, 1, true, null, true);
 
     // Add a new raw column with no forward index
     resetIndexConfigs();
@@ -2041,17 +2706,17 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       // For V1 segments reload doesn't support modifying the forward index yet. Since for MV columns we create a
       // dictionary in the default column handler, the forward index should indeed be disabled but we should still have
       // the dictionary.
-      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
-          _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, true, DataType.STRING,
-          100000);
-      validateIndexExists(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.dictionary());
+      createAndValidateIndex(_newColumnsSchemaWithForwardIndexDisabled, StandardIndexes.forward(),
+          NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, DataType.STRING, false, 1, true, false, 4, 100000, 1, true, null,
+          true);
+      validateIndexExists(StandardIndexes.dictionary(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
     } else {
-      createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
-          _newColumnsSchemaWithForwardIndexDisabled, true, false, false, 0, false, 1, null, true, DataType.STRING,
-          100000);
-      validateIndexDoesNotExist(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.dictionary());
+      createAndValidateIndex(_newColumnsSchemaWithForwardIndexDisabled, StandardIndexes.forward(),
+          NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, DataType.STRING, false, 1, false, false, 4, 100000, 1, true, null,
+          true);
+      validateIndexDoesNotExist(StandardIndexes.dictionary(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
     }
-    validateIndexDoesNotExist(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.inverted());
+    validateIndexDoesNotExist(StandardIndexes.inverted(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
 
     // Add a new column with no forward index or inverted index
     resetIndexConfigs();
@@ -2059,9 +2724,491 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _fieldConfigMap.put(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV,
         new FieldConfig(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
             Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
-    createAndValidateIndex(StandardIndexes.forward(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, 1, 1,
-        _newColumnsSchemaWithForwardIndexDisabled, true, true, false, 4, false, 1, null, true, DataType.STRING, 100000);
-    validateIndexDoesNotExist(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.inverted());
-    validateIndexExists(NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, StandardIndexes.dictionary());
+    createAndValidateIndex(_newColumnsSchemaWithForwardIndexDisabled, StandardIndexes.forward(),
+        NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV, DataType.STRING, false, 1, true, false, 4, 100000, 1, true, null,
+        true);
+    validateIndexDoesNotExist(StandardIndexes.inverted(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
+    validateIndexExists(StandardIndexes.dictionary(), NEWLY_ADDED_FORWARD_INDEX_DISABLED_COL_MV);
+  }
+
+  /// A derived column whose argument is another derived column added in the same reload. The transform configs are
+  /// listed dependent-first on purpose: the handler has to order them by dependency, not by config order.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testChainedDerivedColumns(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_METRIC_COLUMN_NAME, "plus(newIntSVDimension, 1)"),
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata sourceMetadata = segmentMetadata.getColumnMetadataFor(COLUMN1_NAME);
+    int sourceMin = (Integer) sourceMetadata.getMinValue();
+    int sourceMax = (Integer) sourceMetadata.getMaxValue();
+
+    ColumnMetadata firstLink = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    assertTrue(firstLink.isAutoGenerated());
+    assertEquals(firstLink.getMinValue(), sourceMin + 1);
+    assertEquals(firstLink.getMaxValue(), sourceMax + 1);
+
+    // The chained column is derived from the column above, not filled with its default value.
+    ColumnMetadata secondLink = segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME);
+    assertTrue(secondLink.isAutoGenerated());
+    assertEquals(secondLink.getMinValue(), sourceMin + 2);
+    assertEquals(secondLink.getMaxValue(), sourceMax + 2);
+    assertEquals(secondLink.getCardinality(), sourceMetadata.getCardinality());
+  }
+
+  /// A derived column whose argument is a plain default column added in the same reload. Before dependency
+  /// ordering this hit the same bug as chaining: the argument was not yet in the segment metadata, so the derived
+  /// column silently took its own default value instead of being derived.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testDerivedColumnReadingDefaultColumnAddedInSameReload(SegmentVersion segmentVersion)
+      throws Exception {
+    // With null handling on, a default column added in this reload is null on every row, and the derived column reads
+    // that null as ingestion would. Turn it off so the source holds its default value and the ordering is visible.
+    _nullHandlingEnabled = false;
+    buildSegment(segmentVersion);
+
+    // newIntMetric is NOT derived -- it is a plain new column filled with its default value (0).
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(newIntMetric, 1)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    // newIntMetric declares defaultNullValue 1 in the schema, so every row of it is 1.
+    ColumnMetadata source = segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME);
+    assertEquals(source.getMinValue(), 1);
+
+    // Derived from that value (1 + 1 = 2). Had the argument not been visible, the column would instead hold its own
+    // default null value, which for an INT dimension is Integer.MIN_VALUE.
+    ColumnMetadata derived = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    assertEquals(derived.getMinValue(), 2);
+    assertEquals(derived.getMaxValue(), 2);
+    assertTrue(derived.isAutoGenerated());
+  }
+
+  /// A column reading a cycle member must take the fallback even when that member already exists in the segment and is
+  /// only being updated. Its metadata is then present, so nothing about a missing argument would trigger the fallback,
+  /// and the new column -- ordered before the postponed cycle -- would read the member's pre-update value for good.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testDerivedColumnReadingUpdatedCycleMemberFallsBackToDefaultValue(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    // First reload: a two-column cycle, so both columns are created with their schema default values (1 and 2).
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_METRIC_COLUMN_NAME, "plus(newLongMetric, 1)"),
+            new TransformConfig(NEW_LONG_METRIC_COLUMN_NAME, "plus(newIntMetric, 1)")));
+    Schema firstSchema = new Schema();
+    firstSchema.setSchemaName(_schema.getSchemaName());
+    firstSchema.addField(new MetricFieldSpec(NEW_INT_METRIC_COLUMN_NAME, DataType.INT, 1));
+    firstSchema.addField(new MetricFieldSpec(NEW_LONG_METRIC_COLUMN_NAME, DataType.LONG, 2L));
+    runPreProcessor(firstSchema);
+    SegmentMetadataImpl firstMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(firstMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME).getMinValue(), 1);
+    assertEquals(firstMetadata.getColumnMetadataFor(NEW_LONG_METRIC_COLUMN_NAME).getMinValue(), 2L);
+
+    // Second reload: the cycle members' defaults change (an update, not an add) and a column reading one is added.
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_METRIC_COLUMN_NAME, "plus(newLongMetric, 1)"),
+            new TransformConfig(NEW_LONG_METRIC_COLUMN_NAME, "plus(newIntMetric, 1)"),
+            new TransformConfig(NEW_DOUBLE_METRIC_COLUMN_NAME, "plus(newIntMetric, 1)")));
+    Schema secondSchema = new Schema();
+    secondSchema.setSchemaName(_schema.getSchemaName());
+    secondSchema.addField(new MetricFieldSpec(NEW_INT_METRIC_COLUMN_NAME, DataType.INT, 10));
+    secondSchema.addField(new MetricFieldSpec(NEW_LONG_METRIC_COLUMN_NAME, DataType.LONG, 20L));
+    secondSchema.addField(new MetricFieldSpec(NEW_DOUBLE_METRIC_COLUMN_NAME, DataType.DOUBLE, 0.0));
+    runPreProcessor(secondSchema);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME).getMinValue(), 10);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_LONG_METRIC_COLUMN_NAME).getMinValue(), 20L);
+    // Its own default, not 1 + the cycle member's pre-update value of 1.
+    ColumnMetadata dependent = segmentMetadata.getColumnMetadataFor(NEW_DOUBLE_METRIC_COLUMN_NAME);
+    assertEquals(dependent.getCardinality(), 1);
+    assertEquals(dependent.getMinValue(), 0.0);
+  }
+
+  /// A dependency cycle cannot be satisfied in any order. Both columns must still be created, each falling back to
+  /// its default value, rather than failing the segment load.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testDerivedColumnCycleFallsBackToDefaultValue(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_METRIC_COLUMN_NAME, "plus(newIntSVDimension, 1)"),
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(newIntMetric, 1)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    for (String column : List.of(NEW_INT_METRIC_COLUMN_NAME, NEW_INT_SV_DIMENSION_COLUMN_NAME)) {
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
+      assertNotNull(columnMetadata, column + " must still be created");
+      assertEquals(columnMetadata.getCardinality(), 1, column + " must hold a single default value");
+      // Its own default value, not one derived from a sibling that was itself defaulted: whichever member of the
+      // cycle is created second can see the first through the metadata written a moment ago.
+      assertEquals(columnMetadata.getMinValue(), _newColumnsSchema1.getFieldSpecFor(column).getDefaultNullValue(),
+          column + " must hold its own default value");
+    }
+  }
+
+  /// A derived column reading a source whose forward index is disabled. The handler regenerates that forward index
+  /// from the dictionary and inverted index for the duration of the reload, then drops it again.
+  ///
+  /// v3 only: a v1 reload cannot remove a forward index, so the source never reaches the shape under test.
+  @Test
+  public void testDerivedColumnFromForwardIndexDisabledSource()
+      throws Exception {
+    buildSegment(SegmentVersion.v3);
+
+    // First reload: take the forward index away from the source column, keeping its dictionary and inverted index.
+    _invertedIndexColumns.add(COLUMN1_NAME);
+    _fieldConfigMap.put(COLUMN1_NAME,
+        new FieldConfig(COLUMN1_NAME, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
+            Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
+    runPreProcessor(_schema);
+    validateIndexDoesNotExist(StandardIndexes.forward(), COLUMN1_NAME);
+    validateIndexExists(StandardIndexes.dictionary(), COLUMN1_NAME);
+    validateIndexExists(StandardIndexes.inverted(), COLUMN1_NAME);
+
+    SegmentMetadataImpl beforeMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    int sourceMin = (Integer) beforeMetadata.getColumnMetadataFor(COLUMN1_NAME).getMinValue();
+    int sourceMax = (Integer) beforeMetadata.getColumnMetadataFor(COLUMN1_NAME).getMaxValue();
+
+    // Second reload: derive from it.
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata derived = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    assertEquals(derived.getMinValue(), sourceMin + 1);
+    assertEquals(derived.getMaxValue(), sourceMax + 1);
+
+    // The regenerated forward index was temporary: the source keeps the shape its config asks for.
+    validateIndexDoesNotExist(StandardIndexes.forward(), COLUMN1_NAME);
+  }
+
+  /// A derived column that itself has the forward index disabled: it is built with one, and ForwardIndexHandler
+  /// drops it in its post-update cleanup once the inverted index has been built from it.
+  ///
+  /// v3 only: a v1 reload cannot remove a forward index, so it stays on disk there (same as every other
+  /// forward-index-disabled column on v1).
+  @Test
+  public void testForwardIndexDisabledDerivedColumn()
+      throws Exception {
+    buildSegment(SegmentVersion.v3);
+
+    _invertedIndexColumns.add(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    _fieldConfigMap.put(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME,
+        new FieldConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
+            Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata derived = segmentMetadata.getColumnMetadataFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    assertTrue(derived.isAutoGenerated());
+    assertTrue(derived.hasDictionary(), "A forward-index-disabled column must be dictionary encoded");
+    // Derived from column3, not filled with the default value: column3 has 5 distinct values.
+    assertEquals(derived.getCardinality(), 5);
+
+    validateIndexExists(StandardIndexes.dictionary(), NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    validateIndexExists(StandardIndexes.inverted(), NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    validateIndexDoesNotExist(StandardIndexes.forward(), NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+  }
+
+  /// A chain must give the same answer whether it is built at ingestion or at load. Ingestion evaluates every
+  /// expression before anything is converted to its stored type, so an intermediate link that loses precision on
+  /// the way to disk -- `INT newIntSVDimension = divide(column1, 2)` -- must still hand the exact quotient to
+  /// `DOUBLE newDoubleMetric = plus(newIntSVDimension, 1)`. Reading the intermediate back from its index would
+  /// quietly give the truncated value instead.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testChainedDerivedColumnsMatchIngestion(SegmentVersion segmentVersion)
+      throws Exception {
+    Schema schema = copyOfSchema(_schema);
+    schema.addField(_newColumnsSchema1.getFieldSpecFor(NEW_INT_SV_DIMENSION_COLUMN_NAME));
+    schema.addField(_newColumnsSchema1.getFieldSpecFor(NEW_DOUBLE_METRIC_COLUMN_NAME));
+    List<TransformConfig> transformConfigs =
+        List.of(new TransformConfig(NEW_DOUBLE_METRIC_COLUMN_NAME, "plus(newIntSVDimension, 1)"),
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "divide(column1, 2)"));
+
+    // The ingestion path: both columns are produced while the segment is generated.
+    _ingestionConfig.setTransformConfigs(transformConfigs);
+    buildSegment(segmentVersion, schema);
+    List<Object> ingestedIntermediate = readColumnValues(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    List<Object> ingestedDerived = readColumnValues(NEW_DOUBLE_METRIC_COLUMN_NAME);
+
+    // The load path: the same two columns, built by the default column handler on a segment that has neither.
+    _ingestionConfig.setTransformConfigs(null);
+    buildSegment(segmentVersion);
+    _ingestionConfig.setTransformConfigs(transformConfigs);
+    runPreProcessor(schema);
+
+    assertEquals(readColumnValues(NEW_INT_SV_DIMENSION_COLUMN_NAME), ingestedIntermediate);
+    assertEquals(readColumnValues(NEW_DOUBLE_METRIC_COLUMN_NAME), ingestedDerived);
+
+    // Guard against the comparison passing for the wrong reason: the two paths can only differ on a row whose
+    // quotient has a fractional part, so the data has to contain at least one.
+    boolean anyTruncated = false;
+    for (int i = 0; i < ingestedDerived.size(); i++) {
+      if ((Double) ingestedDerived.get(i) != (Integer) ingestedIntermediate.get(i) + 1.0) {
+        anyTruncated = true;
+        break;
+      }
+    }
+    assertTrue(anyTruncated, "Expected at least one row whose intermediate value is truncated on the way to disk");
+  }
+
+  /// Regenerating a source's forward index can change the metadata its reader has to work from. Here the encoding
+  /// flips from dictionary to raw in the very reload that derives from the column, so the metadata captured before
+  /// the rebuild would open raw bytes with a dictionary reader.
+  ///
+  /// v3 only: a v1 reload cannot remove a forward index, so the source never reaches the shape under test.
+  @Test
+  public void testDerivedColumnFromSourceRegeneratedWithNewEncoding()
+      throws Exception {
+    buildSegment(SegmentVersion.v3);
+
+    // First reload: take the forward index away from the source, keeping its dictionary and inverted index.
+    _invertedIndexColumns.add(COLUMN1_NAME);
+    _fieldConfigMap.put(COLUMN1_NAME,
+        new FieldConfig(COLUMN1_NAME, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
+            Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
+    runPreProcessor(_schema);
+    validateIndexDoesNotExist(StandardIndexes.forward(), COLUMN1_NAME);
+
+    SegmentMetadataImpl beforeMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata sourceMetadata = beforeMetadata.getColumnMetadataFor(COLUMN1_NAME);
+    assertTrue(sourceMetadata.hasDictionary());
+    int sourceMin = (Integer) sourceMetadata.getMinValue();
+    int sourceMax = (Integer) sourceMetadata.getMaxValue();
+
+    // Second reload: bring the forward index back as a raw one and derive from the column at the same time.
+    _fieldConfigMap.remove(COLUMN1_NAME);
+    _invertedIndexColumns.remove(COLUMN1_NAME);
+    _noDictionaryColumns.add(COLUMN1_NAME);
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata derived = segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    assertEquals(derived.getMinValue(), sourceMin + 1);
+    assertEquals(derived.getMaxValue(), sourceMax + 1);
+    assertEquals(derived.getCardinality(), sourceMetadata.getCardinality());
+  }
+
+  /// A source whose own action is an update, not an add. Its values are only final once that update has run, so the
+  /// chain reading it has to be ordered after it -- otherwise the pre-update value is written into the chain for
+  /// good, and no later reload puts it right.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testDerivedColumnOrderedAfterUpdatedSource(SegmentVersion segmentVersion)
+      throws Exception {
+    // With null handling on, a default column added in this reload is null on every row, and the derived column reads
+    // that null as ingestion would. Turn it off so the source holds its default value and the ordering is visible.
+    _nullHandlingEnabled = false;
+    buildSegment(segmentVersion);
+
+    // First reload: the source is added, holding the default value its schema declares.
+    Schema firstSchema = new Schema();
+    firstSchema.setSchemaName(_schema.getSchemaName());
+    firstSchema.addField(new MetricFieldSpec(NEW_INT_METRIC_COLUMN_NAME, DataType.INT, 1));
+    runPreProcessor(firstSchema);
+    assertEquals(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME).getMinValue(), 1);
+
+    // Second reload: the source's default changes and a two-link chain reading it is added in the same run.
+    Schema secondSchema = new Schema();
+    secondSchema.setSchemaName(_schema.getSchemaName());
+    secondSchema.addField(new MetricFieldSpec(NEW_INT_METRIC_COLUMN_NAME, DataType.INT, 2));
+    secondSchema.addField(new DimensionFieldSpec(NEW_INT_SV_DIMENSION_COLUMN_NAME, DataType.INT, true));
+    secondSchema.addField(new MetricFieldSpec(NEW_LONG_METRIC_COLUMN_NAME, DataType.LONG, 0L));
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_LONG_METRIC_COLUMN_NAME, "plus(newIntSVDimension, 1)"),
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(newIntMetric, 1)")));
+    runPreProcessor(secondSchema);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME).getMinValue(), 2);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME).getMinValue(), 3);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_LONG_METRIC_COLUMN_NAME).getMinValue(), 4L);
+  }
+
+  /// A derived column reading a plain multi-value default column that is added in the same reload with its forward
+  /// index disabled. That source has a dictionary and an inverted index but no forward index, and it exists only in
+  /// the metadata properties written a moment ago -- the segment directory's own metadata does not list it yet.
+  ///
+  /// v3 only: regenerating a forward index writes the index file and then registers it under the same path on a v1
+  /// segment, so the rebuild cannot run there at all and the derived column falls back to its default value.
+  @Test
+  public void testDerivedColumnFromForwardIndexDisabledColumnAddedInSameReload()
+      throws Exception {
+    // With null handling on, a default column added in this reload is null on every row, and the derived column reads
+    // that null as ingestion would. Turn it off so the source holds its default value and the ordering is visible.
+    _nullHandlingEnabled = false;
+    buildSegment(SegmentVersion.v3);
+
+    // A default value of its own, so a derived column that fell back to ITS default would be visibly different.
+    Schema schema = copyOfSchema(_newColumnsSchema1);
+    schema.getFieldSpecFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME).setDefaultNullValue("mvDefault");
+
+    _invertedIndexColumns.add(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
+    _fieldConfigMap.put(NEW_STRING_MV_DIMENSION_COLUMN_NAME,
+        new FieldConfig(NEW_STRING_MV_DIMENSION_COLUMN_NAME, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
+            Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
+    _ingestionConfig.setTransformConfigs(List.of(new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME,
+        "arrayElementAtString(newStringMVDimension, 1)")));
+    runPreProcessor(schema);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata derived = segmentMetadata.getColumnMetadataFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    assertTrue(derived.isAutoGenerated());
+    assertEquals(derived.getMinValue(), "mvDefault");
+  }
+
+  /// A chain whose intermediate link evaluates to null. Ingestion runs every expression before any null is turned
+  /// into a column's default, so `newIntMetric = coalesce(newIntSVDimension, 7)` sees the null that
+  /// `newIntSVDimension = nullIf(column1, column1)` produced and stores 7, while the intermediate itself lands on
+  /// disk as its own default (0). Handing the stored default to the rest of the chain instead would store 0 in
+  /// `newIntMetric` for good -- a wrong value that no later reload corrects.
+  ///
+  /// Run with null handling on and off: the substitution happens either way, the flag only decides whether a null
+  /// vector is written next to the intermediate.
+  @Test(dataProvider = "versionAndNullHandling")
+  public void testChainedDerivedColumnsWithNullIntermediateMatchIngestion(SegmentVersion segmentVersion,
+      boolean nullHandlingEnabled)
+      throws Exception {
+    _nullHandlingEnabled = nullHandlingEnabled;
+
+    Schema schema = copyOfSchema(_schema);
+    schema.addField(new DimensionFieldSpec(NEW_INT_SV_DIMENSION_COLUMN_NAME, DataType.INT, true, 0));
+    schema.addField(new MetricFieldSpec(NEW_INT_METRIC_COLUMN_NAME, DataType.INT, 0));
+    List<TransformConfig> transformConfigs =
+        List.of(new TransformConfig(NEW_INT_METRIC_COLUMN_NAME, "coalesce(newIntSVDimension, 7)"),
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "nullIf(column1, column1)"));
+
+    // The ingestion path: both columns are produced while the segment is generated.
+    _ingestionConfig.setTransformConfigs(transformConfigs);
+    buildSegment(segmentVersion, schema);
+    List<Object> ingestedIntermediate = readColumnValues(NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    List<Object> ingestedDerived = readColumnValues(NEW_INT_METRIC_COLUMN_NAME);
+    // Guard against the comparison below passing for the wrong reason: the chain has to have run on a null, which
+    // shows up as the intermediate holding its default while the column reading it does not.
+    assertEquals(ingestedIntermediate.get(0), 0);
+    assertEquals(ingestedDerived.get(0), 7);
+
+    // The load path: the same two columns, built by the default column handler on a segment that has neither.
+    _ingestionConfig.setTransformConfigs(null);
+    buildSegment(segmentVersion);
+    _ingestionConfig.setTransformConfigs(transformConfigs);
+    runPreProcessor(schema);
+
+    assertEquals(readColumnValues(NEW_INT_SV_DIMENSION_COLUMN_NAME), ingestedIntermediate);
+    assertEquals(readColumnValues(NEW_INT_METRIC_COLUMN_NAME), ingestedDerived);
+  }
+
+  /// A transform that reads the same forward-index-disabled source twice. Regenerating that source's forward index
+  /// happens on the first read and brings it back as a raw one, so every later read has to work from the refreshed
+  /// metadata -- the copy taken before the rebuild describes a dictionary-encoded column and would make the second
+  /// read open raw bytes with a dictionary reader.
+  ///
+  /// v3 only: a v1 reload cannot remove a forward index, so the source never reaches the shape under test.
+  @Test
+  public void testDerivedColumnReadingRegeneratedSourceTwice()
+      throws Exception {
+    buildSegment(SegmentVersion.v3);
+
+    // First reload: take the forward index away from the source, keeping its dictionary and inverted index.
+    _invertedIndexColumns.add(COLUMN1_NAME);
+    _fieldConfigMap.put(COLUMN1_NAME,
+        new FieldConfig(COLUMN1_NAME, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
+            Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
+    runPreProcessor(_schema);
+    validateIndexDoesNotExist(StandardIndexes.forward(), COLUMN1_NAME);
+
+    SegmentMetadataImpl beforeMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata sourceMetadata = beforeMetadata.getColumnMetadataFor(COLUMN1_NAME);
+    assertTrue(sourceMetadata.hasDictionary());
+    double sourceMin = (Integer) sourceMetadata.getMinValue();
+    double sourceMax = (Integer) sourceMetadata.getMaxValue();
+
+    // Second reload: bring the forward index back as a raw one and read the column twice in the same expression.
+    _fieldConfigMap.remove(COLUMN1_NAME);
+    _invertedIndexColumns.remove(COLUMN1_NAME);
+    _noDictionaryColumns.add(COLUMN1_NAME);
+    // A DOUBLE target, so that doubling the largest value of column1 stays representable and a wrong read shows up
+    // as a wrong value rather than as both reads saturating at Integer.MAX_VALUE.
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_DOUBLE_METRIC_COLUMN_NAME, "plus(column1, column1)")));
+    runPreProcessor(_newColumnsSchema1);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata derived = segmentMetadata.getColumnMetadataFor(NEW_DOUBLE_METRIC_COLUMN_NAME);
+    assertNotNull(derived, "The derived column must be created");
+    assertTrue(derived.isAutoGenerated());
+    assertEquals(derived.getMinValue(), sourceMin * 2.0);
+    assertEquals(derived.getMaxValue(), sourceMax * 2.0);
+    assertEquals(derived.getCardinality(), sourceMetadata.getCardinality());
+  }
+
+  /// Overlapping cycles: four columns that all reach each other, wired so that a depth-first search closes its
+  /// first back edge over only part of them whichever column it starts from. Reaching the rest of a cycle through
+  /// an edge into an already finished column is what a search like that cannot see, and every one of these four
+  /// columns is reached that way from some starting point.
+  ///
+  /// Each has to hold its own default value. Deriving one of them from a sibling that was itself defaulted would
+  /// store a value that looks real -- 12 rather than 22, say -- instead of the documented fallback.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testOverlappingDerivedColumnCyclesFallBackToDefaultValue(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+
+    Schema schema = new Schema();
+    schema.setSchemaName(_schema.getSchemaName());
+    schema.addField(new DimensionFieldSpec(NEW_INT_SV_DIMENSION_COLUMN_NAME, DataType.INT, true, 11));
+    schema.addField(new MetricFieldSpec(NEW_INT_METRIC_COLUMN_NAME, DataType.INT, 22));
+    schema.addField(new MetricFieldSpec(NEW_LONG_METRIC_COLUMN_NAME, DataType.LONG, 33L));
+    schema.addField(new MetricFieldSpec(NEW_DOUBLE_METRIC_COLUMN_NAME, DataType.DOUBLE, 44.0));
+    _ingestionConfig.setTransformConfigs(List.of(
+        new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(newIntMetric, newLongMetric)"),
+        new TransformConfig(NEW_INT_METRIC_COLUMN_NAME, "plus(newIntSVDimension, newDoubleMetric)"),
+        new TransformConfig(NEW_LONG_METRIC_COLUMN_NAME, "plus(newIntMetric, 1)"),
+        new TransformConfig(NEW_DOUBLE_METRIC_COLUMN_NAME, "plus(newIntSVDimension, 1)")));
+    runPreProcessor(schema);
+
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    for (String column : List.of(NEW_INT_SV_DIMENSION_COLUMN_NAME, NEW_INT_METRIC_COLUMN_NAME,
+        NEW_LONG_METRIC_COLUMN_NAME, NEW_DOUBLE_METRIC_COLUMN_NAME)) {
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
+      assertNotNull(columnMetadata, column + " must still be created");
+      assertEquals(columnMetadata.getCardinality(), 1, column + " must hold a single default value");
+      assertEquals(columnMetadata.getMinValue(), schema.getFieldSpecFor(column).getDefaultNullValue(),
+          column + " must hold its own default value");
+    }
+  }
+
+  /// A deep copy, so a test can change a default value without the schema fields -- read once in the constructor --
+  /// carrying that change into every test that runs after it.
+  private static Schema copyOfSchema(Schema schema)
+      throws IOException {
+    return Schema.fromString(schema.toSingleLineJsonString());
+  }
+
+  private static List<Object> readColumnValues(String column)
+      throws Exception {
+    List<Object> values = new ArrayList<>();
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(INDEX_DIR)) {
+      GenericRow reuse = new GenericRow();
+      while (recordReader.hasNext()) {
+        reuse.clear();
+        values.add(recordReader.next(reuse).getValue(column));
+      }
+    }
+    return values;
   }
 }

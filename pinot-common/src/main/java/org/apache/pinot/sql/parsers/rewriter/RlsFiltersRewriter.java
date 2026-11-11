@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.logging.log4j.util.Strings;
@@ -29,26 +28,23 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
-/**
- * A query rewriter that applies Row-Level Security (RLS) filters to Pinot queries.
- *
- * <p>This rewriter examines query options for table-specific row filters and automatically
- * applies them to the query's WHERE clause. The RLS filters are retrieved from the query
- * options using the prefixed table name as the key.
- *
- * <p>The rewriter performs the following operations:
- * <ul>
- *   <li>Extracts the raw table name from the query's data source</li>
- *   <li>Looks up RLS filters from query options using the table name</li>
- *   <li>Parses the filter string into an Expression object</li>
- *   <li>Combines the RLS filter with any existing WHERE clause using AND logic</li>
- * </ul>
- *
- * <p>If no query options are present, no RLS filters are found for the table, or the
- * filter string is empty, the query is returned unchanged.
- *
- * @see QueryRewriter
- */
+/// A query rewriter that applies Row-Level Security (RLS) filters to Pinot queries.
+///
+/// This rewriter examines query options for table-specific row filters and automatically
+/// applies them to the query's WHERE clause. The RLS filters are retrieved from the query
+/// options using the prefixed table name as the key.
+///
+/// The rewriter performs the following operations:
+///
+/// - Extracts the raw table name from the query's data source
+/// - Looks up RLS filters from query options using the table name
+/// - Parses the filter string into an Expression object
+/// - Combines the RLS filter with any existing WHERE clause using AND logic
+///
+/// If no query options are present, no RLS filters are found for the table, or the
+/// filter string is empty, the query is returned unchanged.
+///
+/// @see QueryRewriter
 public class RlsFiltersRewriter implements QueryRewriter {
 
   @Override
@@ -69,7 +65,7 @@ public class RlsFiltersRewriter implements QueryRewriter {
     Expression existingFilterExpression = pinotQuery.getFilterExpression();
     if (existingFilterExpression != null) {
       Expression combinedFilterExpression =
-          RequestUtils.getFunctionExpression(FilterKind.AND.name(), List.of(expression, existingFilterExpression));
+          RequestUtils.getFunctionExpression(FilterKind.AND.name(), expression, existingFilterExpression);
       pinotQuery.setFilterExpression(combinedFilterExpression);
     } else {
       pinotQuery.setFilterExpression(expression);

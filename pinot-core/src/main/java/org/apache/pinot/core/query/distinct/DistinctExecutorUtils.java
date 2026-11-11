@@ -22,9 +22,7 @@ public class DistinctExecutorUtils {
   private DistinctExecutorUtils() {
   }
 
-  /**
-   * Returns an array of dictionary ids for a given document on multiple expressions (SV or MV).
-   */
+  /// Returns an array of dictionary ids for a given document on multiple expressions (SV or MV).
   public static int[][] getDictIds(int[][] svDictIds, int[][][] mvDictIds, int docId) {
     int[][] dictIdsArray = null;
 
@@ -92,9 +90,7 @@ public class DistinctExecutorUtils {
     return dictIdsArray == null ? new int[][]{singleDictIds} : dictIdsArray;
   }
 
-  /**
-   * Returns an array of records for a given document on multiple expressions (SV or MV).
-   */
+  /// Returns an array of records for a given document on multiple expressions (SV or MV).
   public static Object[][] getRecords(Object[][] svValues, Object[][][] mvValues, int docId) {
     Object[][] records = null;
 

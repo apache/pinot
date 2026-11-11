@@ -20,6 +20,8 @@ package org.apache.pinot.spi.stream;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,17 +37,27 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
   public static final String RECORD_SERIALIZED_VALUE_SIZE_KEY = METADATA_KEY_PREFIX + "recordSerializedValueSize";
 
   private final StreamMessageDecoder _valueDecoder;
+  private final boolean _isKeyBytesType;
   private final GenericRow _reuse = new GenericRow();
 
-  /**
-   * @return Whether the given key is one of the special types of keys (__key, __header$, etc.)
-   */
+  /// @return Whether the given key is one of the special types of keys (\_\_key, \_\_header$, etc.)
   public static boolean isSpecialKeyType(String key) {
     return key.equals(KEY) || key.startsWith(HEADER_KEY_PREFIX) || key.startsWith(METADATA_KEY_PREFIX);
   }
 
+  /// @return Whether the \_\_key column is defined as BYTES type in the schema.
+  public static boolean isKeyBytesType(Schema schema) {
+    FieldSpec fieldSpec = schema.getFieldSpecFor(KEY);
+    return fieldSpec != null && fieldSpec.getDataType() == FieldSpec.DataType.BYTES;
+  }
+
   public StreamDataDecoderImpl(StreamMessageDecoder valueDecoder) {
+    this(valueDecoder, false);
+  }
+
+  public StreamDataDecoderImpl(StreamMessageDecoder valueDecoder, boolean isKeyBytesType) {
     _valueDecoder = valueDecoder;
+    _isKeyBytesType = isKeyBytesType;
   }
 
   @Override
@@ -58,7 +70,9 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
       GenericRow row = _valueDecoder.decode(value, 0, length, _reuse);
       if (row != null) {
         if (message.getKey() != null) {
-          row.putValue(KEY, new String(message.getKey(), StandardCharsets.UTF_8));
+          row.putValue(KEY, _isKeyBytesType
+              ? message.getKey()
+              : new String(message.getKey(), StandardCharsets.UTF_8));
         }
         StreamMessageMetadata metadata = message.getMetadata();
         GenericRow headers = metadata.getHeaders();

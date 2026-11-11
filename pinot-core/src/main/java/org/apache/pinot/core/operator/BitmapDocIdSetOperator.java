@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
@@ -27,11 +26,15 @@ import org.roaringbitmap.ImmutableBitmapDataProvider;
 import org.roaringbitmap.IntIterator;
 
 
-/**
- * The <code>BitmapDocIdSetOperator</code> takes a bitmap of document ids and returns blocks of document ids.
- * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
- * documents) or already gathered enough documents (for selection queries).
- */
+/// The `BitmapDocIdSetOperator` takes a bitmap of document ids and returns blocks of document ids.
+///
+/// Should call [#nextBlock()] multiple times until it returns `null` (already exhausts all the
+/// documents) or already gathered enough documents (for selection queries).
+///
+/// The same document id buffer (caller-supplied, or allocated internally by the factory methods) is reused for every
+/// returned block: each [#nextBlock()] call overwrites the contents of the previously returned
+/// [org.apache.pinot.core.operator.blocks.DocIdSetBlock]. A caller-supplied buffer is additionally shared with the
+/// caller.
 public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET_BITMAP";
 
@@ -102,7 +105,7 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

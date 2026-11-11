@@ -25,9 +25,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
 
-/**
- * StreamMessageDecoder implementation for fake stream
- */
+/// StreamMessageDecoder implementation for fake stream
 public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   @Override

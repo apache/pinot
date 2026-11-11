@@ -89,7 +89,7 @@
     </Logger>
     <!-- Output querylogs to its own file -->
     <Logger name="org.apache.pinot.broker.querylog.QueryLogger" level="info" additivity="false">
-      <AppenderRef ref="queryLog"/>
+      <AppenderRef ref="querylog"/>
     </Logger>
     <!-- Output broker starter logs to the console -->
     <Logger name="org.apache.pinot.broker.broker.helix.HelixBrokerStarter" level="info" additivity="false">

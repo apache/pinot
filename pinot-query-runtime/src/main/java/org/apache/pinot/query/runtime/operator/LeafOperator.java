@@ -22,9 +22,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -43,8 +43,11 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.plan.ExplainInfo;
@@ -60,6 +63,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -74,7 +78,7 @@ import org.slf4j.LoggerFactory;
 /// The data schema of the result expected from leaf stage might be different from the one returned from single-stage
 /// engine, thus the leaf stage operator needs to convert the data types of the result to conform with the expected
 /// data schema.
-public class LeafOperator extends MultiStageOperator {
+public class LeafOperator extends MultiStageOperator implements ExplainableOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafOperator.class);
   private static final String EXPLAIN_NAME = "LEAF";
   private static final ErrorMseBlock CANCELLED_BLOCK =
@@ -94,6 +98,8 @@ public class LeafOperator extends MultiStageOperator {
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
   private final AtomicReference<ErrorMseBlock> _errorBlock = new AtomicReference<>();
   private final ResultsBlockStreamer _resultsBlockStreamer = this::addResultsBlock;
+  @Nullable
+  private final MultiStageQueryStats _pipelineBreakerStats;
 
   // Use a limit-sized BlockingQueue to store the results blocks and apply back pressure to the single-stage threads
   @VisibleForTesting
@@ -105,6 +111,16 @@ public class LeafOperator extends MultiStageOperator {
 
   public LeafOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests, DataSchema dataSchema,
       QueryExecutor queryExecutor, ExecutorService executorService) {
+    this(context, requests, dataSchema, queryExecutor, executorService, null);
+  }
+
+  public LeafOperator(
+      OpChainExecutionContext context,
+      List<ServerQueryRequest> requests,
+      DataSchema dataSchema,
+      QueryExecutor queryExecutor,
+      ExecutorService executorService,
+      @Nullable MultiStageQueryStats pipelineBreakerStats) {
     super(context);
     int numRequests = requests.size();
     Preconditions.checkArgument(numRequests == 1 || numRequests == 2, "Expected 1 or 2 requests, got: %s", numRequests);
@@ -118,6 +134,7 @@ public class LeafOperator extends MultiStageOperator {
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
+    _pipelineBreakerStats = pipelineBreakerStats;
   }
 
   public List<ServerQueryRequest> getRequests() {
@@ -149,6 +166,19 @@ public class LeafOperator extends MultiStageOperator {
   @Override
   public List<MultiStageOperator> getChildOperators() {
     return List.of();
+  }
+
+  @Override
+  protected MultiStageQueryStats calculateUpstreamStats() {
+    // Return a COPY, not the shared instance. calculateStats() runs more than once per opchain (e.g. when the
+    // MailboxSendOperator serializes its EOS stats and again from the scheduler's completion callback that feeds the
+    // stream-stats listener), and the base calculateStats() appends this operator's entry to the returned object.
+    // Handing back the shared _pipelineBreakerStats would append LEAF (+ the downstream MAILBOX_SEND) once per call,
+    // duplicating the leaf opchain's own operators in the flat stats list. A non-pipeline-breaker leaf is immune
+    // because it returns a fresh emptyStats() each call.
+    return _pipelineBreakerStats != null
+        ? MultiStageQueryStats.copy(_pipelineBreakerStats)
+        : MultiStageQueryStats.emptyStats(_context.getStageId());
   }
 
   @Override
@@ -201,6 +231,7 @@ public class LeafOperator extends MultiStageOperator {
         terminateException.getMessage()) : errorBlock;
   }
 
+  @Override
   public ExplainedNode explain() {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
@@ -261,9 +292,28 @@ public class LeafOperator extends MultiStageOperator {
     }
   }
 
+  /// Returns a copy of this operator's stats, extended with [StatKey#NON_ACTIVE_WORKERS] for this single worker.
   @Override
-  protected StatMap<?> copyStatMaps() {
-    return new StatMap<>(_statMap);
+  public StatMap<StatKey> copyStatMaps() {
+    StatMap<StatKey> statMap = new StatMap<>(_statMap);
+    if (!hasSegmentsAssigned()) {
+      statMap.merge(StatKey.NON_ACTIVE_WORKERS, 1);
+    }
+    return statMap;
+  }
+
+  /// Whether this worker was given at least one segment to read.
+  ///
+  /// Decided from the request rather than from anything the query produces, so that a worker whose segments are all
+  /// pruned, or all of whose rows are filtered out, still counts as having been given work. A hybrid table produces
+  /// one request per table type, and segments on either of them are enough.
+  private boolean hasSegmentsAssigned() {
+    for (ServerQueryRequest request : _requests) {
+      if (request.hasSegmentsToQuery()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
@@ -272,14 +322,17 @@ public class LeafOperator extends MultiStageOperator {
     cancelSseTasks();
   }
 
+  /// Stops the single-stage tasks feeding this operator and drains the blocks they have already queued. Routed
+  /// through the release hook rather than through separate `close()`/`cancel()` overrides so that it runs on every
+  /// termination path by construction, and so a failure here cannot abort the rest of the teardown.
   @Override
-  public void cancel(Throwable e) {
+  protected void releaseBuffers() {
     cancelSseTasks();
   }
 
   @Override
-  public void close() {
-    cancelSseTasks();
+  protected boolean hasBufferedState() {
+    return !_blockingQueue.isEmpty();
   }
 
   @VisibleForTesting
@@ -339,8 +392,14 @@ public class LeafOperator extends MultiStageOperator {
         case NUM_GROUPS_WARNING_LIMIT_REACHED:
           _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
           break;
+        case LITE_MODE_LEAF_STAGE_LIMIT_REACHED:
+          _statMap.merge(StatKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
+          break;
+        case APPROXIMATED_RESULT:
+          _statMap.merge(StatKey.APPROXIMATED_RESULT, Boolean.parseBoolean(entry.getValue()));
+          break;
         case TIME_USED_MS:
-          _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
+          _statMap.merge(StatKey.SSE_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
           break;
         case TRACE_INFO:
           LOGGER.debug("Skipping trace info: {}", entry.getValue());
@@ -381,6 +440,18 @@ public class LeafOperator extends MultiStageOperator {
         case NUM_SEGMENTS_PRUNED_BY_VALUE:
           _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE, Integer.parseInt(entry.getValue()));
           break;
+        case NUM_REMOTE_ACCESSES:
+          _statMap.merge(StatKey.NUM_REMOTE_ACCESSES, Long.parseLong(entry.getValue()));
+          break;
+        case REMOTE_ACCESS_BYTES:
+          _statMap.merge(StatKey.REMOTE_ACCESS_BYTES, Long.parseLong(entry.getValue()));
+          break;
+        case NUM_DIRECT_REMOTE_ACCESSES:
+          _statMap.merge(StatKey.NUM_DIRECT_REMOTE_ACCESSES, Long.parseLong(entry.getValue()));
+          break;
+        case DIRECT_REMOTE_ACCESS_BYTES:
+          _statMap.merge(StatKey.DIRECT_REMOTE_ACCESS_BYTES, Long.parseLong(entry.getValue()));
+          break;
         case EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS:
           LOGGER.debug("Skipping empty filter segments: {}", entry.getValue());
           break;
@@ -393,11 +464,28 @@ public class LeafOperator extends MultiStageOperator {
         case NUM_CONSUMING_SEGMENTS_MATCHED:
           _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
           break;
+        case EARLY_TERMINATION_REASON:
+          mergeEarlyTerminationReason(entry.getValue());
+          break;
         case SORTED:
           break;
         default:
           throw new IllegalArgumentException("Unhandled leaf execution stat: " + key);
       }
+    }
+  }
+
+  private void mergeEarlyTerminationReason(@Nullable String earlyTerminationReason) {
+    if (earlyTerminationReason == null || earlyTerminationReason.isEmpty()) {
+      return;
+    }
+    try {
+      EarlyTerminationReason reason = EarlyTerminationReason.valueOf(earlyTerminationReason);
+      if (reason != EarlyTerminationReason.NONE) {
+        _statMap.merge(StatKey.EARLY_TERMINATION_REASONS, Set.of(reason.name()));
+      }
+    } catch (IllegalArgumentException e) {
+      LOGGER.debug("Skipping unknown early termination reason: {}", earlyTerminationReason);
     }
   }
 
@@ -537,10 +625,8 @@ public class LeafOperator extends MultiStageOperator {
     _blockingQueue.clear();
   }
 
-  /**
-   * Composes the {@link MseBlock} from the {@link BaseResultsBlock} returned from single-stage engine. It
-   * converts the data types of the results to conform with the desired data schema asked by the multi-stage engine.
-   */
+  /// Composes the [MseBlock] from the [BaseResultsBlock] returned from single-stage engine. It
+  /// converts the data types of the results to conform with the desired data schema asked by the multi-stage engine.
   private RowHeapDataBlock composeMseBlock(BaseResultsBlock resultsBlock) {
     if (resultsBlock instanceof SelectionResultsBlock) {
       return composeSelectMseBlock((SelectionResultsBlock) resultsBlock);
@@ -549,9 +635,7 @@ public class LeafOperator extends MultiStageOperator {
     }
   }
 
-  /**
-   * For selection, we need to check if the columns are in order. If not, we need to re-arrange the columns.
-   */
+  /// For selection, we need to check if the columns are in order. If not, we need to re-arrange the columns.
   private RowHeapDataBlock composeSelectMseBlock(SelectionResultsBlock resultsBlock) {
     int[] columnIndices = getColumnIndices(resultsBlock);
     if (!inOrder(columnIndices)) {
@@ -649,22 +733,44 @@ public class LeafOperator extends MultiStageOperator {
     assert resultRows != null && inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
     ColumnDataType[] outputStoredTypes = _dataSchema.getStoredColumnDataTypes();
-    if (!Arrays.equals(inputStoredTypes, outputStoredTypes)) {
-      for (Object[] row : resultRows) {
-        convertRow(row, inputStoredTypes, outputStoredTypes);
+    QueryContext queryContext = _requests.get(0).getQueryContext();
+    // Convert the columns whose stored types differ, and the STRING final aggregation results, which can be objects
+    // stored as their strings, e.g. raw sketches
+    int numColumns = outputStoredTypes.length;
+    int firstFinalResultColId = getFirstFinalResultColId(block, queryContext, numColumns);
+    int[] colIdsToConvert = new int[numColumns];
+    int numColumnsToConvert = 0;
+    for (int colId = 0; colId < numColumns; colId++) {
+      if (inputStoredTypes[colId] != outputStoredTypes[colId]
+          || (colId >= firstFinalResultColId && outputStoredTypes[colId] == ColumnDataType.STRING)) {
+        colIdsToConvert[numColumnsToConvert++] = colId;
       }
     }
-    return new RowHeapDataBlock(resultRows, _dataSchema, _requests.get(0).getQueryContext().getAggregationFunctions());
+    if (numColumnsToConvert > 0) {
+      for (Object[] row : resultRows) {
+        for (int i = 0; i < numColumnsToConvert; i++) {
+          int colId = colIdsToConvert[i];
+          Object value = row[colId];
+          if (value != null) {
+            row[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
+          }
+        }
+      }
+    }
+    return new RowHeapDataBlock(resultRows, _dataSchema, queryContext.getAggregationFunctions());
   }
 
-  public static void convertRow(Object[] row, ColumnDataType[] inputStoredTypes, ColumnDataType[] outputStoredTypes) {
-    int numColumns = row.length;
-    for (int colId = 0; colId < numColumns; colId++) {
-      Object value = row[colId];
-      if (value != null && inputStoredTypes[colId] != outputStoredTypes[colId]) {
-        row[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
-      }
+  /// Returns the index of the first final aggregation result column of the block, or `numColumns` when the block does
+  /// not hold final aggregation results, which the server returns when the query asks for them.
+  private static int getFirstFinalResultColId(BaseResultsBlock block, QueryContext queryContext, int numColumns) {
+    if (block instanceof AggregationResultsBlock && queryContext.isServerReturnFinalResult()) {
+      return 0;
     }
+    if (block instanceof GroupByResultsBlock && (queryContext.isServerReturnFinalResult()
+        || queryContext.isServerReturnFinalResultKeyUnpartitioned())) {
+      return queryContext.getNumGroupByKeyColumns();
+    }
+    return numColumns;
   }
 
   public enum StatKey implements StatMap.Key {
@@ -704,6 +810,7 @@ public class LeafOperator extends MultiStageOperator {
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
     THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),
@@ -716,18 +823,37 @@ public class LeafOperator extends MultiStageOperator {
         return "responseSerializationCpuTimeNs";
       }
     },
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG, null),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
-    GC_TIME_MS(StatMap.Type.LONG, null);
+    /// Time spent on GC while this operator or its children in the same stage were running.
+    GC_TIME_MS(StatMap.Type.LONG, null),
+    /// Time spent in single-stage execution engine for this leaf stage.
+    SSE_EXECUTION_TIME_MS(StatMap.Type.LONG, null),
+    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
+    /// How many workers of this stage had no segment assigned to them.
+    ///
+    /// Reported as the count of idle workers rather than active ones so that it is absent when every worker was
+    /// given something to read, which is the common case. A worker with no segment was given no work at all, which
+    /// is different from a worker that read segments and produced nothing: compare this against the `parallelism`
+    /// the stats tree renders on this node, and against what the operators above it report.
+    NON_ACTIVE_WORKERS(StatMap.Type.INT, null),
+    /// Number of remote accesses (local cache misses) made to read segment data from a remote storage tier.
+    NUM_REMOTE_ACCESSES(StatMap.Type.LONG),
+    /// Number of bytes read by the remote accesses.
+    REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    /// Number of remote accesses made directly, i.e. outside the buffers fetched for the query.
+    NUM_DIRECT_REMOTE_ACCESSES(StatMap.Type.LONG),
+    /// Number of bytes read by the direct remote accesses.
+    DIRECT_REMOTE_ACCESS_BYTES(StatMap.Type.LONG),
+    /// Whether a function that can answer exactly returned an approximate final result, when the leaf returns final
+    /// results.
+    APPROXIMATED_RESULT(StatMap.Type.BOOLEAN);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will
     //  propagate to the caller, causing the query to timeout.
+    //  New keys must also be appended at the end: StatMap identifies keys by their ordinal on the wire, so
+    //  inserting, reordering or removing a constant breaks the compatibility with other versions.
 
     private final StatMap.Type _type;
     @Nullable
@@ -771,6 +897,9 @@ public class LeafOperator extends MultiStageOperator {
             break;
           case STRING:
             oldMetadata.merge(_brokerKey, stats.getString(this));
+            break;
+          case STRING_SET:
+            oldMetadata.merge(_brokerKey, stats.getStringSet(this));
             break;
           default:
             throw new IllegalStateException("Unsupported type: " + _type);

@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -26,8 +27,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,17 +63,17 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.IndexUtil;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
-import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.Intern;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -87,7 +89,7 @@ import org.slf4j.LoggerFactory;
 public class DictionaryIndexType
     extends AbstractIndexType<DictionaryIndexConfig, Dictionary, SegmentDictionaryCreator> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryIndexType.class);
-  private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Dict.FILE_EXTENSION);
+  private static final List<String> EXTENSIONS = List.of(V1Constants.Dict.FILE_EXTENSION);
 
   protected DictionaryIndexType() {
     super(StandardIndexes.DICTIONARY_ID);
@@ -106,7 +108,7 @@ public class DictionaryIndexType
   @Override
   public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
-    if (dictionaryConfig.isEnabled() && dictionaryConfig.getUseVarLengthDictionary()) {
+    if (dictionaryConfig.isEnabled() && dictionaryConfig.isUseVarLengthDictionary()) {
       DataType storedType = fieldSpec.getDataType().getStoredType();
       Preconditions.checkState(!storedType.isFixedWidth(),
           "Cannot create var-length dictionary on column: %s of fixed-width stored type: %s", fieldSpec.getName(),
@@ -127,12 +129,27 @@ public class DictionaryIndexType
     ColumnConfigDeserializer<DictionaryIndexConfig> fromNoDictionaryColumns =
         IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getNoDictionaryColumns(),
             (accum, column) -> accum.put(column, DictionaryIndexConfig.DISABLED));
-    ColumnConfigDeserializer<DictionaryIndexConfig> fromFieldConfigs =
-        IndexConfigDeserializer.fromCollection(TableConfig::getFieldConfigList, (accum, fieldConfig) -> {
-          if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
-            accum.put(fieldConfig.getName(), DictionaryIndexConfig.DISABLED);
-          }
-        });
+    ColumnConfigDeserializer<DictionaryIndexConfig> fromFieldConfigs = (tableConfig, schema) -> {
+      List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+      if (fieldConfigList == null) {
+        return Map.of();
+      }
+      Map<String, DictionaryIndexConfig> result = new HashMap<>();
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        // encoding=RAW disables the dictionary unless an explicit dictionary config is given OR an
+        // index that requires a dictionary is enabled in the FieldConfig. In the latter case let the
+        // dictionary fall through to its default-enabled state so the runtime can build it; the
+        // auto-creation paths in BaseSegmentCreator/ForwardIndexHandler will produce a shared-dict +
+        // RAW forward index.
+        FieldSpec fieldSpec = schema == null ? null : schema.getFieldSpecFor(fieldConfig.getName());
+        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
+            && !hasExplicitDictionaryConfig(fieldConfig)
+            && (fieldSpec == null || !hasIndexRequiringDictionary(fieldConfig, fieldSpec))) {
+          result.put(fieldConfig.getName(), DictionaryIndexConfig.DISABLED);
+        }
+      }
+      return result;
+    };
     ColumnConfigDeserializer<DictionaryIndexConfig> fromIndexingConfig = (tableConfig, schema) -> {
       IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
       Set<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns() != null ? new HashSet<>(
@@ -154,14 +171,94 @@ public class DictionaryIndexType
         .withFallbackAlternative(fromIndexingConfig);
   }
 
+  private static boolean hasExplicitDictionaryConfig(FieldConfig fieldConfig) {
+    JsonNode indexes = fieldConfig.getIndexes();
+    return indexes != null && indexes.isObject() && indexes.has(StandardIndexes.DICTIONARY_ID);
+  }
+
+  /// True if any index enabled in the FieldConfig declares
+  /// [IndexType#requiresDictionary(FieldSpec, org.apache.pinot.spi.config.table.IndexConfig)] for the column.
+  /// Iterates over every registered IndexType, asks each whether it's enabled in this raw FieldConfig (legacy
+  /// `indexTypes` list or the `indexes` map without `disabled:true`), and consults `requiresDictionary` against the
+  /// IndexType's default config. (Built-in dict-requiring indexes — FST/IFST/INVERTED — return true unconditionally,
+  /// so the default config is sufficient.)
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static boolean hasIndexRequiringDictionary(FieldConfig fieldConfig, FieldSpec fieldSpec) {
+    Set<String> enabledIds = enabledIndexIds(fieldConfig);
+    for (IndexType indexType : IndexService.getInstance().getAllIndexes()) {
+      if (StandardIndexes.DICTIONARY_ID.equals(indexType.getId()) || !enabledIds.contains(indexType.getId())) {
+        continue;
+      }
+      if (indexType.requiresDictionary(fieldSpec, indexType.getDefaultConfig())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Collects the set of `StandardIndexes` IDs that are explicitly enabled on the FieldConfig — both
+  /// from the legacy `indexTypes` enum list and from the `indexes` JsonNode map (skipping entries marked
+  /// `"disabled": true`).
+  private static Set<String> enabledIndexIds(FieldConfig fieldConfig) {
+    Set<String> ids = new HashSet<>();
+    for (FieldConfig.IndexType legacy : fieldConfig.getIndexTypes()) {
+      String id = legacyIndexTypeId(legacy);
+      if (id != null) {
+        ids.add(id);
+      }
+    }
+    JsonNode indexes = fieldConfig.getIndexes();
+    if (indexes != null && indexes.isObject()) {
+      Iterator<String> names = indexes.fieldNames();
+      while (names.hasNext()) {
+        String name = names.next();
+        JsonNode entry = indexes.get(name);
+        if (entry != null && entry.isObject()) {
+          JsonNode disabled = entry.get("disabled");
+          if (disabled != null && disabled.isBoolean() && disabled.asBoolean()) {
+            continue;
+          }
+        }
+        ids.add(name);
+      }
+    }
+    return ids;
+  }
+
+  @Nullable
+  private static String legacyIndexTypeId(FieldConfig.IndexType type) {
+    switch (type) {
+      case INVERTED:
+        return StandardIndexes.INVERTED_ID;
+      case FST:
+        return StandardIndexes.FST_ID;
+      case IFST:
+        return StandardIndexes.IFST_ID;
+      case TEXT:
+        return StandardIndexes.TEXT_ID;
+      case H3:
+        return StandardIndexes.H3_ID;
+      case JSON:
+        return StandardIndexes.JSON_ID;
+      case RANGE:
+        return StandardIndexes.RANGE_ID;
+      case VECTOR:
+        return StandardIndexes.VECTOR_ID;
+      case SORTED:
+      case TIMESTAMP:
+      default:
+        return null;
+    }
+  }
+
   @Override
   public SegmentDictionaryCreator createIndexCreator(IndexCreationContext context, DictionaryIndexConfig indexConfig) {
     boolean useVarLengthDictionary = shouldUseVarLengthDictionary(context, indexConfig);
-    return new SegmentDictionaryCreator(context.getFieldSpec(), context.getIndexDir(), useVarLengthDictionary);
+    return new SegmentDictionaryCreator(context, useVarLengthDictionary);
   }
 
   public boolean shouldUseVarLengthDictionary(IndexCreationContext context, DictionaryIndexConfig indexConfig) {
-    if (indexConfig.getUseVarLengthDictionary()) {
+    if (indexConfig.isUseVarLengthDictionary()) {
       return true;
     }
     DataType storedType = context.getFieldSpec().getDataType().getStoredType();
@@ -169,15 +266,6 @@ public class DictionaryIndexType
       return false;
     }
     return !context.isFixedLength();
-  }
-
-  public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
-      DataType storedType, ColumnStatistics columnProfile) {
-    if (varLengthDictColumns.contains(columnName)) {
-      return true;
-    }
-
-    return shouldUseVarLengthDictionary(storedType, columnProfile);
   }
 
   public static boolean shouldUseVarLengthDictionary(DataType storedType, ColumnStatistics profile) {
@@ -188,10 +276,8 @@ public class DictionaryIndexType
     return false;
   }
 
-  /**
-   * Similar to shouldUseVarLengthDictionary, but also checks STRING type. Separated due to backwards compatibility
-   * concerns.
-   */
+  /// Similar to shouldUseVarLengthDictionary, but also checks STRING type. Separated due to backwards compatibility
+  /// concerns.
   public static boolean optimizeTypeShouldUseVarLengthDictionary(DataType storedType, ColumnStatistics profile) {
     if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL || storedType == DataType.STRING) {
       return !profile.isFixedLength();
@@ -201,13 +287,11 @@ public class DictionaryIndexType
   }
 
 
-  /**
-   * This function evaluates whether to override dictionary (i.e use noDictionary)
-   * for a column even when its explicitly configured. This evaluation is for both dimension and metric
-   * column types.
-   *
-   * @return true if dictionary should be created, false if noDictionary should be used
-   */
+  /// This function evaluates whether to override dictionary (i.e use noDictionary)
+  /// for a column even when its explicitly configured. This evaluation is for both dimension and metric
+  /// column types.
+  ///
+  /// @return true if dictionary should be created, false if noDictionary should be used
   public static boolean ignoreDictionaryOverride(boolean optimizeDictionary, boolean optimizeDictionaryForMetrics,
       double noDictionarySizeRatioThreshold, @Nullable Double noDictionaryCardinalityRatioThreshold,
       FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs, int cardinality, int totalNumberOfEntries) {
@@ -237,9 +321,7 @@ public class DictionaryIndexType
     return true;
   }
 
-  /**
-   * Hold common logic for ignoring dictionary override for single value fields, used for dim and metric cols
-   */
+  /// Hold common logic for ignoring dictionary override for single value fields, used for dim and metric cols
   private static boolean ignoreDictionaryOverrideForSingleValueFields(int cardinality, int totalNumberOfEntries,
       double noDictionarySizeRatioThreshold, Double noDictionaryCardinalityRatioThreshold, FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
@@ -258,11 +340,9 @@ public class DictionaryIndexType
     return false;
   }
 
-  /**
-   * Given the column cardinality, totalNumberOfEntries, this function checks if the savings ratio
-   * is larger than the configured threshold (noDictionarySizeRatioThreshold). If savings ratio is
-   * smaller than the threshold, we want to override to noDictionary.
-   */
+  /// Given the column cardinality, totalNumberOfEntries, this function checks if the savings ratio
+  /// is larger than the configured threshold (noDictionarySizeRatioThreshold). If savings ratio is
+  /// smaller than the threshold, we want to override to noDictionary.
   private static boolean canSafelyCreateDictionaryWithinThreshold(int cardinality, int totalNumberOfEntries,
       double noDictionarySizeRatioThreshold, FieldSpec spec) {
     long dictionarySize = cardinality * (long) spec.getDataType().size();
@@ -302,15 +382,13 @@ public class DictionaryIndexType
       throws IOException {
 
     DataType dataType = metadata.getDataType();
-    String columnName = metadata.getColumnName();
-    int length = metadata.getCardinality();
-
     boolean loadOnHeap = indexConfig.isOnHeap();
-    Intern internConfig = indexConfig.getIntern();
+    String columnName = metadata.getColumnName();
 
     // If interning is enabled, get the required interners.
     FALFInterner<String> strInterner = null;
     FALFInterner<byte[]> byteInterner = null;
+    Intern internConfig = indexConfig.getIntern();
     if (loadOnHeap) {
       LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
       if (internConfig != null && !internConfig.isDisabled()) {
@@ -321,6 +399,7 @@ public class DictionaryIndexType
       }
     }
 
+    int length = metadata.getCardinality();
     switch (dataType.getStoredType()) {
       case INT:
         return loadOnHeap ? new OnHeapIntDictionary(dataBuffer, length)
@@ -335,15 +414,15 @@ public class DictionaryIndexType
         return loadOnHeap ? new OnHeapDoubleDictionary(dataBuffer, length)
             : new DoubleDictionary(dataBuffer, length);
       case BIG_DECIMAL:
-        int numBytesPerValue = metadata.getColumnMaxLength();
+        int numBytesPerValue = metadata.getLengthOfLongestElement();
         return loadOnHeap ? new OnHeapBigDecimalDictionary(dataBuffer, length, numBytesPerValue)
             : new BigDecimalDictionary(dataBuffer, length, numBytesPerValue);
       case STRING:
-        numBytesPerValue = metadata.getColumnMaxLength();
+        numBytesPerValue = metadata.getLengthOfLongestElement();
         return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue, strInterner, byteInterner)
             : new StringDictionary(dataBuffer, length, numBytesPerValue);
       case BYTES:
-        numBytesPerValue = metadata.getColumnMaxLength();
+        numBytesPerValue = metadata.getLengthOfLongestElement();
         return loadOnHeap ? new OnHeapBytesDictionary(dataBuffer, length, numBytesPerValue, byteInterner)
             : new BytesDictionary(dataBuffer, length, numBytesPerValue);
       default:
@@ -360,6 +439,18 @@ public class DictionaryIndexType
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       Schema schema, TableConfig tableConfig) {
     return IndexHandler.NoOp.INSTANCE;
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, DictionaryIndexConfig indexConfig) {
+    // The dictionary index is the dictionary itself; the question of whether it requires a dictionary is moot.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, DictionaryIndexConfig indexConfig) {
+    // Enable/disable of the dictionary IS the change being driven; the dictionary handler owns its own rebuild.
+    return false;
   }
 
   public static String getFileExtension() {
@@ -424,6 +515,7 @@ public class DictionaryIndexType
     for (FieldConfig fieldConfig : fieldConfigList) {
       // skip further computation of field configs which already has RAW encodingType
       if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
+        noDictionaryColumns.remove(fieldConfig.getName());
         continue;
       }
       // ensure encodingType is RAW on noDictionaryColumns
@@ -468,18 +560,18 @@ public class DictionaryIndexType
     indexingConfig.setVarLengthDictionaryColumns(null);
   }
 
-  /**
-   * Creates a MutableDictionary.
-   *
-   * Unlikes most indexes, while dictionaries are important when
-   * {@link org.apache.pinot.segment.spi.MutableSegment mutable segments} are created, they do not follow the
-   * {@link MutableIndex} interface and therefore
-   * {@link DictionaryIndexType#createMutableIndex(MutableIndexContext, IndexConfig)} is not implemented.
-   *
-   * This also means that dictionaries cannot be overridden in realtime tables.
-   */
+  /// Creates a MutableDictionary.
+  ///
+  /// Unlike most indexes, while dictionaries are important when
+  /// [`mutable segments`]\[org.apache.pinot.segment.spi.MutableSegment\] are created, they do not follow the
+  /// [org.apache.pinot.segment.spi.index.mutable.MutableIndex] interface and therefore
+  /// [DictionaryIndexType#createMutableIndex(MutableIndexContext, org.apache.pinot.spi.config.table.IndexConfig)]
+  /// is not implemented. Mutable segments create their dictionaries through this method on the dictionary index type
+  /// registered in [IndexService] instead, so a plugin that overrides the dictionary index type can override
+  /// [#createMutableDictionary(DataType, boolean, PinotDataBufferMemoryManager, int, int, String)] to substitute its
+  /// own implementation for some of the stored types.
   @Nullable
-  public static MutableDictionary createMutableDictionary(MutableIndexContext context, DictionaryIndexConfig config) {
+  public MutableDictionary createMutableDictionary(MutableIndexContext context, DictionaryIndexConfig config) {
     if (config.isDisabled()) {
       return null;
     }
@@ -499,8 +591,16 @@ public class DictionaryIndexType
     int estimatedCardinality = (int) (context.getEstimatedCardinality() * 1.21);
     String dictionaryAllocationContext =
         IndexUtil.buildAllocationContext(segmentName, column, V1Constants.Dict.FILE_EXTENSION);
-    return MutableDictionaryFactory.getMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(),
-        dictionaryColumnSize, Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
+    return createMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(), dictionaryColumnSize,
+        Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
+  }
+
+  /// Creates the mutable dictionary for the given stored type and sizing hints. Override to substitute a different
+  /// implementation for some of the stored types, and delegate to `super` for the rest.
+  protected MutableDictionary createMutableDictionary(DataType storedType, boolean offHeap,
+      PinotDataBufferMemoryManager memoryManager, int avgLength, int cardinality, String allocationContext) {
+    return MutableDictionaryFactory.getMutableDictionary(storedType, offHeap, memoryManager, avgLength, cardinality,
+        allocationContext);
   }
 
   public BuildLifecycle getIndexBuildLifecycle() {

@@ -33,40 +33,31 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
 
-/**
- * The <code>StarTreeGroupByExecutor</code> class is the group-by executor for star-tree index.
- * <ul>
- *   <li>The column in function context is function-column pair</li>
- *   <li>No transform function in aggregation</li>
- *   <li>For <code>COUNT</code> aggregation function, we need to aggregate on the pre-aggregated column</li>
- * </ul>
- */
+/// The `StarTreeGroupByExecutor` class is the group-by executor for star-tree index.
+///
+/// - The column in function context is function-column pair
+/// - No transform function in aggregation
+/// - For `COUNT` aggregation function, we need to aggregate on the pre-aggregated column
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
 
   public StarTreeGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
-      BaseProjectOperator<?> projectOperator) {
-    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, projectOperator, null);
+      BaseProjectOperator<?> projectOperator, AggregationFunctionColumnPair[] aggregationFunctionColumnPairs) {
+    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, projectOperator,
+        aggregationFunctionColumnPairs, null);
   }
 
-  public StarTreeGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
-      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator) {
-    this(queryContext, aggregationFunctions, groupByExpressions, projectOperator, null);
-  }
-
+  /// Creates an executor over the pre-aggregated columns the query was routed to.
+  ///
+  /// `aggregationFunctionColumnPairs` must be the pairs the star-tree project operator was built with, because they
+  /// depend on which star-tree was picked: a null-aware star-tree resolves `COUNT(column)` to `count__column` while a
+  /// regular one resolves it to `count__*`.
   public StarTreeGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
       ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
-      @Nullable GroupKeyGenerator groupKeyGenerator) {
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable GroupKeyGenerator groupKeyGenerator) {
     super(queryContext, aggregationFunctions, groupByExpressions, projectOperator, groupKeyGenerator);
-
-    assert aggregationFunctions != null;
-    int numAggregationFunctions = aggregationFunctions.length;
-    _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      _aggregationFunctionColumnPairs[i] =
-          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i]);
-    }
+    _aggregationFunctionColumnPairs = aggregationFunctionColumnPairs;
   }
 
   @Override

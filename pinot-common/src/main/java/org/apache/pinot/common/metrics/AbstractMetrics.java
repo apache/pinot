@@ -20,7 +20,6 @@ package org.apache.pinot.common.metrics;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -44,9 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Common code for metrics implementations.
- */
+/// Common code for metrics implementations.
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter,
     G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
 
@@ -69,7 +66,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   private final Set<String> _allowedTables;
 
   public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz) {
-    this(metricPrefix, metricsRegistry, clazz, true, Collections.emptySet());
+    this(metricPrefix, metricsRegistry, clazz, true, Set.of());
   }
 
   public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz,
@@ -81,10 +78,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     _allowedTables = addNameVariations(allowedTables);
   }
 
-  /**
-   * Some metrics use raw table name and some use table name with type. This method adds all variations of the table
-   * name to the allowed entries to make sure that all metrics are checked against the allowed tables.
-   */
+  /// Some metrics use raw table name and some use table name with type. This method adds all variations of the table
+  /// name to the allowed entries to make sure that all metrics are checked against the allowed tables.
   private static Set<String> addNameVariations(Collection<String> allowedTables) {
     return allowedTables.stream().flatMap(tableName -> TableNameBuilder.getTableNameVariations(tableName).stream())
         .collect(Collectors.toCollection(HashSet::new));
@@ -92,6 +87,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   public PinotMetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
+  }
+
+  public String getMetricPrefix() {
+    return _metricPrefix;
   }
 
   public interface QueryPhase {
@@ -148,63 +147,53 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     addPhaseTiming(tableName, phase, nanos, TimeUnit.NANOSECONDS);
   }
 
-  /**
-   * Logs the timing for a table
-   *
-   * @param tableName The table associated with this timer
-   * @param timer The name of timer
-   * @param duration The log time duration time value
-   * @param timeUnit The log time duration time unit
-   */
+  /// Logs the timing for a table
+  ///
+  /// @param tableName The table associated with this timer
+  /// @param timer The name of timer
+  /// @param duration The log time duration time value
+  /// @param timeUnit The log time duration time unit
   public void addTimedTableValue(final String tableName, T timer, final long duration, final TimeUnit timeUnit) {
     final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
 
-  /**
-   * Logs the timing for a table with an additional key
-   * @param tableName The table associated with this timer
-   * @param key The additional key associated with this timer
-   * @param timer The name of timer
-   * @param duration The log time duration time value
-   * @param timeUnit The log time duration time unit
-   */
+  /// Logs the timing for a table with an additional key
+  /// @param tableName The table associated with this timer
+  /// @param key The additional key associated with this timer
+  /// @param timer The name of timer
+  /// @param duration The log time duration time value
+  /// @param timeUnit The log time duration time unit
   public void addTimedTableValue(final String tableName, final String key, final T timer, final long duration,
       final TimeUnit timeUnit) {
     final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + key + "." + timer.getTimerName();
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
 
-  /**
-   * Logs the timing for a global timer
-   * @param timer The name of timer
-   * @param duration The log time duration time value
-   * @param timeUnit The log time duration time unit
-   */
+  /// Logs the timing for a global timer
+  /// @param timer The name of timer
+  /// @param duration The log time duration time value
+  /// @param timeUnit The log time duration time unit
   public void addTimedValue(T timer, final long duration, final TimeUnit timeUnit) {
     final String fullTimerName = _metricPrefix + timer.getTimerName();
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
 
-  /**
-   * Logs the timing for a timer with a key
-   * @param key The key associated with this timer
-   * @param timer The name of timer
-   * @param duration The log time duration time value
-   * @param timeUnit The log time duration time unit
-   */
+  /// Logs the timing for a timer with a key
+  /// @param key The key associated with this timer
+  /// @param timer The name of timer
+  /// @param duration The log time duration time value
+  /// @param timeUnit The log time duration time unit
   public void addTimedValue(final String key, final T timer, final long duration, final TimeUnit timeUnit) {
     final String fullTimerName = _metricPrefix + key + "." + timer.getTimerName();
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
 
-  /**
-   * Logs the timing for a metric
-   *
-   * @param fullTimerName The full name of timer
-   * @param duration The log time duration time value
-   * @param timeUnit The log time duration time unit
-   */
+  /// Logs the timing for a metric
+  ///
+  /// @param fullTimerName The full name of timer
+  /// @param duration The log time duration time value
+  /// @param timeUnit The log time duration time unit
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
     final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
     PinotTimer timer =
@@ -224,23 +213,19 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     removeTimer(fullTimerName);
   }
 
-  /**
-   * Logs a value to a meter.
-   *
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   */
+  /// Logs a value to a meter.
+  ///
+  /// @param meter The meter to use
+  /// @param unitCount The number of units to add to the meter
   public void addMeteredGlobalValue(final M meter, final long unitCount) {
     addMeteredGlobalValue(meter, unitCount, null);
   }
 
-  /**
-   * Logs a value to a meter.
-   *
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   * @param reusedMeter The meter to reuse
-   */
+  /// Logs a value to a meter.
+  ///
+  /// @param meter The meter to use
+  /// @param unitCount The number of units to add to the meter
+  /// @param reusedMeter The meter to reuse
   public PinotMeter addMeteredGlobalValue(final M meter, final long unitCount, PinotMeter reusedMeter) {
     if (reusedMeter != null) {
       reusedMeter.mark(unitCount);
@@ -258,73 +243,61 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  /**
-   * Logs a value to a meter with a key.
-   *
-   * @param key The key associated with this meter
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   */
+  /// Logs a value to a meter with a key.
+  ///
+  /// @param key The key associated with this meter
+  /// @param meter The meter to use
+  /// @param unitCount The number of units to add to the meter
   public void addMeteredValue(final String key, final M meter, final long unitCount) {
     addMeteredValue(key, meter, unitCount, null);
   }
 
-  /**
-   * Logs a value to a meter with a key.
-   *
-   * @param key The key associated with this meter
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   * @param reusedMeter The meter to reuse
-   */
+  /// Logs a value to a meter with a key.
+  ///
+  /// @param key The key associated with this meter
+  /// @param meter The meter to use
+  /// @param unitCount The number of units to add to the meter
+  /// @param reusedMeter The meter to reuse
   public PinotMeter addMeteredValue(final String key, final M meter, final long unitCount, PinotMeter reusedMeter) {
     String meterName = meter.getMeterName();
     final String fullMeterName = _metricPrefix + key + "." + meterName;
     return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
   }
 
-  /**
-   * Logs a value to a table-level meter.
-   *
-   * @param tableName The table name
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   */
+  /// Logs a value to a table-level meter.
+  ///
+  /// @param tableName The table name
+  /// @param meter The meter to use
+  /// @param unitCount The number of units to add to the meter
   public void addMeteredTableValue(final String tableName, final M meter, final long unitCount) {
     addMeteredTableValue(tableName, meter, unitCount, null);
   }
 
-  /**
-   * Logs a value to a table-level meter.
-   * @param tableName The table name
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   * @param reusedMeter The meter to reuse
-   */
+  /// Logs a value to a table-level meter.
+  /// @param tableName The table name
+  /// @param meter The meter to use
+  /// @param unitCount The number of units to add to the meter
+  /// @param reusedMeter The meter to reuse
   public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
       PinotMeter reusedMeter) {
     return addValueToMeter(getTableFullMeterName(tableName, meter), meter.getUnit(), unitCount, reusedMeter);
   }
 
-  /**
-   * Logs a value to a table-level meter with an additional key
-   * @param tableName The table name
-   * @param key The additional key associated with this meter
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   */
+  /// Logs a value to a table-level meter with an additional key
+  /// @param tableName The table name
+  /// @param key The additional key associated with this meter
+  /// @param meter The meter to use
+  /// @param unitCount The number of units to add to the meter
   public void addMeteredTableValue(final String tableName, final String key, final M meter, final long unitCount) {
     addMeteredTableValue(tableName, key, meter, unitCount, null);
   }
 
-  /**
-   * Logs a value to a table-level meter with an additional key
-   * @param tableName The table name
-   * @param key The additional key associated with this meter
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   * @param reusedMeter The meter to reuse
-   */
+  /// Logs a value to a table-level meter with an additional key
+  /// @param tableName The table name
+  /// @param key The additional key associated with this meter
+  /// @param meter The meter to use
+  /// @param unitCount The number of units to add to the meter
+  /// @param reusedMeter The meter to reuse
   public PinotMeter addMeteredTableValue(final String tableName, final String key, final M meter, final long unitCount,
       PinotMeter reusedMeter) {
     String meterName = meter.getMeterName();
@@ -370,16 +343,14 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     return _metricPrefix + getTableName(tableName) + "." + meterName;
   }
 
-  /**
-   * @deprecated Please use addMeteredTableValue(final String tableName, final M meter, final long unitCount), which is
-   * designed for tracking count and rates.
-   *
-   * Logs a value to a table gauge.
-   *
-   * @param tableName The table name
-   * @param gauge The gauge to use
-   * @param unitCount The number of units to add to the gauge
-   */
+  /// @deprecated Please use addMeteredTableValue(final String tableName, final M meter, final long unitCount), which is
+  /// designed for tracking count and rates.
+  ///
+  /// Logs a value to a table gauge.
+  ///
+  /// @param tableName The table name
+  /// @param gauge The gauge to use
+  /// @param unitCount The number of units to add to the gauge
   @Deprecated
   public void addValueToTableGauge(final String tableName, final G gauge, final long unitCount) {
     final String fullGaugeName = composeTableGaugeName(tableName, gauge);
@@ -405,38 +376,32 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  /**
-   * Sets the value of a table gauge.
-   *
-   * @param tableName The table name
-   * @param gauge The gauge to use
-   * @param value The value to set the gauge to
-   */
+  /// Sets the value of a table gauge.
+  ///
+  /// @param tableName The table name
+  /// @param gauge The gauge to use
+  /// @param value The value to set the gauge to
   public void setValueOfTableGauge(final String tableName, final G gauge, final long value) {
     final String fullGaugeName = composeTableGaugeName(tableName, gauge);
     setValueOfGauge(value, fullGaugeName);
   }
 
-  /**
-   * Sets the value of a table partition gauge.
-   *
-   * @param tableName The table name
-   * @param partitionId The partition name
-   * @param gauge The gauge to use
-   * @param value The value to set the gauge to
-   */
+  /// Sets the value of a table partition gauge.
+  ///
+  /// @param tableName The table name
+  /// @param partitionId The partition name
+  /// @param gauge The gauge to use
+  /// @param value The value to set the gauge to
   public void setValueOfPartitionGauge(final String tableName, final int partitionId, final G gauge, final long value) {
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
     setValueOfGauge(value, fullGaugeName);
   }
 
-  /**
-   * Sets the value of a custom global gauge.
-   *
-   * @param suffix The suffix to attach to the gauge name
-   * @param gauge The gauge to use
-   * @param value The value to set the gauge to
-   */
+  /// Sets the value of a custom global gauge.
+  ///
+  /// @param suffix The suffix to attach to the gauge name
+  /// @param gauge The gauge to use
+  /// @param value The value to set the gauge to
   public void setValueOfGlobalGauge(final G gauge, final String suffix, final long value) {
     final String fullGaugeName;
     String gaugeName = gauge.getGaugeName();
@@ -445,12 +410,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     setValueOfGauge(value, fullGaugeName);
   }
 
-  /**
-   * Sets the value of a global  gauge.
-   *
-   * @param gauge The gauge to use
-   * @param value The value to set the gauge to
-   */
+  /// Sets the value of a global  gauge.
+  ///
+  /// @param gauge The gauge to use
+  /// @param value The value to set the gauge to
   public void setValueOfGlobalGauge(final G gauge, final long value) {
     final String gaugeName = gauge.getGaugeName();
 
@@ -473,15 +436,13 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  /**
-   * @deprecated Please use addMeteredGlobalValue(final M meter, final long unitCount), which is designed for tracking
-   * count and rates.
-   *
-   * Adds a value to a table gauge.
-   *
-   * @param gauge The gauge to use
-   * @param unitCount The number of units to add to the gauge
-   */
+  /// @deprecated Please use addMeteredGlobalValue(final M meter, final long unitCount), which is designed for tracking
+  /// count and rates.
+  ///
+  /// Adds a value to a table gauge.
+  ///
+  /// @param gauge The gauge to use
+  /// @param unitCount The number of units to add to the gauge
   @Deprecated
   public void addValueToGlobalGauge(final G gauge, final long unitCount) {
     String gaugeName = gauge.getGaugeName();
@@ -501,20 +462,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  /**
-   * Get the gauge metric value for the provided gauge name
-   * @param gaugeName gauge name
-   * @return gauge value. If gauge is not present return null.
-   */
+  /// Get the gauge metric value for the provided gauge name
+  /// @param gaugeName gauge name
+  /// @return gauge value. If gauge is not present return null.
   @Nullable
   public Long getGaugeValue(final String gaugeName) {
     AtomicLong value = _gaugeValues.get(gaugeName);
     return value != null ? value.get() : null;
   }
 
-  /**
-   * Initializes all global meters (such as exceptions count) to zero.
-   */
+  /// Initializes all global meters (such as exceptions count) to zero.
   public void initializeGlobalMeters() {
     M[] meters = getMeters();
     LOGGER.info("Initializing global {} meters", meters.length);
@@ -534,48 +491,42 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  /**
-   * @deprecated please use setOrUpdateTableGauge(final String tableName, final G gauge,
-   *     final Supplier<Long> valueSupplier) instead.
-   *
-   * Adds a new gauge whose values are retrieved from a callback function.
-   * This method may be called multiple times, while it will be registered to callback function only once.
-   *
-   * @param tableName The table name
-   * @param gauge the gauge to use
-   * @param valueCallback The callback function used to retrieve the value of the gauge
-   */
+  /// @deprecated please use setOrUpdateTableGauge(final String tableName, final G gauge,
+  ///     final Supplier<Long> valueSupplier) instead.
+  ///
+  /// Adds a new gauge whose values are retrieved from a callback function.
+  /// This method may be called multiple times, while it will be registered to callback function only once.
+  ///
+  /// @param tableName The table name
+  /// @param gauge the gauge to use
+  /// @param valueCallback The callback function used to retrieve the value of the gauge
   @Deprecated
   public void addCallbackTableGaugeIfNeeded(final String tableName, final G gauge, final Callable<Long> valueCallback) {
     final String fullGaugeName = composeTableGaugeName(tableName, gauge);
     addCallbackGaugeIfNeeded(fullGaugeName, valueCallback);
   }
 
-  /**
-   * Install a per-partition table gauge.
-   *
-   * @param tableName The table name
-   * @param partitionId The partition id
-   * @param gauge The gauge to use
-   * @param valueSupplier The supplier function used to retrieve the value of the gauge.
-   */
+  /// Install a per-partition table gauge.
+  ///
+  /// @param tableName The table name
+  /// @param partitionId The partition id
+  /// @param gauge The gauge to use
+  /// @param valueSupplier The supplier function used to retrieve the value of the gauge.
   public void setOrUpdatePartitionGauge(final String tableName, final int partitionId, final G gauge,
       final Supplier<Long> valueSupplier) {
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
     setOrUpdateGauge(fullGaugeName, valueSupplier);
   }
 
-  /**
-   * @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
-   *
-   * Adds a new gauge whose values are retrieved from a callback function.
-   * This method may be called multiple times, while it will be registered to callback function only once.
-   *
-   * It's actually same as addCallbackGauge(final String metricName, final Callable<Long> valueCallback) method.
-   *
-   * @param metricName The name of the metric
-   * @param valueCallback The callback function used to retrieve the value of the gauge
-   */
+  /// @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
+  ///
+  /// Adds a new gauge whose values are retrieved from a callback function.
+  /// This method may be called multiple times, while it will be registered to callback function only once.
+  ///
+  /// It's actually same as addCallbackGauge(final String metricName, final Callable<Long> valueCallback) method.
+  ///
+  /// @param metricName The name of the metric
+  /// @param valueCallback The callback function used to retrieve the value of the gauge
   @Deprecated
   public void addCallbackGaugeIfNeeded(final String metricName, final Callable<Long> valueCallback) {
     if (!_gaugeValues.containsKey(metricName)) {
@@ -588,17 +539,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  /**
-   * @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
-   *
-   * Adds a new gauge whose values are retrieved from a callback function.
-   * Once added, the callback function cannot be updated.
-   *
-   * It's actually same as addCallbackGaugeIfNeeded(final String metricName, final Callable<Long> valueCallback) method
-   *
-   * @param metricName The name of the metric
-   * @param valueCallback The callback function used to retrieve the value of the gauge
-   */
+  /// @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
+  ///
+  /// Adds a new gauge whose values are retrieved from a callback function.
+  /// Once added, the callback function cannot be updated.
+  ///
+  /// It's actually same as addCallbackGaugeIfNeeded(final String metricName, final Callable<Long> valueCallback) method
+  ///
+  /// @param metricName The name of the metric
+  /// @param valueCallback The callback function used to retrieve the value of the gauge
   @Deprecated
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
     PinotMetricUtils
@@ -614,69 +563,59 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
             }));
   }
 
-  /**
-   * Sets or updates a gauge to the given value.
-   * The value can be updated by calling this method again.
-   *
-   * @param tableName The table name
-   * @param key The key associated with this gauge
-   * @param gauge The gauge to use
-   * @param value The value of the gauge
-   */
+  /// Sets or updates a gauge to the given value.
+  /// The value can be updated by calling this method again.
+  ///
+  /// @param tableName The table name
+  /// @param key The key associated with this gauge
+  /// @param gauge The gauge to use
+  /// @param value The value of the gauge
   public void setOrUpdateTableGauge(final String tableName, final String key, final G gauge, final long value) {
     String fullGaugeName = composeTableGaugeName(tableName, key, gauge);
     setOrUpdateGauge(fullGaugeName, value);
   }
 
-  /**
-   * Sets or updates a gauge whose values are retrieved from the given supplier function.
-   * The supplier function can be updated by calling this method again.
-   *
-   * @param tableName The table name
-   * @param key The key associated with this gauge
-   * @param gauge The gauge to use
-   * @param valueSupplier The supplier function used to retrieve the value of the gauge
-   */
+  /// Sets or updates a gauge whose values are retrieved from the given supplier function.
+  /// The supplier function can be updated by calling this method again.
+  ///
+  /// @param tableName The table name
+  /// @param key The key associated with this gauge
+  /// @param gauge The gauge to use
+  /// @param valueSupplier The supplier function used to retrieve the value of the gauge
   public void setOrUpdateTableGauge(final String tableName, final String key, final G gauge,
       final Supplier<Long> valueSupplier) {
     String fullGaugeName = composeTableGaugeName(tableName, key, gauge);
     setOrUpdateGauge(fullGaugeName, valueSupplier);
   }
 
-  /**
-   * Sets or updates a gauge to the given value.
-   * The value can be updated by calling this method again.
-   *
-   * @param tableName The table name
-   * @param gauge The gauge to use
-   * @param value The value of the gauge
-   */
+  /// Sets or updates a gauge to the given value.
+  /// The value can be updated by calling this method again.
+  ///
+  /// @param tableName The table name
+  /// @param gauge The gauge to use
+  /// @param value The value of the gauge
   public void setOrUpdateTableGauge(final String tableName, final G gauge, final long value) {
     String fullGaugeName = composeTableGaugeName(tableName, gauge);
     setOrUpdateGauge(fullGaugeName, value);
   }
 
-  /**
-   * Sets or updates a gauge whose values are retrieved from the given supplier function.
-   * The supplier function can be updated by calling this method again.
-   *
-   * @param tableName The table name
-   * @param gauge The gauge to use
-   * @param valueSupplier The supplier function used to retrieve the value of the gauge
-   */
+  /// Sets or updates a gauge whose values are retrieved from the given supplier function.
+  /// The supplier function can be updated by calling this method again.
+  ///
+  /// @param tableName The table name
+  /// @param gauge The gauge to use
+  /// @param valueSupplier The supplier function used to retrieve the value of the gauge
   public void setOrUpdateTableGauge(final String tableName, final G gauge,
       final Supplier<Long> valueSupplier) {
     String fullGaugeName = composeTableGaugeName(tableName, gauge);
     setOrUpdateGauge(fullGaugeName, valueSupplier);
   }
 
-  /**
-   * Sets or updates a gauge to the given value.
-   * The value can be updated by calling this method again.
-   *
-   * @param metricName The name of the metric
-   * @param value The value of the gauge
-   */
+  /// Sets or updates a gauge to the given value.
+  /// The value can be updated by calling this method again.
+  ///
+  /// @param metricName The name of the metric
+  /// @param value The value of the gauge
   public void setOrUpdateGauge(final String metricName, long value) {
     PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
@@ -684,13 +623,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     pinotGauge.setValue(value);
   }
 
-  /**
-   * Sets or updates a gauge whose values are retrieved from the given supplier function.
-   * The supplier function can be updated by calling this method again.
-   *
-   * @param metricName The name of the metric
-   * @param valueSupplier The supplier function used to retrieve the value of the gauge
-   */
+  /// Sets or updates a gauge whose values are retrieved from the given supplier function.
+  /// The supplier function can be updated by calling this method again.
+  ///
+  /// @param metricName The name of the metric
+  /// @param valueSupplier The supplier function used to retrieve the value of the gauge
   public void setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) {
     PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
@@ -698,9 +635,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     pinotGauge.setValueSupplier(valueSupplier);
   }
 
-  /**
-   * Like {@link #setOrUpdateGauge(String, Supplier)}
-   */
+  /// Like [#setOrUpdateGauge(String, Supplier)]
   public void setOrUpdateGauge(final String metricName, final LongSupplier valueSupplier) {
     PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
@@ -708,65 +643,53 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     pinotGauge.setValueSupplier((Supplier<Long>) () -> (Long) valueSupplier.getAsLong());
   }
 
-  /**
-   * Like {@link #setOrUpdateGauge(String, Supplier)} but using a global gauge
-   * @throws IllegalArgumentException if the gauge is not global
-   */
+  /// Like [#setOrUpdateGauge(String, Supplier)] but using a global gauge
+  /// @throws IllegalArgumentException if the gauge is not global
   public void setOrUpdateGlobalGauge(final G gauge, final Supplier<Long> valueSupplier) {
     Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
     setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
   }
 
-  /**
-   * Like {@link #setOrUpdateGauge(String, LongSupplier)} but using a global gauge
-   * @throws IllegalArgumentException if the gauge is not global
-   */
+  /// Like [#setOrUpdateGauge(String, LongSupplier)] but using a global gauge
+  /// @throws IllegalArgumentException if the gauge is not global
   public void setOrUpdateGlobalGauge(final G gauge, final LongSupplier valueSupplier) {
     Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
     setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
   }
 
-  /**
-   * Removes a global gauge given the key and the gauge
-   * @param key the key associated with the gauge
-   * @param gauge the gauge to be removed
-   */
+  /// Removes a global gauge given the key and the gauge
+  /// @param key the key associated with the gauge
+  /// @param gauge the gauge to be removed
   public void removeGlobalGauge(final String key, final G gauge) {
     final String fullGaugeName = composeGlobalGaugeName(key, gauge);
     removeGauge(fullGaugeName);
   }
 
-  /**
-   * Removes a table gauge given the table name and the gauge.
-   * The add/remove is expected to work correctly in case of being invoked across multiple threads.
-   * @param tableName table name
-   * @param gauge the gauge to be removed
-   */
+  /// Removes a table gauge given the table name and the gauge.
+  /// The add/remove is expected to work correctly in case of being invoked across multiple threads.
+  /// @param tableName table name
+  /// @param gauge the gauge to be removed
   public void removeTableGauge(final String tableName, final G gauge) {
     final String fullGaugeName = composeTableGaugeName(tableName, gauge);
     removeGauge(fullGaugeName);
   }
 
 
-  /**
-   * Removes a table gauge given the table name, the partition id and the gauge.
-   * The add/remove is expected to work correctly in case of being invoked across multiple threads.
-   * @param tableName table name
-   * @param partitionId The partition id
-   * @param gauge the gauge to be removed
-   */
+  /// Removes a table gauge given the table name, the partition id and the gauge.
+  /// The add/remove is expected to work correctly in case of being invoked across multiple threads.
+  /// @param tableName table name
+  /// @param partitionId The partition id
+  /// @param gauge the gauge to be removed
   public void removePartitionGauge(final String tableName, final int partitionId, final G gauge) {
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
     removeGauge(fullGaugeName);
   }
 
-  /**
-   * Removes a table gauge given the table name, the key and the gauge.
-   * The add/remove is expected to work correctly in case of being invoked across multiple threads.
-   * @param tableName table name
-   * @param key the key associated with the gauge
-   * @param gauge the gauge to be removed
-   */
+  /// Removes a table gauge given the table name, the key and the gauge.
+  /// The add/remove is expected to work correctly in case of being invoked across multiple threads.
+  /// @param tableName table name
+  /// @param key the key associated with the gauge
+  /// @param gauge the gauge to be removed
   public void removeTableGauge(final String tableName, final String key, final G gauge) {
     final String fullGaugeName = composeTableGaugeName(tableName, key, gauge);
     removeGauge(fullGaugeName);
@@ -788,10 +711,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     return gauge.getGaugeName() + "." + pluginName;
   }
 
-  /**
-   * Remove gauge from Pinot metrics.
-   * @param gaugeName gauge name
-   */
+  /// Remove gauge from Pinot metrics.
+  /// @param gaugeName gauge name
   public void removeGauge(final String gaugeName) {
     synchronized (_gaugeValues) {
       _gaugeValues.remove(gaugeName);
@@ -804,10 +725,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         PinotMetricUtils.makePinotMetricName(_clazz, getTableFullMeterName(tableName, meter)));
   }
 
-  /**
-   * Remove callback gauge.
-   * @param metricName metric name
-   */
+  /// Remove callback gauge.
+  /// @param metricName metric name
   private void removeGaugeFromMetricRegistry(String metricName) {
     PinotMetricUtils
         .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));

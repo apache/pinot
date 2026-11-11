@@ -23,10 +23,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.StringJoiner;
 
 
-/**
- * Pure data class for audit logging configuration.
- * Uses Jackson annotations for automatic JSON mapping from ClusterConfiguration.
- */
+/// Pure data class for audit logging configuration.
+/// Uses Jackson annotations for automatic JSON mapping from ClusterConfiguration.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class AuditConfig {
 
@@ -59,6 +57,9 @@ public final class AuditConfig {
 
   @JsonProperty("capture.response.enabled")
   private boolean _captureResponseEnabled = false;
+
+  @JsonProperty("token.resolver.class")
+  private String _tokenResolverClass = "";
 
   public boolean isEnabled() {
     return _enabled;
@@ -132,6 +133,14 @@ public final class AuditConfig {
     _captureResponseEnabled = captureResponseEnabled;
   }
 
+  public String getTokenResolverClass() {
+    return _tokenResolverClass;
+  }
+
+  public void setTokenResolverClass(String tokenResolverClass) {
+    _tokenResolverClass = tokenResolverClass;
+  }
+
   @Override
   public String toString() {
     return new StringJoiner(", ", AuditConfig.class.getSimpleName() + "[", "]").add("_enabled=" + _enabled)
@@ -143,6 +152,7 @@ public final class AuditConfig {
         .add("_useridHeader='" + _useridHeader + "'")
         .add("_useridJwtClaimName='" + _useridJwtClaimName + "'")
         .add("_captureResponseEnabled=" + _captureResponseEnabled)
+        .add("_tokenResolverClass='" + _tokenResolverClass + "'")
         .toString();
   }
 }

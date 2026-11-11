@@ -21,10 +21,11 @@ package org.apache.pinot.tools.admin.command;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.net.SocketException;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,9 @@ import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentNameGeneratorSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
@@ -52,14 +55,14 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement ImportData command.
- */
+/// Class to implement ImportData command.
 @SuppressWarnings("unused")
 @CommandLine.Command(name = "ImportData", mixinStandardHelpOptions = true)
-public class ImportDataCommand extends AbstractBaseAdminCommand implements Command {
+public class ImportDataCommand extends AbstractDatabaseBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ImportDataCommand.class);
   private static final String SEGMENT_NAME = "segment.name";
+  private static final String DEFAULT_CONTROLLER_URI =
+      String.format("http://localhost:%d", QuickstartRunner.DEFAULT_CONTROLLER_PORT);
 
   @CommandLine.Option(names = {"-dataFilePath"}, required = true, description = "data file path.")
   private String _dataFilePath;
@@ -76,19 +79,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   private String _table;
 
   @CommandLine.Option(names = {"-controllerURI"}, description = "Pinot Controller URI.")
-  private String _controllerURI = String.format("http://localhost:%d", QuickstartRunner.DEFAULT_CONTROLLER_PORT);
-
-  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
-  private String _user;
-
-  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
-  private String _password;
-
-  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
-  private String _authToken;
-
-  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
-  private String _authTokenUrl;
+  private String _controllerURI = DEFAULT_CONTROLLER_URI;
+  private boolean _controllerUriProvidedExplicitly;
 
   @CommandLine.Option(names = {"-tempDir"},
       description = "Temporary directory used to hold data during segment creation.")
@@ -96,8 +88,6 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
   @CommandLine.Option(names = {"-additionalConfigs"}, arity = "1..*", description = "Additional configs to be set.")
   private List<String> _additionalConfigs;
-
-  private AuthProvider _authProvider;
 
   public ImportDataCommand setDataFilePath(String dataFilePath) {
     _dataFilePath = dataFilePath;
@@ -124,6 +114,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
   public ImportDataCommand setControllerURI(String controllerURI) {
     _controllerURI = controllerURI;
+    _controllerUriProvidedExplicitly = true;
     return this;
   }
 
@@ -132,18 +123,8 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     return this;
   }
 
-  public ImportDataCommand setUser(String user) {
-    _user = user;
-    return this;
-  }
-
-  public ImportDataCommand setPassword(String password) {
-    _password = password;
-    return this;
-  }
-
   public ImportDataCommand setAuthProvider(AuthProvider authProvider) {
-    _authProvider = authProvider;
+    super.setAuthProvider(authProvider);
     return this;
   }
 
@@ -169,7 +150,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   }
 
   public String getControllerURI() {
-    return _controllerURI;
+    return resolveControllerURI();
   }
 
   public String getTempDir() {
@@ -178,9 +159,10 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
   @Override
   public String toString() {
+    String controllerUri = resolveControllerURI();
     String results = String
         .format("InsertData -dataFilePath %s -format %s -table %s -controllerURI %s -user %s -password %s -tempDir %s",
-            _dataFilePath, _format, _table, _controllerURI, _user, "[hidden]", _tempDir);
+            _dataFilePath, _format, _table, controllerUri, _user, _password != null ? "[hidden]" : null, _tempDir);
     if (_additionalConfigs != null) {
       results += " -additionalConfigs " + Arrays.toString(_additionalConfigs.toArray());
     }
@@ -261,7 +243,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
     // set PinotFSSpecs
     List<PinotFSSpec> pinotFSSpecs = new ArrayList<>();
-    pinotFSSpecs.add(getPinotFSSpec("file", "org.apache.pinot.spi.filesystem.LocalPinotFS", Collections.emptyMap()));
+    pinotFSSpecs.add(getPinotFSSpec("file", "org.apache.pinot.spi.filesystem.LocalPinotFS", Map.of()));
     String inputFileScheme = dataFileURI.getScheme();
     if ((inputFileScheme != null) && (!PinotFSFactory.isSchemeSupported(inputFileScheme))) {
       pinotFSSpecs.add(getPinotFSSpec(inputFileScheme, getPinotFSClassName(inputFileScheme, additionalConfigs),
@@ -280,8 +262,9 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
     // set TableSpec
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(_table);
-    tableSpec.setSchemaURI(ControllerRequestURLBuilder.baseUrl(_controllerURI).forTableSchemaGet(_table));
-    tableSpec.setTableConfigURI(ControllerRequestURLBuilder.baseUrl(_controllerURI).forTableGet(_table));
+    String controllerUri = resolveControllerURI();
+    tableSpec.setSchemaURI(ControllerRequestURLBuilder.baseUrl(controllerUri).forTableSchemaGet(_table));
+    tableSpec.setTableConfigURI(ControllerRequestURLBuilder.baseUrl(controllerUri).forTableGet(_table));
     spec.setTableSpec(tableSpec);
 
     // set SegmentNameGeneratorSpec
@@ -293,7 +276,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
     // set PinotClusterSpecs
     PinotClusterSpec pinotClusterSpec = new PinotClusterSpec();
-    pinotClusterSpec.setControllerURI(_controllerURI);
+    pinotClusterSpec.setControllerURI(controllerUri);
     PinotClusterSpec[] pinotClusterSpecs = new PinotClusterSpec[]{pinotClusterSpec};
     spec.setPinotClusterSpecs(pinotClusterSpecs);
 
@@ -360,7 +343,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
   private Map<String, String> getAdditionalConfigs(List<String> additionalConfigs) {
     if (additionalConfigs == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     Map<String, String> recordReaderConfigs = new HashMap<>();
     for (String kvPair : additionalConfigs) {
@@ -412,5 +395,26 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
       default:
         throw new IllegalArgumentException("Unsupported file format - " + format);
     }
+  }
+
+  private String resolveControllerURI() {
+    // Detect explicit controller URI: either set via setControllerURI() or changed from default by picocli
+    if (_controllerUriProvidedExplicitly || !_controllerURI.equals(DEFAULT_CONTROLLER_URI)) {
+      return _controllerURI;
+    }
+    boolean controllerFieldsCustomized =
+        _controllerHost != null || !_controllerPort.equals(DEFAULT_CONTROLLER_PORT)
+            || !_controllerProtocol.equals(CommonConstants.HTTP_PROTOCOL);
+    if (!controllerFieldsCustomized) {
+      return _controllerURI;
+    }
+    try {
+      if (_controllerHost == null) {
+        _controllerHost = NetUtils.getHostAddress();
+      }
+    } catch (SocketException | UnknownHostException e) {
+      throw new IllegalStateException("Failed to determine controller host", e);
+    }
+    return _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
   }
 }

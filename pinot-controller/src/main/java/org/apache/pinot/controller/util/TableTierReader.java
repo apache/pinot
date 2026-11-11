@@ -24,7 +24,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +36,7 @@ import org.apache.pinot.common.restlet.resources.TableTierInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
-/**
- * Reads segment storage tiers from servers for the given table.
- */
+/// Reads segment storage tiers from servers for the given table.
 public class TableTierReader {
   // Server didn't respond although segment should be hosted there per ideal state.
   private static final String ERROR_RESP_NO_RESPONSE = "NO_RESPONSE_FROM_SERVER";
@@ -59,14 +56,12 @@ public class TableTierReader {
     _helixResourceManager = helixResourceManager;
   }
 
-  /**
-   * Get the segment storage tiers for the given table. The servers or segments not responding the request are
-   * recorded in the result to be checked by caller.
-   *
-   * @param tableNameWithType table name with type
-   * @param timeoutMs timeout for reading segment tiers from servers
-   * @return details of segment storage tiers for the given table
-   */
+  /// Get the segment storage tiers for the given table. The servers or segments not responding the request are
+  /// recorded in the result to be checked by caller.
+  ///
+  /// @param tableNameWithType table name with type
+  /// @param timeoutMs timeout for reading segment tiers from servers
+  /// @return details of segment storage tiers for the given table
   public TableTierDetails getTableTierDetails(String tableNameWithType, @Nullable String segmentName, int timeoutMs)
       throws InvalidConfigException {
     return getTableTierDetails(tableNameWithType, segmentName, timeoutMs, false);
@@ -79,13 +74,14 @@ public class TableTierReader {
     if (segmentName == null) {
       serverToSegmentsMap.putAll(_helixResourceManager.getServerToSegmentsMap(tableNameWithType));
     } else {
-      List<String> segmentInList = Collections.singletonList(segmentName);
+      List<String> segmentInList = List.of(segmentName);
       for (String server : _helixResourceManager.getServers(tableNameWithType, segmentName)) {
         serverToSegmentsMap.put(server, segmentInList);
       }
     }
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
-    ServerTableTierReader serverTableTierReader = new ServerTableTierReader(_executor, _connectionManager);
+    ServerTableTierReader serverTableTierReader = new ServerTableTierReader(_executor, _connectionManager,
+        _helixResourceManager.getServerAdminAuthProvider());
     Map<String, TableTierInfo> serverToTableTierInfoMap =
         serverTableTierReader.getTableTierInfoFromServers(endpoints, tableNameWithType, segmentName, timeoutMs);
 

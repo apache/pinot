@@ -32,22 +32,28 @@ services:
       - ./pinot-docker-demo/zookeeper/data:/data
       - ./pinot-docker-demo/zookeeper/datalog:/datalog
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: apache/kafka:latest
     hostname: kafka
     ports:
       - "9092:9092"
     environment:
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka:19092,LISTENER_DOCKER_EXTERNAL://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181/kafka"
-      KAFKA_BROKER_ID: 1
-      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      # KRaft settings (no ZooKeeper required for Kafka)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Listener settings
+      KAFKA_LISTENERS: PLAINTEXT://kafka:19092,EXTERNAL://0.0.0.0:9092,CONTROLLER://kafka:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092,EXTERNAL://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Cluster settings
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: pinot-kafka-cluster-001
+      # Persist Kafka logs to the mounted volume (default is /tmp/kraft-combined-logs, which is ephemeral)
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
       - ./pinot-docker-demo/kafka/data:/var/lib/kafka/data
-    depends_on:
-      - zookeeper
   pinot-controller:
     image: apachepinot/pinot:latest
     hostname: pinot-controller
@@ -55,7 +61,7 @@ services:
       - ./pinot-docker-demo/pinot/controller:/tmp/data/controller
     ports:
       - "9000:9000"
-    command: StartController -zkAddress zookeeper:2181
+    command: StartController -zkAddress zookeeper:2181 -controllerHost pinot-controller -dataDir /tmp/data/controller
     depends_on:
       - zookeeper
       - kafka
@@ -64,7 +70,7 @@ services:
     hostname: pinot-broker
     ports:
       - "8099:8099"
-    command: StartBroker -zkAddress zookeeper:2181
+    command: StartBroker -zkAddress zookeeper:2181 -brokerHost pinot-broker
     depends_on:
       - zookeeper
       - kafka
@@ -76,7 +82,7 @@ services:
       - ./pinot-docker-demo/pinot/server:/tmp/data/server
     ports:
       - "8098:8098"
-    command: StartServer -zkAddress zookeeper:2181
+    command: StartServer -zkAddress zookeeper:2181 -serverHost pinot-server -dataDir /tmp/data/server/data -segmentDir /tmp/data/server/segments
     depends_on:
       - zookeeper
       - kafka
@@ -88,7 +94,7 @@ services:
       - ./pinot-docker-demo/pinot/minion:/tmp/data/minion
     ports:
       - "9514:9514"
-    command: StartMinion -zkAddress zookeeper:2181
+    command: StartMinion -zkAddress zookeeper:2181 -minionHost pinot-minion
     depends_on:
       - zookeeper
       - kafka

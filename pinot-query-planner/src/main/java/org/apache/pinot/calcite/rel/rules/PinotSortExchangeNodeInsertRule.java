@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import java.util.Collections;
+import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
@@ -27,17 +27,14 @@ import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 
 
-/**
- * Rewrite any sort into a relation that adds an exchange and pushes down the collation
- * to the rest of the tree. This happens for two reasons:
- * <ol>
- *   <li>Sort needs to be a distributed operation, if there are multiple nodes that are
- *   scanning data the sort ordering must be applied globally.</li>
- *   <li>It is ideal to push down the sort ordering as far as possible. If upstream nodes
- *   can send data in sorted order, then we can apply N-way merge sort and early terminate
- *   once all nodes have sent data that is no longer in the top OFFSET+LIMIT.</li>
- * </ol>
- */
+/// Rewrite any sort into a relation that adds an exchange and pushes down the collation
+/// to the rest of the tree. This happens for two reasons:
+///
+/// 1. Sort needs to be a distributed operation, if there are multiple nodes that are
+///    scanning data the sort ordering must be applied globally.
+/// 2. It is ideal to push down the sort ordering as far as possible. If upstream nodes
+///    can send data in sorted order, then we can apply N-way merge sort and early terminate
+///    once all nodes have sent data that is no longer in the top OFFSET+LIMIT.
 public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   public static final PinotSortExchangeNodeInsertRule INSTANCE =
       new PinotSortExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
@@ -55,13 +52,14 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Sort sort = call.rel(0);
-    // TODO: Assess whether sorting is needed on both sender and receiver side or only receiver side. Potentially add
-    //       SqlHint support to determine this. For now setting sort only on receiver side as sender side sorting is
-    //       not yet implemented.
+    // The Sort is re-parented on top of the exchange below, so a SortOperator always sits above this receive and is
+    // the operator that establishes the global order. Marking the receive as sort-on-receiver would only relocate that
+    // work into SortedMailboxReceiveOperator, which buffers every row from every mailbox because it does not know the
+    // fetch/offset. Leaving it false lets SortOperator pick a bounded implementation when the query has a LIMIT.
     // TODO: Revisit whether we should use hash distribution
     PinotLogicalSortExchange exchange =
-        PinotLogicalSortExchange.create(sort.getInput(), RelDistributions.hash(Collections.emptyList()),
-            sort.getCollation(), false, !sort.getCollation().getKeys().isEmpty());
+        PinotLogicalSortExchange.create(sort.getInput(), RelDistributions.hash(List.of()),
+            sort.getCollation(), false, false);
     call.transformTo(sort.copy(sort.getTraitSet(), exchange, sort.getCollation()));
   }
 }

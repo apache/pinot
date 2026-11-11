@@ -83,6 +83,12 @@ public class PostAggregationFunctionTest {
     assertTrue((Boolean) function.invoke(new Object[]{"a", null}));
     assertTrue((Boolean) function.invoke(new Object[]{"a", "b"}));
 
+    // isDistinctFrom compares numbers of different types by value, e.g. isDistinctFrom(MAX(intCol), 5)
+    function = new PostAggregationFunction("isDistinctFrom",
+        new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.LONG});
+    assertFalse((Boolean) function.invoke(new Object[]{5.0, 5L}));
+    assertTrue((Boolean) function.invoke(new Object[]{5.5, 5L}));
+
     // isNotDistinctFrom
     function = new PostAggregationFunction("isNotDistinctFrom",
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
@@ -133,5 +139,20 @@ public class PostAggregationFunctionTest {
     function = new PostAggregationFunction("plus", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
     // The function returns null if any argument is null
     assertNull(function.invoke(new Object[]{null, 1}));
+  }
+
+  /// Regression test for the single-stage post-aggregation path: arithmetic on whole-number operands - for example
+  /// `COUNT(DISTINCT ...) * 60`, which reaches here as `times(INT, INT)` because DISTINCTCOUNT is typed
+  /// INT and a small integer literal is typed INT - must return LONG rather than silently widening to DOUBLE.
+  @Test
+  public void testWholeNumberArithmeticReturnsLong() {
+    for (String functionName : new String[]{"plus", "minus", "times"}) {
+      PostAggregationFunction function =
+          new PostAggregationFunction(functionName, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+      assertEquals(function.getResultType(), ColumnDataType.LONG, functionName + "(INT, INT) should return LONG");
+    }
+    // 100000 * 100000 overflows int but fits long; the result must be a Long, not a Double.
+    assertEquals(new PostAggregationFunction("times", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT})
+        .invoke(new Object[]{100000, 100000}), 10_000_000_000L);
   }
 }

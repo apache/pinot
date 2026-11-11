@@ -19,14 +19,13 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -34,41 +33,35 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * The manager of the upsert metadata of a table.
- */
+/// The manager of the upsert metadata of a table.
 @ThreadSafe
 public interface TableUpsertMetadataManager extends Closeable {
 
   void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet);
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
   UpsertContext getContext();
 
-  /// @deprecated Use {@link #getContext()} instead.
+  /// @deprecated Use [#getContext()] instead.
   @Deprecated
   UpsertConfig.Mode getUpsertMode();
 
-  /// @deprecated Use {@link #getContext()} instead.
+  /// @deprecated Use [#getContext()] instead.
   @Deprecated
   UpsertConfig.ConsistencyMode getUpsertConsistencyMode();
 
-  /// @deprecated Use {@link #getContext()} instead.
+  /// @deprecated Use [#getContext()] instead.
   @Deprecated
   boolean isEnablePreload();
 
-  /**
-   * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
-   */
+  /// Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
   void stop();
 
-  /**
-   * Retrieves a mapping of partition id to the primary key count for the partition.
-   *
-   * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition
-   */
+  /// Retrieves a mapping of partition id to the primary key count for the partition.
+  ///
+  /// @return A `Map` where keys are partition id and values are count of primary keys for that specific partition
   Map<Integer, Long> getPartitionToPrimaryKeyCount();
 
   default void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
@@ -81,6 +74,6 @@ public interface TableUpsertMetadataManager extends Closeable {
   }
 
   default Set<String> getNewlyAddedSegments() {
-    return Collections.emptySet();
+    return Set.of();
   }
 }

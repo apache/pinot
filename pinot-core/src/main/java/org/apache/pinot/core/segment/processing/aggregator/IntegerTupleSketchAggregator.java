@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.lang.foreign.MemorySegment;
 import java.util.Map;
-import org.apache.datasketches.tuple.Sketch;
-import org.apache.datasketches.tuple.Union;
+import org.apache.datasketches.tuple.TupleSketch;
+import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -39,22 +40,24 @@ public class IntegerTupleSketchAggregator implements ValueAggregator {
   public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
     String nominalEntriesParam = functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES);
 
-    Union<IntegerSummary> integerUnion;
+    TupleUnion<IntegerSummary> integerUnion;
     IntegerSummarySetOperations setOperations = new IntegerSummarySetOperations(_mode, _mode);
 
     // Check if nominal entries is set
     if (nominalEntriesParam != null) {
-      integerUnion = new Union<>(Integer.parseInt(nominalEntriesParam), setOperations);
+      integerUnion = new TupleUnion<>(Integer.parseInt(nominalEntriesParam), setOperations);
     } else {
       // If the functionParameters don't have an explicit nominal entries value set,
       // use the default value for nominal entries
       int sketchNominalEntries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
-      integerUnion = new Union<>(sketchNominalEntries, setOperations);
+      integerUnion = new TupleUnion<>(sketchNominalEntries, setOperations);
     }
 
-    Sketch<IntegerSummary> first = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) value1);
-    Sketch<IntegerSummary> second = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) value2);
-    Sketch<IntegerSummary> result = integerUnion.union(first, second);
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(result);
+    TupleSketch<IntegerSummary> first = TupleSketch.heapifySketch(MemorySegment.ofArray((byte[]) value1),
+        new IntegerSummaryDeserializer());
+    TupleSketch<IntegerSummary> second = TupleSketch.heapifySketch(MemorySegment.ofArray((byte[]) value2),
+        new IntegerSummaryDeserializer());
+    TupleSketch<IntegerSummary> result = integerUnion.union(first, second);
+    return result.compact().toByteArray();
   }
 }

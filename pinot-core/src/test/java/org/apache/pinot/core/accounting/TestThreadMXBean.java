@@ -43,9 +43,41 @@ public class TestThreadMXBean {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
   }
 
-  /**
-   * simple memory allocation
-   */
+  @Test
+  public void testDisableThenEnableCpuTimeMeasurement() {
+    if (!ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
+      return;
+    }
+
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadCpuTime() > 0);
+
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(false);
+    Assert.assertFalse(ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled());
+    Assert.assertEquals(ThreadResourceUsageProvider.getCurrentThreadCpuTime(), 0);
+
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
+    Assert.assertTrue(ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled());
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadCpuTime() > 0);
+  }
+
+  @Test
+  public void testDisableThenEnableMemoryMeasurement() {
+    if (!ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
+      return;
+    }
+
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() > 0);
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(false);
+    Assert.assertFalse(ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled());
+    Assert.assertEquals(ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes(), 0);
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    Assert.assertTrue(ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled());
+    Assert.assertTrue(ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() > 0);
+  }
+
+  /// simple memory allocation
   @Test @io.tesseracta.annotation.TesseractaDisabledTest
   public void testThreadMXBeanSimpleMemAllocTracking() {
     if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
@@ -58,9 +90,7 @@ public class TestThreadMXBean {
     }
   }
 
-  /**
-   * multithread memory allocation test, do not remove
-   */
+  /// multithread memory allocation test, do not remove
   @SuppressWarnings("unused")
   public void testThreadMXBeanMultithreadMemAllocTracking() {
     if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
@@ -114,9 +144,7 @@ public class TestThreadMXBean {
     }
   }
 
-  /**
-   * multithreading deep memory allocation test, do not remove
-   */
+  /// multithreading deep memory allocation test, do not remove
   @SuppressWarnings("unused")
   public void testThreadMXBeanDeepMemAllocTracking() {
     if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
@@ -170,10 +198,8 @@ public class TestThreadMXBean {
     }
   }
 
-  /**
-   * test allocation and gc, getHeapMemoryUsage() tracks realtime usage, while getThreadAllocatedBytes() only tracks
-   * allocated bytes, do not remove
-   */
+  /// test allocation and gc, getHeapMemoryUsage() tracks realtime usage, while getThreadAllocatedBytes() only tracks
+  /// allocated bytes, do not remove
   @SuppressWarnings("unused")
   public void testThreadMXBeanMemAllocGCTracking() {
     LogManager.getLogger(TestThreadMXBean.class).setLevel(Level.INFO);

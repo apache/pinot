@@ -19,7 +19,6 @@
 package org.apache.pinot.core.accounting;
 
 import java.util.Collection;
-import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -27,19 +26,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,34 +81,35 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     private final WatcherTask _watcherTask;
     private final QueryResourceAggregator _queryResourceAggregator;
     private final WorkloadResourceAggregator _workloadResourceAggregator;
-    private final EnumMap<TrackingScope, ResourceAggregator> _resourceAggregators = new EnumMap<>(TrackingScope.class);
 
     public ResourceUsageAccountant(PinotConfiguration config, String instanceId, InstanceType instanceType) {
       LOGGER.info("Initializing ResourceUsageAccountant");
-      boolean cpuSamplingEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING,
-          CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_CPU_SAMPLING);
+      boolean cpuSamplingEnabled =
+          config.getProperty(Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, Accounting.DEFAULT_ENABLE_THREAD_CPU_SAMPLING);
       if (cpuSamplingEnabled && !ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
         LOGGER.warn("Thread CPU time measurement is not enabled in the JVM, disabling CPU sampling");
         cpuSamplingEnabled = false;
       }
       _cpuSamplingEnabled = cpuSamplingEnabled;
-      boolean memorySamplingEnabled =
-          config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING,
-              CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING);
+      boolean memorySamplingEnabled = config.getProperty(Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING,
+          Accounting.DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING);
       if (memorySamplingEnabled && !ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
         LOGGER.warn("Thread memory measurement is not enabled in the JVM, disabling memory sampling");
         memorySamplingEnabled = false;
       }
       _memorySamplingEnabled = memorySamplingEnabled;
-      _watcherTask = new WatcherTask(config);
+      _watcherTask = new WatcherTask(config, instanceType);
       _queryResourceAggregator =
           new QueryResourceAggregator(instanceId, instanceType, cpuSamplingEnabled, memorySamplingEnabled,
               _watcherTask._queryMonitorConfig);
-      _workloadResourceAggregator =
-          new WorkloadResourceAggregator(instanceId, instanceType, cpuSamplingEnabled, memorySamplingEnabled,
-              _watcherTask._queryMonitorConfig);
-      _resourceAggregators.put(TrackingScope.QUERY, _queryResourceAggregator);
-      _resourceAggregators.put(TrackingScope.WORKLOAD, _workloadResourceAggregator);
+      WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManagerFactory.get();
+      if (workloadBudgetManager.isCostCollectionEnabled()) {
+        _workloadResourceAggregator =
+            new WorkloadResourceAggregator(instanceId, instanceType, cpuSamplingEnabled, memorySamplingEnabled,
+                _watcherTask._queryMonitorConfig, workloadBudgetManager);
+      } else {
+        _workloadResourceAggregator = null;
+      }
       LOGGER.info(
           "Initialized ResourceUsageAccountant for {}: {} with cpuSamplingEnabled: {}, memorySamplingEnabled: {}",
           instanceType, instanceId, cpuSamplingEnabled, memorySamplingEnabled);
@@ -134,16 +136,22 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     }
 
     @Override
+    public boolean waitIfPaused() {
+      return _queryResourceAggregator.waitIfPaused();
+    }
+
+    @Override
     public void clear() {
       ThreadResourceTrackerImpl threadTracker = _threadLocalEntry.get();
       assert threadTracker.getThreadContext() != null;
       QueryExecutionContext executionContext = threadTracker.getThreadContext().getExecutionContext();
-      String queryId = executionContext.getCid();
-      String workloadName = executionContext.getWorkloadName();
       long cpuTimeNs = threadTracker.getCpuTimeNs();
       long allocatedBytes = threadTracker.getAllocatedBytes();
-      _queryResourceAggregator.updateUntrackedResourceUsage(queryId, cpuTimeNs, allocatedBytes);
-      _workloadResourceAggregator.updateUntrackedResourceUsage(workloadName, cpuTimeNs, allocatedBytes);
+      _queryResourceAggregator.updateUntrackedResourceUsage(executionContext.getCid(), cpuTimeNs, allocatedBytes);
+      if (_workloadResourceAggregator != null) {
+        _workloadResourceAggregator.updateUntrackedResourceUsage(executionContext.getWorkloadName(), cpuTimeNs,
+            allocatedBytes);
+      }
       threadTracker.clear();
     }
 
@@ -156,7 +164,14 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       if (!_memorySamplingEnabled) {
         allocatedBytes = 0;
       }
-      _resourceAggregators.get(trackingScope).updateUntrackedResourceUsage(identifier, cpuTimeNs, allocatedBytes);
+      if (trackingScope == TrackingScope.QUERY) {
+        _queryResourceAggregator.updateUntrackedResourceUsage(identifier, cpuTimeNs, allocatedBytes);
+      } else {
+        assert trackingScope == TrackingScope.WORKLOAD;
+        if (_workloadResourceAggregator != null) {
+          _workloadResourceAggregator.updateUntrackedResourceUsage(identifier, cpuTimeNs, allocatedBytes);
+        }
+      }
     }
 
     @Override
@@ -191,10 +206,13 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
 
     private class WatcherTask implements Runnable, PinotClusterConfigChangeListener {
       final AtomicReference<QueryMonitorConfig> _queryMonitorConfig = new AtomicReference<>();
+      final InstanceType _instanceType;
 
-      int _sleepTime;
+      long _nextQueryAggregateTimeMs;
+      long _nextWorkloadAggregateTimeMs;
 
-      WatcherTask(PinotConfiguration config) {
+      WatcherTask(PinotConfiguration config, InstanceType instanceType) {
+        _instanceType = instanceType;
         QueryMonitorConfig queryMonitorConfig = new QueryMonitorConfig(config, ResourceUsageUtils.getMaxHeapSize());
         _queryMonitorConfig.set(queryMonitorConfig);
         logQueryMonitorConfig(queryMonitorConfig);
@@ -209,49 +227,62 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
         try {
           //noinspection InfiniteLoopStatement
           while (true) {
-            try {
-              runOnce();
-            } finally {
+            int sleepTimeMs = runOnce();
+            if (sleepTimeMs > 0) {
               //noinspection BusyWait
-              Thread.sleep(_sleepTime);
+              Thread.sleep(sleepTimeMs);
             }
           }
         } catch (InterruptedException e) {
           LOGGER.warn("WatcherTask interrupted, exiting.");
+        } catch (Error e) {
+          LOGGER.error("Caught unexpected error in WatcherTask", e);
         }
       }
 
-      private void runOnce() {
+      private int runOnce() {
+        boolean runQueryAggregate = false;
+        boolean runWorkloadAggregate = false;
+        int sleepTimeMs;
         try {
-          runPreAggregation();
-          runAggregation();
-          runPostAggregation();
-        } catch (Exception e) {
+          if (_nextQueryAggregateTimeMs <= System.currentTimeMillis()) {
+            runQueryAggregate = true;
+            runAggregate(_queryResourceAggregator);
+          }
+          if (_workloadResourceAggregator != null && _nextWorkloadAggregateTimeMs <= System.currentTimeMillis()) {
+            runWorkloadAggregate = true;
+            runAggregate(_workloadResourceAggregator);
+          }
+        } catch (RuntimeException e) {
           LOGGER.error("Caught exception while executing stats aggregation and query kill", e);
           // TODO: Add a metric to track the number of watcher task errors.
         } finally {
           LOGGER.debug("_threadTrackers size: {}", _threadTrackers.size());
-          for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
-            resourceAggregator.cleanUpPostAggregation();
+          if (runQueryAggregate) {
+            _queryResourceAggregator.cleanUpPostAggregation();
           }
-          // Get sleeptime from both resourceAggregators. Pick the minimum. PerQuery Accountant modifies the sleep
-          // time when condition is critical.
-          int sleepTime = Integer.MAX_VALUE;
-          for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
-            sleepTime = Math.min(sleepTime, resourceAggregator.getAggregationSleepTimeMs());
+          if (runWorkloadAggregate) {
+            _workloadResourceAggregator.cleanUpPostAggregation();
           }
-          _sleepTime = sleepTime;
+          long currentTimeMs = System.currentTimeMillis();
+          if (runQueryAggregate) {
+            _nextQueryAggregateTimeMs = currentTimeMs + _queryResourceAggregator.getAggregationSleepTimeMs();
+          }
+          if (runWorkloadAggregate) {
+            _nextWorkloadAggregateTimeMs = currentTimeMs + _workloadResourceAggregator.getAggregationSleepTimeMs();
+          }
+          assert _nextQueryAggregateTimeMs > 0;
+          long nextAggregateTimeMs = _nextQueryAggregateTimeMs;
+          if (_nextWorkloadAggregateTimeMs > 0) {
+            nextAggregateTimeMs = Math.min(nextAggregateTimeMs, _nextWorkloadAggregateTimeMs);
+          }
+          sleepTimeMs = (int) (nextAggregateTimeMs - currentTimeMs);
         }
+        return sleepTimeMs;
       }
 
-      private void runPreAggregation() {
-        // Call the pre-aggregation methods for each ResourceAggregator.
-        for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
-          resourceAggregator.preAggregate(_threadTrackers.values());
-        }
-      }
-
-      private void runAggregation() {
+      private void runAggregate(ResourceAggregator resourceAggregator) {
+        resourceAggregator.preAggregate(_threadTrackers.values());
         Iterator<Map.Entry<Thread, ThreadResourceTrackerImpl>> iterator = _threadTrackers.entrySet().iterator();
         while (iterator.hasNext()) {
           Map.Entry<Thread, ThreadResourceTrackerImpl> entry = iterator.next();
@@ -260,43 +291,23 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
             LOGGER.debug("Thread: {} is no longer alive, removing it from _threadTrackers", thread.getName());
             iterator.remove();
           } else {
-            for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
-              resourceAggregator.aggregate(entry.getValue());
-            }
+            resourceAggregator.aggregate(entry.getValue());
           }
         }
-      }
-
-      private void runPostAggregation() {
-        for (ResourceAggregator resourceAggregator : _resourceAggregators.values()) {
-          resourceAggregator.postAggregate();
-        }
+        resourceAggregator.postAggregate();
       }
 
       @Override
-      public synchronized void onChange(Set<String> changedConfigs,
-          Map<String, String> clusterConfigs) {        // Filter configs that have CommonConstants
-        // .PREFIX_SCHEDULER_PREFIX
-        Set<String> filteredChangedConfigs = changedConfigs.stream()
-            .filter(config -> config.startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .map(config -> config.replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""))
-            .collect(Collectors.toSet());
-
-        if (filteredChangedConfigs.isEmpty()) {
+      public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+        ThreadAccountantUtils.AccountingConfigChange change =
+            ThreadAccountantUtils.filterAccountingConfigChange(changedConfigs, clusterConfigs, _instanceType);
+        if (change.isEmpty()) {
           LOGGER.debug("No relevant configs changed, skipping update for QueryMonitorConfig.");
           return;
         }
-
-        Map<String, String> filteredClusterConfigs = clusterConfigs.entrySet()
-            .stream()
-            .filter(entry -> entry.getKey().startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .collect(Collectors.toMap(
-                entry -> entry.getKey().replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""),
-                Map.Entry::getValue));
-
         QueryMonitorConfig oldConfig = getQueryMonitorConfig();
         QueryMonitorConfig newConfig =
-            new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
+            new QueryMonitorConfig(oldConfig, change.getChangedConfigs(), change.getClusterConfigs());
         _queryMonitorConfig.set(newConfig);
         logQueryMonitorConfig(newConfig);
       }
@@ -313,6 +324,8 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
         LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
         LOGGER.info("_cpuTimeBasedKillingEnabled: {}", queryMonitorConfig.isCpuTimeBasedKillingEnabled());
         LOGGER.info("_cpuTimeBasedKillingThresholdNs: {}", queryMonitorConfig.getCpuTimeBasedKillingThresholdNs());
+        LOGGER.info("_oomPreQueryKillPauseDurationMs: {}", queryMonitorConfig.getOomPreQueryKillPauseDurationMs());
+        LOGGER.info("_oomPanicPreQueryKillPauseEnabled: {}", queryMonitorConfig.isOomPanicPreQueryKillPauseEnabled());
         LOGGER.info("_workloadSleepTimeMs: {}", queryMonitorConfig.getWorkloadSleepTimeMs());
         LOGGER.info("_workloadCostEnforcementEnabled: {}", queryMonitorConfig.isWorkloadCostEnforcementEnabled());
       }

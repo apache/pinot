@@ -21,30 +21,23 @@ package org.apache.pinot.spi.ingestion.batch.runner;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 
 
-/**
- * IngestionJobRunner is the interface of ingestion job runner.
- *
- * For batch ingestion jobs, there are three types:
- *    SegmentGenerationJobRunner
- *    SegmentTarPushJobRunner
- *    SegmentUriPushJobRunner
- *    SegmentMetadataPushJobRunner
- *
- */
+/// IngestionJobRunner is the interface of ingestion job runner.
+///
+/// For batch ingestion jobs, there are three types:
+///    SegmentGenerationJobRunner
+///    SegmentTarPushJobRunner
+///    SegmentUriPushJobRunner
+///    SegmentMetadataPushJobRunner
 public interface IngestionJobRunner {
 
-  /**
-   * Initialize IngestionJobRunner with SegmentGenerationJobSpec
-   *
-   * @param jobSpec
-   */
+  /// Initialize IngestionJobRunner with SegmentGenerationJobSpec
+  ///
+  /// @param jobSpec
   void init(SegmentGenerationJobSpec jobSpec);
 
-  /**
-   * Run IngestionJobRunner
-   *
-   * @throws Exception
-   */
+  /// Run IngestionJobRunner
+  ///
+  /// @throws Exception
   void run()
       throws Exception;
 }

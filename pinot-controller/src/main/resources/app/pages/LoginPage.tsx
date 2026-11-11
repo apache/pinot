@@ -77,11 +77,11 @@ const LoginPage = (props) => {
     const isUserAuthenticated = await PinotMethodUtils.verifyAuth(authToken);
     if(isUserAuthenticated){
       setInvalidToken(false);
-      props.setIsAuthenticated(true);
+      app_state.username = data.username;
       app_state.authWorkflow = AuthWorkflow.BASIC;
       app_state.authToken = authToken;
+      props.setIsAuthenticated(true);
       props.history.push(app_state.queryConsoleOnlyView ? '/query' : '/');
-      app_state.username = data.username;
     } else {
       setInvalidToken(true);
     }

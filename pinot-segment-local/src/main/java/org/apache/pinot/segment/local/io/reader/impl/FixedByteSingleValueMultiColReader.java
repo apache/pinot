@@ -24,20 +24,17 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- *
- * Generic utility class to read data from file. The data file consists of rows
- * and columns. The number of columns are fixed. Each column can have either
- * single value or multiple values. There are two basic types of methods to read
- * the data <br>
- * 1. &lt;TYPE&gt; getType(int row, int col) this is used for single value column <br>
- * 2. int getTYPEArray(int row, int col, TYPE[] array). The caller has to create
- * and initialize the array. The implementation will fill up the array. The
- * caller is responsible to ensure that the array is big enough to fit all the
- * values. The return value tells the number of values.<br>
- *
- *
- */
+/// Generic utility class to read data from file. The data file consists of rows
+/// and columns. The number of columns are fixed. Each column can have either
+/// single value or multiple values. There are two basic types of methods to read
+/// the data
+///
+/// 1. &lt;TYPE&gt; getType(int row, int col) this is used for single value column
+///
+/// 2. int getTYPEArray(int row, int col, TYPE\[\] array). The caller has to create
+/// and initialize the array. The implementation will fill up the array. The
+/// caller is responsible to ensure that the array is big enough to fit all the
+/// values. The return value tells the number of values.
 public class FixedByteSingleValueMultiColReader implements Closeable {
   private final PinotDataBuffer _dataBuffer;
   private final int _numRows;
@@ -59,108 +56,85 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
     _rowSize = offset;
   }
 
-  /**
-   * Computes the offset where the actual column data can be read
-   *
-   * @param row
-   * @param col
-   * @return
-   */
+  /// Computes the offset where the actual column data can be read
+  ///
+  /// @param row
+  /// @param col
+  /// @return
   private int computeOffset(int row, int col) {
     final int offset = row * _rowSize + _columnOffSets[col];
     return offset;
   }
 
-  /**
-   *
-   * @param row
-   * @param col
-   * @return
-   */
+  /// @param row
+  /// @param col
+  /// @return
   public char getChar(int row, int col) {
     final int offset = computeOffset(row, col);
     return _dataBuffer.getChar(offset);
   }
 
-  /**
-   *
-   * @param row
-   * @param col
-   * @return
-   */
+  /// @param row
+  /// @param col
+  /// @return
   public short getShort(int row, int col) {
     final int offset = computeOffset(row, col);
     return _dataBuffer.getShort(offset);
   }
 
-  /**
-   *
-   * @param row
-   * @param col
-   * @return
-   */
+  /// @param row
+  /// @param col
+  /// @return
   public int getInt(int row, int col) {
     assert getColumnSizes()[col] == 4;
     final int offset = computeOffset(row, col);
     return _dataBuffer.getInt(offset);
   }
 
-  /**
-   *
-   * @param row
-   * @param col
-   * @return
-   */
+  /// @param row
+  /// @param col
+  /// @return
   public long getLong(int row, int col) {
     assert getColumnSizes()[col] == 8;
     final int offset = computeOffset(row, col);
     return _dataBuffer.getLong(offset);
   }
 
-  /**
-   *
-   * @param row
-   * @param col
-   * @return
-   */
+  /// @param row
+  /// @param col
+  /// @return
   public float getFloat(int row, int col) {
     assert getColumnSizes()[col] == 4;
     final int offset = computeOffset(row, col);
     return _dataBuffer.getFloat(offset);
   }
 
-  /**
-   * Reads the double at row,col
-   *
-   * @param row
-   * @param col
-   * @return
-   */
+  /// Reads the double at row,col
+  ///
+  /// @param row
+  /// @param col
+  /// @return
   public double getDouble(int row, int col) {
     assert getColumnSizes()[col] == 8;
     final int offset = computeOffset(row, col);
     return _dataBuffer.getDouble(offset);
   }
 
-  /**
-   * Returns the string value, NOTE: It expects all String values in the file
-   * to be of same length
-   *
-   * @param row
-   * @param col
-   * @return
-   */
+  /// Returns the string value, NOTE: It expects all String values in the file
+  /// to be of same length
+  ///
+  /// @param row
+  /// @param col
+  /// @return
   public String getString(int row, int col) {
     return new String(getBytes(row, col), UTF_8);
   }
 
-  /**
-   * Generic method to read the raw bytes
-   *
-   * @param row
-   * @param col
-   * @return
-   */
+  /// Generic method to read the raw bytes
+  ///
+  /// @param row
+  /// @param col
+  /// @return
   public byte[] getBytes(int row, int col) {
     final int length = getColumnSizes()[col];
     final byte[] dst = new byte[length];

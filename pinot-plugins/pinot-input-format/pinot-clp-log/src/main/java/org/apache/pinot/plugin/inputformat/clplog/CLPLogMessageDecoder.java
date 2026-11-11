@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.plugin.inputformat.clplog;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
@@ -33,16 +31,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * An implementation of StreamMessageDecoder to read log events from a stream. This is an experimental feature.
- * It allows us to encode user-specified fields of a log event using CLP. See {@link CLPLogRecordExtractor} for more
- * details. The implementation is based on {@link org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder}.
- */
+/// An implementation of StreamMessageDecoder to read log events from a stream. This is an experimental feature.
+/// It allows us to encode user-specified fields of a log event using CLP. See [CLPLogRecordExtractor] for more
+/// details. The implementation is based on [org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder].
 public class CLPLogMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String ERROR_SAMPLING_PERIOD_CONFIG_KEY = "errorSamplingPeriod";
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogMessageDecoder.class);
   private static final int DEFAULT_ERROR_SAMPLING_PERIOD = 10000;
-  private final ServerMetrics _serverMetrics = ServerMetrics.get();
 
   private RecordExtractor<Map<String, Object>> _recordExtractor;
   // Period at which errors should be sampled for printing:
@@ -70,7 +65,7 @@ public class CLPLogMessageDecoder implements StreamMessageDecoder<byte[]> {
     RecordExtractorConfig config = PluginManager.get().createInstance(recordExtractorConfigClass);
     config.init(props);
     if (_recordExtractor instanceof CLPLogRecordExtractor) {
-      ((CLPLogRecordExtractor) _recordExtractor).init(fieldsToRead, config, topicName, _serverMetrics);
+      ((CLPLogRecordExtractor) _recordExtractor).init(fieldsToRead, config, topicName);
     } else {
       _recordExtractor.init(fieldsToRead, config);
     }
@@ -99,8 +94,9 @@ public class CLPLogMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     try {
-      JsonNode jsonNode = JsonUtils.bytesToJsonNode(payload, offset, length);
-      return _recordExtractor.extract(JsonUtils.jsonNodeToMap(jsonNode), destination);
+      // Parse directly to Map, avoiding intermediate JsonNode representation for better performance
+      Map<String, Object> jsonMap = JsonUtils.bytesToMap(payload, offset, length);
+      return _recordExtractor.extract(jsonMap, destination);
     } catch (Exception e) {
       if (_errorSamplingPeriod != 0) {
         _numErrorsUntilNextPrint--;

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,11 +28,14 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -103,5 +107,100 @@ public class TableConfigTest {
 
     assertEquals(config, copy);
     assertEquals(config.toJsonString(), copy.toJsonString());
+  }
+
+  @Test
+  public void testDuplicateTableSamplerNamesRejected() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    List<TableSamplerConfig> duplicateSamplers = List.of(
+        new TableSamplerConfig("sampler1", "firstN", Map.of("numSegments", "10")),
+        new TableSamplerConfig("sampler1", "firstN", Map.of("numSegments", "1")));
+    IllegalArgumentException e = Assert.expectThrows(IllegalArgumentException.class,
+        () -> config.setTableSamplers(duplicateSamplers));
+    assertTrue(e.getMessage().contains("Duplicate table sampler name: sampler1"));
+  }
+
+  @Test
+  public void testDuplicateTableSamplerNamesRejectedAfterNormalization() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    List<TableSamplerConfig> duplicateSamplers = List.of(
+        new TableSamplerConfig("sampler1", "firstN", Map.of("numSegments", "10")),
+        new TableSamplerConfig(" Sampler1 ", "firstN", Map.of("numSegments", "1")));
+    IllegalArgumentException e = Assert.expectThrows(IllegalArgumentException.class,
+        () -> config.setTableSamplers(duplicateSamplers));
+    assertTrue(e.getMessage().contains("Duplicate table sampler name: Sampler1"));
+  }
+
+  @Test
+  public void testBlankTableSamplerNameRejected() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    List<TableSamplerConfig> samplers =
+        List.of(new TableSamplerConfig("  ", "firstN", Map.of("numSegments", "10")));
+    IllegalArgumentException e =
+        Assert.expectThrows(IllegalArgumentException.class, () -> config.setTableSamplers(samplers));
+    assertTrue(e.getMessage().contains("Table sampler name cannot be blank"));
+  }
+
+  @Test
+  public void testDescriptionAndTagsSerdeRoundtrip()
+      throws IOException {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setDescription("Tracks all user events in real-time.")
+        .setTags(List.of("real-time", "production"))
+        .build();
+
+    assertThat(config.getDescription()).isEqualTo("Tracks all user events in real-time.");
+    assertThat(config.getTags()).containsExactly("real-time", "production");
+
+    String json = config.toJsonString();
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
+    assertThat(jsonNode.get("description").asText()).isEqualTo("Tracks all user events in real-time.");
+    assertThat(jsonNode.get("tags").size()).isEqualTo(2);
+
+    TableConfig deserialized = JsonUtils.stringToObject(json, TableConfig.class);
+    assertThat(deserialized.getDescription()).isEqualTo("Tracks all user events in real-time.");
+    assertThat(deserialized.getTags()).containsExactly("real-time", "production");
+    assertThat(deserialized).isEqualTo(config);
+  }
+
+  @Test
+  public void testDescriptionAndTagsOmittedWhenNotSet()
+      throws IOException {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .build();
+
+    assertThat(config.getDescription()).isNull();
+    assertThat(config.getTags()).isNull();
+
+    String json = config.toJsonString();
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
+    assertThat(jsonNode.has("description")).as("description should be absent when null").isFalse();
+    assertThat(jsonNode.has("tags")).as("tags should be absent when null").isFalse();
+  }
+
+  @Test
+  public void testOldJsonWithoutDescriptionDeserializesCleanly()
+      throws IOException {
+    // Minimal old-format JSON without description field
+    String oldJson = "{\"tableName\":\"testTable_OFFLINE\",\"tableType\":\"OFFLINE\","
+        + "\"segmentsConfig\":{},\"tenants\":{},\"tableIndexConfig\":{}}";
+    TableConfig config = JsonUtils.stringToObject(oldJson, TableConfig.class);
+    assertThat(config.getDescription()).isNull();
+  }
+
+  @Test
+  public void testCopyConstructorCopiesDescriptionAndTags() {
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setDescription("Original description")
+        .setTags(List.of("production", "critical"))
+        .build();
+
+    TableConfig copy = new TableConfig(config);
+    assertThat(copy.getDescription()).isEqualTo("Original description");
+    assertThat(copy.getTags()).containsExactly("production", "critical");
+    assertThat(config).isEqualTo(copy);
   }
 }

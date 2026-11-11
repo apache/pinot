@@ -22,9 +22,7 @@ import com.google.common.base.Joiner;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 
 
-/**
- * Property key definitions for all kafka stream related properties
- */
+/// Property key definitions for all kafka stream related properties
 public class KafkaStreamConfigProperties {
   private KafkaStreamConfigProperties() {
   }
@@ -32,25 +30,11 @@ public class KafkaStreamConfigProperties {
   public static final String DOT_SEPARATOR = ".";
   public static final String STREAM_TYPE = "kafka";
 
-  /**
-   * Helper method to create a property string for kafka stream
-   * @param property
-   * @return
-   */
+  /// Helper method to create a property string for kafka stream
+  /// @param property
+  /// @return
   public static String constructStreamProperty(String property) {
     return Joiner.on(DOT_SEPARATOR).join(StreamConfigProperties.STREAM_PREFIX, property);
-  }
-
-  public static class HighLevelConsumer {
-    public static final String KAFKA_HLC_BOOTSTRAP_SERVER = "kafka.hlc.bootstrap.server";
-    public static final String KAFKA_HLC_ZK_CONNECTION_STRING = "kafka.hlc.zk.connect.string";
-    public static final String ZK_SESSION_TIMEOUT_MS = "zookeeper.session.timeout.ms";
-    public static final String ZK_CONNECTION_TIMEOUT_MS = "zookeeper.connection.timeout.ms";
-    public static final String ZK_SYNC_TIME_MS = "zookeeper.sync.time.ms";
-    public static final String REBALANCE_MAX_RETRIES = "rebalance.max.retries";
-    public static final String REBALANCE_BACKOFF_MS = "rebalance.backoff.ms";
-    public static final String AUTO_COMMIT_ENABLE = "auto.commit.enable";
-    public static final String AUTO_OFFSET_RESET = "auto.offset.reset";
   }
 
   public static class LowLevelConsumer {
@@ -68,4 +52,23 @@ public class KafkaStreamConfigProperties {
   }
 
   public static final String KAFKA_CONSUMER_PROP_PREFIX = "kafka.consumer.prop";
+
+  /// Default value of the Kafka client property `auto.offset.reset`
+  ///
+  /// Pinot always seeks the consumer to an explicit start offset before polling, so this policy takes effect only
+  /// when that offset is no longer in kafka. `earliest` then resumes from the oldest retained record, so
+  /// only the records the broker actually deleted are skipped. Kafka's own default (`latest`) would instead jump to
+  /// the end of the partition log and drop every retained record in between.
+  ///
+  /// This is deliberately independent of the table's initial-offset criteria
+  /// (`stream.<streamType>.consumer.prop.auto.offset.reset`), which only decides where a partition with no prior
+  /// offset starts consuming. To override, set the raw Kafka property `auto.offset.reset` in `streamConfigs`;
+  /// accepted values are Kafka's own (`earliest`, `latest`, `none`).
+  public static final String AUTO_OFFSET_RESET_DEFAULT = "earliest";
+
+  /// Optional comma-separated list of Kafka partition IDs or inclusive ranges to consume
+  /// (e.g. "0,2,5" or "0-399" or "0-99,200,300-399").
+  /// When set, only these partitions are used for the table; when absent, all topic partitions are consumed.
+  /// The total number of unique partition IDs must not exceed 10,000.
+  public static final String PARTITION_IDS = "kafka.partition.ids";
 }

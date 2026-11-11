@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
@@ -48,15 +47,16 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * The {@code ExpressionScanDocIdIterator} is the scan-based iterator for ExpressionFilterDocIdSet that can handle
- * filters on the expressions. It leverages the projection operator to batch processing the records block by block.
- */
+/// The `ExpressionScanDocIdIterator` is the scan-based iterator for ExpressionFilterDocIdSet that can handle
+/// filters on the expressions. It leverages the projection operator to batch processing the records block by block.
 public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator {
   private final TransformFunction _transformFunction;
   private final PredicateEvaluator _predicateEvaluator;
   private final Map<String, DataSource> _dataSourceMap;
   private final int _endDocId;
+  // Scratch buffer handed to the doc-id source operators; each nextBlock() call on the source overwrites it. Do not
+  // read it to attribute results to docIds after further blocks have been pulled — use ValueBlock.getDocIds() of the
+  // block being processed instead (see processProjectionBlock).
   private final int[] _docIdBuffer = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
   private final boolean _nullHandlingEnabled;
   private final PredicateEvaluationResult _predicateEvaluationResult;
@@ -156,6 +156,12 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
 
   private void processProjectionBlock(ProjectionBlock projectionBlock, BitmapDataProvider matchingDocIds) {
     int numDocs = projectionBlock.getNumDocs();
+    // Read the docIds from the projection block being processed instead of _docIdBuffer: a pluggable projection
+    // operator (see ProjectionOperatorUtils) may pull multiple blocks from the doc-id source before this block is
+    // processed, and each pull overwrites _docIdBuffer. The block's docIds are guaranteed to be position-aligned
+    // with the values fetched for it.
+    int[] docIds = projectionBlock.getDocIds();
+    assert docIds != null : "ProjectionBlock must expose docIds for expression evaluation";
     TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();
     if (resultMetadata.isSingleValue()) {
       _numEntriesScanned += numDocs;
@@ -164,7 +170,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
         nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
         if (nullBitmap != null) {
           for (int i : nullBitmap) {
-            matchingDocIds.add(_docIdBuffer[i]);
+            matchingDocIds.add(docIds[i]);
           }
         }
         return;
@@ -179,13 +185,13 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < numDocs; i++) {
             if (_predicateEvaluator.applySV(dictIds[i]) == predicateEvaluationResult && !nullBitmap.contains(i)) {
-              matchingDocIds.add(_docIdBuffer[i]);
+              matchingDocIds.add(docIds[i]);
             }
           }
         } else {
           for (int i = 0; i < numDocs; i++) {
             if (_predicateEvaluator.applySV(dictIds[i]) == predicateEvaluationResult) {
-              matchingDocIds.add(_docIdBuffer[i]);
+              matchingDocIds.add(docIds[i]);
             }
           }
         }
@@ -199,13 +205,13 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             if (nullBitmap != null && !nullBitmap.isEmpty()) {
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(intValues[i]) == predicateEvaluationResult && !nullBitmap.contains(i)) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             } else {
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(intValues[i]) == predicateEvaluationResult) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             }
@@ -219,13 +225,13 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(longValues[i]) == predicateEvaluationResult && !nullBitmap.contains(
                     i)) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             } else {
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(longValues[i]) == predicateEvaluationResult) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             }
@@ -239,13 +245,13 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(floatValues[i]) == predicateEvaluationResult && !nullBitmap.contains(
                     i)) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             } else {
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(floatValues[i]) == predicateEvaluationResult) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             }
@@ -259,13 +265,13 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(doubleValues[i]) == predicateEvaluationResult && !nullBitmap.contains(
                     i)) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             } else {
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(doubleValues[i]) == predicateEvaluationResult) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             }
@@ -279,13 +285,13 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(stringValues[i]) == predicateEvaluationResult && !nullBitmap.contains(
                     i)) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             } else {
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(stringValues[i]) == predicateEvaluationResult) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             }
@@ -299,13 +305,13 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(bytesValues[i]) == predicateEvaluationResult && !nullBitmap.contains(
                     i)) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             } else {
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(bytesValues[i]) == predicateEvaluationResult) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             }
@@ -319,13 +325,13 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(bigDecimalValues[i]) == predicateEvaluationResult
                     && !nullBitmap.contains(i)) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             } else {
               for (int i = 0; i < numDocs; i++) {
                 if (_predicateEvaluator.applySV(bigDecimalValues[i]) == predicateEvaluationResult) {
-                  matchingDocIds.add(_docIdBuffer[i]);
+                  matchingDocIds.add(docIds[i]);
                 }
               }
             }
@@ -348,7 +354,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
           int numDictIds = dictIds.length;
           _numEntriesScanned += numDictIds;
           if (_predicateEvaluator.applyMV(dictIds, numDictIds) == predicateEvaluationResult) {
-            matchingDocIds.add(_docIdBuffer[i]);
+            matchingDocIds.add(docIds[i]);
           }
         }
       } else {
@@ -360,7 +366,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               int numValues = values.length;
               _numEntriesScanned += numValues;
               if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(_docIdBuffer[i]);
+                matchingDocIds.add(docIds[i]);
               }
             }
             break;
@@ -371,7 +377,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               int numValues = values.length;
               _numEntriesScanned += numValues;
               if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(_docIdBuffer[i]);
+                matchingDocIds.add(docIds[i]);
               }
             }
             break;
@@ -382,7 +388,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               int numValues = values.length;
               _numEntriesScanned += numValues;
               if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(_docIdBuffer[i]);
+                matchingDocIds.add(docIds[i]);
               }
             }
             break;
@@ -393,7 +399,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               int numValues = values.length;
               _numEntriesScanned += numValues;
               if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(_docIdBuffer[i]);
+                matchingDocIds.add(docIds[i]);
               }
             }
             break;
@@ -404,7 +410,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               int numValues = values.length;
               _numEntriesScanned += numValues;
               if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
-                matchingDocIds.add(_docIdBuffer[i]);
+                matchingDocIds.add(docIds[i]);
               }
             }
             break;
@@ -420,9 +426,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     return _numEntriesScanned;
   }
 
-  /**
-   * NOTE: This operator contains only one block.
-   */
+  /// NOTE: This operator contains only one block.
   private class RangeDocIdSetOperator extends BaseDocIdSetOperator {
     static final String EXPLAIN_NAME = "DOC_ID_SET_RANGE";
 
@@ -450,7 +454,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
 
     @Override
     public List<Operator> getChildOperators() {
-      return Collections.emptyList();
+      return List.of();
     }
 
     @Override

@@ -54,13 +54,21 @@ public class SegmentMetadataUtils {
     CommonsConfigurationUtils.saveToFile(propertiesConfiguration, metadataFile);
   }
 
+  /// Writes the given key→value updates to the segment's `metadata.properties` and reloads metadata. A `null`
+  /// value removes the property instead of writing it, so callers can drop a key by mapping it to `null`.
   public static SegmentMetadata updateMetadataProperties(SegmentDirectory segmentDirectory,
       Map<String, String> metadataProperties)
       throws Exception {
     SegmentMetadata segmentMetadata = segmentDirectory.getSegmentMetadata();
     PropertiesConfiguration propertiesConfiguration = SegmentMetadataUtils.getPropertiesConfiguration(segmentMetadata);
     for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
-      propertiesConfiguration.setProperty(entry.getKey(), entry.getValue());
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (value != null) {
+        propertiesConfiguration.setProperty(key, value);
+      } else {
+        propertiesConfiguration.clearProperty(key);
+      }
     }
     savePropertiesConfiguration(propertiesConfiguration, segmentMetadata.getIndexDir());
     // TODO: Revisit if we can save the overhead of reloading the metadata when invoked from ForwardIndexHandler

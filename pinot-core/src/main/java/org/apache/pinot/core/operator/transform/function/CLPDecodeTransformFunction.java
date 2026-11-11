@@ -35,35 +35,41 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.data.FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
 
 
-/**
- * Decodes a CLP-encoded column group into the original value. In Pinot, a CLP-encoded field is encoded into three
- * Pinot columns, what we collectively refer to as a column group. E.g., A CLP-encoded "message" field would be
- * stored in three columns: "message_logtype", "message_dictionaryVars", and "message_encodedVars".
- * <p>
- * Usage:
- * <pre>
- *   clpDecode("columnGroupName_logtype", "columnGroupName_dictionaryVars",
- *             "columnGroupName_encodedVars"[, defaultValue])
- * </pre>
- * The "defaultValue" is optional and is used when a column group can't be decoded for some reason.
- * <p>
- * Sample queries:
- * <pre>
- *   SELECT clpDecode("message_logtype", "message_dictionaryVars", "message_encodedVars") FROM table
- *   SELECT clpDecode("message_logtype", "message_dictionaryVars", "message_encodedVars", 'null') FROM table
- * </pre>
- * For instance, consider a record that contains a "message" field with this value:
- * <pre>INFO Task task_12 assigned to container: [ContainerID:container_15], operation took 0.335 seconds. 8 tasks
- * remaining.</pre>
- * {@link org.apache.pinot.plugin.inputformat.clplog.CLPLogMessageDecoder} will encode it into 3 columns:
- * <ul>
- *   <li>message_logtype: "INFO Task \x12 assigned to container: [ContainerID:\x12], operation took \x13 seconds.
- *   \x11 tasks remaining."</li>
- *   <li>message_dictionaryVars: [“task_12”, “container_15”]</li>
- *   <li>message_encodedVars: [[0x190000000000014f, 8]]</li>
- * </ul>
- * Then we can use the sample queries above to decode the columns back into the original value of the "message" field.
- */
+/// Decodes a CLP-encoded column group into the original value. In Pinot, a CLP-encoded field is encoded into three
+/// Pinot columns, what we collectively refer to as a column group. E.g., A CLP-encoded "message" field would be
+/// stored in three columns: "message_logtype", "message_dictionaryVars", and "message_encodedVars".
+///
+/// Usage:
+///
+/// ```
+/// clpDecode("columnGroupName_logtype", "columnGroupName_dictionaryVars",
+///           "columnGroupName_encodedVars"[, defaultValue])
+/// ```
+///
+/// The "defaultValue" is optional and is used when a column group can't be decoded for some reason.
+///
+/// Sample queries:
+///
+/// ```
+/// SELECT clpDecode("message_logtype", "message_dictionaryVars", "message_encodedVars") FROM table
+/// SELECT clpDecode("message_logtype", "message_dictionaryVars", "message_encodedVars", 'null') FROM table
+/// ```
+///
+/// For instance, consider a record that contains a "message" field with this value:
+///
+/// ```
+/// INFO Task task_12 assigned to container: [ContainerID:container_15], operation took 0.335 seconds. 8 tasks
+/// remaining.
+/// ```
+///
+/// [org.apache.pinot.plugin.inputformat.clplog.CLPLogMessageDecoder] will encode it into 3 columns:
+///
+/// - message_logtype: "INFO Task \x12 assigned to container: \[ContainerID:\x12\], operation took \x13 seconds.
+///   \x11 tasks remaining."
+/// - message_dictionaryVars: \[“task_12”, “container_15”\]
+/// - message_encodedVars: \[\[0x190000000000014f, 8\]\]
+///
+/// Then we can use the sample queries above to decode the columns back into the original value of the "message" field.
 public class CLPDecodeTransformFunction extends BaseTransformFunction {
   private static final Logger _logger = LoggerFactory.getLogger(CLPDecodeTransformFunction.class);
   private final List<TransformFunction> _transformFunctions = new ArrayList<>();

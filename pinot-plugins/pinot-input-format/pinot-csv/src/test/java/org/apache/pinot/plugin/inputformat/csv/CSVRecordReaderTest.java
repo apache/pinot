@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.inputformat.csv;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -435,7 +434,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     assertEquals(recordReader.next().getFieldToValueMap(), createMap("id", "100", "name", "John"));
     // Second line is unparseable, should throw exception when next() is called, and being skipped
     assertTrue(recordReader.hasNext());
-    assertThrows(UncheckedIOException.class, recordReader::next);
+    assertThrows(IOException.class, recordReader::next);
     // Third line is parseable
     assertTrue(recordReader.hasNext());
     assertEquals(recordReader.next().getFieldToValueMap(), createMap("id", "102", "name", "Alice"));
@@ -482,7 +481,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     assertEquals(recordReader.next().getFieldToValueMap(), createMap("id", "100", "name", "John"));
     // Second line is unparseable, should throw exception when next() is called, and being skipped
     assertTrue(recordReader.hasNext());
-    assertThrows(UncheckedIOException.class, recordReader::next);
+    assertThrows(IOException.class, recordReader::next);
     // 2 lines in total
     assertFalse(recordReader.hasNext());
   }
@@ -528,7 +527,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     assertEquals(recordReader.next().getFieldToValueMap(),
         createMap("id", "101", "firstName", "john", "lastName", "doe", "appVersion", "1.0.1", "active", "yes"));
     assertTrue(recordReader.hasNext());
-    assertThrows(UncheckedIOException.class, recordReader::next);
+    assertThrows(IOException.class, recordReader::next);
     assertFalse(recordReader.hasNext());
   }
 
@@ -578,9 +577,9 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     assertEquals(recordReader.next().getFieldToValueMap(), createMap("id", "103", "name", "Suzanne"));
     // NOTE: Here we need to skip twice because the first line is a comment line
     assertTrue(recordReader.hasNext());
-    assertThrows(UncheckedIOException.class, recordReader::next);
+    assertThrows(IOException.class, recordReader::next);
     assertTrue(recordReader.hasNext());
-    assertThrows(UncheckedIOException.class, recordReader::next);
+    assertThrows(IOException.class, recordReader::next);
     assertTrue(recordReader.hasNext());
     assertEquals(recordReader.next().getFieldToValueMap(), createMap("id", "105", "name", "Zack\nZack"));
     assertTrue(recordReader.hasNext());

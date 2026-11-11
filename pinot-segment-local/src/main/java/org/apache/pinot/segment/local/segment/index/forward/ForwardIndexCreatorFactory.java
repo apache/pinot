@@ -19,10 +19,13 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV2;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.CompressionStatsTrackingForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueEntryDictForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
@@ -51,9 +54,13 @@ public class ForwardIndexCreatorFactory {
     FieldSpec fieldSpec = context.getFieldSpec();
     String columnName = fieldSpec.getName();
     int numTotalDocs = context.getTotalDocs();
+    Preconditions.checkArgument(
+        indexConfig.getCodecSpec() == null || indexConfig.getEncodingType() == FieldConfig.EncodingType.RAW,
+        "codecSpec requires RAW forward-index encoding for column: %s", columnName);
 
-    if (context.hasDictionary()) {
-      // Dictionary enabled columns
+    if (indexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+      // Dictionary-encoded forward index requires a dictionary to translate dict ids to values.
+      assert context.hasDictionary();
       int cardinality = context.getCardinality();
       if (fieldSpec.isSingleValueField()) {
         if (context.isSorted()) {
@@ -70,46 +77,59 @@ public class ForwardIndexCreatorFactory {
         }
       }
     } else {
-      // Dictionary disabled columns
+      // Raw forward index
       DataType storedType = fieldSpec.getDataType().getStoredType();
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+      ForwardIndexCreator creator = null;
+
+      // codecSpec always selects the self-describing V7 codec-pipeline format. The legacy raw
+      // writers remain available only through compressionCodec/chunkCompressionType.
+      if (indexConfig.getCodecSpec() != null) {
+        String codecSpec = indexConfig.getCodecSpec();
+        ForwardIndexType.validateCodecPipelineShape(codecSpec, fieldSpec);
+        CodecPipelineExecutor executor = CodecPipelineExecutor.create(codecSpec, storedType);
+        creator = new SingleValueFixedByteRawIndexCreator(indexDir, columnName, numTotalDocs, storedType,
+            indexConfig.getTargetDocsPerChunk(), executor);
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
         // CLP (V1) uses hard-coded chunk compressor which is set to `PassThrough`
-        return new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
+        creator = new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2) {
+        // Use the default CLP chunk compression type, currently ZSTANDARD.
+        creator = new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics());
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_ZSTD) {
+        creator = new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.ZSTANDARD);
+      } else if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
+        creator = new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.LZ4);
       }
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2) {
-        // Use the default chunk compression codec for CLP, currently configured to use ZStandard
-        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics());
+
+      if (creator == null) {
+        ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
+        if (chunkCompressionType == null) {
+          chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
+        }
+        boolean deriveNumDocsPerChunk = indexConfig.isDeriveNumDocsPerChunk();
+        int writerVersion = indexConfig.getRawIndexWriterVersion();
+        int targetMaxChunkSize = indexConfig.getTargetMaxChunkSizeBytes();
+        int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
+        if (fieldSpec.isSingleValueField()) {
+          creator = getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
+              context.getLengthOfLongestElement(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
+              targetDocsPerChunk);
+        } else {
+          creator = getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
+              context.getMaxNumberOfMultiValues(), deriveNumDocsPerChunk, writerVersion,
+              context.getMaxRowLengthInBytes(), targetMaxChunkSize, targetDocsPerChunk);
+        }
       }
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_ZSTD) {
-        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.ZSTANDARD);
+      if (context.isCompressionStatsEnabled()
+          && creator instanceof CompressionStatsTrackingForwardIndexCreator trackingCreator) {
+        trackingCreator.enableRawForwardIndexUncompressedValueSizeTracking();
       }
-      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
-        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.LZ4);
-      }
-      ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
-      if (chunkCompressionType == null) {
-        chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
-      }
-      boolean deriveNumDocsPerChunk = indexConfig.isDeriveNumDocsPerChunk();
-      int writerVersion = indexConfig.getRawIndexWriterVersion();
-      int targetMaxChunkSize = indexConfig.getTargetMaxChunkSizeBytes();
-      int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
-      if (fieldSpec.isSingleValueField()) {
-        return getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
-            targetDocsPerChunk);
-      } else {
-        return getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
-            context.getMaxRowLengthInBytes(), targetMaxChunkSize, targetDocsPerChunk);
-      }
+      return creator;
     }
   }
 
-  /**
-   * Helper method to build the raw index creator for the column.
-   * Assumes that column to be indexed is single valued.
-   */
+  /// Helper method to build the raw index creator for the column.
+  /// Assumes that column to be indexed is single valued.
   public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
       int writerVersion, int targetMaxChunkSize, int targetDocsPerChunk)
@@ -132,10 +152,8 @@ public class ForwardIndexCreatorFactory {
     }
   }
 
-  /**
-   * Helper method to build the raw index creator for the column.
-   * Assumes that column to be indexed is multi-valued.
-   */
+  /// Helper method to build the raw index creator for the column.
+  /// Assumes that column to be indexed is multi-valued.
   public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int maxNumberOfMultiValueElements,
       boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes, int targetMaxChunkSize,
@@ -149,6 +167,7 @@ public class ForwardIndexCreatorFactory {
         return new MultiValueFixedByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
             maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
             targetDocsPerChunk);
+      case BIG_DECIMAL:
       case STRING:
       case BYTES:
         return new MultiValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,

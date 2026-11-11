@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -54,10 +53,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A {@link SegmentWriter} implementation that uses a local file as a buffer to collect {@link GenericRow}.
- * The {@link GenericRow} are written to the buffer as AVRO records.
- */
+/// A [SegmentWriter] implementation that uses a local file as a buffer to collect [GenericRow].
+/// The [GenericRow] are written to the buffer as AVRO records.
 @NotThreadSafe
 public class FileBasedSegmentWriter implements SegmentWriter {
 
@@ -82,7 +79,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
 
   @Override
   public void init(TableConfig tableConfig, Schema schema) throws Exception {
-    init(tableConfig, schema, Collections.emptyMap());
+    init(tableConfig, schema, Map.of());
   }
 
   @Override
@@ -133,7 +130,8 @@ public class FileBasedSegmentWriter implements SegmentWriter {
   private void resetBuffer()
       throws IOException {
     FileUtils.deleteQuietly(_bufferFile);
-    _recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+    _recordWriter =
+        new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema, SegmentProcessorAvroUtils.getAvroDataModel()));
     _recordWriter.create(_avroSchema, _bufferFile);
   }
 
@@ -148,23 +146,21 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     }
   }
 
-  /**
-   * Creates one Pinot segment using the {@link GenericRow}s collected in the AVRO file buffer,
-   * at the outputDirUri as specified in the tableConfig->batchConfigs.
-   * Successful invocation of this method means that the {@link GenericRow}s collected so far,
-   * are now available in the Pinot segment and not available in the buffer anymore.
-   *
-   * Successful completion of segment will return the segment URI.
-   * The buffer will be reset and ready to accept further records via <code>collect()</code>
-   *
-   * If an exception is thrown, the buffer will not be reset
-   * and so, <code>flush()</code> can be invoked repeatedly in a retry loop.
-   * If a successful invocation is not achieved,<code>close()</code> followed by <code>init</code> will have to be
-   * called in order to reset the buffer and resume record writing.
-   *
-   * @return URI of the generated segment
-   * @throws IOException
-   */
+  /// Creates one Pinot segment using the [GenericRow]s collected in the AVRO file buffer,
+  /// at the outputDirUri as specified in the tableConfig->batchConfigs.
+  /// Successful invocation of this method means that the [GenericRow]s collected so far,
+  /// are now available in the Pinot segment and not available in the buffer anymore.
+  ///
+  /// Successful completion of segment will return the segment URI.
+  /// The buffer will be reset and ready to accept further records via `collect()`
+  ///
+  /// If an exception is thrown, the buffer will not be reset
+  /// and so, `flush()` can be invoked repeatedly in a retry loop.
+  /// If a successful invocation is not achieved,`close()` followed by `init` will have to be
+  /// called in order to reset the buffer and resume record writing.
+  ///
+  /// @return URI of the generated segment
+  /// @throws IOException
   @Override
   public URI flush()
       throws IOException {

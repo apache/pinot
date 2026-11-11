@@ -26,14 +26,12 @@ import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 
 
-/**
- * MailboxServerInterceptor is used in GrpcMailboxServer to intercept mailboxId from headers
- * to inject into context.
- */
+/// MailboxServerInterceptor is used in GrpcMailboxServer to intercept mailboxId from headers
+/// to inject into context.
 public class MailboxServerInterceptor implements ServerInterceptor {
   @Override
   public <T, R> ServerCall.Listener<T> interceptCall(
-    ServerCall<T, R> call, Metadata headers, ServerCallHandler<T, R> next) {
+      ServerCall<T, R> call, Metadata headers, ServerCallHandler<T, R> next) {
     String mailboxId = headers.get(ChannelUtils.MAILBOX_ID_METADATA_KEY);
     if (mailboxId != null) {
       Context context = Context.current().withValue(ChannelUtils.MAILBOX_ID_CTX_KEY, mailboxId);

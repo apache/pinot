@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.spi.config.table;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.testng.annotations.Test;
 
@@ -34,7 +34,7 @@ public class UpsertConfigTest {
     assertEquals(upsertConfig1.getMode(), UpsertConfig.Mode.FULL);
 
     upsertConfig1.setComparisonColumn("comparison");
-    assertEquals(upsertConfig1.getComparisonColumns(), Collections.singletonList("comparison"));
+    assertEquals(upsertConfig1.getComparisonColumns(), List.of("comparison"));
 
     upsertConfig1.setHashFunction(HashFunction.MURMUR3);
     assertEquals(upsertConfig1.getHashFunction(), HashFunction.MURMUR3);

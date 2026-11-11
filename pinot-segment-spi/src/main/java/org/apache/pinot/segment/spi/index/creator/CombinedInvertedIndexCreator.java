@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * This is the index used to create range indexes
- */
+/// This is the index used to create range indexes
 public interface CombinedInvertedIndexCreator
     extends DictionaryBasedInvertedIndexCreator, RawValueBasedInvertedIndexCreator {
 
@@ -104,10 +103,8 @@ public interface CombinedInvertedIndexCreator
     }
   }
 
-  /**
-   * Primitive type additions for columnar processing optimization.
-   * These methods avoid boxing overhead when iterating over columnar data.
-   */
+  /// Primitive type additions for columnar processing optimization.
+  /// These methods avoid boxing overhead when iterating over columnar data.
 
   @Override
   default void addInt(int value, int dictId) {
@@ -142,6 +139,15 @@ public interface CombinedInvertedIndexCreator
       add(dictId);
     } else {
       add(value);
+    }
+  }
+
+  @Override
+  default void addBigDecimal(BigDecimal value, int dictId) {
+    if (dictId >= 0) {
+      add(dictId);
+    } else {
+      throw new RuntimeException("BigDecimal not supported for range index");
     }
   }
 
@@ -196,6 +202,15 @@ public interface CombinedInvertedIndexCreator
       add(dictIds, dictIds.length);
     } else {
       add(values, values.length);
+    }
+  }
+
+  @Override
+  default void addBigDecimalMV(BigDecimal[] values, @Nullable int[] dictIds) {
+    if (dictIds != null) {
+      add(dictIds, dictIds.length);
+    } else {
+      throw new RuntimeException("BigDecimal MV not supported for range index");
     }
   }
 

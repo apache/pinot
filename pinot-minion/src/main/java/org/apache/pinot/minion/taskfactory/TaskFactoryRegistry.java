@@ -21,7 +21,6 @@ package org.apache.pinot.minion.taskfactory;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.task.JobContext;
@@ -30,14 +29,11 @@ import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskFactory;
 import org.apache.helix.task.TaskResult;
-import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metrics.MinionGauge;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.MinionTimer;
-import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
@@ -53,10 +49,9 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 
-/**
- * Registry for all {@link TaskFactory}.
- * <p>All {@link PinotTaskExecutor} in {@link TaskExecutorFactoryRegistry} will automatically be registered.
- */
+/// Registry for all [TaskFactory].
+///
+/// All [PinotTaskExecutor] in [TaskExecutorFactoryRegistry] will automatically be registered.
 public class TaskFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskFactoryRegistry.class);
   // we use 1000 as the limit for the following reasons:
@@ -138,11 +133,6 @@ public class TaskFactoryRegistry {
             }
 
             private TaskResult runInternal(PinotTaskConfig pinotTaskConfig) {
-              if (StringUtils.isBlank(pinotTaskConfig.getConfigs().get(MinionConstants.AUTH_TOKEN))) {
-                pinotTaskConfig.getConfigs().put(MinionConstants.AUTH_TOKEN,
-                    AuthProviderUtils.toStaticToken(MinionContext.getInstance().getTaskAuthProvider()));
-              }
-
               String tableName = pinotTaskConfig.getTableName();
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);
@@ -219,9 +209,7 @@ public class TaskFactoryRegistry {
     return rootCauseMessage;
   }
 
-  /**
-   * Returns the task factory registry.
-   */
+  /// Returns the task factory registry.
   public Map<String, TaskFactory> getTaskFactoryRegistry() {
     return _taskFactoryRegistry;
   }

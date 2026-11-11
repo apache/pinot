@@ -24,11 +24,9 @@ import java.nio.ByteBuffer;
 import javax.annotation.concurrent.NotThreadSafe;
 
 
-/**
- * Off-heap set for 32-bit values.
- *
- * NOTE: We store and return hash mixed values instead of original values.
- */
+/// Off-heap set for 32-bit values.
+///
+/// NOTE: We store and return hash mixed values instead of original values.
 @NotThreadSafe
 public class OffHeap32BitSet extends BaseOffHeapSet {
 
@@ -146,7 +144,7 @@ public class OffHeap32BitSet extends BaseOffHeapSet {
   @Override
   public byte[] serialize() {
     int size = size();
-    byte[] bytes = new byte[Integer.BYTES + size << 2];
+    byte[] bytes = new byte[Integer.BYTES + (size << 2)];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     byteBuffer.putInt(size);
     IntIterator iterator = iterator();

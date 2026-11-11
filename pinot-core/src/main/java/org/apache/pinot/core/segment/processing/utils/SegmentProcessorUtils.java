@@ -20,13 +20,14 @@ package org.apache.pinot.core.segment.processing.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
+import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
@@ -35,18 +36,38 @@ public final class SegmentProcessorUtils {
   private SegmentProcessorUtils() {
   }
 
-  /**
-   * Returns the field specs (physical only) and number of sort fields based on the merge type and sort order.
-   * <p>The field specs returned should have sorted columns in the front, followed by dimension/time columns sorted in
-   * alphabetical order, followed by metric columns sorted in alphabetical order.
-   * <p>For CONCAT, only include sort columns as sort fields;
-   * <p>For ROLLUP, include sort columns and dimension/time columns as sort fields;
-   * <p>For DEDUP, include all columns as sort fields.
-   */
+  /// Returns the field specs (physical only) and number of sort fields based on the merge type and sort order.
+  ///
+  /// The field specs returned should have sorted columns in the front, followed by dimension/time columns sorted in
+  /// alphabetical order, followed by metric columns sorted in alphabetical order.
+  ///
+  /// For CONCAT, only include sort columns as sort fields;
+  ///
+  /// For ROLLUP, include sort columns and dimension/time columns as sort fields;
+  ///
+  /// For DEDUP, include all columns as sort fields.
   public static Pair<List<FieldSpec>, Integer> getFieldSpecs(Schema schema, MergeType mergeType,
       @Nullable List<String> sortOrder) {
+    return getFieldSpecs(schema, mergeType, sortOrder, false);
+  }
+
+  /// Returns the field specs (physical only) and number of sort fields based on the merge type and sort order.
+  ///
+  /// When `includeOriginalTimeField` is `true` (only allowed for ROLLUP), a hidden LONG column
+  /// ([TimeHandler#ORIGINAL_TIME_MS_COLUMN]) is appended as the last sort field. It carries the original
+  /// (pre-rounding) time value in millis so that rows within the same rollup group are sorted by the original time,
+  /// which is required by order sensitive aggregations (FIRSTWITHTIME/LASTWITHTIME). The hidden column is not part of
+  /// the rollup group key, and is stripped by the reducer before the output segments are created.
+  public static Pair<List<FieldSpec>, Integer> getFieldSpecs(Schema schema, MergeType mergeType,
+      @Nullable List<String> sortOrder, boolean includeOriginalTimeField) {
+    if (includeOriginalTimeField) {
+      Preconditions.checkArgument(mergeType == MergeType.ROLLUP,
+          "Original time field can only be included for ROLLUP merge type");
+      Preconditions.checkArgument(!schema.hasColumn(TimeHandler.ORIGINAL_TIME_MS_COLUMN),
+          "Schema must not contain the reserved column: %s", TimeHandler.ORIGINAL_TIME_MS_COLUMN);
+    }
     if (sortOrder == null) {
-      sortOrder = Collections.emptyList();
+      sortOrder = List.of();
     }
 
     List<FieldSpec> fieldSpecs = new ArrayList<>();
@@ -73,9 +94,14 @@ public final class SegmentProcessorUtils {
       }
     }
 
-    metricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
-    fieldSpecs.addAll(nonMetricFieldSpecs);
     nonMetricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
+    fieldSpecs.addAll(nonMetricFieldSpecs);
+    if (includeOriginalTimeField) {
+      // Hidden sort field carrying the original time, placed after the group key fields so that rows within the same
+      // rollup group are sorted by the original time
+      fieldSpecs.add(new DimensionFieldSpec(TimeHandler.ORIGINAL_TIME_MS_COLUMN, FieldSpec.DataType.LONG, true));
+    }
+    metricFieldSpecs.sort(Comparator.comparing(FieldSpec::getName));
     fieldSpecs.addAll(metricFieldSpecs);
 
     int numSortFields;
@@ -84,7 +110,7 @@ public final class SegmentProcessorUtils {
         numSortFields = sortOrder.size();
         break;
       case ROLLUP:
-        numSortFields = sortOrder.size() + nonMetricFieldSpecs.size();
+        numSortFields = sortOrder.size() + nonMetricFieldSpecs.size() + (includeOriginalTimeField ? 1 : 0);
         break;
       case DEDUP:
         numSortFields = fieldSpecs.size();

@@ -17,16 +17,19 @@
  * under the License.
  */
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { get, each } from 'lodash';
 import { Grid, makeStyles, Box } from '@material-ui/core';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import CustomizedTables from '../components/Table';
+import CustomButton from '../components/CustomButton';
+import { useConfirm } from '../components/Confirm';
 import TaskStatusFilter, { TaskStatus } from '../components/TaskStatusFilter';
 import { TaskRuntimeConfig } from 'Models';
 import AppLoader from '../components/AppLoader';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomCodemirror from '../components/CustomCodemirror';
+import { NotificationContext } from '../components/Notification/NotificationContext';
 import { formatTimeInTimezone } from '../utils/TimezoneUtils';
 import { useTimezone } from '../contexts/TimezoneContext';
 
@@ -72,7 +75,9 @@ const useStyles = makeStyles(() => ({
 const TaskDetail = (props) => {
   const classes = useStyles();
   const { currentTimezone } = useTimezone();
+  const { history } = props;
   const { taskID, taskType, queueTableName } = props.match.params;
+  const { dispatch } = useContext(NotificationContext);
 
   const [fetching, setFetching] = useState(true);
   const [taskDebugData, setTaskDebugData] = useState({});
@@ -148,12 +153,66 @@ const TaskDetail = (props) => {
     />
   );
 
+  const handleDeleteTask = async () => {
+    deleteTaskConfirm.setConfirmDialog(false);
+    try {
+      // Some Pinot endpoints embed errors in a 200 body (`{error: "..."}`).
+      // Treat that as a failure rather than a silent success.
+      const result = await PinotMethodUtils.deleteSingleTaskOp(taskID);
+      const embeddedError = get(result, 'error');
+      if (embeddedError) {
+        throw new Error(String(embeddedError));
+      }
+      dispatch({
+        type: 'success',
+        message: `Successfully deleted task ${taskID}`,
+        show: true,
+      });
+      const target = `/task-queue/${taskType}/tables/${queueTableName}`;
+      // Defer navigation by a tick so the success toast has time to mount before
+      // this page unmounts. Fall back to window.location when react-router is
+      // unavailable so the user does not stay on a stale (deleted) URL.
+      setTimeout(() => {
+        if (history && typeof history.push === 'function') {
+          history.push(target);
+        } else if (typeof window !== 'undefined') {
+          window.location.hash = `#${target}`;
+        }
+      }, 0);
+    } catch (e) {
+      dispatch({
+        type: 'error',
+        message: `Failed to delete task: ${get(e, 'response.data.error') || (e as Error).message || 'unknown error'}`,
+        show: true,
+      });
+    }
+  };
+
+  const deleteTaskConfirm = useConfirm({
+    dialogTitle: 'Delete task',
+    dialogContent: `Delete task ${taskID}? Sub-tasks and their state will be removed from ZooKeeper.`,
+    successCallback: handleDeleteTask,
+  });
+
   if(fetching) {
     return <AppLoader />
   }
 
   return (
     <Grid item xs className={classes.gridContainer}>
+      <div className={classes.operationDiv}>
+        <SimpleAccordion headerTitle="Operations" showSearchBox={false}>
+          <Box p={1}>
+            <CustomButton
+              onClick={() => deleteTaskConfirm.setConfirmDialog(true)}
+              tooltipTitle="Delete this task and remove its sub-tasks from the task queue"
+              enableTooltip={true}
+            >
+              Delete Task
+            </CustomButton>
+          </Box>
+        </SimpleAccordion>
+      </div>
       <div className={classes.highlightBackground}>
         <Grid container className={classes.body}>
           <Grid item xs={12}>
@@ -207,6 +266,7 @@ const TaskDetail = (props) => {
           />
         </Grid>
       </Grid>
+      {deleteTaskConfirm.confirmComponent}
     </Grid>
   );
 };

@@ -18,19 +18,23 @@
  */
 package org.apache.pinot.query.runtime.queries;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -44,6 +48,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.assertj.core.api.Assertions;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
@@ -52,11 +57,13 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
-/**
- * all special tests that doesn't fit into {@link org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest}
- * pattern goes here.
- */
+
+/// all special tests that doesn't fit into [org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest]
+/// pattern goes here.
 public class QueryRunnerTest extends QueryRunnerTestBase {
   //@formatter:off
   public static final Object[][] ROWS = new Object[][]{
@@ -94,7 +101,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   protected Map<String, Object> getConfiguration() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   @BeforeClass
@@ -166,21 +173,363 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
-  /**
-   * Test compares with expected row count only.
-   */
+  /// The self stats of a node are the node's own value minus its children's. A mailbox send reports its stats from
+  /// inside the getNextBlock() call whose time it is still spending, so unless that call is accounted first it
+  /// reports less than the input whose call it contains and the subtraction goes negative. A query whose filter
+  /// matches nothing makes the end-of-stream block the only block a stage handles, which is when the whole of the
+  /// send's time would be missing.
+  @Test
+  public void testSelfStatsAreNotNegative() {
+    @Language("sql")
+    String sql = "SELECT col1, COUNT(*) FROM a WHERE col1 = 'no-such-value' GROUP BY col1";
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, true);
+    Map<Integer, DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageMap();
+    ObjectNode statsTree =
+        new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats()).jsonStatsByStage(1);
+
+    int checked = assertSelfStatsAreNotNegative(statsTree);
+    Assert.assertTrue(checked > 0, "expected some self stats to check, got: " + statsTree);
+  }
+
+  /// Asserts that no self stat in the tree is negative, and returns how many were checked.
+  private static int assertSelfStatsAreNotNegative(JsonNode node) {
+    int checked = 0;
+    for (String statName : List.of("selfExecutionTimeMs", "selfClockTimeMs", "selfAllocatedMB", "selfGcTimeMs")) {
+      JsonNode stat = node.get(statName);
+      if (stat != null) {
+        Assert.assertTrue(stat.asLong() >= 0,
+            statName + " is " + stat.asLong() + ", which means this node reported less than its children, for node "
+                + node);
+        checked++;
+      }
+    }
+    for (JsonNode child : node.path("children")) {
+      checked += assertSelfStatsAreNotNegative(child);
+    }
+    return checked;
+  }
+
+  /// Runs a shuffling query over the two-server setup and checks the per-worker stats reported by every stage.
+  /// This is the only place these stats are exercised end to end, through real multi-worker stages and the
+  /// cross-server merge of their stat maps.
+  @Test
+  public void testPerWorkerStats() {
+    ObjectNode statsTree = statsTreeOf("SELECT col1, COUNT(*) FROM a GROUP BY col1");
+
+    // Idle workers are reported rather than active ones, so a query where every worker did something must not
+    // report any: their absence is the healthy signal.
+    Assert.assertNull(findFieldOwner(statsTree, "nonActiveWorkers"),
+        "expected no idle worker in a query where every worker contributes, got: " + statsTree);
+
+    // Assertions comparing a single worker's stats against the stage totals collapse to identities on a
+    // single-worker stage, so require a stage that actually ran on several workers, otherwise this test would keep
+    // passing if the cross-worker merge broke.
+    int multiWorkerSends = assertSendStats(statsTree);
+    Assert.assertTrue(multiWorkerSends > 0,
+        "expected a multi-worker send reporting maxEmittedRows and maxClockTimeMs, got: " + statsTree);
+  }
+
+  /// Each operator decides for itself which workers it was idle on, so a query whose filter matches nothing
+  /// separates them: the leaf operators were handed segments and are not idle, while everything above them sent
+  /// and received nothing and is idle on every worker.
+  @Test
+  public void testPerWorkerStatsWhenNothingMatches() {
+    ObjectNode statsTree = statsTreeOf("SELECT col1, COUNT(*) FROM a WHERE col1 = 'no-such-value' GROUP BY col1");
+
+    // StatMap drops zero-valued keys, so an absent field means zero throughout.
+    ObjectNode leaf = findNodeOfType(statsTree, "LEAF");
+    Assert.assertNotNull(leaf, "expected a LEAF node in " + statsTree);
+    Assert.assertNull(leaf.get("nonActiveWorkers"),
+        "expected workers with segments assigned not to be idle even though they emitted nothing: " + leaf);
+
+    ObjectNode leafStageSend = findSendAboveLeaf(statsTree);
+    Assert.assertNotNull(leafStageSend, "expected a leaf stage in " + statsTree);
+    Assert.assertEquals(leafStageSend.path("emittedRows").asLong(0), 0L, "expected the leaf stage to send nothing");
+    Assert.assertEquals(leafStageSend.path("nonActiveWorkers").asLong(0),
+        leafStageSend.path("parallelism").asLong(0),
+        "expected every worker of a send that sent nothing to be idle: " + leafStageSend);
+
+    ObjectNode receive = findNodeOfType(statsTree, "MAILBOX_RECEIVE");
+    Assert.assertNotNull(receive, "expected a MAILBOX_RECEIVE node in " + statsTree);
+    Assert.assertEquals(receive.path("nonActiveWorkers").asLong(0), receive.path("parallelism").asLong(0),
+        "expected every worker of a receive that got no row to be idle: " + receive);
+  }
+
+  private ObjectNode statsTreeOf(@Language("sql") String sql) {
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, true);
+    Map<Integer, DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageMap();
+    return new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats()).jsonStatsByStage(1);
+  }
+
+  @Nullable
+  private static ObjectNode findNodeOfType(JsonNode node, String type) {
+    if (type.equals(node.path("type").asText())) {
+      return (ObjectNode) node;
+    }
+    for (JsonNode child : node.path("children")) {
+      ObjectNode found = findNodeOfType(child, type);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  /// Returns the first node in the tree carrying `field`, or null if none does.
+  @Nullable
+  private static ObjectNode findFieldOwner(JsonNode node, String field) {
+    if (node.get(field) != null) {
+      return (ObjectNode) node;
+    }
+    for (JsonNode child : node.path("children")) {
+      ObjectNode found = findFieldOwner(child, field);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  /// Returns the MAILBOX_SEND node of the leaf stage, that is, the one holding the LEAF operator.
+  @Nullable
+  private static ObjectNode findSendAboveLeaf(JsonNode node) {
+    for (JsonNode child : node.path("children")) {
+      if ("MAILBOX_SEND".equals(node.path("type").asText()) && "LEAF".equals(child.path("type").asText())) {
+        return (ObjectNode) node;
+      }
+      ObjectNode found = findSendAboveLeaf(child);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  /// Asserts the per-worker invariants on every send node reporting them, and returns how many of those ran on
+  /// more than one worker.
+  private static int assertSendStats(JsonNode node) {
+    int multiWorker = 0;
+    JsonNode maxEmittedRows = node.get("maxEmittedRows");
+    if (maxEmittedRows != null) {
+      long max = maxEmittedRows.asLong();
+      long emitted = node.path("emittedRows").asLong(0);
+      long parallelism = node.path("parallelism").asLong(0);
+      String ctx = " for node " + node;
+
+      // Both are counts over one worker while emittedRows is the sum over all of them, so neither can exceed it.
+      // This is what catches a merge function summing where it should take an extremum.
+      Assert.assertTrue(max <= emitted, "maxEmittedRows " + max + " exceeds emittedRows " + emitted + ctx);
+
+      long maxClockTimeMs = node.path("maxClockTimeMs").asLong(0);
+      long executionTimeMs = node.path("executionTimeMs").asLong(0);
+      Assert.assertTrue(maxClockTimeMs <= executionTimeMs,
+          "maxClockTimeMs " + maxClockTimeMs + " exceeds the summed executionTimeMs " + executionTimeMs + ctx);
+      Assert.assertTrue(maxClockTimeMs >= node.path("clockTimeMs").asLong(0),
+          "maxClockTimeMs " + maxClockTimeMs + " is below the average clockTimeMs" + ctx);
+
+      if (parallelism > 1) {
+        multiWorker++;
+      }
+    }
+    for (JsonNode child : node.path("children")) {
+      multiWorker += assertSendStats(child);
+    }
+    return multiWorker;
+  }
+
+  /// Test compares with expected row count only.
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
     ResultTable resultTable = queryRunner(sql, false).getResultTable();
     Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
 
-  /**
-   * Test automatically compares against H2.
-   *
-   * @deprecated do not add to this test set. this class will be broken down and clean up.
-   *   add your test to the appropriate files in {@link org.apache.pinot.query.runtime.queries} instead.
-   */
+  @Test
+  public void testJsonExtractScalarFoldedBooleanArrayConsumer() {
+    for (boolean nullHandlingEnabled : new boolean[]{false, true}) {
+      assertSingleColumnValue("SET enableNullHandling=" + nullHandlingEnabled
+          + "; SELECT arraySum(jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY')) FROM a", 1D, 15);
+    }
+  }
+
+  @Test
+  public void testJsonExtractScalarPathEvaluationFailure() {
+    for (boolean nullHandlingEnabled : new boolean[]{false, true}) {
+      String options = "SET enableNullHandling=" + nullHandlingEnabled + "; ";
+      assertSingleColumnValue(options
+          + "SELECT jsonExtractScalar('{\"v\":[]}', '$.v.avg()', 'DOUBLE', 7) FROM a", 7D, 15);
+      assertSingleColumnValue(options
+          + "SELECT jsonExtractScalar(REPLACE(col1, col1, '{\"v\":[]}'), '$.v.avg()', 'DOUBLE', 7) FROM a", 7D, 15);
+      // Both join inputs are needed, so this extract executes as a scalar in an intermediate stage.
+      assertSingleColumnValue(options + "SELECT jsonExtractScalar(REPLACE(CONCAT(a.col1, b.col1), "
+          + "CONCAT(a.col1, b.col1), '{\"v\":[]}'), '$.v.avg()', 'DOUBLE', 7) "
+          + "FROM a JOIN b ON a.col1 = b.col1", 7D, 15);
+    }
+  }
+
+  @Test
+  public void testJsonExtractScalarLiteralDefaultParity() {
+    for (String booleanDefault : new String[]{"true", "false"}) {
+      assertSingleColumnValue(
+          "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', " + booleanDefault + ") FROM a",
+          booleanDefault, 15);
+      assertSingleColumnValue(
+          "SELECT jsonExtractScalar('{\"v\":[null]}', '$.v', 'STRING_ARRAY', " + booleanDefault + ") FROM a",
+          new String[]{booleanDefault}, 15);
+      assertSingleColumnValue(
+          "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', " + booleanDefault
+              + ") FROM a JOIN b ON a.col1 = b.col1", booleanDefault, 15);
+    }
+    String timestamp = "TIMESTAMP '2018-01-01 11:12:53'";
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', " + timestamp + ") FROM a LIMIT 1",
+        "2018-01-01 11:12:53", 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', DATE '2024-02-29') FROM a LIMIT 1",
+        "2024-02-29", 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', TIME '11:12:53') FROM a LIMIT 1",
+        "11:12:53", 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', "
+            + "UUID '123e4567-e89b-12d3-a456-426614174000') FROM a LIMIT 1",
+        "123e4567-e89b-12d3-a456-426614174000", 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'LONG', 9007199254740993.0) FROM a LIMIT 1",
+        9007199254740992L, 1);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar('{}', '$.missing', 'STRING', 92233720368547758071) FROM a LIMIT 1",
+        "-9", 1);
+
+    // A dynamic path keeps the scalar call above the join. Its default must retain the same SQL-literal spelling used
+    // by the single-stage transform rather than becoming epoch-millis text during Rex conversion.
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', " + timestamp
+            + ") FROM a JOIN b ON a.col1 = b.col1",
+        "2018-01-01 11:12:53", 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', DATE '2024-02-29') "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        "2024-02-29", 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', TIME '11:12:53') "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        "11:12:53", 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', "
+            + "UUID '123e4567-e89b-12d3-a456-426614174000') FROM a JOIN b ON a.col1 = b.col1",
+        "123e4567-e89b-12d3-a456-426614174000", 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'BOOLEAN', " + timestamp
+            + ") FROM a JOIN b ON a.col1 = b.col1",
+        false, 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'LONG', 9007199254740993.0) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        9007199254740992L, 15);
+    assertSingleColumnValue(
+        "SELECT jsonExtractScalar(a.col1, b.col2, 'STRING', 92233720368547758071) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        "-9", 15);
+
+    for (String function : new String[]{
+        "jsonExtractScalar", "jsonExtractScalarFast", "jsonExtractScalarFirstMatch", "jsonExtractScalarFory"
+    }) {
+      assertSingleColumnValue(
+          "SELECT " + function + "(col1, '$.missing', 'STRING', " + timestamp + ") FROM a",
+          "2018-01-01 11:12:53", 15);
+      assertSingleColumnValue(
+          "SELECT " + function + "(col1, '$.missing', 'TIMESTAMP', " + timestamp + ") FROM a",
+          "2018-01-01 11:12:53.0", 15);
+      assertSingleColumnValue(
+          "SELECT " + function + "(col1, '$.missing', 'LONG', 9007199254740993.0) FROM a",
+          9007199254740992L, 15);
+    }
+  }
+
+  @Test
+  public void testJsonExtractScalarNullInputWithNonNullDefault() {
+    String literalInputQuery =
+        "SELECT jsonExtractScalar(CAST(NULL AS VARCHAR), '$.missing', 'INT', 7) FROM a";
+    assertSingleColumnValue("SET enableNullHandling=true; " + literalInputQuery, null, 15);
+    assertSingleColumnValue("SET enableNullHandling=false; " + literalInputQuery, 7, 15);
+
+    // The path depends on both join inputs, which keeps jsonExtractScalar above the join and exercises FunctionOperand.
+    String joinedInputQuery = "SELECT jsonExtractScalar(CAST(NULL AS VARCHAR), "
+        + "REPLACE(CONCAT(a.col1, b.col1), CONCAT(a.col1, b.col1), '$.missing'), 'INT', 7) "
+        + "FROM a JOIN b ON a.col1 = b.col1";
+    assertSingleColumnValue("SET enableNullHandling=true; " + joinedInputQuery, null, 15);
+    assertSingleColumnValue("SET enableNullHandling=false; " + joinedInputQuery, 7, 15);
+
+    String joinedInputWithoutDefault = "SELECT jsonExtractScalar(CAST(NULL AS VARCHAR), "
+        + "REPLACE(CONCAT(a.col1, b.col1), CONCAT(a.col1, b.col1), '$.missing'), 'INT') "
+        + "FROM a JOIN b ON a.col1 = b.col1";
+    assertSingleColumnValue("SET enableNullHandling=true; " + joinedInputWithoutDefault, null, 15);
+    assertQueryFails("SET enableNullHandling=false; " + joinedInputWithoutDefault, "Cannot resolve JSON path");
+  }
+
+  @Test
+  public void testJsonExtractScalarUnresolvedArrayWithNullDefault() {
+    // Taking the path from the joined table forces intermediate-stage scalar evaluation. Match the leaf transform's
+    // explicit SQL NULL behavior under both null-handling modes.
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar(a.col1, b.col2, 'INT_ARRAY', NULL) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        null, 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=false; SELECT jsonExtractScalar(a.col1, b.col2, 'INT_ARRAY', NULL) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        new int[0], 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar(col1, '$.missing', 'INT_ARRAY', NULL) FROM a",
+        null, 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=false; SELECT jsonExtractScalar(col1, '$.missing', 'INT_ARRAY', NULL) FROM a",
+        new int[0], 15);
+
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar(a.col1, b.col2, 'INT', NULL) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        null, 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=false; SELECT jsonExtractScalar(a.col1, b.col2, 'INT', NULL) "
+            + "FROM a JOIN b ON a.col1 = b.col1",
+        0, 15);
+  }
+
+  @Test
+  public void testJsonExtractScalarResolvedNonArrayWithNullDefault() {
+    // The JSON expression uses both join inputs, so these calls cannot be evaluated on either leaf.
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar("
+            + "CONCAT(CONCAT(CONCAT('{\"v\":42,\"a\":\"', a.col1), "
+            + "CONCAT('\",\"b\":\"', b.col1)), '\"}'), "
+            + "'$.v', 'INT_ARRAY', NULL) FROM a JOIN b ON a.col1 = b.col1",
+        new int[0], 15);
+    assertSingleColumnValue(
+        "SET enableNullHandling=true; SELECT jsonExtractScalar("
+            + "CONCAT(CONCAT(CONCAT('{\"v\":{\"x\":1},\"a\":\"', a.col1), "
+            + "CONCAT('\",\"b\":\"', b.col1)), '\"}'), "
+            + "'$.v', 'INT_ARRAY', NULL) FROM a JOIN b ON a.col1 = b.col1",
+        new int[0], 15);
+  }
+
+  private void assertSingleColumnValue(String sql, Object expectedValue, int expectedRows) {
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, false);
+    assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
+    ResultTable resultTable = queryResult.getResultTable();
+    assertNotNull(resultTable, "Query returned no result table: " + sql);
+    assertEquals(resultTable.getRows().size(), expectedRows);
+    for (Object[] row : resultTable.getRows()) {
+      assertEquals(row.length, 1);
+      assertEquals(row[0], expectedValue, sql);
+    }
+  }
+
+  /// Test automatically compares against H2.
+  ///
+  /// @deprecated do not add to this test set. this class will be broken down and clean up.
+  ///   add your test to the appropriate files in [org.apache.pinot.query.runtime.queries] instead.
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
@@ -190,11 +539,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     compareRowEquals(resultTable, expectedRows);
   }
 
-  /**
-   * Test compares against its desired exceptions.
-   */
+  /// Test compares against its desired exceptions.
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, @Language("regexp") String expectedError) {
+    assertQueryFails(sql, expectedError);
+  }
+
+  private void assertQueryFails(String sql, String expectedError) {
     try {
       // query pinot
       QueryDispatcher.QueryResult queryResult = queryRunner(sql, false);
@@ -210,6 +561,34 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
           .withFailMessage("Exception should contain: " + expectedError + ", but found: " + exceptionMessage)
           .contains(expectedError);
     }
+  }
+
+  /// RLS filters are stamped onto the leaf's query options, which is also the only place the planner records that the
+  /// leaf must finalize its aggregates (`is_partitioned_by_group_by_keys` makes the aggregate `AggType.DIRECT`, so no
+  /// stage above it can finalize anything). Stamping must merge, not replace: dropping the flag makes the leaf emit a
+  /// raw `IntOpenHashSet` into a column typed `INT`. Table b lives on a single server, so one row per group.
+  @Test
+  public void testDirectAggregateWithRowLevelSecurityFilter() {
+    String sql = "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, DISTINCTCOUNT(col3) FROM b "
+        + "GROUP BY col1 ORDER BY col1";
+    Map<String, String> rlsFilters = Map.of(RlsUtils.buildRlsFilterKey("b"), "col3 > 1");
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, false, rlsFilters);
+    Assert.assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
+    // The RLS filter keeps only the two rows with col3 = 42.
+    compareRowEquals(queryResult.getResultTable(), List.of(new Object[]{"bar", 1}, new Object[]{"bob", 1}), true);
+  }
+
+  /// The leaf stage applies the RLS filter before the user filter. The user expression is a number on the rows that
+  /// the RLS filter allows (`col3 = 42`: bar and bob) and throws on every other row, so the query fails if the leaf
+  /// evaluates it on a hidden row.
+  @Test
+  public void testUserFilterDoesNotRunOnRowsHiddenByRowLevelSecurity() {
+    String sql = "SELECT col1 FROM b WHERE CAST(REPLACE(REPLACE(col1, 'bar', '1'), 'bob', '2') AS INT) > 0 "
+        + "ORDER BY col1";
+    Map<String, String> rlsFilters = Map.of(RlsUtils.buildRlsFilterKey("b"), "col3 > 1");
+    QueryDispatcher.QueryResult queryResult = queryRunner(sql, false, rlsFilters);
+    Assert.assertNull(queryResult.getProcessingException(), "Query failed: " + queryResult.getProcessingException());
+    compareRowEquals(queryResult.getResultTable(), List.of(new Object[]{"bar"}, new Object[]{"bob"}), true);
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
@@ -257,6 +636,28 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SELECT round_decimal(col3) FROM a", 15},
         new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
         new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
+
+        // test json_extract_scalar resolves on the intermediate stage. Taking the jsonPath from the joined table
+        // keeps the call above the join, so it can only be answered by the scalar function. col1 is not JSON, so
+        // every row falls back to the default value and the query is a pure row-count check.
+        new Object[]{"SELECT json_extract_scalar(a.col1, b.col2, 'INT', 0) FROM a JOIN b ON a.col1 = b.col1", 15},
+        new Object[]{"SELECT jsonExtractScalar(a.col1, '$.x', 'INT', 0) FROM a JOIN b ON a.col1 = b.col1", 15},
+        // Empty all-literal arrays stay as runtime calls because Calcite cannot represent a typed empty array literal.
+        // Execute every supported array storage family to guard result serialization.
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'INT_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'LONG_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'FLOAT_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'DOUBLE_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'BOOLEAN_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'TIMESTAMP_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'STRING_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', '$.missing', 'BIG_DECIMAL_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{\"v\":[true,false]}', '$.v', 'BOOLEAN_ARRAY') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{\"v\":[1.25,2.5]}', '$.v', 'BIG_DECIMAL_ARRAY') FROM a", 15},
+        // nullableParameters on the four-argument scalar must preserve the three-argument overload's null-path
+        // short-circuit instead of attempting to compile a null JSONPath.
+        new Object[]{"SELECT jsonExtractScalar('{}', CAST(NULL AS VARCHAR), 'INT') FROM a", 15},
+        new Object[]{"SELECT jsonExtractScalar('{}', CAST(NULL AS VARCHAR), 'INT', 7) FROM a", 15},
 
         // test queries with special query options attached
         //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
@@ -308,11 +709,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     });
 
     // Timeout exception should occur with this option:
-    // - If the query times out during submission, we get: "Error occurred during stage submission: Timeout"
-    // - If the query times out during execution, we get: "Timed out on stage 0 waiting for data sent by a child stage"
+    // - During submission: "Error occurred during stage submission: Timeout"
+    // - During execution on receiver side: "Timed out on stage 0 waiting for data from child stage 1"
+    // - During execution on sender side: "Received 1 error from stage 1 on serverId: Timing out on: HASH_JOIN"
     testCases.add(new Object[]{
         "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
-        "Time"
+        "Tim"
     });
 
     // Function with incorrect argument signature should throw runtime exception when casting string to numeric
@@ -322,11 +724,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     //   - predicate only functions:
     testCases.add(new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"});
     testCases.add(new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index"});
-    testCases.add(new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')", "supported only on native text index"});
-    testCases.add(new Object[]{
-        "SELECT * FROM a WHERE text_contains(col1, 'f')",
-        "supported only on native text index"}
-    );
 
     //  - transform only functions
     testCases.add(new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"});
@@ -336,11 +733,23 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
     testCases.add(
         new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
-    //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
+    //    - a constant-foldable jsonPath must be folded by PinotEvaluateLiteralRule and then applied like a literal.
+    //      Reaching "Cannot resolve JSON path" (rather than ParserUtils' "single-quoted literal values") is what
+    //      proves the fold happened, so this pins the reason jsonPath does not require a literal in
+    //      TransformFunctionType#jsonExtractScalarOperandTypeChecker.
     testCases.add(new Object[]{
-        "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
-        "Unsupported function: JSONEXTRACTSCALAR"
-    });
+        "SELECT CAST(jsonExtractScalar(col1, CONCAT('pa', 'th'), 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
+    //    - the flip side: a jsonPath that cannot fold to a literal is still rejected, on the leaf stage rather than
+    //      during validation. Covers all four variants, which share the operand type checker.
+    for (String jsonExtractScalar : new String[]{
+        "jsonExtractScalar", "jsonExtractScalarFast", "jsonExtractScalarFirstMatch", "jsonExtractScalarFory"
+    }) {
+      testCases.add(new Object[]{
+          "SELECT " + jsonExtractScalar + "(col1, col2, 'INT') FROM a",
+          "Expect the 2nd and 3rd arguments of transform function: " + jsonExtractScalar
+              + "(jsonFieldName, 'jsonPath', 'resultsType', ['defaultValue']) to be single-quoted literal values"
+      });
+    }
 
     // Positive int keys (only included ones that will be parsed for this query)
     for (String key : new String[]{

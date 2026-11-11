@@ -20,81 +20,48 @@ package org.apache.pinot.segment.spi.creator;
 
 import java.io.Serializable;
 import java.util.Map;
-import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.ColumnShape;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * An interface to read the column statistics from statistics collectors.
- */
-public interface ColumnStatistics extends Serializable {
-  /**
-   * @return Minimum value of the column
-   */
-  Object getMinValue();
+/// Statistics for a column, collected before creating indexes.
+/// For MV column, the stats are on individual elements within the MV values.
+public interface ColumnStatistics extends ColumnShape, Serializable {
 
-  /**
-   * @return Maximum value of the column
-   */
-  Object getMaxValue();
-
-  /**
-   *
-   * @return An array of elements that has the unique values for this column, sorted order.
-   */
+  /// Returns a sorted (ascending) array of all unique values for non-empty dictionary-encoded columns, `null`
+  /// otherwise.
+  /// - INT: int[]
+  /// - LONG: long[]
+  /// - FLOAT: float[]
+  /// - DOUBLE: double[]
+  /// - BIG_DECIMAL: BigDecimal[]
+  /// - STRING: String[]
+  /// - BYTES: ByteArray[]
+  @Nullable
   Object getUniqueValuesSet();
 
-  /**
-   *
-   * @return The number of unique values of this column.
-   */
-  int getCardinality();
-
-  /**
-   *
-   * @return For variable length objects, returns the length of the shortest value. For others, returns -1.
-   */
-  int getLengthOfShortestElement();
-
-  /**
-   *
-   * @return For variable length objects, returns the length of the longest value. For others, returns -1.
-   */
-  int getLengthOfLargestElement();
-
-  default boolean isFixedLength() {
-    return getLengthOfShortestElement() == getLengthOfLargestElement();
+  @Deprecated(since = "1.6.0", forRemoval = true)
+  default DataType getValueType() {
+    return getStoredType();
   }
 
-  /**
-   * Whether or not the data in this column is in ascending order.
-   * @return true if the data is in ascending order.
-   */
-  boolean isSorted();
-
-  /**
-   * @return total number of entries
-   */
-  int getTotalNumberOfEntries();
-
-  /**
-   * @return For multi-valued columns, returns the max number of values in a single occurrence of the column,
-   * otherwise 0.
-   */
-  int getMaxNumberOfMultiValues();
-
-  /**
-   * @return the length of the largest row in bytes for variable length types
-   */
-  default int getMaxRowLengthInBytes() {
-    return -1;
+  @Deprecated(since = "1.6.0", forRemoval = true)
+  default int getLengthOfLargestElement() {
+    return getLengthOfLongestElement();
   }
 
-  PartitionFunction getPartitionFunction();
+  @Deprecated(since = "1.6.0", forRemoval = true)
+  default int getNumPartitions() {
+    PartitionFunction partitionFunction = getPartitionFunction();
+    return partitionFunction != null ? partitionFunction.getNumPartitions() : 0;
+  }
 
-  int getNumPartitions();
-
-  Map<String, String> getPartitionFunctionConfig();
-
-  Set<Integer> getPartitions();
+  @Deprecated(since = "1.6.0", forRemoval = true)
+  @Nullable
+  default Map<String, String> getPartitionFunctionConfig() {
+    PartitionFunction partitionFunction = getPartitionFunction();
+    return partitionFunction != null ? partitionFunction.getFunctionConfig() : null;
+  }
 }

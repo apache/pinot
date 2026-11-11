@@ -52,23 +52,19 @@ public class BitSlicedRangeIndexCreator implements CombinedInvertedIndexCreator 
     _valueType = valueType;
   }
 
-  /**
-   * For dictionarized columns
-   * @param indexDir the directory for the index
-   * @param fieldSpec the specification of the field
-   * @param cardinality the cardinality of the dictionary
-   */
+  /// For dictionarized columns
+  /// @param indexDir the directory for the index
+  /// @param fieldSpec the specification of the field
+  /// @param cardinality the cardinality of the dictionary
   public BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality) {
     this(indexDir, fieldSpec, 0, cardinality - 1, fieldSpec.getDataType().getStoredType());
   }
 
-  /**
-   * For raw columns
-   * @param indexDir the directory for the index
-   * @param fieldSpec the specification of the field
-   * @param minValue the minimum value
-   * @param maxValue the maximum value
-   */
+  /// For raw columns
+  /// @param indexDir the directory for the index
+  /// @param fieldSpec the specification of the field
+  /// @param minValue the minimum value
+  /// @param maxValue the maximum value
   public BitSlicedRangeIndexCreator(File indexDir, FieldSpec fieldSpec, Comparable<?> minValue,
       Comparable<?> maxValue) {
     this(indexDir, fieldSpec, minValue(fieldSpec, minValue), maxValue(fieldSpec, minValue, maxValue),

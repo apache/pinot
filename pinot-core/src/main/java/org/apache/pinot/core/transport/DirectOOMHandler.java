@@ -24,7 +24,6 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -34,12 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Handling netty direct memory OOM on broker and server. In this case there is a great chance that multiple channels
- * are receiving large data tables from servers concurrently. We want to close all channels to servers to
- * proactively release the direct memory, because the execution of netty threads can all block in allocating direct
- * memory, in which case no one will reach channelRead0.
- */
+/// Handling netty direct memory OOM on broker and server. In this case there is a great chance that multiple channels
+/// are receiving large data tables from servers concurrently. We want to close all channels to servers to
+/// proactively release the direct memory, because the execution of netty threads can all block in allocating direct
+/// memory, in which case no one will reach channelRead0.
 public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
   private static final Logger LOGGER = LoggerFactory.getLogger(DirectOOMHandler.class);
   private static final AtomicBoolean DIRECT_OOM_SHUTTING_DOWN = new AtomicBoolean(false);
@@ -73,9 +70,7 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
     ctx.fireChannelInactive();
   }
 
-  /**
-   * Closes and removes all active channels from the map to release direct memory.
-   */
+  /// Closes and removes all active channels from the map to release direct memory.
   private void closeAllChannels() {
     LOGGER.warn("OOM detected: Closing all channels to server to release direct memory");
     for (SocketChannel channel : _allChannels.keySet()) {
@@ -107,8 +102,18 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-    // catch direct memory oom here
-    if (cause instanceof OutOfMemoryError && StringUtils.containsIgnoreCase(cause.getMessage(), "direct buffer")) {
+    /*
+     * Catch all OutOfMemoryError, not just direct memory OOM.
+     * Why instanceof OutOfMemoryError (not OutOfDirectMemoryError or string check):
+     * 1. Only direct memory OOM reaches this handler — frame decoder is upstream and uses
+     *    PooledByteBufAllocator(preferDirect=true). Heap OOM from DataTableHandler (downstream)
+     *    never propagates backwards in Netty's exception chain.
+     * 2. instanceof OutOfDirectMemoryError would miss JVM-thrown "Direct buffer memory" errors
+     *    (plain OutOfMemoryError, not Netty's subclass).
+     * 3. String matching on the message is fragile — Netty says "direct memory", JVM says
+     *    "Direct buffer memory". A mismatch here caused prod issues (hours of stuck channels).
+     */
+    if (cause instanceof OutOfMemoryError) {
       // only one thread can get here and do the shutdown
       if (DIRECT_OOM_SHUTTING_DOWN.compareAndSet(false, true)) {
         try {
@@ -123,7 +128,7 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
               removed.closeChannel();
               removed.setSilentShutdown();
             });
-            _queryRouter.markServerDown(_serverRoutingInstance,
+            _queryRouter.cancelQuery(_serverRoutingInstance,
                 new QueryCancelledException("Query cancelled as broker is out of direct memory"));
           } else if (_allChannels != null && !_allChannels.isEmpty()) { // server side direct OOM handler
             LOGGER.error("Closing channel from broker, as we are running out of direct memory "

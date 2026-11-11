@@ -21,10 +21,10 @@ package org.apache.pinot.controller.helix.core.controllerjob;
 import java.util.EnumMap;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.TableRebalanceProgressStats;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -33,9 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Controller jobs that store metadata in the ZK property store.
- */
+/// Controller jobs that store metadata in the ZK property store.
 public enum ControllerJobTypes implements ControllerJobType {
   RELOAD_SEGMENT,
   FORCE_COMMIT,

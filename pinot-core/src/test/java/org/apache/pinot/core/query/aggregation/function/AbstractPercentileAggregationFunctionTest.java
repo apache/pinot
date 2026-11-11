@@ -20,7 +20,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -29,11 +29,11 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @DataProvider(name = "scenarios")
   Object[] scenarios() {
-    return new Object[] {
-        new Scenario(FieldSpec.DataType.INT),
-        new Scenario(FieldSpec.DataType.LONG),
-        new Scenario(FieldSpec.DataType.FLOAT),
-        new Scenario(FieldSpec.DataType.DOUBLE),
+    return new Object[]{
+        new Scenario(DataType.INT),
+        new Scenario(DataType.LONG),
+        new Scenario(DataType.FLOAT),
+        new Scenario(DataType.DOUBLE),
     };
   }
 
@@ -44,13 +44,13 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
   }
 
   public class Scenario {
-    private final FieldSpec.DataType _dataType;
+    private final DataType _dataType;
 
-    public Scenario(FieldSpec.DataType dataType) {
+    public Scenario(DataType dataType) {
       _dataType = dataType;
     }
 
-    public FieldSpec.DataType getDataType() {
+    public DataType getDataType() {
       return _dataType;
     }
 
@@ -66,39 +66,20 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   FluentQueryTest.TableWithSegments withDefaultData(Scenario scenario, boolean nullHandlingEnabled) {
     return scenario.getDeclaringTable(nullHandlingEnabled)
-        .onFirstInstance("myField",
-            "null",
-            "0",
-            "null",
-            "1",
-            "null",
-            "2",
-            "null",
-            "3",
-            "null",
-            "4",
-            "null"
-        ).andSegment("myField",
-            "null",
-            "5",
-            "null",
-            "6",
-            "null",
-            "7",
-            "null",
-            "8",
-            "null",
-            "9",
-            "null"
-        );
+        .onFirstInstance("myField", "null", "0", "null", "1", "null", "2", "null", "3", "null", "4", "null")
+        .andSegment("myField", "null", "5", "null", "6", "null", "7", "null", "8", "null", "9", "null");
   }
 
-  String minValue(FieldSpec.DataType dataType) {
+  String minValue(DataType dataType) {
     switch (dataType) {
-      case INT: return "-2.147483648E9";
-      case LONG: return "-9.223372036854776E18";
-      case FLOAT: return "-Infinity";
-      case DOUBLE: return "-Infinity";
+      case INT:
+        return "-2.147483648E9";
+      case LONG:
+        return "-9.223372036854776E18";
+      case FLOAT:
+        return "-Infinity";
+      case DOUBLE:
+        return "-Infinity";
       default:
         throw new IllegalArgumentException("Unexpected type " + dataType);
     }
@@ -146,45 +127,27 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithoutNull(Scenario scenario) {
-
     FluentQueryTest.TableWithSegments instance = withDefaultData(scenario, false);
 
-    instance
-        .whenQuery("select " + callStr("myField", 10) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 10) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull10(scenario));
-
-    instance
-        .whenQuery("select " + callStr("myField", 15) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 15) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull15(scenario));
-
-    instance
-        .whenQuery("select " + callStr("myField", 30) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 30) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull30(scenario));
-    instance
-        .whenQuery("select " + callStr("myField", 35) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 35) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull35(scenario));
-
-    instance
-        .whenQuery("select " + callStr("myField", 50) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 50) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull50(scenario));
-    instance
-        .whenQuery("select " + callStr("myField", 55) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 55) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull55(scenario));
-
-    instance
-        .whenQuery("select " + callStr("myField", 70) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 70) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull70(scenario));
-
-    instance
-        .whenQuery("select " + callStr("myField", 75) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 75) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull75(scenario));
-
-    instance
-        .whenQuery("select " + callStr("myField", 90) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 90) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull90(scenario));
-
-    instance
-        .whenQuery("select " + callStr("myField", 100) + " from testTable")
+    instance.whenQuery("select " + callStr("myField", 100) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithoutNull100(scenario));
   }
 
@@ -194,8 +157,7 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithNull10(Scenario scenario) {
-    withDefaultData(scenario, true)
-        .whenQuery("select " + callStr("myField", 10) + " from testTable")
+    withDefaultData(scenario, true).whenQuery("select " + callStr("myField", 10) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithNull10(scenario));
   }
 
@@ -205,8 +167,7 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithNull15(Scenario scenario) {
-    withDefaultData(scenario, true)
-        .whenQuery("select " + callStr("myField", 15) + " from testTable")
+    withDefaultData(scenario, true).whenQuery("select " + callStr("myField", 15) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithNull15(scenario));
   }
 
@@ -216,8 +177,7 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithNull30(Scenario scenario) {
-    withDefaultData(scenario, true)
-        .whenQuery("select " + callStr("myField", 30) + " from testTable")
+    withDefaultData(scenario, true).whenQuery("select " + callStr("myField", 30) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithNull30(scenario));
   }
 
@@ -227,8 +187,7 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithNull35(Scenario scenario) {
-    withDefaultData(scenario, true)
-        .whenQuery("select " + callStr("myField", 35) + " from testTable")
+    withDefaultData(scenario, true).whenQuery("select " + callStr("myField", 35) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithNull35(scenario));
   }
 
@@ -238,8 +197,7 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithNull50(Scenario scenario) {
-    withDefaultData(scenario, true)
-        .whenQuery("select " + callStr("myField", 50) + " from testTable")
+    withDefaultData(scenario, true).whenQuery("select " + callStr("myField", 50) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithNull50(scenario));
   }
 
@@ -249,8 +207,7 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithNull55(Scenario scenario) {
-    withDefaultData(scenario, true)
-        .whenQuery("select " + callStr("myField", 55) + " from testTable")
+    withDefaultData(scenario, true).whenQuery("select " + callStr("myField", 55) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithNull55(scenario));
   }
 
@@ -260,8 +217,7 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithNull70(Scenario scenario) {
-    withDefaultData(scenario, true)
-        .whenQuery("select " + callStr("myField", 70) + " from testTable")
+    withDefaultData(scenario, true).whenQuery("select " + callStr("myField", 70) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithNull70(scenario));
   }
 
@@ -271,8 +227,7 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithNull75(Scenario scenario) {
-    withDefaultData(scenario, true)
-        .whenQuery("select " + callStr("myField", 75) + " from testTable")
+    withDefaultData(scenario, true).whenQuery("select " + callStr("myField", 75) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithNull75(scenario));
   }
 
@@ -282,27 +237,20 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
 
   @Test(dataProvider = "scenarios")
   void aggrWithNull100(Scenario scenario) {
-    withDefaultData(scenario, true)
-        .whenQuery("select " + callStr("myField", 100) + " from testTable")
+    withDefaultData(scenario, true).whenQuery("select " + callStr("myField", 100) + " from testTable")
         .thenResultIs(getFinalResultColumnType(), expectedAggrWithNull100(scenario));
   }
 
   @Test(dataProvider = "scenarios")
   void aggrSvWithoutNull(Scenario scenario) {
     scenario.getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "1",
-            "null"
-        ).andSegment("myField",
-            "9"
-        ).andSegment("myField",
-            "null",
-            "null",
-            "null"
-        ).whenQuery("select $segmentName, " + callStr("myField", 50) + " from testTable "
+        .onFirstInstance("myField", "null", "1", "null")
+        .andSegment("myField", "9")
+        .andSegment("myField", "null", "null", "null")
+        .whenQuery("select $segmentName, " + callStr("myField", 50) + " from testTable "
             + "group by $segmentName order by $segmentName")
-        .thenResultIs("STRING | " + getFinalResultColumnType(),
+        .thenResultIs(
+            "STRING | " + getFinalResultColumnType(),
             "testTable_0 | " + minValue(scenario._dataType),
             "testTable_1 |  9",
             "testTable_2 | " + minValue(scenario._dataType)
@@ -312,19 +260,13 @@ public abstract class AbstractPercentileAggregationFunctionTest extends Abstract
   @Test(dataProvider = "scenarios")
   void aggrSvWithNull(Scenario scenario) {
     scenario.getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "1",
-            "null"
-        ).andSegment("myField",
-            "9"
-        ).andSegment("myField",
-            "null",
-            "null",
-            "null"
-        ).whenQuery("select $segmentName, " + callStr("myField", 50) + " from testTable "
+        .onFirstInstance("myField", "null", "1", "null")
+        .andSegment("myField", "9")
+        .andSegment("myField", "null", "null", "null")
+        .whenQuery("select $segmentName, " + callStr("myField", 50) + " from testTable "
             + "group by $segmentName order by $segmentName")
-        .thenResultIs("STRING | " + getFinalResultColumnType(),
+        .thenResultIs(
+            "STRING | " + getFinalResultColumnType(),
             "testTable_0 | 1",
             "testTable_1 | 9",
             "testTable_2 | null"

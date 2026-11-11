@@ -44,15 +44,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Stores responses in a file system. All storage schemes supported by PinotFS can be used.
- * Responses are stored in "data.dir" directory with the following structure:
- * - A directory is created for every request id.
- * - Response metadata is stored with filename "response"
- * - Results are stored with filename "resultTable"
- * The extension of the file is determined by the config "extension"
- *
- */
+/// Stores responses in a file system. All storage schemes supported by PinotFS can be used.
+/// Responses are stored in "data.dir" directory with the following structure:
+/// - A directory is created for every request id.
+/// - Response metadata is stored with filename "response"
+/// - Results are stored with filename "resultTable"
+/// The extension of the file is determined by the config "extension"
 @AutoService(ResponseStore.class)
 public class FsResponseStore extends AbstractResponseStore {
   private static final Logger LOGGER = LoggerFactory.getLogger(FsResponseStore.class);
@@ -138,9 +135,11 @@ public class FsResponseStore extends AbstractResponseStore {
           LOGGER.debug("Checking for query dir {} & metadata file: {}. Metadata file exists: {}", queryDir,
               metadataFile, metadataFileExists);
           if (metadataFileExists) {
-            BrokerResponse response =
-                _responseSerde.deserialize(pinotFS.open(metadataFile), CursorResponseNative.class);
-            if (response.getBrokerId().equals(_brokerId)) {
+            BrokerResponse response;
+            try (InputStream is = pinotFS.open(metadataFile)) {
+              response = _responseSerde.deserialize(is, CursorResponseNative.class);
+            }
+            if (_brokerId.equals(response.getBrokerId())) {
               requestIdList.add(response.getRequestId());
               LOGGER.debug("Added response store {}", queryDir);
             }
@@ -159,11 +158,18 @@ public class FsResponseStore extends AbstractResponseStore {
       throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
-    if (pinotFS.exists(queryDir)) {
+    try {
       pinotFS.delete(queryDir, true);
       return true;
+    } catch (Exception e) {
+      if (!pinotFS.exists(queryDir)) {
+        LOGGER.debug("Directory already deleted for requestId={} (likely concurrent deletion)", requestId);
+        // synchronized serializes JVM-local callers; the directory can still disappear due to operator cleanup,
+        // manual FS edits, or tooling. Other brokers should not delete this broker's request ids per SPI contract.
+        return false;
+      }
+      throw e;
     }
-    return false;
   }
 
   @Override

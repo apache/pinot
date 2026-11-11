@@ -24,10 +24,8 @@ import net.jpountz.lz4.LZ4Factory;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
-/**
- * Implementation of {@link ChunkDecompressor} for delta compression with LZ4.
- * This decompressor reconstructs the original integer sequence from LZ4 compressed delta encoded values.
- */
+/// Implementation of [ChunkDecompressor] for delta compression with LZ4.
+/// This decompressor reconstructs the original integer sequence from LZ4 compressed delta encoded values.
 class DeltaDecompressor implements ChunkDecompressor {
 
   static final DeltaDecompressor INSTANCE = new DeltaDecompressor();

@@ -34,6 +34,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -122,6 +123,7 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
           continue;
         }
         Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segmentName)));
+        configs.putAll(MinionTaskUtils.getPushTaskConfig(tableName, taskConfigs, _clusterInfoAccessor));
         Long tsLastPurge;
         if (segmentZKMetadata.getCustomMap() != null) {
           tsLastPurge = Long.valueOf(segmentZKMetadata.getCustomMap()
@@ -142,8 +144,10 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
           break;
         }
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
+        // Purge can reuse the original index directory, whose metadata may name the source table. Other conversion
+        // tasks use v1 because they regenerate destination-bound metadata; any future artifact-reuse path must use v2.
         configs.put(MinionConstants.UPLOAD_URL_KEY,
-            _clusterInfoAccessor.getVipUrlForLeadController(tableName) + "/segments");
+            _clusterInfoAccessor.getVipUrlForLeadController(tableName) + "/v2/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
         pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
         tableNumTasks++;

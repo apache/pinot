@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
+import io.grpc.ConnectivityState;
+import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,19 +31,30 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -73,7 +87,196 @@ public class QueryDispatcherTest extends QueryTestSet {
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(1, portList.get(0), portList.get(1),
         QueryEnvironmentTestBase.TABLE_SCHEMAS, QueryEnvironmentTestBase.SERVER1_SEGMENTS,
         QueryEnvironmentTestBase.SERVER2_SEGMENTS, null);
-    _queryDispatcher = new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class));
+    _queryDispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, true,
+            Duration.ofSeconds(1));
+  }
+
+  /// The proto segment list encoding ships disabled and is turned on by an operator through cluster config, which has
+  /// to reach the broker without a restart, and off again the same way.
+  @Test
+  public void testProtoSegmentListFollowsClusterConfig() {
+    String key = CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    try {
+      Assert.assertFalse(dispatcher.isEnableProtoSegmentList(), "The encoding must ship disabled");
+
+      dispatcher.onChange(Set.of(key), Map.of(key, "true"));
+      Assert.assertTrue(dispatcher.isEnableProtoSegmentList(), "Cluster config must turn the encoding on");
+
+      dispatcher.onChange(Set.of(key), Map.of(key, "false"));
+      Assert.assertFalse(dispatcher.isEnableProtoSegmentList(), "Cluster config must turn the encoding off again");
+
+      // A change that does not touch the key leaves it alone.
+      dispatcher.onChange(Set.of(key), Map.of(key, "TRUE"));
+      dispatcher.onChange(Set.of("some.other.key"), Map.of("some.other.key", "x"));
+      Assert.assertTrue(dispatcher.isEnableProtoSegmentList());
+
+      // Anything that is not a boolean reads as disabled, the safe direction.
+      dispatcher.onChange(Set.of(key), Map.of(key, "SAFE"));
+      Assert.assertFalse(dispatcher.isEnableProtoSegmentList());
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  /// Clearing the cluster-config key disables the encoding, whatever the static broker config said: the fallback is
+  /// always the legacy encoding that every server understands.
+  @Test
+  public void testClearingClusterConfigDisablesTheEncoding() {
+    String key = CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST;
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1), 0, 0, false, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS, true);
+    try {
+      Assert.assertTrue(dispatcher.isEnableProtoSegmentList(), "The static broker config seeds the value");
+
+      dispatcher.onChange(Set.of(key), Map.of());
+      Assert.assertFalse(dispatcher.isEnableProtoSegmentList(),
+          "Clearing the key must fall back to the legacy encoding");
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  /// When a server becomes routable, the dispatch channel to it resolves the hostname again, and the channel to an
+  /// address it left is shut down.
+  @Test
+  public void testServerEnabledRefreshesAndRetiresChannels() {
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    try {
+      // Nothing listens there
+      int port = QueryTestUtils.getAvailablePort();
+      QueryServerInstance server = new QueryServerInstance("Server_localhost_8098", "localhost", port, 8101);
+      DispatchClient client = dispatcher.getOrCreateDispatchClient(server);
+      ManagedChannel channel = client.getChannel();
+      // Connecting fails, but takes the channel out of IDLE
+      channel.getState(true);
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port));
+      Assert.assertSame(dispatcher.getOrCreateDispatchClient(server), client);
+      TestUtils.waitForCondition(aVoid -> channel.getState(false) == ConnectivityState.IDLE, 10_000L,
+          "The channel did not go back to IDLE");
+      Assert.assertFalse(channel.isShutdown());
+
+      // The server restarted on another port
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port + 1));
+      Assert.assertTrue(channel.isShutdown());
+      Assert.assertNotSame(dispatcher.getOrCreateDispatchClient(server), client);
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  /// The dispatch channel to an address stays when the server that had the address moves away, if another server has
+  /// taken the address over.
+  @Test
+  public void testServerEnabledKeepsChannelToAddressTakenOver() {
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    try {
+      int port = QueryTestUtils.getAvailablePort();
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port));
+      DispatchClient client = dispatcher.getOrCreateDispatchClient(
+          new QueryServerInstance("Server_localhost_8098", "localhost", port, 8101));
+
+      // Another server takes over the address, then the server that had it comes back on another port
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8099", port));
+      dispatcher.onServerEnabled(serverInstance("Server_localhost_8098", port + 1));
+
+      Assert.assertFalse(client.getChannel().isShutdown());
+      Assert.assertSame(dispatcher.getOrCreateDispatchClient(
+          new QueryServerInstance("Server_localhost_8099", "localhost", port, 8101)), client);
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  /// Each refresh drops the connection that the previous one opened, so a channel is refreshed at most once a second.
+  @Test
+  public void testDispatchChannelRefreshIsDebounced() {
+    DispatchClient client = new DispatchClient("localhost", QueryTestUtils.getAvailablePort(), null);
+    try {
+      Assert.assertTrue(client.refreshChannel());
+      Assert.assertFalse(client.refreshChannel());
+      TestUtils.waitForCondition(aVoid -> client.refreshChannel(), 10_000L, "The channel was not refreshed again");
+    } finally {
+      client.getChannel().shutdownNow();
+    }
+  }
+
+  /// The failure detector checks an instance that the routing manager does not know, for example a server of a remote
+  /// cluster, at the address where a query was last dispatched to it.
+  @Test
+  public void testCheckConnectivityToInstanceAtLastDispatchAddress() {
+    QueryDispatcher dispatcher =
+        new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, false,
+            Duration.ofSeconds(1));
+    String instanceId = "Server_remote_8098";
+    // Nothing listens there until the server starts
+    int port = QueryTestUtils.getAvailablePort();
+    QueryServerInstance instance = new QueryServerInstance(instanceId, "localhost", port, 8101);
+    QueryServer queryServer = new QueryServer(port, Mockito.mock(QueryRunner.class));
+    try {
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNKNOWN);
+
+      // What a dispatch does
+      dispatcher.recordDispatchAddress(instance);
+      ManagedChannel channel = dispatcher.getOrCreateDispatchClient(instance).getChannel();
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNHEALTHY);
+      TestUtils.waitForCondition(aVoid -> channel.getState(false) == ConnectivityState.TRANSIENT_FAILURE, 10_000L,
+          "Connecting did not fail");
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNHEALTHY);
+
+      queryServer.start();
+      TestUtils.waitForCondition(
+          aVoid -> dispatcher.checkConnectivityToInstance(instanceId) == FailureDetector.ServerState.HEALTHY, 10_000L,
+          "The instance did not become healthy after its server started");
+
+      // A request other than a dispatch, for example a cancel, does not change the address to check
+      QueryServerInstance movedInstance =
+          new QueryServerInstance(instanceId, "localhost", QueryTestUtils.getAvailablePort(), 8101);
+      dispatcher.getOrCreateDispatchClient(movedInstance);
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.HEALTHY);
+
+      // A dispatch does: the instance moved to another port, where nothing listens
+      dispatcher.recordDispatchAddress(movedInstance);
+      Assert.assertEquals(dispatcher.checkConnectivityToInstance(instanceId), FailureDetector.ServerState.UNHEALTHY);
+    } finally {
+      dispatcher.shutdown();
+      queryServer.shutdown();
+    }
+  }
+
+  /// Each dispatch records the address of the instances it reaches, for the failure detector.
+  @Test
+  public void testDispatchRecordsInstanceAddress()
+      throws Exception {
+    Set<QueryServerInstance> servers = new HashSet<>();
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery("SELECT * FROM a");
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 10_000L, servers, Map.of());
+    }
+    Assert.assertFalse(servers.isEmpty());
+    for (QueryServerInstance server : servers) {
+      Assert.assertEquals(_queryDispatcher.checkConnectivityToInstance(server.getInstanceId()),
+          FailureDetector.ServerState.HEALTHY);
+    }
+  }
+
+  private static ServerInstance serverInstance(String instanceId, int queryServerPort) {
+    InstanceConfig instanceConfig = new InstanceConfig(instanceId);
+    instanceConfig.setHostName("localhost");
+    instanceConfig.setPort(instanceId.substring(instanceId.lastIndexOf('_') + 1));
+    instanceConfig.getRecord()
+        .setIntField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY, queryServerPort);
+    instanceConfig.getRecord()
+        .setIntField(CommonConstants.Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, 8101);
+    return new ServerInstance(instanceConfig);
   }
 
   @AfterClass
@@ -140,7 +343,7 @@ public class QueryDispatcherTest extends QueryTestSet {
   }
 
   @Test
-  public void testQueryDispatcherCancelWhenQueryReducerThrowsError()
+  public void testQueryDispatcherCancelWhenQueryReducerReturnsError()
       throws Exception {
     String sql = "SELECT * FROM a";
     long requestId = REQUEST_ID_GEN.getAndIncrement();
@@ -217,5 +420,95 @@ public class QueryDispatcherTest extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 0L, new HashSet<>(), Map.of());
     }
+  }
+
+  @Test
+  public void testStatsManagerNotCalledWhenSubmitFails()
+      throws Exception {
+    ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+
+    QueryServer failingQueryServer = _queryServerMap.values().iterator().next();
+    Mockito.doThrow(new RuntimeException("partial dispatch failure"))
+        .when(failingQueryServer).submit(Mockito.any(), Mockito.any());
+
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
+      Assert.fail("Should have thrown");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+    }
+
+    Mockito.verifyNoInteractions(statsManager);
+    Mockito.reset(failingQueryServer);
+  }
+
+  @Test
+  public void testRealStatsManagerInflightReturnsToZero()
+      throws Exception {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+
+    PinotConfiguration brokerConfig = new PinotConfiguration();
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(
+        brokerConfig.subset(CommonConstants.Broker.METRICS_CONFIG_PREFIX));
+    BrokerMetrics brokerMetrics = new BrokerMetrics(
+        CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX,
+        metricsRegistry,
+        CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS,
+        List.of());
+    brokerMetrics.initializeGlobalMeters();
+    BrokerMetrics.register(brokerMetrics);
+
+    ServerRoutingStatsManager statsManager = new ServerRoutingStatsManager(
+        new PinotConfiguration(properties), brokerMetrics);
+    statsManager.init();
+
+    String sql = "SELECT * FROM a";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+
+    Set<String> expectedInstanceIds = new HashSet<>();
+    for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
+      for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
+        expectedInstanceIds.add(server.getInstanceId());
+      }
+    }
+    Assert.assertFalse(expectedInstanceIds.isEmpty());
+
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
+    } catch (NullPointerException e) {
+      // expected: reduce phase fails with mocked MailboxService
+    }
+
+    // Wait for the async executor to process all stats tasks (1 submission + 1 arrival per server).
+    int expectedTasks = expectedInstanceIds.size() * 2;
+    TestUtils.waitForCondition(
+        aVoid -> statsManager.getCompletedTaskCount() >= expectedTasks,
+        10L, 5000,
+        "Timed out waiting for stats manager to process all tasks");
+
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      for (String instanceId : expectedInstanceIds) {
+        Integer numInFlight = statsManager.fetchNumInFlightRequestsForServer(instanceId);
+        Assert.assertNotNull(numInFlight, "Expected stats entry for " + instanceId);
+        Assert.assertEquals(numInFlight.intValue(), 0,
+            "Expected 0 in-flight requests for " + instanceId + " after submitAndReduce returns");
+      }
+    }
+
+    statsManager.shutDown();
   }
 }

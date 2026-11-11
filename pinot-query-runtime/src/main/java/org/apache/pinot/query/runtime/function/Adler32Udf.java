@@ -30,9 +30,7 @@ import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * UDF stub for adler32 (not implemented).
- */
+/// UDF stub for adler32 (not implemented).
 @AutoService(Udf.class)
 public class Adler32Udf extends Udf.FromAnnotatedMethod {
 

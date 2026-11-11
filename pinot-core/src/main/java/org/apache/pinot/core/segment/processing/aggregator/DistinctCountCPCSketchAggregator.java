@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.lang.foreign.MemorySegment;
 import java.util.Map;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -33,8 +33,26 @@ public class DistinctCountCPCSketchAggregator implements ValueAggregator {
 
   @Override
   public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
-    CpcSketch first = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize((byte[]) value1);
-    CpcSketch second = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize((byte[]) value2);
+    byte[] bytes1 = (byte[]) value1;
+    byte[] bytes2 = (byte[]) value2;
+
+    // Empty byte arrays represent the default null value for BYTES columns.
+    // When both are empty, produce a serialized empty sketch so the stored value
+    // is always a valid sketch and does not propagate byte[0] into merged segments.
+    if (bytes1.length == 0 && bytes2.length == 0) {
+      String lgKParam = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
+      int lgK = lgKParam != null ? Integer.parseInt(lgKParam) : CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
+      return new CpcSketch(lgK).toByteArray();
+    }
+    if (bytes1.length == 0) {
+      return bytes2;
+    }
+    if (bytes2.length == 0) {
+      return bytes1;
+    }
+
+    CpcSketch first = CpcSketch.heapify(MemorySegment.ofArray(bytes1));
+    CpcSketch second = CpcSketch.heapify(MemorySegment.ofArray(bytes2));
     CpcUnion union;
 
     String lgKParam = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
@@ -47,6 +65,6 @@ public class DistinctCountCPCSketchAggregator implements ValueAggregator {
     }
     union.update(first);
     union.update(second);
-    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(union.getResult());
+    return union.getResult().toByteArray();
   }
 }

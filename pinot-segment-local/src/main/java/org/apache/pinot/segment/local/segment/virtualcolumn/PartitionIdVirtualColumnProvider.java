@@ -19,28 +19,29 @@
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.constant.ConstantMVInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
-/**
- * Virtual column provider that returns the partition information of the segment.
- * Returns a multi-value string column with entries in the format "columnName_partitionId"
- * for all partitioned columns in the segment. Returns empty array for segments without partition information.
- */
+/// Virtual column provider that returns the partition information of the segment.
+/// Returns a multi-value string column with entries in the format "columnName_partitionId"
+/// for all partitioned columns in the segment. Returns empty array for segments without partition information.
 public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
 
   @Override
@@ -81,20 +82,19 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     return builder.build();
   }
 
-  /**
-   * Extract partition information from segment metadata.
-   * Returns a list of strings in format "columnName_partitionId" for all partitioned columns.
-   */
+  /// Extract partition information from segment metadata.
+  /// Returns a list of strings in format "columnName_partitionId" for all partitioned columns.
   private List<String> getPartitionInfo(VirtualColumnContext context) {
     List<String> partitionInfo = new ArrayList<>();
     SegmentMetadata segmentMetadata = context.getSegmentMetadata();
 
-    if (segmentMetadata != null && segmentMetadata.getColumnMetadataMap() != null) {
+    if (segmentMetadata != null && !segmentMetadata.isMutableSegment()) {
       // Get partition info from all partitioned columns in the segment metadata
-      Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
-      for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
-        String columnName = entry.getKey();
-        ColumnMetadata columnMetadata = entry.getValue();
+      Set<String> physicalColumns = segmentMetadata instanceof SegmentMetadataImpl
+          ? ((SegmentMetadataImpl) segmentMetadata).getPhysicalColumnNames()
+          : segmentMetadata.getSchema().getPhysicalColumnNames();
+      for (String columnName : physicalColumns) {
+        ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
         Set<Integer> partitions = columnMetadata.getPartitions();
         if (partitions != null && !partitions.isEmpty()) {
           // Add all partition IDs for this column
@@ -113,10 +113,8 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     return partitionInfo;
   }
 
-  /**
-   * Forward index reader for multi-value partition column.
-   * Returns all dictionary IDs (0, 1, 2, ..., n-1) for each document.
-   */
+  /// Forward index reader for multi-value partition column.
+  /// Returns all dictionary IDs (0, 1, 2, ..., n-1) for each document.
   private static class MultiValueConstantForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
     private final int _numValues;
     private final int[] _dictIds;
@@ -167,10 +165,8 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     }
   }
 
-  /**
-   * Minimal dictionary that extends BaseImmutableDictionary for virtual columns.
-   * Follows the same pattern as StringDictionary but for in-memory virtual column values.
-   */
+  /// Minimal dictionary that extends BaseImmutableDictionary for virtual columns.
+  /// Follows the same pattern as StringDictionary but for in-memory virtual column values.
   private static class MultiValueConstantStringDictionary extends BaseImmutableDictionary {
     private final List<String> _values;
     private final Object2IntOpenHashMap<String> _valueToIndexMap;
@@ -210,6 +206,16 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     }
 
     @Override
+    public byte[] getBytesValue(int dictId) {
+      return _values.get(dictId).getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public int getValueSize(int dictId) {
+      return Utf8Utils.encodedLength(_values.get(dictId));
+    }
+
+    @Override
     public int getIntValue(int dictId) {
       throw new UnsupportedOperationException();
     }
@@ -230,7 +236,7 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
     }
 
     @Override
-    public java.math.BigDecimal getBigDecimalValue(int dictId) {
+    public BigDecimal getBigDecimalValue(int dictId) {
       throw new UnsupportedOperationException();
     }
   }

@@ -23,9 +23,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Pinot extended Instance Config for pinot extra configuration like TlsPort, etc
- */
+/// Pinot extended Instance Config for pinot extra configuration like TlsPort, etc
 public class ExtraInstanceConfig {
 
   private final InstanceConfig _proxy;
@@ -46,11 +44,9 @@ public class ExtraInstanceConfig {
     _proxy.getRecord().setSimpleField(PinotInstanceConfigProperty.PINOT_TLS_PORT.toString(), tlsPort);
   }
 
-  /**
-   * Returns an instance URL from the InstanceConfig. Will set the appropriate protocol and port. Note that the helix
-   * participant port will be returned. For the Pinot server this will not correspond to the admin port.
-   * Returns null if the URL cannot be constructed.
-   */
+  /// Returns an instance URL from the InstanceConfig. Will set the appropriate protocol and port. Note that the helix
+  /// participant port will be returned. For the Pinot server this will not correspond to the admin port.
+  /// Returns null if the URL cannot be constructed.
   public String getComponentUrl() {
     String protocol = null;
     String port = null;
@@ -65,7 +61,8 @@ public class ExtraInstanceConfig {
           protocol = CommonConstants.HTTP_PROTOCOL;
           port = _proxy.getPort();
         }
-      } catch (Exception ignored) {
+      } catch (Exception ex) {
+        // Failed to parse port as integer, URL will not be constructed
       }
     }
     if (port != null) {

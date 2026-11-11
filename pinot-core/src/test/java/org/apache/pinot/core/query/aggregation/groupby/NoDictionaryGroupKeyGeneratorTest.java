@@ -45,7 +45,7 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -60,9 +60,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit test for {@link NoDictionaryMultiColumnGroupKeyGenerator}
- */
+/// Unit test for [NoDictionaryMultiColumnGroupKeyGenerator]
 public class NoDictionaryGroupKeyGeneratorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "NoDictionaryGroupKeyGeneratorTest");
   private static final Random RANDOM = new Random();
@@ -84,13 +82,13 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(COLUMNS.subList(0, NUM_COLUMNS - 1)).build();
   private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
-          .addSingleValueDimension(LONG_COLUMN, FieldSpec.DataType.LONG)
-          .addSingleValueDimension(FLOAT_COLUMN, FieldSpec.DataType.FLOAT)
-          .addSingleValueDimension(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE)
-          .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
-          .addSingleValueDimension(BYTES_COLUMN, FieldSpec.DataType.BYTES)
-          .addSingleValueDimension(BYTES_DICT_COLUMN, FieldSpec.DataType.BYTES).build();
+      new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
+          .addSingleValueDimension(LONG_COLUMN, DataType.LONG)
+          .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
+          .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+          .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+          .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+          .addSingleValueDimension(BYTES_DICT_COLUMN, DataType.BYTES).build();
 
   private static final int NUM_RECORDS = 1000;
   private static final int NUM_UNIQUE_RECORDS = 100;
@@ -121,7 +119,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
       double doubleValue = RANDOM.nextDouble();
       record.putValue(DOUBLE_COLUMN, doubleValue);
       values[3] = Double.toString(doubleValue);
-      String stringValue = RandomStringUtils.randomAlphabetic(10);
+      String stringValue = RandomStringUtils.secure().nextAlphabetic(10);
       record.putValue(STRING_COLUMN, stringValue);
       values[4] = stringValue;
       // NOTE: Create fixed-length bytes so that dictionary can be generated.
@@ -161,9 +159,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     _valueBlock = _projectOperator.nextBlock();
   }
 
-  /**
-   * Unit test for {@link NoDictionarySingleColumnGroupKeyGenerator}
-   */
+  /// Unit test for [NoDictionarySingleColumnGroupKeyGenerator]
   @Test
   public void testSingleColumnGroupKeyGenerator() {
     for (int i = 0; i < NUM_COLUMNS - 1; i++) {
@@ -171,9 +167,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     }
   }
 
-  /**
-   * Unit test for {@link NoDictionaryMultiColumnGroupKeyGenerator}
-   */
+  /// Unit test for [NoDictionaryMultiColumnGroupKeyGenerator]
   @Test
   public void testMultiColumnGroupKeyGenerator() {
     testGroupKeyGenerator(new int[]{0, 1});
@@ -184,9 +178,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     testGroupKeyGenerator(new int[]{5, 4, 3, 2, 1, 0});
   }
 
-  /**
-   * Tests multi-column group key generator when at least one column as dictionary, and others don't.
-   */
+  /// Tests multi-column group key generator when at least one column as dictionary, and others don't.
   @Test
   public void testMultiColumnHybridGroupKeyGenerator() {
     for (int i = 0; i < NUM_COLUMNS - 1; i++) {

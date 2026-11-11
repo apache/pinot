@@ -18,19 +18,23 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleCollection;
+import it.unimi.dsi.fastutil.doubles.DoubleIterator;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
+import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggDoubleFunction<I extends DoubleCollection>
-    extends BaseArrayAggFunction<I, DoubleArrayList> {
+    extends BaseArrayAggFunction<I, double[]> {
   public BaseArrayAggDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.DOUBLE, nullHandlingEnabled);
+    super(expression, DataType.DOUBLE, nullHandlingEnabled);
   }
 
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, double value);
@@ -39,6 +43,23 @@ public abstract class BaseArrayAggDoubleFunction<I extends DoubleCollection>
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to the group's accumulator.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          int groupKey = groupKeyArray[i];
+          DoubleSet set = ObjectSerDeUtils.DOUBLE_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.DOUBLE));
+          DoubleIterator iterator = set.iterator();
+          while (iterator.hasNext()) {
+            setGroupByResult(groupByResultHolder, groupKey, iterator.nextDouble());
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       double[] values = blockValSet.getDoubleValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -64,6 +85,24 @@ public abstract class BaseArrayAggDoubleFunction<I extends DoubleCollection>
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    // Star-tree pre-aggregated column: each single-value BYTES entry is a serialized distinct set; add each of its
+    // elements to every group the row belongs to.
+    if (blockValSet instanceof StarTreePreAggregatedBlockValSet) {
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          DoubleSet set = ObjectSerDeUtils.DOUBLE_SET_SER_DE.deserialize(starTreeSetPayload(bytesValues[i],
+              ElementType.DOUBLE));
+          for (int groupKey : groupKeysArray[i]) {
+            DoubleIterator iterator = set.iterator();
+            while (iterator.hasNext()) {
+              setGroupByResult(groupByResultHolder, groupKey, iterator.nextDouble());
+            }
+          }
+        }
+      });
+      return;
+    }
     if (blockValSet.isSingleValue()) {
       double[] values = blockValSet.getDoubleValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -103,10 +142,10 @@ public abstract class BaseArrayAggDoubleFunction<I extends DoubleCollection>
   }
 
   @Override
-  public DoubleArrayList extractFinalResult(I doubles) {
+  public double[] extractFinalResult(I doubles) {
     if (doubles == null) {
-      return new DoubleArrayList();
+      return new double[0];
     }
-    return new DoubleArrayList(doubles);
+    return doubles.toDoubleArray();
   }
 }

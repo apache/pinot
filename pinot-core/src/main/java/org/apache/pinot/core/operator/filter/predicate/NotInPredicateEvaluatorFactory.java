@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
@@ -39,38 +40,31 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.MultiValueVisitor;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Factory for NOT_IN predicate evaluators.
- */
+/// Factory for NOT_IN predicate evaluators.
 public class NotInPredicateEvaluatorFactory {
   private NotInPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based NOT_IN predicate evaluator.
-   *
-   * @param notInPredicate NOT_IN predicate to evaluate
-   * @param dictionary     Dictionary for the column
-   * @param dataType       Data type for the column
-   * @param queryContext   Query context
-   * @return Dictionary based NOT_IN predicate evaluator
-   */
+  /// Create a new instance of dictionary based NOT_IN predicate evaluator.
+  ///
+  /// @param notInPredicate NOT_IN predicate to evaluate
+  /// @param dictionary     Dictionary for the column
+  /// @param dataType       Data type for the column
+  /// @param queryContext   Query context
+  /// @return Dictionary based NOT_IN predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NotInPredicate notInPredicate,
       Dictionary dictionary, DataType dataType, @Nullable QueryContext queryContext) {
     return new DictionaryBasedNotInPredicateEvaluator(notInPredicate, dictionary, dataType, queryContext);
   }
 
-  /**
-   * Create a new instance of raw value based NOT_IN predicate evaluator.
-   *
-   * @param notInPredicate NOT_IN predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based NOT_IN predicate evaluator
-   */
+  /// Create a new instance of raw value based NOT_IN predicate evaluator.
+  ///
+  /// @param notInPredicate NOT_IN predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based NOT_IN predicate evaluator
   public static NotInRawPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate, DataType dataType) {
     switch (dataType) {
       case INT: {
@@ -150,6 +144,19 @@ public class NotInPredicateEvaluatorFactory {
         }
         return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
+      // UUID is a logical type stored as 16 raw bytes, so -- like TIMESTAMP over LONG above -- convert the
+      // literals to their stored form and reuse the stored-type evaluator.
+      case UUID: {
+        ByteArray[] uuidValues = notInPredicate.getUuidValues();
+        Set<ByteArray> nonMatchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(uuidValues.length));
+        // NOTE: Add value-by-value to avoid overhead
+        //noinspection ManualArrayToCollectionCopy
+        for (ByteArray value : uuidValues) {
+          //noinspection UseBulkOperation
+          nonMatchingValues.add(value);
+        }
+        return new BytesRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
+      }
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }
@@ -211,10 +218,28 @@ public class NotInPredicateEvaluatorFactory {
       super(predicate);
     }
 
-    /**
-     * Visits the not matching value of this predicate.
-     */
-    public abstract <R> R accept(MultiValueVisitor<R> visitor);
+    /// Visits the non-matching values of this predicate.
+    public abstract <R> R accept(Visitor<R> visitor);
+
+    /// Visitor for the non-matching values of a NOT_IN predicate, dispatched by the stored value type.
+    ///
+    /// The `BigDecimal` non-matching values are delivered in a [SortedSet] because `BigDecimal`'s `compareTo` is not
+    /// consistent with `equals` (e.g. `3.0` and `3` compare equal).
+    public interface Visitor<R> {
+      R visitInt(IntSet nonMatchingValues);
+
+      R visitLong(LongSet nonMatchingValues);
+
+      R visitFloat(FloatSet nonMatchingValues);
+
+      R visitDouble(DoubleSet nonMatchingValues);
+
+      R visitBigDecimal(SortedSet<BigDecimal> nonMatchingValues);
+
+      R visitString(Set<String> nonMatchingValues);
+
+      R visitBytes(Set<ByteArray> nonMatchingValues);
+    }
   }
 
   private static final class IntRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
@@ -254,8 +279,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitInt(_nonMatchingValues.toIntArray());
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitInt(_nonMatchingValues);
     }
   }
 
@@ -296,8 +321,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitLong(_nonMatchingValues.toLongArray());
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitLong(_nonMatchingValues);
     }
   }
 
@@ -338,8 +363,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitFloat(_nonMatchingValues.toFloatArray());
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitFloat(_nonMatchingValues);
     }
   }
 
@@ -380,8 +405,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitDouble(_nonMatchingValues.toDoubleArray());
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitDouble(_nonMatchingValues);
     }
   }
 
@@ -411,8 +436,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitBigDecimal(_nonMatchingValues.toArray(new BigDecimal[0]));
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitBigDecimal(_nonMatchingValues);
     }
   }
 
@@ -440,8 +465,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitString(_nonMatchingValues.toArray(new String[0]));
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitString(_nonMatchingValues);
     }
   }
 
@@ -469,9 +494,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      byte[][] bytes = _nonMatchingValues.stream().map(ByteArray::getBytes).toArray(byte[][]::new);
-      return visitor.visitBytes(bytes);
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitBytes(_nonMatchingValues);
     }
   }
 }

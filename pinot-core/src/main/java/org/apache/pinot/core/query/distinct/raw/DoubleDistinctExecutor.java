@@ -25,14 +25,11 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.distinct.BaseSingleColumnDistinctExecutor;
-import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.table.DoubleDistinctTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * {@link DistinctExecutor} for single raw DOUBLE column.
- */
+/// [org.apache.pinot.core.query.distinct.DistinctExecutor] for single raw DOUBLE column.
 public class DoubleDistinctExecutor
     extends BaseSingleColumnDistinctExecutor<DoubleDistinctTable, double[], double[][]> {
 

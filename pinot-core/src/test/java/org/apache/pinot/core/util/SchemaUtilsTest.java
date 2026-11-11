@@ -21,12 +21,12 @@ package org.apache.pinot.core.util;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -46,9 +46,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertThrows;
 
 
-/**
- * Tests schema validations
- */
+/// Tests schema validations
 public class SchemaUtilsTest {
   private static final String TABLE_NAME = "testTable";
   private static final String TIME_COLUMN = "timeColumn";
@@ -97,7 +95,7 @@ public class SchemaUtilsTest {
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("colA", "round(colB, 1000)")));
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("colA", "round(colB, 1000)")));
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
     try {
@@ -190,6 +188,58 @@ public class SchemaUtilsTest {
     SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
   }
 
+  @Test
+  public void testCompatibilityGrandfathersExistingNonDeterministicTransform() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addMetric("eventTimeMs", DataType.LONG)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("eventTimeMs", "now()")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(getStreamConfigs())
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    // A new table using this transform is still rejected.
+    Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));
+
+    // Schema validation checks an already-associated, unchanged table config, so the legacy transform is
+    // grandfathered while the rest of table/schema compatibility validation continues to run.
+    SchemaUtils.validate(schema, List.of(tableConfig));
+  }
+
+  @Test
+  public void testSchemaTransformVolatility()
+      throws Exception {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("eventTimeMs", DataType.LONG).build();
+    schema.getFieldSpecFor("eventTimeMs").setTransformFunction("now()");
+
+    // Runtime validation remains permissive so a legacy schema already stored in ZK can still be loaded.
+    SchemaUtils.validate(schema);
+
+    IllegalStateException nonDeterministicError = Assert.expectThrows(IllegalStateException.class,
+        () -> SchemaUtils.validate(schema, List.of()));
+    Assert.assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"),
+        nonDeterministicError.getMessage());
+
+    Schema existingSchema = Schema.fromString(schema.toString());
+    Schema unchangedTransform = Schema.fromString(schema.toString());
+    unchangedTransform.addField(new DimensionFieldSpec("newColumn", DataType.STRING, true));
+    SchemaUtils.validate(unchangedTransform, List.of(), false, existingSchema);
+
+    unchangedTransform.getFieldSpecFor("eventTimeMs").setTransformFunction("plus(now(), 1)");
+    nonDeterministicError = Assert.expectThrows(IllegalStateException.class,
+        () -> SchemaUtils.validate(unchangedTransform, List.of(), false, existingSchema));
+    Assert.assertTrue(nonDeterministicError.getMessage().contains("Function 'now' has VOLATILE volatility"),
+        nonDeterministicError.getMessage());
+
+    unchangedTransform.getFieldSpecFor("eventTimeMs").setTransformFunction("rand(123)");
+    SchemaUtils.validate(unchangedTransform, List.of(), false, existingSchema);
+  }
+
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
@@ -199,11 +249,9 @@ public class SchemaUtilsTest {
     return streamConfigs;
   }
 
-  /**
-   * TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test
-   * backward compatibility/
-   *  Remove these when we totally stop honoring transform functions in schema
-   */
+  /// TODO: transform functions have moved to tableConfig#ingestionConfig. However, these tests remain to test
+  /// backward compatibility/
+  ///  Remove these when we totally stop honoring transform functions in schema
   @Test
   public void testValidateTransformFunctionArguments() {
     Schema pinotSchema;
@@ -244,6 +292,29 @@ public class SchemaUtilsTest {
     pinotSchema.getFieldSpecFor("x").setTransformFunction("Groovy({y + 10}, y)");
     pinotSchema.getFieldSpecFor("z").setTransformFunction("Groovy({x*w*20}, x, w)");
     checkValidationFails(pinotSchema);
+  }
+
+  /// Regression test: when a transformed column is reused as an argument to another transform, the validation error
+  /// must list the actual conflicting columns. Historically this message reported a boolean ("true"/"false") because
+  /// {@link java.util.Set#retainAll} was passed as the format argument.
+  @Test
+  public void testChainedTransformErrorMessageListsConflictingColumns() {
+    Schema pinotSchema =
+        new Schema.SchemaBuilder().addSingleValueDimension("x", DataType.INT).addSingleValueDimension("z", DataType.INT)
+            .build();
+    pinotSchema.getFieldSpecFor("x").setTransformFunction("Groovy({y + 10}, y)");
+    pinotSchema.getFieldSpecFor("z").setTransformFunction("Groovy({x*w*20}, x, w)");
+
+    try {
+      SchemaUtils.validate(pinotSchema);
+      Assert.fail("Schema validation should have failed for chained transforms.");
+    } catch (IllegalStateException e) {
+      String message = e.getMessage();
+      Assert.assertNotNull(message);
+      // The chained column set has a single deterministic element here, so the formatted set form is "[x]".
+      Assert.assertEquals(message,
+          "Columns: [x] are a result of transformations, and cannot be used as arguments to other transform functions");
+    }
   }
 
   @Test
@@ -294,28 +365,28 @@ public class SchemaUtilsTest {
   public void testValidateMultiValueFieldSpec() {
     Schema pinotSchema;
 
+    // JSON MV is rejected by SchemaUtils.validate() — the multi-value compatibility check lives there
+    // (controller-side ingest validation), not in Schema.validate() (pure schema DTO validation).
     pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addMultiValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
-
-    checkValidationFails(pinotSchema);
-
-    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
-
     checkValidationFails(pinotSchema);
 
     pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
-
     SchemaUtils.validate(pinotSchema);
 
     pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
+        .addSingleValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL)
+        .addMultiValueDimension("myBigDecimalMvCol", FieldSpec.DataType.BIG_DECIMAL).build();
+    SchemaUtils.validate(pinotSchema);
 
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myUuidCol", FieldSpec.DataType.UUID)
+        .addMultiValueDimension("myUuidMvCol", FieldSpec.DataType.UUID).build();
     SchemaUtils.validate(pinotSchema);
   }
 
@@ -330,6 +401,33 @@ public class SchemaUtilsTest {
         .build();
 
     checkValidationFails(pinotSchema, true);
+  }
+
+  /// Case-only column collisions (e.g. memberId / MemberID) are rejected when case-insensitive mode is on.
+  /// Cluster default is enable.case.insensitive=true, so new schemas on default clusters are already protected.
+  /// When case-insensitive mode is off, collisions are allowed (always-on rejection needs validation levels #6645).
+  @Test
+  public void testValidateCaseOnlyColumnCollision() {
+    Schema collidingSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("memberId", DataType.STRING)
+        .addSingleValueDimension("MemberID", DataType.STRING)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    // Default cluster path: enable.case.insensitive=true rejects case-only collisions
+    checkValidationFails(collidingSchema, true);
+
+    // Case-sensitive mode still allows collisions (compat; do not force always-on without #6645)
+    SchemaUtils.validate(collidingSchema, false);
+
+    // Distinct after lowercasing is fine even when case-insensitive
+    Schema distinctSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("memberId", DataType.STRING)
+        .addSingleValueDimension("memberName", DataType.STRING)
+        .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    SchemaUtils.validate(distinctSchema, true);
+    SchemaUtils.validate(distinctSchema, false);
   }
 
   @Test
@@ -458,12 +556,10 @@ public class SchemaUtilsTest {
     SchemaUtils.validate(schema);
   }
 
-  /**
-   * Testcases for testing column name validation logic.
-   * Currently column name validation only checks no blank space in column names. Should we add more validation on
-   * column
-   * names later on, we can corresponding tests here.
-   */
+  /// Testcases for testing column name validation logic.
+  /// Currently column name validation only checks no blank space in column names. Should we add more validation on
+  /// column
+  /// names later on, we can corresponding tests here.
   @Test
   public void testColumnNameValidation()
       throws IOException {

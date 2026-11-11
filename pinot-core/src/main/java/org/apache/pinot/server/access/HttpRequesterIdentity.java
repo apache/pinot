@@ -20,13 +20,15 @@ package org.apache.pinot.server.access;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
+import org.glassfish.grizzly.http.server.Request;
 
 
-/**
- * Identity container for HTTP requests with (optional) authorization headers
- */
+/// Identity container for HTTP requests with (optional) authorization headers
 public class HttpRequesterIdentity extends RequesterIdentity {
   private Multimap<String, String> _httpHeaders;
   private String _endpointUrl;
@@ -34,6 +36,25 @@ public class HttpRequesterIdentity extends RequesterIdentity {
   public HttpRequesterIdentity(HttpHeaders httpHeaders) {
     _httpHeaders = HashMultimap.create();
     httpHeaders.getRequestHeaders().forEach(_httpHeaders::putAll);
+  }
+
+  public HttpRequesterIdentity(Request request) {
+    _httpHeaders = HashMultimap.create();
+    request.getHeaderNames().forEach(name -> request.getHeaders(name).forEach(value -> _httpHeaders.put(name, value)));
+    String requestUrl = request.getRequestURL().toString();
+    String queryString = request.getQueryString();
+    _endpointUrl = queryString != null ? requestUrl + "?" + queryString : requestUrl;
+  }
+
+  /// Returns all values for a header name, using HTTP's case-insensitive name semantics.
+  public Collection<String> getHeaderValues(String name) {
+    List<String> values = new ArrayList<>();
+    _httpHeaders.asMap().forEach((headerName, headerValues) -> {
+      if (headerName.equalsIgnoreCase(name)) {
+        values.addAll(headerValues);
+      }
+    });
+    return values;
   }
 
   public Multimap<String, String> getHttpHeaders() {

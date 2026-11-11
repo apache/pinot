@@ -21,18 +21,16 @@ package org.apache.pinot.common.function.scalar;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.Base64;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
-import static org.apache.pinot.common.utils.PinotDataType.*;
+import static org.apache.pinot.spi.utils.PinotDataType.*;
 
 
-/**
- * Contains function to convert a datatype to another datatype.
- */
+/// Contains function to convert a datatype to another datatype.
 public class DataTypeConversionFunctions {
   private DataTypeConversionFunctions() {
   }
@@ -41,19 +39,31 @@ public class DataTypeConversionFunctions {
   public static Object cast(Object value, String targetTypeLiteral) {
     Class<?> clazz = value.getClass();
     // TODO: Support cast for MV
-    Preconditions.checkArgument(!clazz.isArray() | clazz == byte[].class, "%s must not be an array type", clazz);
-    PinotDataType sourceType = PinotDataType.getSingleValueType(clazz);
+    Preconditions.checkArgument(!clazz.isArray() || clazz == byte[].class, "%s must not be an array type", clazz);
+    PinotDataType sourceType = PinotDataType.getSingleValueType(value);
     String transformed = targetTypeLiteral.toUpperCase();
     PinotDataType targetDataType;
     switch (transformed) {
       case "BIGINT":
+      // Calcite 1.41+ (CALCITE-1466) makes unsigned integer types parseable under BABEL in the single-stage path too.
+      // Pinot has no unsigned storage, so map the supported ones to the narrowest signed type that holds their range,
+      // mirroring the multi-stage RelToPlanNodeConverter: UTINYINT/USMALLINT -> INT, UINTEGER -> LONG.
+      case "UINTEGER":
         targetDataType = LONG;
         break;
+      // UBIGINT (0..2^64-1) has no signed type wide enough to hold its full range, so reject it rather than silently
+      // wrapping values above Long.MAX_VALUE (mirrors RelToPlanNodeConverter.convertToColumnDataType).
+      case "UBIGINT":
+        throw new IllegalArgumentException(
+            "Unsigned BIGINT (BIGINT UNSIGNED) is not supported: Pinot has no type that can represent the full "
+                + "unsigned 64-bit range. CAST to BIGINT or DECIMAL instead.");
       case "DECIMAL":
         targetDataType = BIG_DECIMAL;
         break;
-      case "INT":
-        targetDataType = INTEGER;
+      case "INTEGER":
+      case "UTINYINT":
+      case "USMALLINT":
+        targetDataType = INT;
         break;
       case "VARBINARY":
         targetDataType = BYTES;
@@ -69,9 +79,9 @@ public class DataTypeConversionFunctions {
         }
         break;
     }
-    if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
+    if (sourceType == STRING && (targetDataType == INT || targetDataType == LONG)) {
       String stringValue = value.toString().trim();
-      if (targetDataType == INTEGER) {
+      if (targetDataType == INT) {
         try {
           return Integer.parseInt(stringValue);
         } catch (NumberFormatException e) {
@@ -91,74 +101,60 @@ public class DataTypeConversionFunctions {
     return targetDataType.convert(value, sourceType);
   }
 
-  /**
-   * Converts {@link BigDecimal} to bytes.
-   * Only scale of upto 2 bytes is supported by the function
-   * @param bigDecimal big decimal number
-   * @return The result byte array contains the bytes of the unscaled value appended to bytes of the scale in BIG
-   * ENDIAN order.
-   */
+  /// Converts [BigDecimal] to bytes.
+  /// Only scale of upto 2 bytes is supported by the function
+  /// @param bigDecimal big decimal number
+  /// @return The result byte array contains the bytes of the unscaled value appended to bytes of the scale in BIG
+  /// ENDIAN order.
   @ScalarFunction
   public static byte[] bigDecimalToBytes(BigDecimal bigDecimal) {
     return BigDecimalUtils.serialize(bigDecimal);
   }
 
-  /**
-   * Converts serialized {@link BigDecimal} bytes to value.
-   * @param bytes array that contains the bytes of the unscaled value appended to 2 bytes of the scale in BIG ENDIAN
-   *              order.
-   * @return big decimal number
-   */
+  /// Converts serialized [BigDecimal] bytes to value.
+  /// @param bytes array that contains the bytes of the unscaled value appended to 2 bytes of the scale in BIG ENDIAN
+  ///              order.
+  /// @return big decimal number
   @ScalarFunction
   public static BigDecimal bytesToBigDecimal(byte[] bytes) {
     return BigDecimalUtils.deserialize(bytes);
   }
 
-  /**
-   * convert simple hex string to byte array
-   * @param hex a plain hex string e.g. 'f0e1a3b2'
-   * @return byte array representation of hex string
-   */
+  /// convert simple hex string to byte array
+  /// @param hex a plain hex string e.g. 'f0e1a3b2'
+  /// @return byte array representation of hex string
   @ScalarFunction
   public static byte[] hexToBytes(String hex) {
     return BytesUtils.toBytes(hex);
   }
 
-  /**
-   * convert simple bytes array to hex string
-   * @param bytes any byte array
-   * @return plain hex string e.g. 'f012be3c'
-   */
+  /// convert simple bytes array to hex string
+  /// @param bytes any byte array
+  /// @return plain hex string e.g. 'f012be3c'
   @ScalarFunction
   public static String bytesToHex(byte[] bytes) {
     return BytesUtils.toHexString(bytes);
   }
 
-  /**
-   * Encodes bytes using {@link Base64}.
-   * @param input original bytes
-   * @return base64 encoded bytes
-   */
+  /// Encodes bytes using [Base64].
+  /// @param input original bytes
+  /// @return base64 encoded bytes
   @ScalarFunction
   public static byte[] base64Encode(byte[] input) {
     return Base64.getEncoder().encode(input);
   }
 
-  /**
-   * Decodes {@link Base64} encoded bytes.
-   * @param input base64 encoded bytes
-   * @return decoded bytes
-   */
+  /// Decodes [Base64] encoded bytes.
+  /// @param input base64 encoded bytes
+  /// @return decoded bytes
   @ScalarFunction
   public static byte[] base64Decode(byte[] input) {
     return Base64.getDecoder().decode(input);
   }
 
-  /**
-   * Converts a hex string to the corresponded long value.
-   * @param input hex decimal string
-   * @return decoded long value
-   */
+  /// Converts a hex string to the corresponded long value.
+  /// @param input hex decimal string
+  /// @return decoded long value
   @ScalarFunction
   public static long hexDecimalToLong(String input) {
     if (input.startsWith("0x")) {
@@ -167,11 +163,9 @@ public class DataTypeConversionFunctions {
     return Long.parseLong(input, 16);
   }
 
-  /**
-   * Converts a long value to corresponded hex decimal string
-   * @param input long value
-   * @return encoded hex decimal string
-   */
+  /// Converts a long value to corresponded hex decimal string
+  /// @param input long value
+  /// @return encoded hex decimal string
   @ScalarFunction
   public static String longToHexDecimal(long input) {
     return Long.toHexString(input);

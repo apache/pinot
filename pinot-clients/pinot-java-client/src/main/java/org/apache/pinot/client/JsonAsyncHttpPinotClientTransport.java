@@ -21,12 +21,11 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -45,9 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * JSON encoded Pinot client transport over AsyncHttpClient.
- */
+/// JSON encoded Pinot client transport over AsyncHttpClient.
 public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<ClientStats>, CursorCapable {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
   private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
@@ -60,13 +57,17 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   private final AsyncHttpClient _httpClient;
   private final String _extraOptionStr;
   private final boolean _useMultistageEngine;
+  private static final SslContextProvider SSL_CONTEXT_PROVIDER = SslContextProviderFactory.create();
 
   public JsonAsyncHttpPinotClientTransport() {
     _brokerReadTimeout = 60000;
     _headers = new HashMap<>();
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
-    _httpClient = Dsl.asyncHttpClient(Dsl.config().setRequestTimeout(Duration.ofMillis(_brokerReadTimeout)));
+    Builder builder = Dsl.config();
+    SSL_CONTEXT_PROVIDER.configure(builder, null, TlsProtocols.defaultProtocols(false));
+    _httpClient =
+        Dsl.asyncHttpClient(builder.setRequestTimeout(Duration.ofMillis(_brokerReadTimeout)).build());
     _useMultistageEngine = false;
   }
 
@@ -80,16 +81,12 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _useMultistageEngine = useMultistageEngine;
 
     Builder builder = Dsl.config();
-    if (sslContext != null) {
-      builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
-    }
-
+    SSL_CONTEXT_PROVIDER.configure(builder, sslContext, tlsProtocols);
     builder.setRequestTimeout(Duration.ofMillis(_brokerReadTimeout))
         .setReadTimeout(Duration.ofMillis(connectionTimeouts.getReadTimeoutMs()))
         .setConnectTimeout(Duration.ofMillis(connectionTimeouts.getConnectTimeoutMs()))
         .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
-        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
+        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId));
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
 
@@ -118,8 +115,10 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
       }
-      LOGGER.debug("Sending query {} to {}", query, url);
-      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
+      String correlationId = UUID.randomUUID().toString();
+      LOGGER.debug("Sending query {} to {} with correlationId {}", query, url, correlationId);
+      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8")
+          .addHeader("X-Correlation-Id", correlationId).setBody(json.toString())
           .execute().toCompletableFuture().thenApply(httpResponse -> {
             LOGGER.debug("Completed query, HTTP status is {}", httpResponse.getStatusCode());
 
@@ -152,15 +151,13 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     }
   }
 
-  /**
-   * Executes a query with cursor pagination support.
-   *
-   * @param brokerAddress The broker address in "host:port" format
-   * @param query The SQL query to execute
-   * @param numRows The number of rows to return in the first page
-   * @return BrokerResponse containing the first page and cursor metadata
-   * @throws PinotClientException If query execution fails
-   */
+  /// Executes a query with cursor pagination support.
+  ///
+  /// @param brokerAddress The broker address in "host:port" format
+  /// @param query The SQL query to execute
+  /// @param numRows The number of rows to return in the first page
+  /// @return BrokerResponse containing the first page and cursor metadata
+  /// @throws PinotClientException If query execution fails
   @Override
   public CursorAwareBrokerResponse executeQueryWithCursor(String brokerAddress, String query, int numRows)
       throws PinotClientException {
@@ -171,14 +168,12 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     }
   }
 
-  /**
-   * Executes a query asynchronously with cursor pagination support.
-   *
-   * @param brokerAddress The broker address in "host:port" format
-   * @param query The SQL query to execute
-   * @param numRows The number of rows to return in the first page
-   * @return CompletableFuture containing BrokerResponse with first page and cursor metadata
-   */
+  /// Executes a query asynchronously with cursor pagination support.
+  ///
+  /// @param brokerAddress The broker address in "host:port" format
+  /// @param query The SQL query to execute
+  /// @param numRows The number of rows to return in the first page
+  /// @return CompletableFuture containing BrokerResponse with first page and cursor metadata
   @Override
   public CompletableFuture<CursorAwareBrokerResponse> executeQueryWithCursorAsync(String brokerAddress, String query,
       int numRows) {
@@ -220,14 +215,12 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   }
 
 
-  /**
-   * Retrieves metadata for an existing cursor.
-   *
-   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
-   * @param requestId The unique identifier of the cursor
-   * @return BrokerResponse containing cursor metadata
-   * @throws PinotClientException If metadata retrieval fails
-   */
+  /// Retrieves metadata for an existing cursor.
+  ///
+  /// @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+  /// @param requestId The unique identifier of the cursor
+  /// @return BrokerResponse containing cursor metadata
+  /// @throws PinotClientException If metadata retrieval fails
   @Override
   public BrokerResponse getCursorMetadata(String brokerAddress, String requestId) throws PinotClientException {
     try {
@@ -237,13 +230,11 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     }
   }
 
-  /**
-   * Retrieves metadata for an existing cursor asynchronously.
-   *
-   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
-   * @param requestId The unique identifier of the cursor
-   * @return CompletableFuture containing BrokerResponse with cursor metadata
-   */
+  /// Retrieves metadata for an existing cursor asynchronously.
+  ///
+  /// @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+  /// @param requestId The unique identifier of the cursor
+  /// @return CompletableFuture containing BrokerResponse with cursor metadata
   @Override
   public CompletableFuture<BrokerResponse> getCursorMetadataAsync(String brokerAddress, String requestId) {
     try {
@@ -273,13 +264,11 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     }
   }
 
-  /**
-   * Deletes a cursor and cleans up its resources.
-   *
-   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
-   * @param requestId The unique identifier of the cursor to delete
-   * @throws PinotClientException If cursor deletion fails
-   */
+  /// Deletes a cursor and cleans up its resources.
+  ///
+  /// @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+  /// @param requestId The unique identifier of the cursor to delete
+  /// @throws PinotClientException If cursor deletion fails
   @Override
   public void deleteCursor(String brokerAddress, String requestId) throws PinotClientException {
     try {
@@ -289,13 +278,11 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     }
   }
 
-  /**
-   * Deletes a cursor and cleans up its resources asynchronously.
-   *
-   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
-   * @param requestId The unique identifier of the cursor to delete
-   * @return CompletableFuture that completes when the cursor is deleted
-   */
+  /// Deletes a cursor and cleans up its resources asynchronously.
+  ///
+  /// @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+  /// @param requestId The unique identifier of the cursor to delete
+  /// @return CompletableFuture that completes when the cursor is deleted
   @Override
   public CompletableFuture<Void> deleteCursorAsync(String brokerAddress, String requestId) {
     try {

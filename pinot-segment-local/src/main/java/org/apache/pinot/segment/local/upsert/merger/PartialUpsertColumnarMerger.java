@@ -31,11 +31,9 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Default Partial upsert merger implementation.
- * PartialUpsertColumnarMerger iterates over each column and merges them based on the defined strategy per column in
- * table config.
- */
+/// Default Partial upsert merger implementation.
+/// PartialUpsertColumnarMerger iterates over each column and merges them based on the defined strategy per column in
+/// table config.
 public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
   private final PartialUpsertColumnMerger _defaultColumnValueMerger;
   private final Map<String, PartialUpsertColumnMerger> _column2Mergers = new HashMap<>();
@@ -53,17 +51,15 @@ public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
     }
   }
 
-  /**
-   * Merges records and returns the merged record.
-   * We used a map to indicate all configured fields for partial upsert. For these fields
-   * (1) If the prev value is null, return the new value
-   * (2) If the prev record is not null, the new value is null, return the prev value.
-   * (3) If neither values are not null, then merge the value and return.
-   * For un-configured fields, they are using default override behavior, regardless null values.
-   *
-   * For example, overwrite merger will only override the prev value if the new value is not null.
-   * Null values will override existing values if not configured. They can be ignored by using ignoreMerger.
-   */
+  /// Merges records and returns the merged record.
+  /// We used a map to indicate all configured fields for partial upsert. For these fields
+  /// (1) If the prev value is null, return the new value
+  /// (2) If the prev record is not null, the new value is null, return the prev value.
+  /// (3) If neither values are not null, then merge the value and return.
+  /// For un-configured fields, they are using default override behavior, regardless null values.
+  ///
+  /// For example, overwrite merger will only override the prev value if the new value is not null.
+  /// Null values will override existing values if not configured. They can be ignored by using ignoreMerger.
   @Override
   public void merge(LazyRow previousRow, GenericRow newRow, Map<String, Object> resultHolder) {
     for (String column : previousRow.getColumnNames()) {

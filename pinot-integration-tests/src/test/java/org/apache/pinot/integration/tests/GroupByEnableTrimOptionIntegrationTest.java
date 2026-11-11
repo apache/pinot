@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.integration.tests.custom.GroupByOptionsTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -41,7 +42,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
 
 
-// similar to GroupByOptionsIntegrationTest but this test verifies that default enable group trim option works even
+// similar to GroupByOptionsTest but this test verifies that default enable group trim option works even
 // if hint is not set in the query
 public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrationTestSet {
 
@@ -69,14 +70,13 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
     TableConfig tableConfig = createOfflineTableConfig();
     addTableConfig(tableConfig);
 
-    List<File> avroFiles = GroupByOptionsIntegrationTest.createAvroFile(_tempDir);
+    List<File> avroFiles = GroupByOptionsTest.createAvroFile(_tempDir);
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
 
     // Wait for all documents loaded
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(DEFAULT_TABLE_NAME) == FILES_NO * RECORDS_NO, 100L,
-        60_000,
-        "Failed to load  documents", true, Duration.ofMillis(60_000 / 10));
+        60_000L, "Failed to load  documents", Duration.ofMillis(60_000 / 10));
 
     setUseMultiStageQueryEngine(true);
 
@@ -105,7 +105,7 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
     final String trimEnabledPlan = "Execution Plan\n"
         + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], offset=[0], fetch=[3])\n"
         + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], "
-        + "isSortOnReceiver=[true])\n"
+        + "isSortOnReceiver=[false])\n"
         + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[3])\n"
         // 'collations' below is the important bit
         + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, "
@@ -164,7 +164,7 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], offset=[0], fetch=[3])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[3])\n"
             // lack of 'collations' below is the important bit
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])\n"
@@ -206,8 +206,8 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
     JsonNode result = postV2Query(sql);
     JsonNode plan = postV2Query(option + " set explainAskingServers=true; explain plan for " + query);
 
-    Assert.assertEquals(GroupByOptionsIntegrationTest.toResultStr(result), expectedResult);
-    Assert.assertEquals(GroupByOptionsIntegrationTest.toExplainStr(plan, true), expectedPlan);
+    Assert.assertEquals(GroupByOptionsTest.toResultStr(result), expectedResult);
+    Assert.assertEquals(GroupByOptionsTest.toExplainStr(plan, true), expectedPlan);
   }
 
   private JsonNode postV2Query(String query)

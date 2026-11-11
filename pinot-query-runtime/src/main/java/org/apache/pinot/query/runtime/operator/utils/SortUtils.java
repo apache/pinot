@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
+import org.apache.pinot.spi.utils.StoredValueComparator;
 
 
 public class SortUtils {
@@ -35,12 +36,10 @@ public class SortUtils {
     private final int[] _multipliers;
     private final int[] _nullsMultipliers;
 
-    /**
-     * Sort comparator for use with priority queues.
-     *
-     * @param collations collations to sort on
-     * @param reverse 'true' if the opposite sort direction should be used as what is specified
-     */
+    /// Sort comparator for use with priority queues.
+    ///
+    /// @param collations collations to sort on
+    /// @param reverse 'true' if the opposite sort direction should be used as what is specified
     public SortComparator(List<RelFieldCollation> collations, boolean reverse) {
       _numFields = collations.size();
       _valueIndices = new int[_numFields];
@@ -74,8 +73,7 @@ public class SortUtils {
         if (v2 == null) {
           return -_nullsMultipliers[i];
         }
-        //noinspection rawtypes,unchecked
-        int result = ((Comparable) v1).compareTo(v2);
+        int result = StoredValueComparator.INSTANCE.compare(v1, v2);
         if (result != 0) {
           return result * _multipliers[i];
         }

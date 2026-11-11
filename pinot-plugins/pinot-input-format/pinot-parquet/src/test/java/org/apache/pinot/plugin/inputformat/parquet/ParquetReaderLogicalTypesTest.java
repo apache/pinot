@@ -21,7 +21,9 @@ package org.apache.pinot.plugin.inputformat.parquet;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
@@ -35,14 +37,16 @@ import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
-/**
- * TODO: add test for other logical types
- */
+/// TODO: add test for other logical types
 public class ParquetReaderLogicalTypesTest {
 
   @Test
@@ -52,6 +56,8 @@ public class ParquetReaderLogicalTypesTest {
         + "required int64 decimal_from_int64 (DECIMAL(18, 2));"
         + "required fixed_len_byte_array(16) decimal_from_fixed (DECIMAL(38, 9));"
         + "required binary decimal_from_binary (DECIMAL(38, 9));"
+        + "required binary decimal_trailing_zero (DECIMAL(10, 2));"
+        + "required binary decimal_precision18 (DECIMAL(18, 6));"
         + "}";
 
     byte[] byteArray = new BigDecimal("12345678901234567890123456789.012345678").unscaledValue().toByteArray();
@@ -62,6 +68,10 @@ public class ParquetReaderLogicalTypesTest {
     row.put("decimal_from_int64", new BigDecimal("1234567890123.45").unscaledValue().longValue());
     row.put("decimal_from_fixed", Binary.fromConstantByteArray(paddedArray));
     row.put("decimal_from_binary", Binary.fromConstantByteArray(byteArray));
+    row.put("decimal_trailing_zero",
+        Binary.fromConstantByteArray(new BigDecimal("1.10").unscaledValue().toByteArray()));
+    row.put("decimal_precision18",
+        Binary.fromConstantByteArray(new BigDecimal("123456789012.345678").unscaledValue().toByteArray()));
 
     String outputPath = null;
     try {
@@ -76,6 +86,8 @@ public class ParquetReaderLogicalTypesTest {
             new BigDecimal("12345678901234567890123456789.012345678"));
         assertEquals(genericRow.getValue("decimal_from_binary"),
             new BigDecimal("12345678901234567890123456789.012345678"));
+        assertEquals(genericRow.getValue("decimal_trailing_zero"), new BigDecimal("1.10"));
+        assertEquals(genericRow.getValue("decimal_precision18"), new BigDecimal("123456789012.345678"));
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -86,9 +98,159 @@ public class ParquetReaderLogicalTypesTest {
     }
   }
 
-  /**
-   * Write the given row object to a random parquet file and return the path of the file
-   */
+  /// Unsigned 32-bit integers (`INT32` annotated `INTEGER(32, false)` / legacy `UINT_32`) can exceed
+  /// `Integer.MAX_VALUE`, so every reader must widen them to `Long` instead of returning the signed bit pattern.
+  @Test
+  public void testUnsignedInt32Type()
+      throws IOException {
+    String schemaStr = "message UnsignedExample {"
+        + "required int32 uint32_new (INTEGER(32, false));"
+        + "required int32 uint32_legacy (UINT_32);"
+        + "required int32 uint16 (INTEGER(16, false));"
+        + "}";
+    long largeUnsigned = 3540738458L;
+    long smallUnsigned = 7L;
+    File dataFile = new File(FileUtils.getTempDirectory(), "unsigned-int32-" + System.nanoTime() + ".parquet");
+    MessageType schema = MessageTypeParser.parseMessageType(schemaStr);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+        .withType(schema)
+        .build()) {
+      SimpleGroupFactory groupFactory = new SimpleGroupFactory(schema);
+      for (long value : new long[]{largeUnsigned, smallUnsigned}) {
+        Group group = groupFactory.newGroup();
+        group.append("uint32_new", (int) value);
+        group.append("uint32_legacy", (int) value);
+        group.append("uint16", 65535);
+        writer.write(group);
+      }
+    }
+    try {
+      List<RecordReader> recordReaders =
+          List.of(new ParquetNativeRecordReader(), new ParquetAvroRecordReader(), new ParquetRecordReader());
+      for (RecordReader recordReader : recordReaders) {
+        String readerName = recordReader.getClass().getSimpleName();
+        try (recordReader) {
+          recordReader.init(dataFile, null, null);
+          List<GenericRow> rows = new ArrayList<>();
+          while (recordReader.hasNext()) {
+            rows.add(recordReader.next());
+          }
+          assertEquals(rows.size(), 2, readerName);
+          assertEquals(rows.get(0).getValue("uint32_new"), largeUnsigned, readerName);
+          assertEquals(rows.get(0).getValue("uint32_legacy"), largeUnsigned, readerName);
+          assertEquals(rows.get(1).getValue("uint32_new"), smallUnsigned, readerName);
+          assertEquals(rows.get(1).getValue("uint32_legacy"), smallUnsigned, readerName);
+          // Narrower unsigned widths always fit in a signed int.
+          assertEquals(rows.get(0).getValue("uint16"), 65535, readerName);
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
+    }
+  }
+
+  /// The native reader widens unsigned 32-bit values at every nesting level: in a list and in a struct.
+  @Test
+  public void testNestedUnsignedInt32TypeWithNativeReader()
+      throws IOException {
+    String schemaStr = "message NestedUnsignedExample {"
+        + "required group uint32_list (LIST) { repeated group list { required int32 element (INTEGER(32, false)); } }"
+        + "required group uint32_struct { required int32 value (UINT_32); }"
+        + "}";
+    long largeUnsigned = 3540738458L;
+    File dataFile = new File(FileUtils.getTempDirectory(), "nested-unsigned-int32-" + System.nanoTime() + ".parquet");
+    MessageType schema = MessageTypeParser.parseMessageType(schemaStr);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+        .withType(schema)
+        .build()) {
+      Group group = new SimpleGroupFactory(schema).newGroup();
+      Group list = group.addGroup("uint32_list");
+      list.addGroup("list").append("element", (int) largeUnsigned);
+      list.addGroup("list").append("element", 7);
+      group.addGroup("uint32_struct").append("value", (int) largeUnsigned);
+      writer.write(group);
+    }
+    try (ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader()) {
+      recordReader.init(dataFile, null, null);
+      GenericRow row = recordReader.next();
+      assertEquals((Object[]) row.getValue("uint32_list"), new Object[]{largeUnsigned, 7L});
+      assertEquals(((Map<?, ?>) row.getValue("uint32_struct")).get("value"), largeUnsigned);
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
+    }
+  }
+
+  @Test
+  public void testReadersPreserveUnsignedInt64Bits()
+      throws IOException {
+    MessageType schema = MessageTypeParser.parseMessageType(
+        "message m { required int64 value (INTEGER(64, false)); }");
+    File dataFile = new File(FileUtils.getTempDirectory(), "unsigned-int64-" + System.nanoTime() + ".parquet");
+    try {
+      try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+          .withType(schema).build()) {
+        SimpleGroupFactory groups = new SimpleGroupFactory(schema);
+        for (long value : new long[]{-1L, 7L, Long.MIN_VALUE}) {
+          writer.write(groups.newGroup().append("value", value));
+        }
+      }
+      for (RecordReader reader : List.of(new ParquetNativeRecordReader(), new ParquetAvroRecordReader())) {
+        try (reader) {
+          reader.init(dataFile, null, null);
+          for (long value : new long[]{-1L, 7L, Long.MIN_VALUE}) {
+            assertTrue(reader.hasNext());
+            assertEquals(reader.next(new GenericRow()).getValue("value"), value);
+          }
+          assertFalse(reader.hasNext());
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
+    }
+  }
+
+  @Test
+  public void testReadersAdvancePastRejectedInt96()
+      throws IOException {
+    MessageType schema = MessageTypeParser.parseMessageType("message m { required int96 value; }");
+    File dataFile = new File(FileUtils.getTempDirectory(), "rejected-int96-" + System.nanoTime() + ".parquet");
+    try {
+      try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+          .withType(schema).build()) {
+        SimpleGroupFactory groups = new SimpleGroupFactory(schema);
+        // Year 1600 cannot fit signed Long epoch nanos; the valid middle row is followed by another rejection.
+        writer.write(groups.newGroup().append("value", new NanoTime(2305448, 0L)));
+        writer.write(groups.newGroup().append("value", new NanoTime(2440588, 7L)));
+        writer.write(groups.newGroup().append("value", new NanoTime(2305448, 0L)));
+      }
+      for (boolean useAvro : new boolean[]{false, true}) {
+        ParquetRecordReaderConfig config = new ParquetRecordReaderConfig();
+        config.setUseParquetAvroRecordReader(useAvro);
+        config.setUseParquetNativeRecordReader(!useAvro);
+        config.setExtractRawTimeValues(true);
+        try (ParquetRecordReader reader = new ParquetRecordReader()) {
+          reader.init(dataFile, null, config);
+          assertEquals(reader.useAvroParquetRecordReader(), useAvro);
+          for (int iteration = 0; iteration < 2; iteration++) {
+            if (iteration > 0) {
+              reader.rewind();
+            }
+            assertTrue(reader.hasNext());
+            expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
+            assertTrue(reader.hasNext());
+            assertEquals(reader.next(new GenericRow()).getValue("value"), 7L);
+            assertTrue(reader.hasNext());
+            expectThrows(IllegalArgumentException.class, () -> reader.next(new GenericRow()));
+            assertFalse(reader.hasNext(), "Extraction failures must not retry the rejected record");
+          }
+        }
+      }
+    } finally {
+      FileUtils.deleteQuietly(dataFile);
+    }
+  }
+
+  /// Write the given row object to a random parquet file and return the path of the file
   private String writeToFile(String schemaStr, Map<String, Object> rowObject)
       throws IOException {
     Path outputPath = new Path(FileUtils.getTempDirectory().toString(), "example.parquet");

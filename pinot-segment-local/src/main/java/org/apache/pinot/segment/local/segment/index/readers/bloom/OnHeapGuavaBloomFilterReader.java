@@ -21,9 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers.bloom;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * On-heap reader for guava bloom filter.
- */
+/// On-heap reader for guava bloom filter.
 public class OnHeapGuavaBloomFilterReader extends BaseGuavaBloomFilterReader {
   private final long[] _data;
 

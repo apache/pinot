@@ -18,15 +18,26 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
@@ -34,14 +45,304 @@ import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertEqualsNoOrder;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
 public class JsonUtilsTest {
   private static final String JSON_FILE = "json_util_test.json";
+
+  /// The parse-once index path: `flattenParsed(parsedValue)` must produce the same flattened records as the old
+  /// serialize-then-reparse path (the records are a set, so order is ignored). Covers diverse leaf types - including
+  /// non-Jackson types (Float / BigInteger / BigDecimal / large long) that a non-JSON RecordReader could place on a
+  /// JSON column - plus nested objects/arrays, a top-level list, null, and empty containers, across maxLevels.
+  @Test
+  public void testFlattenParsedValueMatchesString()
+      throws Exception {
+    Map<String, Object> nested = new HashMap<>();
+    nested.put("a", "x");
+    nested.put("arr", Arrays.asList(1, 2, 3));
+    Map<String, Object> doc = new HashMap<>();
+    doc.put("s", "line 1\nline 2 \"quoted\" é");
+    doc.put("i", 7);
+    doc.put("lng", 9007199254740993L);
+    doc.put("f", 0.1f);
+    doc.put("d", 3.140625);
+    doc.put("bd", new BigDecimal("1234567890.5"));
+    doc.put("bi", new BigInteger("123456789012345678901234567890"));
+    doc.put("bool", true);
+    doc.put("nul", null);
+    doc.put("obj", nested);
+    doc.put("arrObj", List.of(Map.of("k", "v1"), Map.of("k", "v2")));
+    doc.put("empty", new HashMap<>());
+    // JSON-column Map inputs use MapUtils' canonical key ordering for the forward value.
+    String oldPathInput = MapUtils.toString(doc);
+
+    for (int maxLevels : new int[]{-1, 1, 2, 3}) {
+      JsonIndexConfig config = new JsonIndexConfig();
+      config.setMaxLevels(maxLevels);
+      List<Map<String, String>> fromParsed = JsonUtils.flattenParsed(doc, oldPathInput, config);
+      List<Map<String, String>> fromString = JsonUtils.flatten(oldPathInput, config);
+      assertEqualsNoOrder(fromParsed.toArray(), fromString.toArray(),
+          "flattenParsed(Map) must match serialize+reparse at maxLevels=" + maxLevels);
+    }
+
+    // Top-level list input (the cache stores List values too).
+    List<Object> topList = List.of(Map.of("k", "a"), Map.of("k", "b"));
+    JsonIndexConfig config = new JsonIndexConfig();
+    assertTrue(JsonUtils.canFlattenParsedValue(topList));
+    assertEqualsNoOrder(flattenParsed(topList, config).toArray(),
+        JsonUtils.flatten(JsonUtils.objectToString(topList), config).toArray());
+  }
+
+  @Test
+  public void testFlattenParsedPreservesDecimalRepresentationAndMapOrder()
+      throws Exception {
+    Map<String, Object> collision = new LinkedHashMap<>();
+    collision.put("a.b", 2);
+    collision.put("a", Map.of("b", 1));
+    Map<String, Object> decimals = Map.of("scaled", new BigDecimal("2.0"),
+        "large", new BigDecimal("123456789012345678900"),
+        "array", new Object[]{new BigDecimal("0.0100"), Map.of("n", new BigDecimal("9007199254740993.0"))});
+    JsonIndexConfig config = new JsonIndexConfig();
+    for (Map<String, Object> doc : List.<Map<String, Object>>of(decimals, collision, Map.of("nested", collision))) {
+      assertTrue(JsonUtils.canFlattenParsedValue(doc));
+      assertEqualsNoOrder(flattenParsed(doc, config).toArray(),
+          JsonUtils.flatten(MapUtils.toString(doc), config).toArray());
+    }
+    // A List forward value preserves map insertion order instead of using MapUtils' sorted writer.
+    List<Object> list = List.of(collision, decimals);
+    assertTrue(JsonUtils.canFlattenParsedValue(list));
+    assertEqualsNoOrder(flattenParsed(list, config).toArray(),
+        JsonUtils.flatten(JsonUtils.objectToString(list), config).toArray());
+  }
+
+  @Test
+  public void testFlattenParsedJsonNodeMatchesString()
+      throws Exception {
+    // A JSON column fed as text (the common case) is parsed once and the JsonNode is cached for the JSON index. The
+    // node is parsed with BigDecimal (matching PinotDataType's JSON canonicalization), so flattenParsed(node) must
+    // match flatten(node.toString()) -- the string the forward index stores and the index used to re-parse.
+    String noDecimal = "{\"s\":\"a\\nb \\\"q\\\"\",\"i\":7,\"lng\":9007199254740993,"
+        + "\"bi\":123456789012345678901234567890,\"bool\":true,\"nul\":null,"
+        + "\"obj\":{\"a\":\"x\",\"arr\":[1,2,3]},\"arr\":[{\"k\":\"v1\"},{\"k\":\"v2\"}]}";
+    // Numbers parse to DecimalNode under BigDecimal, which can render differently than the re-parsed string path: a
+    // fractional value as a double (e.g. "1234567890.5" -> "1.2345678905E9") and an INTEGRAL-valued decimal as an
+    // integer ("2.0" -> "2", not "2.0"; past 2^53 the integer must be preserved exactly). flattenParsed re-parses each
+    // DecimalNode the same way, so it must still match -- across integral, large-magnitude, tiny, high-precision,
+    // exponent, negative, >2^53, nested and array values.
+    String withDecimal = "{\"f\":0.1,\"d\":3.140625,\"bd\":1234567890.5,\"tiny\":0.0000001,"
+        + "\"prec\":3.141592653589793238462643383279,\"neg\":-9876543210.125,\"exp\":1.5e10,"
+        + "\"whole\":2.0,\"negWhole\":-5.0,\"zero\":0.0,\"expWhole\":1.5e1,\"bigWhole\":9007199254740993.0,"
+        + "\"arr\":[0.5,123456.789,2,1234567890.5,7.0,-100.00],\"nested\":{\"x\":98765.4321,\"w\":42.0},"
+        + "\"i\":42,\"s\":\"hi\"}";
+    for (String json : new String[]{noDecimal, withDecimal}) {
+      JsonNode node = JsonUtils.stringToJsonNodeWithBigDecimal(json);
+      assertTrue(JsonUtils.canFlattenParsedValue(node));
+      for (int maxLevels : new int[]{-1, 1, 2, 3}) {
+        JsonIndexConfig config = new JsonIndexConfig();
+        config.setMaxLevels(maxLevels);
+        assertEqualsNoOrder(JsonUtils.flattenParsed(node, node.toString(), config).toArray(),
+            JsonUtils.flatten(node.toString(), config).toArray(),
+            "flattenParsed(JsonNode) must match flatten(node.toString()) for " + json + " at maxLevels=" + maxLevels);
+      }
+    }
+  }
+
+  /// A parsed value must not bypass the parser constraints of the string path; otherwise the consuming index would
+  /// differ from the immutable index built from the forward value (e.g. a matching document vs. a skipped one with
+  /// `skipInvalidJson`). Values at the parser limits stay on the parsed path.
+  @Test
+  public void testFlattenParsedRespectsParserConstraints()
+      throws Exception {
+    StreamReadConstraints constraints = StreamReadConstraints.defaults();
+    String maxName = "k".repeat(constraints.getMaxNameLength());
+    String maxString = "s".repeat(constraints.getMaxStringLength());
+    String maxDigits = "9".repeat(constraints.getMaxNumberLength());
+    int maxDepth = constraints.getMaxNestingDepth();
+    JsonIndexConfig config = new JsonIndexConfig();
+
+    List<Object> withinLimits = List.of(Map.of(maxName, "v"), Map.of("s", maxString),
+        Map.of("n", new BigInteger(maxDigits), "neg", new BigInteger("-" + maxDigits)),
+        JsonNodeFactory.instance.objectNode().put(maxName, new BigInteger("-" + maxDigits)),
+        Map.of("d", new BigDecimal("1." + maxDigits.substring(1))));
+    for (int i = 0; i < withinLimits.size(); i++) {
+      Object value = withinLimits.get(i);
+      assertTrue(JsonUtils.canFlattenParsedValue(value), "withinLimits[" + i + "]");
+      assertEqualsNoOrder(flattenParsed(value, config).toArray(),
+          JsonUtils.flatten(forwardValue(value), config).toArray(), "withinLimits[" + i + "]");
+    }
+    // Documents nested this deep are only classified: serializing and flattening them recursively (on either path) can
+    // need more stack than a test thread has.
+    List<Object> deepWithinLimits = List.of(nestedMap(maxDepth), nestedList(maxDepth), nestedArray(maxDepth),
+        nestedJsonNode(maxDepth), nestedObjectNode(maxDepth), Map.of("node", nestedJsonNode(maxDepth - 1)));
+    for (int i = 0; i < deepWithinLimits.size(); i++) {
+      assertTrue(JsonUtils.canFlattenParsedValue(deepWithinLimits.get(i)), "deepWithinLimits[" + i + "]");
+    }
+
+    JsonIndexConfig skipInvalidJson = new JsonIndexConfig();
+    skipInvalidJson.setSkipInvalidJson(true);
+    // A decimal document is a bare token in its forward value, which Jackson currently accepts with one digit over the
+    // number-length limit at the end of the input. Both paths must agree either way.
+    JsonNode decimalDocument = JsonNodeFactory.instance.numberNode(new BigDecimal("1." + maxDigits));
+    assertEquals(flattenParsed(decimalDocument, skipInvalidJson),
+        JsonUtils.flatten(forwardValue(decimalDocument), skipInvalidJson));
+
+    String longName = maxName + "k";
+    String longDigits = maxDigits + "9";
+    List<Object> exceedingLimits = List.of(Map.of("ok", "v", longName, "v"), Map.of("ok", "v", "s", maxString + "s"),
+        Map.of("ok", "v", "n", new BigInteger(longDigits)), List.of("v", new BigInteger("-" + longDigits)),
+        new Object[]{Map.of(longName, 1)}, JsonNodeFactory.instance.objectNode().put("ok", "v").put(longName, "v"),
+        JsonNodeFactory.instance.arrayNode().add(maxString + "s"),
+        JsonNodeFactory.instance.objectNode().put("ok", "v").put("n", new BigInteger(longDigits)),
+        Map.of("node", JsonNodeFactory.instance.objectNode().put(longName, "v")));
+    for (int i = 0; i < exceedingLimits.size(); i++) {
+      assertFalse(JsonUtils.canFlattenParsedValue(exceedingLimits.get(i)), "exceedingLimits[" + i + "]");
+      assertSkippedOnBothPaths(exceedingLimits.get(i), config, skipInvalidJson);
+    }
+
+    // Decimal tokens are checked when the parsed path re-parses them, including a token that becomes too long when its
+    // BigDecimal is rendered for the forward value.
+    BigDecimal longDecimal = new BigDecimal("1." + maxDigits);
+    List<Object> decimalsExceedingLimits = List.of(Map.of("ok", "v", "d", longDecimal),
+        JsonNodeFactory.instance.objectNode().put("ok", "v").put("d", longDecimal),
+        JsonUtils.stringToJsonNodeWithBigDecimal("{\"ok\":\"v\",\"d\":" + maxDigits.substring(3) + "e5}"));
+    for (int i = 0; i < decimalsExceedingLimits.size(); i++) {
+      assertTrue(JsonUtils.canFlattenParsedValue(decimalsExceedingLimits.get(i)), "decimalsExceedingLimits[" + i + "]");
+      assertSkippedOnBothPaths(decimalsExceedingLimits.get(i), config, skipInvalidJson);
+    }
+
+    // Objects nested one level deeper than the limit can still be serialized, so they are cached, but the string path
+    // rejects their forward value. Build that forward value directly instead of serializing such a deep document.
+    String deepForwardValue = "{\"a\":".repeat(maxDepth + 1) + "\"v\"" + "}".repeat(maxDepth + 1);
+    assertEquals(JsonUtils.flatten(deepForwardValue, skipInvalidJson), JsonUtils.SKIPPED_FLATTENED_RECORD);
+    for (Object value : List.of(nestedMap(maxDepth + 1), nestedObjectNode(maxDepth + 1))) {
+      assertFalse(JsonUtils.canFlattenParsedValue(value));
+      assertEquals(JsonUtils.flattenParsed(value, deepForwardValue, skipInvalidJson),
+          JsonUtils.SKIPPED_FLATTENED_RECORD);
+      assertThrows(IOException.class, () -> JsonUtils.flattenParsed(value, deepForwardValue, config));
+    }
+
+    // An array nested deeper than the limit cannot be serialized, so the value has no forward value and is not cached.
+    List<Object> tooDeep = List.of(nestedList(maxDepth + 1), nestedArray(maxDepth + 1), nestedJsonNode(maxDepth + 1),
+        Map.of("node", nestedJsonNode(maxDepth)));
+    for (int i = 0; i < tooDeep.size(); i++) {
+      assertFalse(JsonUtils.canFlattenParsedValue(tooDeep.get(i)), "tooDeep[" + i + "]");
+    }
+  }
+
+  /// Over 32,768 chars, the string path reads the forward value in chunks, and a plain decimal token one digit over the
+  /// number-length limit is accepted when it ends a chunk. The parsed path then defers to the string path instead of
+  /// rejecting the token in its normalization.
+  @Test
+  public void testFlattenParsedDefersToStringPathAtReaderBufferBoundaries()
+      throws Exception {
+    BigDecimal longDecimal = new BigDecimal("1." + "9".repeat(StreamReadConstraints.defaults().getMaxNumberLength()));
+    JsonIndexConfig skipInvalidJson = new JsonIndexConfig();
+    skipInvalidJson.setSkipInvalidJson(true);
+    int numAccepted = 0;
+    for (int padding = 33_000; padding < 37_000; padding += 7) {
+      Map<String, Object> value = Map.of("a", "x".repeat(padding), "d", longDecimal, "z", 1);
+      String forwardValue = forwardValue(value);
+      List<Map<String, String>> expected = JsonUtils.flatten(forwardValue, skipInvalidJson);
+      if (!expected.equals(JsonUtils.SKIPPED_FLATTENED_RECORD)) {
+        numAccepted++;
+      }
+      assertEquals(JsonUtils.flattenParsed(value, forwardValue, skipInvalidJson), expected, "padding: " + padding);
+    }
+    assertTrue(numAccepted > 0,
+        "The string path no longer accepts the decimal token at reader buffer boundaries; revisit this fallback");
+  }
+
+  /// The JSON index passes the forward value along with the cached value, so a value that cannot be flattened directly
+  /// is flattened from that string instead of being serialized again, while a supported value ignores it.
+  @Test
+  public void testFlattenParsedFallsBackToSerializedForm()
+      throws Exception {
+    JsonIndexConfig config = new JsonIndexConfig();
+    String serializedForm = "{\"serialized\":\"form\"}";
+    List<Object> unsupported = List.of(Map.of("f", 0.1f), Map.of("b", new byte[]{1, 2, 3}),
+        JsonNodeFactory.instance.objectNode().put("f", 0.1f),
+        Map.of("k".repeat(StreamReadConstraints.defaults().getMaxNameLength() + 1), "v"));
+    for (int i = 0; i < unsupported.size(); i++) {
+      assertEquals(JsonUtils.flattenParsed(unsupported.get(i), serializedForm, config),
+          JsonUtils.flatten(serializedForm, config), "unsupported[" + i + "]");
+    }
+    Map<String, Object> supported = Map.of("a", 1, "d", new BigDecimal("2.0"));
+    assertEquals(JsonUtils.flattenParsed(supported, serializedForm, config),
+        JsonUtils.flatten(MapUtils.toString(supported), config));
+  }
+
+  private static void assertSkippedOnBothPaths(Object value, JsonIndexConfig config, JsonIndexConfig skipInvalidJson)
+      throws IOException {
+    String forwardValue = forwardValue(value);
+    assertEquals(JsonUtils.flatten(forwardValue, skipInvalidJson), JsonUtils.SKIPPED_FLATTENED_RECORD);
+    assertEquals(JsonUtils.flattenParsed(value, forwardValue, skipInvalidJson), JsonUtils.SKIPPED_FLATTENED_RECORD);
+    assertThrows(IOException.class, () -> JsonUtils.flatten(forwardValue, config));
+    assertThrows(IOException.class, () -> JsonUtils.flattenParsed(value, forwardValue, config));
+  }
+
+  /// Flattens a parsed value as the realtime JSON index does, along with the forward value it was serialized into.
+  private static List<Map<String, String>> flattenParsed(Object value, JsonIndexConfig config)
+      throws IOException {
+    return JsonUtils.flattenParsed(value, forwardValue(value), config);
+  }
+
+  /// Serializes a parsed value the way the forward index does for JSON columns.
+  @SuppressWarnings("unchecked")
+  private static String forwardValue(Object value)
+      throws IOException {
+    return value instanceof Map ? MapUtils.toString((Map<String, Object>) value) : JsonUtils.objectToString(value);
+  }
+
+  private static Object nestedMap(int depth) {
+    Object value = "v";
+    for (int i = 0; i < depth; i++) {
+      value = Map.of("a", value);
+    }
+    return value;
+  }
+
+  private static Object nestedList(int depth) {
+    Object value = "v";
+    for (int i = 0; i < depth; i++) {
+      value = List.of(value);
+    }
+    return value;
+  }
+
+  private static Object nestedArray(int depth) {
+    Object value = "v";
+    for (int i = 0; i < depth; i++) {
+      value = new Object[]{value};
+    }
+    return value;
+  }
+
+  private static JsonNode nestedJsonNode(int depth) {
+    JsonNode value = JsonNodeFactory.instance.textNode("v");
+    for (int i = 0; i < depth; i++) {
+      value = i % 2 == 0
+          ? JsonNodeFactory.instance.arrayNode().add(value)
+          : JsonNodeFactory.instance.objectNode().set("a", value);
+    }
+    return value;
+  }
+
+  private static JsonNode nestedObjectNode(int depth) {
+    JsonNode value = JsonNodeFactory.instance.textNode("v");
+    for (int i = 0; i < depth; i++) {
+      value = JsonNodeFactory.instance.objectNode().set("a", value);
+    }
+    return value;
+  }
 
   @Test
   public void testFlatten()
@@ -56,7 +357,7 @@ public class JsonUtilsTest {
       JsonNode jsonNode = JsonUtils.stringToJsonNode("123");
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertEquals(flattenedRecords.size(), 1);
-      assertEquals(flattenedRecords.get(0), Collections.singletonMap("", "123"));
+      assertEquals(flattenedRecords.get(0), Map.of("", "123"));
     }
     {
       JsonNode jsonNode = JsonUtils.stringToJsonNode("[]");
@@ -355,7 +656,7 @@ public class JsonUtilsTest {
       jsonIndexConfig.setMaxLevels(2);
       flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertEquals(flattenedRecords.size(), 1);
-      assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "adam"));
+      assertEquals(flattenedRecords.get(0), Map.of(".name", "adam"));
 
       jsonIndexConfig.setMaxLevels(1);
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
@@ -435,12 +736,12 @@ public class JsonUtilsTest {
             + "\"office\"]}," + "{\"country\":\"ca\",\"street\":\"second st\"}]}");
 
     JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.name"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.name"));
     List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
 
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.addresses"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.addresses"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 3);
     Map<String, String> flattenedRecord0 = flattenedRecords.get(0);
@@ -463,10 +764,10 @@ public class JsonUtilsTest {
     assertEquals(flattenedRecord2.get(".addresses..country"), "ca");
     assertEquals(flattenedRecord2.get(".addresses..street"), "second st");
 
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.addresses[*]"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.addresses[*]"));
     assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.addresses[*].types"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.addresses[*].types"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 2);
     flattenedRecord0 = flattenedRecords.get(0);
@@ -496,7 +797,7 @@ public class JsonUtilsTest {
     assertEquals(flattenedRecord1.get(".addresses..types.$index"), "1");
     assertEquals(flattenedRecord1.get(".addresses..types."), "office");
 
-    jsonIndexConfig.setIncludePaths(Collections.singleton("$.no_match"));
+    jsonIndexConfig.setIncludePaths(Set.of("$.no_match"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertTrue(flattenedRecords.isEmpty());
   }
@@ -512,10 +813,10 @@ public class JsonUtilsTest {
     jsonIndexConfig.setExcludeArray(true);
     List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
 
     jsonIndexConfig = new JsonIndexConfig();
-    jsonIndexConfig.setExcludePaths(Collections.singleton("$.name"));
+    jsonIndexConfig.setExcludePaths(Set.of("$.name"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 3);
     Map<String, String> flattenedRecord0 = flattenedRecords.get(0);
@@ -538,21 +839,21 @@ public class JsonUtilsTest {
     assertEquals(flattenedRecord2.get(".addresses..country"), "ca");
     assertEquals(flattenedRecord2.get(".addresses..street"), "second st");
 
-    jsonIndexConfig.setExcludePaths(Collections.singleton("$.addresses"));
+    jsonIndexConfig.setExcludePaths(Set.of("$.addresses"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
 
-    jsonIndexConfig.setExcludePaths(Collections.singleton("$.addresses[*]"));
+    jsonIndexConfig.setExcludePaths(Set.of("$.addresses[*]"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
 
     jsonIndexConfig = new JsonIndexConfig();
-    jsonIndexConfig.setExcludeFields(Collections.singleton("addresses"));
+    jsonIndexConfig.setExcludeFields(Set.of("addresses"));
     flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertEquals(flattenedRecords.size(), 1);
-    assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "charles"));
+    assertEquals(flattenedRecords.get(0), Map.of(".name", "charles"));
   }
 
   @Test
@@ -592,7 +893,7 @@ public class JsonUtilsTest {
 
     // unnest collection entries
     inferredPinotSchema =
-        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Collections.singletonList("entries"),
+        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, List.of("entries"),
             ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.INT)
@@ -606,7 +907,7 @@ public class JsonUtilsTest {
 
     // change delimiter
     inferredPinotSchema =
-        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Collections.singletonList(""), "_",
+        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, List.of(""), "_",
             ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.INT)
@@ -619,7 +920,7 @@ public class JsonUtilsTest {
 
     // change the handling of collection-to-json option, d2 will become string
     inferredPinotSchema =
-        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, Collections.singletonList("entries"),
+        JsonUtils.getPinotSchemaFromJsonFile(file, fieldSpecMap, TimeUnit.HOURS, List.of("entries"),
             ".", ComplexTypeConfig.CollectionNotUnnestedToJson.ALL);
     expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
         .addMetric("m1", FieldSpec.DataType.INT)
@@ -666,11 +967,11 @@ public class JsonUtilsTest {
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
 
       // flatten everything within 2 layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*"));
+      jsonIndexConfig.setIndexPaths(Set.of("*.*"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten "a." prefix till 2 layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("a.*"));
+      jsonIndexConfig.setIndexPaths(Set.of("a.*"));
       flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertTrue(flattenedRecords.isEmpty());
     }
@@ -699,11 +1000,11 @@ public class JsonUtilsTest {
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
 
       // flatten everything
-      jsonIndexConfig.setIndexPaths(Collections.singleton("**"));
+      jsonIndexConfig.setIndexPaths(Set.of("**"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten everything within 3 layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*.*"));
+      jsonIndexConfig.setIndexPaths(Set.of("*.*.*"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten "name" 1 layer and "addresses" infinite layers
@@ -711,13 +1012,13 @@ public class JsonUtilsTest {
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten everything within 2 layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*"));
+      jsonIndexConfig.setIndexPaths(Set.of("*.*"));
       flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertEquals(flattenedRecords.size(), 1);
-      assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "adam"));
+      assertEquals(flattenedRecords.get(0), Map.of(".name", "adam"));
 
       // flatten "name." prefix with infinite layers
-      jsonIndexConfig.setIndexPaths(Collections.singleton("name.**"));
+      jsonIndexConfig.setIndexPaths(Set.of("name.**"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
     }
     {
@@ -744,11 +1045,11 @@ public class JsonUtilsTest {
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
 
       // flatten everything
-      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*.**"));
+      jsonIndexConfig.setIndexPaths(Set.of("*.*.**"));
       assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
 
       // flatten addresses array with one more layer
-      jsonIndexConfig.setIndexPaths(Collections.singleton("addresses..*"));
+      jsonIndexConfig.setIndexPaths(Set.of("addresses..*"));
       flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
       assertEquals(flattenedRecords.size(), 2);
       Map<String, String> flattenedRecord0 = flattenedRecords.get(0);
@@ -762,5 +1063,502 @@ public class JsonUtilsTest {
       assertEquals(flattenedRecord1.get(".addresses..country"), "ca");
       assertEquals(flattenedRecord1.get(".addresses..street"), "second st");
     }
+  }
+
+  // ==================== Tests for bytesToMap optimization ====================
+  // These tests verify that bytesToMap produces identical results to the old
+  // two-step approach (bytesToJsonNode + jsonNodeToMap)
+
+  /// Data provider for various JSON payloads to test bytesToMap equivalence
+  @DataProvider(name = "jsonPayloads")
+  public Object[][] jsonPayloads() {
+    return new Object[][]{
+        // Empty and null cases
+        {"{}"},
+        {"{\"key\":null}"},
+
+        // Simple primitives
+        {"{\"string\":\"value\"}"},
+        {"{\"integer\":42}"},
+        {"{\"negative\":-123}"},
+        {"{\"float\":3.14159}"},
+        {"{\"negative_float\":-2.718}"},
+        {"{\"boolean_true\":true}"},
+        {"{\"boolean_false\":false}"},
+        {"{\"zero\":0}"},
+        {"{\"zero_float\":0.0}"},
+
+        // Large numbers
+        {"{\"large_int\":9223372036854775807}"},
+        {"{\"large_negative\":-9223372036854775808}"},
+        {"{\"scientific\":1.23e10}"},
+        {"{\"scientific_negative\":1.23e-10}"},
+
+        // String edge cases
+        {"{\"empty_string\":\"\"}"},
+        {"{\"whitespace\":\"   \"}"},
+        {"{\"with_quotes\":\"she said \\\"hello\\\"\"}"},
+        {"{\"with_backslash\":\"path\\\\to\\\\file\"}"},
+        {"{\"with_newline\":\"line1\\nline2\"}"},
+        {"{\"with_tab\":\"col1\\tcol2\"}"},
+        {"{\"with_unicode\":\"日本語\"}"},
+        {"{\"emoji\":\"Hello 👋 World 🌍\"}"},
+        {"{\"special_chars\":\"<>&'\\\"\"}"},
+
+        // Arrays
+        {"{\"empty_array\":[]}"},
+        {"{\"int_array\":[1,2,3,4,5]}"},
+        {"{\"string_array\":[\"a\",\"b\",\"c\"]}"},
+        {"{\"mixed_array\":[1,\"two\",3.0,true,null]}"},
+        {"{\"nested_array\":[[1,2],[3,4],[5,6]]}"},
+        {"{\"array_of_objects\":[{\"a\":1},{\"b\":2}]}"},
+
+        // Nested objects
+        {"{\"nested\":{\"level1\":{\"level2\":{\"level3\":\"deep\"}}}}"},
+        {"{\"person\":{\"name\":\"John\",\"age\":30,\"address\":{\"city\":\"NYC\",\"zip\":\"10001\"}}}"},
+
+        // Complex realistic payloads
+        {
+            "{\"event\":{\"id\":123,\"type\":\"click\",\"timestamp\":1609459200000,"
+                + "\"user\":{\"id\":\"user123\",\"session\":\"sess456\"},"
+                + "\"data\":{\"page\":\"/products\",\"element\":\"button\",\"coordinates\":{\"x\":100,\"y\":200}}}}"
+        },
+
+        // Multiple fields with same type
+        {"{\"a\":1,\"b\":2,\"c\":3,\"d\":4,\"e\":5,\"f\":6,\"g\":7,\"h\":8,\"i\":9,\"j\":10}"},
+
+        // Field names with special characters
+        {"{\"field-with-dash\":1}"},
+        {"{\"field.with.dots\":2}"},
+        {"{\"field_with_underscore\":3}"},
+        {"{\"123numeric_start\":4}"},
+
+        // Boolean and null combinations
+        {"{\"flags\":{\"active\":true,\"deleted\":false,\"pending\":null}}"},
+
+        // Array with nulls
+        {"{\"array_with_nulls\":[1,null,3,null,5]}"},
+
+        // Unicode field names
+        {"{\"日本語キー\":\"value\"}"},
+
+        // Very long string value
+        {"{\"long_string\":\"" + "a".repeat(1000) + "\"}"},
+
+        // Deeply nested structure
+        {"{\"l1\":{\"l2\":{\"l3\":{\"l4\":{\"l5\":{\"value\":\"deep\"}}}}}}"},
+
+        // Real-world like Kafka message
+        {
+            "{\"topic\":\"events\",\"partition\":0,\"offset\":12345,\"timestamp\":1609459200000,"
+                + "\"key\":\"user123\",\"value\":{\"event_type\":\"purchase\","
+                + "\"items\":[{\"sku\":\"ABC123\",\"qty\":2,\"price\":29.99},"
+                + "{\"sku\":\"XYZ789\",\"qty\":1,\"price\":49.99}],"
+                + "\"total\":109.97,\"currency\":\"USD\"}}"
+        }
+    };
+  }
+
+  /// Test that bytesToMap produces identical results to bytesToJsonNode + jsonNodeToMap
+  /// for all payload types
+  @Test(dataProvider = "jsonPayloads")
+  public void testBytesToMapEquivalence(String jsonString)
+      throws IOException {
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    // Old approach: bytesToJsonNode + jsonNodeToMap
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes, 0, jsonBytes.length);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+
+    // New approach: bytesToMap directly
+    Map<String, Object> newResult = JsonUtils.bytesToMap(jsonBytes, 0, jsonBytes.length);
+
+    // Verify they are equal
+    assertEquals(newResult, oldResult,
+        "bytesToMap should produce identical result to bytesToJsonNode + jsonNodeToMap for: " + jsonString);
+  }
+
+  /// Test bytesToMap with offset and length parameters (partial array reading)
+  @Test
+  public void testBytesToMapWithOffset()
+      throws IOException {
+    String prefix = "GARBAGE";
+    String jsonString = "{\"key\":\"value\",\"num\":42}";
+    String suffix = "MORE_GARBAGE";
+    String combined = prefix + jsonString + suffix;
+
+    byte[] fullBytes = combined.getBytes(StandardCharsets.UTF_8);
+    int offset = prefix.length();
+    int length = jsonString.length();
+
+    // Old approach
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(fullBytes, offset, length);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+
+    // New approach
+    Map<String, Object> newResult = JsonUtils.bytesToMap(fullBytes, offset, length);
+
+    assertEquals(newResult, oldResult);
+    assertEquals(newResult.get("key"), "value");
+    assertEquals(newResult.get("num"), 42);
+  }
+
+  /// Test bytesToMap with offset where offset + length would exceed array bounds.
+  /// This test ensures we're passing length (not offset+length) to Jackson API.
+  @Test
+  public void testBytesToMapWithOffsetEdgeCase()
+      throws IOException {
+    // Create a case where offset + length > array.length would fail if we incorrectly
+    // passed offset+length as the third parameter to Jackson's readValue
+    String prefix = "XX";  // 2 bytes
+    String jsonString = "{\"a\":1}";  // 7 bytes
+    // Total: 9 bytes
+    // offset=2, length=7
+    // If buggy (passing offset+length=9), would try to read 9 bytes from position 2,
+    // but only 7 bytes available from that position
+
+    String combined = prefix + jsonString;  // No suffix - exactly at the boundary
+    byte[] fullBytes = combined.getBytes(StandardCharsets.UTF_8);
+    int offset = prefix.length();
+    int length = jsonString.length();
+
+    // Verify array bounds: offset + length should equal array length exactly
+    assertEquals(fullBytes.length, offset + length,
+        "Test setup: offset + length should equal array length");
+
+    // This would fail with the bug: "Invalid 'offset' and/or 'len' arguments"
+    Map<String, Object> result = JsonUtils.bytesToMap(fullBytes, offset, length);
+    assertEquals(result.get("a"), 1);
+
+    // Verify equivalence with old approach
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(fullBytes, offset, length);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /// Test bytesToMap with various offset positions to ensure correct slicing.
+  @Test
+  public void testBytesToMapWithVariousOffsets()
+      throws IOException {
+    String json = "{\"x\":\"y\"}";
+    byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+
+    // Test with offset=0 (should work like no offset)
+    Map<String, Object> result0 = JsonUtils.bytesToMap(jsonBytes, 0, jsonBytes.length);
+    assertEquals(result0.get("x"), "y");
+
+    // Test with padding on both sides at different positions
+    for (int prefixLen = 1; prefixLen <= 10; prefixLen++) {
+      String prefix = "P".repeat(prefixLen);
+      String suffix = "S".repeat(5);
+      String combined = prefix + json + suffix;
+      byte[] fullBytes = combined.getBytes(StandardCharsets.UTF_8);
+
+      Map<String, Object> result = JsonUtils.bytesToMap(fullBytes, prefixLen, json.length());
+      assertEquals(result.get("x"), "y",
+          "Failed with prefix length " + prefixLen);
+
+      // Verify equivalence
+      JsonNode node = JsonUtils.bytesToJsonNode(fullBytes, prefixLen, json.length());
+      assertEquals(result, JsonUtils.jsonNodeToMap(node));
+    }
+  }
+
+  /// Test bytesToMap without offset (full array)
+  @Test
+  public void testBytesToMapFullArray()
+      throws IOException {
+    String jsonString = "{\"name\":\"test\",\"values\":[1,2,3]}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    // Old approach using full array methods
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+
+    // New approach
+    Map<String, Object> newResult = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(newResult, oldResult);
+  }
+
+  /// Test that numeric types are preserved correctly
+  @Test
+  public void testBytesToMapNumericTypes()
+      throws IOException {
+    String jsonString = "{\"int\":42,\"long\":9223372036854775807,\"double\":3.14159,\"float\":1.5}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    // Verify the types and values
+    assertEquals(result.get("int"), 42);
+    assertEquals(result.get("long"), 9223372036854775807L);
+    assertEquals(result.get("double"), 3.14159);
+    assertEquals(result.get("float"), 1.5);
+
+    // Also verify equivalence with old approach
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /// Test nested object access after parsing
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testBytesToMapNestedAccess()
+      throws IOException {
+    String jsonString = "{\"outer\":{\"inner\":{\"value\":\"deep\"},\"array\":[1,2,3]}}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+    Map<String, Object> outer = (Map<String, Object>) result.get("outer");
+    Map<String, Object> inner = (Map<String, Object>) outer.get("inner");
+    List<Object> array = (List<Object>) outer.get("array");
+
+    assertEquals(inner.get("value"), "deep");
+    assertEquals(array, Arrays.asList(1, 2, 3));
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /// Test null handling in bytesToMap
+  @Test
+  public void testBytesToMapNullHandling()
+      throws IOException {
+    String jsonString = "{\"nullField\":null,\"nested\":{\"alsoNull\":null}}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    assertTrue(result.containsKey("nullField"));
+    assertNull(result.get("nullField"));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> nested = (Map<String, Object>) result.get("nested");
+    assertTrue(nested.containsKey("alsoNull"));
+    assertNull(nested.get("alsoNull"));
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /// Test boolean handling
+  @Test
+  public void testBytesToMapBooleanHandling()
+      throws IOException {
+    String jsonString = "{\"trueVal\":true,\"falseVal\":false}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(result.get("trueVal"), true);
+    assertEquals(result.get("falseVal"), false);
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /// Test empty object and array
+  @Test
+  public void testBytesToMapEmptyStructures()
+      throws IOException {
+    String jsonString = "{\"emptyObj\":{},\"emptyArr\":[]}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> emptyObj = (Map<String, Object>) result.get("emptyObj");
+    assertTrue(emptyObj.isEmpty());
+
+    @SuppressWarnings("unchecked")
+    List<Object> emptyArr = (List<Object>) result.get("emptyArr");
+    assertTrue(emptyArr.isEmpty());
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /// Test that the method correctly handles UTF-8 encoded bytes
+  @Test
+  public void testBytesToMapUtf8Encoding()
+      throws IOException {
+    // Test various UTF-8 characters
+    String jsonString = "{\"chinese\":\"中文\",\"japanese\":\"日本語\",\"korean\":\"한국어\","
+        + "\"emoji\":\"🎉🎊🎁\",\"mixed\":\"Hello世界\"}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(result.get("chinese"), "中文");
+    assertEquals(result.get("japanese"), "日本語");
+    assertEquals(result.get("korean"), "한국어");
+    assertEquals(result.get("emoji"), "🎉🎊🎁");
+    assertEquals(result.get("mixed"), "Hello世界");
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /// Test escape sequences in strings
+  @Test
+  public void testBytesToMapEscapeSequences()
+      throws IOException {
+    String jsonString = "{\"quotes\":\"\\\"quoted\\\"\",\"backslash\":\"a\\\\b\","
+        + "\"newline\":\"line1\\nline2\",\"tab\":\"col1\\tcol2\","
+        + "\"unicode\":\"\\u0048\\u0065\\u006C\\u006C\\u006F\"}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(result.get("quotes"), "\"quoted\"");
+    assertEquals(result.get("backslash"), "a\\b");
+    assertEquals(result.get("newline"), "line1\nline2");
+    assertEquals(result.get("tab"), "col1\tcol2");
+    assertEquals(result.get("unicode"), "Hello");
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /// Test mixed type arrays
+  @Test
+  public void testBytesToMapMixedArrays()
+      throws IOException {
+    String jsonString = "{\"mixed\":[1,\"two\",3.0,true,null,{\"nested\":\"obj\"},[1,2]]}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    @SuppressWarnings("unchecked")
+    List<Object> mixed = (List<Object>) result.get("mixed");
+    assertEquals(mixed.size(), 7);
+    assertEquals(mixed.get(0), 1);
+    assertEquals(mixed.get(1), "two");
+    assertEquals(mixed.get(2), 3.0);
+    assertEquals(mixed.get(3), true);
+    assertNull(mixed.get(4));
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  /// Test error handling - malformed JSON should throw IOException
+  @Test(expectedExceptions = IOException.class)
+  public void testBytesToMapMalformedJson()
+      throws IOException {
+    String malformedJson = "{\"key\":value}"; // missing quotes around value
+    byte[] jsonBytes = malformedJson.getBytes(StandardCharsets.UTF_8);
+    JsonUtils.bytesToMap(jsonBytes);
+  }
+
+  /// Test error handling - incomplete JSON
+  @Test(expectedExceptions = IOException.class)
+  public void testBytesToMapIncompleteJson()
+      throws IOException {
+    String incompleteJson = "{\"key\":\"value\""; // missing closing brace
+    byte[] jsonBytes = incompleteJson.getBytes(StandardCharsets.UTF_8);
+    JsonUtils.bytesToMap(jsonBytes);
+  }
+
+  /// Stress test with a large number of fields
+  @Test
+  public void testBytesToMapManyFields()
+      throws IOException {
+    StringBuilder sb = new StringBuilder("{");
+    for (int i = 0; i < 100; i++) {
+      if (i > 0) {
+        sb.append(",");
+      }
+      sb.append("\"field").append(i).append("\":").append(i);
+    }
+    sb.append("}");
+    String jsonString = sb.toString();
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    // Old approach
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+
+    // New approach
+    Map<String, Object> newResult = JsonUtils.bytesToMap(jsonBytes);
+
+    assertEquals(newResult, oldResult);
+    assertEquals(newResult.size(), 100);
+
+    for (int i = 0; i < 100; i++) {
+      assertEquals(newResult.get("field" + i), i);
+    }
+  }
+
+  /// Test with a deeply nested array structure
+  @Test
+  public void testBytesToMapDeeplyNestedArrays()
+      throws IOException {
+    String jsonString = "{\"data\":[[[[[\"deep\"]]]]]}";
+    byte[] jsonBytes = jsonString.getBytes(StandardCharsets.UTF_8);
+
+    Map<String, Object> result = JsonUtils.bytesToMap(jsonBytes);
+
+    // Verify equivalence
+    JsonNode jsonNode = JsonUtils.bytesToJsonNode(jsonBytes);
+    Map<String, Object> oldResult = JsonUtils.jsonNodeToMap(jsonNode);
+    assertEquals(result, oldResult);
+  }
+
+  // === JSR-310 type serialization — RecordExtractor outputs LocalDate / LocalTime per the contract on
+  // org.apache.pinot.spi.data.readers.RecordExtractor; objectToString must serialize them as ISO-8601
+  // strings. java.sql.Timestamp continues to serialize as epoch millis (Jackson default for Date subclasses
+  // with WRITE_DATES_AS_TIMESTAMPS=true). ===
+
+  @Test
+  public void testObjectToStringSerializesLocalDateAsIsoString()
+      throws IOException {
+    assertEquals(JsonUtils.objectToString(LocalDate.of(2022, 2, 8)), "\"2022-02-08\"");
+  }
+
+  @Test
+  public void testObjectToStringSerializesLocalTimeAsIsoString()
+      throws IOException {
+    assertEquals(JsonUtils.objectToString(LocalTime.of(12, 34, 56)), "\"12:34:56\"");
+  }
+
+  @Test
+  public void testObjectToStringSerializesTimestampAsEpochMillis()
+      throws IOException {
+    // Timestamp serializes as numeric epoch millis (Jackson default with WRITE_DATES_AS_TIMESTAMPS=true).
+    // RecordExtractor outputs Timestamp directly per its contract.
+    Timestamp ts = new Timestamp(1644278400000L);
+    assertEquals(JsonUtils.objectToString(ts), "1644278400000");
+  }
+
+  @Test
+  public void testObjectToStringSerializesMapContainingLocalDate()
+      throws IOException {
+    // Nested case: ResultSet STRUCT or schema-promoted attribute can wrap LocalDate inside a Map.
+    String json = JsonUtils.objectToString(Map.of("d", LocalDate.of(2022, 2, 8)));
+    assertEquals(json, "{\"d\":\"2022-02-08\"}");
+  }
+
+  @Test
+  public void testObjectToStringSerializesListContainingLocalDate()
+      throws IOException {
+    String json = JsonUtils.objectToString(List.of(LocalDate.of(2022, 2, 8), LocalDate.of(2022, 2, 9)));
+    assertEquals(json, "[\"2022-02-08\",\"2022-02-09\"]");
   }
 }

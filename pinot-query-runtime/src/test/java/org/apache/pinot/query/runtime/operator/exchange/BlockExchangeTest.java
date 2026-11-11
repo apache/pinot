@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.Iterators;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -88,7 +87,7 @@ public class BlockExchangeTest {
     // Given:
     List<SendingMailbox> destinations = List.of(_mailbox1);
     BlockExchange exchange = new TestBlockExchange(destinations);
-    RowHeapDataBlock block = new RowHeapDataBlock(Collections.singletonList(new Object[]{"val"}),
+    RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}),
         new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}));
 
     // When:
@@ -110,7 +109,7 @@ public class BlockExchangeTest {
     // Given:
     List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
-    RowHeapDataBlock block = new RowHeapDataBlock(Collections.singletonList(new Object[]{"val"}),
+    RowHeapDataBlock block = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"val"}),
         new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}));
 
     // When send normal block and some mailbox has terminated
@@ -144,11 +143,11 @@ public class BlockExchangeTest {
     DataSchema schema = new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING});
 
     RowHeapDataBlock inBlock =
-        new RowHeapDataBlock(List.of(new Object[]{"one"}, new Object[]{"two"}), schema);
+        new RowHeapDataBlock(List.<Object[]>of(new Object[]{"one"}, new Object[]{"two"}), schema);
 
-    RowHeapDataBlock outBlockOne = new RowHeapDataBlock(Collections.singletonList(new Object[]{"one"}), schema);
+    RowHeapDataBlock outBlockOne = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"one"}), schema);
 
-    RowHeapDataBlock outBlockTwo = new RowHeapDataBlock(Collections.singletonList(new Object[]{"two"}), schema);
+    RowHeapDataBlock outBlockTwo = new RowHeapDataBlock(List.<Object[]>of(new Object[]{"two"}), schema);
 
     BlockSplitter blockSplitter = (block, maxSize) -> List.of(outBlockOne, outBlockTwo).iterator();
     BlockExchange exchange = new TestBlockExchange(destinations, blockSplitter);
@@ -164,6 +163,28 @@ public class BlockExchangeTest {
     Assert.assertEquals(sentBlocks.size(), 2, "expected to send two blocks");
     Assert.assertEquals(sentBlocks.get(0).asRowHeap().getRows(), outBlockOne.getRows());
     Assert.assertEquals(sentBlocks.get(1).asRowHeap().getRows(), outBlockTwo.getRows());
+  }
+
+  @Test
+  public void shouldDeliverByReferenceWhenAnyDestinationDoes() {
+    // Given: an exchange whose destinations are one mailbox that serializes blocks and one that does not
+    when(_mailbox2.deliversByReference()).thenReturn(true);
+    BlockExchange exchange = new TestBlockExchange(List.of(_mailbox1, _mailbox2));
+
+    // Then: the exchange exposed as a mailbox reports that it delivers by reference
+    Assert.assertTrue(exchange.asSendingMailbox("1").deliversByReference());
+  }
+
+  @Test
+  public void shouldNotDeliverByReferenceWhenNoDestinationDoes() {
+    // Given: an exchange whose destinations all serialize the blocks they are sent
+    BlockExchange exchange = new TestBlockExchange(List.of(_mailbox1, _mailbox2));
+
+    // Then: the exchange exposed as a mailbox reports that it does not deliver by reference. It still takes blocks
+    // whole, because splitting them is left to the exchange it decorates
+    SendingMailbox sendingMailbox = exchange.asSendingMailbox("1");
+    Assert.assertFalse(sendingMailbox.deliversByReference());
+    Assert.assertTrue(sendingMailbox.isLocal());
   }
 
   private static class TestBlockExchange extends BlockExchange {

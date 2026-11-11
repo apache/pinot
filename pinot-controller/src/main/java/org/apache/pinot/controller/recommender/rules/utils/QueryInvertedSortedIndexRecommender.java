@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.recommender.rules.utils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -37,8 +36,6 @@ import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.io.configs.IndexConfig;
 import org.apache.pinot.controller.recommender.rules.io.params.InvertedSortedIndexJointRuleParams;
 import org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants;
-import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
-import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,16 +45,14 @@ import static org.apache.pinot.controller.recommender.rules.utils.PredicateParse
 import static org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.PERCENT_SELECT_ZERO;
 
 
-/**
- * A query parser to simulate the nESI cost of a given query in run-time, recommend an optimal set of dimensions to
- * apply indices on, and calculate the estimated nESI saved by applying such indices
- */
+/// A query parser to simulate the nESI cost of a given query in run-time, recommend an optimal set of dimensions to
+/// apply indices on, and calculate the estimated nESI saved by applying such indices
 public class QueryInvertedSortedIndexRecommender {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryInvertedSortedIndexRecommender.class);
   private static final int NESTED_TOP_LEVEL = 0;
   private static final int NESTED_SECOND_LEVEL = 1;
   public static final List<List<PredicateParseResult>> EMPTY_PARSE_RESULT =
-      Collections.singletonList(Collections.singletonList(PredicateParseResult.emptyPredicateParseResult()));
+      List.of(List.of(PredicateParseResult.emptyPredicateParseResult()));
 
   private InputManager _inputManager;
   private boolean _useOverwrittenIndices;
@@ -65,9 +60,8 @@ public class QueryInvertedSortedIndexRecommender {
   private InvertedSortedIndexJointRuleParams _params;
   private int _numColumnsIndexApplicable;
 
-  /**
-   * The plan priority for AND-connected sub-predicates in {@link FilterOperatorUtils}
-   */
+  /// The plan priority for AND-connected sub-predicates in
+  /// [org.apache.pinot.core.operator.filter.FilterOperatorUtils]
   public enum IteratorEvalPriorityEnum {
     INDEXED, // sorted, bitmap, range, text
     AND, OR, SCAN, EXPRESSION,
@@ -79,13 +73,10 @@ public class QueryInvertedSortedIndexRecommender {
     NON_CANDIDATE_SCAN, NESTED, // not applicable
   }
 
-  /**
-   *
-   * @param queryContext parse query in QueryContext
-   * @param queryWeight the weight (frequency) of query in the sample queries
-   * @return A list of List<PredicateParseResult>. Each List<PredicateParseResult> is a list of exclusive candidates,
-   * meaning that at most one candidate (PredicateParseResult) in the list can contribute to the global recommendation.
-   */
+  /// @param queryContext parse query in QueryContext
+  /// @param queryWeight the weight (frequency) of query in the sample queries
+  /// @return A list of List<PredicateParseResult>. Each List<PredicateParseResult> is a list of exclusive candidates,
+  /// meaning that at most one candidate (PredicateParseResult) in the list can contribute to the global recommendation.
   public List<List<PredicateParseResult>> parseQuery(QueryContext queryContext, double queryWeight) {
     FilterContext filter = queryContext.getFilter();
     if (filter == null || filter.isConstant()) {
@@ -96,12 +87,11 @@ public class QueryInvertedSortedIndexRecommender {
     return parseTopLevel(filter, queryWeight);
   }
 
-  /**
-   *  Reorder the list according to the plan priority for AND-connected sub-predicates in {@link FilterOperatorUtils}
-   *  and iterator evaluation priority in {@link AndDocIdSet#iterator()}
-   * @param childResults input child predicates
-   * @return reordered AND-connected sub-predicates based on priorities
-   */
+  ///  Reorder the list according to the plan priority for AND-connected sub-predicates in
+  ///  [org.apache.pinot.core.operator.filter.FilterOperatorUtils] and iterator evaluation priority in
+  ///  [org.apache.pinot.core.operator.docidsets.AndDocIdSet#iterator()]
+  /// @param childResults input child predicates
+  /// @return reordered AND-connected sub-predicates based on priorities
   private List<PredicateParseResult> reorderAndPredicateList(List<PredicateParseResult> childResults) {
     // With any indexed columns, the order will be first intersecting (indexed columns + all scan based columns)
     // then make the resulting bitmap and the nested iterators a nested iterator
@@ -111,10 +101,10 @@ public class QueryInvertedSortedIndexRecommender {
           childResults.stream().collect(Collectors.groupingBy(PredicateParseResult::getIteratorEvalPriority));
       List<PredicateParseResult> ret =
           groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.INDEXED, new ArrayList<>());
-      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.SCAN, Collections.emptyList()));
-      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.AND, Collections.emptyList()));
-      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.OR, Collections.emptyList()));
-      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.EXPRESSION, Collections.emptyList()));
+      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.SCAN, List.of()));
+      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.AND, List.of()));
+      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.OR, List.of()));
+      ret.addAll(groupedPredicates.getOrDefault(IteratorEvalPriorityEnum.EXPRESSION, List.of()));
       return ret;
     } else {
       // Else the evaluation priority is simply AND, OR, SCAN, EXPRESSION
@@ -123,27 +113,25 @@ public class QueryInvertedSortedIndexRecommender {
     }
   }
 
-  /**
-   * Simulates the execution of top level predicate list
-   * top level: a = 3 and b = 4 and (...) is top level in "select ... where a = 3 and b = 4 and (c=5 or d=6)"
-   * whereas (c=5 or d=6) is the second level
-   *
-   * Recommend inverted index for:
-   * Case AND: The dimension(s) which minimizes the total nESI for AND clause, given the
-   *           iterator reordering and intersection process in {@link AndDocIdSet}. The result is a list
-   *           containing ONE List<PredicateParseResult>. The List<PredicateParseResult> is a set of exclusive
-   *           candidates, meaning that any one but only one candidate in the list can
-   *           contribute to the global recommendation.
-   *
-   * Case OR:  Recursively run parseTopLevel on each of the child predicates. The result is a list
-   *           containing MULTIPLE List<PredicateParseResult>, which are the return value of parsing each of the child
-   *           clauses of or. Each List<PredicateParseResult> will contribute to the global recommendation equally.
-   *           This is due to the nature of evaluating or-connected predicates is essentially evaluating each of them
-   *           individually
-   *
-   * @param filterContextTopLevel The tree representing the top level "where" clause
-   * @return see {@link QueryInvertedSortedIndexRecommender#parseQuery(QueryContext, double)}
-   */
+  /// Simulates the execution of top level predicate list
+  /// top level: a = 3 and b = 4 and (...) is top level in "select ... where a = 3 and b = 4 and (c=5 or d=6)"
+  /// whereas (c=5 or d=6) is the second level
+  ///
+  /// Recommend inverted index for:
+  /// Case AND: The dimension(s) which minimizes the total nESI for AND clause, given the iterator reordering and
+  ///           intersection process in [org.apache.pinot.core.operator.docidsets.AndDocIdSet]. The result is a
+  ///           list containing ONE List<PredicateParseResult>. The List<PredicateParseResult> is a set of exclusive
+  ///           candidates, meaning that any one but only one candidate in the list can contribute to the global
+  ///           recommendation.
+  ///
+  /// Case OR:  Recursively run parseTopLevel on each of the child predicates. The result is a list
+  ///           containing MULTIPLE List<PredicateParseResult>, which are the return value of parsing each of the child
+  ///           clauses of or. Each List<PredicateParseResult> will contribute to the global recommendation equally.
+  ///           This is due to the nature of evaluating or-connected predicates is essentially evaluating each of them
+  ///           individually
+  ///
+  /// @param filterContextTopLevel The tree representing the top level "where" clause
+  /// @return see [QueryInvertedSortedIndexRecommender#parseQuery(QueryContext, double)]
   private List<List<PredicateParseResult>> parseTopLevel(FilterContext filterContextTopLevel, double queryWeight) {
     LOGGER.debug("parseTopLevel: Parsing top level predicate list: {}", filterContextTopLevel.toString());
     FilterContext.Type type = filterContextTopLevel.getType();
@@ -207,7 +195,7 @@ public class QueryInvertedSortedIndexRecommender {
       // Pick the top N candidates whose nESI saved are > ratio * top_nESI_saved. Forming a list of candidates.
       // However only one of these candidates will be counted towards the global recommendation, this is called
       // exclusive candidates
-      // This is to ensure the the per-query near-optimal recommendations not be overshadowed by the optimal
+      // This is to ensure the per-query near-optimal recommendations not be overshadowed by the optimal
       // recommendations
       // Which will make the global recommendation optimal
       if (totalNESIWithIdxSorted.isEmpty()) { // If no applicable PredicateParseResult
@@ -283,7 +271,7 @@ public class QueryInvertedSortedIndexRecommender {
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.AND)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.NESTED).setnESI(totalNESI)
           .setPercentSelected(percentSelected).setnESIWithIdx(totalNESI).setQueryWeight(queryWeight).build());
-      return Collections.singletonList(ret);
+      return List.of(ret);
     } else if (type == FilterContext.Type.OR) {
       // case: OR connected top level predicates, recursively run parseTopLevel on each on its children and
       // simply return all the results. Each result will contribute to the global recommendation equally
@@ -318,24 +306,22 @@ public class QueryInvertedSortedIndexRecommender {
             .setnESIWithIdx(predicateParseResult._nESI).setQueryWeight(queryWeight).build());
         ret.add(predicateParseResult.multiplyWeight(queryWeight));
         LOGGER.debug("parseTopLevel: LEAF: Child results: {}", ret);
-        return Collections.singletonList(ret);
+        return List.of(ret);
       }
     }
   }
 
-  /**
-   * Recursively simulates the execution of nested predicates, whose nested level > top level
-   * e.g. (c=5 or d=6) in select ... where a = 3 and b = 4 and (c=5 or d=6)
-   * Recommend inverted index for:
-   * Case AND: The dimension which selects the lowest percentage of rows.
-   * Case OR:  All the recommended dimensions from evaluating all its child predicates.
-   * Case NOT: Same as the underlying predicate
-   * Case Leaf: See {@link QueryInvertedSortedIndexRecommender#parseLeafPredicate(FilterContext, int)}
-   * @param predicateList Single or nested predicates.
-   * @param depth         The depth of current AST tree. >= Second level in this function. Top level is handled in
-   * {@link QueryInvertedSortedIndexRecommender#parseTopLevel(FilterContext, double)} ()}.
-   * @return A {@link PredicateParseResult} holding the metrics of simulated execution.
-   */
+  /// Recursively simulates the execution of nested predicates, whose nested level > top level
+  /// e.g. (c=5 or d=6) in select ... where a = 3 and b = 4 and (c=5 or d=6)
+  /// Recommend inverted index for:
+  /// Case AND: The dimension which selects the lowest percentage of rows.
+  /// Case OR:  All the recommended dimensions from evaluating all its child predicates.
+  /// Case NOT: Same as the underlying predicate
+  /// Case Leaf: See [QueryInvertedSortedIndexRecommender#parseLeafPredicate(FilterContext, int)]
+  /// @param predicateList Single or nested predicates.
+  /// @param depth         The depth of current AST tree. >= Second level in this function. Top level is handled in
+  /// [QueryInvertedSortedIndexRecommender#parseTopLevel(FilterContext, double)] ()}.
+  /// @return A [PredicateParseResult] holding the metrics of simulated execution.
   private PredicateParseResult parsePredicateList(FilterContext predicateList, int depth) {
     LOGGER.debug("parsePredicateList: Parsing predicate list: {}", predicateList.toString());
     FilterContext.Type type = predicateList.getType();
@@ -397,7 +383,7 @@ public class QueryInvertedSortedIndexRecommender {
       // Recommend one predicate having min percent docs selected to apply indices on,
       // from the scanning based predicates
       Optional<PredicateParseResult> newCandidateOptional =
-          groupedPredicates.getOrDefault(RecommendationPriorityEnum.CANDIDATE_SCAN, Collections.emptyList()).stream()
+          groupedPredicates.getOrDefault(RecommendationPriorityEnum.CANDIDATE_SCAN, List.of()).stream()
               .filter(
                   PredicateParseResult::hasCandidateDim) // The predicate should be index applicable to be recommended
               .min(Comparator.comparing(PredicateParseResult::getPercentSelected));
@@ -405,7 +391,7 @@ public class QueryInvertedSortedIndexRecommender {
       double bitmapPercentSelected = PERCENT_SELECT_ALL;
       double bitmapNESIWithIdx = NESI_ZERO;
       for (PredicateParseResult predicateParseResult : groupedPredicates
-          .getOrDefault(RecommendationPriorityEnum.BITMAP, Collections.emptyList())) {
+          .getOrDefault(RecommendationPriorityEnum.BITMAP, List.of())) {
         bitmapPercentSelected *= predicateParseResult.getPercentSelected();
         bitmapNESIWithIdx += predicateParseResult.getnESIWithIdx();
         candidateDims.union(predicateParseResult.getCandidateDims());
@@ -433,7 +419,7 @@ public class QueryInvertedSortedIndexRecommender {
       nESIWithIdx += bitmapNESIWithIdx;
 
       for (PredicateParseResult predicateParseResult : groupedPredicates
-          .getOrDefault(RecommendationPriorityEnum.CANDIDATE_SCAN, Collections.emptyList())) {
+          .getOrDefault(RecommendationPriorityEnum.CANDIDATE_SCAN, List.of())) {
         if (predicateParseResult != newCandidateOptional.orElse(null)) {
           nESIWithIdx += predicateParseResult.getnESI() * percentSelectedWithIdx;
           percentSelectedWithIdx *= predicateParseResult.getPercentSelected();
@@ -441,7 +427,7 @@ public class QueryInvertedSortedIndexRecommender {
       }
 
       for (PredicateParseResult predicateParseResult : groupedPredicates
-          .getOrDefault(RecommendationPriorityEnum.NON_CANDIDATE_SCAN, Collections.emptyList())) {
+          .getOrDefault(RecommendationPriorityEnum.NON_CANDIDATE_SCAN, List.of())) {
         nESIWithIdx += predicateParseResult.getnESI() * percentSelectedWithIdx;
         percentSelectedWithIdx *= predicateParseResult.getPercentSelected();
       }
@@ -514,12 +500,10 @@ public class QueryInvertedSortedIndexRecommender {
     }
   }
 
-  /**
-   * Simulate the execution of leaf predicates
-   *
-   * @param leafPredicate the leaf predicate context where the score are generated from selectivity
-   * @return A {@link PredicateParseResult} holding the metrics of simulated execution.
-   */
+  /// Simulate the execution of leaf predicates
+  ///
+  /// @param leafPredicate the leaf predicate context where the score are generated from selectivity
+  /// @return A [PredicateParseResult] holding the metrics of simulated execution.
   private PredicateParseResult parseLeafPredicate(FilterContext leafPredicate, int depth) {
     LOGGER.trace("parseLeafPredicate: Parsing predicate: {}", leafPredicate.toString());
     Predicate predicate = leafPredicate.getPredicate();

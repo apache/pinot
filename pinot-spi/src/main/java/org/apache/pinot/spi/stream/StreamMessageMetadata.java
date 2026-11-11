@@ -23,10 +23,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * A class that provides metadata associated with the message of a stream, for e.g.,
- * timestamp derived from the incoming record (not the ingestion time).
- */
+/// A class that provides metadata associated with the message of a stream, for e.g.,
+/// timestamp derived from the incoming record (not the ingestion time).
 public class StreamMessageMetadata {
   private final long _recordIngestionTimeMs;
   private final long _firstStreamRecordIngestionTimeMs;

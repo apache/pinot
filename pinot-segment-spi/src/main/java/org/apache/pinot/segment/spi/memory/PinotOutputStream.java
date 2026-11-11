@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.memory;
 
-import com.google.common.primitives.Longs;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -26,90 +25,85 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 
+/// A big-endian [DataOutput] with a seekable position and bulk writes of primitive arrays.
 public abstract class PinotOutputStream extends OutputStream implements DataOutput {
 
-  /**
-   * Return the current position in the OutputStream.
-   *
-   * @return current position in bytes from the start of the stream
-   */
+  /// Returns the current position, in bytes from the start of the stream.
   public abstract long getCurrentOffset();
 
-  /**
-   * Seek to a new position in the OutputStream.
-   *
-   * @param newPos the new position to seek to
-   * @throws IllegalArgumentException If the new position is negative
-   */
+  /// Seeks to a new position.
+  ///
+  /// @throws IllegalArgumentException if the new position is negative
   public abstract void seek(long newPos);
 
-  /**
-   * Moves the current offset, applying the given change.
-   * @param change the change to apply to the current offset
-   * @throws IllegalArgumentException if the new position is negative
-   */
-  public void moveCurrentOffset(long change) {
-    long newOffset = getCurrentOffset() + change;
-    seek(newOffset);
-  }
-
   @Override
-  public void writeBoolean(boolean v) throws IOException {
+  public void writeBoolean(boolean v)
+      throws IOException {
     write(v ? 1 : 0);
   }
 
   @Override
-  public void writeByte(int v) throws IOException {
+  public void writeByte(int v)
+      throws IOException {
     write(v);
   }
 
   @Override
-  public void writeChar(int v) throws IOException {
+  public abstract void writeShort(int v)
+      throws IOException;
+
+  @Override
+  public void writeChar(int v)
+      throws IOException {
     writeShort(v);
   }
 
   @Override
-  public void writeChars(String s) throws IOException {
-    for (int i = 0; i < s.length(); i++) {
-      writeChar(s.charAt(i));
-    }
-  }
+  public abstract void writeInt(int v)
+      throws IOException;
 
-  public void writeDouble(double v) throws IOException {
-    writeLong(Double.doubleToLongBits(v));
-  }
+  @Override
+  public abstract void writeLong(long v)
+      throws IOException;
 
-  public void writeFloat(float v) throws IOException {
+  @Override
+  public void writeFloat(float v)
+      throws IOException {
     writeInt(Float.floatToIntBits(v));
   }
 
-  public void writeInt(int v) throws IOException {
-    write(0xFF & (v >> 24));
-    write(0xFF & (v >> 16));
-    write(0xFF & (v >> 8));
-    write(0xFF & v);
+  @Override
+  public void writeDouble(double v)
+      throws IOException {
+    writeLong(Double.doubleToLongBits(v));
   }
 
-  public void writeLong(long v) throws IOException {
-    byte[] bytes = Longs.toByteArray(v);
-    write(bytes, 0, bytes.length);
-  }
+  /// Writes `length` ints of `values` from `offset`, with the same big-endian bytes as calling [#writeInt(int)] on
+  /// each one.
+  public abstract void writeInts(int[] values, int offset, int length)
+      throws IOException;
 
-  public void writeShort(int v) throws IOException {
-    write(0xFF & (v >> 8));
-    write(0xFF & v);
-  }
+  /// Writes `length` longs of `values` from `offset`, with the same big-endian bytes as calling [#writeLong(long)] on
+  /// each one.
+  public abstract void writeLongs(long[] values, int offset, int length)
+      throws IOException;
 
-  /**
-   * This method is commonly used in Pinot to write a string with a 4-byte length prefix.
-   * <p>
-   * <b>Note</b>: This method is incompatible with {@link DataOutput#writeUTF(String)}. It is recommended to use
-   * this method instead of the one in {@link DataOutput} to write strings.
-   */
-  public void writeInt4String(String v) throws IOException {
-    byte[] bytes = v.getBytes(StandardCharsets.UTF_8);
-    writeInt(bytes.length);
-    write(bytes);
+  /// Writes `length` floats of `values` from `offset` as big-endian raw bits ([Float#floatToRawIntBits]), the same
+  /// bytes as `ByteBuffer.putFloat`. Unlike [#writeFloat(float)], a NaN keeps its payload.
+  public abstract void writeFloats(float[] values, int offset, int length)
+      throws IOException;
+
+  /// Writes `length` doubles of `values` from `offset` as big-endian raw bits ([Double#doubleToRawLongBits]), the same
+  /// bytes as `ByteBuffer.putDouble`. Unlike [#writeDouble(double)], a NaN keeps its payload.
+  public abstract void writeDoubles(double[] values, int offset, int length)
+      throws IOException;
+
+  @Override
+  public void writeChars(String s)
+      throws IOException {
+    for (int i = 0; i < s.length(); i++) {
+      writeChar(s.charAt(i));
+    }
   }
 
   @Override
@@ -124,20 +118,23 @@ public abstract class PinotOutputStream extends OutputStream implements DataOutp
     new DataOutputStream(this).writeUTF(s);
   }
 
+  /// Writes a string as its UTF-8 bytes behind a 4-byte length prefix, the form Pinot commonly uses for strings.
+  ///
+  /// **Note**: This method is incompatible with [DataOutput#writeUTF(String)]. It is recommended to use this method
+  /// instead of the one in [DataOutput] to write strings.
+  public void writeInt4String(String v)
+      throws IOException {
+    byte[] bytes = v.getBytes(StandardCharsets.UTF_8);
+    writeInt(bytes.length);
+    write(bytes);
+  }
+
   public void write(DataBuffer input)
       throws IOException {
     write(input, 0, input.size());
   }
 
-  public void write(DataBuffer input, long offset, long length)
-      throws IOException {
-    byte[] bytes = new byte[4096];
-    long currentOffset = offset;
-    while (currentOffset < offset + length) {
-      int bytesToRead = (int) Math.min(length - (currentOffset - offset), bytes.length);
-      input.copyTo(currentOffset, bytes, 0, bytesToRead);
-      write(bytes, 0, bytesToRead);
-      currentOffset += bytesToRead;
-    }
-  }
+  /// Writes `length` bytes of `input` from `offset`.
+  public abstract void write(DataBuffer input, long offset, long length)
+      throws IOException;
 }

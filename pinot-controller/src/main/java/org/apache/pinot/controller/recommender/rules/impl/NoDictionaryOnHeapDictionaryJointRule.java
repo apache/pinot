@@ -39,21 +39,19 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.REALTIME;
 
 
-/**
- * Recommend no dictionary columns and on heap dictionary columns
- * Name of the column(s) not to create a dictionary on:
- *    EXCLUDE the columns we will create bitmap/sorted indices on.
- *    If a column (fixed width or variable width) is used in filter and/or group by, create a dictionary.
- *    If a column is not used in filter and group by: there are two cases:
- *      If the column is used heavily in selection, then don't create a dictionary
- *      If the column is not used in selection, then create a dictionary only if by creating a dictionary we can save
- *      > p% of storage
- *
- * Name of the column(s) with dictionary on heap
- *    We want the table’s QPS > Q
- *    The memory footprint should be < M (configurable)
- *    The column is frequently > F queried in filter/group by
- */
+/// Recommend no dictionary columns and on heap dictionary columns
+/// Name of the column(s) not to create a dictionary on:
+///    EXCLUDE the columns we will create bitmap/sorted indices on.
+///    If a column (fixed width or variable width) is used in filter and/or group by, create a dictionary.
+///    If a column is not used in filter and group by: there are two cases:
+///      If the column is used heavily in selection, then don't create a dictionary
+///      If the column is not used in selection, then create a dictionary only if by creating a dictionary we can save
+///      > p% of storage
+///
+/// Name of the column(s) with dictionary on heap
+///    We want the table’s QPS > Q
+///    The memory footprint should be < M (configurable)
+///    The column is frequently > F queried in filter/group by
 public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(NoDictionaryOnHeapDictionaryJointRule.class);
   private final NoDictionaryOnHeapDictionaryJointRuleParams _params;

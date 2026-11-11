@@ -27,7 +27,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
-import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -47,24 +46,23 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V912_IFST_INDEX_FILE_EXTENSION;
 
 
-/**
- * Helper class for IFST (case-insensitive FST) indexes used by {@link SegmentPreProcessor}.
- * to create IFST index for column during segment load time. Currently IFST index is always
- * created (if enabled on a column) during segment generation
- *
- * (1) A new segment with IFST index is created/refreshed. Server loads the segment. The handler
- * detects the existence of IFST index and returns.
- *
- * (2) A reload is issued on an existing segment with existing IFST index. The handler
- * detects the existence of IFST index and returns.
- *
- * (3) A reload is issued on an existing segment after IFST index is enabled on an existing
- * column. Reads the dictionary to create IFST index.
- *
- * (4) A reload is issued on an existing segment after IFST index is enabled on a newly
- * added column. In this case, the default column handler would have taken care of adding
- * dictionary for the new column. Read the dictionary to create IFST index.
- */
+/// Helper class for IFST (case-insensitive FST) indexes used by
+/// [org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor].
+/// to create IFST index for column during segment load time. Currently IFST index is always
+/// created (if enabled on a column) during segment generation
+///
+/// (1) A new segment with IFST index is created/refreshed. Server loads the segment. The handler
+/// detects the existence of IFST index and returns.
+///
+/// (2) A reload is issued on an existing segment with existing IFST index. The handler
+/// detects the existence of IFST index and returns.
+///
+/// (3) A reload is issued on an existing segment after IFST index is enabled on an existing
+/// column. Reads the dictionary to create IFST index.
+///
+/// (4) A reload is issued on an existing segment after IFST index is enabled on a newly
+/// added column. In this case, the default column handler would have taken care of adding
+/// dictionary for the new column. Read the dictionary to create IFST index.
 public class IFSTIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(IFSTIndexHandler.class);
   private final Set<String> _columnsToAddIdx;
@@ -164,8 +162,7 @@ public class IFSTIndexHandler extends BaseIndexHandler {
     }
     LOGGER.info("Creating new IFST index for column: {} in segment: {}, cardinality: {}", columnName, segmentName,
         columnMetadata.getCardinality());
-    IndexCreationContext context =
-        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build();
+    IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
     FstIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.ifst());
     try (FSTIndexCreator ifstIndexCreator = StandardIndexes.ifst().createIndexCreator(context, config);
         Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {

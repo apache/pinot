@@ -20,13 +20,14 @@ package org.apache.pinot.controller.helix.core.util;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.TableRebalanceProgressStats;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -35,6 +36,11 @@ import static org.testng.Assert.assertEquals;
 
 
 public class ControllerZkHelixUtilsTest {
+
+  @AfterMethod(alwaysRun = true)
+  public void resetControllerJobTypes() {
+    ControllerJobTypes.init(new ControllerConf());
+  }
 
   @Test
   public void testControllerJobZkMetadataExpiryWithInProgressJobs()

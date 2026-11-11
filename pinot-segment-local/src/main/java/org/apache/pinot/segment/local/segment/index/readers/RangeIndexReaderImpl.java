@@ -108,108 +108,84 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
     return false;
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   public int getNumMatchingDocs(int min, int max) {
     ImmutableRoaringBitmap matching = getMatchingDocIds(min, max);
     return matching == null ? 0 : matching.getCardinality();
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   public int getNumMatchingDocs(long min, long max) {
     ImmutableRoaringBitmap matching = getMatchingDocIds(min, max);
     return matching == null ? 0 : matching.getCardinality();
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   public int getNumMatchingDocs(float min, float max) {
     ImmutableRoaringBitmap matching = getMatchingDocIds(min, max);
     return matching == null ? 0 : matching.getCardinality();
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   public int getNumMatchingDocs(double min, double max) {
     ImmutableRoaringBitmap matching = getMatchingDocIds(min, max);
     return matching == null ? 0 : matching.getCardinality();
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   @Nullable
   public ImmutableRoaringBitmap getMatchingDocIds(long min, long max) {
     return getMatchesInRange(findRangeId(min), findRangeId(max));
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   @Nullable
   public ImmutableRoaringBitmap getMatchingDocIds(int min, int max) {
     return getMatchesInRange(findRangeId(min), findRangeId(max));
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   @Nullable
   public ImmutableRoaringBitmap getMatchingDocIds(double min, double max) {
     return getMatchesInRange(findRangeId(min), findRangeId(max));
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   @Nullable
   public ImmutableRoaringBitmap getMatchingDocIds(float min, float max) {
     return getMatchesInRange(findRangeId(min), findRangeId(max));
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   @Nullable
   public ImmutableRoaringBitmap getPartiallyMatchingDocIds(long min, long max) {
     return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   @Nullable
   public ImmutableRoaringBitmap getPartiallyMatchingDocIds(int min, int max) {
     return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   @Nullable
   public ImmutableRoaringBitmap getPartiallyMatchingDocIds(double min, double max) {
     return getPartialMatchesInRange(findRangeId(min), findRangeId(max));
   }
 
-  /**
-   * {@inheritDoc}
-   */
+  /// {@inheritDoc}
   @Override
   @Nullable
   public ImmutableRoaringBitmap getPartiallyMatchingDocIds(float min, float max) {
@@ -230,12 +206,10 @@ public class RangeIndexReaderImpl implements RangeIndexReader<ImmutableRoaringBi
     return _dataBuffer.getLong(_bitmapIndexOffset + (long) rangeId * Long.BYTES);
   }
 
-  /**
-   * Find the rangeIndex that the value falls in
-   * Note this assumes that the value is in one of the range.
-   * @param value
-   * @return
-   */
+  /// Find the rangeIndex that the value falls in
+  /// Note this assumes that the value is in one of the range.
+  /// @param value
+  /// @return
   private int findRangeId(int value) {
     for (int i = 0; i < _rangeStartArray.length; i++) {
       if (value < _rangeStartArray[i].intValue()) {

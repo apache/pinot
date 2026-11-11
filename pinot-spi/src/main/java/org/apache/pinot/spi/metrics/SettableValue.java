@@ -21,20 +21,17 @@ package org.apache.pinot.spi.metrics;
 import java.util.function.Supplier;
 
 
-/**
- * SettableValue allows the value to be set to a value or provided by a value supplier.
- * @param <T> the type of the value to be set.
- */
+/// SettableValue allows the value to be set to a value or provided by a value supplier.
+/// @param <T> the type of the value to be set.
 public interface SettableValue<T> {
-  /**
-   * Sets the value.
-   * @param value the value to set.
-   */
+  /// Sets the value.
+  /// @param value the value to set.
   void setValue(T value);
 
-  /**
-   * Sets the value supplier.
-   * @param valueSupplier the value supplier to set.
-   */
+  /// Sets the value supplier.
+  /// @param valueSupplier the value supplier to set.
   void setValueSupplier(Supplier<T> valueSupplier);
+
+  /// Returns the current value produced by either the set value or the value supplier.
+  T getValue();
 }

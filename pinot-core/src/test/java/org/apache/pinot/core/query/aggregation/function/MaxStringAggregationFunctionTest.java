@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -28,46 +28,48 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
 public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
-  /**
-   * Helper method to create a FluentQueryTest builder for a table with a single String field.
-   * This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
-   * but fixed for the STRING data type.
-   */
+  /// Helper method to create a FluentQueryTest builder for a table with a single String field.
+  /// This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
+  /// but fixed for the STRING data type.
   protected FluentQueryTest.DeclaringTable getDeclaringTable(boolean enableColumnBasedNullHandling) {
+    return getDeclaringTable(enableColumnBasedNullHandling, Map.of());
+  }
+
+  protected FluentQueryTest.DeclaringTable getDeclaringTable(boolean enableColumnBasedNullHandling,
+      Map<String, String> extraQueryOptions) {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(enableColumnBasedNullHandling)
+        .addSingleValueDimension("myField", DataType.STRING)
+        .build();
     return FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(enableColumnBasedNullHandling)
-                .addSingleValueDimension("myField", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG);
+        .withExtraQueryOptions(extraQueryOptions)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG);
   }
 
   @Test
   public void testNumericColumnExceptioninAggregateMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MaxStringAggregationFunction function = new MaxStringAggregationFunction(Collections.singletonList(expression),
-        false);
+    MaxStringAggregationFunction function = new MaxStringAggregationFunction(List.of(expression), false);
 
     AggregationResultHolder resultHolder = function.createAggregationResultHolder();
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     BlockValSet mockBlockValSet = mock(BlockValSet.class);
-    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.INT);
     blockValSetMap.put(expression, mockBlockValSet);
 
     try {
@@ -81,13 +83,12 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateGroupBySVMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MaxStringAggregationFunction function = new MaxStringAggregationFunction(Collections.singletonList(expression),
-        false);
+    MaxStringAggregationFunction function = new MaxStringAggregationFunction(List.of(expression), false);
 
     GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     BlockValSet mockBlockValSet = mock(BlockValSet.class);
-    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.INT);
     blockValSetMap.put(expression, mockBlockValSet);
 
     try {
@@ -101,13 +102,12 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateGroupByMVMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MaxStringAggregationFunction function = new MaxStringAggregationFunction(Collections.singletonList(expression),
-        false);
+    MaxStringAggregationFunction function = new MaxStringAggregationFunction(List.of(expression), false);
 
     GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     BlockValSet mockBlockValSet = mock(BlockValSet.class);
-    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.INT);
     blockValSetMap.put(expression, mockBlockValSet);
 
     try {
@@ -121,8 +121,7 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testFunctionBasics() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MaxStringAggregationFunction function = new MaxStringAggregationFunction(Collections.singletonList(expression),
-        false);
+    MaxStringAggregationFunction function = new MaxStringAggregationFunction(List.of(expression), false);
 
     // Test function type
     assertEquals(function.getType(), AggregationFunctionType.MAXSTRING);
@@ -132,11 +131,6 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     assertEquals(function.merge("banana", "apple"), "banana");
     assertEquals(function.merge("", "apple"), "apple");
     assertEquals(function.merge("apple", ""), "apple");
-
-    // Test null handling
-    assertEquals(function.merge("apple", null), "apple");
-    assertEquals(function.merge(null, "apple"), "apple");
-    assertNull(function.merge(null, null));
     assertEquals(function.merge("apple", "null"), "null");
 
     // Test final result merging
@@ -149,12 +143,9 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     // the result should be 'null' as there's no valid string to compare.
     // This differs from numeric MAX/MIN which might return an initial default value.
     getDeclaringTable(false) // nullHandlingEnabled = false
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select maxstring(myField) from testTable")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select maxstring(myField) from testTable")
         .thenResultIs("STRING", "\"null\""); // Asserting "null" as a string literal for the result
   }
 
@@ -162,12 +153,9 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
   void aggregationAllNullsWithNullHandlingEnabled() {
     // When null handling is enabled, and all values are null, the result should also be 'null'.
     getDeclaringTable(true) // nullHandlingEnabled = true
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select maxstring(myField) from testTable")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select maxstring(myField) from testTable")
         .thenResultIs("STRING", "\"null\""); // Asserting "null" as a string literal for the result
   }
 
@@ -176,12 +164,9 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     // For group by, if all values in a group are null and null handling is disabled,
     // the group's result for MAXSTRING should be 'null'.
     getDeclaringTable(false) // nullHandlingEnabled = false
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', maxstring(myField) from testTable group by 'literal'")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', maxstring(myField) from testTable group by 'literal'")
         // Expected "null" as a string literal for the aggregated column
         .thenResultIs("STRING | STRING", "literal | \"null\"");
   }
@@ -191,12 +176,9 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     // For group by, if all values in a group are null and null handling is enabled,
     // the group's result for MAXSTRING should be 'null'.
     getDeclaringTable(true) // nullHandlingEnabled = true
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', maxstring(myField) from testTable group by 'literal'")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', maxstring(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | STRING", "literal | \"null\"");
   }
 
@@ -205,15 +187,9 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     // With null handling disabled, null values are effectively skipped, and the maximum non-null
     // string should be found. The updated function handles this correctly.
     getDeclaringTable(false) // nullHandlingEnabled = false
-        .onFirstInstance("myField",
-            "cat",
-            "null",
-            "apple"
-        ).andOnSecondInstance("myField",
-            "null",
-            "zebra",
-            "null"
-        ).whenQuery("select maxstring(myField) from testTable")
+        .onFirstInstance("myField", "cat", "null", "apple")
+        .andOnSecondInstance("myField", "null", "zebra", "null")
+        .whenQuery("select maxstring(myField) from testTable")
         .thenResultIs("STRING", "zebra"); // Max of {"cat", "apple", "zebra"} is "zebra"
   }
 
@@ -222,15 +198,9 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     // With null handling enabled, null values are explicitly ignored, and the maximum non-null
     // string should be found. The updated function handles this correctly.
     getDeclaringTable(true) // nullHandlingEnabled = true
-        .onFirstInstance("myField",
-            "cat",
-            "null",
-            "apple"
-        ).andOnSecondInstance("myField",
-            "null",
-            "zebra",
-            "null"
-        ).whenQuery("select maxstring(myField) from testTable")
+        .onFirstInstance("myField", "cat", "null", "apple")
+        .andOnSecondInstance("myField", "null", "zebra", "null")
+        .whenQuery("select maxstring(myField) from testTable")
         .thenResultIs("STRING", "zebra"); // Max of {"cat", "apple", "zebra"} is "zebra"
   }
 
@@ -240,17 +210,21 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     // Null handling disabled: nulls are ignored if there's at least one non-null value in the group.
     // The updated function should now correctly find the max among non-nulls.
     getDeclaringTable(false) // nullHandlingEnabled = false
-        .onFirstInstance("myField",
-            "alpha", // Grouped with 'literal'
+        .onFirstInstance(
+            "myField", "alpha", // Grouped with 'literal'
             "null",  // Grouped with 'literal'
             "gamma"  // Grouped with 'literal'
-        ).andOnSecondInstance("myField",
-            "null",  // Grouped with 'literal'
+        )
+        .andOnSecondInstance(
+            "myField", "null",  // Grouped with 'literal'
             "beta",  // Grouped with 'literal'
             "null"   // Grouped with 'literal'
-        ).whenQuery("select 'literal', maxstring(myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | STRING",
-            "literal | \"null\""); // Max of {"alpha", null, "gamma", "beta"} is "null" when null handling is disabled
+        )
+        .whenQuery("select 'literal', maxstring(myField) from testTable group by 'literal'")
+        .thenResultIs(
+            "STRING | STRING",
+            "literal | \"null\"" // Max of {"alpha", null, "gamma", "beta"} is "null" when null handling is disabled
+        );
   }
 
   @Test
@@ -259,28 +233,31 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     // Null handling enabled: nulls are ignored.
     // The updated function should now correctly find the max among non-nulls.
     getDeclaringTable(true) // nullHandlingEnabled = true
-        .onFirstInstance("myField",
+        .onFirstInstance(
+            "myField",
             "alpha", // Grouped with 'literal'
             "null",  // Grouped with 'literal'
             "gamma"  // Grouped with 'literal'
-        ).andOnSecondInstance("myField",
+        )
+        .andOnSecondInstance(
+            "myField",
             "null",  // Grouped with 'literal'
             "beta",  // Grouped with 'literal'
             "null"   // Grouped with 'literal'
-        ).whenQueryWithNullHandlingEnabled("select 'literal', maxstring(myField) from testTable group by 'literal'")
+        )
+        .whenQueryWithNullHandlingEnabled("select 'literal', maxstring(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | STRING", "literal | gamma"); // Max of {"alpha", "gamma", "beta"} is "gamma"
   }
 
   @Test
   void aggregationGroupByMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true) // Set at schema level for general behavior
+        .addMultiValueDimension("tags", DataType.STRING) // Dimension for tags
+        .addDimensionField("value", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true) // Set at schema level for general behavior
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING) // Dimension for tags
-                .addDimensionField("value", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[]{"tag1;tag2", "banana"}, // Row 1: tag1 -> "banana", tag2 -> "banana"
             new Object[]{"tag2;tag3", null}      // Row 2: tag2 -> null, tag3 -> null
@@ -300,13 +277,62 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
             "tag3    | \"null\""  // Values for tag3: null, "cherry". Max is "null".
         )
         // Query with explicit null handling enabled via query option
-        .whenQueryWithNullHandlingEnabled("select tags, MAXSTRING(value) from testTable "
-            + "group by tags order by tags")
+        .whenQueryWithNullHandlingEnabled("select tags, MAXSTRING(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | STRING",
             "tag1    | banana", // Values for tag1: "banana", "apple". Max is "banana".
             "tag2    | cherry", // Values for tag2: "banana", "apple", "cherry". Max is "cherry".
             "tag3    | cherry"  // Values for tag3: "cherry". Max is "cherry".
         );
+  }
+
+  /// MAXSTRING has no identity element, so it yields a null intermediate result when no row is aggregated at all --
+  /// in both null-handling modes. The intermediate result column is STRING, whose 4-byte DataTable slot cannot hold
+  /// the custom-object null encoding, so this only round-trips if the builder writes the null through a bitmap.
+  @Test
+  void aggregationNoMatchingRowsWithNullHandlingDisabled() {
+    getDeclaringTable(false).onFirstInstance("myField", "alpha")
+        .andOnSecondInstance("myField", "beta")
+        .whenQuery("select maxstring(myField) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING", "null");
+  }
+
+  @Test
+  void aggregationNoMatchingRowsWithNullHandlingEnabled() {
+    getDeclaringTable(true).onFirstInstance("myField", "alpha")
+        .andOnSecondInstance("myField", "beta")
+        .whenQueryWithNullHandlingEnabled("select maxstring(myField) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING", "null");
+  }
+
+  /// The null intermediate result must survive alongside a neighbouring aggregate: the STRING column occupies a
+  /// 4-byte slot, so an over-wide null encoding would corrupt the column that follows it.
+  @Test
+  void aggregationNoMatchingRowsWithFollowingAggregateColumn() {
+    getDeclaringTable(false).onFirstInstance("myField", "alpha")
+        .andOnSecondInstance("myField", "beta")
+        .whenQuery("select maxstring(myField), count(*) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING | LONG", "null | 0");
+  }
+
+  /// With `serverReturnFinalResult` the servers finalize before serializing, so the null lands in a column typed by
+  /// `getFinalResultColumnType()` rather than the intermediate type -- STRING here, a 4-byte slot either way. The
+  /// broker sets this option on its own for any single-server query, so this is a routine path, not an edge case.
+  @Test
+  void aggregationNoMatchingRowsReturningFinalResultWithNullHandlingDisabled() {
+    getDeclaringTable(false, Map.of(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true")).onFirstInstance("myField",
+            "alpha")
+        .andOnSecondInstance("myField", "beta")
+        .whenQuery("select maxstring(myField) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING", "null");
+  }
+
+  @Test
+  void aggregationNoMatchingRowsReturningFinalResultWithNullHandlingEnabled() {
+    getDeclaringTable(true, Map.of(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true")).onFirstInstance("myField",
+            "alpha")
+        .andOnSecondInstance("myField", "beta")
+        .whenQueryWithNullHandlingEnabled("select maxstring(myField) from testTable where myField = 'nomatch'")
+        .thenResultIs("STRING", "null");
   }
 }

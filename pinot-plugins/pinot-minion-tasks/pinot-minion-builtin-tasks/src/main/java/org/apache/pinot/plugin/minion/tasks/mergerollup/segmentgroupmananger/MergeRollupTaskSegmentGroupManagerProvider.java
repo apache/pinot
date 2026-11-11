@@ -23,9 +23,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
-/**
- * Provider class for {@link MergeRollupTaskSegmentGroupManager}
- */
+/// Provider class for [MergeRollupTaskSegmentGroupManager]
 public abstract class MergeRollupTaskSegmentGroupManagerProvider {
 
   private static String _defaultMergeRollupTaskSegmentGroupManagerClassName =
@@ -35,9 +33,7 @@ public abstract class MergeRollupTaskSegmentGroupManagerProvider {
     _defaultMergeRollupTaskSegmentGroupManagerClassName = className;
   }
 
-  /**
-   * Constructs the {@link MergeRollupTaskSegmentGroupManager} using MergeRollup task configs
-   */
+  /// Constructs the [MergeRollupTaskSegmentGroupManager] using MergeRollup task configs
   public static MergeRollupTaskSegmentGroupManager create(Map<String, String> taskConfigs) {
     String segmentGroupManagerClassName =
         taskConfigs.getOrDefault(MinionConstants.MergeRollupTask.SEGMENT_GROUP_MANAGER_CLASS_NAME_KEY,

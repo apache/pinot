@@ -21,13 +21,10 @@ package org.apache.pinot.plugin.minion.tasks;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.core.minion.PinotTaskConfig;
 
 
-/**
- * The class <code>SegmentConversionResult</code> wraps the result of
- * {@link BaseSingleSegmentConversionExecutor#convert(PinotTaskConfig, File, File)}.
- */
+/// The class `SegmentConversionResult` wraps the result of
+/// [BaseSingleSegmentConversionExecutor#convert(org.apache.pinot.core.minion.PinotTaskConfig, File, File)].
 public class SegmentConversionResult {
   private final File _file;
   private final String _tableNameWithType;

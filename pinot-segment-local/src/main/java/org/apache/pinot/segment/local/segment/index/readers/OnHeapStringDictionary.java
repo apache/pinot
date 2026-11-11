@@ -30,15 +30,14 @@ import org.apache.pinot.spi.utils.FALFInterner;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Implementation of String dictionary that cache all values on-heap.
- * <p>This is useful for String columns that:
- * <ul>
- *   <li>Has low cardinality string dictionary where memory footprint on-heap is acceptably small</li>
- *   <li>Is heavily queried</li>
- * </ul>
- * <p>This helps avoid creation of String from byte[], which is expensive as well as creates garbage.
- */
+/// Implementation of String dictionary that cache all values on-heap.
+///
+/// This is useful for String columns that:
+///
+/// - Has low cardinality string dictionary where memory footprint on-heap is acceptably small
+/// - Is heavily queried
+///
+/// This helps avoid creation of String from byte\[\], which is expensive as well as creates garbage.
 public class OnHeapStringDictionary extends BaseImmutableDictionary {
   private final String[] _unpaddedStrings;
   private final byte[][] _unpaddedBytes;
@@ -127,5 +126,10 @@ public class OnHeapStringDictionary extends BaseImmutableDictionary {
   @Override
   public byte[] getBytesValue(int dictId) {
     return _unpaddedBytes[dictId];
+  }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return _unpaddedBytes[dictId].length;
   }
 }

@@ -22,37 +22,47 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformerUtils;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 
 
-/**
- * Handler for partial-upsert.
- *
- * This class is responsible for merging the new record with the previous record.
- * It uses the configured merge strategies to merge the columns. If no merge strategy is configured for a column,
- * it uses the default merge strategy.
- *
- * It is also possible to define a custom logic for merging rows by implementing {@link PartialUpsertMerger}.
- * If a merger for row is defined then it takes precedence and ignores column mergers.
- */
+/// Handler for partial-upsert.
+///
+/// This class is responsible for merging the new record with the previous record.
+/// It uses the configured merge strategies to merge the columns. If no merge strategy is configured for a column,
+/// it uses the default merge strategy.
+///
+/// It is also possible to define a custom logic for merging rows by implementing [PartialUpsertMerger].
+/// If a merger for row is defined then it takes precedence and ignores column mergers.
+///
+/// NOTE: This class is not thread safe. The post partial upsert transformers keep reusable evaluation state, so a
+/// handler belongs to exactly one partition and must be used by one thread at a time.
+@NotThreadSafe
 public class PartialUpsertHandler {
   private final List<String> _primaryKeyColumns;
   private final List<String> _comparisonColumns;
   private final PartialUpsertMerger _partialUpsertMerger;
+  @Nullable
+  private final List<RecordTransformer> _postUpdateTransformers;
 
   private final Map<String, Object> _defaultNullValues = new HashMap<>();
 
-  public PartialUpsertHandler(Schema schema, List<String> comparisonColumns, UpsertConfig upsertConfig) {
+  public PartialUpsertHandler(TableConfig tableConfig, Schema schema, List<String> comparisonColumns,
+      UpsertConfig upsertConfig) {
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
     _comparisonColumns = comparisonColumns;
     _partialUpsertMerger =
         PartialUpsertMergerFactory.getPartialUpsertMerger(_primaryKeyColumns, comparisonColumns, upsertConfig);
+    _postUpdateTransformers = RecordTransformerUtils.getPostPartialUpsertTransformers(tableConfig, schema);
     // cache default null values to handle null merger results
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
       String column = entry.getKey();
@@ -83,6 +93,12 @@ public class PartialUpsertHandler {
       if (newRow.isNullValue(column) && !previousRow.isNullValue(column)) {
         newRow.putValue(column, previousRow.getValue(column));
         newRow.removeNullValueField(column);
+      }
+    }
+
+    if (_postUpdateTransformers != null) {
+      for (RecordTransformer transformer : _postUpdateTransformers) {
+        transformer.transform(newRow);
       }
     }
   }

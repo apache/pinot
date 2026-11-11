@@ -21,6 +21,7 @@ package org.apache.pinot.common.minion;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
@@ -40,11 +41,9 @@ import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * MinionClient is the client-side APIs for Pinot Controller tasks APIs.
- * Minion feature is still in beta development mode, so those APIs may change frequently.
- * Please use this client in caution.
- */
+/// MinionClient is the client-side APIs for Pinot Controller tasks APIs.
+/// Minion feature is still in beta development mode, so those APIs may change frequently.
+/// Please use this client in caution.
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class MinionClient {
@@ -89,7 +88,7 @@ public class MinionClient {
     HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTasksStates(taskType));
     try (CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet)) {
       int statusCode = response.getCode();
-      final String responseString = IOUtils.toString(response.getEntity().getContent());
+      final String responseString = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
       if (statusCode >= 400) {
         throw new HttpException(
             String.format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode,

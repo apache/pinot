@@ -89,7 +89,12 @@ public class QuickstartTableRequest {
     _tableType = tableType;
   }
 
+  /// @return the table name this request creates. When the request was built from a bootstrap directory the name is
+  /// the directory name, which is how [BootstrapTableTool] resolves the table to create from the same directory.
   public String getTableName() {
+    if (_tableName == null && _bootstrapTableDir != null) {
+      return new File(_bootstrapTableDir).getName();
+    }
     return _tableName;
   }
 

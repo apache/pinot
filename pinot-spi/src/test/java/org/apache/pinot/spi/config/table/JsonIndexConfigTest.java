@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.Set;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
@@ -105,5 +106,63 @@ public class JsonIndexConfigTest {
     assertEquals(config.getIncludePaths(), Lists.newArrayList("a"), "Unexpected includePaths");
     assertEquals(config.getExcludePaths(), Lists.newArrayList("b"), "Unexpected excludePaths");
     assertEquals(config.getExcludeFields(), Lists.newArrayList("c"), "Unexpected excludeFields");
+  }
+
+  // ---------------------------------------------------------------------------
+  // equals / hashCode — _indexPaths and _maxBytesSize must be included
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testEqualsIgnoresDifferentIndexPathsWithoutFix() {
+    // Two configs that differ only in indexPaths must NOT be equal.
+    JsonIndexConfig a = new JsonIndexConfig();
+    JsonIndexConfig b = new JsonIndexConfig();
+    b.setIndexPaths(Set.of("a.**"));
+
+    assertNotEquals(a, b, "Configs with different indexPaths must not be equal");
+  }
+
+  @Test
+  public void testEqualsIgnoresDifferentMaxBytesSizeWithoutFix() {
+    // Two configs that differ only in maxBytesSize must NOT be equal.
+    JsonIndexConfig a = new JsonIndexConfig();
+    JsonIndexConfig b = new JsonIndexConfig();
+    b.setMaxBytesSize(1024L);
+
+    assertNotEquals(a, b, "Configs with different maxBytesSize must not be equal");
+  }
+
+  @Test
+  public void testEqualsIdenticalConfigs() {
+    JsonIndexConfig a = new JsonIndexConfig();
+    a.setIndexPaths(Set.of("a.**"));
+    a.setMaxBytesSize(512L);
+
+    JsonIndexConfig b = new JsonIndexConfig();
+    b.setIndexPaths(Set.of("a.**"));
+    b.setMaxBytesSize(512L);
+
+    assertEquals(a, b, "Identical configs must be equal");
+    assertEquals(a.hashCode(), b.hashCode(), "Equal configs must have the same hashCode");
+  }
+
+  @Test
+  public void testHashCodeIncludesIndexPaths() {
+    JsonIndexConfig a = new JsonIndexConfig();
+    JsonIndexConfig b = new JsonIndexConfig();
+    b.setIndexPaths(Set.of("x.**"));
+
+    assertNotEquals(a.hashCode(), b.hashCode(),
+        "hashCode must differ when indexPaths differ");
+  }
+
+  @Test
+  public void testHashCodeIncludesMaxBytesSize() {
+    JsonIndexConfig a = new JsonIndexConfig();
+    JsonIndexConfig b = new JsonIndexConfig();
+    b.setMaxBytesSize(2048L);
+
+    assertNotEquals(a.hashCode(), b.hashCode(),
+        "hashCode must differ when maxBytesSize differs");
   }
 }

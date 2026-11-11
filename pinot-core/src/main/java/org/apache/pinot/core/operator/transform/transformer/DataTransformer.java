@@ -18,20 +18,16 @@
  */
 package org.apache.pinot.core.operator.transform.transformer;
 
-/**
- * Interface for data transformer to batch transform array of input values and store the results into the output array.
- *
- * @param <I> Type of input array
- * @param <O> Type of output array
- */
+/// Interface for data transformer to batch transform array of input values and store the results into the output array.
+///
+/// @param <I> Type of input array
+/// @param <O> Type of output array
 public interface DataTransformer<I, O> {
 
-  /**
-   * Transforms array of input values and store the results into the output array.
-   *
-   * @param input Input array
-   * @param output Output array
-   * @param length Number of values to transform
-   */
+  /// Transforms array of input values and store the results into the output array.
+  ///
+  /// @param input Input array
+  /// @param output Output array
+  /// @param length Number of values to transform
   void transform(I input, O output, int length);
 }

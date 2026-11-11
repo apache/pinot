@@ -25,9 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class for handling authentication in Pinot admin operations.
- */
+/// Utility class for handling authentication in Pinot admin operations.
 public class PinotAdminAuthentication {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdminAuthentication.class);
 
@@ -41,13 +39,11 @@ public class PinotAdminAuthentication {
     CUSTOM
   }
 
-  /**
-   * Creates authentication headers for basic authentication.
-   *
-   * @param username Username
-   * @param password Password
-   * @return Authentication headers
-   */
+  /// Creates authentication headers for basic authentication.
+  ///
+  /// @param username Username
+  /// @param password Password
+  /// @return Authentication headers
   public static Map<String, String> createBasicAuthHeaders(String username, String password) {
     String authString = username + ":" + password;
     String encodedAuth = Base64.getEncoder().encodeToString(authString.getBytes());
@@ -56,12 +52,10 @@ public class PinotAdminAuthentication {
     return headers;
   }
 
-  /**
-   * Creates authentication headers for bearer token authentication.
-   *
-   * @param token Bearer token
-   * @return Authentication headers
-   */
+  /// Creates authentication headers for bearer token authentication.
+  ///
+  /// @param token Bearer token
+  /// @return Authentication headers
   public static Map<String, String> createBearerAuthHeaders(String token) {
     Map<String, String> headers = new HashMap<>();
     headers.put("Authorization", "Bearer " + token);
@@ -69,24 +63,20 @@ public class PinotAdminAuthentication {
     return headers;
   }
 
-  /**
-   * Creates custom authentication headers.
-   *
-   * @param headers Custom authentication headers
-   * @return Authentication headers
-   */
+  /// Creates custom authentication headers.
+  ///
+  /// @param headers Custom authentication headers
+  /// @return Authentication headers
   public static Map<String, String> createCustomAuthHeaders(Map<String, String> headers) {
     LOGGER.debug("Created custom authentication headers");
     return new HashMap<>(headers);
   }
 
-  /**
-   * Validates authentication configuration.
-   *
-   * @param authType Authentication type
-   * @param authConfig Authentication configuration
-   * @throws PinotAdminAuthenticationException If authentication configuration is invalid
-   */
+  /// Validates authentication configuration.
+  ///
+  /// @param authType Authentication type
+  /// @param authConfig Authentication configuration
+  /// @throws PinotAdminAuthenticationException If authentication configuration is invalid
   public static void validateAuthConfig(AuthType authType, Map<String, String> authConfig)
       throws PinotAdminAuthenticationException {
     switch (authType) {
@@ -112,14 +102,12 @@ public class PinotAdminAuthentication {
     }
   }
 
-  /**
-   * Creates authentication headers based on the specified type and configuration.
-   *
-   * @param authType Authentication type
-   * @param authConfig Authentication configuration
-   * @return Authentication headers
-   * @throws PinotAdminAuthenticationException If authentication configuration is invalid
-   */
+  /// Creates authentication headers based on the specified type and configuration.
+  ///
+  /// @param authType Authentication type
+  /// @param authConfig Authentication configuration
+  /// @return Authentication headers
+  /// @throws PinotAdminAuthenticationException If authentication configuration is invalid
   public static Map<String, String> createAuthHeaders(AuthType authType, Map<String, String> authConfig)
       throws PinotAdminAuthenticationException {
     validateAuthConfig(authType, authConfig);

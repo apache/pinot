@@ -57,23 +57,21 @@ public class TimeUtils {
   private static final String UPPER_CASE_NANOS_SINCE_EPOCH = "NANOSSINCEEPOCH";
   private static final String UPPER_CASE_NANOSECONDS_SINCE_EPOCH = "NANOSECONDSSINCEEPOCH";
 
-  /**
-   * Converts a time unit string into {@link TimeUnit}, ignoring case. For {@code null} or empty time unit string,
-   * returns {@code null}.
-   * <p>Besides the standard time unit, also support the following time unit strings:
-   * <ul>
-   *   <li>"daysSinceEpoch" -> DAYS</li>
-   *   <li>"hoursSinceEpoch" -> HOURS</li>
-   *   <li>"minutesSinceEpoch" -> MINUTES</li>
-   *   <li>"secondsSinceEpoch" -> SECONDS</li>
-   *   <li>"millisSinceEpoch"/"millisecondsSinceEpoch" -> MILLISECONDS</li>
-   *   <li>"microsSinceEpoch"/"microsecondsSinceEpoch" -> MICROSECONDS</li>
-   *   <li>"nanosSinceEpoch"/"nanosecondsSinceEpoch" -> NANOSECONDS</li>
-   * </ul>
-   *
-   * @param timeUnitString The time unit string to convert, e.g. "DAYS" or "SECONDS"
-   * @return The corresponding {@link TimeUnit}
-   */
+  /// Converts a time unit string into [TimeUnit], ignoring case. For `null` or empty time unit string,
+  /// returns `null`.
+  ///
+  /// Besides the standard time unit, also support the following time unit strings:
+  ///
+  /// - "daysSinceEpoch" -> DAYS
+  /// - "hoursSinceEpoch" -> HOURS
+  /// - "minutesSinceEpoch" -> MINUTES
+  /// - "secondsSinceEpoch" -> SECONDS
+  /// - "millisSinceEpoch"/"millisecondsSinceEpoch" -> MILLISECONDS
+  /// - "microsSinceEpoch"/"microsecondsSinceEpoch" -> MICROSECONDS
+  /// - "nanosSinceEpoch"/"nanosecondsSinceEpoch" -> NANOSECONDS
+  ///
+  /// @param timeUnitString The time unit string to convert, e.g. "DAYS" or "SECONDS"
+  /// @return The corresponding [TimeUnit]
   @Nullable
   public static TimeUnit timeUnitFromString(@Nullable String timeUnitString) {
     // NOTE: for backward-compatibility, return null if time unit string is null or empty
@@ -110,33 +108,27 @@ public class TimeUtils {
     }
   }
 
-  /**
-   * Given a time value, returns true if the value is between a valid range, false otherwise.
-   * <p>The current valid range used is between beginning of 1971 and beginning of 2071.
-   */
+  /// Given a time value, returns true if the value is between a valid range, false otherwise.
+  ///
+  /// The current valid range used is between beginning of 1971 and beginning of 2071.
   public static boolean timeValueInValidRange(long timeValueInMillis) {
     return timeValueInMillis >= VALID_MIN_TIME_MILLIS && timeValueInMillis <= VALID_MAX_TIME_MILLIS;
   }
 
-  /**
-   * Given a time interval, returns true if the interval is between a valid range, false otherwise.
-   * <p>The current valid range used is between beginning of 1971 and beginning of 2071.
-   */
+  /// Given a time interval, returns true if the interval is between a valid range, false otherwise.
+  ///
+  /// The current valid range used is between beginning of 1971 and beginning of 2071.
   public static boolean isValidTimeInterval(Interval timeInterval) {
     return timeInterval.getStartMillis() >= VALID_MIN_TIME_MILLIS
         && timeInterval.getEndMillis() <= VALID_MAX_TIME_MILLIS;
   }
 
-  /**
-   * Returns the minimum valid time in milliseconds.
-   */
+  /// Returns the minimum valid time in milliseconds.
   public static long getValidMinTimeMillis() {
     return VALID_MIN_TIME_MILLIS;
   }
 
-  /**
-   * Returns the maximum valid time in milliseconds.
-   */
+  /// Returns the maximum valid time in milliseconds.
   public static long getValidMaxTimeMillis() {
     return VALID_MAX_TIME_MILLIS;
   }
@@ -145,15 +137,13 @@ public class TimeUtils {
       new PeriodFormatterBuilder().appendDays().appendSuffix("d").appendHours().appendSuffix("h").appendMinutes()
           .appendSuffix("m").appendSeconds().appendSuffix("s").toFormatter();
 
-  /**
-   * Converts a string representing a period/duration to corresponding milliseconds.
-   * For ex, input "1d" would return 86400000L. Supported units are days (d), hours (h),
-   * minutes (m) and seconds (s).
-   *
-   * @param timeStr string representing the duration
-   * @return the corresponding time converted to milliseconds
-   * @throws IllegalArgumentException if the string does not conform to the expected format
-   */
+  /// Converts a string representing a period/duration to corresponding milliseconds.
+  /// For ex, input "1d" would return 86400000L. Supported units are days (d), hours (h),
+  /// minutes (m) and seconds (s).
+  ///
+  /// @param timeStr string representing the duration
+  /// @return the corresponding time converted to milliseconds
+  /// @throws IllegalArgumentException if the string does not conform to the expected format
   public static Long convertPeriodToMillis(String timeStr) {
     Long millis = 0L;
     if (timeStr != null) {
@@ -168,13 +158,11 @@ public class TimeUtils {
     return millis;
   }
 
-  /**
-   * Converts a string representing the timestamp to corresponding milliseconds.
-   *
-   * @param timeStr string representing the timestamp in ISO 8601 format
-   * @return the corresponding time converted to milliseconds
-   * @throws IllegalArgumentException if the string does not conform to the expected format
-   */
+  /// Converts a string representing the timestamp to corresponding milliseconds.
+  ///
+  /// @param timeStr string representing the timestamp in ISO 8601 format
+  /// @return the corresponding time converted to milliseconds
+  /// @throws IllegalArgumentException if the string does not conform to the expected format
   public static Long convertTimestampToMillis(String timeStr) {
     long millis = 0L;
     if (timeStr != null) {
@@ -189,13 +177,11 @@ public class TimeUtils {
     return millis;
   }
 
-  /**
-   * Converts milliseconds into human readable duration string. For ex, input of 86400000L would
-   * return "1d".
-   *
-   * @param millis the value in milliseconds to be converted
-   * @return the corresponding human readable string or empty string if value cannot be converted
-   */
+  /// Converts milliseconds into human readable duration string. For ex, input of 86400000L would
+  /// return "1d".
+  ///
+  /// @param millis the value in milliseconds to be converted
+  /// @return the corresponding human readable string or empty string if value cannot be converted
   public static String convertMillisToPeriod(Long millis) {
     String periodStr = null;
     if (millis != null) {
@@ -205,9 +191,7 @@ public class TimeUtils {
     return periodStr;
   }
 
-  /**
-   * Checks if the given period string is valid i.e. has format like 30h, 15d, 10m
-   */
+  /// Checks if the given period string is valid i.e. has format like 30h, 15d, 10m
   public static boolean isPeriodValid(String timeStr) {
     try {
       PERIOD_FORMATTER.parsePeriod(timeStr);
@@ -217,9 +201,7 @@ public class TimeUtils {
     }
   }
 
-  /**
-   * Checks if the given timestamp string is valid
-   */
+  /// Checks if the given timestamp string is valid
   public static boolean isTimestampValid(String timeStr) {
     try {
       Instant.parse(timeStr);

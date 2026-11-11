@@ -19,6 +19,8 @@
 package org.apache.pinot.core.operator.streaming;
 
 import java.util.List;
+import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -37,12 +39,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Like {@link InstanceResponseOperator}, but instead of sending all the data to the broker at once, it streams the data
- * to a given {@link ResultsBlockStreamer}.
- *
- * This is used in multi-stage to stream data to the receiving mailboxes.
- */
+/// Like [InstanceResponseOperator], but instead of sending all the data to the broker at once, it streams the
+/// data to a given [ResultsBlockStreamer].
+///
+/// This is used in multi-stage to stream data to the receiving mailboxes.
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
   private static final String EXPLAIN_NAME = "STREAMING_INSTANCE_RESPONSE";
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingInstanceResponseOperator.class);
@@ -66,18 +66,22 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
       prefetchAll();
       if (_streamingCombineOperator != null) {
         _streamingCombineOperator.start();
+        long totalRowsStreamed = 0;
         BaseResultsBlock resultsBlock = getBaseBlock();
         while (!(resultsBlock instanceof MetadataResultsBlock)) {
           if (resultsBlock instanceof ExceptionResultsBlock) {
             return new InstanceResponseBlock(resultsBlock);
           }
           if (resultsBlock.getNumRows() > 0) {
+            totalRowsStreamed += resultsBlock.getNumRows();
             _streamer.send(resultsBlock);
           }
           resultsBlock = getBaseBlock();
         }
         // Return a metadata-only block in the end
-        return buildInstanceResponseBlock(resultsBlock);
+        InstanceResponseBlock responseBlock = buildInstanceResponseBlock(resultsBlock);
+        addLiteModeMetadataIfNeeded(responseBlock, totalRowsStreamed);
+        return responseBlock;
       } else {
         // Handle single block combine operator in streaming fashion
         BaseResultsBlock resultsBlock = getBaseBlock();
@@ -113,6 +117,13 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
 
   protected BaseResultsBlock getCombinedResults() {
     return _combineOperator.nextBlock();
+  }
+
+  private void addLiteModeMetadataIfNeeded(InstanceResponseBlock responseBlock, long totalRowsStreamed) {
+    Integer implicitLimit = QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(_queryContext.getQueryOptions());
+    if (implicitLimit != null && totalRowsStreamed >= implicitLimit) {
+      responseBlock.addMetadata(MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
+    }
   }
 
   @Override

@@ -28,6 +28,7 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.IFSTInd
 import org.apache.pinot.segment.local.segment.index.readers.LuceneIFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
@@ -43,9 +44,7 @@ import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -91,28 +90,24 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
 
   @Override
   protected ColumnConfigDeserializer<FstIndexConfig> createDeserializerForLegacyConfigs() {
-    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.IFST, (tableConfig, fieldConfig) -> {
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      FSTType fstIndexType = indexingConfig != null ? indexingConfig.getFSTIndexType() : null;
-      return new FstIndexConfig(fstIndexType);
-    });
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.IFST,
+        (tableConfig, fieldConfig) -> new FstIndexConfig(false));
   }
 
   @Override
   public FSTIndexCreator createIndexCreator(IndexCreationContext context, FstIndexConfig indexConfig)
       throws IOException {
-    Preconditions.checkState(context.getFieldSpec().isSingleValueField(),
+    FieldSpec fieldSpec = context.getFieldSpec();
+    Preconditions.checkState(fieldSpec.isSingleValueField(),
         "IFST index is currently only supported on single-value columns");
-    Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
+    Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
         "IFST index is currently only supported on STRING type columns");
     Preconditions.checkState(context.hasDictionary(),
         "IFST index is currently only supported on dictionary-encoded columns");
-    // IFST only supports Lucene implementation, not native FST
-    if (indexConfig.getFstType() == FSTType.NATIVE) {
-      throw new UnsupportedOperationException(
-          "Native FST is not supported for IFST index. Only Lucene implementation is supported.");
-    }
-    return new LuceneIFSTIndexCreator(context);
+    ColumnStatistics columnStatistics = context.getColumnStatistics();
+    String[] sortedEntries = columnStatistics != null ? (String[]) columnStatistics.getUniqueValuesSet() : null;
+    return new LuceneIFSTIndexCreator(context.getIndexDir(), fieldSpec.getName(), context.getTableNameWithType(),
+        context.isContinueOnError(), sortedEntries);
   }
 
   @Override
@@ -129,6 +124,19 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig) {
     return new IFSTIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, FstIndexConfig indexConfig) {
+    // IFST is built over the column's sorted dictionary entries; without a dictionary it cannot be created or read.
+    return true;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, FstIndexConfig indexConfig) {
+    // IFST exists only when a dictionary exists; enabling/disabling the dictionary changes whether the IFST file
+    // must exist at all and is built from a different value set.
+    return true;
   }
 
   @Override
@@ -159,10 +167,5 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
         throws IndexReaderConstraintException, IOException {
       return createIndexReader(dataBuffer, metadata);
     }
-  }
-
-  @Override
-  protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
-    tableConfig.getIndexingConfig().setFSTIndexType(null);
   }
 }

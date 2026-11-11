@@ -35,14 +35,13 @@ import org.apache.parquet.io.ColumnIOFactory;
 import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.schema.MessageType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
-/**
- * Record reader for Native Parquet file.
- */
+/// Record reader for Native Parquet file.
 public class ParquetNativeRecordReader implements RecordReader {
   private static final String EXTENSION = "parquet";
 
@@ -64,8 +63,13 @@ public class ParquetNativeRecordReader implements RecordReader {
     File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
     _dataFilePath = new Path(parquetFile.getAbsolutePath());
     _hadoopConf = ParquetUtils.getParquetHadoopConfiguration();
+    ParquetNativeRecordExtractorConfig extractorConfig = new ParquetNativeRecordExtractorConfig();
+    if (recordReaderConfig instanceof ParquetRecordReaderConfig) {
+      extractorConfig.setExtractRawTimeValues(
+          ((ParquetRecordReaderConfig) recordReaderConfig).isExtractRawTimeValues());
+    }
     _recordExtractor = new ParquetNativeRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+    _recordExtractor.init(fieldsToRead, extractorConfig);
 
     _parquetReadOptions = ParquetReadOptions.builder().withMetadataFilter(ParquetMetadataConverter.NO_FILTER).build();
 
@@ -112,9 +116,16 @@ public class ParquetNativeRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    _nextRecord = _parquetRecordReader.read();
-    _recordExtractor.extract(_nextRecord, reuse);
+    // Record fetch: read next record from Parquet page.
+    try {
+      _nextRecord = _parquetRecordReader.read();
+    } catch (Exception e) {
+      throw new RecordFetchException("Failed to read next Parquet native record", e);
+    }
+    // The physical row is consumed even if extraction fails and the caller skips it.
     _currentPageIdx++;
+    // Data parsing: extract into GenericRow.
+    _recordExtractor.extract(_nextRecord, reuse);
     return reuse;
   }
 

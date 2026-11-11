@@ -22,11 +22,10 @@ import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
-/**
- * Extension of {@link BaseImmutableDictionary} that implements immutable dictionary for BigDecimal type.
- */
+/// Extension of [BaseImmutableDictionary] that implements immutable dictionary for BigDecimal type.
 public class BigDecimalDictionary extends BaseImmutableDictionary {
 
   public BigDecimalDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
@@ -99,10 +98,15 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int getValueSize(int dictId) {
+    return getByteSize(dictId);
+  }
+
+  @Override
   public void read32BitsMurmur3HashValues(int[] dictIds, int length, int[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = get32BitsMurmur3Hash(dictIds[i], buffer);
+      outValues[i] = MurmurHashFunctions.murmurHash3X64Bit32(buffer, readBytes(dictIds[i], buffer), 0);
     }
   }
 
@@ -110,7 +114,7 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
   public void read64BitsMurmur3HashValues(int[] dictIds, int length, long[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = get64BitsMurmur3Hash(dictIds[i], buffer);
+      outValues[i] = MurmurHashFunctions.murmurHash3X64Bit64(buffer, readBytes(dictIds[i], buffer), 0);
     }
   }
 
@@ -118,7 +122,7 @@ public class BigDecimalDictionary extends BaseImmutableDictionary {
   public void read128BitsMurmur3HashValues(int[] dictIds, int length, long[][] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
-      outValues[i] = get128BitsMurmur3HashValue(dictIds[i], buffer);
+      outValues[i] = MurmurHashFunctions.murmurHash3X64Bit128AsLongs(buffer, readBytes(dictIds[i], buffer), 0);
     }
   }
 }

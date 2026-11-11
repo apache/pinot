@@ -27,26 +27,24 @@ import org.apache.commons.math3.distribution.UniformRealDistribution;
 import org.apache.commons.math3.random.Well19937c;
 
 
-/**
- * PatternSpikeGenerator produces a series of log-normal spikes with log-normal arrival times, with optional smoothing.
- * This pattern is typical for rare even spikes, such as error counts. The generated values are sampled
- * non-deterministically.
- *
- * Generator example:
- * <pre>
- *     baseline = 0
- *     arrivalMean = ?
- *     magnitudeMean = ?
- *
- *     returns [ 0, 0, 0, 0, 0, 0, 47, 15, 2, 1, 0, 0, ... ]
- * </pre>
- *
- * Configuration examples:
- * <ul>
- *     <li>./pinot-tools/src/main/resources/generator/simpleWebsite_generator.json</li>
- *     <li>./pinot-tools/src/main/resources/generator/complexWebsite_generator.json</li>
- * </ul>
- */
+/// PatternSpikeGenerator produces a series of log-normal spikes with log-normal arrival times, with optional smoothing.
+/// This pattern is typical for rare even spikes, such as error counts. The generated values are sampled
+/// non-deterministically.
+///
+/// Generator example:
+///
+/// ```
+/// baseline = 0
+/// arrivalMean = ?
+/// magnitudeMean = ?
+///
+/// returns [ 0, 0, 0, 0, 0, 0, 47, 15, 2, 1, 0, 0, ... ]
+/// ```
+///
+/// Configuration examples:
+///
+/// - ./pinot-tools/src/main/resources/generator/simpleWebsite_generator.json
+/// - ./pinot-tools/src/main/resources/generator/complexWebsite_generator.json
 public class PatternSpikeGenerator implements Generator {
   private final double _baseline;
   private final double _smoothing;

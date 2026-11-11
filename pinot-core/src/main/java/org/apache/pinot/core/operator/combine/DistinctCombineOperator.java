@@ -26,15 +26,13 @@ import org.apache.pinot.core.operator.combine.merger.DistinctResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Combine operator for distinct queries.
- */
+/// Combine operator for distinct queries.
 @SuppressWarnings("rawtypes")
 public class DistinctCombineOperator extends BaseSingleBlockCombineOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "COMBINE_DISTINCT";
 
   public DistinctCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
-    super(new DistinctResultsBlockMerger(), operators, queryContext, executorService);
+    super(new DistinctResultsBlockMerger(queryContext), operators, queryContext, executorService);
   }
 
   @Override

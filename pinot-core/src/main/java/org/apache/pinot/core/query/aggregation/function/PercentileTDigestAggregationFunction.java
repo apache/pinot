@@ -18,30 +18,34 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.tdunning.math.stats.TDigest;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigestInput;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * TDigest based Percentile aggregation function.
- *
- * TODO: Decided not to support custom compression for version 0 queries as it seems to be the older syntax and requires
- *       extra handling for two argument PERCENTILE functions to assess if v0 or v1. This can be revisited later if the
- *       need arises
- */
-public class PercentileTDigestAggregationFunction extends NullableSingleInputAggregationFunction<TDigest, Double> {
+/// TDigest based Percentile aggregation function.
+///
+/// TODO: Decided not to support custom compression for version 0 queries as it seems to be the older syntax and
+///       requires extra handling for two argument PERCENTILE functions to assess if v0 or v1. This can be revisited
+///       later if the need arises
+public class PercentileTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, Double> {
+  private static final int TDIGEST_TYPE = 10;
+
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
   // version 0 functions specified in the of form PERCENTILETDIGEST<2-digits>(column). Uses default compression of 100
@@ -66,8 +70,8 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
     _compressionFactor = DEFAULT_TDIGEST_COMPRESSION;
   }
 
-  public PercentileTDigestAggregationFunction(ExpressionContext expression, double percentile,
-      int compressionFactor, boolean nullHandlingEnabled) {
+  public PercentileTDigestAggregationFunction(ExpressionContext expression, double percentile, int compressionFactor,
+      boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
     _version = 1;
     _percentile = percentile;
@@ -81,14 +85,12 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
 
   @Override
   public String getResultColumnName() {
-    return _version == 0 ? AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + (int) _percentile + "("
-        + _expression + ")"
-        : ((_compressionFactor == DEFAULT_TDIGEST_COMPRESSION)
-            ? (AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "(" + _expression + ", "
-                + _percentile + ")")
-            : (AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase() + "(" + _expression + ", "
-                + _percentile + ", " + _compressionFactor + ")")
-            );
+    String functionName = AggregationFunctionType.PERCENTILETDIGEST.getName().toLowerCase();
+    return _version == 0
+        ? functionName + (int) _percentile + "(" + _expression + ")"
+        : _compressionFactor == DEFAULT_TDIGEST_COMPRESSION
+            ? functionName + "(" + _expression + ", " + _percentile + ")"
+            : functionName + "(" + _expression + ", " + _percentile + ", " + _compressionFactor + ")";
   }
 
   @Override
@@ -105,127 +107,194 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      TDigest tDigest = getDefaultTDigest(aggregationResultHolder, _compressionFactor);
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          tDigest.add(doubleValues[i]);
-        }
-      });
-    } else {
+    if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized TDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      foldNotNull(length, blockValSet, (TDigest) aggregationResultHolder.getResult(), (tDigest, from, toEx) -> {
-        if (tDigest != null) {
-          for (int i = from; i < toEx; i++) {
-            tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
-          }
-        } else {
-          tDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[0]);
-          aggregationResultHolder.setValue(tDigest);
-          for (int i = 1; i < length; i++) {
-            tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
-          }
-        }
-        return tDigest;
-      });
+      SerializedTDigestInput input = new SerializedTDigestInput();
+      foldNotNull(length, blockValSet, (TDigestAccumulator) aggregationResultHolder.getResult(),
+          (current, from, toExclusive) -> {
+            if (current == null) {
+              current = TDigestAccumulator.forReduction(TDigestCodec.readCompression(bytesValues[from]));
+              aggregationResultHolder.setValue(current);
+            }
+            for (int i = from; i < toExclusive; i++) {
+              input.reset(bytesValues[i]);
+              current.addSerializedTDigestDirect(input);
+            }
+            return current;
+          });
+      return;
     }
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, blockValSet);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet);
+    }
+  }
+
+  protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    double[] doubleValues = blockValSet.getDoubleValuesSV();
+    TDigestAccumulator accumulator = getAccumulator(aggregationResultHolder, _compressionFactor);
+    forEachNotNull(length, blockValSet, (from, to) -> accumulator.add(doubleValues, from, to));
+  }
+
+  protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    TDigestAccumulator accumulator = getAccumulator(aggregationResultHolder, _compressionFactor);
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        accumulator.add(values, 0, values.length);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          getDefaultTDigest(groupByResultHolder, groupKeyArray[i], _compressionFactor).add(doubleValues[i]);
-        }
-      });
-    } else {
+    if (blockValSet.getValueType() == DataType.BYTES) {
       // Serialized TDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      SerializedTDigestInput input = new SerializedTDigestInput();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
           int groupKey = groupKeyArray[i];
-          TDigest tDigest = groupByResultHolder.getResult(groupKey);
-          if (tDigest != null) {
-            tDigest.add(value);
-          } else {
-            groupByResultHolder.setValueForKey(groupKey, value);
-          }
+          input.reset(bytesValues[i]);
+          getSerializedAccumulator(groupByResultHolder, groupKey, input).addSerializedTDigestDirect(input);
         }
       });
+      return;
     }
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    double[] doubleValues = blockValSet.getDoubleValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        getDefaultTDigest(groupByResultHolder, groupKeyArray[i], _compressionFactor).add(doubleValues[i]);
+      }
+    });
+  }
+
+  protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKeyArray[i], _compressionFactor);
+        for (double value : valuesArray[i]) {
+          tDigest.add(value);
+        }
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          double value = doubleValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            getDefaultTDigest(groupByResultHolder, groupKey, _compressionFactor).add(value);
-          }
-        }
-      });
-    } else {
-      // Serialized QuantileDigest
+    if (blockValSet.getValueType() == DataType.BYTES) {
+      // Serialized TDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      SerializedTDigestInput input = new SerializedTDigestInput();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
-          for (int groupKey : groupKeysArray[i]) {
-            TDigest tDigest = groupByResultHolder.getResult(groupKey);
-            if (tDigest != null) {
-              tDigest.add(value);
-            } else {
-              // Create a new TDigest for the group
-              groupByResultHolder.setValueForKey(groupKey, ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
-            }
+          int[] groupKeys = groupKeysArray[i];
+          if (groupKeys.length == 0) {
+            continue;
+          }
+          input.reset(bytesValues[i]);
+          for (int groupKey : groupKeys) {
+            getSerializedAccumulator(groupByResultHolder, groupKey, input).addSerializedTDigestDirect(input);
           }
         }
       });
+      return;
     }
+
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    double[] doubleValues = blockValSet.getDoubleValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double value = doubleValues[i];
+        for (int groupKey : groupKeysArray[i]) {
+          getDefaultTDigest(groupByResultHolder, groupKey, _compressionFactor).add(value);
+        }
+      }
+    });
+  }
+
+  protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          TDigest tDigest = getDefaultTDigest(groupByResultHolder, groupKey, _compressionFactor);
+          for (double value : values) {
+            tDigest.add(value);
+          }
+        }
+      }
+    });
   }
 
   @Override
   public TDigest extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    TDigest tDigest = aggregationResultHolder.getResult();
-    if (tDigest == null) {
-      return TDigest.createMergingDigest(_compressionFactor);
-    } else {
-      return tDigest;
-    }
+    return aggregationResultHolder.getResult();
   }
 
   @Override
   public TDigest extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    TDigest tDigest = groupByResultHolder.getResult(groupKey);
-    if (tDigest == null) {
-      return TDigest.createMergingDigest(_compressionFactor);
-    } else {
-      return tDigest;
-    }
+    return (TDigest) groupByResultHolder.getResult(groupKey);
   }
 
   @Override
   public TDigest merge(TDigest intermediateResult1, TDigest intermediateResult2) {
-    if (intermediateResult1.size() == 0L) {
+    if (intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
-    if (intermediateResult2.size() == 0L) {
+    if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
-    intermediateResult1.add(intermediateResult2);
-    return intermediateResult1;
+    if (intermediateResult1 instanceof TDigestAccumulator) {
+      intermediateResult1.add(intermediateResult2);
+      return intermediateResult1;
+    }
+    TDigestAccumulator accumulator = TDigestAccumulator.forReduction(intermediateResult1.compression());
+    accumulator.add(intermediateResult1);
+    accumulator.add(intermediateResult2);
+    return accumulator;
+  }
+
+  /// Merges both digests using the compression configured for this aggregation function.
+  ///
+  /// Segment merge-and-rollup uses this method because its configured output compression can differ from the
+  /// compression stored in either input digest.
+  public TDigest mergeWithConfiguredCompression(TDigest intermediateResult1, TDigest intermediateResult2) {
+    TDigestAccumulator accumulator = TDigestAccumulator.forReduction(_compressionFactor);
+    accumulator.add(intermediateResult1);
+    accumulator.add(intermediateResult2);
+    accumulator.compress();
+    return accumulator;
   }
 
   @Override
@@ -234,9 +303,8 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(TDigest tDigest) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.TDigest.getValue(),
-        ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
+  public SerializedResult serializeIntermediateResult(TDigest tDigest) {
+    return new SerializedBytes(TDIGEST_TYPE, ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
   }
 
   @Override
@@ -249,8 +317,15 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(TDigest intermediateResult) {
+  public Double extractFinalResult(@Nullable TDigest intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and so does an empty digest, which is what a
+    // deserialized peer can still carry. With null handling enabled the percentile of nothing is NULL; with it
+    // disabled it is what `quantile` returns for an empty digest, which is NaN.
+    if (intermediateResult == null || intermediateResult.isEmpty()) {
+      return _nullHandlingEnabled ? null : Double.NaN;
+    }
     return intermediateResult.quantile(_percentile / 100.0);
   }
 
@@ -267,35 +342,37 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
     }
   }
 
-  /**
-   * Returns the TDigest from the result holder or creates a new one with default compression if it does not exist.
-   *
-   * @param aggregationResultHolder Result holder
-   * @param compressionFactor Compression factor to use for the TDigest
-   * @return TDigest from the result holder
-   */
-  protected static TDigest getDefaultTDigest(AggregationResultHolder aggregationResultHolder, int compressionFactor) {
-    TDigest tDigest = aggregationResultHolder.getResult();
-    if (tDigest == null) {
-      tDigest = TDigest.createMergingDigest(compressionFactor);
-      aggregationResultHolder.setValue(tDigest);
+  private static TDigestAccumulator getAccumulator(AggregationResultHolder aggregationResultHolder,
+      int compressionFactor) {
+    TDigestAccumulator accumulator = aggregationResultHolder.getResult();
+    if (accumulator == null) {
+      accumulator = new TDigestAccumulator(compressionFactor);
+      aggregationResultHolder.setValue(accumulator);
     }
-    return tDigest;
+    return accumulator;
   }
 
-  /**
-   * Returns the TDigest for the given group key if exists, or creates a new one with default compression.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the TDigest
-   * @param compressionFactor Compression factor to use for the TDigest
-   * @return TDigest for the group key
-   */
+  private static TDigestAccumulator getSerializedAccumulator(GroupByResultHolder groupByResultHolder, int groupKey,
+      SerializedTDigestInput input) {
+    TDigestAccumulator accumulator = groupByResultHolder.getResult(groupKey);
+    if (accumulator == null) {
+      accumulator = TDigestAccumulator.forReduction(input.getCompression());
+      groupByResultHolder.setValueForKey(groupKey, accumulator);
+    }
+    return accumulator;
+  }
+
+  /// Returns the TDigest for the given group key if exists, or creates a new one with default compression.
+  ///
+  /// @param groupByResultHolder Result holder
+  /// @param groupKey Group key for which to return the TDigest
+  /// @param compressionFactor Compression factor to use for the TDigest
+  /// @return TDigest for the group key
   protected static TDigest getDefaultTDigest(GroupByResultHolder groupByResultHolder, int groupKey,
       int compressionFactor) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);
     if (tDigest == null) {
-      tDigest = TDigest.createMergingDigest(compressionFactor);
+      tDigest = new TDigestAccumulator(compressionFactor);
       groupByResultHolder.setValueForKey(groupKey, tDigest);
     }
     return tDigest;

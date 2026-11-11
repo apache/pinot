@@ -21,21 +21,15 @@ package org.apache.pinot.segment.spi.index.mutable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * Interface for mutable dictionary (for CONSUMING segment).
- */
+/// Interface for mutable dictionary (for CONSUMING segment).
 public interface MutableDictionary extends Dictionary {
 
-  /**
-   * Indexes a single-value entry (a value of the dictionary type) into the dictionary, and returns the dictId of the
-   * value.
-   */
+  /// Indexes a single-value entry (a value of the dictionary type) into the dictionary, and returns the dictId of the
+  /// value.
   int index(Object value);
 
-  /**
-   * Indexes a multi-value entry (an array of values of the dictionary type) into the dictionary, and returns an array
-   * of dictIds for each value.
-   */
+  /// Indexes a multi-value entry (an array of values of the dictionary type) into the dictionary, and returns an array
+  /// of dictIds for each value.
   int[] index(Object[] values);
 
   @Override
@@ -49,9 +43,22 @@ public interface MutableDictionary extends Dictionary {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Return true if the mutable dictionary can consume an additional row.
-   */
+  @Override
+  default int getLengthOfShortestElement() {
+    return getValueType().size();
+  }
+
+  @Override
+  default int getLengthOfLongestElement() {
+    return getValueType().size();
+  }
+
+  @Override
+  default boolean isAscii() {
+    return false;
+  }
+
+  /// Return true if the mutable dictionary can consume an additional row.
   default boolean canAddMore() {
     return true;
   }

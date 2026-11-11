@@ -24,11 +24,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
-/**
- * This class represents the server-side debug information for a segment.
- * NOTE: Debug classes are not expected to maintain backward compatibility,
- * and should not be exposed to the client side.
- */
+/// This class represents the server-side debug information for a segment.
+/// NOTE: Debug classes are not expected to maintain backward compatibility,
+/// and should not be exposed to the client side.
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonPropertyOrder({"segmentName", "segmentSize", "consumerInfo", "errorInfo"}) // For readability of JSON output
 public class SegmentServerDebugInfo {

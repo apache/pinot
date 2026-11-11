@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
-/**
- * Provides the configured maxRecordsPerSegment
- */
+/// Provides the configured maxRecordsPerSegment
 public class DefaultSegmentNumRowProvider implements SegmentNumRowProvider {
   private int _maxRecordsPerSegment;
 

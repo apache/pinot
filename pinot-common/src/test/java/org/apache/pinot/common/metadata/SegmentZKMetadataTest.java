@@ -39,7 +39,8 @@ import static org.testng.Assert.assertEquals;
 public class SegmentZKMetadataTest {
 
   @Test
-  public void realtimeSegmentZKMetadataConversionTest() {
+  public void realtimeSegmentZKMetadataConversionTest()
+      throws IOException {
 
     ZNRecord inProgressZnRecord = getTestInProgressRealtimeSegmentZNRecord();
     ZNRecord doneZnRecord = getTestDoneRealtimeSegmentZNRecord();
@@ -65,10 +66,18 @@ public class SegmentZKMetadataTest {
         new SegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()).hashCode());
     assertEquals(doneSegmentMetadata, new SegmentZKMetadata(doneSegmentMetadata.toZNRecord()));
     assertEquals(doneSegmentMetadata.hashCode(), new SegmentZKMetadata(doneSegmentMetadata.toZNRecord()).hashCode());
+
+    // toJsonString / fromJsonString round-trip. These records have no customMap, so the JSON
+    // must omit the customMap key and the round-tripped instance must equal the original.
+    assertEquals(SegmentZKMetadata.fromJsonString(inProgressSegmentMetadata.toJsonString()), inProgressSegmentMetadata);
+    assertEquals(SegmentZKMetadata.fromJsonString(doneSegmentMetadata.toJsonString()), doneSegmentMetadata);
+    Assert.assertFalse(inProgressSegmentMetadata.toJsonString().contains("\"customMap\""));
+    Assert.assertFalse(doneSegmentMetadata.toJsonString().contains("\"customMap\""));
   }
 
   @Test
-  public void offlineSegmentZKMetadataConvertionTest() {
+  public void offlineSegmentZKMetadataConvertionTest()
+      throws IOException {
     ZNRecord offlineZNRecord = getTestOfflineSegmentZNRecord();
     SegmentZKMetadata offlineSegmentMetadata = getTestOfflineSegmentZKMetadata();
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(offlineZNRecord, offlineSegmentMetadata.toZNRecord()));
@@ -79,6 +88,25 @@ public class SegmentZKMetadataTest {
     assertEquals(offlineSegmentMetadata, new SegmentZKMetadata(offlineSegmentMetadata.toZNRecord()));
     assertEquals(offlineSegmentMetadata.hashCode(),
         new SegmentZKMetadata(offlineSegmentMetadata.toZNRecord()).hashCode());
+
+    // toJsonString / fromJsonString round-trip with a populated customMap. The round-tripped
+    // instance must equal the original (which compares both simpleFields and customMap via
+    // SegmentZKMetadata#equals -> toMap).
+    SegmentZKMetadata roundTripped = SegmentZKMetadata.fromJsonString(offlineSegmentMetadata.toJsonString());
+    assertEquals(roundTripped, offlineSegmentMetadata);
+    assertEquals(roundTripped.getCustomMap(), offlineSegmentMetadata.getCustomMap());
+  }
+
+  @Test
+  public void fromJsonStringIsBackwardCompatibleWithoutCustomMap()
+      throws IOException {
+    // Legacy JSON (pre-customMap) must still parse and yield a SegmentZKMetadata whose customMap
+    // is null.
+    String legacyJson = "{\"segmentName\":\"legacy\",\"simpleFields\":{\"segment.crc\":\"42\"}}";
+    SegmentZKMetadata parsed = SegmentZKMetadata.fromJsonString(legacyJson);
+    assertEquals(parsed.getSegmentName(), "legacy");
+    assertEquals(parsed.getCrc(), 42L);
+    Assert.assertNull(parsed.getCustomMap());
   }
 
   @Test
@@ -139,6 +167,7 @@ public class SegmentZKMetadataTest {
     record.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
     record.setLongField(CommonConstants.Segment.TOTAL_DOCS, 10000);
     record.setLongField(CommonConstants.Segment.CRC, 1234);
+    record.setLongField(CommonConstants.Segment.DATA_CRC, 4567);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
     record.setIntField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_SIZE, 1234);
     return record;
@@ -153,6 +182,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setStatus(Status.DONE);
     realtimeSegmentMetadata.setTotalDocs(10000);
     realtimeSegmentMetadata.setCrc(1234);
+    realtimeSegmentMetadata.setDataCrc(4567);
     realtimeSegmentMetadata.setCreationTime(3000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
     return realtimeSegmentMetadata;
@@ -208,6 +238,7 @@ public class SegmentZKMetadataTest {
     offlineSegmentMetadata.setTimeUnit(TimeUnit.HOURS);
     offlineSegmentMetadata.setTotalDocs(50000);
     offlineSegmentMetadata.setCrc(54321);
+    offlineSegmentMetadata.setDataCrc(-1);
     offlineSegmentMetadata.setCreationTime(1000);
     offlineSegmentMetadata.setDownloadUrl("http://localhost:8000/testTable_O_3000_4000");
     offlineSegmentMetadata.setPushTime(4000);

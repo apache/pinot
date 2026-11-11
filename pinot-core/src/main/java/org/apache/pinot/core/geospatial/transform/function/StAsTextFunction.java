@@ -33,9 +33,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 
 
-/**
- * Returns the text representation of the geometry object.
- */
+/// Returns the text representation of the geometry object.
 public class StAsTextFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "ST_AsText";
 

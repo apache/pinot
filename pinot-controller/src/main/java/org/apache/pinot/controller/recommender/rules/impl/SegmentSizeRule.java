@@ -20,8 +20,9 @@
 package org.apache.pinot.controller.recommender.rules.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.io.Files;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
@@ -37,24 +38,23 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
 
-/**
- * This rule generates a segment based on the provided schema characteristics and then recommends the followings
- * using the size and number of records in the generated segments:
- *   - number of segments
- *   - number of records in each segment
- *   - size of each segment
- *
- * The purpose of generating a segment is to estimate the size and number of rows of one sample segment. In case user
- * already have a production segment in hand, they can provide actualSegmentSize and numRowsInActualSegment parameters
- * in the input and then this rule uses those parameters instead of generating a segment to derived those values.
- * It's worth noting that since this rule gets executed before other rules, we run into chicken-egg problem.
- *  - Index recommendation, dictionary, bloom filter rules will be run next.
- *  - Only after the subsequent rules run and the index recommendation is available, will we know what segment might
- *    look like.
- * So here we just assume dictionary on all dimensions and raw for metric columns and try to generate a segment quickly.
- * This also means that the calculated size of the optimal segment should ideally be bumped up by a factor, say 20%, to
- * account for what the size might look like when all the index/dictionary/bloom recommendations are applied.
- */
+/// This rule generates a segment based on the provided schema characteristics and then recommends the followings
+/// using the size and number of records in the generated segments:
+///   - number of segments
+///   - number of records in each segment
+///   - size of each segment
+///
+/// The purpose of generating a segment is to estimate the size and number of rows of one sample segment. In case user
+/// already have a production segment in hand, they can provide actualSegmentSize and numRowsInActualSegment parameters
+/// in the input and then this rule uses those parameters instead of generating a segment to derived those values.
+/// It's worth noting that since this rule gets executed before other rules, we run into chicken-egg problem.
+///  - Index recommendation, dictionary, bloom filter rules will be run next.
+///  - Only after the subsequent rules run and the index recommendation is available, will we know what segment might
+///    look like.
+/// So here we just assume dictionary on all dimensions and raw for metric columns and try to generate a segment
+/// quickly. This also means that the calculated size of the optimal segment should ideally be bumped up by a factor,
+/// say 20%, to account for what the size might look like when all the index/dictionary/bloom recommendations are
+/// applied.
 public class SegmentSizeRule extends AbstractRule {
 
   static final int MEGA_BYTE = 1024 * 1024;
@@ -82,7 +82,12 @@ public class SegmentSizeRule extends AbstractRule {
         && segmentSizeRuleParams.getNumRowsInActualSegment() == RecommenderConstants.SegmentSizeRule.NOT_PROVIDED) {
 
       // generate a segment
-      File workingDir = Files.createTempDir();
+      File workingDir;
+      try {
+        workingDir = Files.createTempDirectory("pinot-segment-size-").toFile();
+      } catch (IOException e) {
+        throw new InvalidInputException("Failed to create temp directory for segment sizing", e);
+      }
       try {
         TableConfig tableConfig = createTableConfig(_input.getSchema());
         int numRowsInGeneratedSegment = segmentSizeRuleParams.getNumRowsInGeneratedSegment();
@@ -111,19 +116,17 @@ public class SegmentSizeRule extends AbstractRule {
     _input.capCardinalities((int) params.getNumRowsPerSegment());
   }
 
-  /**
-   * Estimate segment size parameters by extrapolation based on the number of records and size of the generated segment.
-   * The linear extrapolation used here is not optimal because of columnar way of storing data and usage of different
-   * indices. Another way would be to iteratively generate new segments with expected number of rows until the ideal
-   * segment is found, but that's costly because of the time it takes to generate segments. Although the extrapolation
-   * approach seems to be less accurate, it is chosen due to its performance.
-   *
-   * @param generatedSegmentSize  generated segment size
-   * @param desiredSegmentSize  desired segment size
-   * @param numRecordsOfGeneratedSegment num records of generated segment
-   * @param numRecordsPerPush num records per push
-   * @return recommendations on optimal segment count, size, and number of records
-   */
+  /// Estimate segment size parameters by extrapolation based on the number of records and size of the generated
+  /// segment. The linear extrapolation used here is not optimal because of columnar way of storing data and usage of
+  /// different indices. Another way would be to iteratively generate new segments with expected number of rows until
+  /// the ideal segment is found, but that's costly because of the time it takes to generate segments. Although the
+  /// extrapolation approach seems to be less accurate, it is chosen due to its performance.
+  ///
+  /// @param generatedSegmentSize  generated segment size
+  /// @param desiredSegmentSize  desired segment size
+  /// @param numRecordsOfGeneratedSegment num records of generated segment
+  /// @param numRecordsPerPush num records per push
+  /// @return recommendations on optimal segment count, size, and number of records
   @VisibleForTesting
   SegmentSizeRecommendations estimate(long generatedSegmentSize, int desiredSegmentSize,
       int numRecordsOfGeneratedSegment, long numRecordsPerPush) {

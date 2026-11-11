@@ -86,7 +86,7 @@ public interface ExplainIntegrationTestTrait {
               + ", Actual complete plan: " + planAsStrList);
         } else if (expectedObj instanceof String) {
           Assert.assertEquals(planAsStr, expectedObj, "Actual: " + planAsStr + ", Expected: " + expectedObj
-            + ", Actual complete plan: " + planAsStrList);
+              + ", Actual complete plan: " + planAsStrList);
         } else {
           Assert.fail("Expected object should be either Pattern or String in position " + i + ". Actual: "
               + expectedObj + " of type " + expectedObj.getClass());

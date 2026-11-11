@@ -22,16 +22,15 @@ import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
-/**
- * The {@code ListAggDistinctFunction} extends the {@link ListAggFunction} to use {@link ObjectLinkedOpenHashSet} as
- * the intermediate result to hold distinct values for aggregation.
- */
+/// The `ListAggDistinctFunction` extends the [ListAggFunction] to use [ObjectLinkedOpenHashSet] as
+/// the intermediate result to hold distinct values for aggregation.
 public class ListAggDistinctFunction extends ListAggFunction {
+  private static final int ORDERED_STRING_SET_TYPE = 50;
 
   public ListAggDistinctFunction(ExpressionContext expression, String separator, boolean nullHandlingEnabled) {
     super(expression, separator, nullHandlingEnabled);
@@ -59,9 +58,9 @@ public class ListAggDistinctFunction extends ListAggFunction {
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ObjectCollection<String> strings) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.OrderedStringSet.getValue(),
-        ObjectSerDeUtils.ORDERED_STRING_SET_SER_DE.serialize((ObjectLinkedOpenHashSet<String>) strings));
+  public SerializedResult serializeIntermediateResult(ObjectCollection<String> strings) {
+    return new SerializedValue<>(ORDERED_STRING_SET_TYPE, (ObjectLinkedOpenHashSet<String>) strings,
+        ObjectSerDeUtils.ORDERED_STRING_SET_SER_DE);
   }
 
   @Override

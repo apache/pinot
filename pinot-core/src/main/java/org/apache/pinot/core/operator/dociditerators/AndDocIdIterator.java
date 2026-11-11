@@ -22,11 +22,10 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 
 
-/**
- * The {@code AndDocIdIterator} is the iterator for AndDocIdSet to perform AND on all child BlockDocIdIterators.
- * <p>It keeps calling {@link BlockDocIdIterator#advance(int)} to gather the common matching document ids from all child
- * BlockDocIdIterators until one of them hits the end.
- */
+/// The `AndDocIdIterator` is the iterator for AndDocIdSet to perform AND on all child BlockDocIdIterators.
+///
+/// It keeps calling [BlockDocIdIterator#advance(int)] to gather the common matching document ids from all child
+/// BlockDocIdIterators until one of them hits the end.
 public final class AndDocIdIterator implements BlockDocIdIterator {
   public final BlockDocIdIterator[] _docIdIterators;
 

@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils.builder;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -123,6 +124,21 @@ public class ControllerRequestURLBuilder {
 
   public String forDeleteMinionTask(String taskName) {
     return StringUtil.join("/", _baseUrl, "tasks", "task", taskName);
+  }
+
+  public String forMinionStatus(@Nullable String statusFilter, boolean includeTaskCounts) {
+    StringBuilder url = new StringBuilder(StringUtil.join("/", _baseUrl, "minions", "status"));
+    List<String> params = new ArrayList<>();
+    if (statusFilter != null && !statusFilter.isEmpty()) {
+      params.add("status=" + statusFilter);
+    }
+    if (includeTaskCounts) {
+      params.add("includeTaskCounts=true");
+    }
+    if (!params.isEmpty()) {
+      url.append("?").append(String.join("&", params));
+    }
+    return url.toString();
   }
 
   public String forStopMinionTaskQueue(String taskType) {
@@ -331,6 +347,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "schema");
   }
 
+  public String forConsumerWatermarksGet(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "consumerWatermarks");
+  }
+
   public String forTableExternalView(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
   }
@@ -389,6 +409,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tableConfigs", "validate");
   }
 
+  public String forTableConfigsTune() {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", "tune");
+  }
+
   public String forSegmentReload(String tableName, String segmentName, boolean forceDownload) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName),
         "reload?forceDownload=" + forceDownload);
@@ -417,15 +441,6 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentsMetadataFromServer(String tableName) {
     return forSegmentsMetadataFromServer(tableName, (List<String>) null);
-  }
-
-  @Deprecated
-  public String forSegmentsMetadataFromServer(String tableName, @Nullable String columns) {
-    String url = StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
-    if (columns != null) {
-      url += "?columns=" + columns;
-    }
-    return url;
   }
 
   public String forSegmentsMetadataFromServer(String tableName, @Nullable List<String> columns) {
@@ -705,5 +720,9 @@ public class ControllerRequestURLBuilder {
 
   public String forBaseQueryWorkloadConfig(String config) {
     return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs", config);
+  }
+
+  public String forPageCacheWarmupQueries(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "pagecache", "queries", tableName) + "?tableType=" + tableType;
   }
 }

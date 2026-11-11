@@ -24,9 +24,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.joda.time.DateTimeZone;
 
 
-/**
- * Date time transformer to transform and bucket date time values from simple date format to epoch format.
- */
+/// Date time transformer to transform and bucket date time values from simple date format to epoch format.
 public class SDFToEpochTransformer extends BaseDateTimeTransformer<String[], long[]> {
 
   public SDFToEpochTransformer(DateTimeFormatSpec inputFormat, DateTimeFormatSpec outputFormat,

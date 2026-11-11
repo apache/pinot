@@ -1,0 +1,1180 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.materializedview.rewrite;
+
+import java.util.HashMap;
+import java.util.List;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
+import org.apache.pinot.materializedview.rewrite.MaterializedViewMetadataCache.MaterializedViewCacheEntry;
+import org.apache.pinot.materializedview.rewrite.strategy.AggregationSubsumptionStrategy;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
+
+
+public class AggregationSubsumptionStrategyTest {
+
+  private AggregationSubsumptionStrategy _strategy;
+
+  @BeforeClass
+  public void setUp() {
+    _strategy = new AggregationSubsumptionStrategy();
+  }
+
+  private MaterializedViewCacheEntry createEntry(String viewTableName, String baseTable, String definedSql) {
+    MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
+        viewTableName,
+        List.of(baseTable),
+        definedSql,
+        new HashMap<>(),
+        null);
+    PinotQuery compiledQuery = CalciteSqlParser.compileToPinotQuery(definedSql);
+    return new MaterializedViewCacheEntry(definition, compiledQuery, 1L, java.util.Map.of());
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  Basic aggregation matching
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testBasicAggregationMatch() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getMaterializedViewTableNameWithType(), "mv_orders_OFFLINE");
+    assertEquals(result.getCost(), 6.0);
+    assertEquals(result.getMaterializedViewQuery().getDataSource().getTableName(), "mv_orders_OFFLINE");
+  }
+
+  @Test
+  public void testSelectSubset() {
+    String definedSql =
+        "SELECT city, SUM(revenue) AS sum_rev, COUNT(revenue) AS cnt FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getCost(), 6.0);
+    assertEquals(result.getMaterializedViewQuery().getSelectList().size(), 2);
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  GROUP BY order insensitivity
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testGroupByOrderInsensitive() {
+    String definedSql =
+        "SELECT city, state, SUM(revenue) AS sum_rev FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, state, SUM(revenue) FROM orders GROUP BY state, city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getCost(), 6.0);
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  Alias handling
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testAliasInsensitiveMatching() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) AS total_revenue FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getCost(), 6.0);
+  }
+
+  @Test
+  public void testRewrittenSelectPreservesUserAlias() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) AS r_sum FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 2);
+
+    assertEquals(selectList.get(0).getIdentifier().getName(), "city");
+
+    /// SUM(revenue) AS r_sum → SUM(sum_rev) AS r_sum
+    Function aliasFunc = selectList.get(1).getFunctionCall();
+    assertNotNull(aliasFunc);
+    assertEquals(aliasFunc.getOperator(), "as");
+    Function innerAgg = aliasFunc.getOperands().get(0).getFunctionCall();
+    assertNotNull(innerAgg);
+    assertEquals(innerAgg.getOperator(), "sum");
+    assertEquals(innerAgg.getOperands().get(0).getIdentifier().getName(), "sum_rev");
+    assertEquals(aliasFunc.getOperands().get(1).getIdentifier().getName(), "r_sum");
+  }
+
+  @Test
+  public void testRewrittenSelectNoAlias() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    List<Expression> selectList = result.getMaterializedViewQuery().getSelectList();
+    assertEquals(selectList.size(), 2);
+
+    assertEquals(selectList.get(0).getIdentifier().getName(), "city");
+    /// SUM(revenue) → SUM(sum_rev) AS sum(revenue) — implicit alias preserves the user's
+    /// expected result column name when there is no explicit AS clause.
+    Function aliasFunc = selectList.get(1).getFunctionCall();
+    assertNotNull(aliasFunc);
+    assertEquals(aliasFunc.getOperator(), "as");
+    Function reAgg = aliasFunc.getOperands().get(0).getFunctionCall();
+    assertNotNull(reAgg);
+    assertEquals(reAgg.getOperator(), "sum");
+    assertEquals(reAgg.getOperands().get(0).getIdentifier().getName(), "sum_rev");
+    assertEquals(aliasFunc.getOperands().get(1).getIdentifier().getName(), "sum(revenue)");
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  GROUP BY mismatch
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testNoMatchUserHasMoreGroupByColumns() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, state, SUM(revenue) FROM orders GROUP BY city, state");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result);
+  }
+
+  @Test
+  public void testFinerMaterializedViewGranularityBasicSum() {
+    String definedSql =
+        "SELECT city, state, SUM(revenue) AS sum_rev FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Finer MV granularity should match via re-aggregation");
+    assertEquals(result.getCost(), 6.0);
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getGroupByList(), "GROUP BY should be retained");
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    assertEquals(rewritten.getGroupByList().get(0).getIdentifier().getName(), "city");
+
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 2);
+    assertEquals(selectList.get(0).getIdentifier().getName(), "city");
+    /// SUM(revenue) → SUM(sum_rev) AS sum(revenue) — implicit alias preserves result column name.
+    Function aliasFunc = selectList.get(1).getFunctionCall();
+    assertNotNull(aliasFunc);
+    assertEquals(aliasFunc.getOperator(), "as");
+    Function reAgg = aliasFunc.getOperands().get(0).getFunctionCall();
+    assertNotNull(reAgg);
+    assertEquals(reAgg.getOperator(), "sum");
+    assertEquals(reAgg.getOperands().get(0).getIdentifier().getName(), "sum_rev");
+    assertEquals(aliasFunc.getOperands().get(1).getIdentifier().getName(), "sum(revenue)");
+  }
+
+  @Test
+  public void testWholeTableUserAgainstGroupedMaterializedView() {
+    /// User query has no GROUP BY but contains an aggregation; MV is grouped.  Engine should
+    /// re-aggregate the MV's per-group rows into one whole-table result on the MV side.  This
+    /// pins the fix for groupByMatches accepting the userIsWholeTable && !mvIsWholeTable case.
+    String definedSql =
+        "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery("SELECT SUM(revenue) FROM orders");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "User whole-table over grouped MV should re-aggregate");
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertTrue(rewritten.getGroupByList() == null || rewritten.getGroupByList().isEmpty(),
+        "Rewritten query must not have GROUP BY (whole-table re-aggregation)");
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 1);
+    /// SUM(revenue) → SUM(sum_rev) AS sum(revenue) — implicit alias preserves result column name.
+    Function aliasFunc = selectList.get(0).getFunctionCall();
+    assertNotNull(aliasFunc);
+    assertEquals(aliasFunc.getOperator(), "as");
+    Function reAgg = aliasFunc.getOperands().get(0).getFunctionCall();
+    assertNotNull(reAgg);
+    assertEquals(reAgg.getOperator(), "sum");
+    assertEquals(reAgg.getOperands().get(0).getIdentifier().getName(), "sum_rev");
+    assertEquals(aliasFunc.getOperands().get(1).getIdentifier().getName(), "sum(revenue)");
+  }
+
+  @Test
+  public void testNoMatchDifferentGroupByColumns() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT state, SUM(revenue) FROM orders GROUP BY state");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result);
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  HAVING remap
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testHavingKeptAsHaving() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city HAVING SUM(revenue) > 1000");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+
+    assertNotNull(rewritten.getGroupByList());
+    assertNotNull(rewritten.getHavingExpression());
+    assertNull(rewritten.getFilterExpression());
+
+    /// HAVING SUM(revenue) > 1000 → HAVING SUM(sum_rev) > 1000
+    assertTrue(rewritten.getHavingExpression().toString().contains("sum_rev"));
+  }
+
+  @Test
+  public void testNoMatchHavingReferencesUnknownAgg() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city HAVING AVG(revenue) > 100");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "HAVING references AVG(revenue) which is not in MV projection");
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  ORDER BY remap
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testOrderByRemappedToMaterializedViewColumn() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city ORDER BY SUM(revenue) DESC");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+
+    List<Expression> orderByList = rewritten.getOrderByList();
+    assertNotNull(orderByList);
+    assertEquals(orderByList.size(), 1);
+    assertTrue(orderByList.get(0).toString().contains("sum_rev"));
+  }
+
+  @Test
+  public void testOrderByDimensionColumn() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city ORDER BY city ASC");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertNotNull(result.getMaterializedViewQuery().getOrderByList());
+  }
+
+  @Test
+  public void testNoMatchOrderByUnknownExpression() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city ORDER BY AVG(revenue)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result);
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  Residual WHERE filter
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testResidualWhereOnGroupByColumn() {
+    String definedSql =
+        "SELECT city, SUM(revenue) AS sum_rev FROM orders WHERE region = 'US' GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders WHERE region = 'US' AND city = 'NYC' GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getCost(), 7.0);
+    assertNotNull(result.getMaterializedViewQuery().getFilterExpression());
+  }
+
+  @Test
+  public void testNoMatchResidualWhereOnNonGroupByColumn() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders WHERE status = 'active' GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "Residual filter on non-GROUP-BY column 'status' is invalid for aggregation MV");
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  Shape rejection
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testNoMatchScanUserVsAggMaterializedView() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery("SELECT city FROM orders");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result);
+  }
+
+  @Test
+  public void testNoMatchAggUserVsScanMaterializedView() {
+    String definedSql = "SELECT city, revenue FROM orders";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result);
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  SELECT expression not in MV
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testNoMatchSelectExprNotInMaterializedView() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, AVG(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result);
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  Null compiled query
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testNullCompiledQuery() {
+    MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
+        "mv_broken_OFFLINE",
+        List.of("orders"),
+        null,
+        new HashMap<>(),
+        null);
+    MaterializedViewCacheEntry entry = new MaterializedViewCacheEntry(
+        definition, null, 1L, java.util.Map.of());
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result);
+  }
+
+  /// -----------------------------------------------------------------------
+  ///  Rewrite structure verification
+  /// -----------------------------------------------------------------------
+
+  @Test
+  public void testRewrittenQueryRetainsGroupBy() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+
+    assertNotNull(rewritten.getGroupByList());
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    assertEquals(rewritten.getGroupByList().get(0).getIdentifier().getName(), "city");
+    assertNull(rewritten.getHavingExpression());
+    assertNull(rewritten.getFilterExpression());
+  }
+
+  @Test
+  public void testRewrittenQueryHavingAndResidualSeparate() {
+    String definedSql =
+        "SELECT city, SUM(revenue) AS sum_rev FROM orders WHERE region = 'US' GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders WHERE region = 'US' AND city = 'NYC' "
+            + "GROUP BY city HAVING SUM(revenue) > 1000");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+
+    assertNotNull(rewritten.getGroupByList());
+
+    /// HAVING kept as HAVING with re-aggregation reference
+    assertNotNull(rewritten.getHavingExpression());
+    assertTrue(rewritten.getHavingExpression().toString().contains("sum_rev"));
+
+    /// Residual WHERE on dimension column
+    assertNotNull(rewritten.getFilterExpression());
+    assertTrue(rewritten.getFilterExpression().toString().contains("city"));
+  }
+
+  @Test
+  public void testMatchWhenUserAndConjunctsReordered() {
+    /// MV defined with two AND conjuncts; user writes the same conjuncts in the opposite order.
+    /// AND is commutative, so this must match with the no-residual cost and a null rewritten filter.
+    String definedSql =
+        "SELECT city, SUM(revenue) AS sum_rev FROM orders "
+            + "WHERE region = 'US' AND status = 'active' GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders "
+            + "WHERE status = 'active' AND region = 'US' GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "AND is commutative: reordered conjuncts must still match");
+    assertEquals(result.getCost(), 6.0, "Set-equal filters -> no-residual cost");
+    assertNull(result.getMaterializedViewQuery().getFilterExpression(),
+        "Set-equal filters should leave the rewritten MV query with no residual filter");
+  }
+
+  @Test
+  public void testNoFilterWhenFiltersEqualAndNoHaving() {
+    String definedSql =
+        "SELECT city, SUM(revenue) AS sum_rev FROM orders WHERE region = 'US' GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders WHERE region = 'US' GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getCost(), 6.0);
+    assertNull(result.getMaterializedViewQuery().getFilterExpression());
+    assertNotNull(result.getMaterializedViewQuery().getGroupByList());
+  }
+
+  /// =======================================================================
+  ///  Equal granularity with function mismatch (equivalence-based rewrite)
+  /// =======================================================================
+
+  @Test
+  public void testEqualGranularitySketchMismatchUsesAggregationRewrite() {
+    String definedSql =
+        "SELECT city, DISTINCTCOUNTRAWHLL(user_id) AS raw_hll FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, DISTINCTCOUNTHLL(user_id) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Equal granularity with sketch mismatch should match via aggregation rewrite");
+    assertEquals(result.getCost(), 6.0);
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+
+    /// GROUP BY must be retained (not removed as in scan rewrite)
+    assertNotNull(rewritten.getGroupByList());
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    assertEquals(rewritten.getGroupByList().get(0).getIdentifier().getName(), "city");
+
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 2);
+    assertEquals(selectList.get(0).getIdentifier().getName(), "city");
+
+    /// DISTINCTCOUNTHLL(user_id) → DISTINCTCOUNTHLL(raw_hll) AS distinctcounthll(user_id)
+    Function aliasFunc = selectList.get(1).getFunctionCall();
+    assertNotNull(aliasFunc);
+    assertEquals(aliasFunc.getOperator(), "as");
+    Function reAgg = aliasFunc.getOperands().get(0).getFunctionCall();
+    assertNotNull(reAgg);
+    assertEquals(reAgg.getOperator(), "distinctcounthll");
+    assertEquals(reAgg.getOperands().get(0).getIdentifier().getName(), "raw_hll");
+    assertEquals(aliasFunc.getOperands().get(1).getIdentifier().getName(), "distinctcounthll(user_id)");
+  }
+
+  /// Simulates the broker's `handleHLLLog2mOverride` injecting a
+  /// `Literal(8)` operand into the user query's DISTINCTCOUNTHLL.
+  /// Verifies that:
+  ///
+  ///   - The match still succeeds (operandsMatch ignores literals).
+  ///   - The rewritten query preserves the injected log2m parameter.
+  @Test
+  public void testEqualGranularitySketchWithBrokerInjectedLog2m() {
+    String definedSql =
+        "SELECT city, DISTINCTCOUNTRAWHLL(user_id) AS raw_hll FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, DISTINCTCOUNTHLL(user_id) FROM orders GROUP BY city");
+
+    /// Simulate handleHLLLog2mOverride: append Literal(8) to DISTINCTCOUNTHLL operands
+    for (Expression selectExpr : userQuery.getSelectList()) {
+      Function func = selectExpr.getFunctionCall();
+      if (func != null && "distinctcounthll".equalsIgnoreCase(func.getOperator())) {
+        func.addToOperands(RequestUtils.getLiteralExpression(8));
+      }
+    }
+
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+    assertNotNull(result, "Should match despite broker-injected log2m literal");
+    assertEquals(result.getCost(), 6.0);
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getGroupByList());
+
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 2);
+
+    /// DISTINCTCOUNTHLL(user_id, 8) → DISTINCTCOUNTHLL(raw_hll, 8) AS distinctcounthll(user_id, 8)
+    Function aliasFunc = selectList.get(1).getFunctionCall();
+    assertNotNull(aliasFunc);
+    assertEquals(aliasFunc.getOperator(), "as");
+    Function reAgg = aliasFunc.getOperands().get(0).getFunctionCall();
+    assertNotNull(reAgg);
+    assertEquals(reAgg.getOperator(), "distinctcounthll");
+    assertEquals(reAgg.getOperandsSize(), 2, "Rewritten expression must retain trailing literal");
+    assertEquals(reAgg.getOperands().get(0).getIdentifier().getName(), "raw_hll");
+    assertTrue(reAgg.getOperands().get(1).getLiteral() != null,
+        "Second operand must be the preserved log2m literal");
+    assertEquals(aliasFunc.getOperands().get(1).getIdentifier().getName(), "distinctcounthll(user_id, 8)");
+  }
+
+  /// =======================================================================
+  ///  Finer MV granularity tests (aggregation rewrite)
+  /// =======================================================================
+
+  @Test
+  public void testFinerMaterializedViewCountToSum() {
+    String definedSql =
+        "SELECT city, state, COUNT(revenue) AS cnt FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, COUNT(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "COUNT -> SUM re-aggregation should work");
+    assertEquals(result.getCost(), 6.0);
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    List<Expression> selectList = rewritten.getSelectList();
+    /// COUNT(revenue) → SUM(cnt) AS count(revenue)
+    Function aliasFunc = selectList.get(1).getFunctionCall();
+    assertNotNull(aliasFunc);
+    assertEquals(aliasFunc.getOperator(), "as");
+    Function reAgg = aliasFunc.getOperands().get(0).getFunctionCall();
+    assertNotNull(reAgg);
+    assertEquals(reAgg.getOperator(), "sum");
+    assertEquals(reAgg.getOperands().get(0).getIdentifier().getName(), "cnt");
+    assertEquals(aliasFunc.getOperands().get(1).getIdentifier().getName(), "count(revenue)");
+  }
+
+  @Test
+  public void testFinerMaterializedViewSketchMergeDistinctCountHll() {
+    String definedSql =
+        "SELECT city, state, DISTINCTCOUNTRAWHLL(user_id) AS raw_hll "
+            + "FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, DISTINCTCOUNTHLL(user_id) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "DISTINCTCOUNTHLL from DISTINCTCOUNTRAWHLL should match");
+    assertEquals(result.getCost(), 6.0);
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    List<Expression> selectList = rewritten.getSelectList();
+    /// DISTINCTCOUNTHLL(user_id) → DISTINCTCOUNTHLL(raw_hll) AS distinctcounthll(user_id)
+    Function aliasFunc = selectList.get(1).getFunctionCall();
+    assertNotNull(aliasFunc);
+    assertEquals(aliasFunc.getOperator(), "as");
+    Function reAgg = aliasFunc.getOperands().get(0).getFunctionCall();
+    assertNotNull(reAgg);
+    assertEquals(reAgg.getOperator(), "distinctcounthll");
+    assertEquals(reAgg.getOperands().get(0).getIdentifier().getName(), "raw_hll");
+    assertEquals(aliasFunc.getOperands().get(1).getIdentifier().getName(), "distinctcounthll(user_id)");
+  }
+
+  @Test
+  public void testFinerMaterializedViewMixedAggregationTypes() {
+    String definedSql =
+        "SELECT city, state, SUM(revenue) AS sum_rev, COUNT(revenue) AS cnt, "
+            + "MAX(revenue) AS max_rev FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue), COUNT(revenue), MAX(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getCost(), 6.0);
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 4);
+
+    /// city -> city (dimension, no alias wrap since name matches MV column)
+    assertEquals(selectList.get(0).getIdentifier().getName(), "city");
+    /// SUM(revenue) → SUM(sum_rev) AS sum(revenue)
+    Function sumAlias = selectList.get(1).getFunctionCall();
+    assertEquals(sumAlias.getOperator(), "as");
+    assertEquals(sumAlias.getOperands().get(0).getFunctionCall().getOperator(), "sum");
+    assertEquals(sumAlias.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "sum_rev");
+    assertEquals(sumAlias.getOperands().get(1).getIdentifier().getName(), "sum(revenue)");
+    /// COUNT(revenue) → SUM(cnt) AS count(revenue)
+    Function countAlias = selectList.get(2).getFunctionCall();
+    assertEquals(countAlias.getOperator(), "as");
+    assertEquals(countAlias.getOperands().get(0).getFunctionCall().getOperator(), "sum");
+    assertEquals(countAlias.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "cnt");
+    assertEquals(countAlias.getOperands().get(1).getIdentifier().getName(), "count(revenue)");
+    /// MAX(revenue) → MAX(max_rev) AS max(revenue)
+    Function maxAlias = selectList.get(3).getFunctionCall();
+    assertEquals(maxAlias.getOperator(), "as");
+    assertEquals(maxAlias.getOperands().get(0).getFunctionCall().getOperator(), "max");
+    assertEquals(maxAlias.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "max_rev");
+    assertEquals(maxAlias.getOperands().get(1).getIdentifier().getName(), "max(revenue)");
+  }
+
+  @Test
+  public void testFinerMaterializedViewPreservesUserAlias() {
+    String definedSql =
+        "SELECT city, state, SUM(revenue) AS sum_rev FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) AS total FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    List<Expression> selectList = rewritten.getSelectList();
+
+    /// SUM(revenue) AS total → SUM(sum_rev) AS total
+    Function aliasFunc = selectList.get(1).getFunctionCall();
+    assertNotNull(aliasFunc);
+    assertEquals(aliasFunc.getOperator(), "as");
+    /// Inner: SUM(sum_rev)
+    Function innerAgg = aliasFunc.getOperands().get(0).getFunctionCall();
+    assertEquals(innerAgg.getOperator(), "sum");
+    assertEquals(innerAgg.getOperands().get(0).getIdentifier().getName(), "sum_rev");
+    /// Alias: total
+    assertEquals(aliasFunc.getOperands().get(1).getIdentifier().getName(), "total");
+  }
+
+  @Test
+  public void testFinerMaterializedViewWithHavingKeptAsHaving() {
+    String definedSql =
+        "SELECT city, state, SUM(revenue) AS sum_rev FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city HAVING SUM(revenue) > 1000");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getCost(), 6.0);
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    /// GROUP BY retained
+    assertNotNull(rewritten.getGroupByList());
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    /// HAVING kept as HAVING (not converted to WHERE)
+    assertNotNull(rewritten.getHavingExpression());
+    /// HAVING should reference SUM(sum_rev) > 1000
+    String havingStr = rewritten.getHavingExpression().toString();
+    assertTrue(havingStr.contains("sum_rev"), "HAVING should reference re-aggregated MV column");
+  }
+
+  @Test
+  public void testFinerMaterializedViewWithResidualWhere() {
+    String definedSql =
+        "SELECT city, state, SUM(revenue) AS sum_rev FROM orders WHERE region = 'US' "
+            + "GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders WHERE region = 'US' AND city = 'NYC' GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getCost(), 7.0);
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getGroupByList());
+    assertNotNull(rewritten.getFilterExpression());
+    assertTrue(rewritten.getFilterExpression().toString().contains("city"));
+  }
+
+  @Test
+  public void testFinerMaterializedViewRejectUnsupportedFunction() {
+    String definedSql =
+        "SELECT city, state, SUM(revenue) AS sum_rev FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, AVG(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "AVG has no equivalence rule registered");
+  }
+
+  /// Regression test: the MV stores AVG(revenue) as a pre-computed column. Even though the user
+  /// query's AVG(revenue) is an exact key in the MV projection map, there is no
+  /// AggregationEquivalence rule for AVG (it is not re-aggregatable from a pre-computed average).
+  /// The old code fell through to a bare-column rewrite (avg_rev), producing wrong results.
+  /// The fix requires a rule to exist before accepting the MV candidate.
+  @Test
+  public void testRejectAvgEvenWhenMaterializedViewHasExactAvgColumn() {
+    /// MV materialises AVG(revenue) directly — but there is no distributive re-aggregation rule.
+    String definedSql =
+        "SELECT city, state, AVG(revenue) AS avg_rev FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, AVG(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result,
+        "AVG has no re-aggregation rule; MV with exact AVG column must be rejected, not silently rewritten "
+            + "to a bare identifier that would compute wrong results over finer-granularity groups");
+  }
+
+  @Test
+  public void testFinerMaterializedViewRejectSketchFunctionMismatch() {
+    String definedSql =
+        "SELECT city, state, SUM(revenue) AS sum_rev FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, DISTINCTCOUNTHLL(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "MV stores SUM, not DISTINCTCOUNTRAWHLL — sketch merge not possible");
+  }
+
+  @Test
+  public void testFinerMaterializedViewWithOrderBy() {
+    String definedSql =
+        "SELECT city, state, SUM(revenue) AS sum_rev FROM orders GROUP BY city, state";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, SUM(revenue) FROM orders GROUP BY city ORDER BY SUM(revenue) DESC");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    assertEquals(result.getCost(), 6.0);
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getOrderByList());
+    assertEquals(rewritten.getOrderByList().size(), 1);
+    /// ORDER BY should reference SUM(sum_rev), wrapped in ordering
+    String orderByStr = rewritten.getOrderByList().get(0).toString();
+    assertTrue(orderByStr.contains("sum_rev"));
+  }
+
+  @Test
+  public void testFinerMaterializedViewCountStarWithOrderByAlias() {
+    String definedSql = "SELECT DaysSinceEpoch, Carrier, SUM(ArrDelay) AS sum_ArrDelay, "
+        + "COUNT(*) AS flight_count FROM airlineStats GROUP BY DaysSinceEpoch, Carrier";
+    MaterializedViewCacheEntry entry = createEntry("airlineStatsMv_OFFLINE", "airlineStats", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT Carrier, SUM(ArrDelay) AS total_delay, COUNT(*) AS flights FROM airlineStats "
+            + "GROUP BY Carrier ORDER BY total_delay DESC LIMIT 10");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Quickstart SUM/COUNT query should match the daily carrier MV");
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertEquals(rewritten.getSelectList().size(), 3);
+    assertEquals(rewritten.getSelectList().get(1).getFunctionCall().getOperands().get(0)
+        .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "sum_ArrDelay");
+    assertEquals(rewritten.getSelectList().get(2).getFunctionCall().getOperands().get(0)
+        .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "flight_count");
+    assertTrue(rewritten.getOrderByList().get(0).toString().contains("sum_ArrDelay"));
+  }
+
+  @Test
+  public void testFinerMaterializedViewSketchWithOrderByAlias() {
+    String definedSql = "SELECT DaysSinceEpoch, Carrier, DISTINCTCOUNTRAWHLL(FlightNum) AS raw_hll_FlightNum "
+        + "FROM airlineStats GROUP BY DaysSinceEpoch, Carrier";
+    MaterializedViewCacheEntry entry = createEntry("airlineStatsMv_OFFLINE", "airlineStats", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT Carrier, DISTINCTCOUNTHLL(FlightNum) AS approx_flight_nums FROM airlineStats "
+            + "GROUP BY Carrier ORDER BY approx_flight_nums DESC LIMIT 10");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Quickstart sketch query should match the daily carrier raw-sketch MV");
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertEquals(rewritten.getSelectList().size(), 2);
+    assertEquals(rewritten.getSelectList().get(1).getFunctionCall().getOperands().get(0)
+        .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "raw_hll_FlightNum");
+    assertTrue(rewritten.getOrderByList().get(0).toString().contains("raw_hll_FlightNum"));
+  }
+
+  /// =======================================================================
+  ///  Scalar grouping function support (e.g. DATETRUNC)
+  /// =======================================================================
+
+  /// A scalar grouping function (DATETRUNC) in the SELECT list must be treated as a plain
+  /// projection — a direct MV column hit is sufficient. It must NOT be routed through the
+  /// aggregation-equivalence path (which would reject it for lack of a re-aggregation rule).
+  @Test
+  public void testScalarGroupingFunctionExactMatch() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Scalar grouping function should match via direct MV projection");
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+
+    /// GROUP BY remapped to the MV column.
+    assertNotNull(rewritten.getGroupByList());
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    assertEquals(rewritten.getGroupByList().get(0).getIdentifier().getName(), "day");
+
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 2);
+
+    /// DATETRUNC('DAY', ts) → day AS datetrunc('DAY', ts) (direct projection, alias preserves name).
+    Function dayAlias = selectList.get(0).getFunctionCall();
+    assertNotNull(dayAlias);
+    assertEquals(dayAlias.getOperator(), "as");
+    assertEquals(dayAlias.getOperands().get(0).getIdentifier().getName(), "day");
+
+    /// SUM(revenue) → SUM(sum_rev) AS sum(revenue).
+    Function sumAlias = selectList.get(1).getFunctionCall();
+    assertNotNull(sumAlias);
+    assertEquals(sumAlias.getOperator(), "as");
+    Function rewrittenSum = sumAlias.getOperands().get(0).getFunctionCall();
+    assertNotNull(rewrittenSum);
+    assertEquals(rewrittenSum.getOperator(), "sum");
+    assertEquals(rewrittenSum.getOperands().get(0).getIdentifier().getName(), "sum_rev");
+  }
+
+  /// A scalar grouping function used in ORDER BY must remap to the MV column.
+  @Test
+  public void testScalarGroupingFunctionInOrderBy() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts) ORDER BY DATETRUNC('DAY', ts) DESC");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getOrderByList());
+    assertEquals(rewritten.getOrderByList().size(), 1);
+    Function orderByFunction = rewritten.getOrderByList().get(0).getFunctionCall();
+    assertNotNull(orderByFunction);
+    assertEquals(orderByFunction.getOperator(), "desc");
+    assertEquals(orderByFunction.getOperands().get(0).getIdentifier().getName(), "day");
+  }
+
+  /// A scalar grouping function used in HAVING must remap to the MV column.
+  @Test
+  public void testScalarGroupingFunctionInHaving() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts) HAVING DATETRUNC('DAY', ts) > 0");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getHavingExpression());
+    Function havingFunction = rewritten.getHavingExpression().getFunctionCall();
+    assertNotNull(havingFunction);
+    assertEquals(havingFunction.getOperator(), "GREATER_THAN");
+    assertEquals(havingFunction.getOperands().get(0).getIdentifier().getName(), "day");
+  }
+
+  /// A scalar function not present in the MV projection (different truncation unit) must reject.
+  @Test
+  public void testNoMatchScalarFunctionNotMaterialized() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('MONTH', ts), SUM(revenue) FROM orders GROUP BY DATETRUNC('MONTH', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "DATETRUNC('MONTH', ts) is not a materialized projection and must be rejected");
+  }
+
+  /// MV is grouped by a superset of the user keys (DATETRUNC('DAY', ts), city) while the user
+  /// groups only by DATETRUNC('DAY', ts). Re-aggregation is non-trivial here (multiple MV rows
+  /// collapse per day), and the scalar grouping function must still resolve as a direct MV hit.
+  @Test
+  public void testScalarGroupingFunctionFinerMaterializedViewGranularity() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, city, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts), city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Finer MV granularity with a scalar grouping key should re-aggregate");
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getGroupByList());
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    assertEquals(rewritten.getGroupByList().get(0).getIdentifier().getName(), "day");
+
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 2);
+    Function dayAlias = selectList.get(0).getFunctionCall();
+    assertNotNull(dayAlias);
+    assertEquals(dayAlias.getOperator(), "as");
+    assertEquals(dayAlias.getOperands().get(0).getIdentifier().getName(), "day");
+
+    Function sumAlias = selectList.get(1).getFunctionCall();
+    assertNotNull(sumAlias);
+    Function rewrittenSum = sumAlias.getOperands().get(0).getFunctionCall();
+    assertNotNull(rewrittenSum);
+    assertEquals(rewrittenSum.getOperands().get(0).getIdentifier().getName(), "sum_rev");
+  }
+
+  /// The raw source column inside a scalar grouping expression is not available in the MV.
+  /// Filtering on `ts` after it has been truncated to `day` would either reference a missing
+  /// column or incorrectly apply an intra-day predicate to a whole-day bucket.
+  @Test
+  public void testScalarGroupingFunctionRejectsResidualOnSourceColumn() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders WHERE ts >= 1000 "
+            + "GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "Bare source column 'ts' is not projected by the materialized view");
+  }
+
+  /// The complete scalar grouping expression is available as one atomic MV column, so a residual
+  /// on that exact expression is safe and must be remapped without exposing its source column.
+  @Test
+  public void testScalarGroupingFunctionAllowsResidualOnMaterializedExpression() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders "
+            + "WHERE DATETRUNC('DAY', ts) >= 1000 GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "The complete materialized grouping expression is a valid residual");
+    assertEquals(result.getMatchType(), MatchType.AGG_REAGG);
+    Expression residual = result.getMaterializedViewQuery().getFilterExpression();
+    assertNotNull(residual, "The residual must be retained on the MV side, not dropped");
+    assertEquals(residual.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "day");
+  }
+
+  /// A scalar grouping key must not prevent residual filtering on another grouping key that the
+  /// MV projects directly. The aliased projection also verifies that the residual is remapped to
+  /// the MV-side column name.
+  @Test
+  public void testScalarGroupingFunctionAllowsResidualOnProjectedIdentifierGroupKey() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, city AS mv_city, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts), city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders WHERE city = 'NYC' "
+            + "GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Directly projected identifier group keys remain valid residuals");
+    assertEquals(result.getMatchType(), MatchType.AGG_REAGG);
+    Expression residual = result.getMaterializedViewQuery().getFilterExpression();
+    assertNotNull(residual, "The residual must be retained on the MV side, not dropped");
+    assertEquals(residual.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "mv_city");
+  }
+
+  /// Regression: an MV may group by a key it never materializes — here `city` is only visible
+  /// through `UPPER(city)`. Matching such an MV would rewrite the user's `GROUP BY city` to the
+  /// missing column and emit `GROUP BY <null identifier>`, failing on the server instead of
+  /// falling back to the base table. Treating the scalar as a direct projection hit must not
+  /// bypass that check.
+  @Test
+  public void testNoMatchScalarProjectedButGroupKeyNotMaterialized() {
+    String definedSql =
+        "SELECT UPPER(city) AS uc, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT UPPER(city), SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "'city' is grouped by the MV but not materialized as a column");
+  }
+
+  /// The same invariant for a plain identifier grouping key: an MV that groups by `city` without
+  /// projecting it cannot answer a query grouped by `city`.
+  @Test
+  public void testNoMatchGroupKeyNotMaterialized() {
+    String definedSql = "SELECT SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "'city' is grouped by the MV but not materialized as a column");
+  }
+
+  /// Counterpart to the two rejections above: once the MV also projects the grouping key, the
+  /// scalar projection resolves and the key remaps to the MV column.
+  @Test
+  public void testScalarProjectedWithMaterializedGroupKey() {
+    String definedSql =
+        "SELECT city, UPPER(city) AS uc, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT UPPER(city), SUM(revenue) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Both the grouping key and the scalar projection are materialized");
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    assertEquals(rewritten.getGroupByList().get(0).getIdentifier().getName(), "city");
+
+    Function upperAlias = rewritten.getSelectList().get(0).getFunctionCall();
+    assertNotNull(upperAlias);
+    assertEquals(upperAlias.getOperator(), "as");
+    assertEquals(upperAlias.getOperands().get(0).getIdentifier().getName(), "uc");
+  }
+
+  /// A whole-table user aggregate re-aggregates the MV's per-group rows, so no GROUP BY key needs
+  /// remapping — the unmaterialized MV grouping key must not reject this rewrite.
+  @Test
+  public void testWholeTableAggregateOverUnmaterializedGroupKey() {
+    String definedSql = "SELECT SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery("SELECT SUM(revenue) FROM orders");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Whole-table re-aggregation does not reference the MV grouping key");
+    assertNull(result.getMaterializedViewQuery().getGroupByList());
+  }
+
+  /// Regression: a nested aggregate such as ROUND(SUM(x)) must stay on the aggregate path. There is
+  /// no re-aggregation rule for ROUND, so it must be rejected — never treated as a scalar direct hit.
+  @Test
+  public void testNoMatchNestedAggregateRoundSum() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, ROUND(SUM(revenue)) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "ROUND(SUM(revenue)) has no re-aggregation rule and must be rejected");
+  }
+}

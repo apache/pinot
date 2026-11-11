@@ -31,7 +31,6 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -75,7 +74,6 @@ public class PinotResourceManagerTest {
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setStreamConfigs(streamConfigs)
-            .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1))
             .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
     _resourceManager.addTable(realtimeTableConfig);
   }
@@ -122,12 +120,10 @@ public class PinotResourceManagerTest {
     assertFalse(_resourceManager.updateZkMetadata(OFFLINE_TABLE_NAME, segmentZKMetadata, 0));
   }
 
-  /**
-   * First tests basic segment adding/deleting.
-   * Then creates 3 threads that concurrently try to add 10 segments each, and asserts that we have 30 segments in the
-   * end. Then launches 3 threads again that concurrently try to delete all segments, and makes sure that we have 0
-   * segments left in the end.
-   */
+  /// First tests basic segment adding/deleting.
+  /// Then creates 3 threads that concurrently try to add 10 segments each, and asserts that we have 30 segments in the
+  /// end. Then launches 3 threads again that concurrently try to delete all segments, and makes sure that we have 0
+  /// segments left in the end.
   @Test
   public void testBasicAndConcurrentAddingAndDeletingSegments()
       throws Exception {

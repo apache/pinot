@@ -21,17 +21,13 @@ package org.apache.pinot.spi.utils;
 import java.util.Arrays;
 
 
-/**
- * Wrapper around fixed size primitive int array. Provides the following so it can be used
- * as key in Maps/Sets.
- *
- * <ul>
- *   <li> hashCode()</li>
- *   <li> equals</li>
- * </ul>
- *
- * Note, does not provide a deep-copy of the value, and caller is responsible for maintaining the values.
- */
+/// Wrapper around fixed size primitive int array. Provides the following so it can be used
+/// as key in Maps/Sets.
+///
+/// - hashCode()
+/// - equals
+///
+/// Note, does not provide a deep-copy of the value, and caller is responsible for maintaining the values.
 public class FixedIntArray {
   private final int[] _value;
 

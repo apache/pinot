@@ -30,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -41,6 +40,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -50,22 +50,19 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Accounting mechanism for thread task execution status and thread resource usage sampling
- * Design and algorithm see
- * https://docs.google.com/document/d/1Z9DYAfKznHQI9Wn8BjTWZYTcNRVGiPP0B8aEP3w_1jQ
- *
- * TODO: Functionalities in this Accountant are now supported in a more generic ResourceUsageAccountantFactory. Keeping
- * this around for backward compatibility. Will slowly phase this out in favor of ResourceUsageAccountantFactory after
- * achieving stability.
- */
+/// Accounting mechanism for thread task execution status and thread resource usage sampling
+/// Design and algorithm see
+/// https://docs.google.com/document/d/1Z9DYAfKznHQI9Wn8BjTWZYTcNRVGiPP0B8aEP3w_1jQ
+///
+/// TODO: Functionalities in this Accountant are now supported in a more generic ResourceUsageAccountantFactory. Keeping
+/// this around for backward compatibility. Will slowly phase this out in favor of ResourceUsageAccountantFactory after
+/// achieving stability.
 public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory {
 
   @Override
@@ -76,9 +73,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
   public static class PerQueryCPUMemResourceUsageAccountant implements ThreadAccountant {
     private static final Logger LOGGER = LoggerFactory.getLogger(PerQueryCPUMemResourceUsageAccountant.class);
 
-    /**
-     * Executor service for the thread accounting task, slightly higher priority than normal priority
-     */
+    /// Executor service for the thread accounting task, slightly higher priority than normal priority
     private static final String ACCOUNTANT_TASK_NAME = "CPUMemThreadAccountant";
     private static final int ACCOUNTANT_PRIORITY = 4;
     private final ExecutorService _executorService = Executors.newSingleThreadExecutor(r -> {
@@ -118,14 +113,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.info("Initializing PerQueryCPUMemResourceUsageAccountant");
       _instanceId = instanceId;
       _instanceType = instanceType;
-      boolean cpuSamplingEnabled = config.getProperty(Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING,
-          Accounting.DEFAULT_ENABLE_THREAD_CPU_SAMPLING);
+      boolean cpuSamplingEnabled =
+          config.getProperty(Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, Accounting.DEFAULT_ENABLE_THREAD_CPU_SAMPLING);
       if (cpuSamplingEnabled && !ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
         LOGGER.warn("Thread CPU time measurement is not enabled in the JVM, disabling CPU sampling");
         cpuSamplingEnabled = false;
       }
       _cpuSamplingEnabled = cpuSamplingEnabled;
-      boolean memorySamplingEnabled = config.getProperty(Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING,
+      boolean memorySamplingEnabled = config.getProperty(Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING,
           Accounting.DEFAULT_ENABLE_THREAD_MEMORY_SAMPLING);
       if (memorySamplingEnabled && !ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
         LOGGER.warn("Thread memory measurement is not enabled in the JVM, disabling memory sampling");
@@ -295,17 +290,13 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           totalHeapUsage);
     }
 
-    /**
-     * The triggered level for the actions, only the highest level action will get triggered. Severity is defined by
-     * the ordinal Normal(0) does not trigger any action.
-     */
+    /// The triggered level for the actions, only the highest level action will get triggered. Severity is defined by
+    /// the ordinal Normal(0) does not trigger any action.
     protected enum TriggeringLevel {
       Normal, HeapMemoryAlarmingVerbose, CPUTimeBasedKilling, HeapMemoryCritical, HeapMemoryPanic
     }
 
-    /**
-     * A watcher task to perform usage sampling, aggregation, and query preemption
-     */
+    /// A watcher task to perform usage sampling, aggregation, and query preemption
     @SuppressWarnings({"rawtypes", "unchecked"})
     protected class WatcherTask implements Runnable, PinotClusterConfigChangeListener {
       protected final AtomicReference<QueryMonitorConfig> _queryMonitorConfig = new AtomicReference<>();
@@ -367,27 +358,15 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       @Override
       public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-        // Filter configs that have CommonConstants.PREFIX_SCHEDULER_PREFIX
-        Set<String> filteredChangedConfigs = changedConfigs.stream()
-            .filter(config -> config.startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .map(config -> config.replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""))
-            .collect(Collectors.toSet());
-
-        if (filteredChangedConfigs.isEmpty()) {
+        ThreadAccountantUtils.AccountingConfigChange change =
+            ThreadAccountantUtils.filterAccountingConfigChange(changedConfigs, clusterConfigs, _instanceType);
+        if (change.isEmpty()) {
           LOGGER.debug("No relevant configs changed, skipping update for QueryMonitorConfig.");
           return;
         }
-
-        Map<String, String> filteredClusterConfigs = clusterConfigs.entrySet()
-            .stream()
-            .filter(entry -> entry.getKey().startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .collect(Collectors.toMap(
-                entry -> entry.getKey().replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""),
-                Map.Entry::getValue));
-
         QueryMonitorConfig oldConfig = _queryMonitorConfig.get();
         QueryMonitorConfig newConfig =
-            new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
+            new QueryMonitorConfig(oldConfig, change.getChangedConfigs(), change.getClusterConfigs());
         _queryMonitorConfig.set(newConfig);
         logQueryMonitorConfig(newConfig);
       }
@@ -468,28 +447,41 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         LOGGER.debug("Heap used bytes: {}", _usedBytes);
       }
 
-      /**
-       * Evaluate triggering levels of query preemption
-       * Triggers should be mutually exclusive and evaluated following level high -> low
-       */
+      /// Evaluate triggering levels of query preemption
+      /// Triggers should be mutually exclusive and evaluated following level high -> low
       protected void evalTriggers() {
         TriggeringLevel previousTriggeringLevel = _triggeringLevel;
 
         // Compute the new triggering level based on the current heap usage
         QueryMonitorConfig config = _queryMonitorConfig.get();
-        _triggeringLevel =
-            config.isCpuTimeBasedKillingEnabled() ? TriggeringLevel.CPUTimeBasedKilling : TriggeringLevel.Normal;
         if (_usedBytes > config.getPanicLevel()) {
+          // PANIC
+          _sleepTime = config.getAlarmingSleepTime();
           _triggeringLevel = TriggeringLevel.HeapMemoryPanic;
           _metrics.addMeteredGlobalValue(_heapMemoryPanicExceededMeter, 1);
         } else if (_usedBytes > config.getCriticalLevel()) {
+          // CRITICAL
+          _sleepTime = config.getAlarmingSleepTime();
           _triggeringLevel = TriggeringLevel.HeapMemoryCritical;
           _metrics.addMeteredGlobalValue(_heapMemoryCriticalExceededMeter, 1);
         } else if (_usedBytes > config.getAlarmingLevel()) {
+          // ALARMING
           _sleepTime = config.getAlarmingSleepTime();
-          // For debugging
-          if (LOGGER.isDebugEnabled() && _triggeringLevel == TriggeringLevel.Normal) {
-            _triggeringLevel = TriggeringLevel.HeapMemoryAlarmingVerbose;
+          if (config.isCpuTimeBasedKillingEnabled()) {
+            _triggeringLevel = TriggeringLevel.CPUTimeBasedKilling;
+          } else {
+            if (LOGGER.isDebugEnabled()) {
+              _triggeringLevel = TriggeringLevel.HeapMemoryAlarmingVerbose;
+            } else {
+              _triggeringLevel = TriggeringLevel.Normal;
+            }
+          }
+        } else {
+          // NORMAL
+          if (config.isCpuTimeBasedKillingEnabled()) {
+            _triggeringLevel = TriggeringLevel.CPUTimeBasedKilling;
+          } else {
+            _triggeringLevel = TriggeringLevel.Normal;
           }
         }
 
@@ -568,9 +560,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
       }
 
-      /**
-       * Kill the query with the highest cost (memory footprint/cpu time/...)
-       */
+      /// Kill the query with the highest cost (memory footprint/cpu time/...)
       protected void killMostExpensiveQuery() {
         if (!_memorySamplingEnabled) {
           return;

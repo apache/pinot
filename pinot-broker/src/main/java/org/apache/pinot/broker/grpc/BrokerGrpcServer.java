@@ -156,9 +156,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     LOGGER.info("Initialized BrokerGrpcServer on port: {}", portToUse);
   }
 
-  /**
-   * Registers buffer metrics for the given allocator.
-   */
+  /// Registers buffer metrics for the given allocator.
   private void registerBufferMetrics(PooledByteBufAllocator bufAllocator, BrokerMetrics brokerMetrics) {
     PooledByteBufAllocatorMetric metric = bufAllocator.metric();
     brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
@@ -230,10 +228,11 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(query, requestJsonNode);
     } catch (Exception e) {
+      QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
       BrokerResponse brokerResponse;
       Broker.BrokerResponse errorBlock;
       try {
-        brokerResponse = new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+        brokerResponse = new BrokerResponseNative(errorCode, e.getMessage());
         errorBlock = Broker.BrokerResponse.newBuilder().setPayload(ByteString.copyFrom(
             brokerResponse.toJsonString().getBytes())).build();
       } catch (IOException ex) {
@@ -242,8 +241,23 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
       }
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       responseObserver.onNext(errorBlock);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_BYTES_SENT, errorBlock.getSerializedSize());
       responseObserver.onCompleted();
       return;
+    }
+
+    /// The MV minion executor sets this request-metadata flag to force-disable materialized-view
+    /// rewrite for its materialization query. Apply it as an override AFTER parsing so it cannot be
+    /// defeated by an `enableMaterializedViewRewrite` option present in the (user-authored) query
+    /// text: the parser keeps the last value for a duplicated SET, and SQL options otherwise outrank
+    /// request options. The materialization query reads the base table and must never be rewritten
+    /// back onto an MV (its own or a sibling). Safe to force from request metadata — disabling MV
+    /// rewrite only forgoes an optimization and never changes results.
+    String mvRewriteOverride =
+        metadataMap.get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE);
+    if (mvRewriteOverride != null) {
+      sqlNodeAndOptions.getOptions()
+          .put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE, mvRewriteOverride);
     }
 
     RequesterIdentity requesterIdentify = GrpcRequesterIdentity.fromRequest(request);
@@ -278,10 +292,14 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
         throw new RuntimeException(e);
       }
       responseObserver.onNext(emptyOrErrorBlock);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_BYTES_SENT, emptyOrErrorBlock.getSerializedSize());
       responseObserver.onCompleted();
       return;
     }
     // Handle query response:
+    // Track total bytes sent for metrics
+    long totalBytesSent = 0;
+
     // First block is metadata
     try {
       Broker.BrokerResponse metadataBlock =
@@ -289,6 +307,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
               .setPayload(ByteString.copyFrom(brokerResponse.toMetadataJsonString().getBytes()))
               .build();
       responseObserver.onNext(metadataBlock);
+      totalBytesSent += metadataBlock.getSerializedSize();
     } catch (IOException e) {
       responseObserver.onError(e);
       throw new RuntimeException(e);
@@ -299,6 +318,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
           Broker.BrokerResponse.newBuilder().setPayload(ByteString.copyFrom(resultTable.getDataSchema().toBytes()))
               .build();
       responseObserver.onNext(schemaBlock);
+      totalBytesSent += schemaBlock.getSerializedSize();
     } catch (IOException e) {
       responseObserver.onError(e);
       throw new RuntimeException(e);
@@ -334,11 +354,13 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
                 .putMetadata("encoding", encodingAlgorithm)
                 .build();
         responseObserver.onNext(dataBlock);
+        totalBytesSent += dataBlock.getSerializedSize();
       } catch (Exception e) {
         responseObserver.onError(e);
         throw new RuntimeException(e);
       }
     }
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.GRPC_BYTES_SENT, totalBytesSent);
     responseObserver.onCompleted();
   }
 
@@ -353,15 +375,19 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
       SSLFactory sslFactory =
           RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig);
       // since tlsConfig.getKeyStorePath() is not null, sslFactory.getKeyManagerFactory().get() should not be null
-      SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
-          .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+      SslProvider sslProvider = SslProvider.valueOf(tlsConfig.getSslProvider());
+      // Runtime visibility for Platform-FIPS-JDK deployments: warn & log the actual JSSE provider/protocol once.
+      TlsUtils.warnIfNonJdkProviderConfigured("grpc.broker.server", tlsConfig);
+      TlsUtils.logJsseDiagnosticsOnce("grpc.broker.server", sslFactory, tlsConfig);
+      SslContextBuilder sslContextBuilder =
+          SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get()).sslProvider(sslProvider);
       sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
 
       if (tlsConfig.isClientAuthEnabled()) {
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
       }
 
-      return GrpcSslContexts.configure(sslContextBuilder).build();
+      return GrpcSslContexts.configure(sslContextBuilder, sslProvider).build();
     }
   }
 

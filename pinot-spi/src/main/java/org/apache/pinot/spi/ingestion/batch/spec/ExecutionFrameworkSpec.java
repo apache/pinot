@@ -22,38 +22,24 @@ import java.io.Serializable;
 import java.util.Map;
 
 
-/**
- * ExecutionFrameworkSpec defines which ingestion jobs to be running.
- */
+/// ExecutionFrameworkSpec defines which ingestion jobs to be running.
 public class ExecutionFrameworkSpec implements Serializable {
-  /**
-   * The name of the execution framework, currently supports: Standalone.
-   */
+  /// The name of the execution framework, currently supports: Standalone.
   private String _name;
 
-  /**
-   * The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
-   */
+  /// The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
   private String _segmentGenerationJobRunnerClassName;
 
-  /**
-   * The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
-   */
+  /// The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
   private String _segmentTarPushJobRunnerClassName;
 
-  /**
-   * The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
-   */
+  /// The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
   private String _segmentUriPushJobRunnerClassName;
 
-  /**
-   * The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
-   */
+  /// The class implements org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner interface.
   private String _segmentMetadataPushJobRunnerClassName;
 
-  /**
-   * Extra configs for execution framework.
-   */
+  /// Extra configs for execution framework.
   private Map<String, String> _extraConfigs;
 
   public String getName() {

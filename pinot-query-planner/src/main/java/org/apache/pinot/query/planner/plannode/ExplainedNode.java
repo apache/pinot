@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,12 +26,10 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 
 
-/**
- * The {@link PlanNode} version for the {@link org.apache.pinot.core.plan.PinotExplainedRelNode}.
- *
- * Remember that {@link PlanNode} are just the serializable and deserializable version of a
- * {@link org.apache.calcite.rel.RelNode}.
- */
+/// The [PlanNode] version for the [org.apache.pinot.core.plan.PinotExplainedRelNode].
+///
+/// Remember that [PlanNode] are just the serializable and deserializable version of a
+/// [org.apache.calcite.rel.RelNode].
 public class ExplainedNode extends BasePlanNode {
 
   private final String _title;
@@ -40,7 +37,7 @@ public class ExplainedNode extends BasePlanNode {
 
   public ExplainedNode(int stageId, DataSchema dataSchema, @Nullable NodeHint nodeHint, PlanNode input,
       String title, Map<String, Plan.ExplainNode.AttributeValue> attributes) {
-    this(stageId, dataSchema, nodeHint, Collections.singletonList(input), title, attributes);
+    this(stageId, dataSchema, nodeHint, List.of(input), title, attributes);
   }
 
   public ExplainedNode(int stageId, DataSchema dataSchema, @Nullable NodeHint nodeHint, List<PlanNode> inputs,

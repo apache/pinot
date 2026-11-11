@@ -21,36 +21,39 @@ package org.apache.pinot.core.query.aggregation.function;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
-import org.roaringbitmap.IntIterator;
 
 
-/**
- * This function is used for LastWithTime calculations for data column with string type.
- * <p>The function can be used as LastWithTime(dataExpression, timeExpression, 'string')
- * <p>Following arguments are supported:
- * <ul>
- *   <li>dataExpression: expression that contains the string data column to be calculated last on</li>
- *   <li>timeExpression: expression that contains the column to be used to decide which data is last, can be any
- *   Numeric column</li>
- * </ul>
- */
+/// This function is used for LastWithTime calculations for data column with string type.
+///
+/// The function can be used as LastWithTime(dataExpression, timeExpression, 'string')
+///
+/// Following arguments are supported:
+///
+/// - dataExpression: expression that contains the string data column to be calculated last on
+/// - timeExpression: expression that contains the column to be used to decide which data is last, can be any
+///   Numeric column
 public class LastStringValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<String> {
-  private final static ValueLongPair<String> DEFAULT_VALUE_TIME_PAIR = new StringLongPair("", Long.MIN_VALUE);
+  private static final int STRING_LONG_PAIR_TYPE = 31;
+
+  private static final ValueLongPair<String> DEFAULT_VALUE_TIME_PAIR = new StringLongPair("", Long.MIN_VALUE);
 
   public LastStringValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled) {
-    super(dataCol, timeCol, ObjectSerDeUtils.STRING_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    super(dataCol, timeCol, nullHandlingEnabled);
   }
 
   @Override
   public ValueLongPair<String> constructValueLongPair(String value, long time) {
     return new StringLongPair(value, time);
+  }
+
+  @Override
+  public ValueLongPair<String> deserializeValueLongPair(byte[] bytes) {
+    return StringLongPair.fromBytes(bytes);
   }
 
   @Override
@@ -69,8 +72,7 @@ public class LastStringValueWithTimeAggregationFunction extends LastWithTimeAggr
     String[] stringValues = blockValSet.getStringValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
 
-    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    RoaringBitmapUtils.forEachUnset(length, nullIdxIterator, (from, to) -> {
+    forEachNotNull(length, blockValSet, timeValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         String data = stringValues[i];
         long time = timeValues[i];
@@ -85,8 +87,7 @@ public class LastStringValueWithTimeAggregationFunction extends LastWithTimeAggr
     String[] stringValues = blockValSet.getStringValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
 
-    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    RoaringBitmapUtils.forEachUnset(length, nullIdxIterator, (from, to) -> {
+    forEachNotNull(length, blockValSet, timeValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         String value = stringValues[i];
         long time = timeValues[i];
@@ -103,14 +104,13 @@ public class LastStringValueWithTimeAggregationFunction extends LastWithTimeAggr
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<String> stringLongPair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringLongPair.getValue(),
-        ObjectSerDeUtils.STRING_LONG_PAIR_SER_DE.serialize((StringLongPair) stringLongPair));
+  public SerializedResult serializeIntermediateResult(ValueLongPair<String> stringLongPair) {
+    return new SerializedBytes(STRING_LONG_PAIR_TYPE, stringLongPair.toBytes());
   }
 
   @Override
   public ValueLongPair<String> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.STRING_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return StringLongPair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

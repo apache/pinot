@@ -24,9 +24,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Sep 12, 2014
- */
+/// Sep 12, 2014
 
 public class StringGenerator implements Generator {
   private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;
@@ -51,7 +49,7 @@ public class StringGenerator implements Generator {
     int initValueSize = lengthOfEachString - _counterLength;
     Preconditions.checkState(initValueSize >= 0,
         String.format("Cannot generate %d unique string with length %d", _cardinality, lengthOfEachString));
-    _initialValue = RandomStringUtils.randomAlphabetic(initValueSize);
+    _initialValue = RandomStringUtils.secure().nextAlphabetic(initValueSize);
     _rand = new Random(System.currentTimeMillis());
   }
 

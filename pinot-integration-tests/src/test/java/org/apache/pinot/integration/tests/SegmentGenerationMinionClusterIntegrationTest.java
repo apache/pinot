@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -94,14 +93,14 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
         if (getTotalDocs(tableName) < rowCnt) {
           // To avoid the NoTaskScheduledException after all files are ingested.
           sendPostRequest(url, JsonUtils.objectToString(adhocTaskConfig),
-              Collections.singletonMap("accept", "application/json"));
+              Map.of("accept", "application/json"));
         }
         return getTotalDocs(tableName) == rowCnt;
       } catch (Exception e) {
         LOGGER.error("Failed to get expected totalDocs: {}", rowCnt, e);
         return false;
       }
-    }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents", true);
+    }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents");
     JsonNode result = postQuery("SELECT COUNT(*) FROM " + tableName);
     // One segment per file.
     assertEquals(result.get("numSegmentsQueried").asInt(), 7);
@@ -146,7 +145,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
         LOGGER.error("Failed to get expected totalDocs: {}", rowCnt, e);
         return false;
       }
-    }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents", true);
+    }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents");
     JsonNode result = postQuery("SELECT COUNT(*) FROM " + tableName);
     // One segment per file.
     assertEquals(result.get("numSegmentsQueried").asInt(), 7);
@@ -157,8 +156,8 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
     addSchema(new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("id", FieldSpec.DataType.INT)
         .addSingleValueDimension("name", FieldSpec.DataType.STRING).build());
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toString(),
-        BasicAuthTestUtils.AUTH_HEADER);
+    getOrCreateAdminClient().getTableClient()
+        .createTable(tableConfig.toJsonString(), null, BasicAuthTestUtils.AUTH_HEADER);
   }
 
   private int prepInputFiles(File inputDir, int fileNum, int rowsPerFile)

@@ -22,18 +22,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Base abstract class for task generator info.
- */
+/// Base abstract class for task generator info.
 public abstract class BaseTaskGeneratorInfo {
-  /**
-   * @return task type
-   */
+  /// @return task type
   public abstract String getTaskType();
 
-  /**
-   * @return task generator info as a Json string
-   */
+  /// @return task generator info as a Json string
   public String toJsonString() {
     try {
       return JsonUtils.objectToString(this);

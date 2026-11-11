@@ -32,9 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Factory class to initialize query scheduler
- */
+/// Factory class to initialize query scheduler
 public class QuerySchedulerFactory {
   private QuerySchedulerFactory() {
   }
@@ -49,14 +47,12 @@ public class QuerySchedulerFactory {
   public static final String DEFAULT_QUERY_SCHEDULER_ALGORITHM = FCFS_ALGORITHM;
   public static final String WORKLOAD_SCHEDULER_ALGORITHM = "workload";
 
-  /**
-   * Static factory to instantiate query scheduler based on scheduler configuration.
-   * 'name' configuration in the scheduler will decide which scheduler instance to create
-   * Besides known instances, 'name' can be a classname
-   * @param schedulerConfig scheduler specific configuration
-   * @param queryExecutor QueryExecutor to use
-   * @return returns an instance of query scheduler
-   */
+  /// Static factory to instantiate query scheduler based on scheduler configuration.
+  /// 'name' configuration in the scheduler will decide which scheduler instance to create
+  /// Besides known instances, 'name' can be a classname
+  /// @param schedulerConfig scheduler specific configuration
+  /// @param queryExecutor QueryExecutor to use
+  /// @return returns an instance of query scheduler
   public static QueryScheduler create(PinotConfiguration schedulerConfig, String instanceId,
       QueryExecutor queryExecutor, ThreadAccountant threadAccountant, LongAccumulator latestQueryTime) {
     String schedulerName = schedulerConfig.getProperty(ALGORITHM_NAME_CONFIG_KEY, DEFAULT_QUERY_SCHEDULER_ALGORITHM);

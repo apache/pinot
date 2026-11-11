@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.timeseries;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import javax.annotation.Nullable;
@@ -28,10 +27,8 @@ import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
 
 
-/**
- * With the broker-reduce mode in Time Series Engine, this node becomes the leaf stage for the broker. In other words,
- * the plan fragment that runs in the broker will always have this node in the leaves.
- */
+/// With the broker-reduce mode in Time Series Engine, this node becomes the leaf stage for the broker. In other words,
+/// the plan fragment that runs in the broker will always have this node in the leaves.
 public class TimeSeriesExchangeReceivePlanNode extends BaseTimeSeriesPlanNode {
   private final long _deadlineMs;
   private final AggInfo _aggInfo;
@@ -41,7 +38,7 @@ public class TimeSeriesExchangeReceivePlanNode extends BaseTimeSeriesPlanNode {
 
   public TimeSeriesExchangeReceivePlanNode(String id, long deadlineMs, @Nullable AggInfo aggInfo,
       TimeSeriesBuilderFactory factory) {
-    super(id, Collections.emptyList());
+    super(id, List.of());
     _deadlineMs = deadlineMs;
     _aggInfo = aggInfo;
     _factory = factory;

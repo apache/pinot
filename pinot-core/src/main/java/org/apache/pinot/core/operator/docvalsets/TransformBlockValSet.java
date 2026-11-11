@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.docvalsets;
 
 import java.math.BigDecimal;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -27,6 +28,7 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -34,14 +36,18 @@ import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The <code>TransformBlockValSet</code> class represents the block value set for a transform function in the transform
- * block.
- * <p>Caller is responsible for calling the correct method based on the data source metadata for the block value set.
- */
+/// The `TransformBlockValSet` class represents the block value set for a transform function in the transform
+/// block.
+///
+/// Caller is responsible for calling the correct method based on the data source metadata for the block value set.
+///
+/// The values are not cached: each `get*Values*()` call evaluates the transform function on the whole block again. To
+/// make sure that a caller that evaluates the transform many times in one block (for example, once per row) cannot run
+/// past the query deadline, each evaluation first checks whether the query is terminated.
 public class TransformBlockValSet implements BlockValSet {
   private final ValueBlock _valueBlock;
   private final TransformFunction _transformFunction;
+  private final Supplier<String> _terminationScope;
 
   private boolean _nullBitmapSet;
   private RoaringBitmap _nullBitmap;
@@ -51,6 +57,7 @@ public class TransformBlockValSet implements BlockValSet {
   public TransformBlockValSet(ValueBlock valueBlock, TransformFunction transformFunction) {
     _valueBlock = valueBlock;
     _transformFunction = transformFunction;
+    _terminationScope = () -> "transform function: " + transformFunction.getName();
   }
 
   @Nullable
@@ -79,8 +86,18 @@ public class TransformBlockValSet implements BlockValSet {
     return _transformFunction.getDictionary();
   }
 
+  /// A transform function that exposes a dictionary always builds it itself (e.g.,
+  /// [org.apache.pinot.core.operator.transform.function.IdentifierTransformFunction] only exposes the
+  /// underlying column's dictionary when its forward index is dict-encoded), so the dict-id read path is callable
+  /// whenever the dictionary is present.
+  @Override
+  public boolean isDictionaryEncoded() {
+    return _transformFunction.getDictionary() != null;
+  }
+
   @Override
   public int[] getDictionaryIdsSV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, true);
       return _transformFunction.transformToDictIdsSV(_valueBlock);
@@ -89,6 +106,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public int[] getIntValuesSV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, true);
       return _transformFunction.transformToIntValuesSV(_valueBlock);
@@ -97,6 +115,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public long[] getLongValuesSV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.LONG, true);
       return _transformFunction.transformToLongValuesSV(_valueBlock);
@@ -105,6 +124,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public float[] getFloatValuesSV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.FLOAT, true);
       return _transformFunction.transformToFloatValuesSV(_valueBlock);
@@ -113,6 +133,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public double[] getDoubleValuesSV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.DOUBLE, true);
       return _transformFunction.transformToDoubleValuesSV(_valueBlock);
@@ -121,6 +142,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public BigDecimal[] getBigDecimalValuesSV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.BIG_DECIMAL, true);
       return _transformFunction.transformToBigDecimalValuesSV(_valueBlock);
@@ -129,6 +151,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public String[] getStringValuesSV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.STRING, true);
       return _transformFunction.transformToStringValuesSV(_valueBlock);
@@ -137,6 +160,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public byte[][] getBytesValuesSV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.BYTES, true);
       return _transformFunction.transformToBytesValuesSV(_valueBlock);
@@ -178,6 +202,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public int[][] getDictionaryIdsMV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, false);
       return _transformFunction.transformToDictIdsMV(_valueBlock);
@@ -186,6 +211,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public int[][] getIntValuesMV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, false);
       return _transformFunction.transformToIntValuesMV(_valueBlock);
@@ -194,6 +220,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public long[][] getLongValuesMV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.LONG, false);
       return _transformFunction.transformToLongValuesMV(_valueBlock);
@@ -202,6 +229,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public float[][] getFloatValuesMV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.FLOAT, false);
       return _transformFunction.transformToFloatValuesMV(_valueBlock);
@@ -210,6 +238,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public double[][] getDoubleValuesMV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.DOUBLE, false);
       return _transformFunction.transformToDoubleValuesMV(_valueBlock);
@@ -217,7 +246,17 @@ public class TransformBlockValSet implements BlockValSet {
   }
 
   @Override
+  public BigDecimal[][] getBigDecimalValuesMV() {
+    checkTermination();
+    try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
+      recordTransformValues(scope, DataType.BIG_DECIMAL, false);
+      return _transformFunction.transformToBigDecimalValuesMV(_valueBlock);
+    }
+  }
+
+  @Override
   public String[][] getStringValuesMV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.STRING, false);
       return _transformFunction.transformToStringValuesMV(_valueBlock);
@@ -226,6 +265,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Override
   public byte[][][] getBytesValuesMV() {
+    checkTermination();
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.BYTES, false);
       return _transformFunction.transformToBytesValuesMV(_valueBlock);
@@ -271,16 +311,33 @@ public class TransformBlockValSet implements BlockValSet {
             _numMVEntries[i] = doubleValues[i].length;
           }
           return _numMVEntries;
+        case BIG_DECIMAL:
+          BigDecimal[][] bigDecimalValues = getBigDecimalValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = bigDecimalValues[i].length;
+          }
+          return _numMVEntries;
         case STRING:
           String[][] stringValues = getStringValuesMV();
           for (int i = 0; i < numDocs; i++) {
             _numMVEntries[i] = stringValues[i].length;
           }
           return _numMVEntries;
+        case BYTES:
+          byte[][][] bytesValues = getBytesValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = bytesValues[i].length;
+          }
+          return _numMVEntries;
         default:
           throw new IllegalStateException();
       }
     }
+  }
+
+  /// Throws if the query is terminated or timed out. Called before each evaluation of the transform function.
+  private void checkTermination() {
+    QueryThreadContext.checkTermination(_terminationScope);
   }
 
   private void recordTransformValues(InvocationRecording recording, DataType dataType, boolean singleValue) {

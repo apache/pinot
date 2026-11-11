@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.memory;
 import java.io.File;
 import java.io.IOException;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
@@ -30,14 +31,13 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 
 
-/**
- * Not an actual test but a base class that can be extended by tests in order to have some basic data
- */
+/// Not an actual test but a base class that can be extended by tests in order to have some basic data
 public class PinotDataBufferTestBase {
 
   protected static final Random RANDOM = new Random();
   protected ExecutorService _executorService;
-  protected static final File TEMP_FILE = new File(FileUtils.getTempDirectory(), "PinotDataBufferTest");
+  protected static final File TEMP_FILE =
+      new File(FileUtils.getTempDirectory(), "PinotDataBufferTest-" + UUID.randomUUID());
   protected static final int FILE_OFFSET = 10;      // Not page-aligned
   protected static final int BUFFER_SIZE = 10_000;  // Not page-aligned
   protected static final int CHAR_ARRAY_LENGTH = BUFFER_SIZE / Character.BYTES;

@@ -33,10 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code EmptySegmentPruner} prunes segments if they have 0 total docs.
- * It does not prune segments with -1 total docs (that can be either error case or CONSUMING segment).
- */
+/// The `EmptySegmentPruner` prunes segments if they have 0 total docs.
+/// It does not prune segments with -1 total docs (that can be either error case or CONSUMING segment).
 public class EmptySegmentPruner implements SegmentPruner {
   private static final Logger LOGGER = LoggerFactory.getLogger(EmptySegmentPruner.class);
 

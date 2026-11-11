@@ -27,9 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Maintains broker cache this is updated periodically
- */
+/// Maintains broker cache this is updated periodically
 public class BrokerCacheUpdaterPeriodic implements UpdatableBrokerCache {
   public static final String BROKER_UPDATE_FREQUENCY_MILLIS = "brokerUpdateFrequencyInMillis";
   public static final String DEFAULT_BROKER_UPDATE_FREQUENCY_MILLIS = "300000"; // 5 minutes

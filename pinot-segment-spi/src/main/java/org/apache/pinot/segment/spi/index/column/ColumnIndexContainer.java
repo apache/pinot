@@ -25,23 +25,27 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.VectorIndexConfigProvider;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 
 
-/**
- * A container for all the indexes for a column.
- */
+/// A container for all the indexes for a column.
 public interface ColumnIndexContainer extends Closeable {
 
-  /**
-   * Returns the index reader of the given type or null if the column doesn't have an index of that type.
-   * @param indexType the type of the index the caller is interested in.
-   * @return The index reader of the given type, or null if the column doesn't have an index of that type.
-   * @param <I> The index reader class
-   * @param <T> The index type
-   */
+  /// Returns the index reader of the given type or null if the column doesn't have an index of that type.
+  /// @param indexType the type of the index the caller is interested in.
+  /// @return The index reader of the given type, or null if the column doesn't have an index of that type.
+  /// @param <I> The index reader class
+  /// @param <T> The index type
   @Nullable
   <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType);
+
+  @Nullable
+  default VectorIndexConfig getVectorIndexConfig() {
+    return null;
+  }
 
   class Empty implements ColumnIndexContainer {
     public static final Empty INSTANCE = new Empty();
@@ -61,26 +65,38 @@ public interface ColumnIndexContainer extends Closeable {
   class FromMap implements ColumnIndexContainer {
     private final Map<IndexType, ? extends IndexReader> _readersByIndex;
     private final MultiColumnTextIndexReader _multiColTextReader;
+    @Nullable
+    private final VectorIndexConfig _vectorIndexConfig;
 
-    /**
-     * @param readersByIndex it is assumed that each index is associated with a compatible reader, but there is no check
-     *                       to verify that. It is recommended to construct instances of this class by using
-     *                       {@link FromMap.Builder}
-     */
+    /// @param readersByIndex it is assumed that each index is associated with a compatible reader, but there is no
+    ///                       check to verify that. It is recommended to construct instances of this class by using
+    ///                       [FromMap.Builder]
     public FromMap(Map<IndexType, ? extends IndexReader> readersByIndex) {
-      this(readersByIndex, null);
+      this(readersByIndex, null, null);
     }
 
     public FromMap(Map<IndexType, ? extends IndexReader> readersByIndex,
         MultiColumnTextIndexReader multiColTextReader) {
+      this(readersByIndex, multiColTextReader, null);
+    }
+
+    public FromMap(Map<IndexType, ? extends IndexReader> readersByIndex,
+        @Nullable MultiColumnTextIndexReader multiColTextReader, @Nullable VectorIndexConfig vectorIndexConfig) {
       _readersByIndex = readersByIndex;
       _multiColTextReader = multiColTextReader;
+      _vectorIndexConfig = vectorIndexConfig != null ? vectorIndexConfig : resolveVectorIndexConfig(readersByIndex);
     }
 
     @Nullable
     @Override
     public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
       return (I) _readersByIndex.get(indexType);
+    }
+
+    @Nullable
+    @Override
+    public VectorIndexConfig getVectorIndexConfig() {
+      return _vectorIndexConfig;
     }
 
     public MultiColumnTextIndexReader getMultiColumnTextIndex() {
@@ -92,17 +108,38 @@ public interface ColumnIndexContainer extends Closeable {
         throws IOException {
     }
 
+    @Nullable
+    private static VectorIndexConfig resolveVectorIndexConfig(Map<IndexType, ? extends IndexReader> readersByIndex) {
+      if (readersByIndex instanceof VectorIndexConfigProvider) {
+        return ((VectorIndexConfigProvider) readersByIndex).getVectorIndexConfig();
+      }
+      IndexReader vectorIndex = readersByIndex.get(StandardIndexes.vector());
+      if (vectorIndex instanceof VectorIndexConfigProvider) {
+        return ((VectorIndexConfigProvider) vectorIndex).getVectorIndexConfig();
+      }
+      return null;
+    }
+
     public static class Builder {
       private final Map<IndexType, IndexReader> _readersByIndex = new HashMap<>();
       private MultiColumnTextIndexReader _multiColTextReader;
+      @Nullable
+      private VectorIndexConfig _vectorIndexConfig;
 
       public Builder withAll(Map<IndexType, ? extends IndexReader> safeMap) {
         _readersByIndex.putAll(safeMap);
+        if (_vectorIndexConfig == null) {
+          _vectorIndexConfig = resolveVectorIndexConfig(safeMap);
+        }
         return this;
       }
 
       public <R extends IndexReader> Builder with(IndexType<?, ? super R, ?> type, R reader) {
         _readersByIndex.put(type, reader);
+        if (_vectorIndexConfig == null && type.equals(StandardIndexes.vector())
+            && reader instanceof VectorIndexConfigProvider) {
+          _vectorIndexConfig = ((VectorIndexConfigProvider) reader).getVectorIndexConfig();
+        }
         return this;
       }
 
@@ -111,8 +148,13 @@ public interface ColumnIndexContainer extends Closeable {
         return this;
       }
 
+      public Builder withVectorIndexConfig(@Nullable VectorIndexConfig vectorIndexConfig) {
+        _vectorIndexConfig = vectorIndexConfig;
+        return this;
+      }
+
       public FromMap build() {
-        return new FromMap(_readersByIndex, _multiColTextReader);
+        return new FromMap(_readersByIndex, _multiColTextReader, _vectorIndexConfig);
       }
     }
   }

@@ -22,11 +22,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.IntFunction;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
@@ -54,6 +57,7 @@ public class QuickstartRunner {
 
   public static final int DEFAULT_CONTROLLER_PORT = 9000;
   private static final int DEFAULT_BROKER_PORT = 8000;
+  private static final int DEFAULT_BROKER_GRPC_PORT = 8010;
   private static final int DEFAULT_SERVER_ADMIN_API_PORT = 7500;
   private static final int DEFAULT_SERVER_NETTY_PORT = 7050;
   private static final int DEFAULT_SERVER_GRPC_PORT = 7100;
@@ -74,6 +78,8 @@ public class QuickstartRunner {
   private final AuthProvider _authProvider;
   private final Map<String, Object> _configOverrides;
   private final Map<String, String> _clusterConfigOverrides;
+  private final IntFunction<Map<String, Object>> _individualBrokerConfigOverridesFunction;
+  private final IntFunction<Map<String, Object>> _individualServerConfigOverridesFunction;
   private final boolean _deleteExistingData;
 
   // If this field is non-null, an embedded Zookeeper instance will not be launched
@@ -81,7 +87,10 @@ public class QuickstartRunner {
 
   private final List<Integer> _controllerPorts = new ArrayList<>();
   private final List<Integer> _brokerPorts = new ArrayList<>();
-  private boolean _isStopped = false;
+  private final List<QuickstartServerProcess> _serverProcesses = new CopyOnWriteArrayList<>();
+  private boolean _forkServers;
+  private boolean _stopRequested;
+  private boolean _isStopped;
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides)
@@ -91,10 +100,10 @@ public class QuickstartRunner {
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
-    int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, AuthProvider authProvider)
-    throws Exception {
+      int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, AuthProvider authProvider)
+      throws Exception {
     this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, authProvider,
-      configOverrides, null, true, Map.of());
+        configOverrides, null, true, Map.of());
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
@@ -102,6 +111,18 @@ public class QuickstartRunner {
       Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData,
       Map<String, String> clusterConfigOverrides)
       throws Exception {
+    this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, enableIsolation, authProvider,
+        configOverrides, zkExternalAddress, deleteExistingData, clusterConfigOverrides, i -> Map.of(),
+        i -> Map.of());
+  }
+
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
+      int numServers, int numMinions, File tempDir, boolean enableIsolation, AuthProvider authProvider,
+      Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData,
+      Map<String, String> clusterConfigOverrides,
+      IntFunction<Map<String, Object>> individualBrokerConfigOverridesFunction,
+      IntFunction<Map<String, Object>> individualServerConfigOverridesFunction
+  ) throws Exception {
     _tableRequests = tableRequests;
     _numControllers = numControllers;
     _numBrokers = numBrokers;
@@ -112,6 +133,8 @@ public class QuickstartRunner {
     _authProvider = authProvider;
     _configOverrides = new HashMap<>(configOverrides);
     _clusterConfigOverrides = clusterConfigOverrides;
+    _individualBrokerConfigOverridesFunction = individualBrokerConfigOverridesFunction;
+    _individualServerConfigOverridesFunction = individualServerConfigOverridesFunction;
     if (numMinions > 0) {
       // configure the controller to schedule tasks when minion is enabled
       _configOverrides.put("controller.task.scheduler.enabled", true);
@@ -163,9 +186,19 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
-      brokerStarter.setPort(DEFAULT_BROKER_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
-          .setConfigOverrides(_configOverrides);
+      brokerStarter
+          .setPort(DEFAULT_BROKER_PORT + i)
+          .setGrpcPort(DEFAULT_BROKER_GRPC_PORT + i)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME);
+
+      Map<String, Object> individualBrokerConfigOverrides = _individualBrokerConfigOverridesFunction.apply(i);
+      if (!individualBrokerConfigOverrides.isEmpty()) {
+        Map<String, Object> config = new HashMap<>(_configOverrides);
+        config.putAll(individualBrokerConfigOverrides);
+        brokerStarter.setConfigOverrides(config);
+      } else {
+        brokerStarter.setConfigOverrides(_configOverrides);
+      }
       if (!brokerStarter.execute()) {
         throw new RuntimeException("Failed to start Broker");
       }
@@ -173,17 +206,45 @@ public class QuickstartRunner {
     }
   }
 
+  /// Starts servers in separate JVMs, isolating server-local static state such as dimension-table managers.
+  /// Configure this before calling [#startAll].
+  public QuickstartRunner setForkServers(boolean forkServers) {
+    _forkServers = forkServers;
+    return this;
+  }
+
   private void startServers()
       throws Exception {
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
-      serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
+      serverStarter
+          .setPort(DEFAULT_SERVER_NETTY_PORT + i)
+          .setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setGrpcPort(DEFAULT_SERVER_GRPC_PORT + i)
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
-          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
-          .setConfigOverrides(_configOverrides);
-      if (!serverStarter.execute()) {
+          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath());
+
+      Map<String, Object> individualControllerConfigOverrides = _individualServerConfigOverridesFunction.apply(i);
+      if (!individualControllerConfigOverrides.isEmpty()) {
+        Map<String, Object> config = new HashMap<>(_configOverrides);
+        config.putAll(individualControllerConfigOverrides);
+        serverStarter.setConfigOverrides(config);
+      } else {
+        serverStarter.setConfigOverrides(_configOverrides);
+      }
+      if (_forkServers) {
+        QuickstartServerProcess process;
+        synchronized (_serverProcesses) {
+          if (_stopRequested) {
+            throw new IllegalStateException("Quickstart stopped while starting server " + i);
+          }
+          process = QuickstartServerProcess.launch(serverStarter.getServerConf(),
+              new File(_tempDir, "server-process-" + i));
+          _serverProcesses.add(process);
+        }
+        process.awaitReady();
+      } else if (!serverStarter.execute()) {
         throw new RuntimeException("Failed to start Server");
       }
     }
@@ -209,32 +270,67 @@ public class QuickstartRunner {
 
   public void startAll()
       throws Exception {
-    registerDefaultPinotFS();
-    if (_zkExternalAddress == null) {
-      startZookeeper();
+    try {
+      registerDefaultPinotFS();
+      if (_zkExternalAddress == null) {
+        startZookeeper();
+      }
+      startControllers();
+      startBrokers();
+      startServers();
+      startMinions();
+    } catch (Exception e) {
+      try {
+        stopServerProcesses();
+      } catch (Exception cleanupException) {
+        e.addSuppressed(cleanupException);
+      }
+      throw e;
     }
-    startControllers();
-    startBrokers();
-    startServers();
-    startMinions();
   }
 
-  public void stop()
+  public synchronized void stop()
       throws Exception {
     if (_isStopped) {
       return;
     }
+    synchronized (_serverProcesses) {
+      _stopRequested = true;
+    }
+    stopServerProcesses();
 
     // TODO: Stop Minion
     StopProcessCommand stopper = new StopProcessCommand(false);
     if (_zkExternalAddress == null) {
-      stopper.stopController().stopBroker().stopServer().stopZookeeper();
+      stopper.stopController().stopBroker().stopZookeeper();
+      if (!_forkServers) {
+        stopper.stopServer();
+      }
     }
     stopper.execute();
     if (_deleteExistingData) {
       clean();
     }
     _isStopped = true;
+  }
+
+  private void stopServerProcesses()
+      throws Exception {
+    Exception failure = null;
+    for (QuickstartServerProcess process : _serverProcesses) {
+      try {
+        process.stop();
+      } catch (Exception e) {
+        if (failure == null) {
+          failure = e;
+        } else {
+          failure.addSuppressed(e);
+        }
+      }
+    }
+    if (failure != null) {
+      throw failure;
+    }
   }
 
   public void createServerTenantWith(int numOffline, int numRealtime, String tenantName)
@@ -250,6 +346,16 @@ public class QuickstartRunner {
         .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
   }
 
+  /// @return names of the tables [#bootstrapTable()] creates, so that callers can tell which sample queries can
+  /// actually be answered.
+  public Set<String> getBootstrappedTableNames() {
+    Set<String> tableNames = new HashSet<>();
+    for (QuickstartTableRequest request : _tableRequests) {
+      tableNames.add(request.getTableName());
+    }
+    return tableNames;
+  }
+
   public void bootstrapTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
@@ -262,7 +368,7 @@ public class QuickstartRunner {
 
   public JsonNode runQuery(String query)
       throws Exception {
-    return runQuery(query, Collections.emptyMap());
+    return runQuery(query, Map.of());
   }
 
   public JsonNode runQuery(String query, Map<String, String> additionalOptions)

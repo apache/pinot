@@ -26,9 +26,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Tests for BatchConfigs
- */
+/// Tests for BatchConfigs
 public class BatchConfigTest {
 
   @Test

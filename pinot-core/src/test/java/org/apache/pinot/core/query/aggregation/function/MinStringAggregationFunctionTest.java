@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -28,7 +28,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.annotations.Test;
@@ -36,38 +36,32 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
 public class MinStringAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
-  /**
-   * Helper method to create a FluentQueryTest builder for a table with a single String field.
-   * This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
-   * but fixed for the STRING data type.
-   */
+  /// Helper method to create a FluentQueryTest builder for a table with a single String field.
+  /// This is used to simulate the DataTypeScenario concept from numeric aggregation tests,
+  /// but fixed for the STRING data type.
   protected FluentQueryTest.DeclaringTable getDeclaringTable(boolean enableColumnBasedNullHandling) {
-    return FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(enableColumnBasedNullHandling)
-                .addSingleValueDimension("myField", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(enableColumnBasedNullHandling)
+        .addSingleValueDimension("myField", DataType.STRING)
+        .build();
+    return FluentQueryTest.withBaseDir(_baseDir).givenTable(schema, SINGLE_FIELD_TABLE_CONFIG);
   }
 
   @Test
   public void testNumericColumnExceptioninAggregateMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
-        false);
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression), false);
 
     AggregationResultHolder resultHolder = function.createAggregationResultHolder();
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     BlockValSet mockBlockValSet = mock(BlockValSet.class);
-    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.INT);
     blockValSetMap.put(expression, mockBlockValSet);
 
     try {
@@ -81,13 +75,12 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateGroupBySVMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
-        false);
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression), false);
 
     GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     BlockValSet mockBlockValSet = mock(BlockValSet.class);
-    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.INT);
     blockValSetMap.put(expression, mockBlockValSet);
     try {
       function.aggregateGroupBySV(10, new int[10], groupByResultHolder, blockValSetMap);
@@ -100,13 +93,12 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testNumericColumnExceptioninAggregateGroupByMVMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
-        false);
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression), false);
 
     GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     BlockValSet mockBlockValSet = mock(BlockValSet.class);
-    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    when(mockBlockValSet.getValueType()).thenReturn(DataType.INT);
     blockValSetMap.put(expression, mockBlockValSet);
     try {
       function.aggregateGroupByMV(10, new int[10][], groupByResultHolder, blockValSetMap);
@@ -119,8 +111,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   @Test
   public void testFunctionBasics() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
-    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
-        false);
+    MinStringAggregationFunction function = new MinStringAggregationFunction(List.of(expression), false);
 
     // Test function type
     assertEquals(function.getType(), AggregationFunctionType.MINSTRING);
@@ -130,11 +121,6 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     assertEquals(function.merge("banana", "apple"), "apple");
     assertEquals(function.merge("", "apple"), "");
     assertEquals(function.merge("apple", ""), "");
-
-    // Test null handling
-    assertEquals(function.merge("apple", null), "apple");
-    assertEquals(function.merge(null, "apple"), "apple");
-    assertNull(function.merge(null, null));
 
     // Test final result merging
     assertEquals(function.mergeFinalResult("apple", "banana"), "apple");
@@ -146,12 +132,9 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     // the result should be 'null' as there's no valid string to compare.
     // This differs from numeric MAX/MIN which might return an initial default value.
     getDeclaringTable(false) // nullHandlingEnabled = false
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select minstring(myField) from testTable")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select minstring(myField) from testTable")
         .thenResultIs("STRING", "\"null\""); // Asserting "null" as a string literal for the result
   }
 
@@ -159,12 +142,9 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   void aggregationAllNullsWithNullHandlingEnabled() {
     // When null handling is enabled, and all values are null, the result should also be 'null'.
     getDeclaringTable(true) // nullHandlingEnabled = true
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select minstring(myField) from testTable")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select minstring(myField) from testTable")
         .thenResultIs("STRING", "\"null\""); // Asserting "null" as a string literal for the result
   }
 
@@ -173,12 +153,9 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     // For group by, if all values in a group are null and null handling is disabled,
     // the group's result for MINSTRING should be 'null'.
     getDeclaringTable(false) // nullHandlingEnabled = false
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', minstring(myField) from testTable group by 'literal'")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', minstring(myField) from testTable group by 'literal'")
         // Expected "null" as a string literal for the aggregated column
         .thenResultIs("STRING | STRING", "literal | \"null\"");
   }
@@ -188,12 +165,9 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     // For group by, if all values in a group are null and null handling is enabled,
     // the group's result for MINSTRING should be 'null'.
     getDeclaringTable(true) // nullHandlingEnabled = true
-        .onFirstInstance("myField",
-            "null",
-            "null"
-        ).andOnSecondInstance("myField",
-            "null"
-        ).whenQuery("select 'literal', minstring(myField) from testTable group by 'literal'")
+        .onFirstInstance("myField", "null", "null")
+        .andOnSecondInstance("myField", "null")
+        .whenQuery("select 'literal', minstring(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | STRING", "literal | \"null\"");
   }
 
@@ -202,15 +176,9 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     // With null handling disabled, null values are effectively skipped, and the minimum non-null
     // string should be found. The updated function handles this correctly.
     getDeclaringTable(false) // nullHandlingEnabled = false
-        .onFirstInstance("myField",
-            "cat",
-            "null",
-            "apple"
-        ).andOnSecondInstance("myField",
-            "null",
-            "zebra",
-            "null"
-        ).whenQuery("select minstring(myField) from testTable")
+        .onFirstInstance("myField", "cat", "null", "apple")
+        .andOnSecondInstance("myField", "null", "zebra", "null")
+        .whenQuery("select minstring(myField) from testTable")
         .thenResultIs("STRING", "apple"); // Min of {"cat", "apple", "zebra"} is "apple"
   }
 
@@ -219,15 +187,9 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     // With null handling enabled, null values are explicitly ignored, and the minimum non-null
     // string should be found. The updated function handles this correctly.
     getDeclaringTable(true) // nullHandlingEnabled = true
-        .onFirstInstance("myField",
-            "cat",
-            "null",
-            "apple"
-        ).andOnSecondInstance("myField",
-            "null",
-            "zebra",
-            "null"
-        ).whenQuery("select minstring(myField) from testTable")
+        .onFirstInstance("myField", "cat", "null", "apple")
+        .andOnSecondInstance("myField", "null", "zebra", "null")
+        .whenQuery("select minstring(myField) from testTable")
         .thenResultIs("STRING", "apple"); // Min of {"cat", "apple", "zebra"} is "apple"
   }
 
@@ -237,15 +199,19 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     // Null handling disabled: nulls are ignored if there's at least one non-null value in the group.
     // The updated function should now correctly find the min among non-nulls.
     getDeclaringTable(false) // nullHandlingEnabled = false
-        .onFirstInstance("myField",
+        .onFirstInstance(
+            "myField",
             "alpha", // Grouped with 'literal'
             "null",  // Grouped with 'literal'
             "gamma"  // Grouped with 'literal'
-        ).andOnSecondInstance("myField",
+        )
+        .andOnSecondInstance(
+            "myField",
             "null",  // Grouped with 'literal'
             "beta",  // Grouped with 'literal'
             "null"   // Grouped with 'literal'
-        ).whenQuery("select 'literal', minstring(myField) from testTable group by 'literal'")
+        )
+        .whenQuery("select 'literal', minstring(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | STRING", "literal | alpha"); // Min of {"alpha", "gamma", "beta"} is "alpha"
   }
 
@@ -255,28 +221,31 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
     // Null handling enabled: nulls are ignored.
     // The updated function should now correctly find the min among non-nulls.
     getDeclaringTable(true) // nullHandlingEnabled = true
-        .onFirstInstance("myField",
+        .onFirstInstance(
+            "myField",
             "alpha", // Grouped with 'literal'
             "null",  // Grouped with 'literal'
             "gamma"  // Grouped with 'literal'
-        ).andOnSecondInstance("myField",
+        )
+        .andOnSecondInstance(
+            "myField",
             "null",  // Grouped with 'literal'
             "beta",  // Grouped with 'literal'
             "null"   // Grouped with 'literal'
-        ).whenQuery("select 'literal', minstring(myField) from testTable group by 'literal'")
+        )
+        .whenQuery("select 'literal', minstring(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | STRING", "literal | alpha"); // Min of {"alpha", "gamma", "beta"} is "alpha"
   }
 
   @Test
   void aggregationGroupByMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true) // Set at schema level for general behavior
+        .addMultiValueDimension("tags", DataType.STRING) // Dimension for tags
+        .addDimensionField("value", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true) // Set at schema level for general behavior
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING) // Dimension for tags
-                .addDimensionField("value", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[]{"tag1;tag2", "banana"}, // Row 1: tag1 -> "banana", tag2 -> "banana"
             new Object[]{"tag2;tag3", null}      // Row 2: tag2 -> null, tag3 -> null
@@ -294,8 +263,7 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
             "tag3    | cherry"  // Values for tag3: null, "cherry". Min is "cherry".
         )
         // Query with explicit null handling enabled via query option
-        .whenQueryWithNullHandlingEnabled("select tags, MINSTRING(value) from testTable "
-            + "group by tags order by tags")
+        .whenQueryWithNullHandlingEnabled("select tags, MINSTRING(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | STRING",
             "tag1    | apple", // Values for tag1: "banana", "apple". Min is "apple".

@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.cleanup;
 
 import java.util.Map;
 import java.util.Properties;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -135,5 +136,47 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
     staleInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
         ControllerGauge.DROPPED_MINION_INSTANCES), 3);
+  }
+
+  @Test(dependsOnMethods = {
+      "testStaleInstancesCleanupTaskForBrokers",
+      "testStaleInstancesCleanupTaskForServers",
+      "testStaleInstancesCleanupTaskForMinions"
+  })
+  public void testServerInUseIsNotDropped()
+      throws Exception {
+    StaleInstancesCleanupTask staleInstancesCleanupTask = _controllerStarter.getStaleInstancesCleanupTask();
+
+    addFakeServerInstancesToAutoJoinHelixCluster(2, true);
+
+    String tableNameWithType = "staleTest_OFFLINE";
+    String segmentName = "staleTest__0__0__20250101T0000Z";
+    String serverInUse = "Server_localhost_0";
+
+    IdealState idealState = new IdealState(tableNameWithType);
+    idealState.setStateModelDefRef("SegmentOnlineOfflineStateModel");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    idealState.setReplicas("1");
+    idealState.setNumPartitions(1);
+    idealState.setPartitionState(segmentName, serverInUse, "ONLINE");
+    _helixAdmin.addResource(getHelixClusterName(), tableNameWithType, idealState);
+
+    try {
+      stopFakeInstance(serverInUse);
+      Thread.sleep(1000);
+
+      long droppedBefore = MetricValueUtils.getGlobalGaugeValue(
+          _controllerStarter.getControllerMetrics(), ControllerGauge.DROPPED_SERVER_INSTANCES);
+
+      staleInstancesCleanupTask.runTask(new Properties());
+
+      long droppedAfter = MetricValueUtils.getGlobalGaugeValue(
+          _controllerStarter.getControllerMetrics(), ControllerGauge.DROPPED_SERVER_INSTANCES);
+      Assert.assertEquals(droppedAfter, droppedBefore,
+          "Server still in IdealState should NOT be dropped");
+    } finally {
+      _helixAdmin.dropResource(getHelixClusterName(), tableNameWithType);
+      stopFakeInstances();
+    }
   }
 }

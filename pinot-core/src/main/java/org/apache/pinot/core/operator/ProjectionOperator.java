@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.CaseFormat;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +49,7 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
       @Nullable BaseDocIdSetOperator docIdSetOperator, QueryContext queryContext) {
     _dataSourceMap = dataSourceMap;
     _docIdSetOperator = docIdSetOperator;
-    _dataFetcher = new DataFetcher(dataSourceMap);
+    _dataFetcher = new DataFetcher(dataSourceMap, queryContext.getQueryOptions());
     _dataBlockCache = new DataBlockCache(_dataFetcher);
     _columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
     dataSourceMap.forEach(
@@ -97,7 +96,7 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
 
   @Override
   public List<Operator<DocIdSetBlock>> getChildOperators() {
-    return Collections.singletonList(_docIdSetOperator);
+    return List.of(_docIdSetOperator);
   }
 
   @Override

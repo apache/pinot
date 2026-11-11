@@ -36,15 +36,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class implements reader as well as writer interfaces for fixed-byte single column and single value data.
- * <ul>
- *   <li> Auto expands memory allocation on-demand. </li>
- *   <li> Supports random reads and writes. </li>
- *   <li> Callers should ensure they are only reading row that were written, as allocated but not written rows
- *   are not guaranteed to have a deterministic value. </li>
- * </ul>
- */
+/// This class implements reader as well as writer interfaces for fixed-byte single column and single value data.
+///
+/// - Auto expands memory allocation on-demand.
+/// - Supports random reads and writes.
+/// - Callers should ensure they are only reading row that were written, as allocated but not written rows
+///   are not guaranteed to have a deterministic value.
 // TODO: Optimize it
 public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSVMutableForwardIndex.class);
@@ -63,13 +60,11 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   private final String _allocationContext;
   private int _capacityInRows = 0;
 
-  /**
-   * @param storedType Data type of the values
-   * @param fixedLength Fixed length of values if known: only used for BYTES field (HyperLogLog and BigDecimal storage)
-   * @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
-   * @param memoryManager Memory manager to be used for allocating memory.
-   * @param allocationContext Allocation allocationContext.
-   */
+  /// @param storedType Data type of the values
+  /// @param fixedLength Fixed length of values if known: only used for BYTES field (HyperLogLog and BigDecimal storage)
+  /// @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
+  /// @param memoryManager Memory manager to be used for allocating memory.
+  /// @param allocationContext Allocation allocationContext.
   public FixedByteSVMutableForwardIndex(boolean dictionaryEncoded, DataType storedType, int fixedLength,
       int numRowsPerChunk, PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     _dictionaryEncoded = dictionaryEncoded;
@@ -115,6 +110,11 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   @Override
   public int getLengthOfLongestElement() {
     return _valueSizeInBytes;
+  }
+
+  @Override
+  public boolean isAscii() {
+    return false;
   }
 
   @Override
@@ -251,9 +251,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     _capacityInRows += _numRowsPerChunk;
   }
 
-  /**
-   * Helper class that encapsulates writer and global startRowId.
-   */
+  /// Helper class that encapsulates writer and global startRowId.
   private void addBufferIfNeeded(int row) {
     if (row >= _capacityInRows) {
 
@@ -301,9 +299,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     }
   }
 
-  /**
-   * Helper class that encapsulates reader and global startRowId.
-   */
+  /// Helper class that encapsulates reader and global startRowId.
   private static class ReaderWithOffset implements Closeable {
     final FixedByteSingleValueMultiColReader _reader;
     final int _startRowId;

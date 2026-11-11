@@ -20,10 +20,8 @@ package org.apache.pinot.query.planner.logical;
 
 import com.google.common.collect.ImmutableList;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.core.CorrelationId;
@@ -31,7 +29,6 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Uncollect;
 import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.logical.LogicalFilter;
-import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
@@ -47,10 +44,7 @@ import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.ObjectSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
-import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
@@ -79,6 +73,20 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ObjectSqlType(SqlTypeName.BIGINT, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.LONG);
+    // Unsigned integer types (Calcite 1.41+, CALCITE-1466): the representable ones map to the narrowest signed type
+    // that holds their range (UTINYINT/USMALLINT -> INT, UINTEGER -> LONG); UBIGINT is rejected because no signed type
+    // holds its full 0..2^64-1 range.
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.UTINYINT, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.USMALLINT, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.UINTEGER, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.LONG);
+    Assert.assertThrows(IllegalArgumentException.class, () -> RelToPlanNodeConverter.convertToColumnDataType(
+        new ObjectSqlType(SqlTypeName.UBIGINT, SqlIdentifier.STAR, true, null, null)));
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ObjectSqlType(SqlTypeName.FLOAT, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.FLOAT);
@@ -97,6 +105,9 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ObjectSqlType(SqlTypeName.VARBINARY, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.BYTES);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.UUID, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.UUID);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ObjectSqlType(SqlTypeName.OTHER, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.OBJECT);
@@ -142,6 +153,12 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.BIGINT, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.LONG_ARRAY);
+    // Unsigned integer types (Calcite 1.41+, CALCITE-1466) map to their signed-equivalent array types.
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.UINTEGER, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.LONG_ARRAY);
+    Assert.assertThrows(IllegalArgumentException.class, () -> RelToPlanNodeConverter.convertToColumnDataType(
+        new ArraySqlType(new ObjectSqlType(SqlTypeName.UBIGINT, SqlIdentifier.STAR, true, null, null), true)));
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.FLOAT, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.FLOAT_ARRAY);
@@ -160,56 +177,9 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.VARBINARY, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.BYTES_ARRAY);
-  }
-
-  @Test
-  public void testConvertEnrichedJoinNodeTest() {
-    final TypeFactory typeFactory = TypeFactory.INSTANCE;
-    final RexBuilder rexBuilder = RexBuilder.DEFAULT;
-    RelTraitSet traits = RelTraitSet.createEmpty();
-
-    HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
-    hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
-    HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
-    RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
-    cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
-
-    RelDataType intType = typeFactory.builder()
-        .add("col1", SqlTypeName.INTEGER)
-        .add("col2", SqlTypeName.INTEGER)
-        .add("col3", SqlTypeName.INTEGER)
-        .build();
-
-    LogicalValues input = new LogicalValues(cluster, traits, intType, ImmutableList.of());
-
-    // join condition col0 = col1
-    RexNode joinCondition = rexBuilder.makeCall(SqlStdOperatorTable.EQUALS,
-        rexBuilder.makeInputRef(intType, 0), rexBuilder.makeInputRef(intType, 3));
-    LogicalJoin originalJoin = LogicalJoin.create(input, input, Collections.emptyList(),
-        joinCondition, Collections.emptySet(), JoinRelType.INNER);
-
-    // filter condition col2 = 1
-    RexNode filterCondition = rexBuilder.makeCall(
-        SqlStdOperatorTable.EQUALS, rexBuilder.makeInputRef(intType, 2),
-        rexBuilder.makeLiteral(1, typeFactory.createSqlType(SqlTypeName.INTEGER)));
-    LogicalFilter originalFilter = LogicalFilter.create(originalJoin, filterCondition);
-
-    // project above filter
-    List<RexNode> projects = List.of(rexBuilder.makeInputRef(intType, 1));
-    LogicalProject project = LogicalProject.create(
-        originalFilter, Collections.emptyList(), projects, List.of("projectCol1"));
-
-    planner.setRoot(project);
-    PinotLogicalEnrichedJoin enrichedJoin = (PinotLogicalEnrichedJoin) planner.findBestExp();
-
-    RelToPlanNodeConverter relToPlanNodeConverter = new RelToPlanNodeConverter(null,
-        CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
-
-    PlanNode node = relToPlanNodeConverter.toPlanNode(enrichedJoin);
-    assert (node instanceof EnrichedJoinNode);
-
-    EnrichedJoinNode enrichedJoinNode = (EnrichedJoinNode) node;
-    Assert.assertEquals(enrichedJoinNode.getFilterProjectRexes().size(), 2);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.UUID, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.UUID_ARRAY);
   }
 
   @Test
@@ -327,7 +297,7 @@ public class RelToPlanNodeConverterTest {
     RelDataType stringArrayType = inputRowType.getFieldList().get(1).getType();
     RexNode longArrayRef = new RexInputRef(0, longArrayType);
     RexNode stringArrayRef = new RexInputRef(1, stringArrayType);
-    LogicalProject project = LogicalProject.create(input, Collections.emptyList(),
+    LogicalProject project = LogicalProject.create(input, List.of(),
         List.of(longArrayRef, stringArrayRef), List.of("longArrayCol", "stringArrayCol"));
     // Create Uncollect without ordinality
     Uncollect uncollect = Uncollect.create(project.getTraitSet(), project, false, List.of("longValue", "stringValue"));
@@ -360,7 +330,7 @@ public class RelToPlanNodeConverterTest {
     RelDataType stringArrayType = inputRowType.getFieldList().get(1).getType();
     RexNode longArrayRef = new RexInputRef(0, longArrayType);
     RexNode stringArrayRef = new RexInputRef(1, stringArrayType);
-    LogicalProject project = LogicalProject.create(input, Collections.emptyList(),
+    LogicalProject project = LogicalProject.create(input, List.of(),
         List.of(longArrayRef, stringArrayRef), List.of("longArrayCol", "stringArrayCol"));
     // Create Uncollect with WITH ORDINALITY
     Uncollect uncollect = Uncollect.create(project.getTraitSet(), project, true,
@@ -398,7 +368,7 @@ public class RelToPlanNodeConverterTest {
         rexBuilder.makeFieldAccess(rexBuilder.makeCorrel(leftRowType, correlationId), "longArrayCol", true);
     RexNode stringArrayAccess =
         rexBuilder.makeFieldAccess(rexBuilder.makeCorrel(leftRowType, correlationId), "stringArrayCol", true);
-    LogicalProject project = LogicalProject.create(LogicalValues.createOneRow(cluster), Collections.emptyList(),
+    LogicalProject project = LogicalProject.create(LogicalValues.createOneRow(cluster), List.of(),
         List.of(longArrayAccess, stringArrayAccess), List.of("longArrayCol", "stringArrayCol"));
     Uncollect uncollect = Uncollect.create(project.getTraitSet(), project, false,
         List.of("longValue", "stringValue"));
@@ -441,7 +411,7 @@ public class RelToPlanNodeConverterTest {
         rexBuilder.makeFieldAccess(rexBuilder.makeCorrel(leftRowType, correlationId), "longArrayCol", true);
     RexNode stringArrayAccess =
         rexBuilder.makeFieldAccess(rexBuilder.makeCorrel(leftRowType, correlationId), "stringArrayCol", true);
-    LogicalProject project = LogicalProject.create(LogicalValues.createOneRow(cluster), Collections.emptyList(),
+    LogicalProject project = LogicalProject.create(LogicalValues.createOneRow(cluster), List.of(),
         List.of(longArrayAccess, stringArrayAccess), List.of("longArrayCol", "stringArrayCol"));
     Uncollect uncollect = Uncollect.create(project.getTraitSet(), project, true,
         List.of("longValue", "stringValue"));
@@ -473,7 +443,7 @@ public class RelToPlanNodeConverterTest {
     RexBuilder rexBuilder = cluster.getRexBuilder();
     RexNode fieldAccess =
         rexBuilder.makeFieldAccess(rexBuilder.makeCorrel(leftRowType, correlationId), fieldName, true);
-    return LogicalProject.create(LogicalValues.createOneRow(cluster), Collections.emptyList(),
+    return LogicalProject.create(LogicalValues.createOneRow(cluster), List.of(),
         List.of(fieldAccess), List.of(fieldName));
   }
 }

@@ -23,9 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 
 
-/**
- * Simple shim so that jps -l shows StartServiceManager instead of PinotAdministrator
- */
+/// Simple shim so that jps -l shows StartServiceManager instead of PinotAdministrator
 public class PinotServiceManagerStarter {
   private PinotServiceManagerStarter() {
   }

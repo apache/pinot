@@ -56,19 +56,24 @@ export const AsyncInstanceTable = ({
   }, [instanceNames]);
 
   useEffect(() => {
-    // async load all the other details
-    if(showInstanceDetails && instanceNames && liveInstanceNames) {
-      fetchAdditionalInstanceDetails();
-    }
-  }, [showInstanceDetails, instanceNames, liveInstanceNames]);
+    let isMounted = true;
 
-  const fetchAdditionalInstanceDetails = async () => {
-    const additionalData = await PinotMethodUtils.getInstanceData(
-      instanceNames,
-      liveInstanceNames
-    );
-    setInstanceData(additionalData);
-  }
+    if(showInstanceDetails && instanceNames && liveInstanceNames) {
+      PinotMethodUtils.getInstanceData(
+        instanceNames,
+        liveInstanceNames
+      ).then((additionalData) => {
+        if (!isMounted) {
+          return;
+        }
+        setInstanceData(additionalData);
+      });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showInstanceDetails, instanceNames, liveInstanceNames]);
 
   return (
     <CustomizedTables

@@ -23,7 +23,6 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 
 
-///
 /// Rewrites CAST function type aliases from Calcite type names to Pinot type names:
 /// - BIGINT -> LONG
 /// - VARCHAR -> STRING
@@ -75,6 +74,8 @@ public class CastTypeAliasRewriter implements QueryRewriter {
           break;
         default:
       }
+      Expression castExpr = expression.getFunctionCall().getOperands().get(0);
+      expression.getFunctionCall().getOperands().set(0, rewriteCastTypeAlias(castExpr));
     } else {
       for (int i = 0; i < expression.getFunctionCall().getOperandsSize(); i++) {
         Expression operand = rewriteCastTypeAlias(expression.getFunctionCall().getOperands().get(i));

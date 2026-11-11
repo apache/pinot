@@ -18,18 +18,14 @@
  */
 package org.apache.pinot.spi.stream;
 
-/**
- * A decoder for {@link StreamMessage}
- */
+/// A decoder for [StreamMessage]
 public interface StreamDataDecoder {
-  /**
-   * Decodes a {@link StreamMessage}
-   *
-   * Please note that the expectation is that the implementations of this class should never throw an exception.
-   * Instead, it should encapsulate the exception within the {@link StreamDataDecoderResult} object.
-   *
-   * @param message {@link StreamMessage} that contains the data payload and optionally, a key and row metadata
-   * @return {@link StreamDataDecoderResult} that either contains the decoded row or the exception
-   */
+  /// Decodes a [StreamMessage]
+  ///
+  /// Please note that the expectation is that the implementations of this class should never throw an exception.
+  /// Instead, it should encapsulate the exception within the [StreamDataDecoderResult] object.
+  ///
+  /// @param message [StreamMessage] that contains the data payload and optionally, a key and row metadata
+  /// @return [StreamDataDecoderResult] that either contains the decoded row or the exception
   StreamDataDecoderResult decode(StreamMessage message);
 }

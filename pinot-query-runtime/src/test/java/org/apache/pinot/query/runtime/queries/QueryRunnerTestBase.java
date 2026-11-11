@@ -73,6 +73,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.h2.jdbc.JdbcArray;
@@ -111,11 +112,16 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
   }
 
-  /**
-   * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
-   * ser/de dispatches.
-   */
+  /// Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
+  /// ser/de dispatches.
   protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) {
+    return queryRunner(sql, trace, Map.of());
+  }
+
+  /// Same as [#queryRunner(String, boolean)], but adds metadata the broker stamps outside the SQL text, e.g. the
+  /// `rlsFilters-<table>` entries carrying row-level-security filters.
+  protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace,
+      Map<String, String> extraRequestMetadata) {
     long startTimeMs = System.currentTimeMillis();
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
@@ -143,6 +149,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     requestMetadataMap.put(QueryOptionKey.TIMEOUT_MS, Long.toString(timeoutMs));
     requestMetadataMap.put(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, Long.toString(extraPassiveTimeoutMs));
     requestMetadataMap.putIfAbsent(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    requestMetadataMap.putAll(extraRequestMetadata);
 
     // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
     if (trace) {
@@ -173,12 +180,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
-            activeDeadlineMs, passiveDeadlineMs, "brokerId", "brokerId");
+            activeDeadlineMs, passiveDeadlineMs, "brokerId", "brokerId", "");
     QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {
       // exception will be propagated through for assert purpose on runtime error
-      return QueryDispatcher.runReducer(dispatchableSubPlan, Map.of(), _mailboxService);
+      return QueryDispatcher.runReducer(dispatchableSubPlan, requestMetadataMap, _mailboxService);
     }
   }
 
@@ -196,10 +203,18 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
           new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
       StagePlan stagePlan = new StagePlan(dispatchableStagePlan.getPlanFragment().getFragmentRoot(), stageMetadata);
       for (WorkerMetadata workerMetadata : workerMetadataList) {
-        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap));
+        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap,
+            getExecutionContext(serverEnclosure, requestMetadataMap)));
       }
     }
     return submissionStubs;
+  }
+
+  /// Returns the execution context in which the given server runs a stage worker. By default, each worker gets its own
+  /// context, while the query server shares one context between all the stages of a query.
+  protected QueryExecutionContext getExecutionContext(QueryServerEnclosure server,
+      Map<String, String> requestMetadataMap) {
+    return QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId");
   }
 
   protected List<Object[]> queryH2(String sql)
@@ -305,6 +320,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         assertTrue(value instanceof String,
             "Got unexpected value type: " + value.getClass() + " for BYTES column, expected: String or byte[]");
         return value;
+      case UUID:
+        return UuidUtils.toUUID(value).toString();
       case INT_ARRAY:
         if (value instanceof List) {
           return ((List) value).stream().mapToInt(i -> (int) i).toArray();
@@ -413,6 +430,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       case TIMESTAMP:
       case STRING:
       case BYTES:
+      case UUID:
         return actual.equals(expected);
       case INT_ARRAY:
         return Arrays.equals((int[]) actual, (int[]) expected);
@@ -509,6 +527,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
               case BYTES:
                 h2Statement.setBytes(h2Index++, Hex.decodeHex((String) value));
                 break;
+              case UUID:
+                h2Statement.setObject(h2Index++, UuidUtils.toUUID(value));
+                break;
               default:
                 h2Statement.setObject(h2Index++, value);
                 break;
@@ -552,6 +573,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         return "BYTEA";
       case TIMESTAMP:
         return "TIMESTAMP";
+      case UUID:
+        return "UUID";
       default:
         throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
     }
@@ -583,6 +606,14 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public Integer _partitionCount;
       @JsonProperty("replicated")
       public boolean _replicated;
+      @JsonProperty("isDimTable")
+      public boolean _isDimTable;
+      @JsonProperty("isActualDimTableNeeded")
+      public boolean _isActualDimTableNeeded;
+      @JsonProperty("disablePreload")
+      public boolean _disablePreload; // Help diff between FastLookup and MemOpt DimData table
+      @JsonProperty("primaryKeyColumns")
+      public List<String> _primaryKeyColumns;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -606,6 +637,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public Integer _expectedNumSegments;
       @JsonProperty("ignoreV2Optimizer")
       public Boolean _ignoreV2Optimizer = false;
+      @JsonProperty("ignoreLiteMode")
+      public Boolean _ignoreLiteMode = false;
     }
 
     public static class ColumnAndType {

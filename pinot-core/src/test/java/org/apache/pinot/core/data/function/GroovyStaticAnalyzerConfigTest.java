@@ -20,16 +20,14 @@ package org.apache.pinot.core.data.function;
 
 import java.util.Iterator;
 import java.util.List;
-import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
+import org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Test serialization and deserialization.
- */
+/// Test serialization and deserialization.
 public class GroovyStaticAnalyzerConfigTest {
   @Test
   public void testEmptyConfig()

@@ -24,7 +24,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.BiMap;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,12 +42,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This is a helper class that calls the server API endpoints to fetch consuming segments info
- * Only the servers returning success are returned by the method. For servers returning errors (http error or
- * otherwise),
- * no entry is created in the return list
- */
+/// This is a helper class that calls the server API endpoints to fetch consuming segments info
+/// Only the servers returning success are returned by the method. For servers returning errors (http error or
+/// otherwise),
+/// no entry is created in the return list
 public class ConsumingSegmentInfoReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentInfoReader.class);
 
@@ -63,10 +60,8 @@ public class ConsumingSegmentInfoReader {
     _pinotHelixResourceManager = helixResourceManager;
   }
 
-  /**
-   * This method retrieves the consuming segments info for a given realtime table.
-   * @return a map of segmentName to the information about its consumer
-   */
+  /// This method retrieves the consuming segments info for a given realtime table.
+  /// @return a map of segmentName to the information about its consumer
   public ConsumingSegmentsInfoMap getConsumingSegmentsInfo(String tableNameWithType, int timeoutMs)
       throws InvalidConfigException {
     final Map<String, List<String>> serverToSegments =
@@ -93,14 +88,12 @@ public class ConsumingSegmentInfoReader {
     }
     // Segments which are in CONSUMING state but found no consumer on the server
     Set<String> consumingSegments = _pinotHelixResourceManager.getConsumingSegments(tableNameWithType);
-    consumingSegments.forEach(c -> consumingSegmentInfoMap.putIfAbsent(c, Collections.emptyList()));
+    consumingSegments.forEach(c -> consumingSegmentInfoMap.putIfAbsent(c, List.of()));
     return new ConsumingSegmentsInfoMap(consumingSegmentInfoMap, response._failedResponseCount, response._failedParses);
   }
 
-  /**
-   * This method makes a MultiGet call to all servers to get the consuming segments info.
-   * @return servers queried and a list of consumer status information for consuming segments on that server
-   */
+  /// This method makes a MultiGet call to all servers to get the consuming segments info.
+  /// @return servers queried and a list of consumer status information for consuming segments on that server
   private ConsumingSegmentsInfoFromServersResponse getConsumingSegmentsInfoFromServers(String tableNameWithType,
       BiMap<String, String> serverToEndpoints, int timeoutMs) {
     LOGGER.info("Reading consuming segment info from servers: {} for table: {}", serverToEndpoints.keySet(),
@@ -114,7 +107,8 @@ public class ConsumingSegmentInfoReader {
     }
 
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers,
+            _pinotHelixResourceManager.getServerAdminAuthProvider());
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, tableNameWithType, false, timeoutMs);
     Map<String, List<SegmentConsumerInfo>> serverToConsumingSegmentInfoList = new HashMap<>();
@@ -141,11 +135,9 @@ public class ConsumingSegmentInfoReader {
     return String.format("%s/tables/%s/consumingSegmentsInfo", endpoint, tableNameWithType);
   }
 
-  /**
-   * Utility method to derive ingestion status from consuming segment Info. Status is HEALTHY if
-   * consuming segment info specifies CONSUMING state for all active segments across all servers
-   * including replicas.
-   */
+  /// Utility method to derive ingestion status from consuming segment Info. Status is HEALTHY if
+  /// consuming segment info specifies CONSUMING state for all active segments across all servers
+  /// including replicas.
   public TableStatus.IngestionStatus getIngestionStatus(String tableNameWithType, int timeoutMs) {
     try {
       ConsumingSegmentsInfoMap consumingSegmentsInfoMap = getConsumingSegmentsInfo(tableNameWithType, timeoutMs);
@@ -185,9 +177,7 @@ public class ConsumingSegmentInfoReader {
     }
   }
 
-  /**
-   * Map containing all consuming segments and their status information
-   */
+  /// Map containing all consuming segments and their status information
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class ConsumingSegmentsInfoMap {
     public TreeMap<String, List<ConsumingSegmentInfo>> _segmentToConsumingInfoMap;
@@ -206,9 +196,7 @@ public class ConsumingSegmentInfoReader {
     }
   }
 
-  /**
-   * Contains all the information about a consuming segment
-   */
+  /// Contains all the information about a consuming segment
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class ConsumingSegmentInfo {
     @JsonProperty("serverName")

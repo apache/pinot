@@ -23,17 +23,15 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Another version of {@link ConcurrentIndexedTable} used for use cases
- * configured to have infinite group by (num group limit to se 1B or higher).
- * For such cases, there won't be any resizing/trimming during upsert since
- * trimThreshold is very high. Thus, we can avoid the overhead of readLock's
- * lock and unlock operations which are otherwise used in ConcurrentIndexedTable
- * to prevent race conditions between 2 threads doing upsert and one of them ends
- * up trimming from upsert. For use cases with very large number of groups, we had
- * noticed that load-unlock overhead was > 1sec and this specialized concurrent
- * indexed table avoids that by overriding just the upsert method
- */
+/// Another version of [ConcurrentIndexedTable] used for use cases
+/// configured to have infinite group by (num group limit to se 1B or higher).
+/// For such cases, there won't be any resizing/trimming during upsert since
+/// trimThreshold is very high. Thus, we can avoid the overhead of readLock's
+/// lock and unlock operations which are otherwise used in ConcurrentIndexedTable
+/// to prevent race conditions between 2 threads doing upsert and one of them ends
+/// up trimming from upsert. For use cases with very large number of groups, we had
+/// noticed that load-unlock overhead was > 1sec and this specialized concurrent
+/// indexed table avoids that by overriding just the upsert method
 public class UnboundedConcurrentIndexedTable extends ConcurrentIndexedTable {
 
   public UnboundedConcurrentIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,

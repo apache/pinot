@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -29,14 +30,16 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-/**
- * Aggregation function to compute the count of distinct values for an SV column.
- */
+/// Aggregation function to compute the count of distinct values for an SV column.
 public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 
   public DistinctCountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(verifySingleArgument(arguments, "DISTINCT_COUNT"), AggregationFunctionType.DISTINCTCOUNT,
-        nullHandlingEnabled);
+    this(verifySingleArgument(arguments, "DISTINCT_COUNT"), AggregationFunctionType.DISTINCTCOUNT, nullHandlingEnabled);
+  }
+
+  protected DistinctCountAggregationFunction(ExpressionContext expression,
+      AggregationFunctionType aggregationFunctionType, boolean nullHandlingEnabled) {
+    super(expression, aggregationFunctionType, nullHandlingEnabled);
   }
 
   @Override
@@ -81,8 +84,8 @@ public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggre
   }
 
   @Override
-  public Integer extractFinalResult(Set intermediateResult) {
-    return intermediateResult.size();
+  public Integer extractFinalResult(@Nullable Set intermediateResult) {
+    return intermediateResult == null ? 0 : intermediateResult.size();
   }
 
   @Override

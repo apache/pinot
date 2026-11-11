@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.query.scheduler;
 
-/**
- * Indicates that the scheduler queue is out of capacity
- */
+/// Indicates that the scheduler queue is out of capacity
 public class OutOfCapacityException extends Exception {
 
   public OutOfCapacityException(String msg) {

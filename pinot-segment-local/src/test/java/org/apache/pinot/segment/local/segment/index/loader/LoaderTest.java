@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.loader;
 
 import java.io.File;
 import java.net.URL;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -29,19 +28,22 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
-import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
-import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -77,10 +79,10 @@ public class LoaderTest {
   private static final String VECTOR_INDEX_COL_NAME = "vector1";
   private static final int VECTOR_DIM_SIZE = 512;
 
-  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER =
-      new SegmentOperationsThrottler(new SegmentAllIndexPreprocessThrottler(1, 2, true),
-          new SegmentStarTreePreprocessThrottler(1, 2, true), new SegmentDownloadThrottler(1, 2, true),
-          new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
+  private static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER =
+      new SegmentOperationsThrottlerSet(new SegmentOperationsThrottler(1, 2, true),
+          new SegmentOperationsThrottler(1, 2, true), new SegmentOperationsThrottler(1, 2, true),
+          new SegmentOperationsThrottler(1, 2, true));
 
   private File _avroFile;
   private File _vectorAvroFile;
@@ -144,10 +146,8 @@ public class LoaderTest {
     testConversion();
   }
 
-  /**
-   * Format converter will leave stale directory around if there were conversion failures. This test checks loading in
-   * that scenario.
-   */
+  /// Format converter will leave stale directory around if there were conversion failures. This test checks loading in
+  /// that scenario.
   @Test
   public void testLoadWithStaleConversionDir()
       throws Exception {
@@ -222,16 +222,38 @@ public class LoaderTest {
   }
 
   private void testBuiltInVirtualColumns(IndexSegment indexSegment) {
-    assertTrue(indexSegment.getColumnNames().containsAll(
-        Arrays.asList(BuiltInVirtualColumn.DOCID, BuiltInVirtualColumn.HOSTNAME, BuiltInVirtualColumn.SEGMENTNAME)));
-    assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.DOCID));
-    assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.HOSTNAME));
-    assertNotNull(indexSegment.getDataSource(BuiltInVirtualColumn.SEGMENTNAME));
+    // Iterate the full set so that a newly added built-in virtual column is covered automatically
+    assertTrue(indexSegment.getColumnNames().containsAll(BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS));
+    for (String column : BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS) {
+      assertNotNull(indexSegment.getDataSource(column), "Missing data source for virtual column: " + column);
+    }
+
+    // Segment metadata that this segment carries is exposed as a real value, and is not marked null
+    SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+    assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.TOTALDOCS).getDictionary().get(0),
+        segmentMetadata.getTotalDocs());
+    assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.CRC).getDictionary().get(0),
+        segmentMetadata.getCrc());
+    assertEquals(indexSegment.getDataSource(BuiltInVirtualColumn.CREATIONTIME).getDictionary().get(0),
+        segmentMetadata.getIndexCreationTime());
+    for (String column : List.of(BuiltInVirtualColumn.TOTALDOCS, BuiltInVirtualColumn.CRC,
+        BuiltInVirtualColumn.CREATIONTIME)) {
+      assertNull(indexSegment.getDataSource(column).getNullValueVector(),
+          "Unexpected null value vector for virtual column: " + column);
+    }
+
+    // This table has no time column, so the segment has no time range and the two time columns read as NULL
+    assertNull(segmentMetadata.getTimeInterval());
+    for (String column : List.of(BuiltInVirtualColumn.STARTTIME, BuiltInVirtualColumn.ENDTIME)) {
+      DataSource dataSource = indexSegment.getDataSource(column);
+      assertEquals(dataSource.getDictionary().get(0), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP);
+      NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+      assertNotNull(nullValueVector, "Missing null value vector for virtual column: " + column);
+      assertEquals(nullValueVector.getNullBitmap().getCardinality(), segmentMetadata.getTotalDocs());
+    }
   }
 
-  /**
-   * Tests loading default string column with empty ("") default null value.
-   */
+  /// Tests loading default string column with empty ("") default null value.
   @Test
   public void testDefaultEmptyValueStringColumn()
       throws Exception {
@@ -454,8 +476,7 @@ public class LoaderTest {
       builder.setSegmentVersion(segmentVersion.toString());
     }
     if (enableInvertedIndex) {
-      builder.setInvertedIndexColumns(List.of(NO_FORWARD_INDEX_COL_NAME))
-          .setCreateInvertedIndexDuringSegmentGeneration(true);
+      builder.setInvertedIndexColumns(List.of(NO_FORWARD_INDEX_COL_NAME));
     }
     return builder.build();
   }
@@ -652,19 +673,12 @@ public class LoaderTest {
     verifyIndexDirIsV3(_indexDir);
     // no change/conversion should have happened for textIndex dir
     textIndexFile = SegmentDirectoryPaths.findTextIndexIndexFile(_indexDir, TEXT_INDEX_COL_NAME);
-    // segment load should have created the docID mapping file in V3 structure
-    File textIndexDocIdMappingFile =
-        SegmentDirectoryPaths.findTextIndexDocIdMappingFile(_indexDir, TEXT_INDEX_COL_NAME);
     assertNotNull(textIndexFile);
-    assertNotNull(textIndexDocIdMappingFile);
     assertTrue(textIndexFile.isDirectory());
-    assertFalse(textIndexDocIdMappingFile.isDirectory());
     assertEquals(textIndexFile.getName(),
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
     assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
-    assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    assertIdentityTextIndexMapping(indexSegment, textIndexFile);
     indexSegment.destroy();
 
     // CASE 2: set the segment version to load in IndexLoadingConfig as V3
@@ -681,18 +695,12 @@ public class LoaderTest {
     verifyIndexDirIsV3(_indexDir);
     // no change/conversion should have happened for textIndex dir
     textIndexFile = SegmentDirectoryPaths.findTextIndexIndexFile(_indexDir, TEXT_INDEX_COL_NAME);
-    // segment load should have created the docID mapping file in V3 structure
-    textIndexDocIdMappingFile = SegmentDirectoryPaths.findTextIndexDocIdMappingFile(_indexDir, TEXT_INDEX_COL_NAME);
     assertNotNull(textIndexFile);
-    assertNotNull(textIndexDocIdMappingFile);
     assertTrue(textIndexFile.isDirectory());
-    assertFalse(textIndexDocIdMappingFile.isDirectory());
     assertEquals(textIndexFile.getName(),
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
     assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
-    assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    assertIdentityTextIndexMapping(indexSegment, textIndexFile);
     indexSegment.destroy();
 
     // Test for scenarios by creating on-disk segment in V1 and then loading
@@ -712,7 +720,6 @@ public class LoaderTest {
     textIndexFile = SegmentDirectoryPaths.findTextIndexIndexFile(_indexDir, TEXT_INDEX_COL_NAME);
     assertNotNull(textIndexFile);
     assertTrue(textIndexFile.isDirectory());
-    assertFalse(textIndexDocIdMappingFile.isDirectory());
     assertEquals(textIndexFile.getName(),
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
     assertEquals(textIndexFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
@@ -730,17 +737,12 @@ public class LoaderTest {
     assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     // no change/conversion should have happened in text index Dir
     textIndexFile = SegmentDirectoryPaths.findTextIndexIndexFile(_indexDir, TEXT_INDEX_COL_NAME);
-    // segment load should have created the docID mapping file in V1 structure
-    textIndexDocIdMappingFile = SegmentDirectoryPaths.findTextIndexDocIdMappingFile(_indexDir, TEXT_INDEX_COL_NAME);
     assertNotNull(textIndexFile);
-    assertNotNull(textIndexDocIdMappingFile);
     assertTrue(textIndexFile.isDirectory());
     assertEquals(textIndexFile.getName(),
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
     assertEquals(textIndexFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
-    assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
+    assertIdentityTextIndexMapping(indexSegment, textIndexFile);
     indexSegment.destroy();
 
     // CASE 2: set the segment version to load in IndexLoadingConfig to V1
@@ -756,17 +758,12 @@ public class LoaderTest {
     assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     // no change/conversion should have happened in text index Dir
     textIndexFile = SegmentDirectoryPaths.findTextIndexIndexFile(_indexDir, TEXT_INDEX_COL_NAME);
-    // segment load should have created the docID mapping file in V1 structure
-    textIndexDocIdMappingFile = SegmentDirectoryPaths.findTextIndexDocIdMappingFile(_indexDir, TEXT_INDEX_COL_NAME);
     assertNotNull(textIndexFile);
-    assertNotNull(textIndexDocIdMappingFile);
     assertTrue(textIndexFile.isDirectory());
     assertEquals(textIndexFile.getName(),
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
     assertEquals(textIndexFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
-    assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
+    assertIdentityTextIndexMapping(indexSegment, textIndexFile);
     indexSegment.destroy();
 
     // CASE 3: set the segment version to load in IndexLoadingConfig to V3
@@ -782,18 +779,25 @@ public class LoaderTest {
     verifyIndexDirIsV3(_indexDir);
     // check that text index exists under V3 subdir. It should exist and should be a subdir
     textIndexFile = SegmentDirectoryPaths.findTextIndexIndexFile(_indexDir, TEXT_INDEX_COL_NAME);
-    // segment load should have created the docID mapping file in V3 structure
-    textIndexDocIdMappingFile = SegmentDirectoryPaths.findTextIndexDocIdMappingFile(_indexDir, TEXT_INDEX_COL_NAME);
     assertNotNull(textIndexFile);
-    assertNotNull(textIndexDocIdMappingFile);
     assertTrue(textIndexFile.isDirectory());
     assertEquals(textIndexFile.getName(),
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
     assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
-    assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-    assertEquals(textIndexDocIdMappingFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    assertIdentityTextIndexMapping(indexSegment, textIndexFile);
     indexSegment.destroy();
+  }
+
+  private void assertIdentityTextIndexMapping(IndexSegment indexSegment, File textIndexDir)
+      throws Exception {
+    // Verified identity mappings remain Skip across loads and V1-to-V3 conversion, without a sidecar.
+    assertNull(SegmentDirectoryPaths.findTextIndexDocIdMappingFile(_indexDir, TEXT_INDEX_COL_NAME));
+    File propertiesFile = new File(textIndexDir, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
+    assertEquals(TextIndexUtils.getUpdatedConfigFromPropertiesFile(propertiesFile,
+        new TextIndexConfigBuilder().build())
+        .getDocIdTranslatorMode(), DocIdTranslatorMode.Skip);
+    assertEquals(indexSegment.getDataSource(TEXT_INDEX_COL_NAME).getTextIndex().getDocIds("*:*", null).getCardinality(),
+        indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
   private void constructSegmentWithVectorIndex(SegmentVersion segmentVersion)
@@ -981,8 +985,9 @@ public class LoaderTest {
   private void verifyIndexDirIsV3(File indexDir) {
     File[] files = indexDir.listFiles();
     assertNotNull(files);
-    assertEquals(files.length, 1);
-    assertEquals(files[0].getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+    assertTrue(new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME).isDirectory());
+    // Serving a sealed segment also writes a versioned metadata sidecar beside the v3 index directory.
+    assertEquals(files.length, new File(indexDir, "segment_metadata.bin").isFile() ? 2 : 1);
   }
 
   @AfterClass

@@ -19,30 +19,29 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.utils.DoubleVectorOpUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
-/**
- * Histogram for single-value numerical columns
- * usage example:
- * `Histogram(columnName, ARRAY[0,1,10,100])` to specify bins [0,1), [1,10), [10,1000] or
- * `Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins [0,100), [100,200), ..., [900,1000]
- */
-public class HistogramAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
+/// Histogram for single-value numerical columns
+/// usage example:
+/// `Histogram(columnName, ARRAY\[0,1,10,100\])` to specify bins \[0,1), \[1,10), \[10,1000\] or
+/// `Histogram(columnName, 0, 1000, 10)` to specify 10 equal-length bins \[0,100), \[100,200), ..., \[900,1000\]
+public class HistogramAggregationFunction extends BaseSingleInputAggregationFunction<double[], double[]> {
+  private static final int DOUBLE_ARRAY_LIST_TYPE = 3;
 
   private static final String ARRAY_CONSTRUCTOR = "arrayvalueconstructor";
   private static final int INVALID_BIN = -1;
@@ -52,8 +51,8 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
   double _upper;
   double _binLength;
 
-  public HistogramAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public HistogramAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments == 4 || numArguments == 2, "Histogram expects 2 or 4 arguments, got: %s;"
         + " usage example: `Histogram(columnName, ARRAY[0,1,10,100])` to specify bins [0,1), [1,10), [10,1000] or "
@@ -147,12 +146,18 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     return ret;
   }
 
-  /**
-   * Find the bin id for the input value. Use division for equal-length bins, and binary search otherwise.
-   *
-   * @param val input value
-   * @return bin id
-   */
+  /// Counts one value into the supplied histogram, ignoring values that fall outside every bin.
+  private void increment(double[] histogram, double value) {
+    int binId = getBinId(value);
+    if (binId != INVALID_BIN) {
+      histogram[binId] += 1;
+    }
+  }
+
+  /// Find the bin id for the input value. Use division for equal-length bins, and binary search otherwise.
+  ///
+  /// @param val input value
+  /// @return bin id
   private int getBinId(double val) {
     if (val > _upper || val < _lower) {
       return INVALID_BIN;
@@ -194,24 +199,30 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    DoubleArrayList aggregationResultHolderResult = aggregationResultHolder.getResult();
-    if (aggregationResultHolderResult == null) {
-      return DoubleVectorOpUtils.createAndInitialize(getNumBins());
-    } else {
-      return aggregationResultHolderResult;
+  public double[] extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    double[] histogram = aggregationResultHolder.getResult();
+    if (histogram != null) {
+      return histogram;
     }
+    // With the option disabled an untouched holder still renders the empty accumulator, which is the
+    // intermediate this mode has always emitted; with it enabled the null is the signal that nothing was
+    // aggregated.
+    return _nullHandlingEnabled ? null : new double[getNumBins()];
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public double[] extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public DoubleArrayList merge(DoubleArrayList intermediateResult1, DoubleArrayList intermediateResult2) {
-    DoubleVectorOpUtils.vectorAdd(intermediateResult1, intermediateResult2);
+  public double[] merge(double[] intermediateResult1, double[] intermediateResult2) {
+    for (int i = 0; i < intermediateResult1.length; i++) {
+      intermediateResult1[i] += intermediateResult2[i];
+    }
     return intermediateResult1;
   }
 
@@ -221,14 +232,13 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubles) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubles));
+  public SerializedResult serializeIntermediateResult(double[] histogram) {
+    return new SerializedValue<>(DOUBLE_ARRAY_LIST_TYPE, histogram, ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE);
   }
 
   @Override
-  public DoubleArrayList deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
+  public double[] deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override
@@ -236,59 +246,171 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     return ColumnDataType.DOUBLE_ARRAY;
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractFinalResult(DoubleArrayList doubleArrayList) {
-    return doubleArrayList;
+  public double[] extractFinalResult(@Nullable double[] histogram) {
+    if (histogram == null) {
+      // A null intermediate result means nothing was aggregated. With null handling enabled the histogram of nothing
+      // is NULL; with it disabled it is the all-zero histogram, which is the answer this mode has always given.
+      return _nullHandlingEnabled ? null : new double[getNumBins()];
+    }
+    return histogram;
   }
 
   @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+  public double[] mergeFinalResult(double[] finalResult1, double[] finalResult2) {
+    return merge(finalResult1.clone(), finalResult2);
+  }
+
+  @Override
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    Preconditions.checkState(blockValSet.isSingleValue(), "Histogram currently only supports single-valued column");
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, blockValSet);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet);
+    }
+  }
+
+  private void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    double[] aggregatedHistogram = aggregationResultHolder.getResult();
+    double[] histogram = aggregatedHistogram != null ? aggregatedHistogram : new double[getNumBins()];
+    int numRows;
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          double value = values[i];
-          for (int groupKey : groupKeysArray[i]) {
-            setGroupByResult(groupKey, groupByResultHolder, value);
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            increment(histogram, values[i]);
           }
-        }
+          return acum + to - from;
+        });
         break;
       }
       case LONG: {
         long[] values = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          double value = values[i];
-          for (int groupKey : groupKeysArray[i]) {
-            setGroupByResult(groupKey, groupByResultHolder, value);
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            increment(histogram, values[i]);
           }
-        }
+          return acum + to - from;
+        });
         break;
       }
       case FLOAT: {
         float[] values = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          double value = values[i];
-          for (int groupKey : groupKeysArray[i]) {
-            setGroupByResult(groupKey, groupByResultHolder, value);
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            increment(histogram, values[i]);
           }
-        }
+          return acum + to - from;
+        });
         break;
       }
       case DOUBLE: {
         double[] values = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          double value = values[i];
-          for (int groupKey : groupKeysArray[i]) {
-            setGroupByResult(groupKey, groupByResultHolder, value);
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            increment(histogram, values[i]);
           }
-        }
+          return acum + to - from;
+        });
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            increment(histogram, values[i].doubleValue());
+          }
+          return acum + to - from;
+        });
         break;
       }
       default:
-        throw new IllegalStateException("Cannot compute histogram for non-numeric type: " + blockValSet.getValueType());
+        throw new IllegalStateException("Cannot compute histogram for non-numeric type: "
+            + blockValSet.getValueType());
+    }
+    // Rows are counted into the aggregated histogram when there is one. A new histogram is published only when a row
+    // reached it, so a block with no non-null row leaves the holder untouched and extractFinalResult sees the null
+    // that means nothing was aggregated.
+    if (aggregatedHistogram == null && numRows > 0) {
+      aggregationResultHolder.setValue(histogram);
+    }
+  }
+
+  private void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    double[] aggregatedHistogram = aggregationResultHolder.getResult();
+    double[] histogram = aggregatedHistogram != null ? aggregatedHistogram : new double[getNumBins()];
+    int numRows;
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT: {
+        int[][] values = blockValSet.getIntValuesMV();
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (int value : values[i]) {
+              increment(histogram, value);
+            }
+          }
+          return acum + to - from;
+        });
+        break;
+      }
+      case LONG: {
+        long[][] values = blockValSet.getLongValuesMV();
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (long value : values[i]) {
+              increment(histogram, value);
+            }
+          }
+          return acum + to - from;
+        });
+        break;
+      }
+      case FLOAT: {
+        float[][] values = blockValSet.getFloatValuesMV();
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (float value : values[i]) {
+              increment(histogram, value);
+            }
+          }
+          return acum + to - from;
+        });
+        break;
+      }
+      case DOUBLE: {
+        double[][] values = blockValSet.getDoubleValuesMV();
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (double value : values[i]) {
+              increment(histogram, value);
+            }
+          }
+          return acum + to - from;
+        });
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[][] values = blockValSet.getBigDecimalValuesMV();
+        numRows = foldNotNull(length, blockValSet, 0, (acum, from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (BigDecimal value : values[i]) {
+              increment(histogram, value.doubleValue());
+            }
+          }
+          return acum + to - from;
+        });
+        break;
+      }
+      default:
+        throw new IllegalStateException("Cannot compute histogram for non-numeric type: "
+            + blockValSet.getValueType());
+    }
+    if (aggregatedHistogram == null && numRows > 0) {
+      aggregationResultHolder.setValue(histogram);
     }
   }
 
@@ -296,115 +418,299 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  private void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          setGroupByResult(groupKeyArray[i], groupByResultHolder, values[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            int value = values[i];
+            setGroupByResult(groupKeyArray[i], groupByResultHolder, value);
+          }
+        });
         break;
       }
       case LONG: {
         long[] values = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          setGroupByResult(groupKeyArray[i], groupByResultHolder, values[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            long value = values[i];
+            setGroupByResult(groupKeyArray[i], groupByResultHolder, value);
+          }
+        });
         break;
       }
       case FLOAT: {
         float[] values = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          setGroupByResult(groupKeyArray[i], groupByResultHolder, values[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            float value = values[i];
+            setGroupByResult(groupKeyArray[i], groupByResultHolder, value);
+          }
+        });
         break;
       }
       case DOUBLE: {
         double[] values = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          setGroupByResult(groupKeyArray[i], groupByResultHolder, values[i]);
-        }
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            double value = values[i];
+            setGroupByResult(groupKeyArray[i], groupByResultHolder, value);
+          }
+        });
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            double value = values[i].doubleValue();
+            setGroupByResult(groupKeyArray[i], groupByResultHolder, value);
+          }
+        });
         break;
       }
       default:
-        throw new IllegalStateException("Cannot compute histogram for non-numeric type: " + blockValSet.getValueType());
+        throw new IllegalStateException("Cannot compute histogram for non-numeric type: "
+            + blockValSet.getValueType());
+    }
+  }
+
+  private void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT: {
+        int[][] values = blockValSet.getIntValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (int value : values[i]) {
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, value);
+            }
+          }
+        });
+        break;
+      }
+      case LONG: {
+        long[][] values = blockValSet.getLongValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (long value : values[i]) {
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, value);
+            }
+          }
+        });
+        break;
+      }
+      case FLOAT: {
+        float[][] values = blockValSet.getFloatValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (float value : values[i]) {
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, value);
+            }
+          }
+        });
+        break;
+      }
+      case DOUBLE: {
+        double[][] values = blockValSet.getDoubleValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (double value : values[i]) {
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, value);
+            }
+          }
+        });
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[][] values = blockValSet.getBigDecimalValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (BigDecimal value : values[i]) {
+              setGroupByResult(groupKeyArray[i], groupByResultHolder, value.doubleValue());
+            }
+          }
+        });
+        break;
+      }
+      default:
+        throw new IllegalStateException("Cannot compute histogram for non-numeric type: "
+            + blockValSet.getValueType());
+    }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  private void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT: {
+        int[] values = blockValSet.getIntValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            int value = values[i];
+            for (int groupKey : groupKeysArray[i]) {
+              setGroupByResult(groupKey, groupByResultHolder, value);
+            }
+          }
+        });
+        break;
+      }
+      case LONG: {
+        long[] values = blockValSet.getLongValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            long value = values[i];
+            for (int groupKey : groupKeysArray[i]) {
+              setGroupByResult(groupKey, groupByResultHolder, value);
+            }
+          }
+        });
+        break;
+      }
+      case FLOAT: {
+        float[] values = blockValSet.getFloatValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            float value = values[i];
+            for (int groupKey : groupKeysArray[i]) {
+              setGroupByResult(groupKey, groupByResultHolder, value);
+            }
+          }
+        });
+        break;
+      }
+      case DOUBLE: {
+        double[] values = blockValSet.getDoubleValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            double value = values[i];
+            for (int groupKey : groupKeysArray[i]) {
+              setGroupByResult(groupKey, groupByResultHolder, value);
+            }
+          }
+        });
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            double value = values[i].doubleValue();
+            for (int groupKey : groupKeysArray[i]) {
+              setGroupByResult(groupKey, groupByResultHolder, value);
+            }
+          }
+        });
+        break;
+      }
+      default:
+        throw new IllegalStateException("Cannot compute histogram for non-numeric type: "
+            + blockValSet.getValueType());
+    }
+  }
+
+  private void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    switch (blockValSet.getValueType().getStoredType()) {
+      case INT: {
+        int[][] values = blockValSet.getIntValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (int value : values[i]) {
+              for (int groupKey : groupKeysArray[i]) {
+                setGroupByResult(groupKey, groupByResultHolder, value);
+              }
+            }
+          }
+        });
+        break;
+      }
+      case LONG: {
+        long[][] values = blockValSet.getLongValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (long value : values[i]) {
+              for (int groupKey : groupKeysArray[i]) {
+                setGroupByResult(groupKey, groupByResultHolder, value);
+              }
+            }
+          }
+        });
+        break;
+      }
+      case FLOAT: {
+        float[][] values = blockValSet.getFloatValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (float value : values[i]) {
+              for (int groupKey : groupKeysArray[i]) {
+                setGroupByResult(groupKey, groupByResultHolder, value);
+              }
+            }
+          }
+        });
+        break;
+      }
+      case DOUBLE: {
+        double[][] values = blockValSet.getDoubleValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (double value : values[i]) {
+              for (int groupKey : groupKeysArray[i]) {
+                setGroupByResult(groupKey, groupByResultHolder, value);
+              }
+            }
+          }
+        });
+        break;
+      }
+      case BIG_DECIMAL: {
+        BigDecimal[][] values = blockValSet.getBigDecimalValuesMV();
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to && i < values.length; i++) {
+            for (BigDecimal value : values[i]) {
+              for (int groupKey : groupKeysArray[i]) {
+                setGroupByResult(groupKey, groupByResultHolder, value.doubleValue());
+              }
+            }
+          }
+        });
+        break;
+      }
+      default:
+        throw new IllegalStateException("Cannot compute histogram for non-numeric type: "
+            + blockValSet.getValueType());
     }
   }
 
   protected void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, double val) {
     int binID = getBinId(val);
-    DoubleArrayList byResultHolderResult = groupByResultHolder.getResult(groupKey);
-    if (byResultHolderResult == null) {
-      byResultHolderResult = DoubleVectorOpUtils.createAndInitialize(getNumBins());
-      groupByResultHolder.setValueForKey(groupKey, byResultHolderResult);
+    double[] histogram = groupByResultHolder.getResult(groupKey);
+    if (histogram == null) {
+      histogram = new double[getNumBins()];
+      groupByResultHolder.setValueForKey(groupKey, histogram);
     }
     if (binID != INVALID_BIN) {
-      DoubleVectorOpUtils.incrementElementByOne(byResultHolderResult, binID);
-    }
-  }
-
-  @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    //TODO: Add MV support for histogram
-    Preconditions.checkState(blockValSet.isSingleValue(), "Histogram currently only supports single-valued column");
-    double[] histogram = new double[this.getNumBins()];
-    switch (blockValSet.getValueType().getStoredType()) {
-      case INT: {
-        int[] values = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          int binId = this.getBinId(values[i]);
-          if (binId != INVALID_BIN) {
-            histogram[binId] += 1;
-          }
-        }
-        setAggregationResult(aggregationResultHolder, histogram);
-        break;
-      }
-      case LONG: {
-        long[] values = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          int binId = this.getBinId(values[i]);
-          if (binId != INVALID_BIN) {
-            histogram[binId] += 1;
-          }
-        }
-        setAggregationResult(aggregationResultHolder, histogram);
-        break;
-      }
-      case FLOAT: {
-        float[] values = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          int binId = this.getBinId(values[i]);
-          if (binId != INVALID_BIN) {
-            histogram[binId] += 1;
-          }
-        }
-        setAggregationResult(aggregationResultHolder, histogram);
-        break;
-      }
-      case DOUBLE: {
-        double[] values = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length && i < values.length; i++) {
-          int binId = this.getBinId(values[i]);
-          if (binId != INVALID_BIN) {
-            histogram[binId] += 1;
-          }
-        }
-        setAggregationResult(aggregationResultHolder, histogram);
-        break;
-      }
-      default:
-        throw new IllegalStateException("Cannot compute histogram for non-numeric type: " + blockValSet.getValueType());
-    }
-  }
-
-  protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double[] histogram) {
-    DoubleArrayList aggregatedHistogram = aggregationResultHolder.getResult();
-    if (aggregatedHistogram == null) {
-      aggregationResultHolder.setValue(DoubleVectorOpUtils.createAndInitialize(histogram));
-    } else {
-      DoubleVectorOpUtils.vectorAdd(aggregatedHistogram, histogram);
+      histogram[binID]++;
     }
   }
 }

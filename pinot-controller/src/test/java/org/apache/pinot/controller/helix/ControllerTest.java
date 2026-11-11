@@ -17,21 +17,23 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix;
-
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -59,7 +61,13 @@ import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
+import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -69,18 +77,18 @@ import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
-import org.apache.pinot.controller.api.resources.PauseStatusDetails;
-import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
+import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -115,26 +123,50 @@ public class ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
 
   public static final String LOCAL_HOST = "localhost";
+  // Use a random UUID rather than a timestamp so concurrent forks never share a data/temp dir
+  // (System.currentTimeMillis() collides when two forks initialize in the same millisecond).
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
-      "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
+      "test-controller-data-dir" + UUID.randomUUID()).getAbsolutePath();
   public static final String DEFAULT_LOCAL_TEMP_DIR = new File(FileUtils.getTempDirectoryPath(),
-      "test-controller-local-temp-dir" + System.currentTimeMillis()).getAbsolutePath();
+      "test-controller-local-temp-dir" + UUID.randomUUID()).getAbsolutePath();
   public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   public static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
+  public static final String TEST_PORT_BASE_PROPERTY = "pinot.test.port.base";
+  public static final String TEST_ZK_PORT_BASE_PROPERTY = "pinot.test.zk.port.base";
+
+  /// Per-fork port offset so that concurrent surefire forks (forkCount > 1, reuseForks=false)
+  /// allocate disjoint port ranges. surefire injects a 1-based `surefire.forkNumber` into each
+  /// fork (so it is 1 even at forkCount=1, 1..N under parallel forks); it is 0 only outside a
+  /// surefire fork. Each fork has a 1000-port block with bounded component ranges below. With
+  /// the default base of 20000, the three CI forks use 21000-23999, below Linux's default
+  /// ephemeral range (32768-60999). Custom bases or additional forks must also avoid that range.
+  /// Probing a port does not reserve it until the listener binds.
+  private static final int FORK_PORT_OFFSET = forkNumber() * 1000;
+
+  private static int forkNumber() {
+    try {
+      return Integer.parseInt(System.getProperty("surefire.forkNumber", "0"));
+    } catch (NumberFormatException e) {
+      return 0;
+    }
+  }
+
+  // Offset only when an explicit ZK port base is configured; a base of 0 means "let ZkStarter
+  // pick the port" (which is already fork-aware), so it must stay 0 for forked runs too.
+  private static final int CONFIGURED_ZK_PORT_BASE = Integer.getInteger(TEST_ZK_PORT_BASE_PROPERTY, 0);
+  private static final AtomicInteger NEXT_CONFIGURED_ZK_PORT = new AtomicInteger(
+      CONFIGURED_ZK_PORT_BASE > 0 ? CONFIGURED_ZK_PORT_BASE + FORK_PORT_OFFSET : 0);
 
   // Default ControllerTest instance settings
   public static final int DEFAULT_MIN_NUM_REPLICAS = 2;
   public static final int DEFAULT_NUM_BROKER_INSTANCES = 3;
-  // NOTE: To add HLC realtime table, number of Server instances must be multiple of replicas
   public static final int DEFAULT_NUM_SERVER_INSTANCES = 4;
   public static final int DEFAULT_NUM_MINION_INSTANCES = 2;
 
   public static final long TIMEOUT_MS = 10_000L;
 
-  /**
-   * default static instance used to access all wrapped static instances.
-   */
+  /// default static instance used to access all wrapped static instances.
   public static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
 
   protected static HttpClient _httpClient;
@@ -142,18 +174,34 @@ public class ControllerTest {
   protected final String _clusterName = getClass().getSimpleName();
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
 
-  protected int _nextControllerPort = 20000;
-  protected int _nextBrokerPort = _nextControllerPort + 1000;
-  protected int _nextBrokerGrpcPort = _nextBrokerPort + 500;
-  protected int _nextServerPort = _nextBrokerPort + 1000;
-  protected int _nextMinionPort = _nextServerPort + 1000;
+  private final int _testPortBase = Integer.getInteger(TEST_PORT_BASE_PROPERTY, 20000) + FORK_PORT_OFFSET;
+  protected final TestPortRange _controllerPortRange =
+      new TestPortRange("controller", _testPortBase, _testPortBase + 100);
+  protected final TestPortRange _brokerPortRange =
+      new TestPortRange("broker HTTP", _testPortBase + 100, _testPortBase + 200);
+  protected final TestPortRange _brokerGrpcPortRange =
+      new TestPortRange("broker gRPC", _testPortBase + 200, _testPortBase + 300);
+  protected final TestPortRange _brokerQueryRunnerPortRange =
+      new TestPortRange("broker query runner", _testPortBase + 300, _testPortBase + 400);
+  // Servers allocate five ports per configuration, with additional ports in TLS tests.
+  protected final TestPortRange _serverPortRange =
+      new TestPortRange("server", _testPortBase + 400, _testPortBase + 800);
+  protected final TestPortRange _minionPortRange =
+      new TestPortRange("minion", _testPortBase + 800, _testPortBase + 900);
+  // Offsets 900-999 are spare. Keep cursors separate so subclasses can reuse existing configurations on restart.
+  protected int _nextControllerPort = _controllerPortRange.getStart();
+  protected int _nextBrokerPort = _brokerPortRange.getStart();
+  protected int _nextBrokerGrpcPort = _brokerGrpcPortRange.getStart();
+  protected int _nextBrokerQueryRunnerPort = _brokerQueryRunnerPortRange.getStart();
+  protected int _nextServerPort = _serverPortRange.getStart();
+  protected int _nextMinionPort = _minionPortRange.getStart();
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   // The following fields need to be reset when stopping the controller.
   protected BaseControllerStarter _controllerStarter;
   protected int _controllerPort;
-  protected ControllerRequestClient _controllerRequestClient;
+  private PinotAdminClient _pinotAdminClient;
 
   // The following fields are always set when controller is started. No need to reset them when stopping the controller.
   protected ControllerConf _controllerConfig;
@@ -168,11 +216,9 @@ public class ControllerTest {
   protected TableRebalanceManager _tableRebalanceManager;
   protected TableSizeReader _tableSizeReader;
 
-  /**
-   * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
-   *
-   * @return the default instance.
-   */
+  /// Acquire the [ControllerTest] default instance that can be shared across different test cases.
+  ///
+  /// @return the default instance.
   public static ControllerTest getInstance() {
     return DEFAULT_INSTANCE;
   }
@@ -196,13 +242,11 @@ public class ControllerTest {
     return _clusterName;
   }
 
-  /**
-   * HttpClient is lazy evaluated, static object, only instantiate when first use.
-   *
-   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
-   * context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
-   * it is not possible to create normal member variable, thus the workaround.
-   */
+  /// HttpClient is lazy evaluated, static object, only instantiate when first use.
+  ///
+  /// This is because `ControllerTest` has HTTP utils that depends on the TLSUtils to install the security
+  /// context first before the HttpClient can be initialized. However, because we have static usages of the HTTPClient,
+  /// it is not possible to create normal member variable, thus the workaround.
   public static HttpClient getHttpClient() {
     if (_httpClient == null) {
       _httpClient = HttpClient.getInstance();
@@ -210,37 +254,38 @@ public class ControllerTest {
     return _httpClient;
   }
 
-  /**
-   * Retrieves the headers to be used for the `ControllerRequestClient`.
-   *
-   * <p>This method returns an empty map, indicating that no custom headers
-   * are set by default for the `ControllerRequestClient`.
-   *
-   * @return A map of headers (key-value pairs) to be used for the `ControllerRequestClient`.
-   */
-  protected Map<String, String> getControllerRequestClientHeaders() {
-    return Collections.emptyMap();
+  /// Retrieves the headers to be used for the [PinotAdminClient].
+  ///
+  /// This method returns an empty map, indicating that no custom headers
+  /// are set by default for the [PinotAdminClient].
+  ///
+  /// @return A map of headers (key-value pairs) to be used for the [PinotAdminClient].
+  protected Map<String, String> getAdminClientHeaders() {
+    return Map.of();
   }
 
-  /**
-   * ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
-   *
-   * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
-   * context first before the ControllerRequestClient can be initialized. However, because we have static usages of the
-   * ControllerRequestClient, it is not possible to create normal member variable, thus the workaround.
-   */
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_controllerRequestClient == null) {
-      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(),
-          getControllerRequestClientHeaders());
-    }
-    return _controllerRequestClient;
+  /// Optionally provide an SSL context for controller admin transport and HTTP utilities.
+  @Nullable
+  protected SSLContext getControllerTransportSslContext() {
+    return null;
   }
 
   public void startZk() {
     if (_zookeeperInstance == null) {
-      runWithHelixMock(() -> _zookeeperInstance = ZkStarter.startLocalZkServer());
+      int zkPort = getNextConfiguredZkPort();
+      runWithHelixMock(() -> _zookeeperInstance = zkPort > 0 ? ZkStarter.startLocalZkServer(zkPort)
+          : ZkStarter.startLocalZkServer());
     }
+  }
+
+  private static synchronized int getNextConfiguredZkPort() {
+    int candidatePort = NEXT_CONFIGURED_ZK_PORT.get();
+    if (candidatePort <= 0) {
+      return 0;
+    }
+    int zkPort = NetUtils.findOpenPort(candidatePort);
+    NEXT_CONFIGURED_ZK_PORT.set(zkPort + 1);
+    return zkPort;
   }
 
   public void startZk(int port) {
@@ -269,7 +314,7 @@ public class ControllerTest {
     properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
-    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    int controllerPort = _controllerPortRange.findOpenPort(_nextControllerPort);
     properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
     if (_controllerPort == 0) {
       _controllerPort = controllerPort;
@@ -277,6 +322,7 @@ public class ControllerTest {
     _nextControllerPort = controllerPort + 1;
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
     properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
+    properties.put(ControllerConf.CONFIG_OF_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR, DEFAULT_DATA_DIR);
     // Enable groovy on the controller
     properties.put(ControllerConf.DISABLE_GROOVY, false);
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
@@ -286,15 +332,21 @@ public class ControllerTest {
     return properties;
   }
 
-  /**
-   * Can be overridden to add more properties.
-   */
+  /// Returns the cluster configs to write to the Helix cluster before the controller starts. Can be overridden to set
+  /// cluster configs for the test.
+  ///
+  /// They are written only for keys not set in the cluster yet, the same way the controller writes its default cluster
+  /// configs. The controller then writes its defaults only for the keys still missing, so these configs take
+  /// precedence, and a key changed at runtime keeps its value across a controller restart.
+  protected Map<String, String> getInitialClusterConfigs() {
+    return Map.of();
+  }
+
+  /// Can be overridden to add more properties.
   protected void overrideControllerConf(Map<String, Object> properties) {
   }
 
-  /**
-   * Can be overridden to use a different implementation.
-   */
+  /// Can be overridden to use a different implementation.
   public BaseControllerStarter createControllerStarter() {
     return new ControllerStarter();
   }
@@ -316,6 +368,10 @@ public class ControllerTest {
     runWithHelixMock(() -> {
       assertNull(_controllerStarter, "Controller is already started");
       assertTrue(_controllerPort > 0, "Controller port is not assigned");
+      Map<String, String> clusterConfigs = getInitialClusterConfigs();
+      if (!clusterConfigs.isEmpty()) {
+        HelixSetupUtils.setupHelixClusterWithDefaultConfigs(getZkUrl(), getHelixClusterName(), clusterConfigs);
+      }
       _controllerStarter = createControllerStarter();
       _controllerStarter.init(new PinotConfiguration(properties));
       _controllerStarter.start();
@@ -359,7 +415,15 @@ public class ControllerTest {
     _controllerStarter.stop();
     _controllerStarter = null;
     _controllerPort = 0;
-    _controllerRequestClient = null;
+    _controllerRequestURLBuilder = null;
+    if (_pinotAdminClient != null) {
+      try {
+        _pinotAdminClient.close();
+      } catch (Exception e) {
+        // ignore
+      }
+      _pinotAdminClient = null;
+    }
     FileUtils.deleteQuietly(new File(_controllerDataDir));
   }
 
@@ -383,9 +447,7 @@ public class ControllerTest {
     }
   }
 
-  /**
-   * Adds fake broker instances until total number of broker instances equals maxCount.
-   */
+  /// Adds fake broker instances until total number of broker instances equals maxCount.
   public void addFakeBrokerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
     HelixManager helixManager =
@@ -509,7 +571,7 @@ public class ControllerTest {
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
-    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    int adminPort = _serverPortRange.findOpenPort(_nextServerPort);
     helixAdmin.setConfig(configScope, Map.of(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
     _nextServerPort = adminPort + 1;
     _fakeInstanceHelixManagers.add(helixManager);
@@ -530,13 +592,13 @@ public class ControllerTest {
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
-    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    int adminPort = _serverPortRange.findOpenPort(_nextServerPort);
     helixAdmin.setConfig(configScope, Map.of(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
     _nextServerPort = adminPort + 1;
     _fakeInstanceHelixManagers.add(helixManager);
   }
 
-  /** Add fake server instances until total number of server instances reaches maxCount */
+  /// Add fake server instances until total number of server instances reaches maxCount
   public void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
     // get current instance count
@@ -719,6 +781,52 @@ public class ControllerTest {
     return schema;
   }
 
+  public ControllerRequestURLBuilder getControllerRequestURLBuilder() {
+    return _controllerRequestURLBuilder;
+  }
+
+  public PinotAdminClient getOrCreateAdminClient()
+      throws IOException {
+    if (_pinotAdminClient != null) {
+      return _pinotAdminClient;
+    }
+    try {
+      String baseApiUrl = _controllerBaseApiUrl;
+      if (baseApiUrl == null && _controllerRequestURLBuilder != null) {
+        // Some tests customize the controller request builder without starting their own controller instance.
+        baseApiUrl = _controllerRequestURLBuilder.getBaseUrl();
+      }
+      if (baseApiUrl == null && this != DEFAULT_INSTANCE && DEFAULT_INSTANCE._controllerBaseApiUrl != null) {
+        baseApiUrl = DEFAULT_INSTANCE._controllerBaseApiUrl;
+      }
+      if (baseApiUrl == null) {
+        throw new IOException("Controller base API URL is not initialized");
+      }
+      URI uri = URI.create(baseApiUrl);
+      String controllerAddress = uri.getHost() + ":" + uri.getPort();
+      java.util.Properties properties = new java.util.Properties();
+      if (uri.getScheme() != null) {
+        properties.setProperty(org.apache.pinot.client.admin.PinotAdminTransport.ADMIN_TRANSPORT_SCHEME,
+            uri.getScheme());
+      }
+      SSLContext sslContext = getControllerTransportSslContext();
+      if (sslContext != null) {
+        org.apache.pinot.common.utils.tls.TlsUtils.setSslContext(sslContext);
+      }
+      _pinotAdminClient = new PinotAdminClient(controllerAddress, properties, getAdminClientHeaders(),
+          sslContext);
+      return _pinotAdminClient;
+    } catch (PinotClientException e) {
+      throw new IOException(e);
+    }
+  }
+
+  /// Exposes the admin client for callers that cannot access protected helpers.
+  public PinotAdminClient getAdminClient()
+      throws IOException {
+    return getOrCreateAdminClient();
+  }
+
   public static TableConfig createDummyTableConfig(String tableName, TableType tableType) {
     TableConfigBuilder builder = new TableConfigBuilder(tableType);
     if (tableType == TableType.REALTIME) {
@@ -734,7 +842,7 @@ public class ControllerTest {
 
   public static Schema createDummySchemaWithPrimaryKey(String tableName) {
     Schema schema = createDummySchema(tableName);
-    schema.setPrimaryKeyColumns(Collections.singletonList("dimA"));
+    schema.setPrimaryKeyColumns(List.of("dimA"));
     return schema;
   }
 
@@ -743,22 +851,34 @@ public class ControllerTest {
     addSchema(createDummySchema(tableName));
   }
 
-  /**
-   * Add a schema to the controller.
-   */
+  /// Add a schema to the controller.
   public void addSchema(Schema schema)
       throws IOException {
-    getControllerRequestClient().addSchema(schema);
+    try {
+      getOrCreateAdminClient().getSchemaClient().createSchema(schema.toSingleLineJsonString());
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateSchema(Schema schema)
       throws IOException {
-    getControllerRequestClient().updateSchema(schema);
+    try {
+      getOrCreateAdminClient().getSchemaClient().updateSchema(schema.getSchemaName(),
+          schema.toSingleLineJsonString());
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void forceUpdateSchema(Schema schema)
       throws IOException {
-    getControllerRequestClient().forceUpdateSchema(schema);
+    try {
+      getOrCreateAdminClient().getSchemaClient().updateSchema(schema.getSchemaName(),
+          schema.toSingleLineJsonString(), false, true);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public Schema getSchema(String schemaName) {
@@ -769,32 +889,64 @@ public class ControllerTest {
 
   public void deleteSchema(String schemaName)
       throws IOException {
-    getControllerRequestClient().deleteSchema(schemaName);
+    try {
+      getOrCreateAdminClient().getSchemaClient().deleteSchema(schemaName);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
-    getControllerRequestClient().addTableConfig(tableConfig);
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void addLogicalTableConfig(LogicalTableConfig logicalTableConfig)
       throws IOException {
-    getControllerRequestClient().addLogicalTableConfig(logicalTableConfig);
+    try {
+      getOrCreateAdminClient().getLogicalTableClient().createLogicalTable(logicalTableConfig.toJsonString());
+    } catch (PinotAdminException e) {
+      e.printStackTrace();
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      e.printStackTrace();
+      throw new IOException(e);
+    }
   }
 
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
-    getControllerRequestClient().updateTableConfig(tableConfig);
+    try {
+      getOrCreateAdminClient().getTableClient().updateTableConfig(tableConfig.getTableName(),
+          tableConfig.toJsonString());
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateLogicalTableConfig(LogicalTableConfig logicalTableConfig)
       throws IOException {
-    getControllerRequestClient().updateLogicalTableConfig(logicalTableConfig);
+    try {
+      getOrCreateAdminClient().getLogicalTableClient()
+          .updateLogicalTable(logicalTableConfig.getTableName(), logicalTableConfig.toJsonString());
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw new IOException(e);
+    }
   }
 
   public void toggleTableState(String tableName, TableType type, boolean enable)
       throws IOException {
-    getControllerRequestClient().toggleTableState(tableName, type, enable);
+    try {
+      getOrCreateAdminClient().getTableClient().setTableState(tableName, type.toString().toLowerCase(), enable);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public TableConfig getOfflineTableConfig(String tableName) {
@@ -811,22 +963,41 @@ public class ControllerTest {
 
   public void dropOfflineTable(String tableName)
       throws IOException {
-    getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropOfflineTable(String tableName, String retentionPeriod)
       throws IOException {
-    getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName), retentionPeriod);
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName), null, retentionPeriod, null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropRealtimeTable(String tableName)
       throws IOException {
-    getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropLogicalTable(String logicalTableName)
       throws IOException {
-    getControllerRequestClient().deleteLogicalTable(logicalTableName);
+    try {
+      getOrCreateAdminClient().getLogicalTableClient().deleteLogicalTable(logicalTableName);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void waitForEVToAppear(String tableNameWithType) {
@@ -846,27 +1017,123 @@ public class ControllerTest {
 
   public List<String> listSegments(String tableName, @Nullable String tableType, boolean excludeReplacedSegments)
       throws IOException {
-    return getControllerRequestClient().listSegments(tableName, tableType, excludeReplacedSegments);
+    try {
+      return getOrCreateAdminClient().getSegmentClient()
+          .listSegments(tableName, tableType, excludeReplacedSegments);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropSegment(String tableName, String segmentName)
       throws IOException {
-    getControllerRequestClient().deleteSegment(tableName, segmentName);
+    try {
+      getOrCreateAdminClient().getSegmentClient().deleteSegment(tableName, segmentName, null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void dropAllSegments(String tableName, TableType tableType)
       throws IOException {
-    getControllerRequestClient().deleteSegments(tableName, tableType);
+    try {
+      getOrCreateAdminClient().getSegmentClient().deleteMultipleSegments(
+          TableNameBuilder.forType(tableType).tableNameWithType(tableName), null, null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public long getTableSize(String tableName)
       throws IOException {
-    return getControllerRequestClient().getTableSize(tableName);
+    try {
+      return getOrCreateAdminClient().getTableClient().getReportedTableSizeInBytes(tableName);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public Map<String, List<String>> getTableServersToSegmentsMap(String tableName, TableType tableType)
       throws IOException {
-    return getControllerRequestClient().getServersToSegmentsMap(tableName, tableType);
+    try {
+      return getOrCreateAdminClient().getSegmentClient()
+          .getServerToSegmentsMapAsMap(tableName, tableType != null ? tableType.name() : null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
+  }
+
+  protected String getInstancePartitionsResponse(String tableName, @Nullable String instancePartitionsType)
+      throws IOException {
+    try {
+      return getOrCreateAdminClient().getTableClient().getInstancePartitions(tableName, instancePartitionsType);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
+  }
+
+  protected String assignInstances(String tableName, @Nullable InstancePartitionsType instancePartitionsType,
+      boolean dryRun)
+      throws IOException {
+    try {
+      return getOrCreateAdminClient().getTableClient()
+          .assignInstances(tableName, instancePartitionsType != null ? instancePartitionsType.toString() : null,
+              dryRun);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
+  }
+
+  protected void deleteInstancePartitions(String tableName, @Nullable String instancePartitionsType)
+      throws IOException {
+    try {
+      getOrCreateAdminClient().getTableClient().deleteInstancePartitions(tableName, instancePartitionsType);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
+  }
+
+  protected String replaceInstanceInPartitions(String tableName,
+      @Nullable InstancePartitionsType instancePartitionsType, String oldInstanceId, String newInstanceId)
+      throws IOException {
+    try {
+      return getOrCreateAdminClient().getTableClient()
+          .replaceInstance(tableName, instancePartitionsType != null ? instancePartitionsType.toString() : null,
+              oldInstanceId, newInstanceId);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
+  }
+
+  protected String updateInstancePartitions(String tableName, String instancePartitionsJson)
+      throws IOException {
+    try {
+      return getOrCreateAdminClient().getTableClient().updateInstancePartitions(tableName, instancePartitionsJson);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    } catch (RuntimeException e) {
+      throw wrapRuntimeException(e);
+    }
+  }
+
+  protected IOException wrapRuntimeException(RuntimeException e) {
+    Throwable t = e;
+    while (t.getCause() != null) {
+      t = t.getCause();
+    }
+    String message = t.getMessage();
+    if (message == null || message.isEmpty()) {
+      message = e.toString();
+    }
+    return new IOException(message, e);
   }
 
   public String reloadOfflineTable(String tableName)
@@ -876,47 +1143,95 @@ public class ControllerTest {
 
   public String reloadOfflineTable(String tableName, boolean forceDownload)
       throws IOException {
-    return getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
+    try {
+      return getOrCreateAdminClient().getSegmentClient()
+          .reloadTable(tableName, TableType.OFFLINE.name(), forceDownload);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
-  public String checkIfReloadIsNeeded(String tableNameWithType, Boolean verbose)
+  public TableSegmentsReloadCheckResponse checkIfReloadIsNeeded(String tableNameWithType, Boolean verbose)
       throws IOException {
-    return getControllerRequestClient().checkIfReloadIsNeeded(tableNameWithType, verbose);
+    try {
+      return getOrCreateAdminClient().getSegmentClient()
+          .checkIfReloadIsNeeded(tableNameWithType, verbose != null && verbose);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public String reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
       throws IOException {
-    return getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
+    try {
+      return getOrCreateAdminClient().getSegmentClient().reloadSegment(tableName, segmentName, forceDownload);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public String reloadRealtimeTable(String tableName)
       throws IOException {
-    return getControllerRequestClient().reloadTable(tableName, TableType.REALTIME, false);
+    try {
+      return getOrCreateAdminClient().getSegmentClient().reloadTable(tableName, TableType.REALTIME.name(), false);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    getControllerRequestClient().createBrokerTenant(tenantName, numBrokers);
+    try {
+      String tenantJson = new org.apache.pinot.spi.config.tenant.Tenant(
+          org.apache.pinot.spi.config.tenant.TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
+      getOrCreateAdminClient().getTenantClient().createTenant(tenantJson);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
-    getControllerRequestClient().updateBrokerTenant(tenantName, numBrokers);
+    try {
+      String tenantJson = new org.apache.pinot.spi.config.tenant.Tenant(
+          org.apache.pinot.spi.config.tenant.TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
+      getOrCreateAdminClient().getTenantClient().updateTenant(tenantJson);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void deleteBrokerTenant(String tenantName)
       throws IOException {
-    getControllerRequestClient().deleteBrokerTenant(tenantName);
+    try {
+      getOrCreateAdminClient().getTenantClient().deleteTenant(tenantName, "BROKER");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    getControllerRequestClient().createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    try {
+      String tenantJson = new org.apache.pinot.spi.config.tenant.Tenant(
+          org.apache.pinot.spi.config.tenant.TenantRole.SERVER, tenantName,
+          numOfflineServers + numRealtimeServers, numOfflineServers, numRealtimeServers).toJsonString();
+      getOrCreateAdminClient().getTenantClient().createTenant(tenantJson);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
-    getControllerRequestClient().updateServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    try {
+      String tenantJson = new org.apache.pinot.spi.config.tenant.Tenant(
+          org.apache.pinot.spi.config.tenant.TenantRole.SERVER, tenantName,
+          numOfflineServers + numRealtimeServers, numOfflineServers, numRealtimeServers).toJsonString();
+      getOrCreateAdminClient().getTenantClient().updateTenant(tenantJson);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void enableResourceConfigForLeadControllerResource(boolean enable) {
@@ -936,22 +1251,34 @@ public class ControllerTest {
 
   public void runPeriodicTask(String taskName, String tableName, TableType tableType)
       throws IOException {
-    sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
+    try {
+      getOrCreateAdminClient().getClusterClient()
+          .runPeriodicTask(taskName, tableName, tableType != null ? tableType.name() : null);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void updateClusterConfig(Map<String, String> clusterConfig)
       throws IOException {
-    getControllerRequestClient().updateClusterConfig(clusterConfig);
+    try {
+      String payload = JsonUtils.objectToString(clusterConfig);
+      getOrCreateAdminClient().getClusterClient().updateClusterConfig(payload);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public void deleteClusterConfig(String clusterConfig)
       throws IOException {
-    getControllerRequestClient().deleteClusterConfig(clusterConfig);
+    try {
+      getOrCreateAdminClient().getClusterClient().deleteClusterConfig(clusterConfig);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
-  /**
-   * Trigger a task on a table and wait for completion
-   */
+  /// Trigger a task on a table and wait for completion
   protected String triggerMinionTask(String taskType, String tableNameWithType) {
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
 
@@ -973,18 +1300,21 @@ public class ControllerTest {
 
   public void pauseTable(String tableName)
       throws IOException {
-    sendPostRequest(getControllerRequestURLBuilder().forPauseConsumption(tableName));
+    try {
+      getOrCreateAdminClient().getTableClient().pauseConsumption(tableName);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     TestUtils.waitForCondition((aVoid) -> {
       try {
         PauseStatusDetails pauseStatusDetails =
-            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
-                PauseStatusDetails.class);
+            getOrCreateAdminClient().getTableClient().getPauseStatusDetails(tableName);
         if (pauseStatusDetails.getConsumingSegments().isEmpty()) {
           return true;
         }
         LOGGER.warn("Table not yet paused. Response " + pauseStatusDetails);
         return false;
-      } catch (IOException e) {
+      } catch (IOException | PinotAdminException e) {
         throw new RuntimeException(e);
       }
     }, 2000, 60_000L, "Failed to pause table: " + tableName);
@@ -997,20 +1327,22 @@ public class ControllerTest {
 
   public void resumeTable(String tableName, String offsetCriteria)
       throws IOException {
-    sendPostRequest(getControllerRequestURLBuilder().forResumeConsumption(tableName)
-        + "?consumeFrom=" + offsetCriteria);
+    try {
+      getOrCreateAdminClient().getTableClient().resumeConsumption(tableName, offsetCriteria);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     TestUtils.waitForCondition((aVoid) -> {
       try {
         PauseStatusDetails pauseStatusDetails =
-            JsonUtils.stringToObject(sendGetRequest(getControllerRequestURLBuilder().forPauseStatus(tableName)),
-                PauseStatusDetails.class);
+            getOrCreateAdminClient().getTableClient().getPauseStatusDetails(tableName);
         // Its possible no segment is in consuming state, so check pause flag
         if (!pauseStatusDetails.getPauseFlag()) {
           return true;
         }
         LOGGER.warn("Pause flag is not yet set to false. Response " + pauseStatusDetails);
         return false;
-      } catch (IOException e) {
+      } catch (IOException | PinotAdminException e) {
         throw new RuntimeException(e);
       }
     }, 2000, 60_000L, "Failed to resume table: " + tableName);
@@ -1021,7 +1353,7 @@ public class ControllerTest {
     TestUtils.waitForCondition((aVoid) -> {
           try {
             AtomicInteger numConsumingSegments = new AtomicInteger(0);
-            TableViews.TableView tableView = getExternalView(tableName, type);
+            TableView tableView = getExternalView(tableName, type);
             Map<String, Map<String, String>> viewForType =
                 type.equals(TableType.OFFLINE) ? tableView._offline : tableView._realtime;
             viewForType.values().forEach((v) -> {
@@ -1036,10 +1368,14 @@ public class ControllerTest {
     );
   }
 
-  public TableViews.TableView getExternalView(String tableName, TableType type)
+  public TableView getExternalView(String tableName, TableType type)
       throws IOException {
-    String state = sendGetRequest(getControllerRequestURLBuilder().forExternalView(tableName + "_" + type));
-    return JsonUtils.stringToObject(state, TableViews.TableView.class);
+    try {
+      return getOrCreateAdminClient().getTableClient()
+          .getExternalViewObject(tableName + "_" + type);
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   public static String sendGetRequest(String urlString)
@@ -1060,15 +1396,13 @@ public class ControllerTest {
 
   public static String sendGetRequestRaw(String urlString)
       throws IOException {
-    return IOUtils.toString(new URL(urlString).openStream());
+    return IOUtils.toString(new URL(urlString).openStream(), StandardCharsets.UTF_8);
   }
 
-  /**
-   * Sends a GET request to the specified URL and returns the status code along with the stringified response.
-   * @param urlString the URL to send the GET request
-   * @param headers the headers to include in the GET request
-   * @return a Pair containing the status code and the stringified response
-   */
+  /// Sends a GET request to the specified URL and returns the status code along with the stringified response.
+  /// @param urlString the URL to send the GET request
+  /// @param headers the headers to include in the GET request
+  /// @return a Pair containing the status code and the stringified response
   public static Pair<Integer, String> sendGetRequestWithStatusCode(String urlString, Map<String, String> headers)
       throws IOException {
     try {
@@ -1087,7 +1421,7 @@ public class ControllerTest {
 
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
-    return sendPostRequest(urlString, payload, Collections.emptyMap());
+    return sendPostRequest(urlString, payload, Map.of());
   }
 
   public static String sendPostRequest(String urlString, String payload, Map<String, String> headers)
@@ -1101,18 +1435,16 @@ public class ControllerTest {
     }
   }
 
-  /**
-   * Sends a POST request to the specified URL with the given payload and returns the status code along with the
-   * stringified response.
-   * @param urlString the URL to send the POST request to
-   * @param payload the payload to send in the POST request
-   * @return a Pair containing the status code and the stringified response
-   */
+  /// Sends a POST request to the specified URL with the given payload and returns the status code along with the
+  /// stringified response.
+  /// @param urlString the URL to send the POST request to
+  /// @param payload the payload to send in the POST request
+  /// @return a Pair containing the status code and the stringified response
   public static Pair<Integer, String> postRequestWithStatusCode(String urlString, String payload)
       throws IOException {
     try {
       SimpleHttpResponse resp =
-          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, Collections.emptyMap());
+          getHttpClient().sendJsonPostRequest(new URL(urlString).toURI(), payload, Map.of());
       return Pair.of(resp.getStatusCode(), constructResponse(resp));
     } catch (URISyntaxException e) {
       throw new IOException(e);
@@ -1139,7 +1471,7 @@ public class ControllerTest {
 
   public static String sendPutRequest(String urlString, String payload)
       throws IOException {
-    return sendPutRequest(urlString, payload, Collections.emptyMap());
+    return sendPutRequest(urlString, payload, Map.of());
   }
 
   public static String sendPutRequest(String urlString, String payload, Map<String, String> headers)
@@ -1155,7 +1487,7 @@ public class ControllerTest {
 
   public static String sendDeleteRequest(String urlString)
       throws IOException {
-    return sendDeleteRequest(urlString, Collections.emptyMap());
+    return sendDeleteRequest(urlString, Map.of());
   }
 
   public static String sendDeleteRequest(String urlString, Map<String, String> headers)
@@ -1175,7 +1507,7 @@ public class ControllerTest {
 
   public static SimpleHttpResponse sendMultipartPostRequest(String url, String body)
       throws IOException {
-    return sendMultipartPostRequest(url, body, Collections.emptyMap());
+    return sendMultipartPostRequest(url, body, Map.of());
   }
 
   public static SimpleHttpResponse sendMultipartPostRequest(String url, String body, Map<String, String> headers)
@@ -1193,9 +1525,7 @@ public class ControllerTest {
     return getHttpClient().sendMultipartPutRequest(url, body, headers);
   }
 
-  /**
-   * @return Number of instances used by all the broker tenants
-   */
+  /// @return Number of instances used by all the broker tenants
   public int getTaggedBrokerCount() {
     int count = 0;
     Set<String> brokerTenants = _helixResourceManager.getAllBrokerTenantNames();
@@ -1206,9 +1536,7 @@ public class ControllerTest {
     return count;
   }
 
-  /**
-   * @return Number of instances used by all the server tenants
-   */
+  /// @return Number of instances used by all the server tenants
   public int getTaggedServerCount() {
     int count = 0;
     Set<String> serverTenants = _helixResourceManager.getAllServerTenantNames();
@@ -1217,10 +1545,6 @@ public class ControllerTest {
     }
 
     return count;
-  }
-
-  public ControllerRequestURLBuilder getControllerRequestURLBuilder() {
-    return _controllerRequestURLBuilder;
   }
 
   public HelixAdmin getHelixAdmin() {
@@ -1239,6 +1563,11 @@ public class ControllerTest {
     return _controllerBaseApiUrl;
   }
 
+  protected String controllerUrl(String path) {
+    String relativePath = path.startsWith("/") ? path : "/" + path;
+    return _controllerBaseApiUrl + relativePath;
+  }
+
   public HelixManager getHelixManager() {
     return _helixManager;
   }
@@ -1255,9 +1584,7 @@ public class ControllerTest {
     return _controllerConfig;
   }
 
-  /**
-   * Do not override this method as the configuration is shared across all default TestNG group.
-   */
+  /// Do not override this method as the configuration is shared across all default TestNG group.
   public final Map<String, Object> getSharedControllerConfiguration() {
     Map<String, Object> properties = getDefaultControllerConfiguration();
 
@@ -1274,9 +1601,7 @@ public class ControllerTest {
     return properties;
   }
 
-  /**
-   * Initialize shared state for the TestNG default test group.
-   */
+  /// Initialize shared state for the TestNG default test group.
   public void startSharedTestSetup()
       throws Exception {
     startZk();
@@ -1287,9 +1612,7 @@ public class ControllerTest {
     addFakeMinionInstancesToAutoJoinHelixCluster(DEFAULT_NUM_MINION_INSTANCES);
   }
 
-  /**
-   * Cleanup shared state used in the TestNG default test group.
-   */
+  /// Cleanup shared state used in the TestNG default test group.
   public void stopSharedTestSetup() {
     cleanup();
 
@@ -1298,9 +1621,7 @@ public class ControllerTest {
     stopZk();
   }
 
-  /**
-   * Checks if the number of online instances for a given resource matches the expected num of instances or not.
-   */
+  /// Checks if the number of online instances for a given resource matches the expected num of instances or not.
   public void checkNumOnlineInstancesFromExternalView(String resourceName, int expectedNumOnlineInstances)
       throws InterruptedException {
     long endTime = System.currentTimeMillis() + TIMEOUT_MS;
@@ -1316,9 +1637,7 @@ public class ControllerTest {
     fail("Failed to reach " + expectedNumOnlineInstances + " online instances for resource: " + resourceName);
   }
 
-  /**
-   * Make sure shared state is setup and valid before each test case class is run.
-   */
+  /// Make sure shared state is setup and valid before each test case class is run.
   public void setupSharedStateAndValidate()
       throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
@@ -1326,15 +1645,37 @@ public class ControllerTest {
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
       // group, state will have already been setup by @BeforeGroups method in ControllerTestSetup.
       startSharedTestSetup();
+    } else {
+      // Ensure the shared cluster starts clean between test classes.
+      List<String> existingTables = getHelixResourceManager().getAllTables();
+      List<String> existingSchemas = getHelixResourceManager().getSchemaNames();
+      if (!existingTables.isEmpty() || !existingSchemas.isEmpty()) {
+        cleanup();
+      }
+    }
+
+    // Always clean tables/schemas from any previous test class to guarantee isolation.
+    cleanup();
+
+    // Ensure expected fake instances are present before validation.
+    int currentBrokers =
+        _helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size();
+    if (currentBrokers < DEFAULT_NUM_BROKER_INSTANCES) {
+      addMoreFakeBrokerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_BROKER_INSTANCES - currentBrokers, true);
+    }
+    int currentServers =
+        _helixResourceManager.getAllInstancesForServerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size();
+    if (currentServers < DEFAULT_NUM_SERVER_INSTANCES) {
+      addMoreFakeServerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_SERVER_INSTANCES - currentServers, true);
     }
 
     // In a single tenant cluster, only the default tenant should exist
     assertEquals(_helixResourceManager.getAllBrokerTenantNames(),
-        Collections.singleton(TagNameUtils.DEFAULT_TENANT_NAME));
+        Set.of(TagNameUtils.DEFAULT_TENANT_NAME));
     assertEquals(_helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size(),
         DEFAULT_NUM_BROKER_INSTANCES);
     assertEquals(_helixResourceManager.getAllServerTenantNames(),
-        Collections.singleton(TagNameUtils.DEFAULT_TENANT_NAME));
+        Set.of(TagNameUtils.DEFAULT_TENANT_NAME));
     assertEquals(_helixResourceManager.getAllInstancesForServerTenant(TagNameUtils.DEFAULT_TENANT_NAME).size(),
         DEFAULT_NUM_SERVER_INSTANCES);
 
@@ -1352,10 +1693,8 @@ public class ControllerTest {
     };
   }
 
-  /**
-   * Clean shared state after a test case class has completed running. Additional cleanup may be needed depending upon
-   * test functionality.
-   */
+  /// Clean shared state after a test case class has completed running. Additional cleanup may be needed depending upon
+  /// test functionality.
   public void cleanup() {
     // Delete logical tables
     List<String> logicalTables = _helixResourceManager.getAllLogicalTableNames();

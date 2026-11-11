@@ -26,9 +26,7 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-/**
- * MessageBatch implementation for the fake stream
- */
+/// MessageBatch implementation for the fake stream
 class FakeStreamMessageBatch implements MessageBatch<byte[]> {
   private final List<byte[]> _values;
   private final List<Integer> _offsets;

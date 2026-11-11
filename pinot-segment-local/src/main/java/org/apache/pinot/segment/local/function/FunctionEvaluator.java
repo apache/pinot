@@ -18,27 +18,16 @@
  */
 package org.apache.pinot.segment.local.function;
 
-import java.util.List;
-import org.apache.pinot.spi.data.readers.GenericRow;
 
-
-/**
- * Interface for evaluators of transform function expressions of schema field specs
- */
-public interface FunctionEvaluator {
-
-  /**
-   * Get the arguments of the function
-   */
-  List<String> getArguments();
-
-  /**
-   * Evaluate the function on the generic row and return the result
-   */
-  Object evaluate(GenericRow genericRow);
-
-  /**
-   * Evaluates the function on the given values (same order as the arguments) and returns the result.
-   */
-  Object evaluate(Object[] values);
+/// Deprecated forwarding interface that preserves the historical
+/// `org.apache.pinot.segment.local.function` binary name for downstream callers.
+///
+/// Behavioral and thread-safety expectations are defined by
+/// [org.apache.pinot.spi.function.FunctionEvaluator].
+///
+/// TODO: Delete this shim after Pinot 1.6.0 is released.
+///
+/// @deprecated Use [org.apache.pinot.spi.function.FunctionEvaluator] instead.
+@Deprecated
+public interface FunctionEvaluator extends org.apache.pinot.spi.function.FunctionEvaluator {
 }

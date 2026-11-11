@@ -26,6 +26,7 @@ import AddOfflineTableOp from '../components/Homepage/Operations/AddOfflineTable
 import AddRealtimeTableOp from '../components/Homepage/Operations/AddRealtimeTableOp';
 import AsyncPinotTables from '../components/AsyncPinotTables';
 import { AsyncPinotSchemas } from '../components/AsyncPinotSchemas';
+import AsyncLogicalTables from '../components/AsyncLogicalTables';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -97,6 +98,7 @@ const TablesListingPage = () => {
         title="Tables"
         baseUrl="/tenants/table/"
       />
+      <AsyncLogicalTables />
       <AsyncPinotSchemas key={`schema-${schemasKey}`} />
       {showSchemaModal && (
         <AddSchemaOp

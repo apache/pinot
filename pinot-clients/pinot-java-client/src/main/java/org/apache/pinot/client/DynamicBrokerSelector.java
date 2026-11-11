@@ -33,13 +33,12 @@ import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
 import org.apache.pinot.client.utils.BrokerSelectorUtils;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Maintains a mapping between table name and list of brokers
- */
+/// Maintains a mapping between table name and list of brokers
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(DynamicBrokerSelector.class);
 
@@ -70,6 +69,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
 
   @VisibleForTesting
   protected ZkClient getZkClient(String zkServers) {
+    ZooKeeperSslContextSupplier.initialize();
     return new ZkClient(zkServers);
   }
 

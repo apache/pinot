@@ -70,49 +70,97 @@ function checkOut() {
 # dedicated maven cache for these builds, and remove the cache after build is
 # completed.
 # If buildId is less than 0, then the mvn version is not changed in pom files.
+function installPinotBom() {
+  local outFile=$1
+  local repoDir=$2
+  local repoOption=$3
+  local maxRetry=$4
+  local mvnCmd=$5
+
+  if [ ! -f "pinot-bom/pom.xml" ]; then
+    return
+  fi
+
+  for i in $(seq 1 $maxRetry); do
+    ${mvnCmd} -U -f pinot-bom/pom.xml install -DskipTests -q -B ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+    if [ $? -eq 0 ]; then break; fi
+    if [ $i -eq $maxRetry ]; then exit 1; fi
+    echo ""
+    echo "Pinot BOM install failed, see last 200 lines of output below."
+    tail -200 ${outFile}
+    echo "Retrying after 30 seconds..."
+    find "${repoDir}" -name "*.lastUpdated" -delete 2>/dev/null || true
+    sleep 30
+  done
+}
+
 function build() {
   local outFile=$1
   local buildTests=$2
   local buildId=$3
   local buildCompatibilityVerifier=$4
-  local repoOption=""
-  local versionOption="-Djdk.version=11"
+  # Build each tree with its own pom jdk.version default: old commits may target an
+  # older Java release than the current tree (e.g. release-1.5.0 targets 11, current
+  # targets 25), and javac supports all of them via --release.
+  local versionOption=""
   local maxRetry=5
+  local repoId=${buildId}
 
   mkdir -p ${MVN_CACHE_DIR}
   mkdir -p ${mvnCache}
+  if [ ${repoId} -le 0 ]; then
+    repoId="current"
+  fi
+  local repoDir="${mvnCache}/${repoId}"
+  mkdir -p "${repoDir}"
+  local repoOption="-Dmaven.repo.local=${repoDir}"
+  # Build checked-out trees (buildId > 0) with the Maven version pinned by their own wrapper,
+  # if they have one. The system Maven can be too new for an old tree, e.g. the Develocity
+  # extension 2.3.4 pinned by release-1.5.0 fails on Maven 3.10.0.
+  local mvnCmd="mvn"
+  if [ ${buildId} -gt 0 ] && [ -x "./mvnw" ]; then
+    mvnCmd="./mvnw"
+  fi
+
+  installPinotBom "${outFile}" "${repoDir}" "${repoOption}" "${maxRetry}" "${mvnCmd}"
 
   if [ ${buildId} -gt 0 ]; then
     # Build it in a different env under different version so that maven cache does
     # not collide
     local pomVersion=$(grep -E "<version>(.*)-SNAPSHOT</version>" pom.xml | cut -d'>' -f2 | cut -d'<' -f1 | cut -d'-' -f1)
-    mvn versions:set -DnewVersion="${pomVersion}-compat-${buildId}" -q -B 1>${outFile} 2>&1
-    mvn versions:commit -q -B 1>${outFile} 2>&1
-    repoOption="-Dmaven.repo.local=${mvnCache}/${buildId}"
+    ${mvnCmd} -U versions:set -DnewVersion="${pomVersion}-compat-${buildId}" -DgenerateBackupPoms=false \
+      -q -B ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1 || exit 1
+    if [ -f "pinot-bom/pom.xml" ]; then
+      ${mvnCmd} -U -f pinot-bom/pom.xml versions:set -DnewVersion="${pomVersion}-compat-${buildId}" \
+        -DgenerateBackupPoms=false -q -B ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1 || exit 1
+    fi
+    installPinotBom "${outFile}" "${repoDir}" "${repoOption}" "${maxRetry}" "${mvnCmd}"
   fi
   buildComponents=":pinot-tools"
   if [ $buildCompatibilityVerifier -gt 0 ]; then
     buildComponents=":pinot-tools,:pinot-compatibility-verifier"
   fi
   for i in $(seq 1 $maxRetry); do
-    mvn clean package -am -pl ${buildComponents} -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
+    ${mvnCmd} -U clean package -am -pl ${buildComponents} -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
     if [ $? -eq 0 ]; then break; fi
     if [ $i -eq $maxRetry ]; then exit 1; fi
     echo ""
     echo "Build failed, see last 1000 lines of output below."
     tail -1000 ${outFile}
     echo "Retrying after 30 seconds..."
+    find "${repoDir}" -name "*.lastUpdated" -delete 2>/dev/null || true
     sleep 30
   done
   if [ $buildTests -eq 1 ]; then
     for i in $(seq 1 $maxRetry); do
-      mvn package -am -pl :pinot-integration-tests -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+      ${mvnCmd} -U package -am -pl :pinot-integration-tests -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
       if [ $? -eq 0 ]; then break; fi
       if [ $i -eq $maxRetry ]; then exit 1; fi
       echo ""
       echo "Build failed, see last 500 lines of output below."
       tail -500 ${outFile}
       echo "Retrying after 30 seconds..."
+      find "${repoDir}" -name "*.lastUpdated" -delete 2>/dev/null || true
       sleep 30
     done
   fi

@@ -23,9 +23,7 @@ import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 
 
-/**
- * Interface for a rule
- */
+/// Interface for a rule
 public abstract class AbstractRule {
   protected InputManager _input;
   protected ConfigManager _output;
@@ -38,10 +36,9 @@ public abstract class AbstractRule {
     _output = output;
   }
 
-  /**
-   * Some rules have to be run even if user has disabled them. The reason is the output of these rules are used in other
-   * rules. This method is used to hide the output from the final result that's going to be presented to the user.
-   */
+  /// Some rules have to be run even if user has disabled them. The reason is the output of these rules are used in
+  /// other rules. This method is used to hide the output from the final result that's going to be presented to the
+  /// user.
   public void hideOutput() {
   }
 }

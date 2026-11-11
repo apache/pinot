@@ -26,26 +26,23 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Implementation of int dictionary that cache all values on-heap.
- * <p>This is useful for int columns that:
- * <ul>
- *   <li>Have low cardinality int dictionary where memory footprint on-heap is acceptably small</li>
- *   <li>Is heavily queried</li>
- * </ul>
- * <p>This helps avoid creation of int from byte[].
- */
+/// Implementation of int dictionary that cache all values on-heap.
+///
+/// This is useful for int columns that:
+///
+/// - Have low cardinality int dictionary where memory footprint on-heap is acceptably small
+/// - Is heavily queried
+///
+/// This helps avoid creation of int from byte\[\].
 public class OnHeapIntDictionary extends BaseImmutableDictionary {
   private final Int2IntOpenHashMap _valToDictId;
   private final int[] _dictIdToVal;
 
-  /**
-   * Constructor for the class.
-   * Populates the value <-> mappings.
-   *
-   * @param dataBuffer Pinot data buffer
-   * @param length Length of the dictionary
-   */
+  /// Constructor for the class.
+  /// Populates the value <-> mappings.
+  ///
+  /// @param dataBuffer Pinot data buffer
+  /// @param length Length of the dictionary
   public OnHeapIntDictionary(PinotDataBuffer dataBuffer, int length) {
     super(dataBuffer, length, Integer.BYTES);
 

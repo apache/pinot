@@ -27,11 +27,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.ws.rs.NotAuthorizedException;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
-import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipalUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
@@ -40,17 +43,21 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Basic Authentication based on http headers. Configured via the "pinot.broker.access.control" family of properties.
- *
- * <pre>
- *     Example:
- *     pinot.broker.access.control.principals=admin123,user456
- *     pinot.broker.access.control.principals.admin123.password=verysecret
- *     pinot.broker.access.control.principals.user456.password=kindasecret
- *     pinot.broker.access.control.principals.user456.tables=stuff,lessImportantStuff
- * </pre>
- */
+/// Basic Authentication based on http headers. Configured via the "pinot.broker.access.control" family of properties.
+///
+/// ```
+/// Example:
+/// pinot.broker.access.control.principals=admin123,user456
+/// pinot.broker.access.control.principals.admin123.password=verysecret
+/// pinot.broker.access.control.principals.user456.password=kindasecret
+/// pinot.broker.access.control.principals.user456.tables=stuff,lessImportantStuff
+/// pinot.broker.access.control.principals.user456.permissions=read,delete
+/// ```
+///
+/// Principals query the tables they have access to. Deleting rows with a SQL `DELETE` also requires the `delete`
+/// permission, granted explicitly: unlike on the controller, where a principal without permissions has them all, a
+/// principal without permissions (or with `*`) does not delete rows, since the broker did not check the permissions
+/// of its principals before.
 public class BasicAuthAccessControlFactory extends AccessControlFactory {
   private static final String PREFIX = "principals";
 
@@ -62,7 +69,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
   @Override
   public void init(PinotConfiguration configuration) {
-    _accessControl = new BasicAuthAccessControl(BasicAuthUtils.extractBasicAuthPrincipals(configuration, PREFIX));
+    _accessControl = new BasicAuthAccessControl(
+        BasicAuthPrincipalUtils.extractBasicAuthPrincipals(configuration, PREFIX));
   }
 
   @Override
@@ -70,9 +78,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     return _accessControl;
   }
 
-  /**
-   * Access Control using header-based basic http authentication
-   */
+  /// Access Control using header-based basic http authentication
   private static class BasicAuthAccessControl implements AccessControl {
     private final Map<String, BasicAuthPrincipal> _token2principal;
 
@@ -136,6 +142,17 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     @Override
+    public AuthorizationResult authorizeDeleteRows(RequesterIdentity requesterIdentity,
+        @Nullable HttpHeaders httpHeaders, String tableName) {
+      BasicAuthPrincipal principal = getPrincipalOpt(requesterIdentity).orElse(null);
+      // The table is matched by the name as given, as for queries: `tables` lists the name as given, and `hasTable`
+      // checks `excludeTables`, which lists raw names, on the raw name too, so that a type suffix cannot bypass an
+      // excluded table
+      return BasicAuthPrincipalUtils.authorizeDeleteRows(principal, tableName,
+          principal != null && principal.hasTable(tableName));
+    }
+
+    @Override
     public TableRowColAccessResult getRowColFilters(RequesterIdentity requesterIdentity, String table) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
@@ -160,7 +177,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       if (tokens.isEmpty()) {
         return Optional.empty();
       }
-      return tokens.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+      return tokens.stream().map(BasicAuthTokenUtils::normalizeBase64Token)
           .map(_token2principal::get).filter(Objects::nonNull)
           .findFirst();
     }

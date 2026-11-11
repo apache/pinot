@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.util.Map;
 import java.util.OptionalInt;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -30,10 +31,8 @@ import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * The {@code SVScanDocIdIterator} is the scan-based iterator for SVScanDocIdSet to scan a single-value column for the
- * matching document ids.
- */
+/// The `SVScanDocIdIterator` is the scan-based iterator for SVScanDocIdSet to scan a single-value column for the
+/// matching document ids.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
@@ -49,11 +48,12 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
+  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize,
+      Map<String, String> queryOptions) {
     _batch = new int[batchSize];
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
-    _readerContext = _reader.createContext();
+    _readerContext = _reader.createContext(queryOptions);
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher();
     _cardinality = dataSource.getDataSourceMetadata().getCardinality();
@@ -147,10 +147,8 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     return _numEntriesScanned;
   }
 
-  /**
-   * This is an approximation of probability calculation in
-   * org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
-   */
+  /// This is an approximation of probability calculation in
+  /// org.apache.pinot.controller.recommender.rules.utils.QueryInvertedSortedIndexRecommender#percentSelected
   @Override
   public float getEstimatedCardinality(boolean isAndDocIdSet) {
     int numMatchingItems = _predicateEvaluator.getNumMatchingItems();
@@ -188,17 +186,13 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   private interface ValueMatcher {
 
-    /**
-     * Returns {@code true} if the value for the given document id matches the predicate, {@code false} Otherwise.
-     */
+    /// Returns `true` if the value for the given document id matches the predicate, `false` Otherwise.
     boolean doesValueMatch(int docId);
 
-    /**
-     * Filters out non matching values and compacts matching docIds in the start of the array.
-     * @param limit how much of the input to read
-     * @param docIds the docIds to match - may be modified by this method so take a copy if necessary.
-     * @return the index in the array of the first non-matching element - all elements before this index match.
-     */
+    /// Filters out non matching values and compacts matching docIds in the start of the array.
+    /// @param limit how much of the input to read
+    /// @param docIds the docIds to match - may be modified by this method so take a copy if necessary.
+    /// @return the index in the array of the first non-matching element - all elements before this index match.
     default int matchValues(int limit, int[] docIds) {
       int matchCount = 0;
       for (int i = 0; i < limit; i++) {

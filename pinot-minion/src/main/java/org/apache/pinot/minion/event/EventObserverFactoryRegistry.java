@@ -29,24 +29,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Registry for all {@link MinionEventObserverFactory}.
- */
+/// Registry for all [MinionEventObserverFactory].
 public class EventObserverFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(EventObserverFactoryRegistry.class);
 
-  /**
-   * The package regex pattern for auto-registered {@link MinionEventObserverFactory}.
-   */
+  /// The package regex pattern for auto-registered [MinionEventObserverFactory].
   private static final String EVENT_OBSERVER_FACTORY_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.minion\\.tasks\\..*";
 
   private final Map<String, MinionEventObserverFactory> _eventObserverFactoryRegistry = new HashMap<>();
 
-  /**
-   * Registers the event observer factories via reflection.
-   * NOTE: In order to plugin a class using reflection, the class should include ".event." in its class path. This
-   *       convention can significantly reduce the time of class scanning.
-   */
+  /// Registers the event observer factories via reflection.
+  /// NOTE: In order to plugin a class using reflection, the class should include ".event." in its class path. This
+  ///       convention can significantly reduce the time of class scanning.
   public EventObserverFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager) {
     this(zkMetadataManager, DefaultMinionTaskObserverStorageManager.getDefaultInstance());
   }
@@ -60,7 +54,8 @@ public class EventObserverFactoryRegistry {
       EventObserverFactory annotation = clazz.getAnnotation(EventObserverFactory.class);
       if (annotation.enabled()) {
         try {
-          MinionEventObserverFactory eventObserverFactory = (MinionEventObserverFactory) clazz.newInstance();
+          MinionEventObserverFactory eventObserverFactory =
+              (MinionEventObserverFactory) clazz.getDeclaredConstructor().newInstance();
           eventObserverFactory.init(zkMetadataManager, taskProgressManager);
           registerEventObserverFactory(eventObserverFactory);
         } catch (Exception e) {
@@ -74,16 +69,12 @@ public class EventObserverFactoryRegistry {
         System.currentTimeMillis() - startTimeMs);
   }
 
-  /**
-   * Registers an event observer factory.
-   */
+  /// Registers an event observer factory.
   public void registerEventObserverFactory(MinionEventObserverFactory eventObserverFactory) {
     _eventObserverFactoryRegistry.put(eventObserverFactory.getTaskType(), eventObserverFactory);
   }
 
-  /**
-   * Returns the event observer factory for the given task type, or default event observer if no one is registered.
-   */
+  /// Returns the event observer factory for the given task type, or default event observer if no one is registered.
   public MinionEventObserverFactory getEventObserverFactory(String taskType) {
     return _eventObserverFactoryRegistry.getOrDefault(taskType, DefaultMinionEventObserverFactory.getInstance());
   }

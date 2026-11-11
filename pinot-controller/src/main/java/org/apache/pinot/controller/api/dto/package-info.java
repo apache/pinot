@@ -16,23 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-/**
- * Data Transfer Objects (DTOs) for Pinot REST APIs.
- *
- * <p>
- * DTOs are Plain Old Java Objects (POJOs) that serve as the contract between Pinot Controller's
- * REST APIs and external clients. These objects are serialized to/from JSON when exchanged via
- * HTTP endpoints.
- * </p>
- *
- * <h2>Guidelines</h2>
- * <ul>
- *   <li><b>Public API Contract:</b> Classes here are part of Pinot's public API.
- *       Maintain backward compatibility or follow proper deprecation practices.</li>
- *   <li><b>Simple POJOs:</b> Keep DTOs as simple data containers without business logic.</li>
- *   <li><b>Serialization-Friendly:</b> All fields should be JSON-serializable.</li>
- *   <li><b>Fluent Setters:</b> Use fluent-style setters that return {@code this}.</li>
- *   <li><b>Documentation:</b> Document each DTO and its fields clearly.</li>
- * </ul>
- */
+/// Data Transfer Objects (DTOs) for Pinot REST APIs.
+///
+/// DTOs are Plain Old Java Objects (POJOs) that serve as the contract between Pinot Controller's
+/// REST APIs and external clients. These objects are serialized to/from JSON when exchanged via
+/// HTTP endpoints.
+///
+/// # Guidelines
+///
+/// - **Public API Contract:** Classes here are part of Pinot's public API.
+///      Maintain backward compatibility or follow proper deprecation practices.
+/// - **Simple POJOs:** Keep DTOs as simple data containers without business logic.
+/// - **Serialization-Friendly:** All fields should be JSON-serializable.
+/// - **Fluent Setters:** Use fluent-style setters that return `this`.
+/// - **Documentation:** Document each DTO and its fields clearly.
 package org.apache.pinot.controller.api.dto;

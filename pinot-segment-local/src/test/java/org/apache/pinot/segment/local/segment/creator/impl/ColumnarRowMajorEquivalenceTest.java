@@ -27,16 +27,13 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for columnar vs row-major equivalence.
- *
- * <p>This test class validates that:
- * <ul>
- *   <li>Columnar segment building produces identical results to row-major building</li>
- *   <li>All data types are correctly handled in columnar mode</li>
- *   <li>Segment statistics and metadata are preserved</li>
- * </ul>
- */
+/// Tests for columnar vs row-major equivalence.
+///
+/// This test class validates that:
+///
+/// - Columnar segment building produces identical results to row-major building
+/// - All data types are correctly handled in columnar mode
+/// - Segment statistics and metadata are preserved
 public class ColumnarRowMajorEquivalenceTest extends ColumnarSegmentBuildingTestBase {
 
   @Test
@@ -76,6 +73,7 @@ public class ColumnarRowMajorEquivalenceTest extends ColumnarSegmentBuildingTest
       Assert.assertTrue(columnNames.contains(BIG_DECIMAL_COL), "BIG_DECIMAL column missing");
       Assert.assertTrue(columnNames.contains(BYTES_COL), "BYTES column missing");
       Assert.assertTrue(columnNames.contains(MV_INT_COL), "Multi-value INT column missing");
+      Assert.assertTrue(columnNames.contains(MV_BIG_DECIMAL_COL), "Multi-value BIG_DECIMAL column missing");
       Assert.assertTrue(columnNames.contains(MV_STRING_COL), "Multi-value STRING column missing");
       Assert.assertTrue(columnNames.contains(TIME_COL), "TIME column missing");
     } finally {

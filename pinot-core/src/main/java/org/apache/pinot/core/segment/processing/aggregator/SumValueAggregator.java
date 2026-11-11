@@ -22,9 +22,7 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Sum value aggregator
- */
+/// Sum value aggregator
 public class SumValueAggregator implements ValueAggregator {
 
   private final FieldSpec.DataType _dataType;

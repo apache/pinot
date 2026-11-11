@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.operator;
 
-/**
- * The <code>ExecutionStatistics</code> class contains the operator statistics during execution time.
- */
+/// The `ExecutionStatistics` class contains the operator statistics during execution time.
 public class ExecutionStatistics {
   // The number of documents scanned post filtering.
   private final long _numDocsScanned;

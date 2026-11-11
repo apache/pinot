@@ -67,8 +67,6 @@ import static org.apache.pinot.spi.plugin.PluginManager.PLUGINS_INCLUDE_PROPERTY
 public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Serializable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SparkSegmentGenerationJobRunner.class);
-  private static final String DEPS_JAR_DIR = "dependencyJarDir";
-  private static final String STAGING_DIR = "stagingDir";
 
   private SegmentGenerationJobSpec _spec;
 
@@ -155,7 +153,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     outputDirFS.mkdir(outputDirURI);
 
     //Get staging directory for temporary output pinot segments
-    String stagingDir = _spec.getExecutionFrameworkSpec().getExtraConfigs().get(STAGING_DIR);
+    String stagingDir =
+        _spec.getExecutionFrameworkSpec().getExtraConfigs().get(SegmentGenerationJobUtils.STAGING_DIR);
     URI stagingDirURI = null;
     if (stagingDir != null) {
       stagingDirURI = URI.create(stagingDir);
@@ -178,9 +177,10 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       packPluginsToDistributedCache(sparkContext);
 
       // Add dependency jars
-      if (_spec.getExecutionFrameworkSpec().getExtraConfigs().containsKey(DEPS_JAR_DIR)) {
+      if (_spec.getExecutionFrameworkSpec().getExtraConfigs()
+          .containsKey(SegmentGenerationJobUtils.DEPENDENCY_JAR_DIR)) {
         addDepsJarToDistributedCache(sparkContext,
-            _spec.getExecutionFrameworkSpec().getExtraConfigs().get(DEPS_JAR_DIR));
+            _spec.getExecutionFrameworkSpec().getExtraConfigs().get(SegmentGenerationJobUtils.DEPENDENCY_JAR_DIR));
       }
 
       List<String> pathAndIdxList = new ArrayList<>();
@@ -225,7 +225,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
             throws Exception {
           PluginManager.get().init();
           for (PinotFSSpec pinotFSSpec : _spec.getPinotFSSpecs()) {
-            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+            PinotFSFactory.registerIfNeeded(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
                 new PinotConfiguration(pinotFSSpec));
           }
           PinotFS finalOutputDirFS = PinotFSFactory.create(finalOutputDirURI.getScheme());
@@ -293,7 +293,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
           // Tar segment directory to compress file
           File localSegmentDir = new File(localOutputTempDir, segmentName);
-          String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
+          String segmentTarFileName = URIUtils.encode(
+              segmentName + Constants.SEGMENT_TAR_FILE_EXTENSIONS.get(_spec.getSegmentTarCompressionCodec()));
           File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
           LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
           TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);
@@ -366,7 +367,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       return;
     }
 
-    ArrayList<File> validPluginDirectories = new ArrayList();
+    ArrayList<File> validPluginDirectories = new ArrayList<>();
 
     for (String pluginsDirPath : pluginDirectories) {
       File pluginsDir = new File(pluginsDirPath);

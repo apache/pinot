@@ -26,11 +26,14 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.analysis.Analyzer;
@@ -57,7 +60,6 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
@@ -80,16 +82,15 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Functional tests for text search feature.
- * The tests use two kinds of input data
- * (1) Skills file
- * (2) Query log file
- * The test table has a SKILLS column and QUERY_LOG column. Text index is created
- * on each of these columns.
- */
+/// Functional tests for text search feature.
+/// The tests use two kinds of input data
+/// (1) Skills file
+/// (2) Query log file
+/// The test table has a SKILLS column and QUERY_LOG column. Text index is created
+/// on each of these columns.
 public class TextSearchQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest-" + UUID.randomUUID());
   protected static final String TABLE_NAME = "MyTable";
   private static final String SEGMENT_NAME = "testSegment";
 
@@ -305,10 +306,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchSelectQueryHelper(query3, 0, false, new ArrayList<>());
   }
 
-  /**
-   * Tests for phrase, term, regex, composite (using AND/OR) text search queries.
-   * Both selection and aggregation queries are used.
-   */
+  /// Tests for phrase, term, regex, composite (using AND/OR) text search queries.
+  /// Both selection and aggregation queries are used.
   @Test
   public void testTextSearch()
       throws Exception {
@@ -1056,10 +1055,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchAggregationQueryHelper(query, expected.size());
   }
 
-  /**
-   * Tests for combining (using AND/OR)
-   * the execution of text match filters with other filters.
-   */
+  /// Tests for combining (using AND/OR)
+  /// the execution of text match filters with other filters.
   @Test
   public void testTextSearchWithAdditionalFilter()
       throws Exception {
@@ -1357,10 +1354,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchAggregationQueryHelper(query, expected.size());
   }
 
-  /**
-   * Test NotFilterOperator with index based doc id iterator (text_match)
-   * @throws Exception
-   */
+  /// Test NotFilterOperator with index based doc id iterator (text_match)
+  /// @throws Exception
   @Test
   public void testTextSearchWithInverse()
       throws Exception {
@@ -1375,11 +1370,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testTextSearchSelectQueryHelper(query, 28, false, expected);
   }
 
-  /**
-   * Test the reference counting mechanism of {@link SearcherManager}
-   * used by {@link RealtimeLuceneTextIndex}
-   * for near realtime text search.
-   */
+  /// Test the reference counting mechanism of [SearcherManager]
+  /// used by [org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex]
+  /// for near realtime text search.
   @Test
   public void testLuceneRealtimeWithSearcherManager()
       throws Exception {
@@ -1545,11 +1538,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     indexWriter.close();
   }
 
-  /**
-   * Test the realtime search by verifying that realtime reader is able
-   * to see monotonically increasing number of uncommitted documents
-   * added to the index.
-   */
+  /// Test the realtime search by verifying that realtime reader is able
+  /// to see monotonically increasing number of uncommitted documents
+  /// added to the index.
   @Test
   public void testLuceneRealtimeWithoutSearcherManager()
       throws Exception {
@@ -1605,31 +1596,29 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   public void testMultiThreadedLuceneRealtime()
       throws Exception {
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test3.index");
-    Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    Analyzer analyzer = new CaseAwareStandardAnalyzer();
-    // create and open a writer
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
-    indexWriterConfig.setRAMBufferSizeMB(500);
-    IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
+    try (Directory indexDirectory = FSDirectory.open(indexFile.toPath());
+        Analyzer analyzer = new CaseAwareStandardAnalyzer()) {
+      // create and open a writer
+      IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
+      indexWriterConfig.setRAMBufferSizeMB(500);
+      try (IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
+          SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
+          ControlledRealTimeReopenThread<IndexSearcher> controlledRealTimeReopenThread =
+              new ControlledRealTimeReopenThread<>(indexWriter, searcherManager, 0.01, 0.01)) {
+        controlledRealTimeReopenThread.start();
 
-    // create an NRT index reader
-    SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
-
-    // background thread to refresh NRT reader
-    ControlledRealTimeReopenThread controlledRealTimeReopenThread =
-        new ControlledRealTimeReopenThread(indexWriter, searcherManager, 0.01, 0.01);
-    controlledRealTimeReopenThread.start();
-
-    // start writer and reader
-    Thread writer = new Thread(new RealtimeWriter(indexWriter));
-    Thread realtimeReader = new Thread(new RealtimeReader(searcherManager, analyzer));
-
-    writer.start();
-    realtimeReader.start();
-
-    writer.join();
-    realtimeReader.join();
-    controlledRealTimeReopenThread.join();
+        // Start the writer and reader, and propagate worker failures back to the test thread.
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        try {
+          Future<?> writer = executorService.submit(new RealtimeWriter(indexWriter));
+          Future<?> realtimeReader = executorService.submit(new RealtimeReader(searcherManager, analyzer));
+          writer.get();
+          realtimeReader.get();
+        } finally {
+          executorService.shutdownNow();
+        }
+      }
+    }
   }
 
   private static class RealtimeWriter implements Runnable {
@@ -1676,9 +1665,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       } finally {
         try {
           _indexWriter.commit();
-          _indexWriter.close();
         } catch (Exception e) {
-          throw new RuntimeException("Failed to commit/close the index writer");
+          throw new RuntimeException("Failed to commit the index writer");
         }
       }
     }
@@ -1703,16 +1691,19 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         // in the index
         while (count < 1000) {
           IndexSearcher indexSearcher = _searcherManager.acquire();
-          int hits = indexSearcher.search(query, Integer.MAX_VALUE).scoreDocs.length;
-          // TODO: see how we can make this more deterministic
-          if (count > 200) {
-            // we should see an increasing number of hits
-            assertTrue(hits > 0);
-            assertTrue(hits >= prevHits);
+          try {
+            int hits = indexSearcher.search(query, Integer.MAX_VALUE).scoreDocs.length;
+            // TODO: see how we can make this more deterministic
+            if (count > 200) {
+              // we should see an increasing number of hits
+              assertTrue(hits > 0);
+              assertTrue(hits >= prevHits);
+            }
+            count++;
+            prevHits = hits;
+          } finally {
+            _searcherManager.release(indexSearcher);
           }
-          count++;
-          prevHits = hits;
-          _searcherManager.release(indexSearcher);
           Thread.sleep(1);
         }
       } catch (Exception e) {
@@ -1993,9 +1984,27 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     testInterSegmentAggregationQueryHelper(query, 4);
   }
 
+  /// `count(*)` with only a TEXT_MATCH filter is routed by [org.apache.pinot.core.plan.AggregationPlanNode]
+  /// to [org.apache.pinot.core.operator.query.FastFilteredCountOperator], which asks the filter for a count
+  /// instead of materializing matching doc ids.
+  ///
+  /// Named explicitly because [TextSearchMultiColIndexQueriesTest] extends this class and so runs it against
+  /// a multi-column text index, exercising the column-aware
+  /// [org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader#getNumMatchingDocs] path. That
+  /// coverage was previously only incidental, inside a broader test.
+  @Test
+  public void testCountStarWithTextMatchIsServedByTheFilterCount() {
+    // Same predicates and expected counts as testInterSegment, kept here as a standalone count-only case.
+    testInterSegmentAggregationQueryHelper("SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '\"Machine learning\" AND \"Tensor flow\"')", 12);
+    // A shape Lucene cannot count from index metadata, so it exercises the collecting branch.
+    testInterSegmentAggregationQueryHelper("SELECT count(*) FROM MyTable WHERE "
+        + "TEXT_MATCH(SKILLS_TEXT_COL, '(\"distributed systems\" AND apache) OR (Java AND C++)')", 36);
+  }
+
   private void testInterSegmentAggregationQueryHelper(String query, long expectedCount) {
     DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
-    List<Object[]> expectedRows = Collections.singletonList(new Object[]{expectedCount});
+    List<Object[]> expectedRows = List.<Object[]>of(new Object[]{expectedCount});
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
         new ResultTable(expectedDataSchema, expectedRows));
   }
@@ -2019,7 +2028,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expected = new ArrayList<>();
     expected.add(new Object[]{
         1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+          + "storage, concurrency, multi-threading"
     });
     expected.add(new Object[]{
         1019,
@@ -2038,7 +2047,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expected1 = new ArrayList<>();
     expected1.add(new Object[]{
         1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+          + "storage, concurrency, multi-threading"
     });
     String query1 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
         + ", '*ava realtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
@@ -2096,11 +2105,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
     expectedTensorFlow.add(new Object[]{
         1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
-        + "large scale systems, Machine learning"
+          + "large scale systems, Machine learning"
     });
     expectedTensorFlow.add(new Object[]{
         1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
-        + " high performance scalable systems"
+          + " high performance scalable systems"
     });
 
     // Test exact phrase "Tensor flow" with default settings (slop=0, inOrder=true)
@@ -2113,7 +2122,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedTensorDatabase = new ArrayList<>();
     expectedTensorDatabase.add(new Object[]{
         1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
-        + "large scale systems, Machine learning"
+          + "large scale systems, Machine learning"
     });
 
     String querySlop1 =
@@ -2189,7 +2198,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedWildcardAnd = new ArrayList<>();
     expectedWildcardAnd.add(new Object[]{
         1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+          + "storage, concurrency, multi-threading"
     });
     expectedWildcardAnd.add(new Object[]{
         1018,
@@ -2348,7 +2357,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedMin2Of3 = new ArrayList<>();
     expectedMin2Of3.add(new Object[]{
         1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
-        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
+          + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
 
     String queryMin2Of3 =
@@ -2369,11 +2378,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
     expectedMin1Of2.add(new Object[]{
         1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
-        + "large scale systems, Machine learning"
+          + "large scale systems, Machine learning"
     });
     expectedMin1Of2.add(new Object[]{
         1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
-        + " high performance scalable systems"
+          + " high performance scalable systems"
     });
 
     String queryMin1Of2 =
@@ -2385,7 +2394,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedMin3Of4 = new ArrayList<>();
     expectedMin3Of4.add(new Object[]{
         1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production "
-        + "systems, concurrency, multi-threading, C++, CPU processing, Java"
+          + "systems, concurrency, multi-threading, C++, CPU processing, Java"
     });
 
     String queryMin3Of4 =
@@ -2397,7 +2406,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedMin3Of3 = new ArrayList<>();
     expectedMin3Of3.add(new Object[]{
         1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
-        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
+          + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
 
     String queryMin3Of3 =

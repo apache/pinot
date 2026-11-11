@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import java.util.Collections;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -44,7 +43,7 @@ public class BaseFilterOperatorTest {
     TestFilterOperator testFilterOperator = new TestFilterOperator(docIds, nullDocIds, numDocs);
 
     Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), List.of(0, 1, 2, 3));
-    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), Collections.emptyList());
+    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), List.of());
   }
 
   @Test
@@ -54,7 +53,7 @@ public class BaseFilterOperatorTest {
     TestFilterOperator testFilterOperator = new TestFilterOperator(docIds, numDocs);
     Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()),
         List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
-    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), Collections.emptyList());
+    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), List.of());
   }
 
   @Test
@@ -62,7 +61,7 @@ public class BaseFilterOperatorTest {
     int numDocs = 10;
     int[] docIds = new int[]{};
     TestFilterOperator testFilterOperator = new TestFilterOperator(docIds, numDocs);
-    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), Collections.emptyList());
+    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), List.of());
     Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()),
         List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
   }
@@ -73,7 +72,29 @@ public class BaseFilterOperatorTest {
     int[] docIds = new int[]{};
     int[] nullDocIds = new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     TestFilterOperator testFilterOperator = new TestFilterOperator(docIds, nullDocIds, numDocs);
-    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), Collections.emptyList());
-    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), Collections.emptyList());
+    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), List.of());
+    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), List.of());
+  }
+
+  @Test
+  public void testGetFilteredDocIdsMaterializesExactBitmap() {
+    BaseFilterOperator.FilteredDocIds filteredDocIds =
+        new TestFilterOperator(new int[]{0, 2, 4}, 10).getFilteredDocIds();
+
+    Assert.assertNotNull(filteredDocIds.getDocIds());
+    Assert.assertEquals(filteredDocIds.getDocIds().getCardinality(), 3);
+    Assert.assertTrue(filteredDocIds.getDocIds().contains(0));
+    Assert.assertTrue(filteredDocIds.getDocIds().contains(2));
+    Assert.assertTrue(filteredDocIds.getDocIds().contains(4));
+  }
+
+  @Test
+  public void testGetFilteredDocIdsReturnsCachedInstance() {
+    TestFilterOperator filterOperator = new TestFilterOperator(new int[]{0, 2, 4}, 10);
+
+    BaseFilterOperator.FilteredDocIds first = filterOperator.getFilteredDocIds();
+    BaseFilterOperator.FilteredDocIds second = filterOperator.getFilteredDocIds();
+
+    Assert.assertSame(first, second);
   }
 }

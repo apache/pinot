@@ -39,7 +39,6 @@ import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
-import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -51,11 +50,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * An implementation of {@link PinotConfigProvider}
- * The {@code TableCache} caches all the table configs and schemas within the cluster, and listens on ZK changes to keep
- * them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
- */
+/// An implementation of [org.apache.pinot.spi.config.provider.PinotConfigProvider]
+/// The `TableCache` caches all the table configs and schemas within the cluster, and listens on ZK changes to
+/// keep them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
 public class ZkTableCache implements TableCache {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkTableCache.class);
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
@@ -87,7 +84,7 @@ public class ZkTableCache implements TableCache {
   private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
 
   private final ZkLogicalTableConfigChangeListener
-    _zkLogicalTableConfigChangeListener = new ZkLogicalTableConfigChangeListener();
+      _zkLogicalTableConfigChangeListener = new ZkLogicalTableConfigChangeListener();
   // Key is table name, value is logical table info
   private final Map<String, LogicalTableConfigInfo> _logicalTableConfigInfoMap = new ConcurrentHashMap<>();
   // Key is lower case logical table name, value is actual logical table name
@@ -133,8 +130,8 @@ public class ZkTableCache implements TableCache {
       List<String> tables = _propertyStore.getChildNames(ZkPaths.LOGICAL_TABLE_PARENT_PATH, AccessOption.PERSISTENT);
       if (CollectionUtils.isNotEmpty(tables)) {
         List<String> pathsToAdd = tables.stream()
-          .map(rawTableName -> ZkPaths.LOGICAL_TABLE_PATH_PREFIX + rawTableName)
-          .collect(Collectors.toList());
+            .map(rawTableName -> ZkPaths.LOGICAL_TABLE_PATH_PREFIX + rawTableName)
+            .collect(Collectors.toList());
         addLogicalTableConfigs(pathsToAdd);
       }
     }
@@ -142,18 +139,14 @@ public class ZkTableCache implements TableCache {
     LOGGER.info("Initialized TableCache with IgnoreCase: {}", ignoreCase);
   }
 
-  /**
-   * Returns {@code true} if the TableCache is case-insensitive, {@code false} otherwise.
-   */
+  /// Returns `true` if the TableCache is case-insensitive, `false` otherwise.
   @Override
   public boolean isIgnoreCase() {
     return _ignoreCase;
   }
 
-  /**
-   * Returns the actual table name for the given table name (with or without type suffix), or {@code null} if the table
-   * does not exist.
-   */
+  /// Returns the actual table name for the given table name (with or without type suffix), or `null` if the table
+  /// does not exist.
   @Nullable
   @Override
   public String getActualTableName(String tableName) {
@@ -164,42 +157,34 @@ public class ZkTableCache implements TableCache {
     }
   }
 
-  /**
-   * Returns the actual logical table name for the given table name, or {@code null} if table does not exist.
-   * @param logicalTableName Logical table name
-   * @return Actual logical table name
-   */
+  /// Returns the actual logical table name for the given table name, or `null` if table does not exist.
+  /// @param logicalTableName Logical table name
+  /// @return Actual logical table name
   @Nullable
   @Override
   public String getActualLogicalTableName(String logicalTableName) {
     return _ignoreCase
-      ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
-      : _logicalTableNameMap.get(logicalTableName);
+        ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
+        : _logicalTableNameMap.get(logicalTableName);
   }
 
-  /**
-   * Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
-   * case.
-   */
+  /// Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
+  /// case.
   @Override
   public Map<String, String> getTableNameMap() {
     return _tableNameMap;
   }
 
-  /**
-   * Returns a map from logical table name to actual logical table name. For case-insensitive case, the keys of the map
-   * are in lower case.
-   * @return Map from logical table name to actual logical table name
-   */
+  /// Returns a map from logical table name to actual logical table name. For case-insensitive case, the keys of the map
+  /// are in lower case.
+  /// @return Map from logical table name to actual logical table name
   @Override
   public Map<String, String> getLogicalTableNameMap() {
     return _logicalTableNameMap;
   }
 
-  /**
-   * Get all dimension table names.
-   * @return List of dimension table names
-   */
+  /// Get all dimension table names.
+  /// @return List of dimension table names
   @Override
   public List<String> getAllDimensionTables() {
     List<String> dimensionTables = new ArrayList<>();
@@ -211,10 +196,8 @@ public class ZkTableCache implements TableCache {
     return dimensionTables;
   }
 
-  /**
-   * Returns a map from column name to actual column name for the given table, or {@code null} if the table schema does
-   * not exist. For case-insensitive case, the keys of the map are in lower case.
-   */
+  /// Returns a map from column name to actual column name for the given table, or `null` if the table schema does
+  /// not exist. For case-insensitive case, the keys of the map are in lower case.
   @Nullable
   @Override
   public Map<String, String> getColumnNameMap(String rawTableName) {
@@ -222,10 +205,8 @@ public class ZkTableCache implements TableCache {
     return schemaInfo != null ? schemaInfo._columnNameMap : null;
   }
 
-  /**
-   * Returns the expression override map for the given logical or physical table, or {@code null} if no override is
-   * configured.
-   */
+  /// Returns the expression override map for the given logical or physical table, or `null` if no override is
+  /// configured.
   @Nullable
   @Override
   public Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName) {
@@ -237,9 +218,7 @@ public class ZkTableCache implements TableCache {
     return logicalTableConfigInfo != null ? logicalTableConfigInfo._expressionOverrideMap : null;
   }
 
-  /**
-   * Returns the timestamp index columns for the given table, or {@code null} if table does not exist.
-   */
+  /// Returns the timestamp index columns for the given table, or `null` if table does not exist.
   @Nullable
   @Override
   public Set<String> getTimestampIndexColumns(String tableNameWithType) {
@@ -247,9 +226,7 @@ public class ZkTableCache implements TableCache {
     return tableConfigInfo != null ? tableConfigInfo._timestampIndexColumns : null;
   }
 
-  /**
-   * Returns the table config for the given table, or {@code null} if it does not exist.
-   */
+  /// Returns the table config for the given table, or `null` if it does not exist.
   @Nullable
   @Override
   public TableConfig getTableConfig(String tableNameWithType) {
@@ -275,9 +252,7 @@ public class ZkTableCache implements TableCache {
     }
   }
 
-  /**
-   * Returns the schema for the given logical or physical table, or {@code null} if it does not exist.
-   */
+  /// Returns the schema for the given logical or physical table, or `null` if it does not exist.
   @Nullable
   @Override
   public Schema getSchema(String rawTableName) {
@@ -331,7 +306,7 @@ public class ZkTableCache implements TableCache {
   }
 
   private void putTableConfig(ZNRecord znRecord)
-    throws IOException {
+      throws IOException {
     TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -346,7 +321,7 @@ public class ZkTableCache implements TableCache {
   }
 
   private void putLogicalTableConfig(ZNRecord znRecord)
-    throws IOException {
+      throws IOException {
     LogicalTableConfig logicalTableConfig = LogicalTableConfigUtils.fromZNRecord(znRecord);
     String logicalTableName = logicalTableConfig.getTableName();
     _logicalTableConfigInfoMap.put(logicalTableName, new LogicalTableConfigInfo(logicalTableConfig));
@@ -493,7 +468,7 @@ public class ZkTableCache implements TableCache {
 
   @Override
   public boolean registerLogicalTableConfigChangeListener(
-    LogicalTableConfigChangeListener logicalTableConfigChangeListener) {
+      LogicalTableConfigChangeListener logicalTableConfigChangeListener) {
     synchronized (_zkLogicalTableConfigChangeListener) {
       boolean added = _logicalTableConfigChangeListeners.add(logicalTableConfigChangeListener);
       if (added) {

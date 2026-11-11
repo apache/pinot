@@ -96,70 +96,6 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
         + ", '$.name', 'STRING'), '$.last', 'STRING') FROM testTable LIMIT 3", expecteds1);
   }
 
-  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
-  @Test(dataProvider = "nativeJsonColumns", enabled = false)
-  public void testJsonSelect(String column) {
-    // SELECT using a simple json path expression.
-    Object[][] expecteds1 = {{"duck"}, {"mouse"}, {"duck"}};
-    checkResult("SELECT " + column + ".name.last FROM testTable LIMIT 3", expecteds1);
-
-    Object[][] expecteds2 =
-        {{"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"null"}, {"1"}};
-    checkResult("SELECT " + column + ".data[0].e[2].z[0].i1 FROM testTable", expecteds2);
-  }
-
-  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
-  /** Test that a json path expression in GROUP BY clause is properly converted into a JSON_EXTRACT_SCALAR function. */
-  @Test(dataProvider = "nativeJsonColumns", enabled = false)
-  public void testJsonGroupBy(String column) {
-    Object[][] expecteds1 =
-        {
-            {"111", 20L}, {"101", 4L}, {"null", 8L}, {"181", 4L}, {"161.5", 4L}, {"171", 4L}, {"161", 4L}, {"141", 4L},
-            {"131", 4L}, {"121", 4L}
-        };
-    checkResult("SELECT " + column + ".id, count(*) FROM testTable GROUP BY " + column + ".id", expecteds1);
-  }
-
-  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
-  /** Test that a json path expression in HAVING clause is properly converted into a JSON_EXTRACT_SCALAR function. */
-  @Test(dataProvider = "nativeJsonColumns", enabled = false)
-  public void testJsonGroupByHaving(String column) {
-    Object[][] expecteds1 = {{"mouse", 8L}};
-    checkResult(
-        "SELECT " + column + ".name.last, count(*) FROM testTable GROUP BY " + column + ".name.last HAVING " + column
-            + ".name"
-            + ".last = 'mouse'", expecteds1);
-  }
-
-  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
-  /** Test a complex SQL statement with json path expression in SELECT, WHERE, and GROUP BY clauses. */
-  @Test(dataProvider = "nativeJsonColumns", enabled = false)
-  public void testJsonSelectFilterGroupBy(String column) {
-    Object[][] expecteds1 = {{"duck", 4L}};
-    checkResult(
-        "SELECT " + column + ".name.last, count(*) FROM testTable WHERE " + column + ".id = 101 GROUP BY " + column
-            + ".name.last",
-        expecteds1);
-  }
-
-  /* NOTE: This test cases is inactive since {@link JsonStatementOptimizer} is currently disabled. */
-  /** Test a numerical function over json path expression in SELECT clause. */
-  @Test(dataProvider = "nativeJsonColumns", enabled = false)
-  public void testNumericalFunctionOverJsonPathSelectExpression(String column) {
-
-    // Test without user-specified alias.
-    Object[][] expecteds1 = {{181.0}};
-    checkResult("SELECT MAX(" + column + ".id) FROM testTable", expecteds1);
-
-    // Test with user-specified alias.
-    Object[][] expecteds2 = {{181.0}};
-    checkResult("SELECT MAX(" + column + ".id) AS x FROM testTable", expecteds2);
-
-    // Test with nested function calls (minus function being used within max function).
-    Object[][] expecteds3 = {{176.0}};
-    checkResult("SELECT MAX(" + column + ".id - 5) FROM testTable", expecteds3);
-  }
-
   @Test(dataProvider = "allJsonColumns")
   public void testExtractJsonLongValue(String column) {
     // test fails, actual number returned is 1790416068515225856
@@ -170,5 +106,66 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
             + "order by 1, 2 "
             + "limit 4",
         new Object[][]{{15, Long.MAX_VALUE}, {16, Long.MIN_VALUE}, {17, -100L}, {18, 1000L}});
+  }
+
+  @Test
+  public void testNullAsDefaultValueWithNullHandlingDisabled() {
+    checkResult(
+        "SET enableNullHandling=false;"
+            + "SELECT intColumn, jsonextractscalar(" + JSON_COLUMN + ", '$.longVal', 'long', null) "
+            + "FROM testTable "
+            + "where intColumn >= 15 and intColumn <= 19 "
+            + "group by 1, 2 "
+            + "order by 1, 2 ",
+        new Object[][]{
+            {15, Long.MAX_VALUE},
+            {16, Long.MIN_VALUE},
+            {17, -100L},
+            {18, 1000L},
+            {19, 0L} // when enableNullHandling is false, null is treated as 0 for LONG type
+        }
+    );
+  }
+
+  @Test(dataProvider = "allJsonColumns")
+  public void testColumnToColumnComparison(String column) {
+    // A JSON last name ("duck", "mouse", ...) is compared as a STRING against stringColumn ("daffy duck",
+    // "mickey mouse", ...). The two are never equal, so '=' matches no row and '!=' matches every row.
+    String lastName = "json_extract_scalar(" + column + ", '$.name.last', 'STRING', '')";
+    checkResult("SELECT intColumn FROM testTable WHERE " + lastName + " = stringColumn", new Object[][]{});
+    checkResult("SELECT intColumn FROM testTable WHERE " + lastName + " != stringColumn LIMIT 3",
+        new Object[][]{{1}, {2}, {3}});
+
+    // A JSON id (101, 111, 121, ... for the first rows) is compared numerically against intColumn (1, 2, 3, ...).
+    // The id is never equal to the row's intColumn, and for the leading rows it is the larger value.
+    String id = "json_extract_scalar(" + column + ", '$.id', 'INT', '0')";
+    checkResult("SELECT intColumn FROM testTable WHERE " + id + " = intColumn", new Object[][]{});
+    checkResult("SELECT intColumn FROM testTable WHERE " + id + " > intColumn LIMIT 3",
+        new Object[][]{{1}, {2}, {3}});
+
+    // Mixed numeric/string comparison: an INT column against a non-numeric STRING column. The old minus()-based
+    // rewrite coerced both operands to DOUBLE and threw NumberFormatException on the non-numeric string, failing the
+    // whole query. The type-safe rewrite evaluates per-row, treating an unparseable comparison as no-match, so the
+    // query runs and simply returns no rows instead of erroring.
+    checkResult("SELECT intColumn FROM testTable WHERE intColumn = stringColumn", new Object[][]{});
+  }
+
+  @Test
+  public void testNullAsDefaultValueWithNullHandlingEnabled() {
+    checkResult(
+        "SET enableNullHandling=true;"
+            + "SELECT intColumn, jsonextractscalar(" + JSON_COLUMN + ", '$.longVal', 'long', null) "
+            + "FROM testTable "
+            + "where intColumn >= 15 and intColumn <= 19 "
+            + "group by 1, 2 "
+            + "order by 1, 2 ",
+        new Object[][]{
+            {15, Long.MAX_VALUE},
+            {16, Long.MIN_VALUE},
+            {17, -100L},
+            {18, 1000L},
+            {19, null} // when enableNullHandling is true, null is treated as null
+        }
+    );
   }
 }

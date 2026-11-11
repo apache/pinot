@@ -43,10 +43,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for functionality and concurrent read/write against mutable dictionaries.
- * <p>Index contiguous integers from 1 so that the index for each value is deterministic.
- */
+/// Tests for functionality and concurrent read/write against mutable dictionaries.
+///
+/// Index contiguous integers from 1 so that the index for each value is deterministic.
 public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
   private static final int NUM_ENTRIES = 100_000;
   private static final int EST_CARDINALITY = NUM_ENTRIES / 3;
@@ -244,7 +243,7 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
       case BIG_DECIMAL:
         return BigDecimal.valueOf(RANDOM.nextDouble());
       case STRING:
-        return RandomStringUtils.randomAscii(RANDOM.nextInt(1024));
+        return RandomStringUtils.secure().nextAscii(RANDOM.nextInt(1024));
       case BYTES:
         byte[] bytes = new byte[RANDOM.nextInt(100) + 1];
         RANDOM.nextBytes(bytes);
@@ -261,10 +260,9 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
     _memoryManager.close();
   }
 
-  /**
-   * Reader to read the index of each value after it's indexed into the dictionary, then get the value from the index.
-   * <p>We can assume that we always first get the index of a value, then use the index to fetch the value.
-   */
+  /// Reader to read the index of each value after it's indexed into the dictionary, then get the value from the index.
+  ///
+  /// We can assume that we always first get the index of a value, then use the index to fetch the value.
   private class Reader implements Callable<Void> {
     private final MutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
@@ -291,9 +289,7 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  /**
-   * Writer to index value into dictionary, then check the index of the value.
-   */
+  /// Writer to index value into dictionary, then check the index of the value.
   private class Writer implements Callable<Void> {
     private final MutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
@@ -317,9 +313,7 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  /**
-   * Helper method to return an <code>Integer</code> or <code>String</code> based on the given int value and data type.
-   */
+  /// Helper method to return an `Integer` or `String` based on the given int value and data type.
   private static Object makeObject(int intValue, FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
@@ -331,9 +325,7 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
     }
   }
 
-  /**
-   * Helper method to check whether the value of the given dictId is one larger than the dictId.
-   */
+  /// Helper method to check whether the value of the given dictId is one larger than the dictId.
   private static void checkEquals(MutableDictionary dictionary, int dictId, FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:

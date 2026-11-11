@@ -24,9 +24,11 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -35,14 +37,13 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The ConsumerCoordinator coordinates the offline->consuming helix transitions.
- */
+/// The ConsumerCoordinator coordinates the offline->consuming helix transitions.
 public class ConsumerCoordinator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);
   private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(3);
@@ -62,6 +63,13 @@ public class ConsumerCoordinator {
 
   private volatile int _maxSequenceNumberRegistered = -1;
 
+  // Set when a consuming segment releases the semaphore before it is sealed, so its rows are still in the partition
+  // metadata when the next consumer starts. Cleared when that segment is offloaded.
+  private final AtomicReference<UnsealedRelease> _unsealedRelease = new AtomicReference<>();
+
+  public record UnsealedRelease(String segmentName, StreamPartitionMsgOffset stoppedAtOffset) {
+  }
+
   public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
     _realtimeTableDataManager = realtimeTableDataManager;
@@ -71,19 +79,17 @@ public class ConsumerCoordinator {
     _serverMetrics = ServerMetrics.get();
   }
 
-  /**
-   * Acquires the consumer semaphore for the given LLC segment. When consumption order is enforced, it waits for the
-   * previous segment to be registered.
-   *
-   * TODO: Revisit if we want to handle the following corner case:
-   *   - Seg 100 (OFFLINE -> CONSUMING pending)
-   *   - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
-   *   - Seg 101 (CONSUMING -> ONLINE processed)
-   *   - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
-   *   It should be extremely rare because there has to be multiple CONSUMING state transitions pending, which means
-   *   state transition for Seg 100 has been delayed for at least the consumption time of Seg 101. Since we are not
-   *   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
-   */
+  /// Acquires the consumer semaphore for the given LLC segment. When consumption order is enforced, it waits for the
+  /// previous segment to be registered.
+  ///
+  /// TODO: Revisit if we want to handle the following corner case:
+  ///   - Seg 100 (OFFLINE -> CONSUMING pending)
+  ///   - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
+  ///   - Seg 101 (CONSUMING -> ONLINE processed)
+  ///   - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
+  ///   It should be extremely rare because there has to be multiple CONSUMING state transitions pending, which means
+  ///   state transition for Seg 100 has been delayed for at least the consumption time of Seg 101. Since we are not
+  ///   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
   public void acquire(LLCSegmentName llcSegmentName)
       throws InterruptedException, ShouldNotConsumeException {
     String segmentName = llcSegmentName.getSegmentName();
@@ -112,6 +118,23 @@ public class ConsumerCoordinator {
 
   public void release() {
     _semaphore.release();
+  }
+
+  /// Releases the semaphore while the segment is still mutable, recording the offset it stopped at (exclusive).
+  public void releaseUnsealed(String segmentName, StreamPartitionMsgOffset stoppedAtOffset) {
+    _unsealedRelease.set(new UnsealedRelease(segmentName, stoppedAtOffset));
+    _semaphore.release();
+  }
+
+  /// Clears the unsealed release recorded by the given segment, once that segment is offloaded.
+  public void clearUnsealedRelease(String segmentName) {
+    _unsealedRelease.updateAndGet(
+        release -> release != null && release.segmentName().equals(segmentName) ? null : release);
+  }
+
+  @Nullable
+  public UnsealedRelease getUnsealedRelease() {
+    return _unsealedRelease.get();
   }
 
   @VisibleForTesting
@@ -143,10 +166,8 @@ public class ConsumerCoordinator {
     }
   }
 
-  /**
-   * Waits for the previous segment to be registered to the server. Returns the segment ZK metadata fetched during the
-   * wait to reduce unnecessary ZK read.
-   */
+  /// Waits for the previous segment to be registered to the server. Returns the segment ZK metadata fetched during the
+  /// wait to reduce unnecessary ZK read.
   private void waitForPreviousSegment(LLCSegmentName currentSegment)
       throws InterruptedException, ShouldNotConsumeException {
     if (!_firstTransitionProcessed.get() || _useIdealStateToCalculatePreviousSegment) {
@@ -161,10 +182,8 @@ public class ConsumerCoordinator {
     }
   }
 
-  /**
-   * Waits for the previous segment with the sequence number to be registered to the server. Returns the segment ZK
-   * metadata fetched during the wait to reduce unnecessary ZK read..
-   */
+  /// Waits for the previous segment with the sequence number to be registered to the server. Returns the segment ZK
+  /// metadata fetched during the wait to reduce unnecessary ZK read..
   @VisibleForTesting
   void waitForPreviousSegment(LLCSegmentName currentSegment, int previousSegmentSequenceNumber)
       throws InterruptedException, ShouldNotConsumeException {
@@ -272,15 +291,13 @@ public class ConsumerCoordinator {
     }
   }
 
-  /**
-   * This exception is thrown when attempting to acquire the consumer semaphore for a segment that should not be
-   * consumed anymore:
-   * - Segment is in completed status (DONE/UPLOADED)
-   * - Segment is deleted
-   *
-   * We allow consumption when segment is COMMITTING (for pauseless consumption) because there is no guarantee that the
-   * segment will be committed soon. This way the slow server can still catch up.
-   */
+  /// This exception is thrown when attempting to acquire the consumer semaphore for a segment that should not be
+  /// consumed anymore:
+  /// - Segment is in completed status (DONE/UPLOADED)
+  /// - Segment is deleted
+  ///
+  /// We allow consumption when segment is COMMITTING (for pauseless consumption) because there is no guarantee that the
+  /// segment will be committed soon. This way the slow server can still catch up.
   public static class ShouldNotConsumeException extends Exception {
     public ShouldNotConsumeException(String message) {
       super(message);

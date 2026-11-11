@@ -21,8 +21,8 @@ package org.apache.pinot.broker.routing.segmentmetadata;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -60,7 +60,7 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
     assertEquals(segmentZkMetadataFetcher.getListeners().size(), 1);
 
     // should not allow register new listener once initialized
-    segmentZkMetadataFetcher.init(idealState, externalView, Collections.emptySet());
+    segmentZkMetadataFetcher.init(idealState, externalView, Set.of());
     try {
       segmentZkMetadataFetcher.register(mock(SegmentZkMetadataFetchListener.class));
       fail();
@@ -70,7 +70,7 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
 
     // should not allow duplicate init either
     try {
-      segmentZkMetadataFetcher.init(idealState, externalView, Collections.emptySet());
+      segmentZkMetadataFetcher.init(idealState, externalView, Set.of());
       fail();
     } catch (RuntimeException rte) {
       assertTrue(rte.getMessage().contains("has already been initialized"));
@@ -87,9 +87,9 @@ public class SegmentZkMetadataFetcherTest extends ControllerTest {
     ExternalView externalView = Mockito.mock(ExternalView.class);
 
     assertEquals(segmentZkMetadataFetcher.getListeners().size(), 0);
-    segmentZkMetadataFetcher.init(idealState, externalView, Collections.singleton("foo"));
+    segmentZkMetadataFetcher.init(idealState, externalView, Set.of("foo"));
     Mockito.verify(mockPropertyStore, times(0)).get(any(), any(), anyInt(), anyBoolean());
-    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, Collections.singleton("foo"));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, Set.of("foo"));
     Mockito.verify(mockPropertyStore, times(0)).get(any(), any(), anyInt(), anyBoolean());
     segmentZkMetadataFetcher.refreshSegment("foo");
     Mockito.verify(mockPropertyStore, times(0)).get(any(), any(), anyInt(), anyBoolean());

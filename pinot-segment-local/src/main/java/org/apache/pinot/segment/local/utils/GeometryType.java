@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-/**
- * The geometry type.
- */
+/// The geometry type.
 public enum GeometryType {
   POINT(false, 0, "ST_Point"),
   MULTI_POINT(true, 1, "ST_MultiPoint"),
@@ -51,18 +49,14 @@ public enum GeometryType {
     return _name;
   }
 
-  /**
-   * @return the id of the serialization type
-   */
+  /// @return the id of the serialization type
   public int id() {
     return _id;
   }
 
-  /**
-   * Constructs the serialization type from the id
-   * @param id id of the serialization type
-   * @return the serialization type
-   */
+  /// Constructs the serialization type from the id
+  /// @param id id of the serialization type
+  /// @return the serialization type
   public static GeometryType fromID(int id) {
     if (id > ID_TO_TYPE_MAP.length) {
       throw new IllegalArgumentException("Invalid type id: " + id);

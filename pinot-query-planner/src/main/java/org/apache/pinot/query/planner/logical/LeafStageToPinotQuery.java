@@ -22,33 +22,38 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * Utility to convert a leaf stage to a {@link PinotQuery}.
- */
+/// Utility to convert a leaf stage to a [PinotQuery].
+///
+/// [#createPinotQueryForRouting] folds a Calcite [RelNode] leaf stage into a routing query for the
+/// physical optimizer; `PlanNodeRoutingQueryBuilder` is the `PlanNode` (logical-planner) counterpart that
+/// must be kept in sync (same leaf-boundary stop and filter-combining behavior). The shared filter-normalization
+/// helpers ([#ensureFilterIsFunctionExpression] and [#addFilterExpression]) live here and are used by both.
 public class LeafStageToPinotQuery {
   private LeafStageToPinotQuery() {
   }
 
-  /**
-   * Converts a leaf stage root to a {@link PinotQuery}. This method only handles Project, Filter and TableScan nodes.
-   * Other node types are ignored since they don't impact routing.
-   *
-   * @param tableName the name of the table. Needs to be provided separately since it needs TableCache.
-   * @param leafStageRoot the root of the leaf stage
-   * @param skipFilter whether to skip the filter in the query
-   * @return a {@link PinotQuery} representing the leaf stage
-   */
+  /// Converts a leaf stage root to a [PinotQuery]. This method only handles Project, Filter and TableScan nodes.
+  /// Other node types are ignored since they don't impact routing.
+  ///
+  /// @param tableName the name of the table. Needs to be provided separately since it needs TableCache.
+  /// @param leafStageRoot the root of the leaf stage
+  /// @param skipFilter whether to skip the filter in the query
+  /// @return a [PinotQuery] representing the leaf stage
   public static PinotQuery createPinotQueryForRouting(String tableName, RelNode leafStageRoot, boolean skipFilter) {
     List<RelNode> bottomToTopNodes = new ArrayList<>();
     accumulateBottomToTop(leafStageRoot, bottomToTopNodes);
@@ -56,13 +61,20 @@ public class LeafStageToPinotQuery {
         "Could not find table scan");
     TableScan tableScan = (TableScan) bottomToTopNodes.get(0);
     PinotQuery pinotQuery = initializePinotQueryForTableScan(tableName, tableScan);
-    for (RelNode parentNode : bottomToTopNodes) {
+    for (int i = 1; i < bottomToTopNodes.size(); i++) {
+      RelNode parentNode = bottomToTopNodes.get(i);
       if (parentNode instanceof Filter) {
         if (!skipFilter) {
           handleFilter((Filter) parentNode, pinotQuery);
         }
       } else if (parentNode instanceof Project) {
         handleProject((Project) parentNode, pinotQuery);
+      } else {
+        // Leaf boundary: the first node that is neither Filter nor Project (e.g. an un-split DIRECT aggregate)
+        // changes the row space -- InputRefs in nodes above it index that node's output, not the scan/project
+        // columns -- so folding anything above it (e.g. a HAVING filter) would mis-resolve columns and corrupt the
+        // routing filter. Everything below this boundary is a genuine row-level condition; ignore everything above.
+        break;
       }
     }
     return pinotQuery;
@@ -98,8 +110,114 @@ public class LeafStageToPinotQuery {
   private static void handleFilter(Filter filter, PinotQuery pinotQuery) {
     if (filter != null) {
       RexExpression rexExpression = RexExpressionUtils.fromRexNode(filter.getCondition());
-      pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(rexExpression,
-          pinotQuery.getSelectList()));
+      Expression filterExpression = CalciteRexExpressionParser.toExpression(rexExpression,
+          pinotQuery.getSelectList());
+      addFilterExpression(pinotQuery, ensureFilterIsFunctionExpression(filterExpression));
     }
+  }
+
+  /// Adds the given filter to the query, AND-ing it with any previously set filter (rather than overwriting it, which
+  /// would silently discard a genuine row-level condition when a leaf stage contains multiple filter nodes).
+  ///
+  /// Note: this mutates `pinotQuery` (and, when combining, reuses the existing filter expression in-place). It
+  /// assumes the query is freshly constructed for routing and not shared across concurrent callers.
+  public static void addFilterExpression(PinotQuery pinotQuery, @Nullable Expression filterExpression) {
+    if (filterExpression == null) {
+      return;
+    }
+    Expression existingFilter = pinotQuery.getFilterExpression();
+    if (existingFilter == null) {
+      pinotQuery.setFilterExpression(filterExpression);
+      return;
+    }
+    pinotQuery.setFilterExpression(
+        RequestUtils.getFunctionExpression(FilterKind.AND.name(), existingFilter, filterExpression));
+  }
+
+  /// Ensures the filter expression is a FUNCTION type that segment pruners can process.
+  ///
+  /// When the V2 physical optimizer passes filters through Calcite's RelNode tree, certain expression types
+  /// (REINTERPRET on bare boolean columns, constant-folded SEARCH) produce IDENTIFIER or LITERAL Expression
+  /// objects with null functionCall. Segment pruners assume all filter expressions are FUNCTION type and NPE
+  /// on these. This method wraps bare IDENTIFIERs as EQUALS(col, true), converts LITERAL false to an
+  /// always-false predicate EQUALS(0, 1), and drops LITERAL true expressions (null = no filter).
+  /// For AND/OR/NOT nodes, operands are recursively fixed.
+  ///
+  /// Boolean scalar functions used directly as predicates (e.g. `WHERE contains(col, 'foo')`) are wrapped as
+  /// `EQUALS(fn(...), true)`, mirroring the single-stage engine's `PredicateComparisonRewriter`: segment
+  /// pruners resolve filter operators via `FilterKind.valueOf` and would otherwise throw on them.
+  ///
+  /// Note: This method mutates the input expression's operand lists in-place for AND/OR/NOT nodes.
+  /// It assumes the expression tree is freshly constructed and not shared across concurrent callers.
+  ///
+  /// @return the pruner-safe filter expression, or `null` when the input carries no filter constraint (e.g.
+  ///         LITERAL true, or an AND/OR/NOT that reduces away entirely).
+  @Nullable
+  public static Expression ensureFilterIsFunctionExpression(@Nullable Expression expression) {
+    if (expression == null) {
+      return null;
+    }
+    if (expression.getFunctionCall() != null) {
+      Function function = expression.getFunctionCall();
+      String operator = function.getOperator();
+      if (FilterKind.AND.name().equals(operator) || FilterKind.OR.name().equals(operator)) {
+        // Recursively fix operands of AND/OR, dropping null (LITERAL) results
+        List<Expression> operands = function.getOperands();
+        List<Expression> fixedOperands = new ArrayList<>();
+        for (Expression operand : operands) {
+          Expression fixed = ensureFilterIsFunctionExpression(operand);
+          if (fixed != null) {
+            fixedOperands.add(fixed);
+          }
+        }
+        if (fixedOperands.isEmpty()) {
+          return null;  // All operands were constant — drop entire filter
+        }
+        if (fixedOperands.size() == 1) {
+          return fixedOperands.get(0);  // Single operand — unwrap AND/OR
+        }
+        function.setOperands(fixedOperands);
+      } else if (FilterKind.NOT.name().equals(operator)) {
+        // Recursively fix the single operand of NOT
+        List<Expression> operands = function.getOperands();
+        // NOT is always unary — Calcite validates this at parse time and RexExpressionUtils
+        // preserves the operand list unchanged. Guard defensively; drop filter if malformed.
+        if (operands.size() != 1) {
+          return null;
+        }
+        Expression fixed = ensureFilterIsFunctionExpression(operands.get(0));
+        if (fixed == null) {
+          return null;  // NOT(constant) — drop entire filter
+        }
+        operands.set(0, fixed);
+      } else if (!EnumUtils.isValidEnum(FilterKind.class, operator)) {
+        // Boolean scalar function used directly as a predicate (e.g. contains(col, 'foo')).
+        return wrapAsEqualsTrue(expression);
+      }
+      return expression;
+    }
+    if (expression.getIdentifier() != null) {
+      // Bare boolean column reference (e.g., "is_active" after REINTERPRET stripped).
+      // Wrap as EQUALS(col, true) so pruners see a standard predicate.
+      return wrapAsEqualsTrue(expression);
+    }
+    // LITERAL expression (constant-folded predicate, e.g., TRUE/FALSE).
+    // Treat LITERAL false as an always-false predicate that pruners can process so they
+    // don't unnecessarily scan everything.
+    if (expression.getLiteral() != null && expression.getLiteral().isSetBoolValue()
+        && !expression.getLiteral().getBoolValue()) {
+      // EQUALS(0, 1) — a predicate that is always false.
+      return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(),
+          RequestUtils.getLiteralExpression(0), RequestUtils.getLiteralExpression(1));
+    }
+    // LITERAL true or non-boolean literals have no filter constraint so we skip pruning
+    return null;
+  }
+
+  /// Wraps a boolean-valued expression as the standard predicate `EQUALS(expression, true)`. The operand list
+  /// is mutable so downstream rewriters (e.g. `PredicateComparisonRewriter`) can modify it.
+  private static Expression wrapAsEqualsTrue(Expression expression) {
+    return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), expression,
+        RequestUtils.getLiteralExpression(true));
   }
 }

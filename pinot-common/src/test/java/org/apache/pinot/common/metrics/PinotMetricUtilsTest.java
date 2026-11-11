@@ -21,6 +21,7 @@ package org.apache.pinot.common.metrics;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.plugin.metrics.fake.FakeMetricsFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.MetricsRegistryRegistrationListener;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -28,23 +29,32 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
 public class PinotMetricUtilsTest {
+
+  @AfterClass
+  public void cleanUpMetricsFactory() {
+    PinotMetricUtils.cleanUp();
+  }
 
   @Test
   public void testPinotMetricsRegistryFactory() {
     try {
       Map<String, Object> properties = new HashMap<>();
+      properties.put(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, FakeMetricsFactory.class.getName());
       PinotConfiguration configuration = new PinotConfiguration(properties);
       PinotMetricUtils.init(configuration);
     } catch (Exception e) {
-      Assert.fail("Fail to initialize PinotMetricsRegistry of yammer");
+      Assert.fail("Fail to initialize PinotMetricsRegistry with the fake factory", e);
     }
     PinotMetricsRegistry pinotMetricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
     Assert.assertNotNull(pinotMetricsRegistry);
-    Assert.assertEquals(pinotMetricsRegistry.getClass().getSimpleName(), "YammerMetricsRegistry");
+    Assert.assertEquals(pinotMetricsRegistry.getClass().getSimpleName(), "FakePinotMetricsRegistry");
   }
 
   public static boolean _listenerOneOkay;
@@ -70,23 +80,26 @@ public class PinotMetricUtilsTest {
     _listenerTwoOkay = false;
 
     Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, FakeMetricsFactory.class.getName());
     properties.put("pinot.broker.metrics.metricsRegistryRegistrationListeners",
         PinotMetricUtilsTest.ListenerOne.class.getName() + "," + PinotMetricUtilsTest.ListenerTwo.class.getName());
 
-    // Initialize the PinotMetricUtils and create a new timer
     PinotConfiguration configuration = new PinotConfiguration(properties);
     PinotMetricUtils.init(configuration.subset("pinot.broker.metrics"));
+    PinotMetricUtils.init(configuration);
     PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
     PinotMetricUtils.makePinotTimer(registry, PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "dummy"),
         TimeUnit.MILLISECONDS, TimeUnit.MILLISECONDS);
 
-    // Check that the two listeners fired
     Assert.assertTrue(_listenerOneOkay);
     Assert.assertTrue(_listenerTwoOkay);
   }
 
   @Test
   public void testMetricValue() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, FakeMetricsFactory.class.getName());
+    PinotMetricUtils.init(new PinotConfiguration(properties));
     PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
     PinotMeter pinotMeter = PinotMetricUtils
         .makePinotMeter(registry, PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMeter"),
@@ -100,6 +113,11 @@ public class PinotMetricUtilsTest {
 
   @Test
   public void testPinotMetricName() {
+    // Explicitly install the fake factory so this test doesn't rely on whichever factory a prior test left behind.
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, FakeMetricsFactory.class.getName());
+    PinotMetricUtils.init(new PinotConfiguration(properties));
+
     PinotMetricName testMetricName1 =
         PinotMetricUtils.makePinotMetricName(PinotMetricUtilsTest.class, "testMetricName");
     PinotMetricName testMetricName2 =
@@ -125,12 +143,18 @@ public class PinotMetricUtilsTest {
 
   @Test
   public void testCleanUp() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, FakeMetricsFactory.class.getName());
+    PinotConfiguration config = new PinotConfiguration(properties);
+
     PinotMetricUtils.cleanUp();
+    PinotMetricUtils.init(config);
     PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
     PinotMetricsRegistry registry1 = PinotMetricUtils.getPinotMetricsRegistry();
     Assert.assertEquals(registry, registry1);
     PinotMetricUtils.cleanUp();
     // after cleaning up, a new one will be created
+    PinotMetricUtils.init(config);
     PinotMetricsRegistry registry2 = PinotMetricUtils.getPinotMetricsRegistry();
     Assert.assertNotEquals(registry, registry2);
   }

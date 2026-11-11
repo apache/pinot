@@ -46,15 +46,13 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     _columnToGlobalDictionary = new HashMap<>();
   }
 
-  /**
-   * First step towards building global dictionary
-   * by inserting the original values from segments
-   * into global dictionary
-   * @param origValue original value
-   * @param column column name
-   * @param columnMetadata column metadata
-   * @param cardinality total cardinality of column
-   */
+  /// First step towards building global dictionary
+  /// by inserting the original values from segments
+  /// into global dictionary
+  /// @param origValue original value
+  /// @param column column name
+  /// @param columnMetadata column metadata
+  /// @param cardinality total cardinality of column
   @Override
   public void addOrigValueToGlobalDictionary(Object origValue, String column, ColumnMetadata columnMetadata,
       int cardinality) {
@@ -68,24 +66,20 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     }
   }
 
-  /**
-   * This is the second step where we complete the global dictionaries
-   * by sorting the original values to get sort order across all segments
-   */
+  /// This is the second step where we complete the global dictionaries
+  /// by sorting the original values to get sort order across all segments
   @Override
   public void sortOriginalValuesInGlobalDictionaries() {
     // NO-OP since we use a sorted map so the global dictionary
     // is already sorted
   }
 
-  /**
-   * This is the third and final step where we complete the global
-   * dictionaries by generating values:
-   *
-   * For numeric columns, we generate in order since
-   * we start with a base value.
-   * For string column, we first generate and then sort
-   */
+  /// This is the third and final step where we complete the global
+  /// dictionaries by generating values:
+  ///
+  /// For numeric columns, we generate in order since
+  /// we start with a base value.
+  /// For string column, we first generate and then sort
   @Override
   public void addDerivedValuesToGlobalDictionaries() {
     // update global dictionary for each column by adding
@@ -150,16 +144,14 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     }
   }
 
-  /**
-   * This wrapper is needed so that we can set the derived values in global dictionary
-   * in sorted order while iterating over it. When we iterate over TreeMap, we get the
-   * map's entries as a set. Since doing a put() while iteration is not going to work,
-   * we create a wrapper and simply set the derived value to whatever the generated
-   * value is as we iterate on the sorted map to go over all original dictionary values.
-   *
-   * TODO: May be if we can do entry.setValue() on Map.Entry, then we don't need this wrapper
-   * and we can safely update the TreeMap during iteration.
-   */
+  /// This wrapper is needed so that we can set the derived values in global dictionary
+  /// in sorted order while iterating over it. When we iterate over TreeMap, we get the
+  /// map's entries as a set. Since doing a put() while iteration is not going to work,
+  /// we create a wrapper and simply set the derived value to whatever the generated
+  /// value is as we iterate on the sorted map to go over all original dictionary values.
+  ///
+  /// TODO: May be if we can do entry.setValue() on Map.Entry, then we don't need this wrapper
+  /// and we can safely update the TreeMap during iteration.
   private static class DerivedValue {
     Object _derivedValue;
 
@@ -245,7 +237,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
         values[i++] = "null";
       } else {
         int origValLength = val.length();
-        values[i++] = RandomStringUtils.randomAlphanumeric(origValLength);
+        values[i++] = RandomStringUtils.secure().nextAlphanumeric(origValLength);
       }
     }
     Arrays.sort(values);

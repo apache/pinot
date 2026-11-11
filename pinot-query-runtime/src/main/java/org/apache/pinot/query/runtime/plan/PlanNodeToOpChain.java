@@ -24,6 +24,9 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.request.context.GroupingSets;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -41,45 +44,40 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.apache.pinot.query.runtime.operator.AggregateOperator;
-import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
-import org.apache.pinot.query.runtime.operator.EnrichedHashJoinOperator;
 import org.apache.pinot.query.runtime.operator.ErrorOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
-import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
-import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
-import org.apache.pinot.query.runtime.operator.NonEquiJoinOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.RepeatOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.UnnestOperator;
-import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
+import org.apache.pinot.query.runtime.operator.factory.AggregateOperatorFactory;
+import org.apache.pinot.query.runtime.operator.factory.JoinOperatorFactory;
 import org.apache.pinot.query.runtime.operator.set.IntersectAllOperator;
 import org.apache.pinot.query.runtime.operator.set.IntersectOperator;
 import org.apache.pinot.query.runtime.operator.set.MinusAllOperator;
 import org.apache.pinot.query.runtime.operator.set.MinusOperator;
 import org.apache.pinot.query.runtime.operator.set.UnionAllOperator;
 import org.apache.pinot.query.runtime.operator.set.UnionOperator;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
-/**
- * A class used to transform PlanNodes (considered logical) into MultiStageOperator (considered physical).
- *
- * Note that this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
- * v1 operators at this point in time.
- *
- * <p><b>Notice</b>: Here <em>physical</em> is used in the context of multi-stage engine, which means it transforms
- * logical PlanNodes into MultiStageOperator.
- * Probably another adjective should be used given physical means different things for Calcite and single-stage</p>
- */
+/// A class used to transform PlanNodes (considered logical) into MultiStageOperator (considered physical).
+///
+/// Note that this works only for the intermediate stage nodes, leaf stage nodes are expected to compile into
+/// v1 operators at this point in time.
+///
+/// **Notice**: Here _physical_ is used in the context of multi-stage engine, which means it transforms
+/// logical PlanNodes into MultiStageOperator.
+/// Probably another adjective should be used given physical means different things for Calcite and single-stage
 public class PlanNodeToOpChain {
 
   private PlanNodeToOpChain() {
@@ -91,24 +89,60 @@ public class PlanNodeToOpChain {
     });
   }
 
-  /**
-   * Like {@link #convert(PlanNode, OpChainExecutionContext, BiConsumer)} but keeps tracking of the original
-   * PlanNode that created each MultiStageOperator
-   * @param tracker a consumer that will be called each time a MultiStageOperator is created.
-   * @return
-   */
+  /// Like [#convert(PlanNode, OpChainExecutionContext, BiConsumer)] but keeps tracking of the original
+  /// PlanNode that created each MultiStageOperator
+  /// @param tracker a consumer that will be called each time a MultiStageOperator is created.
+  /// @return
   public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
-    MyVisitor visitor = new MyVisitor(tracker);
+    // Assign deterministic stage-scoped ids to every PlanNode reachable from the root before constructing operators,
+    // so the stream-mode stats encoder can attach plan_node_ids to each StageStatsNode without needing to mutate or
+    // re-walk the plan. All workers of a stage perform this same pre-walk over the same plan structure (the ids are
+    // serialized on the wire), producing matching ids. Gate on stream-mode — the only consumer of these ids
+    // (MultiStageStatsTreeEncoder) — rather than isSendStats(): isSendStats() is true by default (legacy SAFE mode)
+    // where the ids are never read (pure GC dead weight on the hot path) yet false in stream mode (where they ARE
+    // needed), so gating on it is both wasteful and incorrect.
+    if (context.isStreamStatsReporting()) {
+      assignPlanNodeIds(node, context);
+    }
+    MyVisitor visitor = new MyVisitor(context, tracker);
     MultiStageOperator root = node.visit(visitor, context);
+    visitor.record(node, root);
     tracker.accept(node, root);
     return new OpChain(context, root);
   }
 
+  /// Pre-order walk that assigns each PlanNode in the sub-tree a sequential integer id, recorded on the context.
+  private static void assignPlanNodeIds(PlanNode root, OpChainExecutionContext context) {
+    assignPlanNodeIds(root, context, new int[]{0});
+  }
+
+  private static void assignPlanNodeIds(PlanNode node, OpChainExecutionContext context, int[] counter) {
+    context.recordPlanNodeId(node, counter[0]++);
+    for (PlanNode child : node.getInputs()) {
+      assignPlanNodeIds(child, context, counter);
+    }
+  }
+
+  /// Recursively collects all PlanNodes in the sub-tree rooted at `root` (including `root` itself), in
+  /// pre-order (root first, then children left-to-right).
+  ///
+  /// Used to record the leaf operator's full one-to-many mapping: the leaf operator's tracker fires once with the
+  /// leaf-stage boundary PlanNode, but the leaf actually represents the whole sub-tree of v1 plan nodes below that
+  /// boundary. We walk the boundary's sub-tree once at construction and store the full list on the operator.
+  private static void collectPlanNodeSubTree(PlanNode root, List<PlanNode> out) {
+    out.add(root);
+    for (PlanNode child : root.getInputs()) {
+      collectPlanNodeSubTree(child, out);
+    }
+  }
+
   private static class MyVisitor implements PlanNodeVisitor<MultiStageOperator, OpChainExecutionContext> {
+    private final OpChainExecutionContext _context;
     private final BiConsumer<PlanNode, MultiStageOperator> _tracker;
 
-    public MyVisitor(BiConsumer<PlanNode, MultiStageOperator> tracker) {
+    public MyVisitor(OpChainExecutionContext context, BiConsumer<PlanNode, MultiStageOperator> tracker) {
+      _context = context;
       _tracker = tracker;
     }
 
@@ -116,14 +150,44 @@ public class PlanNodeToOpChain {
       MultiStageOperator result;
       if (context.getLeafStageContext() != null && context.getLeafStageContext().getLeafStageBoundaryNode() == node) {
         ServerPlanRequestContext leafStageContext = context.getLeafStageContext();
+        PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+        @Nullable
+        MultiStageQueryStats pipelineBreakerQueryStats;
+        if (context.isKeepPipelineBreakerStats() && pipelineBreakerResult != null) {
+          pipelineBreakerQueryStats = pipelineBreakerResult.getStageQueryStats();
+        } else {
+          pipelineBreakerQueryStats = null;
+        }
         result = new LeafOperator(context, leafStageContext.getServerQueryRequests(),
             leafStageContext.getLeafStageBoundaryNode().getDataSchema(), leafStageContext.getLeafQueryExecutor(),
-            leafStageContext.getExecutorService());
+            leafStageContext.getExecutorService(), pipelineBreakerQueryStats);
       } else {
         result = node.visit(this, context);
       }
+      record(node, result);
       _tracker.accept(node, result);
       return result;
+    }
+
+    /// Records the operator-to-PlanNode mapping on the execution context. For non-leaf operators this is a 1:1 mapping
+    /// to `node`. For the leaf operator we walk the sub-tree below the leaf-stage boundary and record every
+    /// PlanNode encountered (one-to-many: a leaf operator owns the whole v1 sub-plan below it).
+    ///
+    /// No-op outside stream-mode stats reporting (the only consumer of this mapping) — avoids the O(depth) sub-tree
+    /// walk on the legacy hot path. See [OpChainExecutionContext#isStreamStatsReporting()].
+    void record(PlanNode node, MultiStageOperator operator) {
+      if (!_context.isStreamStatsReporting()) {
+        return;
+      }
+      List<PlanNode> mapping;
+      ServerPlanRequestContext leafStageContext = _context.getLeafStageContext();
+      if (leafStageContext != null && leafStageContext.getLeafStageBoundaryNode() == node) {
+        mapping = new ArrayList<>();
+        collectPlanNodeSubTree(node, mapping);
+      } else {
+        mapping = List.of(node);
+      }
+      _context.recordPlanNodesForOperator(operator, mapping);
     }
 
     @Override
@@ -148,11 +212,72 @@ public class PlanNodeToOpChain {
     public MultiStageOperator visitAggregate(AggregateNode node, OpChainExecutionContext context) {
       MultiStageOperator child = null;
       try {
-        child = visit(node.getInputs().get(0), context);
-        return new AggregateOperator(context, child, node);
+        PlanNode input = node.getInputs().get(0);
+        child = visit(input, context);
+        /// GROUP BY GROUPING SETS / ROLLUP / CUBE in the multi-stage runtime: expand each input row across the
+        /// grouping sets via a RepeatOperator — appending per-set group-key copies (NULL where rolled up) and the
+        /// $groupingId ordinal while leaving the original input columns untouched (aggregation arguments may
+        /// reference a grouping column) — then hand the factory an ordinary GROUP BY over the appended key copies
+        /// plus $groupingId. Wrapping here — rather than inside a specific AggregateOperator implementation — means
+        /// every AggregateOperatorFactory receives already-expanded input and needs no grouping-set awareness. This
+        /// path handles grouping sets over any input (e.g. above a JOIN); when the aggregate sits directly on a
+        /// table scan the whole expansion is pushed down to the single-stage leaf instead and the plan reaching here
+        /// has no grouping sets.
+        if (node.isGroupingSets()) {
+          child = new RepeatOperator(context, child, groupKeyIds(node.getGroupKeys()), node.getGroupingSets(),
+              repeatResultSchema(input.getDataSchema(), node.getGroupKeys()));
+          node = asPlainGroupByOverExpandedInput(node, input.getDataSchema().size());
+        }
+        AggregateOperatorFactory aggregateOperatorFactory =
+            context.getQueryOperatorFactoryProvider().getAggregateOperatorFactory();
+        return aggregateOperatorFactory.createAggregateOperator(context, child, input, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
+    }
+
+    /// Output schema of the [RepeatOperator] that feeds a grouping-set aggregate: the aggregate input schema
+    /// with one group-key copy column per union group-by column and the synthetic `$groupingId` INT
+    /// discriminator column appended.
+    private static DataSchema repeatResultSchema(DataSchema inputSchema, List<Integer> unionGroupKeyIds) {
+      int numInputColumns = inputSchema.size();
+      int numUnionKeys = unionGroupKeyIds.size();
+      String[] columnNames = new String[numInputColumns + numUnionKeys + 1];
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numInputColumns + numUnionKeys + 1];
+      for (int i = 0; i < numInputColumns; i++) {
+        columnNames[i] = inputSchema.getColumnName(i);
+        columnDataTypes[i] = inputSchema.getColumnDataType(i);
+      }
+      for (int i = 0; i < numUnionKeys; i++) {
+        columnNames[numInputColumns + i] = GroupingSets.GROUPING_SET_KEY_COLUMN_PREFIX + i;
+        columnDataTypes[numInputColumns + i] = inputSchema.getColumnDataType(unionGroupKeyIds.get(i));
+      }
+      columnNames[numInputColumns + numUnionKeys] = GroupingSets.GROUPING_ID_COLUMN;
+      columnDataTypes[numInputColumns + numUnionKeys] = DataSchema.ColumnDataType.INT;
+      return new DataSchema(columnNames, columnDataTypes);
+    }
+
+    /// The equivalent plain GROUP BY over the RepeatOperator-expanded input: the group keys are the appended
+    /// group-key copies plus the $groupingId column (the original input columns are left untouched for aggregation
+    /// arguments), and the grouping sets are cleared.
+    private static AggregateNode asPlainGroupByOverExpandedInput(AggregateNode node, int numInputColumns) {
+      int numUnionKeys = node.getGroupKeys().size();
+      List<Integer> groupKeys = new ArrayList<>(numUnionKeys + 1);
+      for (int i = 0; i <= numUnionKeys; i++) {
+        groupKeys.add(numInputColumns + i);
+      }
+      return new AggregateNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), node.getInputs(),
+          node.getAggCalls(), node.getFilterArgs(), groupKeys, node.getAggType(), node.isLeafReturnFinalResult(),
+          node.getCollations(), node.getLimit());
+    }
+
+    private static int[] groupKeyIds(List<Integer> groupKeys) {
+      int numKeys = groupKeys.size();
+      int[] groupKeyIds = new int[numKeys];
+      for (int i = 0; i < numKeys; i++) {
+        groupKeyIds[i] = groupKeys.get(i);
+      }
+      return groupKeyIds;
     }
 
     @Override
@@ -161,7 +286,9 @@ public class PlanNodeToOpChain {
       try {
         PlanNode input = node.getInputs().get(0);
         child = visit(input, context);
-        return new WindowAggregateOperator(context, child, input.getDataSchema(), node);
+        AggregateOperatorFactory aggregateOperatorFactory =
+            context.getQueryOperatorFactoryProvider().getAggregateOperatorFactory();
+        return aggregateOperatorFactory.createWindowAggregateOperator(context, child, input, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
@@ -223,22 +350,8 @@ public class PlanNodeToOpChain {
         PlanNode right = inputs.get(1);
         rightOperator = visit(right, context);
 
-        JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
-        switch (joinStrategy) {
-          case HASH:
-            if (node.getLeftKeys().isEmpty()) {
-              // TODO: Consider adding non-equi as a separate join strategy.
-              return new NonEquiJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-            } else {
-              return new HashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-            }
-          case LOOKUP:
-            return new LookupJoinOperator(context, leftOperator, rightOperator, node);
-          case ASOF:
-            return new AsofJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-          default:
-            throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
-        }
+        JoinOperatorFactory joinOperatorFactory = context.getQueryOperatorFactoryProvider().getJoinOperatorFactory();
+        return joinOperatorFactory.createJoinOperator(context, leftOperator, left, rightOperator, right, node);
       } catch (Exception e) {
         List<MultiStageOperator> children = Stream.of(leftOperator, rightOperator)
             .filter(Objects::nonNull)
@@ -247,6 +360,7 @@ public class PlanNodeToOpChain {
       }
     }
 
+    @Deprecated(forRemoval = true, since = "1.6.0")
     @Override
     public MultiStageOperator visitEnrichedJoin(EnrichedJoinNode node, OpChainExecutionContext context) {
       MultiStageOperator leftOperator = null;
@@ -257,21 +371,8 @@ public class PlanNodeToOpChain {
         leftOperator = visit(left, context);
         PlanNode right = inputs.get(1);
         rightOperator = visit(right, context);
-        JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
-        switch (joinStrategy) {
-          case HASH:
-            if (node.getLeftKeys().isEmpty()) {
-              throw new UnsupportedOperationException("NonEquiJoin yet to be supported for EnrichedJoin");
-            } else {
-              return new EnrichedHashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-            }
-          case LOOKUP:
-            throw new UnsupportedOperationException("LookupJoin yet to be supported for EnrichedJoin");
-          case ASOF:
-            throw new UnsupportedOperationException("AsOfJoin yet to be supported for EnrichedJoin");
-          default:
-            throw new IllegalStateException("Unsupported JoinStrategy for EnrichedJoin: " + joinStrategy);
-        }
+        JoinOperatorFactory joinOperatorFactory = context.getQueryOperatorFactoryProvider().getJoinOperatorFactory();
+        return joinOperatorFactory.createEnrichedJoinOperator(context, leftOperator, left, rightOperator, right, node);
       } catch (Exception e) {
         List<MultiStageOperator> children = Stream.of(leftOperator, rightOperator)
             .filter(Objects::nonNull)
@@ -297,7 +398,7 @@ public class PlanNodeToOpChain {
       MultiStageOperator child = null;
       try {
         child = visit(node.getInputs().get(0), context);
-        return new SortOperator(context, child, node);
+        return SortOperator.create(context, child, node);
       } catch (Exception e) {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }

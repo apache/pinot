@@ -22,9 +22,7 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Inverted index reader for multi-value column with constant values.
- */
+/// Inverted index reader for multi-value column with constant values.
 public final class ConstantMVInvertedIndexReader implements InvertedIndexReader<MutableRoaringBitmap> {
   private final MutableRoaringBitmap _bitmap;
 

@@ -26,6 +26,14 @@ import org.slf4j.Logger;
 
 public class ControllerApplicationException extends WebApplicationException {
 
+  /// Controls whether server logs include the supplied exception details or only its type.
+  public enum ExceptionLogMode {
+    FULL,
+    TYPE_ONLY
+  }
+
+  private final boolean _includeCausesInResponse;
+
   public ControllerApplicationException(Logger logger, String message, Response.Status status) {
     this(logger, message, status.getStatusCode(), null);
   }
@@ -35,23 +43,56 @@ public class ControllerApplicationException extends WebApplicationException {
   }
 
   public ControllerApplicationException(Logger logger, String message, Response.Status status, @Nullable Throwable e) {
-    this(logger, message, status.getStatusCode(), e);
+    this(logger, message, status.getStatusCode(), e, ExceptionLogMode.FULL);
+  }
+
+  public ControllerApplicationException(Logger logger, String message, Response.Status status, @Nullable Throwable e,
+      ExceptionLogMode exceptionLogMode) {
+    this(logger, message, status.getStatusCode(), e, exceptionLogMode);
   }
 
   public ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e) {
-    super(message, status);
+    this(logger, message, status, e, ExceptionLogMode.FULL);
+  }
+
+  private ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e,
+      ExceptionLogMode exceptionLogMode) {
+    this(logger, message, status, e, exceptionLogMode, false);
+  }
+
+  private ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e,
+      ExceptionLogMode exceptionLogMode, boolean includeCausesInResponse) {
+    super(message, includeCausesInResponse ? e : null, status);
+    _includeCausesInResponse = includeCausesInResponse;
     if (status >= 300 && status < 500) {
       if (e == null) {
         logger.info(message);
+      } else if (exceptionLogMode == ExceptionLogMode.TYPE_ONLY) {
+        logger.info("{} exception type: {}", message, e.getClass().getName());
       } else {
         logger.info("{} exception: {}", message, e.getMessage());
       }
     } else {
       if (e == null) {
         logger.error(message);
+      } else if (exceptionLogMode == ExceptionLogMode.TYPE_ONLY) {
+        logger.error("{} exception type: {}", message, e.getClass().getName());
       } else {
         logger.error(message, e);
       }
     }
+  }
+
+  /// Creates an exception whose response also carries the messages of `e` and its causes. Use it only where those
+  /// messages describe the caller's own input: the response reaches the caller, and other causes can name files, hosts
+  /// or plugins on the controller.
+  public static ControllerApplicationException withCausesInResponse(Logger logger, String message,
+      Response.Status status, Throwable e) {
+    return new ControllerApplicationException(logger, message, status.getStatusCode(), e, ExceptionLogMode.FULL, true);
+  }
+
+  /// Whether the response carries the cause chain, which only [#withCausesInResponse] asks for.
+  public boolean shouldIncludeCausesInResponse() {
+    return _includeCausesInResponse;
   }
 }

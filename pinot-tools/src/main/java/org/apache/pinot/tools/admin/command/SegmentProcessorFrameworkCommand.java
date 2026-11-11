@@ -40,9 +40,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Command to run {@link org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework}
- */
+/// Command to run [org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework]
 @CommandLine.Command(name = "SegmentProcessorFramework", mixinStandardHelpOptions = true)
 public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand implements Command {
 

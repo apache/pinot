@@ -21,61 +21,39 @@ package org.apache.pinot.segment.spi.index.startree;
 import java.util.Iterator;
 
 
-/**
- * Interface for Star Tree Node.
- */
+/// Interface for Star Tree Node.
 public interface StarTreeNode {
 
   int ALL = -1;
 
-  /**
-   * Get the index of the dimension.
-   */
+  /// Get the index of the dimension.
   int getDimensionId();
 
-  /**
-   * Get the value (dictionary id) of the dimension.
-   */
+  /// Get the value (dictionary id) of the dimension.
   int getDimensionValue();
 
-  /**
-   * Get the child dimension id.
-   */
+  /// Get the child dimension id.
   int getChildDimensionId();
 
-  /**
-   * Get the index of the start document.
-   */
+  /// Get the index of the start document.
   int getStartDocId();
 
-  /**
-   * Get the index of the end document (exclusive).
-   */
+  /// Get the index of the end document (exclusive).
   int getEndDocId();
 
-  /**
-   * Get the index of the aggregated document.
-   */
+  /// Get the index of the aggregated document.
   int getAggregatedDocId();
 
-  /**
-   * Get the number of children nodes.
-   */
+  /// Get the number of children nodes.
   int getNumChildren();
 
-  /**
-   * Return true if the node is a leaf node, false otherwise.
-   */
+  /// Return true if the node is a leaf node, false otherwise.
   boolean isLeaf();
 
-  /**
-   * Get the child node corresponding to the given dimension value (dictionary id), or null if such child does not
-   * exist.
-   */
+  /// Get the child node corresponding to the given dimension value (dictionary id), or null if such child does not
+  /// exist.
   StarTreeNode getChildForDimensionValue(int dimensionValue);
 
-  /**
-   * Get the iterator over all children nodes.
-   */
+  /// Get the iterator over all children nodes.
   Iterator<? extends StarTreeNode> getChildrenIterator();
 }

@@ -41,9 +41,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
-import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.services.PinotTableReloadService;
 import org.apache.pinot.controller.services.PinotTableReloadStatusReporter;
 import org.apache.pinot.core.auth.Actions;
@@ -55,25 +55,14 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-/**
- * REST API resource for reloading table segments.
- * <ul>
- *   <li>
- *     POST requests:
- *     <ul>
- *       <li>"/segments/{tableName}/{segmentName}/reload": reload a specific segment</li>
- *       <li>"/segments/{tableName}/reload": reload all segments in a table</li>
- *     </ul>
- *   </li>
- *   <li>
- *     GET requests:
- *     <ul>
- *       <li>"/segments/segmentReloadStatus/{jobId}": get status for a submitted reload job</li>
- *       <li>"/segments/{tableNameWithType}/needReload": check if table segments need reloading</li>
- *     </ul>
- *   </li>
- * </ul>
- */
+/// REST API resource for reloading table segments.
+///
+/// - POST requests:
+///   - "/segments/{tableName}/{segmentName}/reload": reload a specific segment
+///   - "/segments/{tableName}/reload": reload all segments in a table (optionally within a time range)
+/// - GET requests:
+///   - "/segments/segmentReloadStatus/{jobId}": get status for a submitted reload job
+///   - "/segments/{tableNameWithType}/needReload": check if table segments need reloading
 @Api(tags = Constants.SEGMENT_TAG, authorizations = {
     @Authorization(value = SWAGGER_AUTHORIZATION_KEY), @Authorization(value = DATABASE)
 })
@@ -88,6 +77,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotTableReloadResource {
   private static final Logger LOG = LoggerFactory.getLogger(PinotTableReloadResource.class);
+  private static final String ONLY_IF_NEEDED_DESCRIPTION = "Reload only the segments whose loaded copy is out of "
+      + "date (CRC changed, tier changed, or index/schema preprocessing needed); up-to-date segments are skipped and "
+      + "counted as successful. Ignored when forceDownload is true";
 
   private final PinotTableReloadService _service;
   private final PinotTableReloadStatusReporter _statusReporter;
@@ -117,9 +109,11 @@ public class PinotTableReloadResource {
       @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Force server to re-download segment from deep store", defaultValue = "false")
       @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = ONLY_IF_NEEDED_DESCRIPTION, defaultValue = "false")
+      @QueryParam("onlyIfNeeded") @DefaultValue("false") boolean onlyIfNeeded,
       @ApiParam(value = "Target specific server instance") @QueryParam("targetInstance") @Nullable
       String targetInstance, @Context HttpHeaders headers) {
-    return _service.reloadSegment(tableName, segmentName, forceDownload, targetInstance, headers);
+    return _service.reloadSegment(tableName, segmentName, forceDownload, onlyIfNeeded, targetInstance, headers);
   }
 
   @POST
@@ -128,7 +122,11 @@ public class PinotTableReloadResource {
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload all segments in a table",
-      notes = "Reloads all segments for the specified table. Supports filtering by type, instance, or custom mapping.")
+      notes = "Reloads all segments for the specified table. Supports filtering by type, instance, "
+          + "custom mapping, or time range. Time range params are in milliseconds and the range is "
+          + "[startTimestamp, endTimestamp). Either timestamp can be omitted to make that side of the "
+          + "range unbounded. When using time range parameters, do not specify targetInstance or "
+          + "instanceToSegmentsMap; these options are mutually exclusive with time range filters.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Reload jobs submitted successfully"),
       @ApiResponse(code = 404, message = "No segments found")
@@ -140,13 +138,21 @@ public class PinotTableReloadResource {
       String tableTypeStr,
       @ApiParam(value = "Force server to re-download segments from deep store", defaultValue = "false")
       @QueryParam("forceDownload") @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = ONLY_IF_NEEDED_DESCRIPTION, defaultValue = "false")
+      @QueryParam("onlyIfNeeded") @DefaultValue("false") boolean onlyIfNeeded,
+      @ApiParam(value = "Start timestamp (inclusive) in milliseconds. Omit for an unbounded lower bound.")
+      @QueryParam("startTimestamp") String startTimestampStr,
+      @ApiParam(value = "End timestamp (exclusive) in milliseconds. Omit for an unbounded upper bound.")
+      @QueryParam("endTimestamp") String endTimestampStr,
+      @ApiParam(value = "Whether to exclude segments overlapping the time range", defaultValue = "false")
+      @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping,
       @ApiParam(value = "Target specific server instance") @QueryParam("targetInstance") @Nullable
       String targetInstance,
       @ApiParam(value = "JSON map of instance to segment lists (overrides targetInstance)")
       @QueryParam("instanceToSegmentsMap") @Nullable String instanceToSegmentsMapInJson, @Context HttpHeaders headers)
       throws IOException {
-    return _service.reloadAllSegments(tableName, tableTypeStr, forceDownload, targetInstance,
-        instanceToSegmentsMapInJson, headers);
+    return _service.reloadAllSegments(tableName, tableTypeStr, forceDownload, onlyIfNeeded, targetInstance,
+        instanceToSegmentsMapInJson, startTimestampStr, endTimestampStr, excludeOverlapping, headers);
   }
 
   @GET

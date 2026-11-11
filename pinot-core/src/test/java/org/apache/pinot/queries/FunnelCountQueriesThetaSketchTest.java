@@ -19,7 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.util.List;
-import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -30,9 +30,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for FUNNEL_COUNT queries.
- */
+/// Queries test for FUNNEL_COUNT queries.
 public class FunnelCountQueriesThetaSketchTest extends BaseFunnelCountQueriesTest {
 
   @Override
@@ -63,7 +61,7 @@ public class FunnelCountQueriesThetaSketchTest extends BaseFunnelCountQueriesTes
   @Override
   protected void assertIntermediateResult(Object intermediateResult, long[] expectedCounts) {
     assertTrue(intermediateResult instanceof List);
-    List<Sketch> sketches = (List<Sketch>) intermediateResult;
+    List<ThetaSketch> sketches = (List<ThetaSketch>) intermediateResult;
     // First step should match
     assertEquals(Math.round(sketches.get(0).getEstimate()), expectedCounts[0]);
     for (int i = 1; i < sketches.size(); i++) {

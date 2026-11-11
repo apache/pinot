@@ -21,28 +21,22 @@ package org.apache.pinot.controller.helix.core.retention.strategy;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 
 
-/**
- * Strategy to manage segment retention.
- */
+/// Strategy to manage segment retention.
 public interface RetentionStrategy {
 
-  /**
-   * Returns whether the segment should be purged
-   *
-   * @param tableNameWithType Table name with type
-   * @param segmentZKMetadata Segment ZK metadata
-   * @return Whether the segment should be purged
-   */
+  /// Returns whether the segment should be purged
+  ///
+  /// @param tableNameWithType Table name with type
+  /// @param segmentZKMetadata Segment ZK metadata
+  /// @return Whether the segment should be purged
   boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata);
 
-  /**
-   * Determines whether a segment is eligible for purging
-   *
-   * @param tableNameWithType The table name, including its type.
-   * @param segmentName The name of the segment to evaluate.
-   * @param segmentTimeMs The segment's timestamp in milliseconds, which could be the end time from ZK metadata or
-   *                      the modification time (mTime) for the file in deep store etc.
-   * @return {@code true} if the segment should be purged; {@code false} otherwise.
-   */
+  /// Determines whether a segment is eligible for purging
+  ///
+  /// @param tableNameWithType The table name, including its type.
+  /// @param segmentName The name of the segment to evaluate.
+  /// @param segmentTimeMs The segment's timestamp in milliseconds, which could be the end time from ZK metadata or
+  ///                      the modification time (mTime) for the file in deep store etc.
+  /// @return `true` if the segment should be purged; `false` otherwise.
   boolean isPurgeable(String tableNameWithType, String segmentName, long segmentTimeMs);
-  }
+}

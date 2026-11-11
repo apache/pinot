@@ -28,9 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Minus/Except operator.
- */
+/// Minus/Except operator.
 public class MinusOperator extends BinarySetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinusOperator.class);
   private static final String EXPLAIN_NAME = "MINUS";

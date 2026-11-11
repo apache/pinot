@@ -23,6 +23,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -32,22 +33,17 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * BinaryOperatorTransformFunctionTest abstracts common test methods for EqualsTransformFunctionTest,
- * NotEqualsTransformFunctionTest, GreaterThanOrEqualTransformFunctionTest, GreaterThanTransformFunctionTest,
- * LessThanOrEqualTransformFunctionTest, LessThanTransformFunctionTest
- *
- */
+/// BinaryOperatorTransformFunctionTest abstracts common test methods for EqualsTransformFunctionTest,
+/// NotEqualsTransformFunctionTest, GreaterThanOrEqualTransformFunctionTest, GreaterThanTransformFunctionTest,
+/// LessThanOrEqualTransformFunctionTest, LessThanTransformFunctionTest
 public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformFunctionTest {
 
   abstract boolean getExpectedValue(int compareResult);
 
   abstract String getFunctionName();
 
-  /**
-   * For columns with dictionary, BinaryOperatorTransformFunction will automatically use the internal
-   * predicateEvaluator for expression evaluation.
-   */
+  /// For columns with dictionary, BinaryOperatorTransformFunction will automatically use the internal
+  /// predicateEvaluator for expression evaluation.
   @Test
   public void testBinaryOperatorTransformFunction() {
     String functionName = getFunctionName();
@@ -153,10 +149,8 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
   }
 
-  /**
-   * Different than the testBinaryOperatorTransformFunction, this test will hit a different code path of
-   * BinaryOperatorTransformFunction, which the left side block has no dictionary nor predicateEvaluator.
-   */
+  /// Different than the testBinaryOperatorTransformFunction, this test will hit a different code path of
+  /// BinaryOperatorTransformFunction, which the left side block has no dictionary nor predicateEvaluator.
   @Test
   public void testBinaryOperatorTransformFunctionNoDict() {
     String functionName = getFunctionName();
@@ -263,6 +257,35 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
   }
 
+  @Test
+  public void testBinaryOperatorTransformFunctionUUID() {
+    String functionName = getFunctionName();
+    String uuidLiteral = UuidUtils.toString(_uuidSVValues[0]);
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, CAST('%s' AS UUID))", functionName, UUID_SV_COLUMN, uuidLiteral));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(UuidUtils.compare(_uuidSVValues[i], _uuidSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testBinaryOperatorTransformFunctionUUIDNoDict() {
+    String functionName = getFunctionName();
+    String uuidLiteral = UuidUtils.toString(_uuidSVValues[0]);
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(CAST(%s AS STRING) AS UUID), CAST('%s' AS UUID))", functionName, UUID_SV_COLUMN,
+            uuidLiteral));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(UuidUtils.compare(_uuidSVValues[i], _uuidSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
@@ -276,7 +299,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
             String.format("%s(%s)", getFunctionName(), INT_SV_COLUMN)
         }, new Object[]{
         String.format("%s(%s, %s, %s)", getFunctionName(), LONG_SV_COLUMN, INT_SV_COLUMN, STRING_SV_COLUMN)
-    }
+        }
     };
   }
 }

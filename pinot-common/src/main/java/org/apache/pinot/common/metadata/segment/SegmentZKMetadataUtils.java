@@ -40,9 +40,7 @@ public class SegmentZKMetadataUtils {
   private SegmentZKMetadataUtils() {
   }
 
-  /**
-   * Creates the segment ZK metadata for a new segment.
-   */
+  /// Creates the segment ZK metadata for a new segment.
   public static SegmentZKMetadata createSegmentZKMetadata(String tableNameWithType, SegmentMetadata segmentMetadata,
       String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
@@ -51,18 +49,14 @@ public class SegmentZKMetadataUtils {
     return segmentZKMetadata;
   }
 
-  /**
-   * Refreshes the segment ZK metadata for a segment being replaced.
-   */
+  /// Refreshes the segment ZK metadata for a segment being replaced.
   public static void refreshSegmentZKMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
       SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
     updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypterName,
         segmentSizeInBytes, null, false);
   }
 
-  /**
-   * Updates the segment ZK metadata for a committing segment.
-   */
+  /// Updates the segment ZK metadata for a committing segment.
   public static void updateCommittingSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata,
       SegmentMetadata segmentMetadata, String downloadUrl, long segmentSizeInBytes, String endOffset) {
     updateSegmentZKMetadata(realtimeTableName, segmentZKMetadata, segmentMetadata, downloadUrl, null,
@@ -94,6 +88,10 @@ public class SegmentZKMetadataUtils {
 
       segmentZKMetadata.setEndOffset(endOffset);
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+      // for committing segments, we use data CRC to replace but only if the data CRC is present for the segment
+      if (segmentMetadata.getDataCrc() >= 0) {
+        segmentZKMetadata.setUseDataCrc(true);
+      }
 
       // For committing segment, use current time as start/end time if total docs is 0
       if (segmentMetadata.getTotalDocs() > 0) {
@@ -110,7 +108,9 @@ public class SegmentZKMetadataUtils {
       segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
     } else {
       // For uploaded segment
-
+      // clear the use data crc flag for uploaded segments
+      // This flag should ONLY be true for segments committed from CONSUMING state
+      segmentZKMetadata.setUseDataCrc(false);
       // Set segment status, start/end offset info for real-time table
       if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
         segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
@@ -159,7 +159,8 @@ public class SegmentZKMetadataUtils {
     SegmentVersion segmentVersion = segmentMetadata.getVersion();
     segmentZKMetadata.setIndexVersion(segmentVersion != null ? segmentVersion.toString() : null);
     segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
-    segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    segmentZKMetadata.setCrc(segmentMetadata.getCrc());
+    segmentZKMetadata.setDataCrc(segmentMetadata.getDataCrc());
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypterName);
     segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);

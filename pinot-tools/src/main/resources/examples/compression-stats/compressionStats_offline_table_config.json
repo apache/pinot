@@ -1,0 +1,26 @@
+{
+  "tableName": "compressionStats",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "replication": "2",
+    "segmentPushType": "APPEND"
+  },
+  "tenants": {},
+  "fieldConfigList": [
+    {
+      "name": "message",
+      "encodingType": "RAW",
+      "compressionCodec": "ZSTANDARD"
+    }
+  ],
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "compressionStatsEnabled": true,
+    "noDictionaryColumns": [
+      "message"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {}
+  }
+}

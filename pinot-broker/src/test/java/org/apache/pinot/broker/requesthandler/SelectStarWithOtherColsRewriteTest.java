@@ -44,9 +44,7 @@ public class SelectStarWithOtherColsRewriteTest {
       "$hostName", "$hostName"
   );
 
-  /**
-   * When the query contains only '*', it should be expanded into columns.
-   */
+  /// When the query contains only '\*', it should be expanded into columns.
   @Test
   public void testShouldExpandWhenOnlyStarIsSelected() {
     String sql = "SELECT * FROM baseballStats";
@@ -66,9 +64,7 @@ public class SelectStarWithOtherColsRewriteTest {
         (key, value) -> Assert.assertEquals((int) value, 1, key + " has more than one occurrences in new selection"));
   }
 
-  /**
-   * Expansion should not contain any virtual columns
-   */
+  /// Expansion should not contain any virtual columns
   @Test
   public void testShouldNotReturnExtraDefaultColumns() {
     String sql = "SELECT $docId,*,$segmentName FROM baseballStats";
@@ -95,9 +91,7 @@ public class SelectStarWithOtherColsRewriteTest {
     Assert.assertEquals(segmentNameCnt, 1);
   }
 
-  /**
-   * Columns should not be deduped
-   */
+  /// Columns should not be deduped
   @Test
   public void testShouldNotDedupMultipleRequestedColumns() {
     String sql = "SELECT playerID,*,G_old FROM baseballStats";
@@ -122,9 +116,7 @@ public class SelectStarWithOtherColsRewriteTest {
     Assert.assertEquals(goldCount, 2, "G_old occurs does not occur once");
   }
 
-  /**
-   * Selections should be returned in the requested order
-   */
+  /// Selections should be returned in the requested order
   @Test
   public void testSelectionOrder() {
     String sql = "SELECT playerID,*,G_old FROM baseballStats";
@@ -141,9 +133,8 @@ public class SelectStarWithOtherColsRewriteTest {
     Assert.assertEquals(expandedSelections, assumedUnsortedSelections, "Expanded selections not sorted alphabetically");
   }
 
-  /**
-   * When the same column is requested twice, once with an alias and once as part of *, then it should be returned twice
-   */
+  /// When the same column is requested twice, once with an alias and once as part of \*, then it should be
+  /// returned twice
   @Test
   public void testAliasing() {
     String sql = "SELECT playerID as pid,* FROM baseballStats";
@@ -165,9 +156,7 @@ public class SelectStarWithOtherColsRewriteTest {
     Assert.assertTrue(playerIdPresent, "playerID col is missing");
   }
 
-  /**
-   * When a function is applied to a column, then that col is returned along with the original column
-   */
+  /// When a function is applied to a column, then that col is returned along with the original column
   @Test
   public void testFuncOnColumns1() {
     String sql = "SELECT sqrt(homeRuns),* FROM baseballStats";
@@ -188,9 +177,7 @@ public class SelectStarWithOtherColsRewriteTest {
     Assert.assertEquals(homeRunsCnt, 1);
   }
 
-  /**
-   * When a function is applied to a column, then that col is returned along with the original column
-   */
+  /// When a function is applied to a column, then that col is returned along with the original column
   @Test
   public void testFuncOnColumns2() {
     String sql = "SELECT add(homeRuns,groundedIntoDoublePlays),* FROM baseballStats";
@@ -217,9 +204,7 @@ public class SelectStarWithOtherColsRewriteTest {
     Assert.assertEquals(groundedIntoDoublePlaysCnt, 1);
   }
 
-  /**
-   * When 'n' no. of unqualified * are present, then each column is returned 'n' times.
-   */
+  /// When 'n' no. of unqualified \* are present, then each column is returned 'n' times.
   @Test
   public void testMultipleUnqualifiedStars() {
     String sql = "SELECT *,* FROM baseballStats";

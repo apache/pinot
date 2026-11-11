@@ -29,9 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
-/**
- * Results block for selection queries.
- */
+/// Results block for selection queries.
 public class SelectionResultsBlock extends BaseResultsBlock {
   private final DataSchema _dataSchema;
   private final Comparator<? super Object[]> _comparator;

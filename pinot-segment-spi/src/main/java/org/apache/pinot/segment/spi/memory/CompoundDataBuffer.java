@@ -25,18 +25,17 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * A {@link DataBuffer} that is composed of multiple {@link DataBuffer}s that define a single contiguous buffer.
- * <p>
- * While reads and writes can span multiple buffers, there may be a performance impact when doing so.
- * Therefore it is recommended to try to wrap independent buffers.
- * <p>
- * Once this class is built, buffers cannot be added or removed.
- */
+/// A [DataBuffer] that is composed of multiple [DataBuffer]s that define a single contiguous buffer.
+///
+/// While reads and writes can span multiple buffers, there may be a performance impact when doing so.
+/// Therefore it is recommended to try to wrap independent buffers.
+///
+/// Once this class is built, buffers cannot be added or removed.
 public class CompoundDataBuffer implements DataBuffer {
 
   private final DataBuffer[] _buffers;
@@ -46,14 +45,13 @@ public class CompoundDataBuffer implements DataBuffer {
   private final long _size;
   private final boolean _owner;
 
-  /**
-   * Creates a compound buffer from the given buffers.
-   *
-   * @param buffers The buffers that will be concatenated to form the compound buffer.
-   * @param order The byte order of the buffer. Buffers in the array that have a different byte order will be converted.
-   * @param owner Whether this buffer owns the underlying buffers. If true, the underlying buffers will be released when
-   *              this buffer is closed.
-   */
+  /// Creates a compound buffer from the given buffers.
+  ///
+  /// @param buffers The buffers that will be concatenated to form the compound buffer.
+  /// @param order The byte order of the buffer. Buffers in the array that have a different byte order will be
+  ///              converted.
+  /// @param owner Whether this buffer owns the underlying buffers. If true, the underlying buffers will be released
+  ///              when this buffer is closed.
   public CompoundDataBuffer(DataBuffer[] buffers, ByteOrder order, boolean owner) {
     _owner = owner;
     _buffers = buffers;
@@ -80,13 +78,11 @@ public class CompoundDataBuffer implements DataBuffer {
     this(asDataBufferArray(buffers), order, owner);
   }
 
-  /**
-   * Creates a compound buffer from the given buffers.
-   * @param buffers The buffers that will be concatenated to form the compound buffer.
-   * @param order The byte order of the buffer. Buffers in the list that have a different byte order will be converted.
-   * @param owner Whether this buffer owns the underlying buffers. If true, the underlying buffers will be released when
-   *              this buffer is closed.
-   */
+  /// Creates a compound buffer from the given buffers.
+  /// @param buffers The buffers that will be concatenated to form the compound buffer.
+  /// @param order The byte order of the buffer. Buffers in the list that have a different byte order will be converted.
+  /// @param owner Whether this buffer owns the underlying buffers. If true, the underlying buffers will be released
+  ///              when this buffer is closed.
   public CompoundDataBuffer(List<DataBuffer> buffers, ByteOrder order, boolean owner) {
     this(buffers.toArray(new DataBuffer[0]), order, owner);
   }
@@ -117,21 +113,19 @@ public class CompoundDataBuffer implements DataBuffer {
   }
 
   private int getBufferIndex(long offset) {
-    // this optimistically assumes that lookups are going to be in ascending order
-    // we don't care about concurrency here given that this is only used to speed up the lookup
+    // Most lookups land in the same buffer as the previous one, so check it first. Otherwise use a binary search,
+    // which keeps random and backward access at O(log n) instead of a scan from the first buffer.
+    // We don't care about concurrency here given that this is only used to speed up the lookup.
     int lastBufferIndex = _lastBufferIndex;
-    if (_bufferOffsets[lastBufferIndex] > offset) {
-      lastBufferIndex = 0;
+    int nextBufferIndex = lastBufferIndex + 1;
+    if (_bufferOffsets[lastBufferIndex] <= offset
+        && (nextBufferIndex == _bufferOffsets.length || offset < _bufferOffsets[nextBufferIndex])) {
+      return lastBufferIndex;
     }
-
-    for (int i = lastBufferIndex; i < _bufferOffsets.length; i++) {
-      if (offset < _bufferOffsets[i]) {
-        int result = i - 1;
-        _lastBufferIndex = result;
-        return result;
-      }
-    }
-    int result = _bufferOffsets.length - 1;
+    // Offsets are strictly ascending because empty buffers are rejected. On a miss, binarySearch returns
+    // (-insertionPoint - 1), and the buffer that contains the offset is the one before the insertion point.
+    int index = Arrays.binarySearch(_bufferOffsets, offset);
+    int result = index >= 0 ? index : -index - 2;
     _lastBufferIndex = result;
     return result;
   }

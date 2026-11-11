@@ -21,9 +21,7 @@ package org.apache.pinot.segment.spi.memory.unsafe;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.EnumUtils;
 
-/**
- * Simple singleton config for managing advanced mmap configurations
- */
+/// Simple singleton config for managing advanced mmap configurations
 public class MmapMemoryConfig {
   private MmapMemoryConfig() { }
   private static final MmapMemoryConfig INSTANCE = new MmapMemoryConfig();
@@ -41,19 +39,15 @@ public class MmapMemoryConfig {
       _advice = advice;
     }
 
-    /**
-     *  Get posix-compatible advice integer
-     */
+    /// Get posix-compatible advice integer
     public int getAdvice() {
       return _advice;
     }
   }
 
-  /**
-   * Advice to use by default after calling mmap on a region of a file.
-   * Notably this is expected to be an integer corresponding to advice
-   * supported by posix_madvise()
-   */
+  /// Advice to use by default after calling mmap on a region of a file.
+  /// Notably this is expected to be an integer corresponding to advice
+  /// supported by posix_madvise()
   private int _defaultAdvice = -1;
 
   public static int getDefaultAdvice() {
@@ -71,9 +65,9 @@ public class MmapMemoryConfig {
 
   public static void setDefaultAdvice(String adviceString) {
     Preconditions.checkArgument(
-      EnumUtils.isValidEnum(Advice.class, adviceString),
-      "Default advice for mmap buffers must match a posix_madvise compatible option: %s",
-      adviceString
+        EnumUtils.isValidEnum(Advice.class, adviceString),
+        "Default advice for mmap buffers must match a posix_madvise compatible option: %s",
+        adviceString
     );
 
     setDefaultAdvice(Advice.valueOf(adviceString).getAdvice());

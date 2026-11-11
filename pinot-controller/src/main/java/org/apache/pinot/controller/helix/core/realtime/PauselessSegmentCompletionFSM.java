@@ -55,6 +55,7 @@ public class PauselessSegmentCompletionFSM extends BlockingSegmentCompletionFSM 
       // this aims to handle the failures during commitSegmentStartMetadata
       // we abort the state machine to allow commit protocol to start from the beginning
       // the server would then retry the commit protocol from the start
+      _logger.error("Failed to commit segment metadata to COMMITTING for segment: {}", _segmentName, e);
       return abortAndReturnFailed();
     }
     _logger.info("{}:Uploading for instance={} offset={}", _state, instanceId, offset);

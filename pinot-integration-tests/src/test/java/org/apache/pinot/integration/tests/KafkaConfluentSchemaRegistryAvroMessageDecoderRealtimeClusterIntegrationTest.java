@@ -19,20 +19,18 @@
 package org.apache.pinot.integration.tests;
 
 import com.google.common.primitives.Longs;
-import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig;
+import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -40,263 +38,194 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.integration.tests.SharedKafkaRealtimeIntegrationTestSuite.ScenarioLease;
 import org.apache.pinot.integration.tests.kafka.schemaregistry.SchemaRegistryStarter;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.plugin.inputformat.avro.confluent.KafkaConfluentSchemaRegistryAvroMessageDecoder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
-import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
- * TODO: Add separate module-level tests and remove the randomness of this test
- */
-public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest
-    extends BaseRealtimeClusterIntegrationTest {
-  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
-  private static final long RANDOM_SEED = System.currentTimeMillis();
-  private static final Random RANDOM = new Random(RANDOM_SEED);
-  private static final int NUM_INVALID_RECORDS = 5;
+/// Focused Confluent Schema Registry decoder scenario for the shared Kafka realtime suite.
+public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest {
+  private static final String TABLE_NAME = "mytableConfluentSchemaRegistry";
+  private static final String TOPIC_NAME =
+      "KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest";
+  private static final int NUM_INVALID_RECORDS_PER_FILE = 5;
+  private static final int NUM_TOMBSTONES = 1_000;
+  private static final long EXPECTED_ARR_TIME_ONE_COUNT = 104L;
 
-  private final boolean _isDirectAlloc = RANDOM.nextBoolean();
-  private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
-  private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
   private SchemaRegistryStarter.KafkaSchemaRegistryInstance _schemaRegistry;
 
-  @Override
-  protected int getNumKafkaBrokers() {
-    return 1;
-  }
+  @Test
+  public void testSchemaRegistryDecoderSkipsInvalidRecordsAndSupportsSegmentRefresh()
+      throws Throwable {
+    SharedKafkaRealtimeIntegrationTestSuite owner =
+        SharedKafkaRealtimeIntegrationTestSuite.getSharedSuiteOwner();
+    ScenarioLease lease = owner.newScenario(TABLE_NAME, TOPIC_NAME);
+    Throwable primaryFailure = null;
+    try {
+      owner.createScenarioTopic(lease);
+      List<File> avroFiles = owner.unpackScenarioData(lease);
+      Schema schema = owner.addScenarioSchema(lease);
+      startSchemaRegistry();
 
-  @Override
-  protected void startKafka() {
-    super.startKafka();
-    startSchemaRegistry();
-  }
+      Map<String, String> streamConfigs = owner.getScenarioStreamConfigs(lease._topicName, false);
+      String streamType = streamConfigs.get(StreamConfigProperties.STREAM_TYPE);
+      streamConfigs.put(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+          KafkaConfluentSchemaRegistryAvroMessageDecoder.class.getName());
+      streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url", _schemaRegistry.getUrl());
+      TableConfig tableConfig = owner.createScenarioTableConfig(lease, avroFiles.get(0), streamConfigs);
+      owner.addScenarioTable(lease, tableConfig);
 
-  @Override
-  protected void stopKafka() {
-    stopSchemaRegistry();
-    super.stopKafka();
+      pushSchemaRegistryRecords(owner, lease, avroFiles);
+      createAndRefreshSegments(owner, lease, avroFiles, schema, tableConfig);
+
+      // Uploaded segments contribute one copy and valid Kafka records contribute the other. Reaching exactly 2x
+      // proves tombstones/malformed records were skipped while every schema-registry record was decoded.
+      owner.waitForScenarioCount(lease, owner.getDefaultScenarioCount() * 2L, 600_000L);
+      // The fixture contains 52 records with ArrTime=1. Seeing two copies also proves the schema-registry decoder
+      // populated field values, rather than merely accepting the expected number of Kafka messages.
+      owner.waitForScenarioQueryResult(
+          "SELECT COUNT(*) FROM " + lease._tableName + " WHERE ArrTime = 1", EXPECTED_ARR_TIME_ONE_COUNT, 60_000L);
+    } catch (Throwable t) {
+      primaryFailure = t;
+      throw t;
+    } finally {
+      owner.closeScenario(lease, primaryFailure, this::stopSchemaRegistry);
+    }
   }
 
   private void startSchemaRegistry() {
     if (_schemaRegistry == null) {
-      _schemaRegistry = SchemaRegistryStarter.startLocalInstance(SchemaRegistryStarter.DEFAULT_PORT);
+      _schemaRegistry = SchemaRegistryStarter.createLocalInstance(SchemaRegistryStarter.DEFAULT_PORT);
+      _schemaRegistry.start();
     }
   }
 
   private void stopSchemaRegistry() {
-    try {
-      if (_schemaRegistry != null) {
-        _schemaRegistry.stop();
-        _schemaRegistry = null;
-      }
-    } catch (Exception e) {
-      // Swallow exceptions
+    if (_schemaRegistry != null) {
+      _schemaRegistry.stop();
+      _schemaRegistry = null;
     }
   }
 
-  @Override
-  protected void pushAvroIntoKafka(List<File> avroFiles)
+  private void pushSchemaRegistryRecords(SharedKafkaRealtimeIntegrationTestSuite owner, ScenarioLease lease,
+      List<File> avroFiles)
       throws Exception {
     Properties avroProducerProps = new Properties();
-    avroProducerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + getKafkaPort());
-    avroProducerProps.put(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, _schemaRegistry.getUrl());
+    avroProducerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, owner.getKafkaBrokerList());
+    avroProducerProps.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, _schemaRegistry.getUrl());
     avroProducerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArraySerializer");
     avroProducerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
         "io.confluent.kafka.serializers.KafkaAvroSerializer");
-    Producer<byte[], GenericRecord> avroProducer = new KafkaProducer<>(avroProducerProps);
 
-    // this producer produces intentionally malformatted records so that
-    // we can test the behavior when consuming such records
-    Properties nonAvroProducerProps = new Properties();
-    nonAvroProducerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + getKafkaPort());
-    nonAvroProducerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+    Properties invalidProducerProps = new Properties();
+    invalidProducerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, owner.getKafkaBrokerList());
+    invalidProducerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArraySerializer");
-    nonAvroProducerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+    invalidProducerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArraySerializer");
-    Producer<byte[], byte[]> invalidDataProducer = new KafkaProducer<>(nonAvroProducerProps);
 
-    if (injectTombstones()) {
-      // publish lots of tombstones to livelock the consumer if it can't handle this properly
-      for (int i = 0; i < 1000; i++) {
-        // publish a tombstone first
-        avroProducer.send(
-            new ProducerRecord<>(getKafkaTopic(), Longs.toByteArray(System.currentTimeMillis()), null));
+    try (Producer<byte[], GenericRecord> avroProducer = new KafkaProducer<>(avroProducerProps);
+        Producer<byte[], byte[]> invalidProducer = new KafkaProducer<>(invalidProducerProps)) {
+      for (int i = 0; i < NUM_TOMBSTONES; i++) {
+        avroProducer.send(new ProducerRecord<>(lease._topicName,
+            Longs.toByteArray(System.currentTimeMillis()), null));
       }
-    }
 
-    for (File avroFile : avroFiles) {
-      int numInvalidRecords = 0;
-      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
-        for (GenericRecord genericRecord : reader) {
-          byte[] keyBytes = (getPartitionColumn() == null) ? Longs.toByteArray(System.currentTimeMillis())
-              : (genericRecord.get(getPartitionColumn())).toString().getBytes();
-
-          if (numInvalidRecords < NUM_INVALID_RECORDS) {
-            // send a few rubbish records to validate that the consumer will skip over non-avro records, but
-            // don't spam them every time as it causes log spam
-            invalidDataProducer.send(new ProducerRecord<>(getKafkaTopic(), keyBytes, "Rubbish".getBytes(UTF_8)));
-            numInvalidRecords++;
+      for (File avroFile : avroFiles) {
+        int numInvalidRecords = 0;
+        try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
+          for (GenericRecord genericRecord : reader) {
+            byte[] keyBytes = owner.getPartitionColumn() == null
+                ? Longs.toByteArray(System.currentTimeMillis())
+                : genericRecord.get(owner.getPartitionColumn()).toString().getBytes(UTF_8);
+            if (numInvalidRecords < NUM_INVALID_RECORDS_PER_FILE) {
+              invalidProducer.send(new ProducerRecord<>(lease._topicName, keyBytes, "Rubbish".getBytes(UTF_8)));
+              numInvalidRecords++;
+            }
+            avroProducer.send(new ProducerRecord<>(lease._topicName, keyBytes, genericRecord));
           }
-
-          avroProducer.send(new ProducerRecord<>(getKafkaTopic(), keyBytes, genericRecord));
         }
       }
     }
   }
 
-  @Override
-  protected Map<String, String> getStreamConfigs() {
-    Map<String, String> streamConfigMap = super.getStreamConfigs();
-    String streamType = "kafka";
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-        KafkaConfluentSchemaRegistryAvroMessageDecoder.class.getName());
-    streamConfigMap.put("stream.kafka.decoder.prop.schema.registry.rest.url", _schemaRegistry.getUrl());
-    return streamConfigMap;
-  }
-
-  @Override
-  protected boolean injectTombstones() {
-    return true;
-  }
-
-  @Override
-  protected String getLoadMode() {
-    return ReadMode.mmap.name();
-  }
-
-  @Override
-  public void startController()
+  private void createAndRefreshSegments(SharedKafkaRealtimeIntegrationTestSuite owner, ScenarioLease lease,
+      List<File> avroFiles, Schema schema, TableConfig tableConfig)
       throws Exception {
-    super.startController();
-    enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, true);
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
-    if (_isConsumerDirConfigured) {
-      configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
-    }
-  }
-
-  @Override
-  protected void createSegmentsAndUpload(List<File> avroFiles, Schema schema, TableConfig tableConfig)
-      throws Exception {
-    if (!_tarDir.exists()) {
-      _tarDir.mkdir();
-    }
-    if (!_segmentDir.exists()) {
-      _segmentDir.mkdir();
-    }
-
-    // create segments out of the avro files (segments will be placed in _tarDir)
     List<File> copyOfAvroFiles = new ArrayList<>(avroFiles);
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(copyOfAvroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(copyOfAvroFiles, tableConfig, schema, 0, lease._segmentDir,
+        lease._tarDir);
 
-    // upload segments to controller
-    uploadSegmentsToController(getTableName(), _tarDir, false, false);
-
-    // upload the first segment again to verify refresh
-    uploadSegmentsToController(getTableName(), _tarDir, true, false);
-
-    // upload the first segment again to verify refresh with different segment crc
-    uploadSegmentsToController(getTableName(), _tarDir, true, true);
-
-    // add avro files to the original list so H2 will have the uploaded data as well
-    avroFiles.addAll(copyOfAvroFiles);
+    uploadSegmentsToController(owner, lease, false, false);
+    uploadSegmentsToController(owner, lease, true, false);
+    uploadSegmentsToController(owner, lease, true, true);
   }
 
-  private void uploadSegmentsToController(String tableName, File tarDir, boolean onlyFirstSegment, boolean changeCrc)
+  private void uploadSegmentsToController(SharedKafkaRealtimeIntegrationTestSuite owner, ScenarioLease lease,
+      boolean onlyFirstSegment, boolean changeCrc)
       throws Exception {
-    File[] segmentTarFiles = tarDir.listFiles();
+    File[] segmentTarFiles = lease._tarDir.listFiles();
     assertNotNull(segmentTarFiles);
     int numSegments = segmentTarFiles.length;
     assertTrue(numSegments > 0);
     if (onlyFirstSegment) {
       numSegments = 1;
     }
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+
+    URI uploadSegmentUri = URI.create(owner.getOrCreateAdminClient().getSegmentUploadUrl());
+    try (FileUploadDownloadClient client = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles[0];
         if (changeCrc) {
-          changeCrcInSegmentZKMetadata(tableName, segmentTarFile.toString());
+          changeCrcInSegmentZKMetadata(owner, lease._tableName, segmentTarFile);
         }
-        assertEquals(
-            fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-                tableName, TableType.REALTIME).getStatusCode(), HttpStatus.SC_OK);
+        assertEquals(client.uploadSegment(uploadSegmentUri, segmentTarFile.getName(), segmentTarFile,
+            lease._tableName, TableType.REALTIME).getStatusCode(), HttpStatus.SC_OK);
       } else {
-        // Upload segments in parallel
         ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
-        List<Future<Integer>> futures = new ArrayList<>(numSegments);
-        for (File segmentTarFile : segmentTarFiles) {
-          futures.add(executorService.submit(
-              () -> fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
-                  segmentTarFile, tableName, TableType.REALTIME).getStatusCode()));
-        }
-        executorService.shutdown();
-        for (Future<Integer> future : futures) {
-          assertEquals((int) future.get(), HttpStatus.SC_OK);
+        try {
+          List<Future<Integer>> futures = new ArrayList<>(numSegments);
+          for (File segmentTarFile : segmentTarFiles) {
+            futures.add(executorService.submit(
+                () -> client.uploadSegment(uploadSegmentUri, segmentTarFile.getName(), segmentTarFile,
+                    lease._tableName, TableType.REALTIME).getStatusCode()));
+          }
+          for (Future<Integer> future : futures) {
+            assertEquals((int) future.get(), HttpStatus.SC_OK);
+          }
+        } finally {
+          executorService.shutdownNow();
         }
       }
     }
   }
 
-  private void changeCrcInSegmentZKMetadata(String tableName, String segmentFilePath) {
-    int startIdx = segmentFilePath.indexOf("mytable_");
-    int endIdx = segmentFilePath.indexOf(".tar.gz");
-    String segmentName = segmentFilePath.substring(startIdx, endIdx);
-    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
-    segmentZKMetadata.setCrc(111L);
-    _helixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata);
-  }
-
-  @Override
-  protected long getCountStarResult() {
-    // all the data that was ingested from Kafka also got uploaded via the controller's upload endpoint
-    return super.getCountStarResult() * 2;
-  }
-
-  @BeforeClass
-  @Override
-  public void setUp()
-      throws Exception {
-    System.out.println(format(
-        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
-        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
-
-    // Remove the consumer directory
-    FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
-
-    super.setUp();
-  }
-
-  @AfterClass
-  @Override
-  public void tearDown()
-      throws Exception {
-    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
-    super.tearDown();
+  private static void changeCrcInSegmentZKMetadata(SharedKafkaRealtimeIntegrationTestSuite owner, String tableName,
+      File segmentTarFile) {
+    String segmentFilePath = segmentTarFile.toString();
+    int startIndex = segmentFilePath.indexOf(tableName + "_");
+    int endIndex = segmentFilePath.indexOf(".tar.gz");
+    assertTrue(startIndex >= 0 && endIndex > startIndex,
+        "Cannot derive segment name from path: " + segmentFilePath);
+    String segmentName = segmentFilePath.substring(startIndex, endIndex);
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    SegmentZKMetadata metadata = owner.getSegmentZKMetadata(tableNameWithType, segmentName);
+    assertNotNull(metadata);
+    metadata.setCrc(111L);
+    owner.updateSegmentZKMetadata(tableNameWithType, metadata);
   }
 }

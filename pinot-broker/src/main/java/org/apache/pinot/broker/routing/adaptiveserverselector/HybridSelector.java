@@ -27,19 +27,19 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
-/**
- * The {@code HybridSelector} is an AdaptiveServerSelector implementation that picks the best server based on the
- * following parameters:
- * 1. Num of in-flight requests (A)
- * 2. EMA of in-flight requests (B)
- * 3. EMA of latencies (C)
- * This selector implementation is based on the ideas suggested in the paper -
- * https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf
- *
- * The Hybrid score for each server is calculated as follows. The server with the lowest Hybrid score is picked.
- *       HybridScore = Math.pow(A+B, N) * C
- * N -> Configurable exponent with default value of 3.
- */
+/// The `HybridSelector` is an AdaptiveServerSelector implementation that picks the best server based on the
+/// following parameters:
+/// 1. Num of in-flight requests (A)
+/// 2. EMA of in-flight requests (B)
+/// 3. EMA of latencies (C)
+/// This selector implementation is based on the ideas suggested in the paper -
+/// https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf
+///
+/// The Hybrid score for each server is calculated as follows. The server with the lowest Hybrid score is picked.
+///       HybridScore = Math.pow(F+A+B, N) \* C
+/// N -> Configurable exponent with default value of 3.
+/// F -> Configurable queue size floor with default value of 0. Setting F=1 matches the original paper formulation and
+///      prevents the score from collapsing to 0 when all servers are idle, ensuring latency is still used for routing.
 public class HybridSelector implements AdaptiveServerSelector {
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
 

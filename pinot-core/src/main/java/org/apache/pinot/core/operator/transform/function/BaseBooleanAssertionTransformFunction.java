@@ -60,7 +60,7 @@ public abstract class BaseBooleanAssertionTransformFunction extends BaseTransfor
             _intValuesSV[docId] = 1;
           }
         } else if (valueEvaluatesToTrue(intValuesSV[docId])) {
-            _intValuesSV[docId] = 1;
+          _intValuesSV[docId] = 1;
         }
       }
     } else {

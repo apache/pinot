@@ -25,25 +25,20 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
-/**
- * Represents the configuration for a specific node type in a query workload.
- * <p>
- * Each NodeConfig specifies:
- * <ul>
- *   <li><strong>Node Type:</strong> The role of the node in processing queries.</li>
- *   <li><strong>Enforcement Profile:</strong> Resource limits (CPU and memory) applied to this node.</li>
- *   <li><strong>Propagation Scheme:</strong> Optional instructions for cascading configs to downstream nodes.</li>
- * </ul>
- * </p>
- * <p>
- * This class is used within {@link QueryWorkloadConfig} to define per-node settings
- * that tailor query execution behavior based on workload classification.
- * </p>
- *
- * @see QueryWorkloadConfig
- * @see EnforcementProfile
- * @see PropagationScheme
- */
+/// Represents the configuration for a specific node type in a query workload.
+///
+/// Each NodeConfig specifies:
+///
+/// - **Node Type:** The role of the node in processing queries.
+/// - **Enforcement Profile:** Resource limits (CPU and memory) applied to this node.
+/// - **Propagation Scheme:** Optional instructions for cascading configs to downstream nodes.
+///
+/// This class is used within [QueryWorkloadConfig] to define per-node settings
+/// that tailor query execution behavior based on workload classification.
+///
+/// @see QueryWorkloadConfig
+/// @see EnforcementProfile
+/// @see PropagationScheme
 public class NodeConfig extends BaseJsonConfig {
 
   public enum Type {
@@ -81,24 +76,18 @@ public class NodeConfig extends BaseJsonConfig {
   private static final String ENFORCEMENT_PROFILE = "enforcementProfile";
   private static final String PROPAGATION_SCHEME = "propagationScheme";
 
-  /**
-   * The role of this node within the query workload, indicating whether it directly serves
-   * queries or acts as an intermediate forwarding node.
-   */
+  /// The role of this node within the query workload, indicating whether it directly serves
+  /// queries or acts as an intermediate forwarding node.
   @JsonPropertyDescription("Describes the type of node")
   private Type _nodeType;
 
-  /**
-   * The resource enforcement profile for this node, defining limits on CPU and memory
-   * usage for queries under this workload.
-   */
+  /// The resource enforcement profile for this node, defining limits on CPU and memory
+  /// usage for queries under this workload.
   @JsonPropertyDescription("Describes the enforcement profile for the node")
   private EnforcementProfile _enforcementProfile;
 
-  /**
-   * Optional propagation scheme that specifies how configuration settings are cascaded
-   * or shared with downstream nodes; may be null if no propagation is applied.
-   */
+  /// Optional propagation scheme that specifies how configuration settings are cascaded
+  /// or shared with downstream nodes; may be null if no propagation is applied.
   @JsonPropertyDescription("Describes the propagation scheme for the node")
   private PropagationScheme _propagationScheme;
 
@@ -113,7 +102,7 @@ public class NodeConfig extends BaseJsonConfig {
   }
 
   public Type getNodeType() {
-      return _nodeType;
+    return _nodeType;
   }
 
   public EnforcementProfile getEnforcementProfile() {

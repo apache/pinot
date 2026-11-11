@@ -62,7 +62,7 @@ public class GeoInputOutputTest extends GeoFunctionTest {
 
   @Test
   public void testGeoJsonInputOutput()
-  throws Exception {
+      throws Exception {
     // empty geometries
     assertAsGeoJsonAndBinary(
         "{\"type\":\"Point\",\"coordinates\":[],"
@@ -129,7 +129,7 @@ public class GeoInputOutputTest extends GeoFunctionTest {
   }
 
   private void assertAsGeoJsonAndBinary(String geoJson)
-  throws Exception {
+      throws Exception {
     // assert geometry
     assertStringFunction(
         String.format("ST_AsGeoJSON(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromGeoJSON(%s))))", STRING_SV_COLUMN),

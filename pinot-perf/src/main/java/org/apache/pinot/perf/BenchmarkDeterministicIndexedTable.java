@@ -76,7 +76,7 @@ public class BenchmarkDeterministicIndexedTable {
     int cardinalityD1 = 100;
     Set<String> d1 = new HashSet<>(cardinalityD1);
     while (d1.size() < cardinalityD1) {
-      d1.add(RandomStringUtils.randomAlphabetic(3));
+      d1.add(RandomStringUtils.secure().nextAlphabetic(3));
     }
     _d1 = new ArrayList<>(cardinalityD1);
     _d1.addAll(d1);

@@ -26,12 +26,10 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/**
- * Post-aggregation function on the annotated scalar function.
- */
+/// Post-aggregation function on the annotated scalar function.
 public class PostAggregationFunction {
   private final QueryFunctionInvoker _functionInvoker;
   private final ColumnDataType _resultType;
@@ -68,22 +66,18 @@ public class PostAggregationFunction {
       }
       _argumentTypes = new PinotDataType[numArguments];
       for (int i = 0; i < numArguments; i++) {
-        _argumentTypes[i] = PinotDataType.getPinotDataTypeForExecution(argumentTypes[i]);
+        _argumentTypes[i] = argumentTypes[i].toPinotDataType();
       }
     }
   }
 
-  /**
-   * Returns the ColumnDataType of the result.
-   */
+  /// Returns the ColumnDataType of the result.
   public ColumnDataType getResultType() {
     return _resultType;
   }
 
-  /**
-   * Invoke the function with the given arguments.
-   * NOTE: The passed in arguments could be modified during the type conversion.
-   */
+  /// Invoke the function with the given arguments.
+  /// NOTE: The passed in arguments could be modified during the type conversion.
   public Object invoke(Object[] arguments) {
     Object result;
     if (_functionInvoker.getMethod().isVarArgs()) {

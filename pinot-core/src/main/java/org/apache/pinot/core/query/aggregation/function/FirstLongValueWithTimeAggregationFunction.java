@@ -18,39 +18,54 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
-import org.roaringbitmap.IntIterator;
 
 
-/**
- * This function is used for FirstWithTime calculations for data column with long type.
- * <p>The function can be used as FirstWithTime(dataExpression, timeExpression, 'long')
- * <p>Following arguments are supported:
- * <ul>
- *   <li>dataExpression: expression that contains the long data column to be calculated first on</li>
- *   <li>timeExpression: expression that contains the column to be used to decide which data is first, can be any
- *   Numeric column</li>
- * </ul>
- */
+/// This function is used for FirstWithTime calculations for data column with long type.
+///
+/// The function can be used as FirstWithTime(dataExpression, timeExpression, 'long')
+///
+/// Following arguments are supported:
+///
+/// - dataExpression: expression that contains the long data column to be calculated first on
+/// - timeExpression: expression that contains the column to be used to decide which data is first, can be any
+///   Numeric column
 public class FirstLongValueWithTimeAggregationFunction extends FirstWithTimeAggregationFunction<Long> {
-  private final static ValueLongPair<Long> DEFAULT_VALUE_TIME_PAIR = new LongLongPair(Long.MIN_VALUE, Long.MAX_VALUE);
+  private static final int LONG_LONG_PAIR_TYPE = 28;
+
+  private static final ValueLongPair<Long> DEFAULT_VALUE_TIME_PAIR = new LongLongPair(Long.MIN_VALUE, Long.MAX_VALUE);
+
+  private final ColumnDataType _resultType;
 
   public FirstLongValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled) {
-    super(dataCol, timeCol, ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    this(dataCol, timeCol, nullHandlingEnabled, ColumnDataType.LONG);
+  }
+
+  /// The result type is LONG or TIMESTAMP; both are stored as long values.
+  public FirstLongValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled, ColumnDataType resultType) {
+    super(dataCol, timeCol, nullHandlingEnabled);
+    Preconditions.checkArgument(resultType == ColumnDataType.LONG || resultType == ColumnDataType.TIMESTAMP,
+        "Unsupported result type: %s", resultType);
+    _resultType = resultType;
   }
 
   @Override
   public ValueLongPair<Long> constructValueLongPair(Long value, long time) {
     return new LongLongPair(value, time);
+  }
+
+  @Override
+  public ValueLongPair<Long> deserializeValueLongPair(byte[] bytes) {
+    return LongLongPair.fromBytes(bytes);
   }
 
   @Override
@@ -69,8 +84,7 @@ public class FirstLongValueWithTimeAggregationFunction extends FirstWithTimeAggr
     long[] longValues = blockValSet.getLongValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
 
-    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    RoaringBitmapUtils.forEachUnset(length, nullIdxIterator, (from, to) -> {
+    forEachNotNull(length, blockValSet, timeValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         long data = longValues[i];
         long time = timeValues[i];
@@ -85,8 +99,7 @@ public class FirstLongValueWithTimeAggregationFunction extends FirstWithTimeAggr
     long[] longValues = blockValSet.getLongValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
 
-    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
-    RoaringBitmapUtils.forEachUnset(length, nullIdxIterator, (from, to) -> {
+    forEachNotNull(length, blockValSet, timeValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         long value = longValues[i];
         long time = timeValues[i];
@@ -99,22 +112,21 @@ public class FirstLongValueWithTimeAggregationFunction extends FirstWithTimeAggr
 
   @Override
   public String getResultColumnName() {
-    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'LONG')";
+    return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'" + _resultType + "')";
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Long> longLongPair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongLongPair.getValue(),
-        ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE.serialize((LongLongPair) longLongPair));
+  public SerializedResult serializeIntermediateResult(ValueLongPair<Long> longLongPair) {
+    return new SerializedBytes(LONG_LONG_PAIR_TYPE, longLongPair.toBytes());
   }
 
   @Override
   public ValueLongPair<Long> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.LONG_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return LongLongPair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
-    return ColumnDataType.LONG;
+    return _resultType;
   }
 }

@@ -27,7 +27,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -46,6 +45,8 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -90,6 +91,7 @@ public class PinotDatabaseRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/databases/{databaseName}")
+  @Authenticate(AccessType.DELETE)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_DATABASE)
   @ApiOperation(value = "Delete all tables in given database name", notes = "Delete all tables in given database name")
   public DeleteDatabaseResponse deleteTablesInDatabase(
@@ -127,14 +129,13 @@ public class PinotDatabaseRestletResource {
     return new DeleteDatabaseResponse(deletedTables, failedTables, dryRun);
   }
 
-  /**
-   * API to update the quota configs for database
-   * If database config is not present it will be created implicitly
-   */
+  /// API to update the quota configs for database
+  /// If database config is not present it will be created implicitly
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/databases/{databaseName}/quotas")
+  @Authenticate(AccessType.UPDATE)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_DATABASE_QUOTA)
   @ApiOperation(value = "Update database quotas", notes = "Update database quotas")
   public SuccessResponse setDatabaseQuota(
@@ -148,7 +149,7 @@ public class PinotDatabaseRestletResource {
       DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
       QuotaConfig quotaConfig = new QuotaConfig(null, queryQuota);
       if (databaseConfig == null) {
-         databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
+        databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
         _pinotHelixResourceManager.addDatabaseConfig(databaseConfig);
       } else {
         databaseConfig.setQuotaConfig(quotaConfig);
@@ -160,10 +161,8 @@ public class PinotDatabaseRestletResource {
     }
   }
 
-  /**
-   * API to get database quota configs.
-   * Will return null if database config is not defined or database quotas are not defined
-   */
+  /// API to get database quota configs.
+  /// Will return null if database config is not defined or database quotas are not defined
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/databases/{databaseName}/quotas")
@@ -183,7 +182,7 @@ public class PinotDatabaseRestletResource {
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
     String defaultQueryQuota = helixAdmin.getConfig(configScope,
-            Collections.singletonList(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
+            List.of(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
             .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, null);
     return new QuotaConfig(null, defaultQueryQuota);
   }

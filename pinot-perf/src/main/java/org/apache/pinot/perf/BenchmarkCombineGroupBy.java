@@ -77,7 +77,7 @@ public class BenchmarkCombineGroupBy {
     // create data
     Set<String> d1 = new HashSet<>(CARDINALITY_D1);
     while (d1.size() < CARDINALITY_D1) {
-      d1.add(RandomStringUtils.randomAlphabetic(3));
+      d1.add(RandomStringUtils.secure().nextAlphabetic(3));
     }
     _d1 = new ArrayList<>(CARDINALITY_D1);
     _d1.addAll(d1);

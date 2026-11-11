@@ -19,16 +19,17 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.client.admin.InstanceAdminClient;
 import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.FailureDetector;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -45,9 +46,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Integration test that extends OfflineClusterIntegrationTest but start multiple brokers and servers.
- */
+/// Integration test that extends OfflineClusterIntegrationTest but start multiple brokers and servers.
 public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiNodesOfflineClusterIntegrationTest.class);
   private static final int NUM_BROKERS = 2;
@@ -78,11 +77,10 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     // Enable thread CPU/memory tracking but not killing queries
     brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
-    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        ResourceUsageAccountantFactory.class.getName());
-    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    String prefix = Accounting.BROKER_PREFIX + ".";
+    brokerConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
   }
 
   @Override
@@ -92,16 +90,16 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     // Enable thread CPU/memory tracking but not killing queries
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
-    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        ResourceUsageAccountantFactory.class.getName());
-    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    String prefix = Accounting.SERVER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
   }
 
   @Test
   public void testUpdateBrokerResource()
       throws Exception {
+    InstanceAdminClient instanceClient = getOrCreateAdminClient().getInstanceClient();
     // Add a new broker to the cluster
     BaseBrokerStarter brokerStarter = startOneBroker(NUM_BROKERS);
 
@@ -130,14 +128,14 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
-      sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+      instanceClient.dropInstance(brokerId);
       fail("Dropping instance should fail because it is still in the broker resource");
     } catch (Exception e) {
       // Expected
     }
 
     // Untag the broker and update the broker resource so that it is removed from the broker resource
-    sendPutRequest(_controllerRequestURLBuilder.forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
+    instanceClient.updateInstanceTags(brokerId, List.of(), true);
 
     // Check if broker is removed from all the tables in broker resource
     brokerResourceIdealState = _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
@@ -156,7 +154,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     }, 60_000L, "Failed to remove broker from broker resource ExternalView");
 
     // Dropping the broker should success now
-    sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+    instanceClient.dropInstance(brokerId);
 
     // Check if broker is dropped from the cluster
     assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));
@@ -326,6 +324,36 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     result = postQuery("SELECT DaysSinceEpoch, AVG(CRSArrTime) FROM mytable WHERE false GROUP BY 1 ORDER BY 2 DESC");
     assertEquals(result.get("numServersQueried").intValue(), 1);
+  }
+
+  @Test
+  public void testMultiStageTotalMemAllocatedBytes()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+
+    // The semi-join query uses a pipeline breaker
+    for (String query : List.of("SELECT Carrier, COUNT(*) FROM mytable GROUP BY Carrier",
+        "SELECT Carrier FROM mytable WHERE Origin IN (SELECT Origin FROM mytable WHERE ArrDelay > 0) LIMIT 10")) {
+      JsonNode result = postQuery("SET streamStats = false; " + query);
+      long totalMemAllocatedBytes = result.path("totalMemAllocatedBytes").asLong();
+      assertTrue(totalMemAllocatedBytes > 0);
+      assertEquals(totalMemAllocatedBytes, sumAllocatedBytes(result.get("stageStats"), true));
+    }
+  }
+
+  /// Sums the allocation of each op chain root (the top node, each MAILBOX_SEND and each pipeline breaker) and of the
+  /// single-stage threads of each LEAF. The legacy (non-stream) stats tree renders a pipeline breaker as the
+  /// MAILBOX_RECEIVE child of its LEAF, but that node carries the stats of the PIPELINE_BREAKER operator itself.
+  private static long sumAllocatedBytes(JsonNode node, boolean isOpChainRoot) {
+    long bytes = node.path("threadMemAllocatedBytes").asLong();
+    if (isOpChainRoot) {
+      bytes += node.path("allocatedMemoryBytes").asLong();
+    }
+    boolean isLeaf = node.path("type").asText().equals("LEAF");
+    for (JsonNode child : node.path("children")) {
+      bytes += sumAllocatedBytes(child, isLeaf || child.path("type").asText().equals("MAILBOX_SEND"));
+    }
+    return bytes;
   }
 
   // Disabled because segments might not be server partitioned with multiple servers

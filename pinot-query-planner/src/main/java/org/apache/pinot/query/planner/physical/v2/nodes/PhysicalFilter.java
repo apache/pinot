@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.physical.v2.nodes;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptCluster;
@@ -44,7 +43,7 @@ public class PhysicalFilter extends Filter implements PRelNode {
       int nodeId, PRelNode input, @Nullable PinotDataDistribution pinotDataDistribution, boolean leafStage) {
     super(cluster, traits, hints, input.unwrap(), condition);
     _nodeId = nodeId;
-    _pRelInputs = Collections.singletonList(input);
+    _pRelInputs = List.of(input);
     _pinotDataDistribution = pinotDataDistribution;
     _leafStage = leafStage;
   }

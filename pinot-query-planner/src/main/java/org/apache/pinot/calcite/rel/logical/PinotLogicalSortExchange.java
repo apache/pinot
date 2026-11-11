@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.logical;
 
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -31,64 +32,71 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.SortExchange;
 
 
-/**
- * Pinot's implementation of {@code SortExchange} which needs information about whether to sort on the sender
- * and/or receiver side of the exchange. Every {@code Exchange} is broken into a send and a receive node and the
- * decision on where to sort is made by the planner and this information has to be passed onto the send and receive
- * nodes for the correct execution.
- *
- * Note: This class does not extend {@code LogicalSortExchange} because its constructor which takes the list of
- * parameters is private.
- */
+/// Pinot's implementation of `SortExchange` which needs information about whether to sort on the sender
+/// and/or receiver side of the exchange. Every `Exchange` is broken into a send and a receive node and the
+/// decision on where to sort is made by the planner and this information has to be passed onto the send and receive
+/// nodes for the correct execution.
+///
+/// Note: This class does not extend `LogicalSortExchange` because its constructor which takes the list of
+/// parameters is private.
 public class PinotLogicalSortExchange extends SortExchange {
 
   protected final boolean _isSortOnSender;
   protected final boolean _isSortOnReceiver;
   protected final PinotRelExchangeType _exchangeType;
+  // Can be used to override the partitioning info calculated from the distribution trait.
+  @Nullable
+  private final Boolean _prePartitioned;
 
   private PinotLogicalSortExchange(RelOptCluster cluster, RelTraitSet traitSet, RelNode input,
       RelDistribution distribution, PinotRelExchangeType exchangeType, RelCollation collation, boolean isSortOnSender,
-      boolean isSortOnReceiver) {
+      boolean isSortOnReceiver, @Nullable Boolean prePartitioned) {
     super(cluster, traitSet, input, distribution, collation);
     _exchangeType = exchangeType;
     _isSortOnSender = isSortOnSender;
     _isSortOnReceiver = isSortOnReceiver;
+    _prePartitioned = prePartitioned;
   }
 
-  /**
-   * Creates a PinotLogicalSortExchange by parsing serialized output.
-   */
+  /// Creates a PinotLogicalSortExchange by parsing serialized output.
   public PinotLogicalSortExchange(RelInput input) {
     super(input);
     _exchangeType = PinotRelExchangeType.STREAMING;
     _isSortOnSender = false;
     _isSortOnReceiver = true;
+    _prePartitioned = null;
   }
 
   public static PinotLogicalSortExchange create(RelNode input, RelDistribution distribution, RelCollation collation,
       boolean isSortOnSender, boolean isSortOnReceiver) {
     return create(input, distribution, PinotRelExchangeType.getDefaultExchangeType(), collation, isSortOnSender,
-        isSortOnReceiver);
+        isSortOnReceiver, null);
   }
 
-  /**
-   * Creates a PinotLogicalSortExchange.
-   *
-   * @param input     Input relational expression
-   * @param distribution Distribution specification
-   * @param exchangeType Exchange type specification
-   * @param collation array of sort specifications
-   * @param isSortOnSender whether to sort on the sender
-   * @param isSortOnReceiver whether to sort on receiver
-   */
+  public static PinotLogicalSortExchange create(RelNode input, RelDistribution distribution, RelCollation collation,
+      boolean isSortOnSender, boolean isSortOnReceiver, @Nullable Boolean prePartitioned) {
+    return create(input, distribution, PinotRelExchangeType.getDefaultExchangeType(), collation, isSortOnSender,
+        isSortOnReceiver, prePartitioned);
+  }
+
+  /// Creates a PinotLogicalSortExchange.
+  ///
+  /// @param input     Input relational expression
+  /// @param distribution Distribution specification
+  /// @param exchangeType Exchange type specification
+  /// @param collation array of sort specifications
+  /// @param isSortOnSender whether to sort on the sender
+  /// @param isSortOnReceiver whether to sort on receiver
+  /// @param prePartitioned whether the exchange is pre-partitioned
   public static PinotLogicalSortExchange create(RelNode input, RelDistribution distribution,
-      PinotRelExchangeType exchangeType, RelCollation collation, boolean isSortOnSender, boolean isSortOnReceiver) {
+      PinotRelExchangeType exchangeType, RelCollation collation, boolean isSortOnSender, boolean isSortOnReceiver,
+      @Nullable Boolean prePartitioned) {
     RelOptCluster cluster = input.getCluster();
     collation = RelCollationTraitDef.INSTANCE.canonize(collation);
     distribution = RelDistributionTraitDef.INSTANCE.canonize(distribution);
     RelTraitSet traitSet = input.getTraitSet().replace(Convention.NONE).replace(distribution).replace(collation);
     return new PinotLogicalSortExchange(cluster, traitSet, input, distribution, exchangeType, collation, isSortOnSender,
-        isSortOnReceiver);
+        isSortOnReceiver, prePartitioned);
   }
 
   //~ Methods ----------------------------------------------------------------
@@ -97,7 +105,7 @@ public class PinotLogicalSortExchange extends SortExchange {
   public SortExchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution,
       RelCollation newCollation) {
     return new PinotLogicalSortExchange(this.getCluster(), traitSet, newInput, newDistribution, _exchangeType,
-        newCollation, _isSortOnSender, _isSortOnReceiver);
+        newCollation, _isSortOnSender, _isSortOnReceiver, _prePartitioned);
   }
 
   @Override
@@ -120,5 +128,10 @@ public class PinotLogicalSortExchange extends SortExchange {
 
   public PinotRelExchangeType getExchangeType() {
     return _exchangeType;
+  }
+
+  @Nullable
+  public Boolean getPrePartitioned() {
+    return _prePartitioned;
   }
 }

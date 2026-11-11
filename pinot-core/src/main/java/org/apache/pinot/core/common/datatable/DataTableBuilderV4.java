@@ -21,14 +21,13 @@ package org.apache.pinot.core.common.datatable;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.IOException;
-import javax.annotation.Nullable;
+import java.io.UncheckedIOException;
+import java.nio.ByteOrder;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.datatable.DataTableImplV4;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public class DataTableBuilderV4 extends BaseDataTableBuilder {
@@ -49,17 +48,17 @@ public class DataTableBuilderV4 extends BaseDataTableBuilder {
   public void setColumn(int colId, ByteArray value)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     byte[] bytes = value.getBytes();
     _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataByteArrayOutputStream.write(bytes);
+    _variableSizeDataOutputStream.write(bytes);
   }
 
   @Override
   public void setColumn(int colId, String[] values)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(variableSizeDataOffset());
     _currentRowDataByteBuffer.putInt(values.length);
     for (String value : values) {
       int dictId = _dictionary.computeIntIfAbsent(value, k -> _dictionary.size());
@@ -68,25 +67,21 @@ public class DataTableBuilderV4 extends BaseDataTableBuilder {
   }
 
   @Override
-  public void setNullRowIds(@Nullable RoaringBitmap nullRowIds)
-      throws IOException {
-    _fixedSizeDataOutputStream.writeInt(_variableSizeDataByteArrayOutputStream.size());
-    if (nullRowIds == null || nullRowIds.isEmpty()) {
-      _fixedSizeDataOutputStream.writeInt(0);
-    } else {
-      byte[] bitmapBytes = RoaringBitmapUtils.serialize(nullRowIds);
-      _fixedSizeDataOutputStream.writeInt(bitmapBytes.length);
-      _variableSizeDataByteArrayOutputStream.write(bitmapBytes);
-    }
-  }
-
-  @Override
   public DataTable build() {
+    try {
+      writeNullBitmaps();
+    } catch (IOException e) {
+      // Both buffers are in-memory heap pages, so this cannot happen.
+      throw new UncheckedIOException(e);
+    }
     String[] reverseDictionary = new String[_dictionary.size()];
     for (Object2IntMap.Entry<String> entry : _dictionary.object2IntEntrySet()) {
       reverseDictionary[entry.getIntValue()] = entry.getKey();
     }
+    // The table views the written pages directly. Pages are heap memory, so nothing has to be released. The views
+    // end at the bytes written so far, and the builder only appends, so later writes do not change this table.
     return new DataTableImplV4(_numRows, _dataSchema, reverseDictionary,
-        _fixedSizeDataByteArrayOutputStream.toByteArray(), _variableSizeDataByteArrayOutputStream.toByteArray());
+        _fixedSizeDataOutputStream.asBuffer(ByteOrder.BIG_ENDIAN, false),
+        _variableSizeDataOutputStream.asBuffer(ByteOrder.BIG_ENDIAN, false));
   }
 }

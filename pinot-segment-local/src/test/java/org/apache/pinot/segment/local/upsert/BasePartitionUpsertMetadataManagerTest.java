@@ -42,6 +42,8 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.SnapshotPass;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -61,7 +63,11 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -104,6 +110,150 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testWatermarkUsesCachedMaximumForDestroyedSegment() {
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.isSnapshotEnabled()).thenReturn(true);
+    when(context.getMetadataTTL()).thenReturn(100.0);
+    when(context.getComparisonColumns()).thenReturn(List.of("eventTime"));
+    when(context.getTableIndexDir()).thenReturn(TEMP_DIR);
+    DummyPartitionUpsertMetadataManager manager =
+        new DummyPartitionUpsertMetadataManager("myTable_REALTIME", 0, context);
+    manager.updateLargestSeenComparisonValue(1_000.0);
+
+    ImmutableSegmentImpl destroyed = mock(ImmutableSegmentImpl.class);
+    SegmentMetadataImpl destroyedMetadata = mock(SegmentMetadataImpl.class);
+    ColumnMetadata destroyedColumnMetadata = mock(ColumnMetadata.class);
+    when(destroyed.getSegmentMetadata()).thenReturn(destroyedMetadata);
+    when(destroyedMetadata.getColumnMetadataFor("eventTime")).thenReturn(destroyedColumnMetadata);
+    doReturn(50).when(destroyedColumnMetadata).getMaxValue();
+    manager.getMaxComparisonValue(destroyed);
+    doThrow(new IllegalStateException("Segment metadata closed")).when(destroyed).getSegmentMetadata();
+    manager.trackSegment(destroyed);
+    manager.markSegmentAsUpdated(destroyed);
+
+    assertEquals(manager.getWatermarkToPersist(), 150.0);
+    verify(destroyed, never()).tryAcquireReadLock();
+    verify(destroyed).getSegmentMetadata();
+    manager.untrackSegment(destroyed);
+
+    ImmutableSegmentImpl live = mock(ImmutableSegmentImpl.class);
+    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
+    ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    when(live.tryAcquireReadLock()).thenReturn(true);
+    when(live.getSegmentMetadata()).thenReturn(metadata);
+    when(metadata.getColumnMetadataFor("eventTime")).thenReturn(columnMetadata);
+    doReturn(50).when(columnMetadata).getMaxValue();
+    manager.trackSegment(live);
+    manager.markSegmentAsUpdated(live);
+
+    assertEquals(manager.getWatermarkToPersist(), 150.0);
+    verify(live).releaseReadLock();
+  }
+
+  @Test
+  public void testUpdatedMarkerIsVisibleBeforeMaximumIsRead()
+      throws Exception {
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.isSnapshotEnabled()).thenReturn(true);
+    when(context.getMetadataTTL()).thenReturn(100.0);
+    when(context.getComparisonColumns()).thenReturn(List.of("eventTime"));
+    when(context.getTableIndexDir()).thenReturn(TEMP_DIR);
+    DummyPartitionUpsertMetadataManager manager =
+        new DummyPartitionUpsertMetadataManager("myTable_REALTIME", 0, context);
+    manager.updateLargestSeenComparisonValue(1_000.0);
+
+    ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+    SegmentMetadataImpl metadata = mock(SegmentMetadataImpl.class);
+    ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    CountDownLatch readStarted = new CountDownLatch(1);
+    CountDownLatch releaseRead = new CountDownLatch(1);
+    AtomicBoolean firstAcquire = new AtomicBoolean(true);
+    AtomicBoolean allowSnapshotRead = new AtomicBoolean(false);
+    when(segment.tryAcquireReadLock()).thenAnswer(invocation -> {
+      if (firstAcquire.getAndSet(false)) {
+        readStarted.countDown();
+        assertTrue(releaseRead.await(5, TimeUnit.SECONDS));
+        return true;
+      }
+      return allowSnapshotRead.get();
+    });
+    when(segment.getSegmentMetadata()).thenReturn(metadata);
+    when(metadata.getColumnMetadataFor("eventTime")).thenReturn(columnMetadata);
+    doReturn(50).when(columnMetadata).getMaxValue();
+    manager.trackSegment(segment);
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> update = executor.submit(() -> manager.markSegmentAsUpdated(segment));
+      assertTrue(readStarted.await(5, TimeUnit.SECONDS));
+      assertEquals(manager.getWatermarkToPersist(), BasePartitionUpsertMetadataManager.TTL_WATERMARK_NOT_SET);
+      allowSnapshotRead.set(true);
+      assertEquals(manager.getWatermarkToPersist(), 150.0);
+      releaseRead.countDown();
+      update.get(5, TimeUnit.SECONDS);
+      assertEquals(manager.getWatermarkToPersist(), 150.0);
+    } finally {
+      releaseRead.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testPersistedSnapshotDiagnosticsRetainCaptureContext()
+      throws IOException {
+    UpsertContext context = mock(UpsertContext.class);
+    when(context.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(context.getTableDataManager()).thenReturn(tableDataManager);
+    Lock segmentLock = mock(Lock.class);
+    when(tableDataManager.getSegmentLock(anyString())).thenReturn(segmentLock);
+    when(segmentLock.tryLock()).thenReturn(true);
+    DummyPartitionUpsertMetadataManager manager = new DummyPartitionUpsertMetadataManager("myTable", 0, context);
+    setDeleteRecordColumn(manager, "deleted");
+    ImmutableSegmentImpl segment = createImmutableSegment("seg", new File(TEMP_DIR, "seg"), new ArrayList<>(), null);
+    ThreadSafeMutableRoaringBitmap valid = createDocIds(1, 2, 3);
+    segment.enableUpsert(manager, valid, createDocIds(1, 3));
+    manager.trackSegment(segment);
+    manager.markSegmentAsUpdated(segment);
+    manager.addRecord(mock(MutableSegmentImpl.class), mock(RecordInfo.class));
+
+    manager.takeSnapshot("myTable__0__2__0", "100");
+    DocIdsSnapshot first = segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+    DocIdsSnapshot queryable = segment.loadDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+    assertEquals(first.metadata().snapshotConsumedUpToOffset(), "100");
+    assertEquals(queryable.metadata().snapshotConsumedUpToOffset(), "100");
+    assertEquals(first.metadata().docIdsType(), DocIdsSnapshot.DocIdsType.VALID_DOC_IDS);
+    assertEquals(queryable.metadata().docIdsType(), DocIdsSnapshot.DocIdsType.QUERYABLE_DOC_IDS);
+    assertNotEquals(first.metadata().docIdsCrc(), queryable.metadata().docIdsCrc());
+    assertEquals(first.docIds(), valid.getMutableRoaringBitmap());
+
+    // An unchanged segment keeps its saved timestamp and trigger, even if a newer consumer triggers a snapshot round.
+    manager.takeSnapshot("myTable__0__3__0", "200");
+    assertEquals(segment.loadDocIdsSnapshot(
+        V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).metadata(), first.metadata());
+    valid.remove(2);
+    manager.markSegmentAsUpdated(segment);
+    when(segmentLock.tryLock()).thenReturn(false);
+    manager.takeSnapshot("myTable__0__3__0", "200");
+    assertEquals(segment.loadDocIdsSnapshot(
+        V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).metadata(), first.metadata());
+
+    // Retrying publishes the new bitmap and its own trigger together.
+    when(segmentLock.tryLock()).thenReturn(true);
+    manager.takeSnapshot("myTable__0__4__0", "300");
+    DocIdsSnapshot retried = segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+    assertEquals(retried.metadata().snapshotConsumedUpToOffset(), "300");
+    assertEquals(retried.docIds(), valid.getMutableRoaringBitmap());
+    assertNotEquals(retried.metadata().docIdsCrc(), first.metadata().docIdsCrc());
+
+    // Shutdown or explicit snapshots without a consumer must not inherit an earlier startup's offset.
+    manager.markSegmentAsUpdated(segment);
+    manager.takeSnapshot();
+    assertNull(segment.loadDocIdsSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME)
+        .metadata().snapshotConsumedUpToOffset());
+  }
+
+  @Test
   public void testTakeSnapshotInOrder()
       throws IOException {
     UpsertContext upsertContext = mock(UpsertContext.class);
@@ -117,21 +267,21 @@ public class BasePartitionUpsertMetadataManagerTest {
     List<String> segmentsTakenSnapshot = new ArrayList<>();
 
     File segDir01 = new File(TEMP_DIR, "seg01");
-    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, null);
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), null);
     upsertMetadataManager.addSegment(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
-    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
-    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
-    upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
-    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
-    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), null);
     upsertMetadataManager.addSegment(seg03);
 
@@ -149,11 +299,11 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 6);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
     assertTrue(segDir03.exists());
-    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
   }
 
   @Test
@@ -178,24 +328,21 @@ public class BasePartitionUpsertMetadataManagerTest {
     List<String> segmentsTakenSnapshot = new ArrayList<>();
 
     File segDir01 = new File(TEMP_DIR, "seg01");
-    ImmutableSegmentImpl seg01 =
-        createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, null);
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), null);
     upsertMetadataManager.addSegment(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
-    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
-    ImmutableSegmentImpl seg02 =
-        createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
-    upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
-    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
-    ImmutableSegmentImpl seg03 =
-        createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), null);
     upsertMetadataManager.addSegment(seg03);
 
@@ -232,14 +379,72 @@ public class BasePartitionUpsertMetadataManagerTest {
       upsertMetadataManager.doTakeSnapshot();
       assertEquals(segmentsTakenSnapshot.size(), 3);
       assertTrue(segDir01.exists());
-      assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 4);
+      assertEquals(seg01.loadDocIdsFromSnapshot(
+          V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
       assertTrue(segDir02.exists());
-      assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 6);
+      assertEquals(seg02.loadDocIdsFromSnapshot(
+          V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
       assertTrue(segDir03.exists());
-      assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
+      assertEquals(seg03.loadDocIdsFromSnapshot(
+          V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
     } finally {
       executor.shutdownNow();
     }
+  }
+
+  @Test
+  public void testTakeSnapshotSkipsSegmentWithoutSnapshotOnLockContention()
+      throws IOException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    Map<String, Lock> segmentLocks = new HashMap<>();
+    // A contended segmentLock on a segment without existing snapshot file skips only that segment, and the other
+    // segments still take their snapshots.
+    Lock seg01Lock = new ReentrantLock() {
+      @Override
+      public boolean tryLock() {
+        return false;
+      }
+    };
+    segmentLocks.put("seg01", seg01Lock);
+    segmentLocks.put("seg02", new ReentrantLock());
+    segmentLocks.put("seg03", new ReentrantLock());
+    when(tdm.getSegmentLock(anyString())).thenAnswer(invocation -> {
+      String segmentName = invocation.getArgument(0);
+      return segmentLocks.get(segmentName);
+    });
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    List<String> segmentsTakenSnapshot = new ArrayList<>();
+
+    File segDir01 = new File(TEMP_DIR, "seg01");
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, null);
+    seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), null);
+    upsertMetadataManager.addSegment(seg01);
+
+    File segDir02 = new File(TEMP_DIR, "seg02");
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
+    seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
+    // seg02 has snapshot file, so its snapshot is taken first.
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
+
+    File segDir03 = new File(TEMP_DIR, "seg03");
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
+    seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), null);
+    upsertMetadataManager.addSegment(seg03);
+
+    upsertMetadataManager.doTakeSnapshot();
+    // seg01 is skipped on lock contention, and the other segments still take their snapshots.
+    assertEquals(segmentsTakenSnapshot.size(), 2);
+    assertEquals(segmentsTakenSnapshot.get(0), "seg02");
+    assertTrue(segmentsTakenSnapshot.contains("seg03"));
+    assertFalse(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).exists());
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
+    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
   }
 
   @Test
@@ -256,21 +461,21 @@ public class BasePartitionUpsertMetadataManagerTest {
     List<String> segmentsTakenSnapshot = new ArrayList<>();
 
     File segDir01 = new File(TEMP_DIR, "seg01");
-    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, null);
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), null);
     upsertMetadataManager.addSegment(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
-    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
-    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
-    upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
-    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
-    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), null);
     // just track it but not mark it as updated.
     upsertMetadataManager.trackSegment(seg03);
@@ -289,11 +494,11 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 6);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
     assertTrue(segDir03.exists());
-    assertNull(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    assertNull(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
   }
 
   // Losing segment is the one that lost all comparisons with docs from other segments, thus becomes empty of valid
@@ -312,22 +517,22 @@ public class BasePartitionUpsertMetadataManagerTest {
     List<String> segmentsTakenSnapshot = new ArrayList<>();
 
     File segDir01 = new File(TEMP_DIR, "seg01");
-    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, null);
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), null);
     // addSegment() would track seg, and mark it as updated for snapshotting.
     upsertMetadataManager.addSegment(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
-    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
-    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), null);
-    upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
-    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    upsertMetadataManager.addSegment(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
-    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), null);
     upsertMetadataManager.addSegment(seg03);
 
@@ -345,11 +550,11 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 6);
+    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 6);
     assertTrue(segDir03.exists());
-    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
   }
 
   @Test
@@ -369,32 +574,30 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     File segDir01 = new File(TEMP_DIR, "seg01");
     ImmutableSegmentImpl seg01 =
-        createImmutableSegment("seg01", segDir01, validDocIdsSegmentsTaken,
-            queryableDocIdsSegmentsTaken);
+        createImmutableSegment("seg01", segDir01, validDocIdsSegmentsTaken, queryableDocIdsSegmentsTaken);
     ThreadSafeMutableRoaringBitmap queryableDocIds01 = createDocIds(0, 1, 2); // Some docs excluded due to deletes
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), queryableDocIds01);
     upsertMetadataManager.trackSegment(seg01);
     upsertMetadataManager.markSegmentAsUpdated(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
-    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
-    FileUtils.touch(new File(segDir01, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
     ImmutableSegmentImpl seg02 =
-        createImmutableSegment("seg02", segDir02, validDocIdsSegmentsTaken,
-            queryableDocIdsSegmentsTaken);
+        createImmutableSegment("seg02", segDir02, validDocIdsSegmentsTaken, queryableDocIdsSegmentsTaken);
     ThreadSafeMutableRoaringBitmap queryableDocIds02 = createDocIds(0, 2, 3, 5); // Some docs excluded due to deletes
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), queryableDocIds02);
     upsertMetadataManager.trackSegment(seg02);
     upsertMetadataManager.markSegmentAsUpdated(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
-    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
-    FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    upsertMetadataManager.markSegmentWithSnapshot(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 =
-        createImmutableSegment("seg03", segDir03, validDocIdsSegmentsTaken,
-            queryableDocIdsSegmentsTaken);
+        createImmutableSegment("seg03", segDir03, validDocIdsSegmentsTaken, queryableDocIdsSegmentsTaken);
     ThreadSafeMutableRoaringBitmap queryableDocIds03 = createDocIds(3, 7); // Some docs excluded due to deletes
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), queryableDocIds03);
     upsertMetadataManager.trackSegment(seg03);
@@ -417,11 +620,14 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg01.loadDocIdsFromSnapshot(
+        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg02.loadDocIdsFromSnapshot(
+        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
     assertTrue(segDir03.exists());
-    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 2);
+    assertEquals(seg03.loadDocIdsFromSnapshot(
+        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 2);
   }
 
   @Test
@@ -447,27 +653,28 @@ public class BasePartitionUpsertMetadataManagerTest {
     List<String> segmentsTakenSnapshot = new ArrayList<>();
 
     File segDir01 = new File(TEMP_DIR, "seg01");
-    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, null);
     ThreadSafeMutableRoaringBitmap queryableDocIds01 = createDocIds(0, 1, 2); // Some docs excluded due to deletes
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), queryableDocIds01);
     upsertMetadataManager.trackSegment(seg01);
     upsertMetadataManager.markSegmentAsUpdated(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
-    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
-    FileUtils.touch(new File(segDir01, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
-    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     ThreadSafeMutableRoaringBitmap queryableDocIds02 = createDocIds(0, 2, 3, 5); // Some docs excluded due to deletes
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), queryableDocIds02);
     upsertMetadataManager.trackSegment(seg02);
     upsertMetadataManager.markSegmentAsUpdated(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
-    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
-    FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    upsertMetadataManager.markSegmentWithSnapshot(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
-    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
     ThreadSafeMutableRoaringBitmap queryableDocIds03 = createDocIds(3, 7); // Some docs excluded due to deletes
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), queryableDocIds03);
     upsertMetadataManager.trackSegment(seg03);
@@ -506,11 +713,14 @@ public class BasePartitionUpsertMetadataManagerTest {
       upsertMetadataManager.doTakeSnapshot();
       assertEquals(segmentsTakenSnapshot.size(), 3);
       assertTrue(segDir01.exists());
-      assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
+      assertEquals(seg01.loadDocIdsFromSnapshot(
+          V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
       assertTrue(segDir02.exists());
-      assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 4);
+      assertEquals(seg02.loadDocIdsFromSnapshot(
+          V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
       assertTrue(segDir03.exists());
-      assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 2);
+      assertEquals(seg03.loadDocIdsFromSnapshot(
+          V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 2);
     } finally {
       executor.shutdownNow();
     }
@@ -531,27 +741,28 @@ public class BasePartitionUpsertMetadataManagerTest {
     List<String> segmentsTakenSnapshot = new ArrayList<>();
 
     File segDir01 = new File(TEMP_DIR, "seg01");
-    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, null);
     ThreadSafeMutableRoaringBitmap queryableDocIds01 = createDocIds(0, 1, 2); // Some docs excluded due to deletes
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), queryableDocIds01);
     upsertMetadataManager.trackSegment(seg01);
     upsertMetadataManager.markSegmentAsUpdated(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
-    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
-    FileUtils.touch(new File(segDir01, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
-    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     ThreadSafeMutableRoaringBitmap queryableDocIds02 = createDocIds(0, 2, 3, 5); // Some docs excluded due to deletes
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), queryableDocIds02);
     upsertMetadataManager.trackSegment(seg02);
     upsertMetadataManager.markSegmentAsUpdated(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
-    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
-    FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    upsertMetadataManager.markSegmentWithSnapshot(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
-    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
     ThreadSafeMutableRoaringBitmap queryableDocIds03 = createDocIds(3, 7); // Some docs excluded due to deletes
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), queryableDocIds03);
     // just track it but not mark it as updated.
@@ -571,11 +782,13 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg01.loadDocIdsFromSnapshot(
+        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg02.loadDocIdsFromSnapshot(
+        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
     assertTrue(segDir03.exists());
-    assertNull(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+    assertNull(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
   }
 
   @Test
@@ -593,28 +806,29 @@ public class BasePartitionUpsertMetadataManagerTest {
     List<String> segmentsTakenSnapshot = new ArrayList<>();
 
     File segDir01 = new File(TEMP_DIR, "seg01");
-    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot, null);
     ThreadSafeMutableRoaringBitmap queryableDocIds01 = createDocIds(0, 1, 2); // Some docs excluded due to deletes
     seg01.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3), queryableDocIds01);
     // addSegment() would track seg, and mark it as updated for snapshotting.
     upsertMetadataManager.trackSegment(seg01);
     upsertMetadataManager.markSegmentAsUpdated(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
-    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
-    FileUtils.touch(new File(segDir01, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
+    FileUtils.touch(new File(segDir01, V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
-    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot, null);
     ThreadSafeMutableRoaringBitmap queryableDocIds02 = createDocIds(0, 2, 3, 5); // Some docs excluded due to deletes
     seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1, 2, 3, 4, 5), queryableDocIds02);
     upsertMetadataManager.trackSegment(seg02);
     upsertMetadataManager.markSegmentAsUpdated(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
-    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
-    FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    FileUtils.touch(new File(segDir02, V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
+    upsertMetadataManager.markSegmentWithSnapshot(seg02);
 
     File segDir03 = new File(TEMP_DIR, "seg03");
-    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, new ArrayList<>());
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot, null);
     // seg03 has all documents queryable initially but then loses them due to deletes
     ThreadSafeMutableRoaringBitmap queryableDocIds03 = new ThreadSafeMutableRoaringBitmap(); // Empty due to all deletes
     seg03.enableUpsert(upsertMetadataManager, createDocIds(3, 4, 7), queryableDocIds03);
@@ -635,12 +849,15 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     assertEquals(TEMP_DIR.list().length, 3);
     assertTrue(segDir01.exists());
-    assertEquals(seg01.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 3);
+    assertEquals(seg01.loadDocIdsFromSnapshot(
+        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 3);
     assertTrue(segDir02.exists());
-    assertEquals(seg02.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 4);
+    assertEquals(seg02.loadDocIdsFromSnapshot(
+        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 4);
     assertTrue(segDir03.exists());
     // seg03 should have empty queryableDocIds snapshot due to all documents being deleted
-    assertEquals(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME).getCardinality(), 0);
+    assertEquals(seg03.loadDocIdsFromSnapshot(
+        V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).getCardinality(), 0);
   }
 
   @Test
@@ -709,15 +926,15 @@ public class BasePartitionUpsertMetadataManagerTest {
       ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(sc.getIndexSegment());
       assertNotNull(validDocIds);
       // SegmentContext holds a clone of the original queryableDocIds held by the segment object.
-      assertNotSame(sc.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertEquals(sc.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertNotSame(sc.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(sc.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
       // docId=0 in seg01 got invalidated.
       if (sc.getIndexSegment() == seg01) {
-        assertFalse(sc.getQueryableDocIdsSnapshot().contains(0));
+        assertFalse(sc.getDocIdsSnapshot().contains(0));
       }
       // docId=12 in seg03 was newly added.
       if (sc.getIndexSegment() == seg03) {
-        assertTrue(sc.getQueryableDocIdsSnapshot().contains(12));
+        assertTrue(sc.getDocIdsSnapshot().contains(12));
       }
     }
   }
@@ -802,21 +1019,21 @@ public class BasePartitionUpsertMetadataManagerTest {
     for (SegmentContext reuseSC : reuseSegmentContexts) {
       for (SegmentContext sc : segmentContexts) {
         if (reuseSC.getIndexSegment() == sc.getIndexSegment()) {
-          assertSame(reuseSC.getQueryableDocIdsSnapshot(), sc.getQueryableDocIdsSnapshot());
+          assertSame(reuseSC.getDocIdsSnapshot(), sc.getDocIdsSnapshot());
         }
       }
       ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(reuseSC.getIndexSegment());
       assertNotNull(validDocIds);
       // The upsert view holds a clone of the original queryableDocIds held by the segment object.
-      assertNotSame(reuseSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertEquals(reuseSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertNotSame(reuseSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(reuseSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
       // docId=0 in seg01 got invalidated.
       if (reuseSC.getIndexSegment() == seg01) {
-        assertFalse(reuseSC.getQueryableDocIdsSnapshot().contains(0));
+        assertFalse(reuseSC.getDocIdsSnapshot().contains(0));
       }
       // docId=12 in seg03 was newly added.
       if (reuseSC.getIndexSegment() == seg03) {
-        assertTrue(reuseSC.getQueryableDocIdsSnapshot().contains(12));
+        assertTrue(reuseSC.getDocIdsSnapshot().contains(12));
       }
     }
 
@@ -831,21 +1048,21 @@ public class BasePartitionUpsertMetadataManagerTest {
     for (SegmentContext refreshSC : refreshSegmentContexts) {
       for (SegmentContext sc : segmentContexts) {
         if (refreshSC.getIndexSegment() == sc.getIndexSegment()) {
-          assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), sc.getQueryableDocIdsSnapshot());
+          assertNotSame(refreshSC.getDocIdsSnapshot(), sc.getDocIdsSnapshot());
         }
       }
       ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(refreshSC.getIndexSegment());
       assertNotNull(validDocIds);
       // The upsert view holds a clone of the original queryableDocIds held by the segment object.
-      assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertEquals(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertNotSame(refreshSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(refreshSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
       // docId=0 in seg01 got invalidated.
       if (refreshSC.getIndexSegment() == seg01) {
-        assertFalse(refreshSC.getQueryableDocIdsSnapshot().contains(0));
+        assertFalse(refreshSC.getDocIdsSnapshot().contains(0));
       }
       // docId=12 in seg03 was newly added.
       if (refreshSC.getIndexSegment() == seg03) {
-        assertTrue(refreshSC.getQueryableDocIdsSnapshot().contains(12));
+        assertTrue(refreshSC.getDocIdsSnapshot().contains(12));
       }
     }
   }
@@ -902,22 +1119,22 @@ public class BasePartitionUpsertMetadataManagerTest {
     for (SegmentContext refreshSC : refreshSegmentContexts) {
       for (SegmentContext sc : segmentContexts) {
         if (refreshSC.getIndexSegment() == sc.getIndexSegment()) {
-          assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), sc.getQueryableDocIdsSnapshot());
+          assertNotSame(refreshSC.getDocIdsSnapshot(), sc.getDocIdsSnapshot());
         }
       }
       ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(refreshSC.getIndexSegment());
       assertNotNull(validDocIds);
       // The upsert view holds a clone of the original queryableDocIds held by the segment object.
-      assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertEquals(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
-      assertNotNull(refreshSC.getQueryableDocIdsSnapshot());
+      assertNotSame(refreshSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(refreshSC.getDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertNotNull(refreshSC.getDocIdsSnapshot());
       // docId=0 in seg01 got invalidated.
       if (refreshSC.getIndexSegment() == seg01) {
-        assertFalse(refreshSC.getQueryableDocIdsSnapshot().contains(0));
+        assertFalse(refreshSC.getDocIdsSnapshot().contains(0));
       }
       // docId=12 in seg03 was newly added.
       if (refreshSC.getIndexSegment() == seg03) {
-        assertTrue(refreshSC.getQueryableDocIdsSnapshot().contains(12));
+        assertTrue(refreshSC.getDocIdsSnapshot().contains(12));
       }
     }
   }
@@ -986,22 +1203,167 @@ public class BasePartitionUpsertMetadataManagerTest {
     return new ThreadSafeMutableRoaringBitmap(bitmap);
   }
 
+  @Test
+  public void testSnapshotPassComparableAcrossReplicas()
+      throws IOException {
+    UpsertContext upsertContext = createSnapshotPassContext();
+    DummyPartitionUpsertMetadataManager replica1 = new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+    DummyPartitionUpsertMetadataManager replica2 = new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+    assertNull(replica1.getLastSnapshotPass());
+
+    File replica1Dir = new File(TEMP_DIR, "replica1");
+    File replica2Dir = new File(TEMP_DIR, "replica2");
+    addSnapshotSegment(replica1, replica1Dir, "seg01");
+    addSnapshotSegment(replica1, replica1Dir, "seg02");
+    addSnapshotSegment(replica2, replica2Dir, "seg02");
+    addSnapshotSegment(replica2, replica2Dir, "seg01");
+    replica1.takeSnapshot();
+    replica2.takeSnapshot();
+    SnapshotPass pass1 = replica1.getLastSnapshotPass();
+    SnapshotPass pass2 = replica2.getLastSnapshotPass();
+    assertTrue(pass1.consistent());
+    assertTrue(pass2.consistent());
+    assertEquals(pass1.numSegments(), 2);
+    assertEquals(pass2.segmentsCrc(), pass1.segmentsCrc());
+
+    // An upload that reached only one replica so far, e.g. from SRT or FIT, makes the two passes not comparable
+    addSnapshotSegment(replica1, replica1Dir, "seg03");
+    replica1.takeSnapshot();
+    SnapshotPass passWithUpload = replica1.getLastSnapshotPass();
+    assertTrue(passWithUpload.consistent());
+    assertEquals(passWithUpload.numSegments(), 3);
+    assertNotEquals(passWithUpload.segmentsCrc(), pass2.segmentsCrc());
+
+    // A compacted copy uploaded under the same name, applied on one replica only, also makes them not comparable
+    DummyPartitionUpsertMetadataManager replica3 = new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+    File replica3Dir = new File(TEMP_DIR, "replica3");
+    addSnapshotSegment(replica3, replica3Dir, "seg01");
+    ImmutableSegmentImpl compactedSeg02 = addSnapshotSegment(replica3, replica3Dir, "seg02");
+    when(compactedSeg02.getSegmentMetadata().getDataCrc()).thenReturn(99L);
+    replica3.takeSnapshot();
+    SnapshotPass passWithCompaction = replica3.getLastSnapshotPass();
+    assertTrue(passWithCompaction.consistent());
+    assertEquals(passWithCompaction.numSegments(), 2);
+    assertNotEquals(passWithCompaction.segmentsCrc(), pass2.segmentsCrc());
+  }
+
+  @Test
+  public void testSnapshotPassNotConsistentWhenSegmentOperationOverlaps()
+      throws Exception {
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, createSnapshotPassContext());
+    File dir = new File(TEMP_DIR, "overlap");
+    addSnapshotSegment(upsertMetadataManager, dir, "seg01");
+
+    // An add that starts before the pass and finishes after it changes valid docs the pass may half capture
+    CountDownLatch addStarted = new CountDownLatch(1);
+    CountDownLatch finishAdd = new CountDownLatch(1);
+    upsertMetadataManager.setOnAddOrReplaceSegment(() -> {
+      addStarted.countDown();
+      try {
+        finishAdd.await(10, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    });
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", new File(dir, "seg02"), new ArrayList<>(), null);
+    seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1), null);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> addFuture = executor.submit(() -> upsertMetadataManager.addSegment(seg02));
+      assertTrue(addStarted.await(10, TimeUnit.SECONDS));
+      upsertMetadataManager.takeSnapshot();
+      assertFalse(upsertMetadataManager.getLastSnapshotPass().consistent());
+      finishAdd.countDown();
+      addFuture.get(10, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+
+    // The next pass with nothing overlapping is consistent again
+    upsertMetadataManager.setOnAddOrReplaceSegment(null);
+    upsertMetadataManager.takeSnapshot();
+    SnapshotPass pass = upsertMetadataManager.getLastSnapshotPass();
+    assertTrue(pass.consistent());
+    assertEquals(pass.numSegments(), 2);
+  }
+
+  @Test
+  public void testSnapshotPassNotConsistentWithStaleFileOrUnsealedSegment()
+      throws IOException {
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, createSnapshotPassContext());
+    File dir = new File(TEMP_DIR, "stale");
+    addSnapshotSegment(upsertMetadataManager, dir, "seg01");
+    // seg02 fails to persist its snapshot once, so its file would lag its valid docs
+    AtomicBoolean failPersist = new AtomicBoolean(true);
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", new File(dir, "seg02"), new ArrayList<>(), null,
+        () -> {
+          if (failPersist.getAndSet(false)) {
+            throw new IllegalStateException("Failed to persist snapshot");
+          }
+        });
+    seg02.enableUpsert(upsertMetadataManager, createDocIds(0, 1), null);
+    upsertMetadataManager.addSegment(seg02);
+    upsertMetadataManager.takeSnapshot();
+    assertFalse(upsertMetadataManager.getLastSnapshotPass().consistent());
+    upsertMetadataManager.takeSnapshot();
+    assertTrue(upsertMetadataManager.getLastSnapshotPass().consistent());
+
+    // A consuming segment still waiting to be sealed may not match the committed copy yet
+    upsertMetadataManager.addRecord(mock(MutableSegmentImpl.class), mock(RecordInfo.class));
+    upsertMetadataManager.takeSnapshot();
+    assertFalse(upsertMetadataManager.getLastSnapshotPass().consistent());
+  }
+
+  private static UpsertContext createSnapshotPassContext() {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    // Partial upsert, so takeSnapshot() does not wait for the first consuming segment
+    when(upsertContext.getPartialUpsertHandlerSupplier()).thenReturn(() -> mock(PartialUpsertHandler.class));
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    when(tdm.getSegmentLock(anyString())).thenAnswer(invocation -> new ReentrantLock());
+    return upsertContext;
+  }
+
+  private static ImmutableSegmentImpl addSnapshotSegment(DummyPartitionUpsertMetadataManager upsertMetadataManager,
+      File dir, String segmentName)
+      throws IOException {
+    ImmutableSegmentImpl segment =
+        createImmutableSegment(segmentName, new File(dir, segmentName), new ArrayList<>(), null);
+    segment.enableUpsert(upsertMetadataManager, createDocIds(0, 1), null);
+    upsertMetadataManager.addSegment(segment);
+    return segment;
+  }
+
   private static ImmutableSegmentImpl createImmutableSegment(String segName, File segDir,
-      List<String> segmentsTakenSnapshot, List<String> queryableDocIdsSegmentsTaken)
+      List<String> segmentsTakenSnapshot, @Nullable List<String> queryableDocIdsSegmentsTaken)
+      throws IOException {
+    return createImmutableSegment(segName, segDir, segmentsTakenSnapshot, queryableDocIdsSegmentsTaken, () -> {
+    });
+  }
+
+  private static ImmutableSegmentImpl createImmutableSegment(String segName, File segDir,
+      List<String> segmentsTakenSnapshot, @Nullable List<String> queryableDocIdsSegmentsTaken, Runnable onPersist)
       throws IOException {
     FileUtils.forceMkdir(segDir);
     SegmentMetadataImpl meta = mock(SegmentMetadataImpl.class);
     when(meta.getName()).thenReturn(segName);
     when(meta.getIndexDir()).thenReturn(segDir);
     return new ImmutableSegmentImpl(mock(SegmentDirectory.class), meta, new HashMap<>(), null) {
-      public void persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap docIds) {
-        if (V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME.equals(fileName)) {
+      @Override
+      public void persistDocIdsSnapshot(String fileName,
+          ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot, @Nullable DocIdsSnapshot.Metadata metadata)
+          throws IOException {
+        onPersist.run();
+        if (V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME.equals(fileName)) {
           segmentsTakenSnapshot.add(segName);
-        } else if (V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME.equals(fileName)
+        } else if (V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME.equals(fileName)
             && queryableDocIdsSegmentsTaken != null) {
           queryableDocIdsSegmentsTaken.add(segName);
         }
-        super.persistDocIdsSnapshot(fileName, docIds);
+        super.persistDocIdsSnapshot(fileName, docIdsSnapshot, metadata);
       }
     };
   }
@@ -1022,16 +1384,26 @@ public class BasePartitionUpsertMetadataManagerTest {
 
   private static class DummyPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {
 
+    private volatile Runnable _onAddOrReplaceSegment;
+
     protected DummyPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
       super(tableNameWithType, partitionId, context);
+    }
+
+    public void setOnAddOrReplaceSegment(@Nullable Runnable onAddOrReplaceSegment) {
+      _onAddOrReplaceSegment = onAddOrReplaceSegment;
     }
 
     public void trackSegment(IndexSegment seg) {
       _trackedSegments.add(seg);
     }
 
-    public void markSegmentAsUpdated(IndexSegment seg) {
-      _updatedSegmentsSinceLastSnapshot.add(seg);
+    public void markSegmentAsUpdated(ImmutableSegmentImpl seg) {
+      trackUpdatedSegmentsSinceLastSnapshot(seg);
+    }
+
+    public void markSegmentWithSnapshot(ImmutableSegmentImpl seg) {
+      _segmentsWithSnapshot.add(seg);
     }
 
     @Override
@@ -1043,6 +1415,10 @@ public class BasePartitionUpsertMetadataManagerTest {
     protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
         @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
         @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
+      Runnable onAddOrReplaceSegment = _onAddOrReplaceSegment;
+      if (onAddOrReplaceSegment != null) {
+        onAddOrReplaceSegment.run();
+      }
     }
 
     @Override
@@ -1060,7 +1436,25 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
+    protected void revertAndRemoveSegment(IndexSegment segment,
+        Iterator<Map.Entry<Integer, PrimaryKey>> primaryKeyIterator) {
+    }
+
+    @Override
+    protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    }
+
+    @Override
     protected void doRemoveExpiredPrimaryKeys() {
+    }
+
+    @Override
+    protected int getPrevKeyToRecordLocationSize() {
+      return 0;
+    }
+
+    @Override
+    protected void clearPrevKeyToRecordLocation() {
     }
   }
 }

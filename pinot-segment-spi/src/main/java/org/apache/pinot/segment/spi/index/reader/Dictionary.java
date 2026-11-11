@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.index.reader;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.spi.index.IndexReader;
@@ -30,152 +29,140 @@ import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
-/**
- * Interface for the dictionary. For the read APIs, type conversion among INT, LONG, FLOAT, DOUBLE, STRING should be
- * supported. Type conversion between STRING and BYTES via Hex encoding/decoding should be supported.
- */
+/// Interface for the dictionary. For the read APIs, type conversion among INT, LONG, FLOAT, DOUBLE, STRING should be
+/// supported. Type conversion between STRING and BYTES via Hex encoding/decoding should be supported.
 @SuppressWarnings("rawtypes")
 public interface Dictionary extends IndexReader {
   int NULL_VALUE_INDEX = -1;
 
-  /**
-   * Returns {@code true} if the values in the dictionary are sorted, {@code false} otherwise.
-   */
+  /// Returns `true` if the values in the dictionary are sorted, `false` otherwise.
   boolean isSorted();
 
-  /**
-   * Returns the data type of the values in the dictionary.
-   */
+  /// Returns the data type of the values in the dictionary.
   DataType getValueType();
 
-  /**
-   * Returns the number of values in the dictionary.
-   */
+  /// Returns the number of values in the dictionary.
   int length();
 
-  /**
-   * Returns the index of the string representation of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if
-   * the value does not exist. This method is for the cross-type predicate evaluation.
-   */
+  /// Returns the index of the string representation of the value in the dictionary, or [#NULL_VALUE_INDEX] (-1)
+  /// if the value does not exist. This method is for the cross-type predicate evaluation.
   int indexOf(String stringValue);
 
-  /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
-   * Must be implemented for INT dictionaries.
-   */
+  /// Returns the index of the value in the dictionary, or [#NULL_VALUE_INDEX] (-1) if the value does not exist.
+  /// Must be implemented for INT dictionaries.
   default int indexOf(int intValue) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
-   * Must be implemented for LONG dictionaries.
-   */
+  /// Returns the index of the value in the dictionary, or [#NULL_VALUE_INDEX] (-1) if the value does not exist.
+  /// Must be implemented for LONG dictionaries.
   default int indexOf(long longValue) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
-   * Must be implemented for FLOAT dictionaries.
-   */
+  /// Returns the index of the value in the dictionary, or [#NULL_VALUE_INDEX] (-1) if the value does not exist.
+  /// Must be implemented for FLOAT dictionaries.
   default int indexOf(float floatValue) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
-   * Must be implemented for DOUBLE dictionaries.
-   */
+  /// Returns the index of the value in the dictionary, or [#NULL_VALUE_INDEX] (-1) if the value does not exist.
+  /// Must be implemented for DOUBLE dictionaries.
   default int indexOf(double doubleValue) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
-   * Must be implemented for BIG_DECIMAL dictionaries.
-   */
+  /// Returns the index of the value in the dictionary, or [#NULL_VALUE_INDEX] (-1) if the value does not exist.
+  /// Must be implemented for BIG_DECIMAL dictionaries.
   default int indexOf(BigDecimal bigDecimalValue) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
-   * Must be implemented for BYTE_ARRAY dictionaries.
-   */
+  /// Returns the index of the value in the dictionary, or [#NULL_VALUE_INDEX] (-1) if the value does not exist.
+  /// Must be implemented for BYTE_ARRAY dictionaries.
   default int indexOf(ByteArray bytesValue) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Returns the insertion index of the string representation of the value in the dictionary. This method follows the
-   * same behavior as in {@link Arrays#binarySearch(Object[], Object)}. All sorted dictionaries should support this
-   * method. This method is for the range predicate evaluation.
-   */
+  /// Returns the insertion index of the string representation of the value in the dictionary. This method follows the
+  /// same behavior as in [java.util.Arrays#binarySearch(Object[], Object)]. All sorted dictionaries should
+  /// support this method. This method is for the range predicate evaluation.
   int insertionIndexOf(String stringValue);
 
-  /**
-   * Returns a set of dictIds in the given value range, where lower/upper bound can be "*" which indicates unbounded
-   * range. All unsorted dictionaries should support this method. This method is for the range predicate evaluation.
-   */
+  /// Returns a set of dictIds in the given value range, where lower/upper bound can be "\*" which indicates unbounded
+  /// range. All unsorted dictionaries should support this method. This method is for the range predicate evaluation.
   IntSet getDictIdsInRange(String lower, String upper, boolean includeLower, boolean includeUpper);
 
-  /**
-   * Returns the comparison result of the values (actual value instead of string representation of the value) for the
-   * given dictionary ids, i.e. {@code value1.compareTo(value2)}.
-   */
+  /// Returns the comparison result of the values (actual value instead of string representation of the value) for the
+  /// given dictionary ids, i.e. `value1.compareTo(value2)`.
   int compare(int dictId1, int dictId2);
 
-  /**
-   * Returns the minimum value in the dictionary. For type BYTES, {@code ByteArray} will be returned. Undefined if the
-   * dictionary is empty.
-   */
+  /// Returns the minimum value in the dictionary. For type BYTES, `ByteArray` will be returned. Undefined if the
+  /// dictionary is empty.
   Comparable getMinVal();
 
-  /**
-   * Returns the maximum value in the dictionary. For type BYTES, {@code ByteArray} will be returned. Undefined if the
-   * dictionary is empty.
-   */
+  /// Returns the maximum value in the dictionary. For type BYTES, `ByteArray` will be returned. Undefined if the
+  /// dictionary is empty.
   Comparable getMaxVal();
 
-  /**
-   * Returns a sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array will
-   * be returned; for type BIG_DECIMAL, {@code BigDecimal[]} will be returned; for type STRING, {@code String[]} will be
-   * returned; for type BYTES, {@code ByteArray[]} will be returned.
-   * This method is for the stats collection phase when sealing the consuming segment.
-   */
-  Object getSortedValues();
+  /// Returns a sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array
+  /// will be returned; for type BIG_DECIMAL, `BigDecimal[]` will be returned; for type STRING, `String[]` will be
+  /// returned; for type BYTES, `ByteArray[]` will be returned.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default Object getSortedValues() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns the length (in bytes) of the shortest element in the dictionary.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default int getLengthOfShortestElement() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns the length (in bytes) of the longest element in the dictionary.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default int getLengthOfLongestElement() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns `true` when all elements in a STRING dictionary contain only ASCII characters, `false` otherwise.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default boolean isAscii() {
+    throw new UnsupportedOperationException();
+  }
 
   // Single-value read APIs
 
-  /**
-   * Returns the value at the given dictId in the dictionary.
-   * <p>The Object type returned for each value type:
-   * <ul>
-   *   <li>INT -> Integer</li>
-   *   <li>LONG -> Long</li>
-   *   <li>FLOAT -> Float</li>
-   *   <li>DOUBLE -> Double</li>
-   *   <li>BIG_DECIMAL -> BigDecimal</li>
-   *   <li>STRING -> String</li>
-   *   <li>BYTES -> byte[]</li>
-   * </ul>
-   */
+  /// Returns the value at the given dictId in the dictionary.
+  ///
+  /// The Object type returned for each value type:
+  /// - INT -> Integer
+  /// - LONG -> Long
+  /// - FLOAT -> Float
+  /// - DOUBLE -> Double
+  /// - BIG_DECIMAL -> BigDecimal
+  /// - STRING -> String
+  /// - BYTES -> byte\[\]
   Object get(int dictId);
 
-  /**
-   * Returns the value at the given dictId in the dictionary.
-   * <p>The Object type returned for each value type:
-   * <ul>
-   *   <li>INT -> Integer</li>
-   *   <li>LONG -> Long</li>
-   *   <li>FLOAT -> Float</li>
-   *   <li>DOUBLE -> Double</li>
-   *   <li>BIG_DECIMAL -> BigDecimal</li>
-   *   <li>STRING -> String</li>
-   *   <li>BYTES -> ByteArray</li>
-   * </ul>
-   */
+  /// Returns the value at the given dictId in the dictionary.
+  ///
+  /// The Object type returned for each value type:
+  /// - INT -> Integer
+  /// - LONG -> Long
+  /// - FLOAT -> Float
+  /// - DOUBLE -> Double
+  /// - BIG_DECIMAL -> BigDecimal
+  /// - STRING -> String
+  /// - BYTES -> ByteArray
   default Object getInternal(int dictId) {
     return get(dictId);
   }
@@ -192,15 +179,22 @@ public interface Dictionary extends IndexReader {
 
   String getStringValue(int dictId);
 
-  /**
-   * NOTE: Should be overridden for STRING, BIG_DECIMAL and BYTES dictionary.
-   */
+  /// Returns the bytes representation of the value.
+  /// Should be overridden for variable sized types, i.e. BIG_DECIMAL, STRING, BYTES.
   default byte[] getBytesValue(int dictId) {
     throw new UnsupportedOperationException();
   }
 
   default ByteArray getByteArrayValue(int dictId) {
     return new ByteArray(getBytesValue(dictId));
+  }
+
+  /// Returns the size of the value in bytes.
+  /// Should be overridden for variable sized types, i.e. BIG_DECIMAL, STRING, BYTES.
+  /// - For BIG_DECIMAL, returns the length of the serialized bytes
+  /// - For STRING, returns the length of the UTF_8 encoded bytes
+  default int getValueSize(int dictId) {
+    return getValueType().size();
   }
 
   default int get32BitsMurmur3HashValue(int dictId) {
@@ -316,9 +310,7 @@ public interface Dictionary extends IndexReader {
     }
   }
 
-  /**
-   * Returns the dictIds for the given sorted values. This method is for the IN/NOT IN predicate evaluation.
-   */
+  /// Returns the dictIds for the given sorted values. This method is for the IN/NOT IN predicate evaluation.
   default void getDictIds(List<String> sortedValues, IntSet dictIds, SortedBatchLookupAlgorithm algorithm) {
     getDictIds(sortedValues, dictIds);
   }

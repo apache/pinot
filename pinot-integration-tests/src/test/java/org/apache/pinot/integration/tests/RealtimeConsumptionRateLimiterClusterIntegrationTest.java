@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -50,7 +49,8 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
   private static final Logger LOGGER =
       LoggerFactory.getLogger(RealtimeConsumptionRateLimiterClusterIntegrationTest.class);
 
-  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  private static final String CONSUMER_DIRECTORY =
+      new File(FileUtils.getTempDirectory(), "consumer-test").getAbsolutePath();
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final double SERVER_RATE_LIMIT = 100;
@@ -86,7 +86,7 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
   protected IngestionConfig getIngestionConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(
-        new StreamIngestionConfig(Collections.singletonList(getStreamConfigMap())));
+        new StreamIngestionConfig(List.of(getStreamConfigMap())));
     return ingestionConfig;
   }
 
@@ -279,6 +279,13 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
   @Test(enabled = false)
   public void testInstanceShutdown() {
     // Do nothing
+  }
+
+  @Test(enabled = false)
+  @Override
+  public void testQueriesDisabled() {
+    // Routing-table-dependent test; the rate-limiter cluster setup keeps the table out of broker routing,
+    // making this test inapplicable here. Mirrors the testInstanceShutdown override above.
   }
 
   @Test(enabled = false)

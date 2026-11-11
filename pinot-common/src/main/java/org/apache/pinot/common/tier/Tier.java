@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.common.tier;
 
-/**
- * Represents a tier of storage in Pinot. It consists of
- * name - unique name given to a tier in the table config and to create instancePartitions for the tier
- * segmentSelector - {@link TierSegmentSelector} strategy used by the tier to select eligible segments of a table
- * storage - {@link TierStorage} used by the tier as storage for the eligible segments
- */
+/// Represents a tier of storage in Pinot. It consists of
+/// name - unique name given to a tier in the table config and to create instancePartitions for the tier
+/// segmentSelector - [TierSegmentSelector] strategy used by the tier to select eligible segments of a table
+/// storage - [TierStorage] used by the tier as storage for the eligible segments
 public class Tier {
 
   private final String _name;

@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Arrays;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -62,10 +63,44 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
       expectedValues[i] = truncate(_doubleSVValues[i], 0);
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    // Regression for signed-zero handling: truncate(value) should match truncate(value, 0).
+    expression = RequestContextUtils.getExpression("truncate(-0.4)");
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
+    Arrays.fill(expectedValues, 0.0d);
+    testTransformFunction(transformFunction, expectedValues);
+
+    long positiveZeroBits = Double.doubleToRawLongBits(0.0d);
+    double[] actualValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    for (double actualValue : actualValues) {
+      Assert.assertEquals(Double.doubleToRawLongBits(actualValue), positiveZeroBits);
+    }
+  }
+
+  @Test
+  public void testTruncateNaNAndInfinity() {
+    testTruncateLiteralNoScale(
+        String.format("truncate((%s - %s) / (%s - %s))", INT_SV_COLUMN, INT_SV_COLUMN, INT_SV_COLUMN, INT_SV_COLUMN),
+        Double.NaN);
+    testTruncateLiteralNoScale(String.format("truncate(1.0 / (%s - %s))", INT_SV_COLUMN, INT_SV_COLUMN),
+        Double.POSITIVE_INFINITY);
+    testTruncateLiteralNoScale(String.format("truncate(-1.0 / (%s - %s))", INT_SV_COLUMN, INT_SV_COLUMN),
+        Double.NEGATIVE_INFINITY);
   }
 
   public Double truncate(double a, int b) {
     return BigDecimal.valueOf(a).setScale(b, RoundingMode.DOWN).doubleValue();
+  }
+
+  private void testTruncateLiteralNoScale(String expressionString, double expectedValue) {
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionString);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.TRUNCATE.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    Arrays.fill(expectedValues, expectedValue);
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   @Test

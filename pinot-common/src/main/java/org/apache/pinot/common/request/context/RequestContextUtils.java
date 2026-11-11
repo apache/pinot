@@ -20,7 +20,6 @@ package org.apache.pinot.common.request.context;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
@@ -36,9 +35,9 @@ import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
+import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -51,9 +50,7 @@ public class RequestContextUtils {
   private RequestContextUtils() {
   }
 
-  /**
-   * Converts the given string expression into an {@link ExpressionContext}.
-   */
+  /// Converts the given string expression into an {@link ExpressionContext}.
   public static ExpressionContext getExpression(String expression) {
     if (expression.equals("*")) {
       // For 'SELECT *' and 'SELECT COUNT(*)'
@@ -63,9 +60,7 @@ public class RequestContextUtils {
     }
   }
 
-  /**
-   * Converts the given Thrift {@link Expression} into an {@link ExpressionContext}.
-   */
+  /// Converts the given Thrift {@link Expression} into an {@link ExpressionContext}.
   public static ExpressionContext getExpression(Expression thriftExpression) {
     switch (thriftExpression.getType()) {
       case LITERAL:
@@ -79,9 +74,7 @@ public class RequestContextUtils {
     }
   }
 
-  /**
-   * Converts the given Thrift {@link Function} into a {@link FunctionContext}.
-   */
+  /// Converts the given Thrift {@link Function} into a {@link FunctionContext}.
   public static FunctionContext getFunction(Function thriftFunction) {
     String functionName = thriftFunction.getOperator();
     FunctionContext.Type functionType =
@@ -95,16 +88,15 @@ public class RequestContextUtils {
       }
       return new FunctionContext(functionType, functionName, arguments);
     } else {
-      return new FunctionContext(functionType, functionName, Collections.emptyList());
+      return new FunctionContext(functionType, functionName, List.of());
     }
   }
 
-  /**
-   * Converts the given Thrift {@link Expression} into a {@link FilterContext}.
-   * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
-   *          missing an EQUALS filter operator.
-   */
+  /// Converts the given Thrift {@link Expression} into a {@link FilterContext}.
+  ///
+  /// NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
+  ///          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+  ///          missing an EQUALS filter operator.
   public static FilterContext getFilter(Expression thriftExpression) {
     Function function = thriftExpression.getFunctionCall();
     // Trim off outer IS_TRUE function as it is redundant
@@ -253,9 +245,6 @@ public class RequestContextUtils {
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(getExpression(operands.get(0)),
             RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), "i"));
-      case TEXT_CONTAINS:
-        return FilterContext.forPredicate(
-            new TextContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         String options = operands.size() > 2 ? getStringValue(operands.get(2)) : null;
         return FilterContext.forPredicate(
@@ -272,6 +261,15 @@ public class RequestContextUtils {
           topK = operands.get(2).getLiteral().getIntValue();
         }
         return FilterContext.forPredicate(new VectorSimilarityPredicate(lhs, vectorValue, topK));
+      case VECTOR_SIMILARITY_RADIUS:
+        ExpressionContext radiusLhs = getExpression(operands.get(0));
+        float[] radiusVectorValue = getVectorValue(operands.get(1));
+        float threshold = VectorSimilarityRadiusPredicate.DEFAULT_THRESHOLD;
+        if (operands.size() == 3) {
+          threshold = getFloatValue(operands.get(2));
+        }
+        return FilterContext.forPredicate(
+            new VectorSimilarityRadiusPredicate(radiusLhs, radiusVectorValue, threshold));
       case IS_NULL:
         return FilterContext.forPredicate(new IsNullPredicate(getExpression(operands.get(0))));
       case IS_NOT_NULL:
@@ -290,12 +288,11 @@ public class RequestContextUtils {
     return RequestUtils.getLiteralString(literal);
   }
 
-  /**
-   * Converts the given filter {@link ExpressionContext} into a {@link FilterContext}.
-   * <p>NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
-   *          always convert the right-hand side expressions into strings. We also update boolean predicates that are
-   *          missing an EQUALS filter operator.
-   */
+  /// Converts the given filter {@link ExpressionContext} into a {@link FilterContext}.
+  ///
+  /// NOTE: Currently the query engine only accepts string literals as the right-hand side of the predicate, so we
+  ///          always convert the right-hand side expressions into strings. We also update boolean predicates that are
+  ///          missing an EQUALS filter operator.
   public static FilterContext getFilter(ExpressionContext filterExpression) {
     FunctionContext function = filterExpression.getFunction();
     // Trim off outer IS_TRUE function as it is redundant
@@ -439,8 +436,6 @@ public class RequestContextUtils {
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(operands.get(0),
             RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), "i"));
-      case TEXT_CONTAINS:
-        return FilterContext.forPredicate(new TextContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
       case TEXT_MATCH:
         String options = operands.size() > 2 ? getStringValue(operands.get(2)) : null;
         return FilterContext.forPredicate(
@@ -455,6 +450,13 @@ public class RequestContextUtils {
         }
         return FilterContext.forPredicate(
             new VectorSimilarityPredicate(operands.get(0), getVectorValue(operands.get(1)), topK));
+      case VECTOR_SIMILARITY_RADIUS:
+        float radiusThreshold = VectorSimilarityRadiusPredicate.DEFAULT_THRESHOLD;
+        if (operands.size() == 3) {
+          radiusThreshold = Float.parseFloat(operands.get(2).getLiteral().getValue().toString());
+        }
+        return FilterContext.forPredicate(
+            new VectorSimilarityRadiusPredicate(operands.get(0), getVectorValue(operands.get(1)), radiusThreshold));
       case IS_NULL:
         return FilterContext.forPredicate(new IsNullPredicate(operands.get(0)));
       case IS_NOT_NULL:

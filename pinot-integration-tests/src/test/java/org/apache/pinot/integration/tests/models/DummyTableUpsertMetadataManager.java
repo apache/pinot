@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests.models;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -33,6 +32,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -49,7 +49,7 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
   @Override
   public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
-    return Collections.emptyMap();
+    return Map.of();
   }
 
   @Override
@@ -88,7 +88,25 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
     }
 
     @Override
+    protected void revertAndRemoveSegment(IndexSegment segment,
+        Iterator<Map.Entry<Integer, PrimaryKey>> primaryKeyIterator) {
+    }
+
+    @Override
+    protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    }
+
+    @Override
     protected void doRemoveExpiredPrimaryKeys() {
+    }
+
+    @Override
+    protected int getPrevKeyToRecordLocationSize() {
+      return 0;
+    }
+
+    @Override
+    protected void clearPrevKeyToRecordLocation() {
     }
   }
 }

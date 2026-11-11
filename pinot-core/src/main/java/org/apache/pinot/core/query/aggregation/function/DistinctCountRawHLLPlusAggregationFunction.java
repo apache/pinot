@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -28,20 +29,23 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.SerializedHLLPlus;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class DistinctCountRawHLLPlusAggregationFunction
-    extends BaseSingleInputAggregationFunction<HyperLogLogPlus, SerializedHLLPlus> {
+    extends BaseSingleInputAggregationFunction<HyperLogLogPlus, Comparable<?>> {
   private final DistinctCountHLLPlusAggregationFunction _distinctCountHLLPlusAggregationFunction;
 
-  public DistinctCountRawHLLPlusAggregationFunction(List<ExpressionContext> arguments) {
-    this(arguments.get(0), new DistinctCountHLLPlusAggregationFunction(arguments));
+  public DistinctCountRawHLLPlusAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    this(arguments.get(0), new DistinctCountHLLPlusAggregationFunction(arguments, nullHandlingEnabled),
+        nullHandlingEnabled);
   }
 
   DistinctCountRawHLLPlusAggregationFunction(ExpressionContext expression,
-      DistinctCountHLLPlusAggregationFunction distinctCountHLLPlusAggregationFunction) {
-    super(expression);
+      DistinctCountHLLPlusAggregationFunction distinctCountHLLPlusAggregationFunction, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
     _distinctCountHLLPlusAggregationFunction = distinctCountHLLPlusAggregationFunction;
   }
 
@@ -105,7 +109,7 @@ public class DistinctCountRawHLLPlusAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(HyperLogLogPlus hyperLogLogPlus) {
+  public SerializedResult serializeIntermediateResult(HyperLogLogPlus hyperLogLogPlus) {
     return _distinctCountHLLPlusAggregationFunction.serializeIntermediateResult(hyperLogLogPlus);
   }
 
@@ -119,8 +123,23 @@ public class DistinctCountRawHLLPlusAggregationFunction
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public SerializedHLLPlus extractFinalResult(HyperLogLogPlus intermediateResult) {
+  public SerializedHLLPlus extractFinalResult(@Nullable HyperLogLogPlus intermediateResult) {
+    if (intermediateResult == null) {
+      return null;
+    }
     return new SerializedHLLPlus(intermediateResult);
+  }
+
+  /// Merges two final results, which are serialized HLL+s in string form, into the string form of the merged HLL+.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    HyperLogLogPlus merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedHLLPlus(merged).toString();
+  }
+
+  private static HyperLogLogPlus deserializeFinalResult(Comparable<?> finalResult) {
+    return ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(BytesUtils.toBytes((String) finalResult));
   }
 }

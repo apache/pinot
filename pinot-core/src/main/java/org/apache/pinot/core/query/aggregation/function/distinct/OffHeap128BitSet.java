@@ -24,11 +24,9 @@ import java.util.Iterator;
 import javax.annotation.concurrent.NotThreadSafe;
 
 
-/**
- * Off-heap set for 128-bit values.
- *
- * NOTE: We store and return hash mixed values instead of original values.
- */
+/// Off-heap set for 128-bit values.
+///
+/// NOTE: We store and return hash mixed values instead of original values.
 @NotThreadSafe
 public class OffHeap128BitSet extends BaseOffHeapSet {
 
@@ -188,7 +186,7 @@ public class OffHeap128BitSet extends BaseOffHeapSet {
   @Override
   public byte[] serialize() {
     int size = size();
-    byte[] bytes = new byte[Integer.BYTES + size << 4];
+    byte[] bytes = new byte[Integer.BYTES + (size << 4)];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     byteBuffer.putInt(size);
     Value buffer = new Value();

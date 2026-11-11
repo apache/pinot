@@ -113,11 +113,6 @@ public class SegmentGenerationUtils {
     }
   }
 
-  @Deprecated
-  public static TableConfig getTableConfig(String tableConfigURIStr) {
-    return getTableConfig(tableConfigURIStr, null);
-  }
-
   public static TableConfig getTableConfig(String tableConfigURIStr, String authToken) {
     return getTableConfig(tableConfigURIStr, authToken, null);
   }
@@ -165,16 +160,14 @@ public class SegmentGenerationUtils {
     }
   }
 
-  /**
-   * Generate a relative output directory path when `useRelativePath` flag is on.
-   * This method will compute the relative path based on `inputFile` and `baseInputDir`,
-   * then apply only the directory part of relative path to `outputDir`.
-   * E.g.
-   *    baseInputDir = "/path/to/input"
-   *    inputFile = "/path/to/input/a/b/c/d.avro"
-   *    outputDir = "/path/to/output"
-   *    getRelativeOutputPath(baseInputDir, inputFile, outputDir) = /path/to/output/a/b/c
-   */
+  /// Generate a relative output directory path when `useRelativePath` flag is on.
+  /// This method will compute the relative path based on `inputFile` and `baseInputDir`,
+  /// then apply only the directory part of relative path to `outputDir`.
+  /// E.g.
+  ///    baseInputDir = "/path/to/input"
+  ///    inputFile = "/path/to/input/a/b/c/d.avro"
+  ///    outputDir = "/path/to/output"
+  ///    getRelativeOutputPath(baseInputDir, inputFile, outputDir) = /path/to/output/a/b/c
   public static URI getRelativeOutputPath(URI baseInputDir, URI inputFile, URI outputDir) {
     URI relativePath = baseInputDir.relativize(inputFile);
     Preconditions.checkState(relativePath.getPath().length() > 0 && !relativePath.equals(inputFile),
@@ -186,12 +179,10 @@ public class SegmentGenerationUtils {
     return relativeOutputURI;
   }
 
-  /**
-   * Extract file name from a given URI.
-   *
-   * @param inputFileURI
-   * @return
-   */
+  /// Extract file name from a given URI.
+  ///
+  /// @param inputFileURI
+  /// @return
   public static String getFileName(URI inputFileURI) {
     String scheme = inputFileURI.getScheme();
     if (scheme != null && scheme.equalsIgnoreCase("file")) {
@@ -201,14 +192,12 @@ public class SegmentGenerationUtils {
     return pathSplits[pathSplits.length - 1];
   }
 
-  /**
-   * Convert a File URI String to URI Object, use parent URI scheme/userInfo/host/port if sheme is not specified.
-   *
-   * @param uriStr
-   * @param fullUriForPathOnlyUriStr
-   * @return
-   * @throws URISyntaxException
-   */
+  /// Convert a File URI String to URI Object, use parent URI scheme/userInfo/host/port if sheme is not specified.
+  ///
+  /// @param uriStr
+  /// @param fullUriForPathOnlyUriStr
+  /// @return
+  /// @throws URISyntaxException
   public static URI getFileURI(String uriStr, URI fullUriForPathOnlyUriStr)
       throws URISyntaxException {
     uriStr = sanitizeURIString(uriStr);
@@ -222,13 +211,11 @@ public class SegmentGenerationUtils {
     return fileURI;
   }
 
-  /**
-   * Convert Directory URI String to URI Object, default to local file system scheme.
-   *
-   * @param uriStr
-   * @return
-   * @throws URISyntaxException
-   */
+  /// Convert Directory URI String to URI Object, default to local file system scheme.
+  ///
+  /// @param uriStr
+  /// @return
+  /// @throws URISyntaxException
   public static URI getDirectoryURI(String uriStr)
       throws URISyntaxException {
     uriStr = sanitizeURIString(uriStr);
@@ -239,15 +226,13 @@ public class SegmentGenerationUtils {
     return uri;
   }
 
-  /**
-   * Retrieves the content of the given URL using a GET request.
-   * Supports HTTPS connections, including those with self-signed certificates.
-   *
-   * @param url The target URL to fetch.
-   * @param authToken Optional authorization token to include in the request header, or null.
-   * @return The response body as a string.
-   * @throws IOException If an error occurs during the connection or reading the response.
-   */
+  /// Retrieves the content of the given URL using a GET request.
+  /// Supports HTTPS connections, including those with self-signed certificates.
+  ///
+  /// @param url The target URL to fetch.
+  /// @param authToken Optional authorization token to include in the request header, or null.
+  /// @return The response body as a string.
+  /// @throws IOException If an error occurs during the connection or reading the response.
   public static String fetchUrl(URL url, String authToken, TlsSpec tlsSpec)
       throws IOException {
     try {
@@ -287,17 +272,15 @@ public class SegmentGenerationUtils {
   }
 
 
-  /**
-   * @param pinotFs root directory fs
-   * @param fileUri root directory uri
-   * @param includePattern optional glob patterns for files to include
-   * @param excludePattern optional glob patterns for files to exclude
-   * @param searchRecursively if ture, search files recursively from directory specified in fileUri
-   * @return list of matching files.
-   * @throws IOException on IO failure for list files in root directory.
-   * @throws URISyntaxException for matching file URIs
-   * @throws RuntimeException if there is no matching file.
-   */
+  /// @param pinotFs root directory fs
+  /// @param fileUri root directory uri
+  /// @param includePattern optional Java NIO PathMatcher glob or regex pattern for files to include
+  /// @param excludePattern optional Java NIO PathMatcher glob or regex pattern for files to exclude
+  /// @param searchRecursively if true, search files recursively from directory specified in fileUri
+  /// @return list of matching files.
+  /// @throws IOException on IO failure for list files in root directory.
+  /// @throws URISyntaxException for matching file URIs
+  /// @throws RuntimeException if there is no matching file.
   public static List<String> listMatchedFilesWithRecursiveOption(PinotFS pinotFs, URI fileUri,
       @Nullable String includePattern, @Nullable String excludePattern, boolean searchRecursively)
       throws Exception {

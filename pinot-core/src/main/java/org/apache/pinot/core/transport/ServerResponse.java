@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.core.transport;
 
+import io.netty.channel.Channel;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
 
 
-/**
- * The {@code ServerResponse} class contains the response and time info from a {@link ServerRoutingInstance}.
- */
+/// The `ServerResponse` class contains the response and time info from a [ServerRoutingInstance].
 @ThreadSafe
 public class ServerResponse {
   private final long _startTimeMs;
   private volatile long _submitRequestTimeMs;
+  // The channel the request was written to, so that a channel going down only affects the queries written to it
+  private volatile Channel _channel;
   private volatile int _requestSentLatencyMs = -1;
   private volatile long _receiveDataTableTimeMs;
   private volatile DataTable _dataTable;
@@ -83,6 +84,17 @@ public class ServerResponse {
   public String toString() {
     return String.format("%d,%d,%d,%d,%d", getSubmitDelayMs(), getResponseDelayMs(), getResponseSize(),
         getDeserializationTimeMs(), getRequestSentDelayMs());
+  }
+
+  @Nullable
+  Channel getChannel() {
+    return _channel;
+  }
+
+  /// Recorded right before the request is written, so that the channel going down is attributed to this query from
+  /// the first byte on
+  void setChannel(Channel channel) {
+    _channel = channel;
   }
 
   void markRequestSubmitted() {

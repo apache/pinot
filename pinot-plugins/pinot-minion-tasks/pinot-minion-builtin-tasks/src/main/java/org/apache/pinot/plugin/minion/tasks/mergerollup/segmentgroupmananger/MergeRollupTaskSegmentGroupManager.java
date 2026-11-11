@@ -24,13 +24,9 @@ import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
-/**
- * The interface <code>PinotTaskSegmentGroupManager</code> defines the APIs to group segments for task generation.
- */
+/// The interface `PinotTaskSegmentGroupManager` defines the APIs to group segments for task generation.
 public interface MergeRollupTaskSegmentGroupManager {
-  /**
-   * Returns a list of segment groups which are scheduled in separate tasks
-   */
+  /// Returns a list of segment groups which are scheduled in separate tasks
   List<List<SegmentZKMetadata>> getSegmentGroups(TableConfig tableConfig, ClusterInfoAccessor clusterInfoAccessor,
       List<SegmentZKMetadata> segments);
 }

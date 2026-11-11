@@ -24,7 +24,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -53,17 +52,17 @@ public class RoundRobinURIProviderTest {
       mock.when(() -> InetAddress.getAllByName("testweb.com")).thenReturn(testWebAddresses);
 
       TestCase[] testCases = new TestCase[]{
-          new TestCase("http://127.0.0.1", Collections.singletonList("http://127.0.0.1")),
-          new TestCase("http://127.0.0.1/", Collections.singletonList("http://127.0.0.1/")),
-          new TestCase("http://127.0.0.1/?", Collections.singletonList("http://127.0.0.1/?")),
-          new TestCase("http://127.0.0.1/?it=5", Collections.singletonList("http://127.0.0.1/?it=5")),
-          new TestCase("http://127.0.0.1/me/out?it=5", Collections.singletonList("http://127.0.0.1/me/out?it=5")),
-          new TestCase("http://127.0.0.1:20000", Collections.singletonList("http://127.0.0.1:20000")),
-          new TestCase("http://127.0.0.1:20000/", Collections.singletonList("http://127.0.0.1:20000/")),
-          new TestCase("http://127.0.0.1:20000/?", Collections.singletonList("http://127.0.0.1:20000/?")),
-          new TestCase("http://127.0.0.1:20000/?it=5", Collections.singletonList("http://127.0.0.1:20000/?it=5")),
+          new TestCase("http://127.0.0.1", List.of("http://127.0.0.1")),
+          new TestCase("http://127.0.0.1/", List.of("http://127.0.0.1/")),
+          new TestCase("http://127.0.0.1/?", List.of("http://127.0.0.1/?")),
+          new TestCase("http://127.0.0.1/?it=5", List.of("http://127.0.0.1/?it=5")),
+          new TestCase("http://127.0.0.1/me/out?it=5", List.of("http://127.0.0.1/me/out?it=5")),
+          new TestCase("http://127.0.0.1:20000", List.of("http://127.0.0.1:20000")),
+          new TestCase("http://127.0.0.1:20000/", List.of("http://127.0.0.1:20000/")),
+          new TestCase("http://127.0.0.1:20000/?", List.of("http://127.0.0.1:20000/?")),
+          new TestCase("http://127.0.0.1:20000/?it=5", List.of("http://127.0.0.1:20000/?it=5")),
           new TestCase("http://127.0.0.1:20000/me/out?it=5",
-              Collections.singletonList("http://127.0.0.1:20000/me/out?it=5")),
+              List.of("http://127.0.0.1:20000/me/out?it=5")),
 
           new TestCase("http://localhost", Arrays.asList("http://127.0.0.1", "http://[0:0:0:0:0:0:0:1]")),
           new TestCase("http://localhost/", Arrays.asList("http://127.0.0.1/", "http://[0:0:0:0:0:0:0:1]/")),
@@ -107,17 +106,17 @@ public class RoundRobinURIProviderTest {
               Arrays.asList("http://192.168.3.1:20000/me/out?it=5", "http://192.168.3.2:20000/me/out?it=5",
                   "http://192.168.3.3:20000/me/out?it=5")),
 
-          new TestCase("https://127.0.0.1", Collections.singletonList("https://127.0.0.1")),
-          new TestCase("https://127.0.0.1/", Collections.singletonList("https://127.0.0.1/")),
-          new TestCase("https://127.0.0.1/?", Collections.singletonList("https://127.0.0.1/?")),
-          new TestCase("https://127.0.0.1/?it=5", Collections.singletonList("https://127.0.0.1/?it=5")),
-          new TestCase("https://127.0.0.1/me/out?it=5", Collections.singletonList("https://127.0.0.1/me/out?it=5")),
-          new TestCase("https://127.0.0.1:20000", Collections.singletonList("https://127.0.0.1:20000")),
-          new TestCase("https://127.0.0.1:20000/", Collections.singletonList("https://127.0.0.1:20000/")),
-          new TestCase("https://127.0.0.1:20000/?", Collections.singletonList("https://127.0.0.1:20000/?")),
-          new TestCase("https://127.0.0.1:20000/?it=5", Collections.singletonList("https://127.0.0.1:20000/?it=5")),
+          new TestCase("https://127.0.0.1", List.of("https://127.0.0.1")),
+          new TestCase("https://127.0.0.1/", List.of("https://127.0.0.1/")),
+          new TestCase("https://127.0.0.1/?", List.of("https://127.0.0.1/?")),
+          new TestCase("https://127.0.0.1/?it=5", List.of("https://127.0.0.1/?it=5")),
+          new TestCase("https://127.0.0.1/me/out?it=5", List.of("https://127.0.0.1/me/out?it=5")),
+          new TestCase("https://127.0.0.1:20000", List.of("https://127.0.0.1:20000")),
+          new TestCase("https://127.0.0.1:20000/", List.of("https://127.0.0.1:20000/")),
+          new TestCase("https://127.0.0.1:20000/?", List.of("https://127.0.0.1:20000/?")),
+          new TestCase("https://127.0.0.1:20000/?it=5", List.of("https://127.0.0.1:20000/?it=5")),
           new TestCase("https://127.0.0.1:20000/me/out?it=5",
-              Collections.singletonList("https://127.0.0.1:20000/me/out?it=5")),
+              List.of("https://127.0.0.1:20000/me/out?it=5")),
 
           new TestCase("https://localhost", Arrays.asList("https://127.0.0.1", "https://[0:0:0:0:0:0:0:1]")),
           new TestCase("https://localhost/", Arrays.asList("https://127.0.0.1/", "https://[0:0:0:0:0:0:0:1]/")),

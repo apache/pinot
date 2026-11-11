@@ -27,9 +27,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.utils.Pairs;
 
 
-/**
- * Implementation of sorted index reader.
- */
+/// Implementation of sorted index reader.
 public class SortedIndexReaderImpl implements SortedIndexReader<SortedIndexReaderImpl.Context> {
   private final FixedByteValueReaderWriter _reader;
   private final int _cardinality;

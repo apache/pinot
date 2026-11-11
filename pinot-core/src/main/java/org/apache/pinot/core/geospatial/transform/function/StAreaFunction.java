@@ -40,11 +40,9 @@ import static java.lang.Math.PI;
 import static java.lang.Math.toRadians;
 
 
-/**
- * Function that calculates the area of the given geo-spatial object. For geometry type, it returns the 2D Euclidean
- * area of a geometry. For geography, returns the area of a polygon or multi-polygon in square meters using a spherical
- * model for Earth.
- */
+/// Function that calculates the area of the given geo-spatial object. For geometry type, it returns the 2D Euclidean
+/// area of a geometry. For geography, returns the area of a polygon or multi-polygon in square meters using a spherical
+/// model for Earth.
 public class StAreaFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   public static final String FUNCTION_NAME = "ST_Area";

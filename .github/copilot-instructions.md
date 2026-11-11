@@ -9,8 +9,7 @@ This document guides AI coding assistants (Copilot, Cursor, etc.) contributing t
 
 ## Libraries and Frameworks
 
-- Most source code is written in Java 11.
-- Code in `pinot-clients` is written in Java 8.
+- Most source code is written in Java 21. `pinot-spi`, `pinot-segment-spi`, `pinot-timeseries-spi`, `pinot-common`, `pinot-java-client`, and `pinot-jdbc-client` target Java 11 bytecode for external consumers.
 - Pinot UI is a React.js frontend. It is stored in `pinot-controller/src/main/resources/`.
 - The code is compiled with Maven and follows a multimodule structure. Use each module's `pom.xml` to
   understand dependencies and configurations.
@@ -22,6 +21,13 @@ This document guides AI coding assistants (Copilot, Cursor, etc.) contributing t
   as specified in [JEP-467](https://openjdk.org/jeps/467).
 - Methods and parameters are non-null by default unless annotated with `javax.annotation.Nullable`.
 - Prefer explicit imports for classes rather than fully qualified names used inline.
+- Prefer `List.of()`, `Set.of()`, and `Map.of()` for non-null immutable collection literals. Checkstyle blocks
+  `Collections.emptyList()`, `Collections.emptySet()`, and `Collections.emptyMap()`; use `List.of()`, `Set.of()`, and
+  `Map.of()` instead. Do not add blanket bans for `Collections.singleton*`; use them only when an element/key/value
+  argument is intentionally null because `List.of(null)`, `Set.of(null)`, and `Map.of(...)` with null keys or values
+  throw `NullPointerException`. Before replacing empty collection factories, check whether the value flows to
+  mutating callers. See
+  `kb/code-review-principles.md` C7.12.
 - Use SLF4J for logging; do not use `System.out` or `System.err`.
 - Propagate exceptions with useful context; avoid blanket `catch (Exception)` and never swallow errors.
 - Keep diffs minimal: do not reformat unrelated code and preserve existing whitespace/indentation styles.

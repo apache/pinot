@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.json;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -59,7 +58,7 @@ import org.apache.pinot.spi.data.Schema;
 public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "json";
   private static final List<String> EXTENSIONS =
-      Collections.singletonList(V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
 
   protected JsonIndexType() {
     super(StandardIndexes.JSON_ID);
@@ -139,6 +138,18 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       Schema schema, TableConfig tableConfig) {
     return new JsonIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, JsonIndexConfig indexConfig) {
+    // JSON index is built directly from the raw JSON column values; it does not depend on a dictionary.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, JsonIndexConfig indexConfig) {
+    // JSON index payload is derived from raw JSON values, independent of dictionary representation.
+    return false;
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<JsonIndexConfig, JsonIndexReader> {

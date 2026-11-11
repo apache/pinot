@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.integration.tests;
 
-import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.restlet.resources.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
+import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.HybridScenarioLease;
+import org.apache.pinot.integration.tests.SharedHybridClusterIntegrationTestSuite.SharedHybridSuiteLease;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.StringUtil;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -30,11 +35,80 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
+/// Verifies tenant rebalance request handling using isolated tables in the shared hybrid cluster.
+/// Scenarios run sequentially; a directly selected class owns a temporary cluster through the same lease.
+public class TenantRebalanceIntegrationTest {
+  private static final String TABLE_NAME = "mytableTenantRebalance";
+  private static final String TOPIC_NAME = "TenantRebalanceIntegrationTest";
 
-  private String getRebalanceUrl() {
-    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tenants", getServerTenant(),
-        "rebalance");
+  private SharedHybridSuiteLease _suiteLease;
+  private SharedHybridClusterIntegrationTestSuite _owner;
+  private HybridScenarioLease _scenario;
+
+  @BeforeClass(alwaysRun = true)
+  public void setUp()
+      throws Throwable {
+    try {
+      _suiteLease = SharedHybridClusterIntegrationTestSuite.acquireSharedSuite();
+      _owner = _suiteLease.getOwner();
+      // Preserve the original fixture's offline-first teardown to exercise both hybrid table removal orders.
+      _scenario = _owner.newScenario(TABLE_NAME, TOPIC_NAME, TableType.OFFLINE);
+      _owner.setUpStandardScenario(_scenario, null, SharedHybridClusterIntegrationTestSuite.DEFAULT_HYBRID_COUNT);
+    } catch (Throwable t) {
+      try {
+        tearDown();
+      } catch (Throwable cleanupFailure) {
+        t.addSuppressed(cleanupFailure);
+      }
+      throw t;
+    }
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Throwable {
+    Throwable cleanupFailure = null;
+    if (_scenario != null) {
+      try {
+        _owner.closeScenario(_scenario, null);
+      } catch (Throwable t) {
+        cleanupFailure = t;
+      } finally {
+        _scenario = null;
+      }
+    }
+    if (_suiteLease != null) {
+      try {
+        _suiteLease.close(null);
+      } catch (Throwable t) {
+        cleanupFailure = SharedHybridClusterIntegrationTestSuite.appendCleanupFailure(cleanupFailure, t);
+      } finally {
+        _suiteLease = null;
+        _owner = null;
+      }
+    }
+    if (cleanupFailure != null) {
+      throw cleanupFailure;
+    }
+  }
+
+  private String getTableName() {
+    return TABLE_NAME;
+  }
+
+  private String getServerTenant() {
+    return SharedHybridClusterIntegrationTestSuite.TENANT_NAME;
+  }
+
+  private TenantRebalanceResult rebalanceTenant(TenantRebalanceConfig config, @Nullable Map<String, String> queryParams)
+      throws Exception {
+    return _owner.getOrCreateAdminClient().getTenantClient()
+        .rebalanceTenantWithConfigObject(config.getTenantName(), JsonUtils.objectToString(config), queryParams);
+  }
+
+  private TenantRebalanceResult rebalanceTenant(TenantRebalanceConfig config)
+      throws Exception {
+    return rebalanceTenant(config, null);
   }
 
   @Test
@@ -51,10 +125,7 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
     config.getParallelBlacklist().add(table2);
 
     // Call the rebalance endpoint with the config
-    TenantRebalanceResult result = JsonUtils.stringToObject(
-        sendPostRequest(getRebalanceUrl(), JsonUtils.objectToString(config)),
-        TenantRebalanceResult.class
-    );
+    TenantRebalanceResult result = rebalanceTenant(config);
 
     // Assert that the result contains the expected tables and statuses
     assertNotNull(result);
@@ -75,11 +146,8 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
     config.getIncludeTables().add(table2);
 
     // Pass only table1 in the query param, should override the body
-    String urlWithQuery = getRebalanceUrl() + "?includeTables=" + table1;
-    TenantRebalanceResult result = JsonUtils.stringToObject(
-        sendPostRequest(urlWithQuery, JsonUtils.objectToString(config)),
-        TenantRebalanceResult.class
-    );
+    TenantRebalanceResult result =
+        rebalanceTenant(config, Map.of("includeTables", table1));
     assertNotNull(result);
     assertTrue(result.getRebalanceTableResults().containsKey(table1));
     assertFalse(result.getRebalanceTableResults().containsKey(table2), "Query param should override body");
@@ -97,10 +165,7 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
     config.getIncludeTables().add(table2);
 
     // No query param, should use body
-    TenantRebalanceResult result = JsonUtils.stringToObject(
-        sendPostRequest(getRebalanceUrl(), JsonUtils.objectToString(config)),
-        TenantRebalanceResult.class
-    );
+    TenantRebalanceResult result = rebalanceTenant(config);
     assertNotNull(result);
     assertTrue(result.getRebalanceTableResults().containsKey(table2));
     assertFalse(result.getRebalanceTableResults().containsKey(table1), "Should only use body if no query param");
@@ -116,14 +181,9 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
     String table2 = getTableName() + "_REALTIME";
 
     // Pass includeTables and excludeTables as comma separated list with spaces and quotes
-    String urlWithQuery =
-        getRebalanceUrl() + "?includeTables=" + java.net.URLEncoder.encode(" " + table1 + " , \"" + table2 + "\" , ",
-            StandardCharsets.UTF_8) + "&excludeTables=" + java.net.URLEncoder.encode(" " + table2 + ", ",
-            StandardCharsets.UTF_8);
-    TenantRebalanceResult result = JsonUtils.stringToObject(
-        sendPostRequest(urlWithQuery, JsonUtils.objectToString(config)),
-        TenantRebalanceResult.class
-    );
+    Map<String, String> queryParams = Map.of("includeTables", " " + table1 + " , \"" + table2 + "\" , ",
+        "excludeTables", " " + table2 + ", ");
+    TenantRebalanceResult result = rebalanceTenant(config, queryParams);
     assertNotNull(result);
     // Should only include table1, table2 are excluded
     assertTrue(result.getRebalanceTableResults().containsKey(table1));

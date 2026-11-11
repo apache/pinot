@@ -25,6 +25,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -41,12 +42,10 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
-/**
- * {@code BrokerRequestHandlerDelegate} delegates the inbound broker request to one of the enabled
- * {@link BrokerRequestHandler} based on the requested handle type.
- *
- * {@see: @CommonConstant
- */
+/// `BrokerRequestHandlerDelegate` delegates the inbound broker request to one of the enabled
+/// [BrokerRequestHandler] based on the requested handle type.
+///
+/// {@see: @CommonConstant
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
@@ -62,6 +61,11 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     _responseStore = responseStore;
   }
 
+  @Nullable
+  public MultiStageBrokerRequestHandler getMultiStageBrokerRequestHandler() {
+    return _multiStageBrokerRequestHandler;
+  }
+
   @Override
   public void start() {
     _singleStageBrokerRequestHandler.start();
@@ -74,6 +78,13 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   }
 
   @Override
+  public int preConnectServers(long deadlineMs) {
+    // Only the single-stage handler owns the broker-to-server Netty channels; the multi-stage (gRPC)
+    // and time-series paths have nothing to pre-connect here.
+    return _singleStageBrokerRequestHandler.preConnectServers(deadlineMs);
+  }
+
+  @Override
   public void shutDown() {
     _singleStageBrokerRequestHandler.shutDown();
     if (_multiStageBrokerRequestHandler != null) {
@@ -82,6 +93,14 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     if (_timeSeriesRequestHandler != null) {
       _timeSeriesRequestHandler.shutDown();
     }
+  }
+
+  /// Warms only the single-stage handler. It owns the broker-to-server netty channels, which is the data
+  /// plane that starts empty on a fresh broker; the multi-stage handler already warms its own compile path
+  /// in `start()`, and the time-series handler shares the single-stage transport.
+  @Override
+  public boolean warmUp(BrokerWarmupConfig config, long deadlineMs) {
+    return _singleStageBrokerRequestHandler.warmUp(config, deadlineMs);
   }
 
   @Override
@@ -101,9 +120,17 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(request.get(Request.SQL).asText(), request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+        QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
+        requestContext.setErrorCode(errorCode);
+        return new BrokerResponseNative(errorCode, e.getMessage());
       }
+    }
+
+    // gRPC and custom containers can call this handler directly, bypassing the REST DELETE authorization path.
+    if (sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
+          "DELETE is only supported by the broker SQL endpoint.");
     }
 
     BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
@@ -136,6 +163,15 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   }
 
   @Override
+  public BrokerResponse handleExplainTimeSeriesRequest(String lang, String rawQueryParamString,
+      Map<String, String> queryParams) {
+    if (_timeSeriesRequestHandler != null) {
+      return _timeSeriesRequestHandler.handleExplainTimeSeriesRequest(lang, rawQueryParamString, queryParams);
+    }
+    throw new QueryException(QueryErrorCode.INTERNAL, "Time series query engine not enabled.");
+  }
+
+  @Override
   public Map<Long, String> getRunningQueries() {
     // Both engines share the same request ID generator, so the query will have unique IDs across the two engines.
     Map<Long, String> queries = new HashMap<>(_singleStageBrokerRequestHandler.getRunningQueries());
@@ -151,7 +187,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       throws Exception {
     if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQuery(
         queryId, timeoutMs, executor, connMgr, serverResponses)) {
-        return true;
+      return true;
     }
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }

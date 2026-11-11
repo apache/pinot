@@ -23,9 +23,7 @@ import java.sql.Timestamp;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-/**
- * The class <code>ArrayCopyUtils</code> provides methods to copy values across arrays of different types.
- */
+/// The class `ArrayCopyUtils` provides methods to copy values across arrays of different types.
 public class ArrayCopyUtils {
   private ArrayCopyUtils() {
   }
@@ -278,6 +276,14 @@ public class ArrayCopyUtils {
     }
   }
 
+  /// Parses canonical UUID strings into the 16-byte stored form. Inverse of
+  /// [#copyFromUuid(byte[][], String[], int)].
+  public static void copyToUuid(String[] src, byte[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = UuidUtils.toBytes(src[i]);
+    }
+  }
+
   public static void copy(String[][] src, byte[][][] dest, int length) {
     for (int i = 0; i < length; i++) {
       String[] stringValues = src[i];
@@ -285,6 +291,18 @@ public class ArrayCopyUtils {
       byte[][] bytesValues = new byte[numValues][];
       ArrayCopyUtils.copy(stringValues, bytesValues, numValues);
       dest[i] = bytesValues;
+    }
+  }
+
+  /// Multi-value variant of [#copyToUuid(String[], byte[][], int)].
+  public static void copyToUuid(String[][] src, byte[][][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      byte[][] row = new byte[rowLength][];
+      for (int j = 0; j < rowLength; j++) {
+        row[j] = UuidUtils.toBytes(src[i][j]);
+      }
+      dest[i] = row;
     }
   }
 
@@ -297,6 +315,46 @@ public class ArrayCopyUtils {
   public static void copy(byte[][] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BytesUtils.toHexString(src[i]);
+    }
+  }
+
+  /// Renders UUID values, stored as 16 raw bytes, into their canonical dashed form. Mirrors
+  /// [#copyFromTimestamp(long[], String[], int)], which likewise renders a logical type from its stored form.
+  public static void copyFromUuid(byte[][] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = UuidUtils.toString(src[i]);
+    }
+  }
+
+  /// Normalises UUID values already in byte form, validating the 16-byte width. Counterpart of
+  /// [#copyToUuid(String[], byte[][], int)] for a BYTES source.
+  public static void copyToUuid(byte[][] src, byte[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = UuidUtils.toBytes(src[i]);
+    }
+  }
+
+  /// Multi-value variant of [#copyFromUuid(byte[][], String[], int)].
+  public static void copyFromUuid(byte[][][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      String[] row = new String[rowLength];
+      for (int j = 0; j < rowLength; j++) {
+        row[j] = UuidUtils.toString(src[i][j]);
+      }
+      dest[i] = row;
+    }
+  }
+
+  /// Multi-value variant of [#copyToUuid(byte[][], byte[][], int)].
+  public static void copyToUuid(byte[][][] src, byte[][][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      byte[][] row = new byte[rowLength][];
+      for (int j = 0; j < rowLength; j++) {
+        row[j] = UuidUtils.toBytes(src[i][j]);
+      }
+      dest[i] = row;
     }
   }
 
@@ -489,6 +547,63 @@ public class ArrayCopyUtils {
       int rowLength = src[i].length;
       dest[i] = new String[rowLength];
       copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(BigDecimal[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(BigDecimal[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(BigDecimal[][] src, float[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new float[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(BigDecimal[][] src, double[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new double[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyToBoolean(BigDecimal[][] src, int[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new int[rowLength];
+      copyToBoolean(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(BigDecimal[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copy(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copy(BigDecimal[][] src, byte[][][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      byte[][] bytesValues = new byte[rowLength][];
+      copy(src[i], bytesValues, rowLength);
+      dest[i] = bytesValues;
     }
   }
 

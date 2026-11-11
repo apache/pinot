@@ -20,14 +20,18 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -42,6 +46,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -52,10 +57,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Queries test for ArrayAgg queries.
- */
-@SuppressWarnings("unchecked")
+/// Queries test for ArrayAgg queries.
 public class ArrayAggQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ArrayAggQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -70,12 +72,26 @@ public class ArrayAggQueriesTest extends BaseQueriesTest {
   private static final String FLOAT_COLUMN = "floatColumn";
   private static final String DOUBLE_COLUMN = "doubleColumn";
   private static final String STRING_COLUMN = "stringColumn";
-  private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
-      .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
-      .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
-      .build();
+  private static final String JSON_COLUMN = "jsonColumn";
+  private static final String BYTES_COLUMN = "bytesColumn";
+  private static final String UUID_COLUMN = "uuidColumn";
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+      .addSingleValueDimension(INT_COLUMN, DataType.INT)
+      .addSingleValueDimension(LONG_COLUMN, DataType.LONG)
+      .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
+      .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+      .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+      .addSingleValueDimension(JSON_COLUMN, DataType.JSON)
+      .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+      .addSingleValueDimension(UUID_COLUMN, DataType.UUID)
+      .build();
+  // The JSON column aggregates to strings
+  private static final ColumnDataType[] EXPECTED_COLUMN_DATA_TYPES = {
+      ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY, ColumnDataType.FLOAT_ARRAY, ColumnDataType.DOUBLE_ARRAY,
+      ColumnDataType.STRING_ARRAY, ColumnDataType.STRING_ARRAY, ColumnDataType.BYTES_ARRAY, ColumnDataType.UUID_ARRAY
+  };
 
   private Set<Integer> _values;
   private int[] _expectedCardinalityResults;
@@ -109,6 +125,9 @@ public class ArrayAggQueriesTest extends BaseQueriesTest {
     Set<Integer> floatResultSet = new HashSet<>(hashMapCapacity);
     Set<Integer> doubleResultSet = new HashSet<>(hashMapCapacity);
     Set<Integer> stringResultSet = new HashSet<>(hashMapCapacity);
+    Set<Integer> jsonResultSet = new HashSet<>(hashMapCapacity);
+    Set<Integer> bytesResultSet = new HashSet<>(hashMapCapacity);
+    Set<Integer> uuidResultSet = new HashSet<>(hashMapCapacity);
     for (int i = 0; i < NUM_RECORDS; i++) {
       int value = RANDOM.nextInt(MAX_VALUE);
       GenericRow record = new GenericRow();
@@ -123,10 +142,22 @@ public class ArrayAggQueriesTest extends BaseQueriesTest {
       String stringValue = Integer.toString(value);
       record.putValue(STRING_COLUMN, stringValue);
       stringResultSet.add(stringValue.hashCode());
+      String jsonValue = "{\"value\":" + value + "}";
+      record.putValue(JSON_COLUMN, jsonValue);
+      jsonResultSet.add(jsonValue.hashCode());
+      byte[] bytesValue = {(byte) (value >> 8), (byte) value};
+      record.putValue(BYTES_COLUMN, bytesValue);
+      // Track the int value: the 2-byte encoding is bijective with it, while Arrays.hashCode collides on 2-byte
+      // arrays.
+      bytesResultSet.add(value);
+      String uuidValue = new UUID(0L, value).toString();
+      record.putValue(UUID_COLUMN, uuidValue);
+      uuidResultSet.add(uuidValue.hashCode());
       records.add(record);
     }
     _expectedCardinalityResults = new int[]{
-        _values.size(), longResultSet.size(), floatResultSet.size(), doubleResultSet.size(), stringResultSet.size()
+        _values.size(), longResultSet.size(), floatResultSet.size(), doubleResultSet.size(), stringResultSet.size(),
+        jsonResultSet.size(), bytesResultSet.size(), uuidResultSet.size()
     };
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
@@ -145,59 +176,102 @@ public class ArrayAggQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testArrayAggNonDistinct() {
-    String query =
-        "SELECT ArrayAgg(intColumn, 'INT'), ArrayAgg(longColumn, 'LONG'), ArrayAgg(floatColumn, 'FLOAT'), "
-            + "ArrayAgg(doubleColumn, 'DOUBLE'), ArrayAgg(stringColumn, 'STRING')"
-            + " FROM testTable";
+    String query = "SELECT ArrayAgg(intColumn, 'INT'), ArrayAgg(longColumn, 'LONG'), ArrayAgg(floatColumn, 'FLOAT'), "
+        + "ArrayAgg(doubleColumn, 'DOUBLE'), ArrayAgg(stringColumn, 'STRING'), ArrayAgg(jsonColumn, 'JSON'), "
+        + "ArrayAgg(bytesColumn, 'BYTES'), ArrayAgg(uuidColumn, 'UUID')" + " FROM testTable";
 
     // Inner segment
     AggregationOperator aggregationOperator = getOperator(query);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
-        5 * NUM_RECORDS, NUM_RECORDS);
+        8 * NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 8; i++) {
       assertEquals(((List) aggregationResult.get(i)).size(), NUM_RECORDS);
     }
 
-    // Inter segments
-    ResultTable resultTable = getBrokerResponse(query).getResultTable();
-    assertEquals(resultTable.getRows().get(0).length, 5);
-    assertEquals(((int[]) resultTable.getRows().get(0)[0]).length, 4 * NUM_RECORDS);
-    assertEquals(((long[]) resultTable.getRows().get(0)[1]).length, 4 * NUM_RECORDS);
-    assertEquals(((float[]) resultTable.getRows().get(0)[2]).length, 4 * NUM_RECORDS);
-    assertEquals(((double[]) resultTable.getRows().get(0)[3]).length, 4 * NUM_RECORDS);
-    assertEquals(((String[]) resultTable.getRows().get(0)[4]).length, 4 * NUM_RECORDS);
+    // Inter segments, with and without servers returning final results
+    for (Map<String, String> queryOptions : List.of(Map.<String, String>of(),
+        Map.of(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true"))) {
+      ResultTable resultTable = getBrokerResponse(query, queryOptions).getResultTable();
+      assertEquals(resultTable.getRows().get(0).length, 8);
+      assertEquals(((int[]) resultTable.getRows().get(0)[0]).length, 4 * NUM_RECORDS);
+      assertEquals(((long[]) resultTable.getRows().get(0)[1]).length, 4 * NUM_RECORDS);
+      assertEquals(((float[]) resultTable.getRows().get(0)[2]).length, 4 * NUM_RECORDS);
+      assertEquals(((double[]) resultTable.getRows().get(0)[3]).length, 4 * NUM_RECORDS);
+      assertEquals(((String[]) resultTable.getRows().get(0)[4]).length, 4 * NUM_RECORDS);
+      assertEquals(((String[]) resultTable.getRows().get(0)[5]).length, 4 * NUM_RECORDS);
+      assertEquals(((String[]) resultTable.getRows().get(0)[6]).length, 4 * NUM_RECORDS);
+      assertEquals(((String[]) resultTable.getRows().get(0)[7]).length, 4 * NUM_RECORDS);
+    }
   }
 
   @Test
   public void testArrayAggDistinct() {
-    String query =
-        "SELECT ArrayAgg(intColumn, 'INT', true), ArrayAgg(longColumn, 'LONG', true), "
-            + "ArrayAgg(floatColumn, 'FLOAT', true), ArrayAgg(doubleColumn, 'DOUBLE', true), "
-            + "ArrayAgg(stringColumn, 'STRING', true)"
-            + " FROM testTable";
+    String query = "SELECT ArrayAgg(intColumn, 'INT', true), ArrayAgg(longColumn, 'LONG', true), "
+        + "ArrayAgg(floatColumn, 'FLOAT', true), ArrayAgg(doubleColumn, 'DOUBLE', true), "
+        + "ArrayAgg(stringColumn, 'STRING', true), ArrayAgg(jsonColumn, 'JSON', true), "
+        + "ArrayAgg(bytesColumn, 'BYTES', true), ArrayAgg(uuidColumn, 'UUID', true)" + " FROM testTable";
 
     // Inner segment
     AggregationOperator aggregationOperator = getOperator(query);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), NUM_RECORDS, 0,
-        5 * NUM_RECORDS, NUM_RECORDS);
+        8 * NUM_RECORDS, NUM_RECORDS);
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 8; i++) {
       assertEquals(((Set) aggregationResult.get(i)).size(), _expectedCardinalityResults[i]);
     }
 
     // Inter segments
     ResultTable resultTable = getBrokerResponse(query).getResultTable();
-    assertEquals(resultTable.getRows().get(0).length, 5);
+    assertEquals(resultTable.getRows().get(0).length, 8);
     assertEquals(((int[]) resultTable.getRows().get(0)[0]).length, _expectedCardinalityResults[0]);
     assertEquals(((long[]) resultTable.getRows().get(0)[1]).length, _expectedCardinalityResults[1]);
     assertEquals(((float[]) resultTable.getRows().get(0)[2]).length, _expectedCardinalityResults[2]);
     assertEquals(((double[]) resultTable.getRows().get(0)[3]).length, _expectedCardinalityResults[3]);
     assertEquals(((String[]) resultTable.getRows().get(0)[4]).length, _expectedCardinalityResults[4]);
+    assertEquals(((String[]) resultTable.getRows().get(0)[5]).length, _expectedCardinalityResults[5]);
+    assertEquals(((String[]) resultTable.getRows().get(0)[6]).length, _expectedCardinalityResults[6]);
+    assertEquals(((String[]) resultTable.getRows().get(0)[7]).length, _expectedCardinalityResults[7]);
+  }
+
+  /// The data type argument can be omitted for a column; the optimizer supplies it from the schema.
+  @Test
+  public void testArrayAggWithInferredDataType() {
+    String query = "SELECT ArrayAgg(intColumn), ArrayAgg(longColumn), ArrayAgg(floatColumn), ArrayAgg(doubleColumn), "
+        + "ArrayAgg(stringColumn), ArrayAgg(jsonColumn), ArrayAgg(bytesColumn), ArrayAgg(uuidColumn) FROM testTable";
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataTypes(), EXPECTED_COLUMN_DATA_TYPES);
+    Object[] row = resultTable.getRows().get(0);
+    for (int i = 0; i < 8; i++) {
+      assertEquals(Array.getLength(row[i]), 4 * NUM_RECORDS);
+    }
+  }
+
+  @Test
+  public void testArrayAggDistinctWithInferredDataType() {
+    String query = "SELECT ArrayAgg(intColumn, true), ArrayAgg(longColumn, true), ArrayAgg(floatColumn, true), "
+        + "ArrayAgg(doubleColumn, true), ArrayAgg(stringColumn, true), ArrayAgg(jsonColumn, true), "
+        + "ArrayAgg(bytesColumn, true), ArrayAgg(uuidColumn, true) FROM testTable";
+    ResultTable resultTable = getBrokerResponseForOptimizedQuery(query, SCHEMA).getResultTable();
+    assertEquals(resultTable.getDataSchema().getColumnDataTypes(), EXPECTED_COLUMN_DATA_TYPES);
+    Object[] row = resultTable.getRows().get(0);
+    for (int i = 0; i < 8; i++) {
+      assertEquals(Array.getLength(row[i]), _expectedCardinalityResults[i]);
+    }
+  }
+
+  @Test
+  public void testArrayAggDistinctKeyword() {
+    for (String arguments : new String[]{"intColumn", "intColumn, false", "intColumn, 'INT'",
+        "intColumn, 'INT', true", "intColumn, 'INT', false"}) {
+      ResultTable result = getBrokerResponseForOptimizedQuery(
+          "SELECT ARRAY_AGG(DISTINCT " + arguments + ") FROM testTable", SCHEMA).getResultTable();
+      assertEquals(((int[]) result.getRows().get(0)[0]).length, _expectedCardinalityResults[0]);
+    }
   }
 
   @AfterClass

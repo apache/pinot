@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.utils.tls.JvmDefaultSslContext;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AddSchemaCommand;
@@ -40,6 +41,7 @@ import org.apache.pinot.tools.admin.command.DeleteSchemaCommand;
 import org.apache.pinot.tools.admin.command.DeleteTableCommand;
 import org.apache.pinot.tools.admin.command.FileSystemCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
+import org.apache.pinot.tools.admin.command.GeneratePageCacheWarmupQueriesCommand;
 import org.apache.pinot.tools.admin.command.GitHubEventsQuickStartCommand;
 import org.apache.pinot.tools.admin.command.ImportDataCommand;
 import org.apache.pinot.tools.admin.command.JsonToPinotSchema;
@@ -75,31 +77,30 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class to implement Pinot Administrator, that provides the following commands:
- *
- * System property: `pinot.admin.system.exit`(default to false) is used to decide if System.exit(...) will be called
- * with exit code.
- *
- * Sample Usage in Commandline:
- *  JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true" \
- *  bin/pinot-admin.sh AddTable \
- *    -schemaFile /my/path/to/table/schema.json \
- *    -tableConfigFile /my/path/to/table/tableConfig.json \
- *    -controllerHost localhost \
- *    -controllerPort 9000 \
- *    -exec
- *
- */
+/// Class to implement Pinot Administrator, that provides the following commands:
+///
+/// System property: `pinot.admin.system.exit`(default to false) is used to decide if System.exit(...) will be called
+/// with exit code.
+///
+/// Sample Usage in Commandline:
+///  JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true" \
+///  bin/pinot-admin.sh AddTable \
+///    -schemaFile /my/path/to/table/schema.json \
+///    -tableConfigFile /my/path/to/table/tableConfig.json \
+///    -controllerHost localhost \
+///    -controllerPort 9000 \
+///    -exec
 public class PinotAdministrator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdministrator.class);
   private static final Map<String, Command> SUBCOMMAND_MAP = new HashMap<>();
 
   static {
+    ZooKeeperSslContextSupplier.initialize();
     JvmDefaultSslContext.initDefaultSslContext();
     SUBCOMMAND_MAP.put("QuickStart", new QuickStartCommand());
     SUBCOMMAND_MAP.put("OperateClusterConfig", new OperateClusterConfigCommand());
     SUBCOMMAND_MAP.put("GenerateData", new GenerateDataCommand());
+    SUBCOMMAND_MAP.put("GeneratePageCacheWarmupQueries", new GeneratePageCacheWarmupQueriesCommand());
     SUBCOMMAND_MAP.put("LaunchDataIngestionJob", new LaunchDataIngestionJobCommand());
     SUBCOMMAND_MAP.put("LaunchBackfillIngestionJob", new LaunchBackfillIngestionJobCommand());
     SUBCOMMAND_MAP.put("LaunchSparkDataIngestionJob", new LaunchSparkDataIngestionJobCommand());
@@ -212,7 +213,7 @@ public class PinotAdministrator {
     pinotAdministrator.execute(args);
     if ((pinotAdministrator._status != 0)
         && Boolean.parseBoolean(System.getProperties().getProperty("pinot.admin.system.exit"))) {
-        System.exit(pinotAdministrator._status);
+      System.exit(pinotAdministrator._status);
     }
   }
 }

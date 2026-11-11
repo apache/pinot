@@ -29,106 +29,78 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * The interface <code>PinotTaskGenerator</code> defines the APIs for task generators.
- */
+/// The interface `PinotTaskGenerator` defines the APIs for task generators.
 public interface PinotTaskGenerator {
 
-  /**
-   * Initializes the task generator.
-   */
+  /// Initializes the task generator.
   void init(ClusterInfoAccessor clusterInfoAccessor);
 
-  /**
-   * Returns the task type of the generator.
-   */
+  /// Returns the task type of the generator.
   String getTaskType();
 
-  /**
-   * Generates a list of tasks to schedule based on the given table configs.
-   */
+  /// Generates a list of tasks to schedule based on the given table configs.
   List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs);
 
-  /**
-   * Generates a list of adhoc tasks to schedule based on the given table configs and task configs.
-   */
+  /// Generates a list of adhoc tasks to schedule based on the given table configs and task configs.
   List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> taskConfigs)
       throws Exception;
 
-  /**
-   * Generates a list of task based on the given table configs, it also gets list of existing task configs
-   */
+  /// Generates a list of task based on the given table configs, it also gets list of existing task configs
   void generateTasks(List<TableConfig> tableConfigs, List<PinotTaskConfig> pinotTaskConfigs)
       throws Exception;
 
-  /**
-   * Returns the timeout in milliseconds for each task, 3600000 (1 hour) by default.
-   */
+  /// Returns the timeout in milliseconds for each task, 3600000 (1 hour) by default.
   default long getTaskTimeoutMs(String minionTag) {
     return JobConfig.DEFAULT_TIMEOUT_PER_TASK;
   }
 
-  /**
-   * Returns the maximum number of concurrent tasks allowed per instance, 1 by default.
-   * Priority order (highest to lowest):
-   * 1. Minion tenant specific cluster config: taskType.minionTag.numConcurrentTasksPerInstance
-   * 2. Task type cluster config: taskType.numConcurrentTasksPerInstance
-   * 3. Default value
-   *
-   * @param minionTag Minion instance tag/tenant (can be null)
-   * @return Number of concurrent tasks per instance
-   */
+  /// Returns the maximum number of concurrent tasks allowed per instance, 1 by default.
+  /// Priority order (highest to lowest):
+  /// 1. Minion tenant specific cluster config: taskType.minionTag.numConcurrentTasksPerInstance
+  /// 2. Task type cluster config: taskType.numConcurrentTasksPerInstance
+  /// 3. Default value
+  ///
+  /// @param minionTag Minion instance tag/tenant (can be null)
+  /// @return Number of concurrent tasks per instance
   default int getNumConcurrentTasksPerInstance(String minionTag) {
     return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
   }
 
-  /**
-   * Returns the max number of subtasks allowed per task.
-   * This overrides individual task level configs like MinionConstants.TABLE_MAX_NUM_TASKS_KEY
-   * Number of subtasks directly impacts the performance of the helix leader and thus the controller
-   * So limiting the number of subtasks helps to avoid performance issues
-   *
-   * Usage
-   * 1. This method is used by the scheduling framework to limit the number of subtasks across task types
-   * 2. This method can also be used by individual task generators to consider the limit while generating subtasks
-   */
+  /// Returns the max number of subtasks allowed per task.
+  /// This overrides individual task level configs like MinionConstants.TABLE_MAX_NUM_TASKS_KEY
+  /// Number of subtasks directly impacts the performance of the helix leader and thus the controller
+  /// So limiting the number of subtasks helps to avoid performance issues
+  ///
+  /// Usage
+  /// 1. This method is used by the scheduling framework to limit the number of subtasks across task types
+  /// 2. This method can also be used by individual task generators to consider the limit while generating subtasks
   default int getMaxAllowedSubTasksPerTask() {
     return MinionConstants.DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT;
   }
 
-  /**
-   * Returns the maximum number of attempts per task, 1 by default.
-   */
+  /// Returns the maximum number of attempts per task, 1 by default.
   default int getMaxAttemptsPerTask(String minionTag) {
     return MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK;
   }
 
-  /**
-   * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
-   */
+  /// Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
   default void nonLeaderCleanUp() {
   }
 
-  /**
-   * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes,
-   * given a list of tables that the current controller isn't the leader for.
-   */
+  /// Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes,
+  /// given a list of tables that the current controller isn't the leader for.
   default void nonLeaderCleanUp(List<String> tableNamesWithType) {
   }
 
-  /**
-   * Gets the minionInstanceTag for the tableConfig
-   */
+  /// Gets the minionInstanceTag for the tableConfig
   default String getMinionInstanceTag(TableConfig tableConfig) {
     return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
   }
 
-  /**
-   * Performs task type specific validations for the given task type.
-   * @param tableConfig The table configuration that is getting added/updated/validated.
-   * @param schema The schema of the table.
-   * @param taskConfigs The task type specific task configuration to be validated.
-   */
+  /// Performs task type specific validations for the given task type.
+  /// @param tableConfig The table configuration that is getting added/updated/validated.
+  /// @param schema The schema of the table.
+  /// @param taskConfigs The task type specific task configuration to be validated.
   default void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
   }
 }

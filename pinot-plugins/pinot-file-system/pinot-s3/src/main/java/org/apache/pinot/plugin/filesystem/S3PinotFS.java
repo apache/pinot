@@ -26,8 +26,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -35,6 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -94,9 +93,7 @@ import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 
 
-/**
- * Implementation of PinotFS for AWS S3 file system
- */
+/// Implementation of PinotFS for AWS S3 file system
 public class S3PinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(S3PinotFS.class);
 
@@ -115,6 +112,19 @@ public class S3PinotFS extends BasePinotFS {
   private long _minObjectSizeToUploadInParts;
   private long _multiPartUploadPartSize;
   private @Nullable StorageClass _storageClass;
+  private StsClient _stsClient;
+  private StsAssumeRoleCredentialsProvider _stsCredentialsProvider;
+  private final Object _clientLock = new Object();
+
+  private static void closeQuietly(AutoCloseable closeable, String name) {
+    if (closeable != null) {
+      try {
+        closeable.close();
+      } catch (Exception e) {
+        LOGGER.warn("Error closing {}", name, e);
+      }
+    }
+  }
 
   @Override
   public void init(PinotConfiguration config) {
@@ -123,84 +133,97 @@ public class S3PinotFS extends BasePinotFS {
   }
 
   public void initOrRefreshS3Client() {
-    Preconditions.checkArgument(StringUtils.isNotEmpty(_s3Config.getRegion()), "Region can't be null or empty");
+    synchronized (_clientLock) {
+      Preconditions.checkArgument(StringUtils.isNotEmpty(_s3Config.getRegion()), "Region can't be null or empty");
 
-    _disableAcl = _s3Config.getDisableAcl();
-    setServerSideEncryption(_s3Config.getServerSideEncryption(), _s3Config);
+      _disableAcl = _s3Config.getDisableAcl();
+      setServerSideEncryption(_s3Config.getServerSideEncryption(), _s3Config);
 
-    AwsCredentialsProvider awsCredentialsProvider;
-    try {
-      if (StringUtils.isNotEmpty(_s3Config.getAccessKey()) && StringUtils.isNotEmpty(_s3Config.getSecretKey())) {
-        AwsBasicCredentials awsBasicCredentials =
-            AwsBasicCredentials.create(_s3Config.getAccessKey(), _s3Config.getSecretKey());
-        awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
-      } else if (_s3Config.isAnonymousCredentialsProvider()) {
-        awsCredentialsProvider = AnonymousCredentialsProvider.create();
-      } else {
-        awsCredentialsProvider = DefaultCredentialsProvider.builder().build();
-      }
+      // Save old resources to close after the new client is live
+      S3Client oldS3Client = _s3Client;
+      StsAssumeRoleCredentialsProvider oldStsCredentialsProvider = _stsCredentialsProvider;
+      StsClient oldStsClient = _stsClient;
 
-      // IAM Role based access
-      if (_s3Config.isIamRoleBasedAccess()) {
-        AssumeRoleRequest.Builder assumeRoleRequestBuilder =
-            AssumeRoleRequest.builder().roleArn(_s3Config.getRoleArn()).roleSessionName(_s3Config.getRoleSessionName())
-                .durationSeconds(_s3Config.getSessionDurationSeconds());
-        AssumeRoleRequest assumeRoleRequest;
-        if (StringUtils.isNotEmpty(_s3Config.getExternalId())) {
-          assumeRoleRequest = assumeRoleRequestBuilder.externalId(_s3Config.getExternalId()).build();
+      AwsCredentialsProvider awsCredentialsProvider;
+      try {
+        if (StringUtils.isNotEmpty(_s3Config.getAccessKey()) && StringUtils.isNotEmpty(_s3Config.getSecretKey())) {
+          AwsBasicCredentials awsBasicCredentials =
+              AwsBasicCredentials.create(_s3Config.getAccessKey(), _s3Config.getSecretKey());
+          awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
+        } else if (_s3Config.isAnonymousCredentialsProvider()) {
+          awsCredentialsProvider = AnonymousCredentialsProvider.create();
         } else {
-          assumeRoleRequest = assumeRoleRequestBuilder.build();
+          awsCredentialsProvider = DefaultCredentialsProvider.builder().build();
         }
-        StsClient stsClient =
-            StsClient.builder().region(Region.of(_s3Config.getRegion())).credentialsProvider(awsCredentialsProvider)
-                .build();
-        awsCredentialsProvider =
-            StsAssumeRoleCredentialsProvider.builder().stsClient(stsClient).refreshRequest(assumeRoleRequest)
-                .asyncCredentialUpdateEnabled(_s3Config.isAsyncSessionUpdateEnabled()).build();
-      }
 
-      S3ClientBuilder s3ClientBuilder = S3Client.builder().forcePathStyle(true).region(Region.of(_s3Config.getRegion()))
-          .credentialsProvider(awsCredentialsProvider).crossRegionAccessEnabled(_s3Config.isCrossRegionAccessEnabled());
-      if (StringUtils.isNotEmpty(_s3Config.getEndpoint())) {
-        try {
-          s3ClientBuilder.endpointOverride(new URI(_s3Config.getEndpoint()));
-        } catch (URISyntaxException e) {
-          throw new RuntimeException(e);
+        // IAM Role based access
+        if (_s3Config.isIamRoleBasedAccess()) {
+          AssumeRoleRequest.Builder assumeRoleRequestBuilder =
+              AssumeRoleRequest.builder().roleArn(_s3Config.getRoleArn())
+                  .roleSessionName(_s3Config.getRoleSessionName())
+                  .durationSeconds(_s3Config.getSessionDurationSeconds());
+          AssumeRoleRequest assumeRoleRequest;
+          if (StringUtils.isNotEmpty(_s3Config.getExternalId())) {
+            assumeRoleRequest = assumeRoleRequestBuilder.externalId(_s3Config.getExternalId()).build();
+          } else {
+            assumeRoleRequest = assumeRoleRequestBuilder.build();
+          }
+          _stsClient = StsClient.builder().region(Region.of(_s3Config.getRegion()))
+              .credentialsProvider(awsCredentialsProvider).build();
+          _stsCredentialsProvider = StsAssumeRoleCredentialsProvider.builder().stsClient(_stsClient)
+              .refreshRequest(assumeRoleRequest)
+              .asyncCredentialUpdateEnabled(_s3Config.isAsyncSessionUpdateEnabled()).build();
+          awsCredentialsProvider = _stsCredentialsProvider;
         }
-      }
-      if (_s3Config.getHttpClientBuilder() != null) {
-        s3ClientBuilder.httpClientBuilder(_s3Config.getHttpClientBuilder());
+
+        S3ClientBuilder s3ClientBuilder =
+            S3Client.builder().forcePathStyle(true).region(Region.of(_s3Config.getRegion()))
+                .credentialsProvider(awsCredentialsProvider)
+                .crossRegionAccessEnabled(_s3Config.isCrossRegionAccessEnabled());
+        if (StringUtils.isNotEmpty(_s3Config.getEndpoint())) {
+          try {
+            s3ClientBuilder.endpointOverride(new URI(_s3Config.getEndpoint()));
+          } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+          }
+        }
+        if (_s3Config.getHttpClientBuilder() != null) {
+          s3ClientBuilder.httpClientBuilder(_s3Config.getHttpClientBuilder());
+        }
+
+        if (_s3Config.getStorageClass() != null) {
+          _storageClass = StorageClass.fromValue(_s3Config.getStorageClass());
+          assert (_storageClass != StorageClass.UNKNOWN_TO_SDK_VERSION);
+        }
+
+        if (_s3Config.getRequestChecksumCalculationWhenRequired() == RequestChecksumCalculation.WHEN_REQUIRED) {
+          s3ClientBuilder.responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED);
+        }
+        if (_s3Config.getResponseChecksumValidationWhenRequired() == ResponseChecksumValidation.WHEN_REQUIRED) {
+          s3ClientBuilder.requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED);
+        }
+        if (_s3Config.useLegacyMd5Plugin()) {
+          s3ClientBuilder.addPlugin(LegacyMd5Plugin.create());
+        }
+
+        _s3Client = s3ClientBuilder.build();
+        setMultiPartUploadConfigs(_s3Config);
+      } catch (S3Exception e) {
+        throw new RuntimeException("Could not initialize S3PinotFS", e);
       }
 
-      if (_s3Config.getStorageClass() != null) {
-        _storageClass = StorageClass.fromValue(_s3Config.getStorageClass());
-        assert (_storageClass != StorageClass.UNKNOWN_TO_SDK_VERSION);
-      }
-
-      if (_s3Config.getRequestChecksumCalculationWhenRequired() == RequestChecksumCalculation.WHEN_REQUIRED) {
-        s3ClientBuilder.responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED);
-      }
-      if (_s3Config.getResponseChecksumValidationWhenRequired() == ResponseChecksumValidation.WHEN_REQUIRED) {
-        s3ClientBuilder.requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED);
-      }
-      if (_s3Config.useLegacyMd5Plugin()) {
-        s3ClientBuilder.addPlugin(LegacyMd5Plugin.create());
-      }
-
-      _s3Client = s3ClientBuilder.build();
-      setMultiPartUploadConfigs(_s3Config);
-    } catch (S3Exception e) {
-      throw new RuntimeException("Could not initialize S3PinotFS", e);
+      // Close old resources after new client is live (order: provider → STS client → S3 client)
+      closeQuietly(oldStsCredentialsProvider, "oldStsCredentialsProvider");
+      closeQuietly(oldStsClient, "oldStsClient");
+      closeQuietly(oldS3Client, "oldS3Client");
     }
   }
 
-  /**
-   * Masks a sensitive key, showing only the first and last 3 characters, with the middle characters replaced by '*'.
-   * If the key is null or shorter than or equal to 6 characters, returns "***".
-   *
-   * @param key the sensitive key string to mask
-   * @return the masked key string
-   */
+  /// Masks a sensitive key, showing only the first and last 3 characters, with the middle characters replaced by '\*'.
+  /// If the key is null or shorter than or equal to 6 characters, returns "\*\*\*".
+  ///
+  /// @param key the sensitive key string to mask
+  /// @return the masked key string
   private static String maskKey(String key) {
     if (key == null || key.length() <= 6) {
       return "***";
@@ -225,12 +248,10 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Retrieves the AWS credentials from the current S3 client's credentials provider.
-   *
-   * @return the resolved {@link AwsCredentials}
-   * @throws IllegalStateException if the S3 client credentials provider is not an {@link AwsCredentialsProvider}
-   */
+  /// Retrieves the AWS credentials from the current S3 client's credentials provider.
+  ///
+  /// @return the resolved [AwsCredentials]
+  /// @throws IllegalStateException if the S3 client credentials provider is not an [AwsCredentialsProvider]
   public AwsCredentials getAwsCredentials() {
     Object provider = _s3Client.serviceClientConfiguration().credentialsProvider();
     if (provider instanceof AwsCredentialsProvider) {
@@ -241,14 +262,12 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Executes the given S3 operation, retrying once after refreshing AWS credentials if an {@link S3Exception} occurs.
-   *
-   * @param action the S3 operation to execute
-   * @param <T> the type of the result returned by the operation
-   * @return the result of the S3 operation
-   * @throws IOException if the operation fails after credential refresh
-   */
+  /// Executes the given S3 operation, retrying once after refreshing AWS credentials if an [S3Exception] occurs.
+  ///
+  /// @param action the S3 operation to execute
+  /// @param <T> the type of the result returned by the operation
+  /// @return the result of the S3 operation
+  /// @throws IOException if the operation fails after credential refresh
   private <T> T retryWithS3CredentialRefresh(Supplier<T> action) throws IOException {
     try {
       return action.get();
@@ -271,28 +290,25 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Initialized the _s3Client directly with provided client.
-   * This initialization method will not initialize the server side encryption
-   * @param s3Client s3Client to initialize with
-   */
+  /// Initialized the \_s3Client directly with provided client.
+  /// This initialization method will not initialize the server side encryption
+  /// @param s3Client s3Client to initialize with
   public void init(S3Client s3Client) {
     _s3Client = s3Client;
     setMultiPartUploadConfigs(-1, -1);
   }
 
-  /**
-   * Initialize the _s3Client directly with provided client, along with additional server side encryption related props
-   * @param s3Client s3Client to initialize with
-   * @param serverSideEncryption the server side encryption string e.g. AWS_KMS is the only supported on as of now
-   * @param serverSideEncryptionConfig properties specific to provided server side encryption type
-   */
+  /// Initialize the \_s3Client directly with provided client, along with additional server side encryption related
+  /// props
+  /// @param s3Client s3Client to initialize with
+  /// @param serverSideEncryption the server side encryption string e.g. AWS_KMS is the only supported on as of now
+  /// @param serverSideEncryptionConfig properties specific to provided server side encryption type
   public void init(S3Client s3Client, String serverSideEncryption, PinotConfiguration serverSideEncryptionConfig) {
     _s3Client = s3Client;
-    S3Config s3Config = new S3Config(serverSideEncryptionConfig);
-    setServerSideEncryption(serverSideEncryption, s3Config);
-    setMultiPartUploadConfigs(s3Config);
-    setDisableAcl(s3Config);
+    _s3Config = new S3Config(serverSideEncryptionConfig);
+    setServerSideEncryption(serverSideEncryption, _s3Config);
+    setMultiPartUploadConfigs(_s3Config);
+    setDisableAcl(_s3Config);
   }
 
   @VisibleForTesting
@@ -385,12 +401,10 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Determines if the file exists at the given path
-   * @param uri file path
-   * @return {@code true} if the file exists in the path
-   *         {@code false} otherwise
-   */
+  /// Determines if the file exists at the given path
+  /// @param uri file path
+  /// @return `true` if the file exists in the path
+  ///         `false` otherwise
   private boolean existsFile(URI uri)
       throws IOException {
     try {
@@ -407,12 +421,10 @@ public class S3PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Determines if a path is a directory that is not empty
-   * @param uri The path under the S3 bucket
-   * @return {@code true} if the path is a non-empty directory,
-   *         {@code false} otherwise
-   */
+  /// Determines if a path is a directory that is not empty
+  /// @param uri The path under the S3 bucket
+  /// @return `true` if the path is a non-empty directory,
+  ///         `false` otherwise
   private boolean isEmptyDirectory(URI uri)
       throws IOException {
     if (!isDirectory(uri)) {
@@ -441,20 +453,17 @@ public class S3PinotFS extends BasePinotFS {
     return isEmpty;
   }
 
-  /**
-   * Method to copy file from source to destination.
-   * @param srcUri source path
-   * @param dstUri destination path
-   * @return {@code true} if the copy operation succeeds, i.e., response code is 200
-   *         {@code false} otherwise
-   */
+  /// Method to copy file from source to destination.
+  /// @param srcUri source path
+  /// @param dstUri destination path
+  /// @return `true` if the copy operation succeeds, i.e., response code is 200
+  ///         `false` otherwise
   private boolean copyFile(URI srcUri, URI dstUri)
       throws IOException {
     try {
-      String encodedUrl = URLEncoder.encode(srcUri.getHost() + srcUri.getPath(), StandardCharsets.UTF_8);
-
       String dstPath = sanitizePath(dstUri.getPath());
-      CopyObjectRequest copyReq = generateCopyObjectRequest(encodedUrl, dstUri, dstPath, null);
+      CopyObjectRequest copyReq =
+          generateCopyObjectRequest(srcUri.getHost(), sanitizePath(srcUri.getPath()), dstUri, dstPath, null);
       CopyObjectResponse copyObjectResponse = retryWithS3CredentialRefresh(() -> _s3Client.copyObject(copyReq));
       return copyObjectResponse.sdkHttpResponse().isSuccessful();
     } catch (S3Exception e) {
@@ -542,7 +551,9 @@ public class S3PinotFS extends BasePinotFS {
         .build();
 
     DeleteObjectsResponse deleteResponse = retryWithS3CredentialRefresh(() -> _s3Client.deleteObjects(deleteRequest));
-    LOGGER.info("Failed to delete {} objects", deleteResponse.hasErrors() ? deleteResponse.errors().size() : 0);
+    if (deleteResponse.hasErrors()) {
+      LOGGER.info("Failed to delete {} objects", deleteResponse.errors().size());
+    }
     return deleteResponse.deleted().size() == objectsToDelete.size();
   }
 
@@ -626,7 +637,6 @@ public class S3PinotFS extends BasePinotFS {
       return true;
     }
     if (!isDirectory(srcUri)) {
-      delete(dstUri, true);
       return copyFile(srcUri, dstUri);
     }
     dstUri = normalizeToDirectoryUri(dstUri);
@@ -723,6 +733,70 @@ public class S3PinotFS extends BasePinotFS {
     return listedFiles;
   }
 
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
+      final Predicate<String> pathFilter, final int maxResults)
+      throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
+    final List<FileMetadata> result = new ArrayList<>();
+    final String scheme = fileUri.getScheme();
+    Preconditions.checkArgument(scheme.equals(S3_SCHEME) || scheme.equals(S3A_SCHEME));
+    try {
+      String continuationToken = null;
+      boolean isDone = false;
+      final String prefix = normalizeToDirectoryPrefix(fileUri);
+      while (!isDone && result.size() < maxResults) {
+        ListObjectsV2Request.Builder listObjectsV2RequestBuilder =
+            ListObjectsV2Request.builder().bucket(fileUri.getHost());
+        if (!prefix.equals(DELIMITER)) {
+          listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.prefix(prefix);
+        }
+        if (!recursive) {
+          listObjectsV2RequestBuilder = listObjectsV2RequestBuilder.delimiter(DELIMITER);
+        }
+        if (continuationToken != null) {
+          listObjectsV2RequestBuilder.continuationToken(continuationToken);
+        }
+        final ListObjectsV2Request listObjectsV2Request = listObjectsV2RequestBuilder.build();
+        LOGGER.debug("Trying to send ListObjectsV2Request {}", listObjectsV2Request);
+        final ListObjectsV2Response listObjectsV2Response = retryWithS3CredentialRefresh(() ->
+            _s3Client.listObjectsV2(listObjectsV2Request));
+        for (final S3Object s3Object : listObjectsV2Response.contents()) {
+          if (s3Object.key().equals(fileUri.getPath())) {
+            continue;
+          }
+          final boolean isDirectory = s3Object.key().endsWith(DELIMITER);
+          if (isDirectory) {
+            continue;
+          }
+          final String filePath =
+              scheme + SCHEME_SEPARATOR + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object);
+          if (pathFilter.test(filePath)) {
+            result.add(new FileMetadata.Builder()
+                .setFilePath(filePath)
+                .setLastModifiedTime(s3Object.lastModified().toEpochMilli())
+                .setLength(s3Object.size())
+                .setIsDirectory(false)
+                .build());
+            if (result.size() >= maxResults) {
+              break;
+            }
+          }
+        }
+        isDone = !listObjectsV2Response.isTruncated();
+        continuationToken = listObjectsV2Response.nextContinuationToken();
+      }
+    } catch (Throwable t) {
+      throw new IOException(t);
+    }
+    LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
+        result.size(), maxResults, fileUri, recursive);
+    return result;
+  }
+
   private static String getNormalizedFileKey(S3Object s3Object) {
     String fileKey = s3Object.key();
     if (fileKey.startsWith(DELIMITER)) {
@@ -779,14 +853,14 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile)
       throws IOException {
-      LOGGER.info("Copy {} to local {}", srcUri, dstFile.getAbsolutePath());
-      URI base = getBase(srcUri);
-      FileUtils.forceMkdir(dstFile.getParentFile());
-      String prefix = sanitizePath(base.relativize(srcUri).getPath());
-      GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(srcUri.getHost()).key(prefix).build();
+    LOGGER.info("Copy {} to local {}", srcUri, dstFile.getAbsolutePath());
+    URI base = getBase(srcUri);
+    FileUtils.forceMkdir(dstFile.getParentFile());
+    String prefix = sanitizePath(base.relativize(srcUri).getPath());
+    GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(srcUri.getHost()).key(prefix).build();
 
-      retryWithS3CredentialRefresh(() ->
-          _s3Client.getObject(getObjectRequest, ResponseTransformer.toFile(dstFile)));
+    retryWithS3CredentialRefresh(() ->
+        _s3Client.getObject(getObjectRequest, ResponseTransformer.toFile(dstFile)));
   }
 
   @Override
@@ -900,10 +974,9 @@ public class S3PinotFS extends BasePinotFS {
       throws IOException {
     try {
       HeadObjectResponse s3ObjectMetadata = getS3ObjectMetadata(uri);
-      String encodedUrl = URLEncoder.encode(uri.getHost() + uri.getPath(), StandardCharsets.UTF_8);
 
       String path = sanitizePath(uri.getPath());
-      CopyObjectRequest request = generateCopyObjectRequest(encodedUrl, uri, path,
+      CopyObjectRequest request = generateCopyObjectRequest(uri.getHost(), path, uri, path,
           Map.of("lastModified", String.valueOf(System.currentTimeMillis())));
       retryWithS3CredentialRefresh(() -> _s3Client.copyObject(request));
       long newUpdateTime = getS3ObjectMetadata(uri).lastModified().toEpochMilli();
@@ -939,10 +1012,11 @@ public class S3PinotFS extends BasePinotFS {
     return putReqBuilder.build();
   }
 
-  private CopyObjectRequest generateCopyObjectRequest(String copySource, URI dest, String path,
+  private CopyObjectRequest generateCopyObjectRequest(String sourceBucket, String sourceKey, URI dest, String path,
       Map<String, String> metadata) {
     CopyObjectRequest.Builder copyReqBuilder =
-        CopyObjectRequest.builder().copySource(copySource).destinationBucket(dest.getHost()).destinationKey(path);
+        CopyObjectRequest.builder().sourceBucket(sourceBucket).sourceKey(sourceKey)
+            .destinationBucket(dest.getHost()).destinationKey(path);
     if (_storageClass != null) {
       copyReqBuilder.storageClass(_storageClass);
     }
@@ -977,7 +1051,16 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public void close()
       throws IOException {
-    _s3Client.close();
+    synchronized (_clientLock) {
+      closeQuietly(_stsCredentialsProvider, "STS credentials provider");
+      _stsCredentialsProvider = null;
+
+      closeQuietly(_stsClient, "STS client");
+      _stsClient = null;
+
+      closeQuietly(_s3Client, "S3 client");
+      _s3Client = null;
+    }
     super.close();
   }
 }

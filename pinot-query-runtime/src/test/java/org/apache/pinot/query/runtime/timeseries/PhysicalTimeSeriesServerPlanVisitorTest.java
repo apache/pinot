@@ -19,7 +19,7 @@
 package org.apache.pinot.query.runtime.timeseries;
 
 import java.time.Duration;
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +46,7 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
   private static final String LANGUAGE = "m3ql";
   private static final int DUMMY_DEADLINE_MS = 10_000;
   private static final int SERIES_LIMIT = 1000;
-  private static final Map<String, String> QUERY_OPTIONS = Collections.emptyMap();
+  private static final Map<String, String> QUERY_OPTIONS = Map.of();
 
   @BeforeClass
   public void setUp() {
@@ -58,7 +58,7 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
     final String planId = "id";
     final String tableName = "orderTable";
     final String timeColumn = "orderTime";
-    final AggInfo aggInfo = new AggInfo("SUM", false, Collections.emptyMap());
+    final AggInfo aggInfo = new AggInfo("SUM", false, Map.of());
     final String filterExpr = "cityName = 'Chicago'";
     PhysicalTimeSeriesServerPlanVisitor serverPlanVisitor = new PhysicalTimeSeriesServerPlanVisitor(
         mock(QueryExecutor.class), mock(ExecutorService.class), mock(ServerMetrics.class));
@@ -66,10 +66,10 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
     {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext(LANGUAGE, TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
-              DUMMY_DEADLINE_MS, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+              DUMMY_DEADLINE_MS, Map.of(), Map.of(), Map.of());
       LeafTimeSeriesPlanNode leafNode =
-          new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 0L,
-              filterExpr, "orderCount", aggInfo, Collections.singletonList("cityName"), SERIES_LIMIT,
+          new LeafTimeSeriesPlanNode(planId, List.of(), tableName, timeColumn, TimeUnit.SECONDS, 0L,
+              filterExpr, "orderCount", aggInfo, List.of("cityName"), SERIES_LIMIT,
               QUERY_OPTIONS);
       QueryContext queryContext = serverPlanVisitor.compileQueryContext(leafNode, context);
       assertEquals(queryContext.getFilter().toString(),
@@ -82,10 +82,10 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
       Map<String, String> queryOptions = Map.of("numGroupsLimit", "1000");
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext(LANGUAGE, TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
-              DUMMY_DEADLINE_MS, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+              DUMMY_DEADLINE_MS, Map.of(), Map.of(), Map.of());
       LeafTimeSeriesPlanNode leafNode =
-          new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 10L,
-              filterExpr, "orderCount*2", aggInfo, Collections.singletonList("concat(cityName, stateName, '-')"),
+          new LeafTimeSeriesPlanNode(planId, List.of(), tableName, timeColumn, TimeUnit.SECONDS, 10L,
+              filterExpr, "orderCount*2", aggInfo, List.of("concat(cityName, stateName, '-')"),
               0 /* limit */, queryOptions);
       QueryContext queryContext = serverPlanVisitor.compileQueryContext(leafNode, context);
       assertNotNull(queryContext);

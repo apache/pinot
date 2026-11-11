@@ -29,9 +29,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
-/**
- * NOTE: All BOOLEAN values are represented as 0 (FALSE) and 1 (TRUE) internally.
- */
+/// NOTE: All BOOLEAN values are represented as 0 (FALSE) and 1 (TRUE) internally.
 public abstract class FilterOperand implements TransformOperand {
 
   @Override
@@ -47,9 +45,13 @@ public abstract class FilterOperand implements TransformOperand {
     List<TransformOperand> _childOperands;
 
     public And(List<RexExpression> children, DataSchema dataSchema) {
+      this(children, dataSchema, false);
+    }
+
+    public And(List<RexExpression> children, DataSchema dataSchema, boolean nullHandlingEnabled) {
       _childOperands = new ArrayList<>(children.size());
       for (RexExpression child : children) {
-        _childOperands.add(TransformOperandFactory.getTransformOperand(child, dataSchema));
+        _childOperands.add(TransformOperandFactory.getTransformOperand(child, dataSchema, nullHandlingEnabled));
       }
     }
 
@@ -73,9 +75,13 @@ public abstract class FilterOperand implements TransformOperand {
     List<TransformOperand> _childOperands;
 
     public Or(List<RexExpression> children, DataSchema dataSchema) {
+      this(children, dataSchema, false);
+    }
+
+    public Or(List<RexExpression> children, DataSchema dataSchema, boolean nullHandlingEnabled) {
       _childOperands = new ArrayList<>(children.size());
       for (RexExpression child : children) {
-        _childOperands.add(TransformOperandFactory.getTransformOperand(child, dataSchema));
+        _childOperands.add(TransformOperandFactory.getTransformOperand(child, dataSchema, nullHandlingEnabled));
       }
     }
 
@@ -99,7 +105,11 @@ public abstract class FilterOperand implements TransformOperand {
     TransformOperand _childOperand;
 
     public Not(RexExpression child, DataSchema dataSchema) {
-      _childOperand = TransformOperandFactory.getTransformOperand(child, dataSchema);
+      this(child, dataSchema, false);
+    }
+
+    public Not(RexExpression child, DataSchema dataSchema, boolean nullHandlingEnabled) {
+      _childOperand = TransformOperandFactory.getTransformOperand(child, dataSchema, nullHandlingEnabled);
     }
 
     @Nullable
@@ -115,9 +125,13 @@ public abstract class FilterOperand implements TransformOperand {
     boolean _isNotIn;
 
     public In(List<RexExpression> children, DataSchema dataSchema, boolean isNotIn) {
+      this(children, dataSchema, isNotIn, false);
+    }
+
+    public In(List<RexExpression> children, DataSchema dataSchema, boolean isNotIn, boolean nullHandlingEnabled) {
       _childOperands = new ArrayList<>(children.size());
       for (RexExpression child : children) {
-        _childOperands.add(TransformOperandFactory.getTransformOperand(child, dataSchema));
+        _childOperands.add(TransformOperandFactory.getTransformOperand(child, dataSchema, nullHandlingEnabled));
       }
       _isNotIn = isNotIn;
     }
@@ -146,7 +160,11 @@ public abstract class FilterOperand implements TransformOperand {
     TransformOperand _childOperand;
 
     public IsTrue(RexExpression child, DataSchema dataSchema) {
-      _childOperand = TransformOperandFactory.getTransformOperand(child, dataSchema);
+      this(child, dataSchema, false);
+    }
+
+    public IsTrue(RexExpression child, DataSchema dataSchema, boolean nullHandlingEnabled) {
+      _childOperand = TransformOperandFactory.getTransformOperand(child, dataSchema, nullHandlingEnabled);
     }
 
     @Override
@@ -160,7 +178,11 @@ public abstract class FilterOperand implements TransformOperand {
     TransformOperand _childOperand;
 
     public IsNotTrue(RexExpression child, DataSchema dataSchema) {
-      _childOperand = TransformOperandFactory.getTransformOperand(child, dataSchema);
+      this(child, dataSchema, false);
+    }
+
+    public IsNotTrue(RexExpression child, DataSchema dataSchema, boolean nullHandlingEnabled) {
+      _childOperand = TransformOperandFactory.getTransformOperand(child, dataSchema, nullHandlingEnabled);
     }
 
     @Override
@@ -180,21 +202,22 @@ public abstract class FilterOperand implements TransformOperand {
     private final boolean _requireCasting;
     private final ColumnDataType _commonCastType;
 
-    /**
-     * Predicate constructor also resolve data type,
-     * since we don't have an exhausted list of filter function signatures. we rely on type casting.
-     *
-     * <ul>
-     *   <li>if both RHS and LHS has null data type, exception occurs.</li>
-     *   <li>if either side is null or OBJECT, we best-effort cast data into the other side's data type.</li>
-     *   <li>if either side supertype of the other, we use the super type.</li>
-     *   <li>if we can't resolve a common data type, exception occurs.</li>
-     * </ul>
-     */
+    /// Predicate constructor also resolve data type,
+    /// since we don't have an exhausted list of filter function signatures. we rely on type casting.
+    ///
+    /// - if both RHS and LHS has null data type, exception occurs.
+    /// - if either side is null or OBJECT, we best-effort cast data into the other side's data type.
+    /// - if either side supertype of the other, we use the super type.
+    /// - if we can't resolve a common data type, exception occurs.
     public Predicate(List<RexExpression> operands, DataSchema dataSchema, IntPredicate comparisonResultPredicate) {
+      this(operands, dataSchema, comparisonResultPredicate, false);
+    }
+
+    public Predicate(List<RexExpression> operands, DataSchema dataSchema, IntPredicate comparisonResultPredicate,
+        boolean nullHandlingEnabled) {
       Preconditions.checkState(operands.size() == 2, "Predicate takes 2 arguments, got: %s" + operands.size());
-      _lhs = TransformOperandFactory.getTransformOperand(operands.get(0), dataSchema);
-      _rhs = TransformOperandFactory.getTransformOperand(operands.get(1), dataSchema);
+      _lhs = TransformOperandFactory.getTransformOperand(operands.get(0), dataSchema, nullHandlingEnabled);
+      _rhs = TransformOperandFactory.getTransformOperand(operands.get(1), dataSchema, nullHandlingEnabled);
       _comparisonResultPredicate = comparisonResultPredicate;
 
       ColumnDataType lhsType = _lhs.getResultType();

@@ -17,17 +17,15 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
 
 
-/**
- * The <code>TableRebalanceObserver</code> interface provides callbacks to take actions
- * during critical triggers. The 4 main triggers during a rebalance operation are shown below.
- * For example, we can track stats + status of rebalance during these triggers.
- */
+/// The `TableRebalanceObserver` interface provides callbacks to take actions
+/// during critical triggers. The 4 main triggers during a rebalance operation are shown below.
+/// For example, we can track stats + status of rebalance during these triggers.
 public interface TableRebalanceObserver {
   enum Trigger {
     // Start of rebalance Trigger

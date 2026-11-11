@@ -21,9 +21,7 @@ package org.apache.pinot.core.query.reduce.filter;
 import org.apache.pinot.common.request.context.FilterContext;
 
 
-/**
- * NOT filter matcher.
- */
+/// NOT filter matcher.
 public class NotRowMatcher implements RowMatcher {
   private final RowMatcher _childMatcher;
 

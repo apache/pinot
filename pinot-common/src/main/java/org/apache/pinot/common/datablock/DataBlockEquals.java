@@ -24,79 +24,63 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * A utility class used to compare two DataBlocks.
- */
+/// A utility class used to compare two DataBlocks.
 public class DataBlockEquals {
 
   private DataBlockEquals() {
   }
 
-  /**
-   * Returns true if the two DataBlocks are of the same type, the same schema and contains the same data in the same
-   * data according to the {@link DefaultContentComparator default contentComparator}.
-   *
-   * This means that a DataBlock of type {@link DataBlock.Type#COLUMNAR} and a DataBlock of type
-   * {@link DataBlock.Type#ROW} will not be considered equal even if they contain the same data in the same order.
-   */
+  /// Returns true if the two DataBlocks are of the same type, the same schema and contains the same data in the same
+  /// data according to the [`default contentComparator`]\[DefaultContentComparator\].
+  ///
+  /// This means that a DataBlock of type [DataBlock.Type#COLUMNAR] and a DataBlock of type
+  /// [DataBlock.Type#ROW] will not be considered equal even if they contain the same data in the same order.
   public static boolean equals(DataBlock left, DataBlock right) {
     return equals(left, right, DefaultContentComparator.INSTANCE);
   }
 
-  /**
-   * Returns true if the two DataBlocks are of the same type, the same schema and contains the same data in the same
-   * data according to the given contentComparator.
-   *
-   * This means that a DataBlock of type {@link DataBlock.Type#COLUMNAR} and a DataBlock of type
-   * {@link DataBlock.Type#ROW} will not be considered equal even if they contain the same data according to the
-   * contentComparator.
-   */
+  /// Returns true if the two DataBlocks are of the same type, the same schema and contains the same data in the same
+  /// data according to the given contentComparator.
+  ///
+  /// This means that a DataBlock of type [DataBlock.Type#COLUMNAR] and a DataBlock of type
+  /// [DataBlock.Type#ROW] will not be considered equal even if they contain the same data according to the
+  /// contentComparator.
   public static boolean equals(DataBlock left, DataBlock right, ContentComparator contentComparator) {
     return sameType(left, right) && sameSchema(left, right) && sameContent(left, right, contentComparator);
   }
 
-  /**
-   * Returns true iff the two DataBlocks have the same type.
-   *
-   * This comparison is strict, meaning that a DataBlock of type {@link DataBlock.Type#COLUMNAR} and a DataBlock of type
-   * {@link DataBlock.Type#ROW} will not be considered equal.
-   */
+  /// Returns true iff the two DataBlocks have the same type.
+  ///
+  /// This comparison is strict, meaning that a DataBlock of type [DataBlock.Type#COLUMNAR] and a DataBlock of
+  /// type [DataBlock.Type#ROW] will not be considered equal.
   public static boolean sameType(DataBlock left, DataBlock right) {
     return left.getDataBlockType() == right.getDataBlockType();
   }
 
-  /**
-   * Returns true iff the two DataBlocks have the same schema.
-   */
+  /// Returns true iff the two DataBlocks have the same schema.
   public static boolean sameSchema(DataBlock left, DataBlock right) {
     return Objects.equals(left.getDataSchema(), right.getDataSchema());
   }
 
-  /**
-   * Returns true iff the two DataBlocks have the same content according to the
-   * {@link DefaultContentComparator default contentComparator}.
-   *
-   * Contrary to {@link #equals(DataBlock, DataBlock)}, this method considers columnar and row types to be compatible.
-   */
+  /// Returns true iff the two DataBlocks have the same content according to the
+  /// [`default contentComparator`]\[DefaultContentComparator\].
+  ///
+  /// Contrary to [#equals(DataBlock, DataBlock)], this method considers columnar and row types to be compatible.
   public static boolean sameContent(DataBlock left, DataBlock right) {
     return sameContent(left, right, DefaultContentComparator.INSTANCE);
   }
 
-  /**
-   * Returns true iff the two DataBlocks have the same content according to the given contentComparator.
-   *
-   * Contrary to {@link #equals(DataBlock, DataBlock)}, this method considers columnar and row types to be compatible.
-   */
+  /// Returns true iff the two DataBlocks have the same content according to the given contentComparator.
+  ///
+  /// Contrary to [#equals(DataBlock, DataBlock)], this method considers columnar and row types to be compatible.
   public static boolean sameContent(DataBlock left, DataBlock right, ContentComparator contentComparator) {
     return contentComparator.equals(left, right);
   }
 
-  /**
-   * Throws an {@link IllegalArgumentException} if the two DataBlocks are not equal according to the
-   * {@link DefaultContentComparator default contentComparator}.
-   *
-   * The exception will contain a message describing the difference.
-   */
+  /// Throws an [IllegalArgumentException] if the two DataBlocks are not equal according to the
+  /// [`default contentComparator`]\[DefaultContentComparator\].
+  ///
+  /// The exception will contain a message describing the difference.
   public static void checkSameContent(DataBlock left, DataBlock right, String message) {
     try {
       sameContent(left, right, DefaultContentComparator.CHECKER);
@@ -105,17 +89,14 @@ public class DataBlockEquals {
     }
   }
 
-  /**
-   * Throws an {@link IllegalArgumentException} if the two DataBlocks are not equal according to the given
-   * contentComparator.
-   *
-   * It is encouraged to use this method with a custom contentComparator that provides a meaningful message in the
-   * {@link ContentComparator#equals(DataBlock, DataBlock)} method by throwing an exception with a message that
-   * describes the difference.
-   * If the contentComparator does not throw an exception, this method will throw an exception with a generic message
-   * when the two DataBlocks are not equal.
-   *
-   */
+  /// Throws an [IllegalArgumentException] if the two DataBlocks are not equal according to the given
+  /// contentComparator.
+  ///
+  /// It is encouraged to use this method with a custom contentComparator that provides a meaningful message in the
+  /// [ContentComparator#equals(DataBlock, DataBlock)] method by throwing an exception with a message that
+  /// describes the difference.
+  /// If the contentComparator does not throw an exception, this method will throw an exception with a generic message
+  /// when the two DataBlocks are not equal.
   public static void checkSameContent(DataBlock left, DataBlock right, String message,
       ContentComparator contentComparator) {
     try {
@@ -396,6 +377,19 @@ public class DataBlockEquals {
                 }
               }
               break;
+            case BIG_DECIMAL_ARRAY:
+              for (int did = 0; did < numRows; did++) {
+                if (!Arrays.equals(left.getBigDecimalArray(did, colId), right.getBigDecimalArray(did, colId))) {
+                  if (_failOnFalse) {
+                    throw new IllegalArgumentException("Different values for " + colTypes[colId]
+                        + " column: " + colNames[colId]
+                        + " left: " + Arrays.toString(left.getBigDecimalArray(did, colId))
+                        + " right: " + Arrays.toString(right.getBigDecimalArray(did, colId)));
+                  }
+                  return false;
+                }
+              }
+              break;
             case STRING_ARRAY:
               for (int did = 0; did < numRows; did++) {
                 if (!Arrays.equals(left.getStringArray(did, colId), right.getStringArray(did, colId))) {
@@ -410,6 +404,18 @@ public class DataBlockEquals {
               }
               break;
             case BYTES_ARRAY:
+              for (int did = 0; did < numRows; did++) {
+                if (!Arrays.equals(left.getBytesArray(did, colId), right.getBytesArray(did, colId))) {
+                  if (_failOnFalse) {
+                    throw new IllegalArgumentException("Different values for " + colTypes[colId]
+                        + " column: " + colNames[colId]
+                        + " left: " + Arrays.toString(left.getBytesArray(did, colId))
+                        + " right: " + Arrays.toString(right.getBytesArray(did, colId)));
+                  }
+                  return false;
+                }
+              }
+              break;
             case BOOLEAN_ARRAY:
             case UNKNOWN:
               throw new UnsupportedOperationException("Check how to read " + colTypes[colId] + " from data block");

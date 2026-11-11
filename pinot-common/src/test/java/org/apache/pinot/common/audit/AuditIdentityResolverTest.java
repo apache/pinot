@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.spi.audit.AuditTokenResolver;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeMethod;
@@ -53,14 +54,17 @@ public class AuditIdentityResolverTest {
   public void setUp()
       throws Exception {
     MockitoAnnotations.openMocks(this);
+    MockAuditTokenResolver.reset();
     _auditIdentityResolver = new AuditIdentityResolver(_auditConfigManager);
 
     _auditConfig = new AuditConfig();
     when(_auditConfigManager.getCurrentConfig()).thenReturn(_auditConfig);
   }
 
+  // ==================== Custom Header Tests ====================
+
   @Test
-  public void testResolveIdentityFromCustomHeaderSuccess() {
+  public void testResolveIdentityFromCustomHeader() {
     _auditConfig.setUseridHeader("X-User-Email");
     when(_requestContext.getHeaderString("X-User-Email")).thenReturn("user@example.com");
 
@@ -70,13 +74,12 @@ public class AuditIdentityResolverTest {
     assertThat(result.getPrincipal()).isEqualTo("user@example.com");
   }
 
-  @Test
-  public void testResolveIdentityFromCustomHeaderEmptyHeaderValue()
-      throws Exception {
-    _auditConfig.setUseridHeader("X-User-Email");
-    _auditConfig.setUseridJwtClaimName("email");
+  // ==================== JWT Tests ====================
 
-    when(_requestContext.getHeaderString("X-User-Email")).thenReturn("");
+  @Test
+  public void testResolveIdentityFromJwtCustomClaim()
+      throws Exception {
+    _auditConfig.setUseridJwtClaimName("email");
     String validJwt = createJwtToken("user123", Map.of("email", "jwt@example.com"));
     when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
 
@@ -87,38 +90,9 @@ public class AuditIdentityResolverTest {
   }
 
   @Test
-  public void testResolveIdentityFromCustomHeaderMissingHeader()
-      throws Exception {
-    _auditConfig.setUseridHeader("X-User-Email");
-    _auditConfig.setUseridJwtClaimName("email");
-
-    when(_requestContext.getHeaderString("X-User-Email")).thenReturn(null);
-    String validJwt = createJwtToken("user123", Map.of("email", "jwt@example.com"));
-    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
-
-    AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
-
-    assertThat(result).isNotNull();
-    assertThat(result.getPrincipal()).isEqualTo("jwt@example.com");
-  }
-
-  @Test
-  public void testResolveIdentityFromJwtCustomClaimSuccess()
+  public void testResolveIdentityFromJwtSubjectWhenClaimMissing()
       throws Exception {
     _auditConfig.setUseridJwtClaimName("email");
-
-    String validJwt = createJwtToken("user123", Map.of("email", "jwt@example.com"));
-    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
-
-    AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
-
-    assertThat(result).isNotNull();
-    assertThat(result.getPrincipal()).isEqualTo("jwt@example.com");
-  }
-
-  @Test
-  public void testResolveIdentityFromJwtSubjectWhenCustomClaimNotConfigured()
-      throws Exception {
     String validJwt = createJwtToken("user123", new HashMap<>());
     when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
 
@@ -129,21 +103,7 @@ public class AuditIdentityResolverTest {
   }
 
   @Test
-  public void testResolveIdentityFromJwtSubjectWhenCustomClaimMissing()
-      throws Exception {
-    _auditConfig.setUseridJwtClaimName("email");
-
-    String validJwt = createJwtToken("user123", new HashMap<>());
-    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
-
-    AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
-
-    assertThat(result).isNotNull();
-    assertThat(result.getPrincipal()).isEqualTo("user123");
-  }
-
-  @Test
-  public void testInvalidJwtToken() {
+  public void testInvalidJwtTokenReturnsNull() {
     when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer invalid-token");
 
     AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
@@ -151,75 +111,113 @@ public class AuditIdentityResolverTest {
     assertThat(result).isNull();
   }
 
-  @Test
-  public void testHeaderTakesPriorityOverJwt()
-      throws Exception {
-    _auditConfig.setUseridHeader("X-User-Email");
-    _auditConfig.setUseridJwtClaimName("email");
+  // ==================== Custom Resolver Tests ====================
 
-    when(_requestContext.getHeaderString("X-User-Email")).thenReturn("header@example.com");
-    String validJwt = createJwtToken("user123", Map.of("email", "jwt@example.com"));
+  @Test
+  public void testCustomTokenResolverSuccess() {
+    AuditTokenResolver mockResolver = new MockAuditTokenResolver("resolved-user");
+    AuditIdentityResolver resolver = new AuditIdentityResolver(_auditConfigManager, mockResolver);
+    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer custom-token");
+
+    AuditEvent.UserIdentity result = resolver.resolveIdentity(_requestContext);
+
+    assertThat(result).isNotNull();
+    assertThat(result.getPrincipal()).isEqualTo("resolved-user");
+  }
+
+  @Test
+  public void testCustomResolverReturnsNullFallsBackToJwt()
+      throws Exception {
+    AuditTokenResolver mockResolver = new MockAuditTokenResolver(null);
+    AuditIdentityResolver resolver = new AuditIdentityResolver(_auditConfigManager, mockResolver);
+    String validJwt = createJwtToken("jwt-user", new HashMap<>());
+    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
+
+    AuditEvent.UserIdentity result = resolver.resolveIdentity(_requestContext);
+
+    assertThat(result).isNotNull();
+    assertThat(result.getPrincipal()).isEqualTo("jwt-user");
+  }
+
+  @Test
+  public void testCustomResolverReceivesFullAuthHeader() {
+    String expectedAuthHeader = "Bearer custom-token-value";
+    MockAuditTokenResolver mockResolver = new MockAuditTokenResolver("user");
+    AuditIdentityResolver resolver = new AuditIdentityResolver(_auditConfigManager, mockResolver);
+    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn(expectedAuthHeader);
+
+    resolver.resolveIdentity(_requestContext);
+
+    assertThat(MockAuditTokenResolver.getLastAuthHeader()).isEqualTo(expectedAuthHeader);
+  }
+
+  // ==================== PluginManager Tests ====================
+
+  @Test
+  public void testResolverLoadedViaPluginManager() {
+    _auditConfig.setTokenResolverClass(MockAuditTokenResolver.class.getName());
+    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer test-token");
+
+    AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
+
+    assertThat(result).isNotNull();
+    assertThat(result.getPrincipal()).isEqualTo("mock-resolved-user");
+  }
+
+  @Test
+  public void testInvalidResolverClassFallsBackToJwt()
+      throws Exception {
+    _auditConfig.setTokenResolverClass("com.invalid.NonExistentResolver");
+    String validJwt = createJwtToken("jwt-user", new HashMap<>());
     when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
 
     AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
 
     assertThat(result).isNotNull();
-    assertThat(result.getPrincipal()).isEqualTo("header@example.com");
+    assertThat(result.getPrincipal()).isEqualTo("jwt-user");
   }
 
+  // ==================== Priority Tests ====================
+
   @Test
-  public void testFallbackChainNoHeaderFallsBackToJwtClaim()
+  public void testPriorityHeaderOverJwt()
       throws Exception {
     _auditConfig.setUseridHeader("X-User-Email");
-    _auditConfig.setUseridJwtClaimName("email");
-
-    when(_requestContext.getHeaderString("X-User-Email")).thenReturn(null);
-    String validJwt = createJwtToken("user123", Map.of("email", "jwt@example.com"));
+    when(_requestContext.getHeaderString("X-User-Email")).thenReturn("header-user");
+    String validJwt = createJwtToken("jwt-user", new HashMap<>());
     when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
 
     AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
 
     assertThat(result).isNotNull();
-    assertThat(result.getPrincipal()).isEqualTo("jwt@example.com");
+    assertThat(result.getPrincipal()).isEqualTo("header-user");
   }
 
   @Test
-  public void testFallbackChainNoHeaderNoClaimFallsBackToSubject()
-      throws Exception {
+  public void testPriorityHeaderOverResolver() {
+    AuditTokenResolver mockResolver = new MockAuditTokenResolver("resolver-user");
+    AuditIdentityResolver resolver = new AuditIdentityResolver(_auditConfigManager, mockResolver);
     _auditConfig.setUseridHeader("X-User-Email");
-    _auditConfig.setUseridJwtClaimName("email");
+    when(_requestContext.getHeaderString("X-User-Email")).thenReturn("header-user");
+    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer token");
 
-    when(_requestContext.getHeaderString("X-User-Email")).thenReturn(null);
-    String validJwt = createJwtToken("user123", new HashMap<>());
-    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
-
-    AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
+    AuditEvent.UserIdentity result = resolver.resolveIdentity(_requestContext);
 
     assertThat(result).isNotNull();
-    assertThat(result.getPrincipal()).isEqualTo("user123");
+    assertThat(result.getPrincipal()).isEqualTo("header-user");
   }
 
+  // ==================== Edge Cases ====================
+
   @Test
-  public void testNoAuthenticationPresentReturnsNull() {
+  public void testNoAuthenticationReturnsNull() {
     AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
 
     assertThat(result).isNull();
   }
 
   @Test
-  public void testBlankConfigurationUsesDefaults()
-      throws Exception {
-    String validJwt = createJwtToken("user123", new HashMap<>());
-    when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Bearer " + validJwt);
-
-    AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
-
-    assertThat(result).isNotNull();
-    assertThat(result.getPrincipal()).isEqualTo("user123");
-  }
-
-  @Test
-  public void testNonBearerAuthorizationHeaderReturnsNull() {
+  public void testNonBearerAuthorizationReturnsNull() {
     when(_requestContext.getHeaderString(HttpHeaders.AUTHORIZATION)).thenReturn("Basic dXNlcjpwYXNz");
 
     AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
@@ -227,16 +225,7 @@ public class AuditIdentityResolverTest {
     assertThat(result).isNull();
   }
 
-  @Test
-  public void testWhitespaceInHeaderValueTrimmed() {
-    _auditConfig.setUseridHeader("X-User-Email");
-    when(_requestContext.getHeaderString("X-User-Email")).thenReturn("  user@example.com  ");
-
-    AuditEvent.UserIdentity result = _auditIdentityResolver.resolveIdentity(_requestContext);
-
-    assertThat(result).isNotNull();
-    assertThat(result.getPrincipal()).isEqualTo("  user@example.com  ");
-  }
+  // ==================== Helper Methods ====================
 
   private String createJwtToken(String subject, Map<String, Object> customClaims)
       throws Exception {

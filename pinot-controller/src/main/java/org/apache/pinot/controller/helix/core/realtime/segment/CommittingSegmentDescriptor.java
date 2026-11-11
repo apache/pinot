@@ -18,18 +18,18 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 
 
-/**
- * Class to hold properties of the committing segment
- */
+/// Class to hold properties of the committing segment
 public class CommittingSegmentDescriptor {
-  private String _segmentName;
-  private long _segmentSizeBytes;
+  private final String _segmentName;
+  private final String _nextOffset;
+  private final long _segmentSizeBytes;
+
   private String _segmentLocation;
-  private String _nextOffset;
   private SegmentMetadataImpl _segmentMetadata;
   private String _stopReason;
   private int _preCommitRowCount;
@@ -70,18 +70,15 @@ public class CommittingSegmentDescriptor {
     return _segmentName;
   }
 
-  public void setSegmentName(String segmentName) {
-    _segmentName = segmentName;
+  public String getNextOffset() {
+    return _nextOffset;
   }
 
   public long getSegmentSizeBytes() {
     return _segmentSizeBytes;
   }
 
-  public void setSegmentSizeBytes(long segmentSizeBytes) {
-    _segmentSizeBytes = segmentSizeBytes;
-  }
-
+  @Nullable
   public String getSegmentLocation() {
     return _segmentLocation;
   }
@@ -90,10 +87,7 @@ public class CommittingSegmentDescriptor {
     _segmentLocation = segmentLocation;
   }
 
-  public String getNextOffset() {
-    return _nextOffset;
-  }
-
+  @Nullable
   public SegmentMetadataImpl getSegmentMetadata() {
     return _segmentMetadata;
   }
@@ -102,6 +96,7 @@ public class CommittingSegmentDescriptor {
     _segmentMetadata = segmentMetadata;
   }
 
+  @Nullable
   public String getStopReason() {
     return _stopReason;
   }

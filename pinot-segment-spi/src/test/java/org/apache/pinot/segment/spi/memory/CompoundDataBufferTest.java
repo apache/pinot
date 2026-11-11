@@ -186,6 +186,32 @@ public class CompoundDataBufferTest {
     }
   }
 
+  /// Reads in random order, so that lookups move backward and forward across buffers of different sizes, and also land
+  /// on the first and last byte of each buffer.
+  @Test
+  void randomAccessAcrossBuffersOfDifferentSizes() {
+    Random r = new Random(42);
+    int[] sizes = {1, 7, 16, 3, 64, 1, 32};
+    int totalSize = Arrays.stream(sizes).sum();
+    byte[] expected = new byte[totalSize];
+    r.nextBytes(expected);
+    DataBuffer[] buffers = new DataBuffer[sizes.length];
+    int start = 0;
+    for (int i = 0; i < sizes.length; i++) {
+      buffers[i] = PinotByteBuffer.wrap(Arrays.copyOfRange(expected, start, start + sizes[i]));
+      start += sizes[i];
+    }
+    CompoundDataBuffer compoundDataBuffer = new CompoundDataBuffer(buffers, ByteOrder.BIG_ENDIAN, false);
+
+    for (int i = 0; i < 10_000; i++) {
+      int offset = r.nextInt(totalSize);
+      assertEquals(compoundDataBuffer.getByte(offset), expected[offset], "Offset " + offset);
+    }
+    for (int offset = totalSize - 1; offset >= 0; offset--) {
+      assertEquals(compoundDataBuffer.getByte(offset), expected[offset], "Offset " + offset);
+    }
+  }
+
   @Test
   void readWriteByteBuffer() {
     Random r = new Random(42);

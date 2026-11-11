@@ -17,10 +17,13 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
+import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -39,11 +42,13 @@ public interface RebalancePreChecker {
     private final TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
     private final RebalanceConfig _rebalanceConfig;
     private final RebalanceSummaryResult _rebalanceSummaryResult;
+    private final Map<String, Set<String>> _providedTierToSegmentsMap;
 
     public PreCheckContext(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
         Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
         @Nullable TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, RebalanceConfig rebalanceConfig,
-        RebalanceSummaryResult rebalanceSummaryResult) {
+        @Nullable RebalanceSummaryResult rebalanceSummaryResult,
+        @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
       _rebalanceJobId = rebalanceJobId;
       _tableNameWithType = tableNameWithType;
       _tableConfig = tableConfig;
@@ -52,6 +57,7 @@ public interface RebalancePreChecker {
       _tableSubTypeSizeDetails = tableSubTypeSizeDetails;
       _rebalanceConfig = rebalanceConfig;
       _rebalanceSummaryResult = rebalanceSummaryResult;
+      _providedTierToSegmentsMap = providedTierToSegmentsMap;
     }
 
     public String getRebalanceJobId() {
@@ -84,6 +90,13 @@ public interface RebalancePreChecker {
 
     public RebalanceSummaryResult getRebalanceSummaryResult() {
       return _rebalanceSummaryResult;
+    }
+
+    /// Returns the tier name to segments map computed while updating the target tiers of this rebalance, or
+    /// `null` if the target tiers were not updated (i.e. updateTargetTier is disabled).
+    @Nullable
+    public Map<String, Set<String>> getProvidedTierToSegmentsMap() {
+      return _providedTierToSegmentsMap;
     }
   }
 

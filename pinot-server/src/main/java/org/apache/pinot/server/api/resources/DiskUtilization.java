@@ -34,9 +34,7 @@ public class DiskUtilization {
 
   private DiskUtilization() {
   }
-  /**
-   * Computes the disk usage for the file store containing the given path using NIO.
-   */
+  /// Computes the disk usage for the file store containing the given path using NIO.
   public static DiskUsageInfo computeDiskUsage(String instanceId, String pathStr) throws IOException {
     if (StringUtils.isEmpty(instanceId)) {
       throw new IllegalArgumentException("InstanceID cannot be null or empty while computing disk utilization.");

@@ -30,9 +30,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for FUNNEL_COUNT queries.
- */
+/// Queries test for FUNNEL_COUNT queries.
 public class FunnelCountQueriesBitmapTest extends BaseFunnelCountQueriesTest {
 
   @Override

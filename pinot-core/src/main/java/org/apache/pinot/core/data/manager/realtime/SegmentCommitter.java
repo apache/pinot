@@ -21,14 +21,10 @@ package org.apache.pinot.core.data.manager.realtime;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 
 
-/**
- * For committing realtime segments.
- */
+/// For committing realtime segments.
 public interface SegmentCommitter {
-  /**
-   * Commits a realtime segment to persistent store
-   * @param segmentBuildDescriptor object that describes segment to be committed
-   * @return
-   */
+  /// Commits a realtime segment to persistent store
+  /// @param segmentBuildDescriptor object that describes segment to be committed
+  /// @return
   SegmentCompletionProtocol.Response commit(RealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor);
 }

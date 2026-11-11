@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -47,11 +48,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Scalability Queries test for Gapfill queries.
- */
+/// Scalability Queries test for Gapfill queries.
 public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PostAggregationGapfillQueriesTest");
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "PostAggregationGapfillQueriesTest-" + UUID.randomUUID());
   private static final String RAW_TABLE_NAME = "parkingData";
   private static final String SEGMENT_NAME = "testSegment";
 
@@ -108,7 +108,7 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
     for (int i = 0; i < 15; i++) {
       for (int j = 0; j < NUM_LOTS; j++) {
         for (int k = 0; k < 4; k++) {
-            records.add(createRow(start + i * 3600_000, k, i * NUM_LOTS + j, true));
+          records.add(createRow(start + i * 3600_000, k, i * NUM_LOTS + j, true));
         }
       }
     }

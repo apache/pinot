@@ -95,23 +95,27 @@ public class DateTimeConversionWindowHopTransformFunctionTest extends BaseTransf
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
     return new Object[][]{
-        new Object[]{
+        {
             String.format("dateTimeConvertWindowHop(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH', '1:MINUTE')",
                 TIME_COLUMN)
-        }, new Object[]{
-        "dateTimeConvertWindowHop(5,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES', '2:MINUTES')"
-    }, new Object[]{
-        String.format(
-            "dateTimeConvertWindowHop(%s,'1:MILLISECONDS:EPOCH'," + "'1:MINUTES:EPOCH','1:MINUTES', '2:MINUTES')",
-            LONG_MV_COLUMN)
-    }, new Object[]{
-        String.format(
-            "dateTimeConvertWindowHop(%s,'1:MILLISECONDS:EPOCH'," + "'1:MINUTES:EPOCH','MINUTES:1', '2:MINUTES')",
-            TIME_COLUMN)
-    }, new Object[]{
-        String.format("dateTimeConvertWindowHop(%s, %s,'1:MINUTES:EPOCH'," + "'1:MINUTES', '2:MINUTES')", TIME_COLUMN,
-            INT_SV_COLUMN)
-    }
+        },
+        {
+            "dateTimeConvertWindowHop(5,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES', '2:MINUTES')"
+        },
+        {
+            String.format(
+                "dateTimeConvertWindowHop(%s,'1:MILLISECONDS:EPOCH'," + "'1:MINUTES:EPOCH','1:MINUTES', '2:MINUTES')",
+                LONG_MV_COLUMN)
+        },
+        {
+            String.format(
+                "dateTimeConvertWindowHop(%s,'1:MILLISECONDS:EPOCH'," + "'1:MINUTES:EPOCH','MINUTES:1', '2:MINUTES')",
+                TIME_COLUMN)
+        },
+        {
+            String.format("dateTimeConvertWindowHop(%s, %s,'1:MINUTES:EPOCH'," + "'1:MINUTES', '2:MINUTES')",
+                TIME_COLUMN, INT_SV_COLUMN)
+        }
     };
   }
 

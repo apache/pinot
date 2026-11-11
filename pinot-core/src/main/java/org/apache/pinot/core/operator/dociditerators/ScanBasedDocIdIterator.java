@@ -25,23 +25,20 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * All scan-based filter iterators should implement this interface to allow intersection (AND operation) to be
- * optimized.
- * <p>When there are at least one index-base BlockDocIdIterator (SortedDocIdIterator or BitmapBasedDocIdIterator) and at
- * least one ScanBasedDocIdIterator, instead of iterating on each BlockDocIdIterator (we should avoid iterating on
- * ScanBasedDocIdIterator because that requires a lot of document scans), it can be optimized by first constructing a
- * bitmap of matching document ids from the index-based BlockDocIdIterators, and let ScanBasedDocIdIterator only scan
- * the matching document ids from the index-base BlockDocIdIterators.
- */
+/// All scan-based filter iterators should implement this interface to allow intersection (AND operation) to be
+/// optimized.
+///
+/// When there are at least one index-base BlockDocIdIterator (SortedDocIdIterator or BitmapBasedDocIdIterator) and at
+/// least one ScanBasedDocIdIterator, instead of iterating on each BlockDocIdIterator (we should avoid iterating on
+/// ScanBasedDocIdIterator because that requires a lot of document scans), it can be optimized by first constructing a
+/// bitmap of matching document ids from the index-based BlockDocIdIterators, and let ScanBasedDocIdIterator only scan
+/// the matching document ids from the index-base BlockDocIdIterators.
 public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
 
   MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc);
 
-  /**
-   * Applies AND operation to the given bitmap of document ids, returns a bitmap of the matching document ids. This
-   * method is expected to be called only once, as resources are released after the first call.
-   */
+  /// Applies AND operation to the given bitmap of document ids, returns a bitmap of the matching document ids. This
+  /// method is expected to be called only once, as resources are released after the first call.
   default MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     if (docIds.isEmpty()) {
       return new MutableRoaringBitmap();
@@ -49,15 +46,11 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
     return applyAnd(docIds.getBatchIterator(), OptionalInt.of(docIds.first()), OptionalInt.of(docIds.last()));
   }
 
-  /**
-   * Returns the number of entries (SV value contains one entry, MV value contains multiple entries) scanned during the
-   * iteration. This method should be called after the iteration is done.
-   */
+  /// Returns the number of entries (SV value contains one entry, MV value contains multiple entries) scanned during the
+  /// iteration. This method should be called after the iteration is done.
   long getNumEntriesScanned();
 
-  /**
-   * Returns the estimated (effective) cardinality of the underlying data source
-   */
+  /// Returns the estimated (effective) cardinality of the underlying data source
   default float getEstimatedCardinality(boolean isAndDocIdSet) {
     //default N/A behavior so that it always get picked in the end
     return isAndDocIdSet ? Float.NEGATIVE_INFINITY : Float.POSITIVE_INFINITY;

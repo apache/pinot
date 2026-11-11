@@ -23,11 +23,9 @@ import java.nio.ByteBuffer;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 
 
-/**
- * Implementation of {@link ChunkDecompressor} using LZ4 decompression algorithm.
- * LZ4Factory.fastestInstance().safeDecompressor().decompress(sourceBuffer, destinationBuffer)
- * Compresses the data in buffer 'sourceBuffer' using default compression level
- */
+/// Implementation of [ChunkDecompressor] using LZ4 decompression algorithm.
+/// LZ4Factory.fastestInstance().safeDecompressor().decompress(sourceBuffer, destinationBuffer)
+/// Compresses the data in buffer 'sourceBuffer' using default compression level
 class LZ4Decompressor implements ChunkDecompressor {
 
   static final LZ4Decompressor INSTANCE = new LZ4Decompressor();

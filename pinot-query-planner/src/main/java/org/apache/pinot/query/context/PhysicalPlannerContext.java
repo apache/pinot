@@ -27,6 +27,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
@@ -34,9 +35,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Per-query unique context dedicated for the physical planner.
- */
+/// Per-query unique context dedicated for the physical planner.
 public class PhysicalPlannerContext {
   private final Supplier<Integer> _nodeIdGenerator = new Supplier<>() {
     private int _id = 0;
@@ -46,22 +45,18 @@ public class PhysicalPlannerContext {
       return _id++;
     }
   };
-  /**
-   * This is hacky. When assigning workers to the leaf-stage we cache the instanceId to QueryServerInstance values.
-   * This way we can continue to use instance IDs throughout planning and convert them back to QueryServerInstance
-   * while working with the Dispatchable Plan.
-   * TODO: We should not use this map and instead have a centralized place for instanceId to QueryServerInstance
-   *   mapping.
-   */
+  /// This is hacky. When assigning workers to the leaf-stage we cache the instanceId to QueryServerInstance values.
+  /// This way we can continue to use instance IDs throughout planning and convert them back to QueryServerInstance
+  /// while working with the Dispatchable Plan.
+  /// TODO: We should not use this map and instead have a centralized place for instanceId to QueryServerInstance
+  ///   mapping.
   private final Map<String, QueryServerInstance> _instanceIdToQueryServerInstance = new HashMap<>();
   @Nullable
   private final RoutingManager _routingManager;
   private final String _hostName;
   private final int _port;
   private final long _requestId;
-  /**
-   * Instance ID of the instance corresponding to this process.
-   */
+  /// Instance ID of the instance corresponding to this process.
   private final String _instanceId;
   private final Map<String, String> _queryOptions;
   private final boolean _useLiteMode;
@@ -71,11 +66,12 @@ public class PhysicalPlannerContext {
   private final int _liteModeLeafStageFanOutAdjustedLimit;
   private final DistHashFunction _defaultHashFunction;
   private final boolean _liteModeJoinsEnabled;
+  @Nullable
+  private final MultiClusterRoutingContext _multiClusterRoutingContext;
+  private int _liteModeEffectiveSortLimit = -1;
 
-  /**
-   * Used by controller when it needs to extract table names from the query.
-   * TODO: Controller should only rely on SQL parser to extract table names.
-   */
+  /// Used by controller when it needs to extract table names from the query.
+  /// TODO: Controller should only rely on SQL parser to extract table names.
   public PhysicalPlannerContext() {
     _routingManager = null;
     _hostName = "";
@@ -90,6 +86,7 @@ public class PhysicalPlannerContext {
     _liteModeLeafStageFanOutAdjustedLimit = CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT;
     _defaultHashFunction = DistHashFunction.valueOf(KeySelector.DEFAULT_HASH_ALGORITHM.toUpperCase());
     _liteModeJoinsEnabled = CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS;
+    _multiClusterRoutingContext = null;
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
@@ -98,13 +95,14 @@ public class PhysicalPlannerContext {
         CommonConstants.Broker.DEFAULT_USE_LITE_MODE, CommonConstants.Broker.DEFAULT_RUN_IN_BROKER,
         CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING, CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT,
         KeySelector.DEFAULT_HASH_ALGORITHM, CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT,
-        CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS);
+        CommonConstants.Broker.DEFAULT_LITE_MODE_ENABLE_JOINS, null);
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
       String instanceId, Map<String, String> queryOptions, boolean defaultUseLiteMode, boolean defaultRunInBroker,
       boolean defaultUseBrokerPruning, int defaultLiteModeLeafStageLimit, String defaultHashFunction,
-      int defaultLiteModeLeafStageFanOutAdjustedLimit, boolean defaultLiteModeEnableJoins) {
+      int defaultLiteModeLeafStageFanOutAdjustedLimit, boolean defaultLiteModeEnableJoins,
+      @Nullable MultiClusterRoutingContext multiClusterRoutingContext) {
     _routingManager = routingManager;
     _hostName = hostName;
     _port = port;
@@ -121,6 +119,7 @@ public class PhysicalPlannerContext {
     _defaultHashFunction = DistHashFunction.valueOf(defaultHashFunction.toUpperCase());
     _instanceIdToQueryServerInstance.put(instanceId, getBrokerQueryServerInstance());
     _liteModeJoinsEnabled = defaultLiteModeEnableJoins;
+    _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
   public Supplier<Integer> getNodeIdGenerator() {
@@ -180,13 +179,22 @@ public class PhysicalPlannerContext {
     return _liteModeLeafStageFanOutAdjustedLimit;
   }
 
-  /**
-   * Gets a random instance id from the registered instances in the context.
-   * <p>
-   *   <b>Important:</b> This method will always return a server instanceId, unless no server has yet been registered
-   *   with the context, which could happen for queries which don't consist of any table-scans.
-   * </p>
-   */
+  public void setLiteModeEffectiveSortLimit(int effectiveLimit) {
+    _liteModeEffectiveSortLimit = effectiveLimit;
+  }
+
+  public boolean isLiteModeImplicitSortApplied() {
+    return _liteModeEffectiveSortLimit >= 0;
+  }
+
+  public int getLiteModeEffectiveSortLimit() {
+    return _liteModeEffectiveSortLimit;
+  }
+
+  /// Gets a random instance id from the registered instances in the context.
+  ///
+  ///   **Important:** This method will always return a server instanceId, unless no server has yet been registered
+  ///   with the context, which could happen for queries which don't consist of any table-scans.
   public String getRandomInstanceId() {
     Preconditions.checkState(!_instanceIdToQueryServerInstance.isEmpty(), "No instances present in context");
     if (_instanceIdToQueryServerInstance.size() == 1) {
@@ -200,6 +208,11 @@ public class PhysicalPlannerContext {
 
   public DistHashFunction getDefaultHashFunction() {
     return _defaultHashFunction;
+  }
+
+  @Nullable
+  public MultiClusterRoutingContext getMultiClusterRoutingContext() {
+    return _multiClusterRoutingContext;
   }
 
   private QueryServerInstance getBrokerQueryServerInstance() {

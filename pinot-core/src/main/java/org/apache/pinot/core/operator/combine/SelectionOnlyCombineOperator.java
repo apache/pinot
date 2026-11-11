@@ -27,12 +27,13 @@ import org.apache.pinot.core.operator.combine.merger.SelectionOnlyResultsBlockMe
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Combine operator for selection only queries.
- * <p>For query with LIMIT 0, directly use main thread to process one segment to get the data schema of the query.
- * <p>Query can be early-terminated when enough documents have been collected to fulfill the LIMIT requirement.
- * <p>NOTE: Selection order-by query with LIMIT 0 is treated as selection only query.
- */
+/// Combine operator for selection only queries.
+///
+/// For query with LIMIT 0, directly use main thread to process one segment to get the data schema of the query.
+///
+/// Query can be early-terminated when enough documents have been collected to fulfill the LIMIT requirement.
+///
+/// NOTE: Selection order-by query with LIMIT 0 is treated as selection only query.
 @SuppressWarnings("rawtypes")
 public class SelectionOnlyCombineOperator extends BaseSingleBlockCombineOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "COMBINE_SELECT";

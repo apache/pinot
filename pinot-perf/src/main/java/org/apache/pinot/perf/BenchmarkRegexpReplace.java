@@ -93,7 +93,7 @@ public class BenchmarkRegexpReplace {
 
   //old regexp_replace implementation
   public static String regexpReplaceOld(String inputStr, String matchStr, String replaceStr, int matchStartPos,
-      int occurence, String flag) {
+      int occurrence, String flag) {
     Integer patternFlag;
 
     switch (flag) {
@@ -115,14 +115,14 @@ public class BenchmarkRegexpReplace {
     Matcher matcher = p.matcher(inputStr).region(matchStartPos, inputStr.length());
     StringBuffer sb;
 
-    if (occurence >= 0) {
+    if (occurrence >= 0) {
       sb = new StringBuffer(inputStr);
-      while (occurence >= 0 && matcher.find()) {
-        if (occurence == 0) {
+      while (occurrence >= 0 && matcher.find()) {
+        if (occurrence == 0) {
           sb.replace(matcher.start(), matcher.end(), replaceStr);
           break;
         }
-        occurence--;
+        occurrence--;
       }
     } else {
       sb = new StringBuffer();

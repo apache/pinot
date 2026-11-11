@@ -36,14 +36,12 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
   private final boolean _hasDataLoss;
   private final long _sizeInBytes;
 
-  /**
-   * @param messages the messages, which may be smaller than {@see unfilteredMessageCount}
-   * @param unfilteredMessageCount how many messages were received from the topic before being filtered
-   * @param offsetOfNextBatch the offset of the next batch
-   * @param firstOffset the offset of the first unfiltered message, -1 if no unfiltered messages
-   * @param lastMessageMetadata metadata for the last unfiltered message in the batch, useful for estimating ingestion
-   *                            delay when a batch has all messages filtered.
-   */
+  /// @param messages the messages, which may be smaller than {@see unfilteredMessageCount}
+  /// @param unfilteredMessageCount how many messages were received from the topic before being filtered
+  /// @param offsetOfNextBatch the offset of the next batch
+  /// @param firstOffset the offset of the first unfiltered message, -1 if no unfiltered messages
+  /// @param lastMessageMetadata metadata for the last unfiltered message in the batch, useful for estimating ingestion
+  ///                            delay when a batch has all messages filtered.
   public KafkaMessageBatch(List<BytesStreamMessage> messages, int unfilteredMessageCount, long offsetOfNextBatch,
       long firstOffset, @Nullable StreamMessageMetadata lastMessageMetadata, boolean hasDataLoss, long sizeInBytes) {
     _messages = messages;

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api;
 
-import java.io.IOException;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -31,9 +30,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Test for {@link org.apache.pinot.controller.api.resources.PinotControllerAppConfigs} class.
- */
+/// Test for [org.apache.pinot.controller.api.resources.PinotControllerAppConfigs] class.
 public class PinotControllerAppConfigsTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
 
@@ -43,19 +40,15 @@ public class PinotControllerAppConfigsTest {
     TEST_INSTANCE.setupSharedStateAndValidate();
   }
 
-  /**
-   * Asserts that app configurations returned by the controller endpoint
-   * are as expected.
-   * @throws IOException In case of exception
-   */
+  /// Asserts that app configurations returned by the controller endpoint
+  /// are as expected.
   @Test
   public void testControllerAppConfigs()
-      throws IOException {
+      throws Exception {
     ControllerConf expectedControllerConf = TEST_INSTANCE.getControllerConfig();
     PinotAppConfigs expected = new PinotAppConfigs(expectedControllerConf);
 
-    String configsJson = ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forAppConfigs());
-    PinotAppConfigs actual = JsonUtils.stringToObject(configsJson, PinotAppConfigs.class);
+    PinotAppConfigs actual = TEST_INSTANCE.getOrCreateAdminClient().getClusterClient().getAppConfigs();
 
     // RuntimeConfig is not checked as it has information that can change during the test run.
     // Also, some of the system configs can change, so compare the ones that don't.

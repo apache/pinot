@@ -43,6 +43,9 @@ enum ColumnDataType {
   BYTES_ARRAY = 18;
   UNKNOWN = 19;
   MAP = 20;
+  BIG_DECIMAL_ARRAY = 21;
+  UUID = 22;
+  UUID_ARRAY = 23;
 }
 
 message InputRef {
@@ -64,6 +67,7 @@ message Literal {
     FloatArray floatArray = 11;
     DoubleArray doubleArray = 12;
     StringArray stringArray = 13;
+    BytesArray bytesArray = 14;
   }
 }
 
@@ -85,6 +89,10 @@ message DoubleArray {
 
 message StringArray {
   repeated string values = 1;
+}
+
+message BytesArray {
+  repeated bytes values = 1;
 }
 
 message FunctionCall {

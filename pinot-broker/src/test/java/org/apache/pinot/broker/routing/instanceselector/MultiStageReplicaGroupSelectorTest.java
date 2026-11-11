@@ -21,7 +21,6 @@ package org.apache.pinot.broker.routing.instanceselector;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,12 +38,14 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.broker.routing.instanceselector.SelectionResultTestUtils.getSegmentToInstanceMap;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
@@ -59,7 +60,10 @@ public class MultiStageReplicaGroupSelectorTest {
   private final static List<String> SEGMENTS =
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
-  private static final Map<String, ServerInstance> EMPTY_SERVER_MAP = Collections.EMPTY_MAP;
+
+  private static final Map<String, ServerInstance> EMPTY_SERVER_MAP = Map.of();
+
+  private static final InstanceSelectorConfig INSTANCE_SELECTOR_CONFIG = new InstanceSelectorConfig(false, 300, false);
   private AutoCloseable _mocks;
   @Mock
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -69,6 +73,8 @@ public class MultiStageReplicaGroupSelectorTest {
   private BrokerRequest _brokerRequest;
   @Mock
   private PinotQuery _pinotQuery;
+  @Mock
+  private TableConfig _tableConfig;
 
   private static List<String> getSegments() {
     return SEGMENTS;
@@ -83,6 +89,7 @@ public class MultiStageReplicaGroupSelectorTest {
     _mocks = MockitoAnnotations.openMocks(this);
     when(_brokerRequest.getPinotQuery()).thenReturn(_pinotQuery);
     when(_pinotQuery.getQueryOptions()).thenReturn(null);
+    when(_tableConfig.getTableName()).thenReturn(TABLE_NAME);
   }
 
   @AfterMethod
@@ -104,23 +111,24 @@ public class MultiStageReplicaGroupSelectorTest {
     Set<String> onlineSegments = new HashSet<>();
 
     setupBasicTestEnvironment(enabledInstances, idealState, externalView, onlineSegments);
-    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
         onlineSegments);
 
     // Using requestId=0 should select replica-group 0. Even segments get assigned to instance-0 and odd segments get
     // assigned to instance-1.
     Map<String, String> expectedSelectorResult = createExpectedAssignment(replicaGroup0, getSegments());
     InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // Using same requestId again should return the same selection
     selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // Using requestId=1 should select replica-group 1
     expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
     selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // Add a new LLC segment to the list of segments but don't update segment states. The selection result should
     // remain the same.
@@ -128,7 +136,7 @@ public class MultiStageReplicaGroupSelectorTest {
     LLCSegmentName newSegmentName = getLLCSegmentName(System.currentTimeMillis());
     segments.add(newSegmentName.getSegmentName());
     selectionResult = multiStageSelector.select(_brokerRequest, segments, 1);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // Test with an LLC segment that is older than the new segment expiration time.
     long delta = multiStageSelector._newSegmentExpirationTimeInSeconds * 1000 + 10_000;
@@ -167,20 +175,23 @@ public class MultiStageReplicaGroupSelectorTest {
     Set<String> onlineSegments = new HashSet<>();
 
     setupBasicTestEnvironment(enabledInstances, idealState, externalView, onlineSegments);
-    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
         onlineSegments);
 
     // If instance-0 is down, replica-group 1 should be picked even with requestId=0
     enabledInstances.remove("instance-0");
-    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
         onlineSegments);
     Map<String, String> expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
     InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // If instance-2 also goes down, no replica-group is eligible
     enabledInstances.remove("instance-2");
-    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
         onlineSegments);
     try {
       multiStageSelector.select(_brokerRequest, getSegments(), 0);
@@ -216,7 +227,8 @@ public class MultiStageReplicaGroupSelectorTest {
     externalView.getRecord().getMapFields().get("segment1").put("instance-1", "ERROR");
     externalView.getRecord().getMapFields().get("segment2").put("instance-2", "ERROR");
 
-    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
         onlineSegments);
 
     // Even though instance-0 and instance-3 belong to different replica groups, they handle exclusive sets of segments
@@ -230,12 +242,13 @@ public class MultiStageReplicaGroupSelectorTest {
       }
     }
     InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // If instance-3 has an error segment as well, there is no replica group available to serve complete set of
     // segments.
     externalView.getRecord().getMapFields().get("segment3").put("instance-3", "ERROR");
-    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
         onlineSegments);
     try {
       multiStageSelector.select(_brokerRequest, getSegments(), 0);
@@ -265,23 +278,21 @@ public class MultiStageReplicaGroupSelectorTest {
     Set<String> onlineSegments = new HashSet<>();
 
     setupBasicTestEnvironment(enabledInstances, idealState, externalView, onlineSegments);
-    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+    multiStageSelector.init(_tableConfig, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
         onlineSegments);
 
     InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
 
-    // Because instanceToPartitionMap is unaware of instances in IS/EV, segments get grouped under a null partition
-    // and are never considered in the [0..numPartitions) loop, resulting in dropped segments.
-    assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
-    assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
+    // Because the instances in IS/EV are not in the instance partitions, the segments are not queried in any instance
+    // partition, resulting in dropped segments.
+    assertTrue(selectionResult.getInstanceToSegmentsMap().isEmpty());
     // Old segments are available in IS/EV, so they should not be marked as unavailable; they are effectively dropped.
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }
 
   private MultiStageReplicaGroupSelector createMultiStageSelector(InstancePartitions instancePartitions) {
-    MultiStageReplicaGroupSelector multiStageSelector =
-        new MultiStageReplicaGroupSelector(TABLE_NAME, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
-            new InstanceSelectorConfig(false, 300, false));
+    MultiStageReplicaGroupSelector multiStageSelector = new MultiStageReplicaGroupSelector();
     multiStageSelector = spy(multiStageSelector);
     doReturn(instancePartitions).when(multiStageSelector).getInstancePartitions();
     return multiStageSelector;

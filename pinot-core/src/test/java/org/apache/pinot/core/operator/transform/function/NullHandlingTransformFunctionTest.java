@@ -106,7 +106,7 @@ public class NullHandlingTransformFunctionTest {
       _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
       _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
-      _bytesSVValues[i] = RandomStringUtils.randomAlphanumeric(26).getBytes();
+      _bytesSVValues[i] = RandomStringUtils.secure().nextAlphanumeric(26).getBytes();
 
       _timeValues[i] = currentTimeMs - RANDOM.nextInt(365 * 24 * 3600) * 1000L;
       _nullValues[i] = nullValueRandom.nextInt(2) > 0;

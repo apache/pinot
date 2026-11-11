@@ -49,7 +49,10 @@ import org.apache.pinot.segment.spi.memory.EmptyIndexBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,11 +79,20 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   private static final long MAGIC_MARKER = 0xdeadbeefdeafbeadL;
   private static final int MAGIC_MARKER_SIZE_BYTES = 8;
 
+  /// Prefix of the [RuntimeException] message thrown when a requested index is absent from the
+  /// segment directory. Single source of truth: [FilePerIndexDirectory] reuses it for the same
+  /// signal, and `VectorIndexUtils#getConsolidatedVectorEntry` matches against it (in the same
+  /// package) to distinguish "no consolidated entry yet" from a genuine failure. Keep them wired to
+  /// this constant rather than re-typing the literal so the produce/match sides cannot drift apart.
+  static final String INDEX_NOT_FOUND_MESSAGE_PREFIX = "Could not find index for column";
+
   // Max size of buffer we want to allocate
   // ByteBuffer limits the size to 2GB - (some platform dependent size)
   // This breaks the abstraction with PinotDataBuffer....a workaround for
   // now till PinotDataBuffer can support large buffers again
   private static final int MAX_ALLOCATION_SIZE = 2000 * 1024 * 1024;
+
+  private static final String TASK_CONFIG_JSON_PROPERTY = "task.config.json";
 
   private final File _segmentDirectory;
   private final SegmentDirectoryLoaderContext _segmentDirectoryLoaderContext;
@@ -102,11 +114,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     this(segmentDirectory, segmentMetadata, null, readMode);
   }
 
-  /**
-   * @param segmentDirectory File pointing to segment directory
-   * @param segmentMetadata segment metadata. Metadata must be fully initialized
-   * @param readMode mmap vs heap mode
-   */
+  /// @param segmentDirectory File pointing to segment directory
+  /// @param segmentMetadata segment metadata. Metadata must be fully initialized
+  /// @param readMode mmap vs heap mode
   public SingleFileIndexDirectory(File segmentDirectory, SegmentMetadataImpl segmentMetadata,
       @Nullable SegmentDirectoryLoaderContext segmentDirectoryLoaderContext, ReadMode readMode)
       throws IOException, ConfigurationException {
@@ -155,8 +165,11 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     if (type == StandardIndexes.text() && TextIndexUtils.hasTextIndex(_segmentDirectory, column)) {
       return true;
     }
-    if (type == StandardIndexes.vector()) {
-      return VectorIndexUtils.hasVectorIndex(_segmentDirectory, column);
+    // Vector index may live either as a combined file (legacy / storeInSegmentFile=false) or as
+    // a typed entry inside columns.psf (storeInSegmentFile=true). Check both — mirror the text
+    // pattern of "combined OR _columnEntries".
+    if (type == StandardIndexes.vector() && VectorIndexUtils.hasVectorIndex(_segmentDirectory, column)) {
+      return true;
     }
     IndexKey key = new IndexKey(column, type);
     return _columnEntries.containsKey(key);
@@ -167,7 +180,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     IndexEntry entry = _columnEntries.get(key);
     if (entry == null || entry._buffer == null) {
       throw new RuntimeException(
-          "Could not find index for column: " + column + ", type: " + type + ", segment: " + _segmentDirectory
+          INDEX_NOT_FOUND_MESSAGE_PREFIX + ": " + column + ", type: " + type + ", segment: " + _segmentDirectory
               .toString());
     }
     return entry._buffer;
@@ -233,7 +246,14 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
       String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _segmentDirectory.getPath());
-      IndexKey indexKey = IndexKey.fromIndexName(parsedKeys[0], parsedKeys[1]);
+      IndexKey indexKey;
+      try {
+        indexKey = IndexKey.fromIndexName(parsedKeys[0], parsedKeys[1]);
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn("Skipping unknown index type: {} for column: {} in segment: {}", parsedKeys[1], parsedKeys[0],
+            _segmentDirectory);
+        continue;
+      }
       IndexEntry entry = _columnEntries.get(indexKey);
       if (entry == null) {
         entry = new IndexEntry(indexKey);
@@ -283,9 +303,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
   }
 
-  /**
-   * Creates buffers for entries with non-zero size, handling memory allocation limits
-   */
+  /// Creates buffers for entries with non-zero size, handling memory allocation limits
   private void createPinotBuffers(List<IndexEntry> regularEntries) throws IOException {
     // Use TreeMap for better memory management of regular entries
     SortedMap<Long, IndexEntry> indexStartMap = new TreeMap<>();
@@ -321,10 +339,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     }
   }
 
-  /**
-   * Creates empty buffers for zero-size entries, using EmptyIndexBuffer
-   * Buffers created this way do not occupy space in the index file and pinot segment
-   */
+  /// Creates empty buffers for zero-size entries, using EmptyIndexBuffer
+  /// Buffers created this way do not occupy space in the index file and pinot segment
   private void createRemoteBuffers(List<IndexEntry> zeroSizeEntries) {
     // Create properties only once for all zero-size entries
     Properties properties = new Properties();
@@ -333,11 +349,51 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       properties.putAll(_segmentDirectoryLoaderContext.getSegmentCustomConfigs());
     }
 
+    // Propagate segment-level custom metadata so downstream readers can read it
+    if (_segmentMetadata != null && _segmentMetadata.getCustomMap() != null) {
+      properties.putAll(_segmentMetadata.getCustomMap());
+    }
+
+    // Propagate the table's task config (serialized as JSON) to remote/empty index buffers so that
+    // downstream readers backed by external storage can resolve any configuration they require
+    // (e.g. credentials, regions, endpoints) from the ingestion task config rather than relying
+    // solely on ambient environment defaults, which may be incomplete or unavailable in this context.
+    String taskConfigJson = serializeTaskConfigToJsonFromContext();
+    if (taskConfigJson != null) {
+      properties.setProperty(TASK_CONFIG_JSON_PROPERTY, taskConfigJson);
+    }
+
     // Create empty buffers for all zero-size entries
     for (IndexEntry entry : zeroSizeEntries) {
       entry._buffer = new EmptyIndexBuffer(properties,
           _segmentMetadata.getName(),
           _segmentMetadata.getTableName());
+    }
+  }
+
+  @Nullable
+  private String serializeTaskConfigToJsonFromContext() {
+    if (_segmentDirectoryLoaderContext == null) {
+      return null;
+    }
+    TableConfig tableConfig = _segmentDirectoryLoaderContext.getTableConfig();
+    if (tableConfig == null) {
+      return null;
+    }
+    TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+    if (taskConfig == null) {
+      return null;
+    }
+    Map<String, Map<String, String>> taskTypeConfigsMap = taskConfig.getTaskTypeConfigsMap();
+    if (taskTypeConfigsMap == null || taskTypeConfigsMap.isEmpty()) {
+      return null;
+    }
+    try {
+      return JsonUtils.objectToString(taskTypeConfigsMap);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to serialize task config to JSON for segment: {}",
+          _segmentMetadata.getName(), e);
+      return null;
     }
   }
 
@@ -405,11 +461,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     return this.getClass().getSimpleName() + key.toString();
   }
 
-  /**
-   * This method sweeps the indices marked for removal. Exception is simply bubbled up w/o
-   * trying to recover disk states from failure. This method is expected to run during segment
-   * reloading, which has failure handling by creating a backup folder before doing reloading.
-   */
+  /// This method sweeps the indices marked for removal. Exception is simply bubbled up w/o
+  /// trying to recover disk states from failure. This method is expected to run during segment
+  /// reloading, which has failure handling by creating a backup folder before doing reloading.
   private void cleanupRemovedIndices()
       throws IOException {
     File tmpIdxFile = new File(_segmentDirectory, V1Constants.INDEX_FILE_NAME + ".tmp");
@@ -449,11 +503,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     // Text index is kept in its own files, thus can be removed directly.
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
-      return;
     }
+    // Vector index can live as a combined file and / or as a typed entry in columns.psf;
+    // clean both. The early-return that was here previously left the columns.psf entry
+    // dangling whenever a consolidated vector index needed to be removed (e.g. rebuild on
+    // backend-type change).
     if (indexType == StandardIndexes.vector()) {
       VectorIndexUtils.cleanupVectorIndex(_segmentDirectory, columnName);
-      return;
     }
     // Only remember to cleanup indices upon close(), if any existing
     // index gets marked for removal.
@@ -467,19 +523,13 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     Set<String> columns = new HashSet<>();
     // TEXT_INDEX is not tracked via _columnEntries, so handled separately.
     if (type == StandardIndexes.text()) {
-      for (String column : _segmentMetadata.getAllColumns()) {
-        if (TextIndexUtils.hasTextIndex(_segmentDirectory, column)) {
-          columns.add(column);
-        }
-      }
+      columns.addAll(TextIndexUtils.getColumnsWithTextIndex(_segmentDirectory, _segmentMetadata.getAllColumns()));
     }
     if (type == StandardIndexes.vector()) {
-      for (String column : _segmentMetadata.getAllColumns()) {
-        if (VectorIndexUtils.hasVectorIndex(_segmentDirectory, column)) {
-          columns.add(column);
-        }
-      }
-      return columns;
+      // Vector may live as a combined file (legacy / storeInSegmentFile=false) or as a typed
+      // entry in columns.psf (storeInSegmentFile=true). Collect both. Removed the early-return
+      // that previously hid consolidated entries from this view.
+      columns.addAll(VectorIndexUtils.getColumnsWithVectorIndex(_segmentDirectory, _segmentMetadata.getAllColumns()));
     }
     for (IndexKey indexKey : _columnEntries.keySet()) {
       if (indexKey._type == type) {
@@ -494,17 +544,15 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     return _indexFile.toString();
   }
 
-  /**
-   * Copy indices, as specified in the Map, from src file to dest file. The Map contains info
-   * about where to find the index data in the src file, like startOffsets and data sizes. The
-   * indices are packed together in the dest file, and their positions are returned.
-   *
-   * @param srcFile contains indices to copy to dest file, and it may contain other data to leave behind.
-   * @param destFile holds the indices copied from src file, and those indices appended one after another.
-   * @param indicesToCopy specifies where to find the indices in the src file, with offset and size info.
-   * @return the offsets and sizes for the indices in the dest file.
-   * @throws IOException from FileChannels upon failure to r/w the index files, and simply raised to caller.
-   */
+  /// Copy indices, as specified in the Map, from src file to dest file. The Map contains info
+  /// about where to find the index data in the src file, like startOffsets and data sizes. The
+  /// indices are packed together in the dest file, and their positions are returned.
+  ///
+  /// @param srcFile contains indices to copy to dest file, and it may contain other data to leave behind.
+  /// @param destFile holds the indices copied from src file, and those indices appended one after another.
+  /// @param indicesToCopy specifies where to find the indices in the src file, with offset and size info.
+  /// @return the offsets and sizes for the indices in the dest file.
+  /// @throws IOException from FileChannels upon failure to r/w the index files, and simply raised to caller.
   @VisibleForTesting
   static List<IndexEntry> copyIndices(File srcFile, File destFile, TreeMap<IndexKey, IndexEntry> indicesToCopy)
       throws IOException {

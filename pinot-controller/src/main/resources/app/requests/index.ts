@@ -221,6 +221,57 @@ export const getTaskGeneratorDebug = (taskName: string, taskType: string): Promi
 export const getTaskTypeDebug = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
 
+// All admin / status helpers below intentionally use `baseApiWithErrors` so that
+// 4xx/5xx responses actually reject. `baseApi` swallows error responses (see
+// axios-config.ts: "control will never go to catch block"), which would otherwise
+// let the UI render "Running"/"Successfully deleted task" on top of a failed call.
+export const getTasksSummary = (tenant?: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/summary`, { headers: { ...headers, Accept: 'application/json' }, params: tenant ? { tenant } : {} });
+
+export const getTaskCounts = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/${taskType}/taskcounts`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskStates = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/${taskType}/taskstates`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getCronSchedulerInformation = (): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/scheduler/information`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const deleteSingleTask = (taskName: string, forceDelete = false): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.delete(`/tasks/task/${taskName}`, {
+    headers: { ...headers, Accept: 'application/json' },
+    params: { forceDelete }
+  });
+
+export const getInstanceLogFiles = (instanceName: string): Promise<AxiosResponse<string[]>> =>
+  baseApiWithErrors.get(`/loggers/instances/${instanceName}`, { headers: { ...headers, Accept: 'application/json' } });
+
+// Fetches the log file as a Blob through the authenticated axios client so that
+// auth headers (basic / bearer) attached by the request interceptor are preserved.
+// Plain anchor downloads cannot reuse those headers, so we route through axios
+// and trigger a download via createObjectURL on the client side.
+export const downloadInstanceLogFile = (
+  instanceName: string,
+  filePath: string
+): Promise<AxiosResponse<Blob>> =>
+  baseApiWithErrors.get(`/loggers/instances/${instanceName}/download`, {
+    params: { filePath },
+    responseType: 'blob',
+  });
+
+// `runPeriodicTask` (above) is shared with legacy callers and stays on baseApi
+// to preserve their behavior. The error-aware variant is used by the new Run
+// Periodic Task dialog so a failed invocation surfaces an error toast rather
+// than a misleading success.
+export const runPeriodicTaskWithErrors = (
+  taskName: string,
+  tableName?: string,
+  tableType?: string
+): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/periodictask/run`, {
+    params: { taskname: taskName, tableName, type: tableType },
+  });
+
 export const getTables = (params): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tables`, { params, headers: { ...headers, Accept: 'application/json' } });
 
@@ -233,6 +284,15 @@ export const getQueryTables = (type?: string): Promise<AxiosResponse<QueryTables
 export const getLogicalTables = (): Promise<AxiosResponse<string[]>> =>
   baseApi.get(`/logicalTables`);
 
+export const getLogicalTable = (name: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/logicalTables/${name}`);
+
+export const putLogicalTable = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/logicalTables/${name}`, params, { headers });
+
+export const deleteLogicalTable = (name: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/logicalTables/${name}`, { headers });
+
 export const getTableSchema = (name: string): Promise<AxiosResponse<TableSchema>> =>
   baseApi.get(`/tables/${name}/schema`);
 
@@ -240,7 +300,7 @@ export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>
   transformApi.post(`/sql`, params, {headers});
 
 export const getTimeSeriesQueryResult = (params: Object): Promise<AxiosResponse<any>> =>
-  transformApi.get(`/timeseries/api/v1/query_range`, { params });
+  transformApi.post(`/query/timeseries`, params);
 
 export const getTimeSeriesLanguages = (): Promise<AxiosResponse<string[]>> =>
   baseApi.get('/timeseries/languages');
@@ -334,7 +394,7 @@ export const getInfo = (): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/auth/info`);
 
 export const authenticateUser = (authToken): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/auth/verify`, {headers:{"Authorization": authToken}});
+  baseApi.get(`/auth/verify/v2`, {headers:{"Authorization": authToken}});
 
 export const getSegmentDebugInfo = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`debug/tables/${tableName}?type=${tableType}&verbosity=10`);
@@ -358,3 +418,14 @@ export const requestDeleteUser = (userObject: UserObject): Promise<AxiosResponse
 
 export const requestUpdateUser = (userObject: UserObject, passwordChanged: boolean): Promise<AxiosResponse<any>> =>
     baseApi.put(`/users/${userObject.username}?component=${userObject.component}&passwordChanged=${passwordChanged}`, JSON.stringify(userObject), {headers});
+
+// Materialized Views
+
+export const getMaterializedViewList = (): Promise<AxiosResponse<any>> =>
+    baseApi.get('/materializedViews');
+
+export const getMaterializedView = (viewTableName: string): Promise<AxiosResponse<any>> =>
+    baseApi.get(`/materializedViews/${viewTableName}`);
+
+export const deleteMaterializedView = (viewTableName: string): Promise<AxiosResponse<any>> =>
+    baseApi.delete(`/materializedViews/${viewTableName}`, {headers});

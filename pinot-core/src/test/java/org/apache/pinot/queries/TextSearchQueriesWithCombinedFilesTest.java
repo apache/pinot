@@ -23,10 +23,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.FieldConfig;
 
-/**
- * Test class that runs all the same tests as TextSearchQueriesTest but with storeInSegmentFile=true.
- * This ensures that all text search functionality works correctly with the store in segment file configuration.
- */
+/// Test class that runs all the same tests as TextSearchQueriesTest but with storeInSegmentFile=true.
+/// This ensures that all text search functionality works correctly with the store in segment file configuration.
 public class TextSearchQueriesWithCombinedFilesTest extends TextSearchQueriesTest {
 
   @Override

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.forward;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -28,26 +29,27 @@ import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.MapUtils.PreparedMapKey;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Single-value forward index reader-writer for variable length values (STRING and BYTES).
- */
+/// Single-value forward index reader-writer for variable length values (STRING and BYTES).
 public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   private final DataType _storedType;
   private final MutableOffHeapByteArrayStore _byteArrayStore;
-  private int _lengthOfShortestElement;
-  private int _lengthOfLongestElement;
+
+  private int _lengthOfShortestElement = Integer.MAX_VALUE;
+  private int _lengthOfLongestElement = 0;
+  private boolean _isAscii;
 
   public VarByteSVMutableForwardIndex(DataType storedType, PinotDataBufferMemoryManager memoryManager,
       String allocationContext, int estimatedMaxNumberOfValues, int estimatedAverageStringLength) {
     _storedType = storedType;
     _byteArrayStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedMaxNumberOfValues,
         estimatedAverageStringLength);
-    _lengthOfShortestElement = Integer.MAX_VALUE;
-    _lengthOfLongestElement = Integer.MIN_VALUE;
+    _isAscii = storedType == DataType.STRING;
   }
 
   @Override
@@ -76,6 +78,11 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
+  public boolean isAscii() {
+    return _isAscii;
+  }
+
+  @Override
   public BigDecimal getBigDecimal(int docId) {
     return BigDecimalUtils.deserialize(_byteArrayStore.get(docId));
   }
@@ -95,6 +102,23 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
     return MapUtils.deserializeMap(getBytes(docId));
   }
 
+  @Nullable
+  @Override
+  public Object getMapEntryValue(int docId, ForwardIndexReaderContext context, PreparedMapKey key) {
+    return MapUtils.deserializeMapEntryValue(_byteArrayStore.getByteBuffer(docId), key);
+  }
+
+  @Override
+  public String getMapAsJsonString(int docId, ForwardIndexReaderContext context) {
+    return MapUtils.frameToJsonString(getBytes(docId));
+  }
+
+  @Override
+  @Nullable
+  public String getMapEntryValueAsString(int docId, ForwardIndexReaderContext context, PreparedMapKey key) {
+    return MapUtils.deserializeMapEntryValueAsString(_byteArrayStore.getByteBuffer(docId), key);
+  }
+
   @Override
   public void setBigDecimal(int docId, BigDecimal value) {
     setBytes(docId, BigDecimalUtils.serialize(value));
@@ -102,7 +126,11 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
 
   @Override
   public void setString(int docId, String value) {
-    setBytes(docId, value.getBytes(UTF_8));
+    byte[] bytes = Utf8Utils.encode(value);
+    setBytes(docId, bytes);
+    if (_isAscii) {
+      _isAscii = bytes.length == value.length();
+    }
   }
 
   @Override

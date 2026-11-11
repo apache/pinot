@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -30,13 +29,13 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * An operator for order-by queries DESC that are partially sorted over the sorting keys.
- *
- * @see LinearSelectionOrderByOperator
- */
+/// An operator for order-by queries DESC that are partially sorted over the sorting keys.
+/// The planner guarantees the sorted prefix can be read in reverse; a literal-only prefix imposes no direction.
+///
+/// @see LinearSelectionOrderByOperator
 public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrderByOperator {
 
   private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_DESC";
@@ -46,31 +45,27 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
   public SelectionPartiallyOrderedByDescOperation(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
-    assert queryContext.getOrderByExpressions() != null;
-    Preconditions.checkArgument(!queryContext.getOrderByExpressions().stream()
-            .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
-            .isAsc(),
-        "%s can only be used when the first column in order by is DESC", EXPLAIN_NAME);
   }
 
   @Override
   protected List<Object[]> fetch(Supplier<ListBuilder> listBuilderSupplier) {
 
-    // Ideally we would use a descending cursor, but we don't actually have them
-    // Alternatively, we could store all blocks in a list and iterate them in reverse order, but ProjectionBlocks share
-    // the same DataBlockCache, so they may be ephemeral and being overridden by the next block.
-    // The only alternative we have right now is to retrieve the last LIMIT elements from each block
+    // This path handles projections that cannot iterate in descending order. Keep the best rows from each block
+    // because the blocks share a mutable DataBlockCache and cannot be buffered for reverse iteration.
 
-    int numExpressions = _expressions.size();
-    BlockValSet[] blockValSets = new BlockValSet[numExpressions];
+    BlockValSet[] blockValSets = new BlockValSet[_numOrderByExpressions];
     List<Object[]> localBestRows = new ArrayList<>();
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       IntFunction<Object[]> rowFetcher = fetchBlock(valueBlock, blockValSets);
       int numDocsFetched = valueBlock.getNumDocs();
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsFetched);
+        scanCost.addEntriesScannedPostFilter(
+            (long) numDocsFetched * _projectOperator.getNumColumnsProjected());
+      }
       ListBuilder listBuilder = listBuilderSupplier.get();
 
       // first, calculate the best rows on this block

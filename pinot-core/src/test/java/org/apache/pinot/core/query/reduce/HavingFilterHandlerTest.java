@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.util.UUID;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -96,6 +97,26 @@ public class HavingFilterHandlerTest {
       assertFalse(havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "10", new byte[]{17}, 5}));
       assertFalse(havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "11", new byte[]{16}, 5}));
     }
+  }
+
+  /// A UUID column reaches [PredicateRowMatcher] as a `java.util.UUID`, not as the internal `ByteArray`:
+  /// `GroupByDataTableReducer` runs every column through `ColumnDataType#convert` immediately before calling
+  /// `isMatch`, and that returns `UuidUtils.toUUID(...)` for UUID. This pins that contract, since the matcher
+  /// casts directly rather than accepting several input forms.
+  @Test
+  public void testHavingFilterOnUuidColumn() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable GROUP BY d1 HAVING d1 = '550e8400-e29b-41d4-a716-446655440000'");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "count(*)"},
+        new ColumnDataType[]{ColumnDataType.UUID, ColumnDataType.LONG});
+    PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
+    HavingFilterHandler havingFilterHandler =
+        new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler, false);
+
+    UUID matching = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    UUID other = UUID.fromString("550e8400-e29b-41d4-a716-446655440001");
+    assertTrue(havingFilterHandler.isMatch(new Object[]{matching, 5L}));
+    assertFalse(havingFilterHandler.isMatch(new Object[]{other, 5L}));
   }
 
   @Test

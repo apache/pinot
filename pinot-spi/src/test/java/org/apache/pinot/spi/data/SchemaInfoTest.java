@@ -34,6 +34,30 @@ import static org.testng.Assert.assertEquals;
 
 public class SchemaInfoTest {
 
+  /// The schema `SchemaInfo` is built from has usually been through the broker's `addBuiltInVirtualColumns`, which adds
+  /// every built-in virtual column as a plain dimension field. None of them may be reported as a user dimension,
+  /// whatever their number.
+  @Test
+  public void testBuiltInVirtualColumnsAreNotCounted() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("TestSchema")
+        .addDimensionField("dim1", FieldSpec.DataType.STRING)
+        .addDimensionField("dim2", FieldSpec.DataType.INT)
+        .addDateTimeField("dt1", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addMetricField("metric", INT)
+        .build();
+    assertEquals(new SchemaInfo(schema).getNumDimensionFields(), 2);
+
+    // Adding the built-in virtual columns must not change the reported dimension count
+    BuiltInVirtualColumnDefinitions.addToSchema(schema);
+    assertEquals(schema.getDimensionFieldSpecs().size(),
+        2 + CommonConstants.Segment.BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.size());
+    SchemaInfo schemaInfo = new SchemaInfo(schema);
+    assertEquals(schemaInfo.getNumDimensionFields(), 2);
+    assertEquals(schemaInfo.getNumDateTimeFields(), 1);
+    assertEquals(schemaInfo.getNumMetricFields(), 1);
+    assertEquals(schemaInfo.getNumComplexFields(), 0);
+  }
+
   @Test
   public void testSchemaInfoSerDeserWithVirtualColumns()
       throws IOException {

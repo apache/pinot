@@ -22,15 +22,11 @@ import java.util.List;
 import java.util.Map;
 
 
-/**
- * Metadata classes for Lucene text index buffer.
- * Contains BufferMetadata and FileInfo classes with proper getter APIs.
- */
+/// Metadata classes for Lucene text index buffer.
+/// Contains BufferMetadata and FileInfo classes with proper getter APIs.
 public class LuceneTextIndexHeader {
 
-  /**
-   * Metadata class for buffer information
-   */
+  /// Metadata class for buffer information
   public static class TextIndexMetadata {
     private final String _magicNumber;
     private final int _version;
@@ -74,9 +70,7 @@ public class LuceneTextIndexHeader {
     }
   }
 
-  /**
-   * File information class
-   */
+  /// File information class
   public static class FileInfo {
     private final String _name;
     private final long _offset;

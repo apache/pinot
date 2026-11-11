@@ -22,9 +22,7 @@ import java.io.Serializable;
 import org.apache.pinot.spi.data.readers.RecordReader;
 
 
-/**
- * Data source used to build segments.
- */
+/// Data source used to build segments.
 public interface SegmentCreationDataSource extends Serializable {
   SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig);
 

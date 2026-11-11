@@ -28,6 +28,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -64,6 +65,17 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
+
     when(segMngrA0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(15));
     when(segMngrA1.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(150));
     when(segMngrB0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(1500));
@@ -117,6 +129,13 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
 
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+
     //           latest ingested offset    latest stream offset
     // segA0               10                     15
     // segA1               100                    150
@@ -130,6 +149,10 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     // setup the remaining SegmentDataManager
     RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
 
     //           latest ingested offset     latest stream offset
     // segA0               20                      15
@@ -178,6 +201,16 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
 
     //           latest ingested offset    latest stream offset
     // segA0              10                       15
@@ -233,6 +266,16 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segA1Provider = mock(StreamMetadataProvider.class);
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA1)).thenReturn(segA1Provider);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0)).thenReturn(segB0Provider);
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA1Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
 
     //           latest ingested offset    latest stream offset
     // segA0              10                       15

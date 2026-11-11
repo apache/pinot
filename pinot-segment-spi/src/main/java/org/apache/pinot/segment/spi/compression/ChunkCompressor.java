@@ -23,34 +23,26 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 
-/**
- * Interface to compress a chunk of data.
- */
+/// Interface to compress a chunk of data.
 public interface ChunkCompressor extends Closeable {
 
-  /**
-   * This method compresses the given data. The output compressed ByteBuffer is returned ready for read.
-   *
-   * @param inUncompressed Input data to be compressed.
-   * @param outCompressed Output compressed data.
-   * @return Size of the compressed output data.
-   *
-   * @throws IOException
-   */
+  /// This method compresses the given data. The output compressed ByteBuffer is returned ready for read.
+  ///
+  /// @param inUncompressed Input data to be compressed.
+  /// @param outCompressed Output compressed data.
+  /// @return Size of the compressed output data.
+  ///
+  /// @throws IOException
   int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException;
 
-  /**
-   * @param uncompressedSize the size of the uncompressed data.
-   * @return the maximum compresses size for a given uncompressed size (may exceed the size of the data).
-   */
+  /// @param uncompressedSize the size of the uncompressed data.
+  /// @return the maximum compresses size for a given uncompressed size (may exceed the size of the data).
   int maxCompressedSize(int uncompressedSize);
 
-  /**
-   * The compression type of this compressor. This may differ from the requested compression type
-   * if it has been upgraded.
-   * @return this compressor's type
-   */
+  /// The compression type of this compressor. This may differ from the requested compression type
+  /// if it has been upgraded.
+  /// @return this compressor's type
   ChunkCompressionType compressionType();
 
   @Override

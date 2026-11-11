@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -49,11 +49,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code TimeSegmentPruner} prunes segments based on their time column start & end time metadata stored in ZK.
- * The pruner
- * supports queries with filter (or nested filter) of EQUALITY and RANGE predicates.
- */
+/// The `TimeSegmentPruner` prunes segments based on their time column start & end time metadata stored in ZK.
+/// The pruner
+/// supports queries with filter (or nested filter) of EQUALITY and RANGE predicates.
 public class TimeSegmentPruner implements SegmentPruner {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeSegmentPruner.class);
   private static final long MIN_START_TIME = 0;
@@ -64,8 +62,16 @@ public class TimeSegmentPruner implements SegmentPruner {
   private final String _timeColumn;
   private final DateTimeFormatSpec _timeFormatSpec;
 
+  /// Rebuilt under the lock on this pruner and read by [#prune(BrokerRequest, Set)] without locking. Each tree is
+  /// immutable, so a query always sees a complete tree.
   private volatile IntervalTree<String> _intervalTree;
+  /// Guarded by the lock on this pruner, except in [#init], which runs before the pruner is used.
   private final Map<String, Interval> _intervalMap = new HashMap<>();
+  /// True while [#_intervalTree] may lag [#_intervalMap]: set before the map is updated and cleared once the tree
+  /// matches it again. If an update throws part way (e.g. with an OutOfMemoryError), the next update rebuilds the tree
+  /// even when it changes nothing, instead of skipping the rebuild and leaving segments missing from the tree. Guarded
+  /// by the lock on this pruner.
+  private boolean _intervalTreeStale;
 
   public TimeSegmentPruner(TableConfig tableConfig, DateTimeFieldSpec timeFieldSpec) {
     _tableNameWithType = tableConfig.getTableName();
@@ -110,27 +116,46 @@ public class TimeSegmentPruner implements SegmentPruner {
       Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
+    boolean treeWasStale = _intervalTreeStale;
+    _intervalTreeStale = true;
+    int numSegmentsBefore = _intervalMap.size();
     for (int idx = 0; idx < pulledSegments.size(); idx++) {
       String segment = pulledSegments.get(idx);
       ZNRecord zNrecord = znRecords.get(idx);
       _intervalMap.computeIfAbsent(segment, k -> extractIntervalFromSegmentZKMetaZNRecord(k, zNrecord));
     }
-    _intervalMap.keySet().retainAll(onlineSegments);
-    _intervalTree = new IntervalTree<>(_intervalMap);
+    // Only insertions can change the size because computeIfAbsent never replaces an existing interval. An external
+    // view change that adds and removes no segment (e.g. a replica changing state) leaves the tree correct as is.
+    boolean segmentsChanged = _intervalMap.size() != numSegmentsBefore;
+    segmentsChanged |= _intervalMap.keySet().retainAll(onlineSegments);
+    if (segmentsChanged || treeWasStale) {
+      _intervalTree = new IntervalTree<>(_intervalMap);
+    }
+    _intervalTreeStale = false;
   }
 
   @Override
   public synchronized void refreshSegment(String segment, @Nullable ZNRecord znRecord) {
     Interval interval = extractIntervalFromSegmentZKMetaZNRecord(segment, znRecord);
-    _intervalMap.put(segment, interval);
-    _intervalTree = new IntervalTree<>(_intervalMap);
+    boolean treeWasStale = _intervalTreeStale;
+    _intervalTreeStale = true;
+    Interval previousInterval = _intervalMap.put(segment, interval);
+    // A segment is commonly refreshed onto the time interval it already has (e.g. an OFFLINE segment replaced with a
+    // new build of the same time range), which leaves the tree correct as is
+    if (treeWasStale || !interval.equals(previousInterval)) {
+      _intervalTree = new IntervalTree<>(_intervalMap);
+    }
+    _intervalTreeStale = false;
   }
 
-  /**
-   * NOTE: Pruning is done by searching _intervalTree based on request time interval and check if the results
-   *       are in the input segments. By doing so we will have run time O(M * logN) (N: # of all online segments,
-   *       M: # of qualified intersected segments).
-   */
+  @VisibleForTesting
+  IntervalTree<String> getIntervalTree() {
+    return _intervalTree;
+  }
+
+  /// NOTE: Pruning is done by searching \_intervalTree based on request time interval and check if the results
+  ///       are in the input segments. By doing so we will have run time O(M \* logN) (N: # of all online segments,
+  ///       M: # of qualified intersected segments).
   @Override
   public Set<String> prune(BrokerRequest brokerRequest, Set<String> segments) {
     IntervalTree<String> intervalTree = _intervalTree;
@@ -146,7 +171,7 @@ public class TimeSegmentPruner implements SegmentPruner {
     }
     if (intervals.isEmpty()) {
       // Invalid query time interval
-      return Collections.emptySet();
+      return Set.of();
     }
 
     Set<String> selectedSegments = new HashSet<>();
@@ -160,16 +185,14 @@ public class TimeSegmentPruner implements SegmentPruner {
     return selectedSegments;
   }
 
-  /**
-   * @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT * from myTable where time
-   *         < 50 OR firstName = Jason')
-   *         Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND
-   *         time > 100')
-   *         Sorted time intervals without overlapping if time condition is valid
-   *
-   * TODO: 1. Merge adjacent intervals
-   *       2. Set interval boundary using time granularity instead of millis
-   */
+  /// @return Null if no time condition or cannot filter base on the condition (e.g. 'SELECT \* from myTable where time
+  ///         < 50 OR firstName = Jason')
+  ///         Empty list if time condition is specified but invalid (e.g. 'SELECT * from myTable where time < 50 AND
+  ///         time > 100')
+  ///         Sorted time intervals without overlapping if time condition is valid
+  ///
+  /// TODO: 1. Merge adjacent intervals
+  ///       2. Set interval boundary using time granularity instead of millis
   @Nullable
   private List<Interval> getFilterTimeIntervals(Expression filterExpression) {
     Function function = filterExpression.getFunctionCall();
@@ -182,7 +205,7 @@ public class TimeSegmentPruner implements SegmentPruner {
           List<Interval> childIntervals = getFilterTimeIntervals(child);
           if (childIntervals != null) {
             if (childIntervals.isEmpty()) {
-              return Collections.emptyList();
+              return List.of();
             }
             andIntervals.add(childIntervals);
           }
@@ -278,10 +301,9 @@ public class TimeSegmentPruner implements SegmentPruner {
     return getIntersectionTwoSortedIntervals(interval1, interval2);
   }
 
-  /**
-   * Intersect two list of non-overlapping sorted intervals.
-   * E.g. {[1, 3], [4, 6], [7, 8], [10, 10]} and {[2, 5], [7, 9]} are merged as {[2, 3], [4, 5], [7, 8]}
-   */
+  /// Intersect two list of non-overlapping sorted intervals.
+  /// E.g. {\[1, 3\], \[4, 6\], \[7, 8\], \[10, 10\]} and {\[2, 5\], \[7, 9\]} are merged as {\[2, 3\], \[4, 5\], \[7,
+  /// 8\]}
   private List<Interval> getIntersectionTwoSortedIntervals(List<Interval> intervals1, List<Interval> intervals2) {
     List<Interval> res = new ArrayList<>();
     int size1 = intervals1.size();
@@ -319,10 +341,8 @@ public class TimeSegmentPruner implements SegmentPruner {
     return getUnionTwoSortedIntervals(intervals1, intervals2);
   }
 
-  /**
-   * Union two list of non-overlapping sorted intervals.
-   * E.g. {[1, 2], [5, 7], [9, 10]} and {[2, 3], [4, 8]} are merged as {[1, 3], [4, 8], [9, 10]}
-   */
+  /// Union two list of non-overlapping sorted intervals.
+  /// E.g. {\[1, 2\], \[5, 7\], \[9, 10\]} and {\[2, 3\], \[4, 8\]} are merged as {\[1, 3\], \[4, 8\], \[9, 10\]}
   private List<Interval> getUnionTwoSortedIntervals(List<Interval> intervals1, List<Interval> intervals2) {
     List<Interval> res = new ArrayList<>();
     int size1 = intervals1.size();
@@ -349,9 +369,7 @@ public class TimeSegmentPruner implements SegmentPruner {
     return res;
   }
 
-  /**
-   * Returns the complement (non-overlapping sorted intervals) of the given non-overlapping sorted intervals.
-   */
+  /// Returns the complement (non-overlapping sorted intervals) of the given non-overlapping sorted intervals.
   private List<Interval> getComplementSortedIntervals(List<Interval> intervals) {
     List<Interval> res = new ArrayList<>();
     long startTime = MIN_START_TIME;
@@ -394,10 +412,8 @@ public class TimeSegmentPruner implements SegmentPruner {
     return _timeFormatSpec.fromFormatToMillis(value);
   }
 
-  /**
-   * Parse interval to millisecond as [min, max] with both sides included.
-   * E.g. '(* 16311]' is parsed as [0, 16311], '(1455 16311)' is parsed as [1456, 16310]
-   */
+  /// Parse interval to millisecond as \[min, max\] with both sides included.
+  /// E.g. '(\* 16311\]' is parsed as \[0, 16311\], '(1455 16311)' is parsed as \[1456, 16310\]
   private List<Interval> parseInterval(String rangeString) {
     long startTime = MIN_START_TIME;
     long endTime = MAX_END_TIME;

@@ -19,21 +19,27 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.memory.PrimitiveArrays;
 
 
-public class PercentileAggregationFunction extends NullableSingleInputAggregationFunction<DoubleArrayList, Double> {
+public class PercentileAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, Double> {
+  private static final int DOUBLE_ARRAY_LIST_TYPE = 3;
+
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   //version 0 functions specified in the of form PERCENTILE<2-digits>(column)
@@ -78,8 +84,16 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    DoubleArrayList valueList = getValueList(aggregationResultHolder);
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.isSingleValue()) {
+      aggregateSV(length, aggregationResultHolder, blockValSet);
+    } else {
+      aggregateMV(length, aggregationResultHolder, blockValSet);
+    }
+  }
+
+  protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    DoubleArrayList valueList = getValueList(aggregationResultHolder);
     double[] valueArray = blockValSet.getDoubleValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
@@ -88,10 +102,31 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
     });
   }
 
+  protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+    DoubleArrayList valueList = getValueList(aggregationResultHolder);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (double value : valuesArray[i]) {
+          valueList.add(value);
+        }
+      }
+    });
+  }
+
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
     double[] valueArray = blockValSet.getDoubleValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
@@ -101,10 +136,32 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
     });
   }
 
+  protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
+        for (double value : valuesArray[i]) {
+          valueList.add(value);
+        }
+      }
+    });
+  }
+
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.isSingleValue()) {
+      aggregateSVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    } else {
+      aggregateMVGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
+    }
+  }
+
+  protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
     double[] valueArray = blockValSet.getDoubleValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
@@ -117,24 +174,30 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
     });
   }
 
+  protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
+          for (double value : values) {
+            valueList.add(value);
+          }
+        }
+      }
+    });
+  }
+
   @Override
   public DoubleArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    DoubleArrayList doubleArrayList = aggregationResultHolder.getResult();
-    if (doubleArrayList == null) {
-      return new DoubleArrayList();
-    } else {
-      return doubleArrayList;
-    }
+    return aggregationResultHolder.getResult();
   }
 
   @Override
   public DoubleArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
-    if (doubleArrayList == null) {
-      return new DoubleArrayList();
-    } else {
-      return doubleArrayList;
-    }
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
@@ -149,9 +212,39 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubleArrayList));
+  public DoubleArrayList mergeSerializedIntermediateResult(@Nullable DoubleArrayList intermediateResult,
+      CustomObject serialized) {
+    if (intermediateResult == null) {
+      return deserializeIntermediateResult(serialized);
+    }
+    // Reads the values in bulk straight into the merged list, in the format of
+    // ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE: an int count, then the doubles, in the buffer's byte order. Same
+    // growth as addAll(), without the incoming list.
+    ByteBuffer buffer = serialized.getBuffer();
+    int numValues = buffer.getInt();
+    if (numValues < 0) {
+      throw new IllegalArgumentException("Negative number of values: " + numValues);
+    }
+    if (numValues > buffer.remaining() / Double.BYTES) {
+      throw new BufferUnderflowException();
+    }
+    int size = intermediateResult.size();
+    int newSize = Math.addExact(size, numValues);
+    int capacity = intermediateResult.elements().length;
+    if (newSize > capacity) {
+      // Grow by half like addAll(), capped below the maximum array size, but never below the size set next.
+      int grownCapacity = (int) Math.min((long) capacity + (capacity >> 1), Integer.MAX_VALUE - 8);
+      intermediateResult.ensureCapacity(Math.max(newSize, grownCapacity));
+    }
+    // size() zero-fills the new range, so it must run before the values are copied in.
+    intermediateResult.size(newSize);
+    PrimitiveArrays.readDoubles(buffer, intermediateResult.elements(), size, numValues);
+    return intermediateResult;
+  }
+
+  @Override
+  public SerializedResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
+    return new SerializedValue<>(DOUBLE_ARRAY_LIST_TYPE, doubleArrayList, ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE);
   }
 
   @Override
@@ -164,32 +257,28 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(DoubleArrayList intermediateResult) {
-    int size = intermediateResult.size();
-    if (size == 0) {
-      if (_nullHandlingEnabled) {
-        return null;
-      } else {
-        return DEFAULT_FINAL_RESULT;
-      }
-    } else {
-      double[] values = intermediateResult.elements();
-      Arrays.sort(values, 0, size);
-      if (_percentile == 100) {
-        return values[size - 1];
-      } else {
-        return values[(int) ((long) size * _percentile / 100)];
-      }
+  public Double extractFinalResult(@Nullable DoubleArrayList intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and so does an empty list, which is what a
+    // deserialized peer can still carry. With null handling enabled the percentile of nothing is NULL; with it
+    // disabled it is the sentinel this function has always rendered for an untouched accumulator.
+    if (intermediateResult == null || intermediateResult.isEmpty()) {
+      return _nullHandlingEnabled ? null : DEFAULT_FINAL_RESULT;
     }
+    int size = intermediateResult.size();
+    double[] values = intermediateResult.elements();
+    Arrays.sort(values, 0, size);
+    if (_percentile == 100) {
+      return values[size - 1];
+    }
+    return values[(int) ((long) size * _percentile / 100)];
   }
 
-  /**
-   * Returns the value list from the result holder or creates a new one if it does not exist.
-   *
-   * @param aggregationResultHolder Result holder
-   * @return Value list from the result holder
-   */
+  /// Returns the value list from the result holder or creates a new one if it does not exist.
+  ///
+  /// @param aggregationResultHolder Result holder
+  /// @return Value list from the result holder
   protected static DoubleArrayList getValueList(AggregationResultHolder aggregationResultHolder) {
     DoubleArrayList valueList = aggregationResultHolder.getResult();
     if (valueList == null) {
@@ -199,13 +288,11 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
     return valueList;
   }
 
-  /**
-   * Returns the value list for the given group key. If one does not exist, creates a new one and returns that.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the value list
-   * @return Value list for the group key
-   */
+  /// Returns the value list for the given group key. If one does not exist, creates a new one and returns that.
+  ///
+  /// @param groupByResultHolder Result holder
+  /// @param groupKey Group key for which to return the value list
+  /// @return Value list for the group key
   protected static DoubleArrayList getValueList(GroupByResultHolder groupByResultHolder, int groupKey) {
     DoubleArrayList valueList = groupByResultHolder.getResult(groupKey);
     if (valueList == null) {

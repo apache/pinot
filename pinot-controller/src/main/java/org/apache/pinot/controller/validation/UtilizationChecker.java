@@ -22,39 +22,31 @@ import com.google.common.collect.BiMap;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 
 
-/**
- * Interface for all utilization checkers to be used to by ResourceUtilizationManager and ResourceUtilizationChecker
- */
+/// Interface for all utilization checkers to be used to by ResourceUtilizationManager and ResourceUtilizationChecker
 public interface UtilizationChecker {
-  /**
-   * Get the name of the utilization checker
-   */
+  /// Get the name of the utilization checker
   String getName();
 
-  /**
-   * Returns whether the resource's utilization is within limits
-   * @param tableNameWithType table name with type
-   * @param purpose purpose of this check
-   * @return CheckResult, UNDETERMINED if result cannot be determined, PASS if within limits, FAIL if not within limits
-   */
+  /// Returns whether the resource's utilization is within limits
+  /// @param tableNameWithType table name with type
+  /// @param purpose purpose of this check
+  /// @return CheckResult, UNDETERMINED if result cannot be determined, PASS if within limits, FAIL if not within limits
   CheckResult isResourceUtilizationWithinLimits(String tableNameWithType, CheckPurpose purpose);
 
-  /**
-   * Computes the resource's utilization
-   * @param endpointsToInstances map of endpoints to instances
-   * @param completionServiceHelper the completion service helper
-   */
+  /// Computes the resource's utilization
+  /// @param endpointsToInstances map of endpoints to instances
+  /// @param completionServiceHelper the completion service helper
   void computeResourceUtilization(BiMap<String, String> endpointsToInstances,
       CompletionServiceHelper completionServiceHelper);
 
-  /**
-   * Passed to 'isResourceUtilizationWithinLimits' so that each 'UtilizationChecker' can decide if any special handling
-   * is required depending on the origin of the check
-   */
+  /// Passed to 'isResourceUtilizationWithinLimits' so that each 'UtilizationChecker' can decide if any special handling
+  /// is required depending on the origin of the check
   enum CheckPurpose {
     // REALTIME_INGESTION if the check is performed from the realtime ingestion code path to pause ingestion
     // TASK_GENERATION if the check is performed from the task generation framework to pause creation of new tasks
-    REALTIME_INGESTION, TASK_GENERATION
+    // OFFLINE_SEGMENT_UPLOAD if the check is performed from the offline segment upload code path to reject a segment
+    // upload
+    REALTIME_INGESTION, TASK_GENERATION, OFFLINE_SEGMENT_UPLOAD
   }
 
   enum CheckResult {

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import javax.annotation.Nullable;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.Message;
@@ -28,22 +29,20 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.materializedview.handler.MaterializedViewHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
 
-/**
- * Broker Resource layer state model to take over how to operate on:
- * Adding an external view to routing table.
- *
- *
- */
+/// Broker Resource layer state model to take over how to operate on:
+/// Adding an external view to routing table.
 public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceOnlineOfflineStateModelFactory.class);
 
@@ -51,14 +50,24 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
   private final HelixDataAccessor _helixDataAccessor;
   private final BrokerRoutingManager _routingManager;
   private final HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
+  @Nullable
+  private final MaterializedViewHandler _materializedViewHandler;
 
   public BrokerResourceOnlineOfflineStateModelFactory(ZkHelixPropertyStore<ZNRecord> propertyStore,
       HelixDataAccessor helixDataAccessor, BrokerRoutingManager routingManager,
       HelixExternalViewBasedQueryQuotaManager queryQuotaManager) {
+    this(propertyStore, helixDataAccessor, routingManager, queryQuotaManager, null);
+  }
+
+  public BrokerResourceOnlineOfflineStateModelFactory(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      HelixDataAccessor helixDataAccessor, BrokerRoutingManager routingManager,
+      HelixExternalViewBasedQueryQuotaManager queryQuotaManager,
+      @Nullable MaterializedViewHandler materializedViewHandler) {
     _helixDataAccessor = helixDataAccessor;
     _propertyStore = propertyStore;
     _routingManager = routingManager;
     _queryQuotaManager = queryQuotaManager;
+    _materializedViewHandler = materializedViewHandler;
   }
 
   public static String getStateModelDef() {
@@ -88,6 +97,11 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
               _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE)));
           _queryQuotaManager.createDatabaseRateLimiter(
               DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(physicalOrLogicalTable));
+          /// Rebuild the MV cache entry in case its broker resource was previously cycled
+          /// OFFLINE without the definition znode being deleted (e.g. an operator-driven
+          /// OFFLINE/ONLINE toggle for maintenance).  Symmetric counterpart to the
+          /// invalidate-on-OFFLINE call below.
+          refreshMaterializedViewCacheForTable(physicalOrLogicalTable);
         }
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing transition from OFFLINE to ONLINE for table: {}",
@@ -105,6 +119,11 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
           _routingManager.removeRoutingForLogicalTable(physicalOrLogicalTable);
           _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
         } else {
+          /// Invalidate MV cache BEFORE routing so an in-flight query that has not yet
+          /// passed compile cannot pick up a stale MV candidate after routing has gone
+          /// away — the worst-case window then yields a successful non-MV plan rather
+          /// than a "no servers found" failure on a now-routeless MV table.
+          invalidateMaterializedViewCacheForTable(physicalOrLogicalTable);
           _routingManager.removeRouting(physicalOrLogicalTable);
           _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
         }
@@ -129,6 +148,8 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
           _routingManager.removeRoutingForLogicalTable(physicalOrLogicalTable);
           _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
         } else {
+          /// See `onBecomeOfflineFromOnline` — invalidate MV cache BEFORE routing.
+          invalidateMaterializedViewCacheForTable(physicalOrLogicalTable);
           _routingManager.removeRouting(physicalOrLogicalTable);
           _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
         }
@@ -136,6 +157,18 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         LOGGER.error("Caught exception while processing transition from ONLINE to DROPPED for table: {}",
             physicalOrLogicalTable, e);
         throw e;
+      }
+    }
+
+    private void invalidateMaterializedViewCacheForTable(String tableNameWithType) {
+      if (_materializedViewHandler != null) {
+        _materializedViewHandler.invalidateBaseTable(TableNameBuilder.extractRawTableName(tableNameWithType));
+      }
+    }
+
+    private void refreshMaterializedViewCacheForTable(String tableNameWithType) {
+      if (_materializedViewHandler != null) {
+        _materializedViewHandler.refreshTable(TableNameBuilder.extractRawTableName(tableNameWithType));
       }
     }
 

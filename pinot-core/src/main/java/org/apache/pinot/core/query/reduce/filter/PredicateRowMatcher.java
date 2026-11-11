@@ -20,16 +20,16 @@ package org.apache.pinot.core.query.reduce.filter;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/**
- * Predicate matcher.
- */
+/// Predicate matcher.
 public class PredicateRowMatcher implements RowMatcher {
   private final ValueExtractor _valueExtractor;
   private final DataType _valueType;
@@ -44,7 +44,7 @@ public class PredicateRowMatcher implements RowMatcher {
     if (_predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL) {
       _predicateEvaluator = null;
     } else {
-      _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, _valueType);
+      _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, _valueType, null);
     }
     _nullHandlingEnabled = nullHandlingEnabled;
   }
@@ -80,6 +80,8 @@ public class PredicateRowMatcher implements RowMatcher {
         return _predicateEvaluator.applySV((String) value);
       case BYTES:
         return _predicateEvaluator.applySV((byte[]) value);
+      case UUID:
+        return _predicateEvaluator.applySV(UuidUtils.toBytes((UUID) value));
       default:
         throw new IllegalStateException();
     }

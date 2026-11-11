@@ -49,7 +49,8 @@ public class LiteModeJoinValidationTest {
         CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT,
         KeySelector.DEFAULT_HASH_ALGORITHM,
         CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT,
-        liteModeJoinsEnabled);
+        liteModeJoinsEnabled,
+        null);
   }
 
   private static PRelNode makeJoinPlan() {

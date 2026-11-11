@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator.join;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,9 +31,7 @@ public abstract class LookupTable {
 
   protected boolean _keysUnique = true;
 
-  /**
-   * Adds a row to the lookup table.
-   */
+  /// Adds a row to the lookup table.
   public abstract void addRow(@Nullable Object key, Object[] row);
 
   @SuppressWarnings("unchecked")
@@ -55,58 +52,46 @@ public abstract class LookupTable {
     }
   }
 
-  /**
-   * Finishes adding rows to the lookup table. This method should be called after all rows are added to the lookup
-   * table, and before looking up rows.
-   */
+  /// Finishes adding rows to the lookup table. This method should be called after all rows are added to the lookup
+  /// table, and before looking up rows.
   public abstract void finish();
 
   protected static void convertValueToList(Map.Entry<?, Object> entry) {
     Object value = entry.getValue();
     if (value instanceof Object[]) {
-      entry.setValue(Collections.singletonList(value));
+      entry.setValue(List.of(value));
     }
   }
 
   protected static Object convertValueToList(Object value) {
     if (value instanceof Object[]) {
-      return Collections.singletonList(value);
+      return List.of(value);
     }
     return value;
   }
 
-  /**
-   * Returns {@code true} when all the keys added to the lookup table are unique.
-   * When all keys are unique, the value of the lookup table is a single row ({@code Object[]}). When keys are not
-   * unique, the value of the lookup table is a list of rows ({@code List<Object[]>}).
-   */
+  /// Returns `true` when all the keys added to the lookup table are unique.
+  /// When all keys are unique, the value of the lookup table is a single row (`Object[]`). When keys are not
+  /// unique, the value of the lookup table is a list of rows (`List<Object[]>`).
   public boolean isKeysUnique() {
     return _keysUnique;
   }
 
-  /**
-   * Returns {@code true} if the lookup table contains the given key.
-   */
+  /// Returns `true` if the lookup table contains the given key.
   public abstract boolean containsKey(@Nullable Object key);
 
-  /**
-   * Returns the row/rows for the given key. When {@link #isKeysUnique} returns {@code true}, this method returns a
-   * single row ({@code Object[]}). When {@link #isKeysUnique} returns {@code false}, this method returns a list of rows
-   * ({@code List<Object[]>}). Returns {@code null} if the key does not exist in the lookup table.
-   */
+  /// Returns the row/rows for the given key. When [#isKeysUnique] returns `true`, this method returns a
+  /// single row (`Object[]`). When [#isKeysUnique] returns `false`, this method returns a list of
+  /// rows (`List<Object[]>`). Returns `null` if the key does not exist in the lookup table.
   @Nullable
   public abstract Object lookup(@Nullable Object key);
 
-  /**
-   * Returns all the entries in the lookup table. When {@link #isKeysUnique} returns {@code true}, the value of the
-   * entries is a single row ({@code Object[]}). When {@link #isKeysUnique} returns {@code false}, the value of the
-   * entries is a list of rows ({@code List<Object[]>}).
-   */
+  /// Returns all the entries in the lookup table. When [#isKeysUnique] returns `true`, the value of the
+  /// entries is a single row (`Object[]`). When [#isKeysUnique] returns `false`, the value of the
+  /// entries is a list of rows (`List<Object[]>`).
   @SuppressWarnings("rawtypes")
   public abstract Set<Map.Entry<Object, Object>> entrySet();
 
-  /**
-   * Returns the number of entries in the lookup table.
-   */
+  /// Returns the number of entries in the lookup table.
   public abstract int size();
 }

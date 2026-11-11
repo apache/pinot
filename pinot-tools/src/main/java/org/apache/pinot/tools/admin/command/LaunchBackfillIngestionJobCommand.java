@@ -23,10 +23,12 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.FileSystems;
+import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +36,7 @@ import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminTransport;
-import org.apache.pinot.client.admin.PinotSegmentApiClient;
+import org.apache.pinot.client.admin.SegmentAdminClient;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
@@ -42,6 +44,7 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionUtils;
 import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
+import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -82,7 +85,8 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
   @CommandLine.Option(names = {"-partitionColumnValue"}, required = false, description =
       "Segments with this partition column value " + "will only be eligible for backfill.")
   private String _partitionColumnValue;
-  private PinotSegmentApiClient _pinotSegmentApiClient;
+  private PinotAdminClient _pinotAdminClient;
+  private SegmentAdminClient _pinotSegmentAdminClient;
 
   @Override
   public boolean execute()
@@ -100,9 +104,9 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
       }
       Map<String, String> authHeader = getAuthHeaders(spec);
       Properties transportProperties = getTransportProperties(spec);
-      PinotAdminClient adminClient = new PinotAdminClient(controllerAddress, transportProperties, authHeader);
+      _pinotAdminClient = new PinotAdminClient(controllerAddress, transportProperties, authHeader);
 
-      _pinotSegmentApiClient = adminClient.getSegmentApiClient();
+      _pinotSegmentAdminClient = _pinotAdminClient.getSegmentClient();
       // 1. Fetch existing segments that need to be backfilled (to be replaced)
       List<String> segmentsToBackfill = fetchSegmentsToBackfill(spec);
 
@@ -124,6 +128,10 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     } catch (Exception e) {
       LOGGER.error("Got exception to generate IngestionJobSpec for backfill ingestion job - ", e);
       throw e;
+    } finally {
+      if (_pinotAdminClient != null) {
+        _pinotAdminClient.close();
+      }
     }
     return true;
   }
@@ -175,9 +183,10 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     long startMs = getMillis(_backfillStartDate);
     long endMs = getMillis(_backfillEndDate);
 
-    JsonNode segmentsJson =
-        _pinotSegmentApiClient.selectSegments(spec.getTableSpec().getTableName(), OFFLINE_TABLE_TYPE,
+    String segmentsResponse =
+        _pinotSegmentAdminClient.selectSegments(spec.getTableSpec().getTableName(), OFFLINE_TABLE_TYPE,
             startMs, endMs, true);
+    JsonNode segmentsJson = JsonUtils.stringToJsonNode(segmentsResponse);
     segmentsJson.findPath(OFFLINE_TABLE_TYPE).forEach(seg -> segmentsToBackfill.add(seg.textValue()));
 
     // Partition filter
@@ -189,19 +198,18 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     return segmentsToBackfill;
   }
 
-  /**
-   * Checks if a segment matches the specified partition column and value.
-   *
-   * @param spec SegmentGenerationJobSpec containing table and cluster info
-   * @param segmentName Name of the segment to check
-   * @return true if the segment matches the partition, false otherwise
-   */
+  /// Checks if a segment matches the specified partition column and value.
+  ///
+  /// @param spec SegmentGenerationJobSpec containing table and cluster info
+  /// @param segmentName Name of the segment to check
+  /// @return true if the segment matches the partition, false otherwise
   private boolean isSegmentMatchPartition(SegmentGenerationJobSpec spec, String segmentName) {
     try {
-      JsonNode response = _pinotSegmentApiClient.getSegmentMetadata(
+      Map<String, Object> metadataMap = _pinotSegmentAdminClient.getSegmentMetadata(
           TableNameBuilder.OFFLINE.tableNameWithType(spec.getTableSpec().getTableName()),
-          segmentName);
-      Map<String, String> segmentMetadata = JsonUtils.jsonNodeToStringMap(response);
+          segmentName, null);
+      Map<String, String> segmentMetadata = new HashMap<>();
+      metadataMap.forEach((k, v) -> segmentMetadata.put(k, v != null ? v.toString() : null));
 
       // Skip segments without partition metadata
       if (!segmentMetadata.containsKey(CommonConstants.Segment.PARTITION_METADATA)) {
@@ -243,7 +251,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     return generatedSegments;
   }
 
-  private List<String> collectSegmentNames(SegmentGenerationJobSpec spec) {
+  List<String> collectSegmentNames(SegmentGenerationJobSpec spec) {
     URI outputDirURI;
     try {
       outputDirURI = new URI(spec.getOutputDirURI());
@@ -255,20 +263,27 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
     }
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
 
-    // Get list of files to process
-    String[] files;
+    PathMatcher pushFilePathMatcher =
+        spec.getPushJobSpec() != null && spec.getPushJobSpec().getPushFileNamePattern() != null
+            ? FileSystems.getDefault().getPathMatcher(spec.getPushJobSpec().getPushFileNamePattern())
+            : null;
+    List<String> generatedSegments = new ArrayList<>();
     try {
-      files = outputDirFS.listFiles(outputDirURI, true);
+      for (String file : outputDirFS.listFiles(outputDirURI, true)) {
+        if (!Constants.isSegmentTarFile(file)
+            || pushFilePathMatcher != null && !pushFilePathMatcher.matches(Paths.get(file))) {
+          continue;
+        }
+        URI fileURI = PinotFSFactory.LOCAL_PINOT_FS_SCHEME.equals(outputDirURI.getScheme())
+            && !file.startsWith(PinotFSFactory.LOCAL_PINOT_FS_SCHEME + ":")
+            ? new File(file).toURI()
+            : URI.create(file);
+        if (!outputDirFS.isDirectory(fileURI)) {
+          generatedSegments.add(SegmentPushUtils.getSegmentNameFromTarFile(file));
+        }
+      }
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
-    }
-
-    List<String> generatedSegments = new ArrayList<>();
-    for (String file : files) {
-      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        generatedSegments.add(
-            file.substring(file.lastIndexOf(File.separator) + 1, file.indexOf(Constants.TAR_GZ_FILE_EXT)));
-      }
     }
     return generatedSegments;
   }
@@ -299,7 +314,7 @@ public class LaunchBackfillIngestionJobCommand extends LaunchDataIngestionJobCom
       LOGGER.info("New segments are pushed successfully and now serving queries.");
     } catch (Exception e) {
       LOGGER.error("Failed to upload segments, reverting lineage entry.", e);
-      Map<URI, String> uriToLineageEntryIdMap = Collections.singletonMap(controllerURI, segmentLineageEntryId);
+      Map<URI, String> uriToLineageEntryIdMap = Map.of(controllerURI, segmentLineageEntryId);
       ConsistentDataPushUtils.handleUploadException(spec, uriToLineageEntryIdMap, e);
       LOGGER.info("Reverted lineage entry [{}]. Any newly uploaded segments should have been deleted.",
           segmentLineageEntryId);

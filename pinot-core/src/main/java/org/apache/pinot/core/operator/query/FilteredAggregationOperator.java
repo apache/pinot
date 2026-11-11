@@ -35,14 +35,14 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * This operator processes a collection of filtered (and potentially non filtered) aggregations.
- *
- * For a query with either all aggregations being filtered or a mix of filtered and non filtered aggregations,
- * FilteredAggregationOperator will come into execution.
- */
+/// This operator processes a collection of filtered (and potentially non filtered) aggregations.
+///
+/// For a query with either all aggregations being filtered or a mix of filtered and non filtered aggregations,
+/// FilteredAggregationOperator will come into execution.
 @SuppressWarnings("rawtypes")
 public class FilteredAggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_FILTERED";
@@ -76,9 +76,10 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
     for (AggregationInfo aggregationInfo : _aggregationInfos) {
       AggregationFunction[] aggregationFunctions = aggregationInfo.getFunctions();
       BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
+      AggregationFunctionColumnPair[] starTreeFunctionColumnPairs = aggregationInfo.getStarTreeFunctionColumnPairs();
       AggregationExecutor aggregationExecutor;
-      if (aggregationInfo.isUseStarTree()) {
-        aggregationExecutor = new StarTreeAggregationExecutor(aggregationFunctions);
+      if (starTreeFunctionColumnPairs != null) {
+        aggregationExecutor = new StarTreeAggregationExecutor(aggregationFunctions, starTreeFunctionColumnPairs);
       } else {
         aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
       }
@@ -95,6 +96,12 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
         result[resultIndexMap.get(aggregationFunctions[i])] = filteredResult.get(i);
       }
       _numDocsScanned += numDocsScanned;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsScanned);
+        scanCost.addEntriesScannedPostFilter(
+            (long) numDocsScanned * projectOperator.getNumColumnsProjected());
+      }
       _numEntriesScannedInFilter += projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * projectOperator.getNumColumnsProjected();
     }

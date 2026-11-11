@@ -19,14 +19,15 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
-import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -34,41 +35,50 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Filter operator for supporting the execution of text search
- * queries: WHERE TEXT_MATCH(column_name, query_string, options_string)
- */
+/// Filter operator for supporting the execution of text search
+/// queries: WHERE TEXT_MATCH(column_name, query_string, options_string)
 public class TextMatchFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_TEXT_INDEX";
 
   // name of text column to query, used with multi-column text indexes.
   private final String _column;
   private final TextIndexReader _textIndexReader;
-  private final int _numDocs;
   private final TextMatchPredicate _predicate;
+  /// Lets the segments of one request share a parsed query instead of each parsing it again. Null
+  /// when no query scope is available, which simply means no sharing.
+  private final QueryScopedCache _queryScopedCache;
 
   public TextMatchFilterOperator(String column, TextIndexReader textIndexReader, TextMatchPredicate predicate,
       int numDocs) {
-    super(numDocs, false);
+    this(column, textIndexReader, predicate, numDocs, null);
+  }
+
+  public TextMatchFilterOperator(String column, TextIndexReader textIndexReader, TextMatchPredicate predicate,
+      int numDocs, @Nullable QueryScopedCache queryScopedCache) {
+    super(getSearchableDocCount(textIndexReader, numDocs), false);
     _column = column;
     _textIndexReader = textIndexReader;
     _predicate = predicate;
-    _numDocs = numDocs;
+    _queryScopedCache = queryScopedCache;
+  }
+
+  private static int getSearchableDocCount(TextIndexReader reader, int numDocs) {
+    int searchableDocCount = reader.getSearchableDocCount();
+    return searchableDocCount >= 0 && searchableDocCount < numDocs ? searchableDocCount : numDocs;
   }
 
   public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {
-    this(null, textIndexReader, predicate, numDocs);
+    this(null, textIndexReader, predicate, numDocs, null);
+  }
+
+  public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs,
+      @Nullable QueryScopedCache queryScopedCache) {
+    this(null, textIndexReader, predicate, numDocs, queryScopedCache);
   }
 
   @Override
   protected BlockDocIdSet getTrues() {
-    if (_textIndexReader.isMultiColumn()) {
-      return new BitmapDocIdSet(
-          ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
-              _predicate.getOptions()), _numDocs);
-    } else {
-      return new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions()), _numDocs);
-    }
+    return BitmapDocIdSet.create(getMatchingDocIds(), _numDocs);
   }
 
   @Override
@@ -79,10 +89,13 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   @Override
   public int getNumMatchingDocs() {
     if (_textIndexReader.isMultiColumn()) {
-      return ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
-          _predicate.getOptions()).getCardinality();
+      return ((MultiColumnTextIndexReader) _textIndexReader).getNumMatchingDocs(_column, _predicate.getValue(),
+          _predicate.getOptions());
     } else {
-      return _textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions()).getCardinality();
+      // Ask the index for the size of the match set rather than for the match set itself: building a bitmap of
+      // every matching doc just to read its cardinality is the dominant cost of a count over a frequent term.
+      return _textIndexReader.getNumMatchingDocs(_predicate.getValue(), _predicate.getOptions(),
+          _queryScopedCache);
     }
   }
 
@@ -93,17 +106,21 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   public BitmapCollection getBitmaps() {
-    ImmutableRoaringBitmap bitmap = _textIndexReader.isMultiColumn()
-        ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
-        _predicate.getOptions()) : _textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions());
-
+    ImmutableRoaringBitmap bitmap = getMatchingDocIds();
     record(bitmap);
     return new BitmapCollection(_numDocs, false, bitmap);
   }
 
+  private ImmutableRoaringBitmap getMatchingDocIds() {
+    return _textIndexReader.isMultiColumn()
+        ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
+            _predicate.getOptions())
+        : _textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions(), _queryScopedCache);
+  }
+
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override

@@ -24,7 +24,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
@@ -39,16 +38,12 @@ import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
-import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -69,6 +64,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -80,17 +76,18 @@ import static org.testng.Assert.*;
 
 @SuppressWarnings("unchecked")
 public class DimensionTableDataManagerTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), LoaderTest.class.getName());
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), DimensionTableDataManagerTest.class.getName());
   private static final String RAW_TABLE_NAME = "dimBaseballTeams";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String CSV_DATA_PATH = "data/dimBaseballTeams.csv";
   private static final String SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
   private static final String TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
-  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
-      new SegmentAllIndexPreprocessThrottler(1, 2, true),
-      new SegmentStarTreePreprocessThrottler(1, 2, true),
-      new SegmentDownloadThrottler(1, 2, true),
-      new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
+  private static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottlerSet(
+      new SegmentOperationsThrottler(1, 2, true),
+      new SegmentOperationsThrottler(1, 2, true),
+      new SegmentOperationsThrottler(1, 2, true),
+      new SegmentOperationsThrottler(1, 2, true));
 
   private File _indexDir;
   private SegmentZKMetadata _segmentZKMetadata;
@@ -117,7 +114,7 @@ public class DimensionTableDataManagerTest {
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfig(csvFile, FileFormat.CSV, tableDataDir, RAW_TABLE_NAME, tableConfig,
             schema);
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig);
     driver.build();
 
@@ -125,7 +122,24 @@ public class DimensionTableDataManagerTest {
     _indexDir = new File(tableDataDir, segmentName);
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(_indexDir);
     _segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    _segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+    _segmentZKMetadata.setCrc(segmentMetadata.getCrc());
+  }
+
+  @AfterMethod(alwaysRun = true)
+  public void tearDownMethod() {
+    // DimensionTableDataManager is a process-wide singleton keyed by table name (see the static
+    // INSTANCES map in DimensionTableDataManager). Every test method loads the same
+    // dimBaseballTeams_OFFLINE table, so without an explicit teardown the singleton (and its
+    // property-store mock, loaded segments, and reload executor) leaks from one method into the
+    // next. A stale async reload from a prior method could then read a _propertyStore that a
+    // concurrent init() had swapped out, surfacing as an intermittent
+    // "Failed to find schema for table: dimBaseballTeams_OFFLINE". Shutting the singleton down
+    // removes it from INSTANCES so each method starts from a clean, freshly-initialized instance.
+    DimensionTableDataManager tableDataManager =
+        DimensionTableDataManager.getInstanceByTableName(OFFLINE_TABLE_NAME);
+    if (tableDataManager != null) {
+      tableDataManager.shutDown();
+    }
   }
 
   @AfterClass
@@ -146,7 +160,7 @@ public class DimensionTableDataManagerTest {
         .setSchemaName("dimBaseballTeams")
         .addSingleValueDimension("teamID", DataType.STRING)
         .addSingleValueDimension("teamName", DataType.STRING)
-        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .setPrimaryKeyColumns(List.of("teamID"))
         .build();
   }
 
@@ -155,7 +169,7 @@ public class DimensionTableDataManagerTest {
         .addSingleValueDimension("teamID", DataType.STRING)
         .addSingleValueDimension("teamName", DataType.STRING)
         .addSingleValueDimension("teamCity", DataType.STRING)
-        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .setPrimaryKeyColumns(List.of("teamID"))
         .build();
   }
 
@@ -253,7 +267,7 @@ public class DimensionTableDataManagerTest {
 
     // Confirm we can read primary column list
     List<String> pkColumns = tableDataManager.getPrimaryKeyColumns();
-    assertEquals(pkColumns, Collections.singletonList("teamID"), "Should return PK column list");
+    assertEquals(pkColumns, List.of("teamID"), "Should return PK column list");
 
     // Remove the segment
     List<SegmentDataManager> segmentManagers = tableDataManager.acquireAllSegments();
@@ -350,7 +364,7 @@ public class DimensionTableDataManagerTest {
 
     // Confirm we can read primary column list
     List<String> pkColumns = tableDataManager.getPrimaryKeyColumns();
-    assertEquals(pkColumns, Collections.singletonList("teamID"), "Should return PK column list");
+    assertEquals(pkColumns, List.of("teamID"), "Should return PK column list");
 
     // Remove the segment
     List<SegmentDataManager> segmentManagers = tableDataManager.acquireAllSegments();

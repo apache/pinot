@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.server.api;
 
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -37,34 +37,30 @@ public class TableTierResourceTest extends BaseResourceTest {
 
   @Test
   public void testSegmentNotFound() {
-    String tableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
-    Response response =
-        _webTarget.path(String.format("segments/%s/unknownSegment/tiers", tableName)).request().get(Response.class);
+    Response response = _webTarget.path(String.format("segments/%s/unknownSegment/tiers", OFFLINE_TABLE_NAME))
+        .request()
+        .get(Response.class);
     assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
   public void testTableTierInfo() {
-    String tableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
-    String requestPath = "/tables/" + tableName + "/tiers";
-    verifyTableTierInfo(requestPath, tableName, _realtimeIndexSegments.get(0));
+    String requestPath = "/tables/" + REALTIME_TABLE_NAME + "/tiers";
+    verifyTableTierInfo(requestPath, REALTIME_TABLE_NAME, _realtimeIndexSegments.get(0));
 
-    tableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
-    requestPath = "/tables/" + tableName + "/tiers";
-    verifyTableTierInfo(requestPath, tableName, _offlineIndexSegments.get(0));
+    requestPath = "/tables/" + OFFLINE_TABLE_NAME + "/tiers";
+    verifyTableTierInfo(requestPath, OFFLINE_TABLE_NAME, _offlineIndexSegments.get(0));
   }
 
   @Test
   public void testTableSegmentTierInfo() {
-    String tableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
     ImmutableSegment segment = _realtimeIndexSegments.get(0);
-    String requestPath = "/segments/" + tableName + "/" + segment.getSegmentName() + "/tiers";
-    verifyTableTierInfo(requestPath, tableName, segment);
+    String requestPath = "/segments/" + REALTIME_TABLE_NAME + "/" + segment.getSegmentName() + "/tiers";
+    verifyTableTierInfo(requestPath, REALTIME_TABLE_NAME, segment);
 
-    tableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
     segment = _offlineIndexSegments.get(0);
-    requestPath = "/segments/" + tableName + "/" + segment.getSegmentName() + "/tiers";
-    verifyTableTierInfo(requestPath, tableName, segment);
+    requestPath = "/segments/" + OFFLINE_TABLE_NAME + "/" + segment.getSegmentName() + "/tiers";
+    verifyTableTierInfo(requestPath, OFFLINE_TABLE_NAME, segment);
   }
 
   private void verifyTableTierInfo(String requestPath, String expectedTableName, ImmutableSegment segment) {
@@ -72,6 +68,12 @@ public class TableTierResourceTest extends BaseResourceTest {
     assertEquals(tableTierInfo.getTableName(), expectedTableName);
     assertEquals(tableTierInfo.getSegmentTiers().size(), 1);
     assertEquals(tableTierInfo.getSegmentTiers(),
-        Collections.singletonMap(segment.getSegmentName(), segment.getTier()));
+        nullableTierMap(segment.getSegmentName(), segment.getTier()));
+  }
+
+  private static Map<String, String> nullableTierMap(String segmentName, String tier) {
+    Map<String, String> map = new HashMap<>();
+    map.put(segmentName, tier);
+    return map;
   }
 }

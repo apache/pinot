@@ -21,52 +21,42 @@ package org.apache.pinot.spi.annotations;
 import java.lang.annotation.Documented;
 
 
-/**
- * Annotation to inform users of a package, class or method's intended audience.
- *
- * Currently the audience can be {@link InterfaceAudience.Public},
- * {@link InterfaceAudience.LimitedPrivate} or
- * {@link InterfaceAudience.Private}. <br>
- *
- * <ul>
- * <li>Public classes that are not marked with this annotation must be
- * considered by default as {@link InterfaceAudience.Private}.</li>
- *
- * <li>External application developers depending on Pinot must only use classes that are marked
- * {@link InterfaceAudience.Public}. Do not depend on classes without an
- * explicit InterfaceAudience.Public annotation as these classes
- * could be removed or change in incompatible ways.</li>
- *
- * <li> Methods may have a different annotation that it is more restrictive
- * compared to the audience classification of the class. Example: A class
- * might be {@link InterfaceAudience.Public},
- * but a method may be {@link InterfaceAudience.LimitedPrivate}
- * </li></ul>
- *
- * The annotation is borrowed from a similar Apache Hadoop annotation.
- */
+/// Annotation to inform users of a package, class or method's intended audience.
+///
+/// Currently the audience can be [InterfaceAudience.Public],
+/// [InterfaceAudience.LimitedPrivate] or
+/// [InterfaceAudience.Private].
+///
+/// - Public classes that are not marked with this annotation must be
+///   considered by default as [InterfaceAudience.Private].
+///
+/// - External application developers depending on Pinot must only use classes that are marked
+///   [InterfaceAudience.Public]. Do not depend on classes without an
+///   explicit InterfaceAudience.Public annotation as these classes
+///   could be removed or change in incompatible ways.
+///
+/// - Methods may have a different annotation that it is more restrictive
+///   compared to the audience classification of the class. Example: A class
+///   might be [InterfaceAudience.Public],
+///   but a method may be [InterfaceAudience.LimitedPrivate]
+///
+/// The annotation is borrowed from a similar Apache Hadoop annotation.
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class InterfaceAudience {
-  /**
-   * Intended for use by any project or application.
-   */
+  /// Intended for use by any project or application.
   @Documented
   public @interface Public {
   }
 
-  /**
-   * Intended only for the project(s) specified in the annotation.
-   * Reserved for future use.
-   */
+  /// Intended only for the project(s) specified in the annotation.
+  /// Reserved for future use.
   @Documented
   public @interface LimitedPrivate {
     String[] value();
   }
 
-  /**
-   * Intended for use only within Pinot itself.
-   */
+  /// Intended for use only within Pinot itself.
   @Documented
   public @interface Private {
   }

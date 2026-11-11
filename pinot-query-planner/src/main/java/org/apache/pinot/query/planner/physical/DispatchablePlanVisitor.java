@@ -22,10 +22,13 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -48,9 +51,11 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, DispatchablePlanContext> {
   private final Set<MailboxSendNode> _visited = Collections.newSetFromMap(new IdentityHashMap<>());
   private final TableCache _tableCache;
+  private final MultiClusterRoutingContext _multiClusterRoutingContext;
 
-  public DispatchablePlanVisitor(TableCache tableCache) {
+  public DispatchablePlanVisitor(TableCache tableCache, MultiClusterRoutingContext multiClusterRoutingContext) {
     _tableCache = tableCache;
+    _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
   private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(PlanNode node,
@@ -102,10 +107,17 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   @Override
   public Void visitJoin(JoinNode node, DispatchablePlanContext context) {
     node.getInputs().forEach(join -> join.visit(this, context));
-    getOrCreateDispatchablePlanMetadata(node, context);
+    DispatchablePlanMetadata metadata = getOrCreateDispatchablePlanMetadata(node, context);
+    // FULL OUTER JOIN with no equi keys requires a single worker because each worker independently tracks matched
+    // right rows via a local BitSet. With multiple workers, each sees only a subset of left rows, causing spurious
+    // unmatched right rows. Using requireSingleton ensures WorkerManager picks one random server (hotspot rotation).
+    if (node.getJoinType() == JoinRelType.FULL && node.getLeftKeys().isEmpty()) {
+      metadata.setRequireSingleton(true);
+    }
     return null;
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public Void visitEnrichedJoin(EnrichedJoinNode node, DispatchablePlanContext context) {
     visitJoin(node, context);
@@ -141,10 +153,24 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitSort(SortNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    // Final sort (receives from sort exchange) needs singleton worker
-    boolean isFinalSort = node.getInputs().get(0) instanceof MailboxReceiveNode;
-    dispatchablePlanMetadata.setRequireSingleton(isFinalSort);
+    dispatchablePlanMetadata.setRequireSingleton(isFinalSort(node));
     return null;
+  }
+
+  /// A final sort orders (or trims with fetch/offset) every row its stage receives, so it needs a singleton worker,
+  /// which also rotates the hotspot server across queries. A Sort without fetch/offset over a hash-partitioned exchange
+  /// orders each partition only - it feeds a `PARTITION BY ... ORDER BY` window or a `WITHIN GROUP` aggregate - so it
+  /// keeps the partitioned worker assignment.
+  private static boolean isFinalSort(SortNode node) {
+    if (!(node.getInputs().get(0) instanceof MailboxReceiveNode)) {
+      return false;
+    }
+    if (node.getFetch() >= 0 || node.getOffset() >= 0) {
+      return true;
+    }
+    MailboxReceiveNode receiveNode = (MailboxReceiveNode) node.getInputs().get(0);
+    return receiveNode.getDistributionType() != RelDistribution.Type.HASH_DISTRIBUTED
+        || receiveNode.getKeys().isEmpty();
   }
 
   @Override
@@ -156,7 +182,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     if (tableName == null) {
       tableName = _tableCache.getActualLogicalTableName(tableNameInNode);
       Preconditions.checkNotNull(tableName, "Logical table config not found in table cache: " + tableNameInNode);
-      LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider();
+      LogicalTableRouteProvider tableRouteProvider = new LogicalTableRouteProvider(_multiClusterRoutingContext);
       LogicalTableRouteInfo logicalTableRouteInfo = new LogicalTableRouteInfo();
       tableRouteProvider.fillTableConfigMetadata(logicalTableRouteInfo, tableName, _tableCache);
       dispatchablePlanMetadata.setLogicalTableRouteInfo(logicalTableRouteInfo);

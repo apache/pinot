@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.upsert.merger;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -50,7 +50,7 @@ public class PartialUpsertMergerFactoryTest {
 
     PartialUpsertMerger partialUpsertMerger =
         PartialUpsertMergerFactory.getPartialUpsertMerger(schema.getPrimaryKeyColumns(),
-            Collections.singletonList("hoursSinceEpoch"), upsertConfig);
+            List.of("hoursSinceEpoch"), upsertConfig);
 
     assertNotNull(partialUpsertMerger);
     assertTrue(partialUpsertMerger instanceof PartialUpsertColumnarMerger);

@@ -26,14 +26,11 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.distinct.BaseSingleColumnDistinctExecutor;
-import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.table.BigDecimalDistinctTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * {@link DistinctExecutor} for single raw BIG_DECIMAL column.
- */
+/// [org.apache.pinot.core.query.distinct.DistinctExecutor] for single raw BIG_DECIMAL column.
 public class BigDecimalDistinctExecutor
     extends BaseSingleColumnDistinctExecutor<BigDecimalDistinctTable, BigDecimal[], BigDecimal[][]> {
 
@@ -50,7 +47,7 @@ public class BigDecimalDistinctExecutor
 
   @Override
   protected BigDecimal[][] getValuesMV(BlockValSet blockValSet) {
-    throw new UnsupportedOperationException();
+    return blockValSet.getBigDecimalValuesMV();
   }
 
   @Override
@@ -77,6 +74,29 @@ public class BigDecimalDistinctExecutor
 
   @Override
   protected boolean processMV(BigDecimal[][] values, int from, int to) {
-    throw new UnsupportedOperationException();
+    if (_distinctTable.hasLimit()) {
+      if (_distinctTable.hasOrderBy()) {
+        for (int i = from; i < to; i++) {
+          for (BigDecimal value : values[i]) {
+            _distinctTable.addWithOrderBy(value);
+          }
+        }
+      } else {
+        for (int i = from; i < to; i++) {
+          for (BigDecimal value : values[i]) {
+            if (_distinctTable.addWithoutOrderBy(value)) {
+              return true;
+            }
+          }
+        }
+      }
+    } else {
+      for (int i = from; i < to; i++) {
+        for (BigDecimal value : values[i]) {
+          _distinctTable.addUnbounded(value);
+        }
+      }
+    }
+    return false;
   }
 }

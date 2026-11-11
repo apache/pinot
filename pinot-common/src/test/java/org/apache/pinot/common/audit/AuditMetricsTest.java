@@ -35,12 +35,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 
 
-/**
- * Unit tests for {@link AuditMetrics} delegation mechanism.
- *
- * Tests verify that AuditMetrics correctly routes metrics calls to the appropriate
- * component-specific metrics (Controller vs Broker) based on service role.
- */
+/// Unit tests for [AuditMetrics] delegation mechanism.
+///
+/// Tests verify that AuditMetrics correctly routes metrics calls to the appropriate
+/// component-specific metrics (Controller vs Broker) based on service role.
 public class AuditMetricsTest {
 
   @Mock

@@ -23,9 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 
 
-/**
- * Simple shim so that jps -l shows PinotServer instead of PinotAdministrator
- */
+/// Simple shim so that jps -l shows PinotServer instead of PinotAdministrator
 public class PinotServer {
   private PinotServer() {
   }

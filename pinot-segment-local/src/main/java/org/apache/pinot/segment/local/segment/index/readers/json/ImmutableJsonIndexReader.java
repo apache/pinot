@@ -29,9 +29,11 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -44,6 +46,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.MutableRoaringBitmapUnion;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
@@ -63,9 +66,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Reader for json index.
- */
+/// Reader for json index.
 public class ImmutableJsonIndexReader implements JsonIndexReader {
   // NOTE: Use long type for _numDocs to comply with the RoaringBitmap APIs.
   private final long _numDocs;
@@ -156,9 +157,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     }
   }
 
-  /**
-   * Returns {@code true} if the given predicate type is exclusive for json_match calculation, {@code false} otherwise.
-   */
+  /// Returns `true` if the given predicate type is exclusive for json_match calculation, `false` otherwise.
   private boolean isExclusive(Predicate.Type predicateType) {
     return predicateType == Predicate.Type.IS_NULL;
   }
@@ -176,6 +175,40 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       return other;
     }
     return ImmutableRoaringBitmap.and(target, other);
+  }
+
+  /// Folds many posting lists into one result through a [MutableRoaringBitmapUnion], which unions lazily and
+  /// finalizes the bitmap once at [#get]. The zero- and single-input cases return the borrowed posting list without
+  /// copying, matching the ownership behavior of [#or].
+  private static class UnionAccumulator {
+    @Nullable
+    private ImmutableRoaringBitmap _first;
+    @Nullable
+    private MutableRoaringBitmapUnion _union;
+
+    void add(ImmutableRoaringBitmap docIds) {
+      if (docIds.isEmpty()) {
+        return;
+      }
+      if (_union != null) {
+        _union.add(docIds);
+      } else if (_first == null) {
+        _first = docIds;
+      } else {
+        // The borrowed first posting list is copied into the union, never adopted
+        _union = new MutableRoaringBitmapUnion();
+        _union.add(_first);
+        _union.add(docIds);
+        _first = null;
+      }
+    }
+
+    ImmutableRoaringBitmap get() {
+      if (_union != null) {
+        return _union.take();
+      }
+      return _first != null ? _first : EMPTY_BITMAP;
+    }
   }
 
   private static ImmutableRoaringBitmap or(ImmutableRoaringBitmap target, ImmutableRoaringBitmap other) {
@@ -210,9 +243,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return ImmutableRoaringBitmap.andNot(target, other);
   }
 
-  /**
-   * Returns the matching flattened doc ids for the given filter.
-   */
+  /// Returns the matching flattened doc ids for the given filter.
   private ImmutableRoaringBitmap getMatchingFlattenedDocIds(FilterContext filter) {
     switch (filter.getType()) {
       case AND: {
@@ -248,12 +279,11 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     }
   }
 
-  /**
-   * Returns the matching flattened doc ids for the given predicate.
-   * <p>Exclusive predicate is handled as the inclusive predicate, and the caller should flip the unflattened doc ids in
-   * order to get the correct exclusive predicate result.
-   * Note: returned bitmap could actually be mutable
-   */
+  /// Returns the matching flattened doc ids for the given predicate.
+  ///
+  /// Exclusive predicate is handled as the inclusive predicate, and the caller should flip the unflattened doc ids in
+  /// order to get the correct exclusive predicate result.
+  /// Note: returned bitmap could actually be mutable
   private ImmutableRoaringBitmap getMatchingFlattenedDocIds(Predicate predicate) {
     ExpressionContext lhs = predicate.getLhs();
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
@@ -325,17 +355,17 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         StringBuilder buffer = new StringBuilder(key);
         buffer.append(JsonIndexCreator.KEY_VALUE_SEPARATOR);
         int pos = buffer.length();
-        ImmutableRoaringBitmap result = EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         List<String> values = ((InPredicate) predicate).getValues();
         for (String value : values) {
           buffer.setLength(pos);
           buffer.append(value);
           int dictId = _dictionary.indexOf(buffer.toString());
           if (dictId >= 0) {
-            result = or(result, _invertedIndex.getDocIds(dictId));
+            result.add(_invertedIndex.getDocIds(dictId));
           }
         }
-        return result;
+        return result.get();
       }
 
       case NOT_IN: {
@@ -381,13 +411,13 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
               notInDictIds.add(dictId);
             }
           }
-          ImmutableRoaringBitmap result = EMPTY_BITMAP;
+          UnionAccumulator result = new UnionAccumulator();
           for (int dictId = dictIdRange[0]; dictId < dictIdRange[1]; dictId++) {
             if (!notInDictIds.contains(dictId)) {
-              result = or(result, _invertedIndex.getDocIds(dictId));
+              result.add(_invertedIndex.getDocIds(dictId));
             }
           }
-          return result;
+          return result.get();
         }
       }
 
@@ -409,7 +439,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         }
         Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
         Matcher matcher = pattern.matcher("");
-        ImmutableRoaringBitmap result = EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         byte[] dictBuffer = _dictionary.getBuffer();
         StringBuilder value = new StringBuilder();
         int valueStart = key.length() + 1;
@@ -418,10 +448,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           value.setLength(0);
           value.append(keyValue, valueStart, keyValue.length());
           if (matcher.reset(value).matches()) {
-            result = or(result, _invertedIndex.getDocIds(dictId));
+            result.add(_invertedIndex.getDocIds(dictId));
           }
         }
-        return result;
+        return result.get();
       }
 
       case RANGE: {
@@ -444,7 +474,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
         Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
         Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
-        ImmutableRoaringBitmap result = EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         byte[] dictBuffer = _dictionary.getBuffer();
         int valueStart = key.length() + 1;
         for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
@@ -457,10 +487,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
               upperUnbounded || (upperInclusive ? rangeDataType.compare(valueObj, upperBound) <= 0
                   : rangeDataType.compare(valueObj, upperBound) < 0);
           if (lowerCompareResult && upperCompareResult) {
-            result = or(result, _invertedIndex.getDocIds(dictId));
+            result.add(_invertedIndex.getDocIds(dictId));
           }
         }
-        return result;
+        return result.get();
       }
 
       default:
@@ -551,6 +581,198 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   }
 
   @Override
+  public Set<String> getMatchingDistinctValues(String jsonPathKey, @Nullable String filterString) {
+    // Normalize the path key (same logic as getMatchingFlattenedDocsMap)
+    if (_version == BaseJsonIndexCreator.VERSION_2) {
+      if (jsonPathKey.startsWith("$")) {
+        jsonPathKey = jsonPathKey.substring(1);
+      } else {
+        jsonPathKey = JsonUtils.KEY_SEPARATOR + jsonPathKey;
+      }
+    } else {
+      if (jsonPathKey.startsWith("$.")) {
+        jsonPathKey = jsonPathKey.substring(2);
+      }
+    }
+
+    Pair<String, ImmutableRoaringBitmap> pathKey = getKeyAndFlattenedDocIds(jsonPathKey);
+    if (pathKey.getRight() != null && pathKey.getRight().isEmpty()) {
+      return new HashSet<>();
+    }
+    jsonPathKey = pathKey.getLeft();
+
+    // Array index paths need bitmap intersection — fall back to the default implementation
+    if (pathKey.getRight() != null) {
+      return collectValuesFromFlattenedDocsMap(jsonPathKey, filterString);
+    }
+
+    if (filterString == null) {
+      return collectAllValues(jsonPathKey);
+    }
+
+    // Parse the filter and attempt single-pass evaluation for same-path predicates
+    FilterContext filter;
+    try {
+      filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+      Preconditions.checkArgument(!filter.isConstant());
+    } catch (Exception e) {
+      throw new BadQueryRequestException("Invalid json match filter: " + filterString);
+    }
+
+    // Only optimize simple single-predicate, non-exclusive, same-path filters
+    if (filter.getType() != FilterContext.Type.PREDICATE || isExclusive(filter.getPredicate().getType())) {
+      return collectValuesFromFlattenedDocsMap(jsonPathKey, filterString);
+    }
+
+    Predicate predicate = filter.getPredicate();
+    String predicateKey = normalizePredicateKey(predicate);
+    if (predicateKey == null || !predicateKey.equals(jsonPathKey)) {
+      return collectValuesFromFlattenedDocsMap(jsonPathKey, filterString);
+    }
+
+    return collectDistinctValuesByPredicate(predicate, jsonPathKey);
+  }
+
+  /// Collects all distinct values for the key without any filter — no posting list reads.
+  private Set<String> collectAllValues(String jsonPathKey) {
+    int[] dictIds = getDictIdRangeForKey(jsonPathKey);
+    if (dictIds[0] < 0) {
+      return new HashSet<>();
+    }
+    Set<String> result = new HashSet<>();
+    byte[] dictBuffer = _dictionary.getBuffer();
+    int valueStart = jsonPathKey.length() + 1;
+    for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
+      String keyValue = _dictionary.getStringValue(dictId, dictBuffer);
+      result.add(keyValue.substring(valueStart));
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(result.size(),
+          "ImmutableJsonIndexReader.getMatchingDistinctValues");
+    }
+    return result;
+  }
+
+  /// Single-pass dictionary scan: evaluates the predicate on each value string directly, no posting list reads.
+  private Set<String> collectDistinctValuesByPredicate(Predicate predicate, String jsonPathKey) {
+    int[] dictIds = getDictIdRangeForKey(jsonPathKey);
+    if (dictIds[0] < 0) {
+      return new HashSet<>();
+    }
+    Set<String> result = new HashSet<>();
+    byte[] dictBuffer = _dictionary.getBuffer();
+    int valueStart = jsonPathKey.length() + 1;
+    java.util.function.Predicate<String> valueMatcher = buildValueMatcher(predicate, jsonPathKey);
+
+    for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
+      String keyValue = _dictionary.getStringValue(dictId, dictBuffer);
+      String value = keyValue.substring(valueStart);
+      if (valueMatcher.test(value)) {
+        result.add(value);
+      }
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(dictId - dictIds[0],
+          "ImmutableJsonIndexReader.getMatchingDistinctValues");
+    }
+    return result;
+  }
+
+  /// Builds a string predicate that evaluates the filter condition on a value string.
+  private static java.util.function.Predicate<String> buildValueMatcher(Predicate predicate, String key) {
+    switch (predicate.getType()) {
+      case EQ: {
+        String eqValue = ((EqPredicate) predicate).getValue();
+        return value -> value.equals(eqValue);
+      }
+      case NOT_EQ: {
+        String notEqValue = ((NotEqPredicate) predicate).getValue();
+        return value -> !value.equals(notEqValue);
+      }
+      case IN: {
+        java.util.Set<String> inValues = new HashSet<>(((InPredicate) predicate).getValues());
+        return inValues::contains;
+      }
+      case NOT_IN: {
+        java.util.Set<String> notInValues = new HashSet<>(((NotInPredicate) predicate).getValues());
+        return value -> !notInValues.contains(value);
+      }
+      case REGEXP_LIKE: {
+        Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
+        Matcher matcher = pattern.matcher("");
+        return value -> matcher.reset(value).matches();
+      }
+      case RANGE: {
+        RangePredicate rangePredicate = (RangePredicate) predicate;
+        FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
+        if (rangeDataType.isNumeric()) {
+          rangeDataType = FieldSpec.DataType.DOUBLE;
+        } else {
+          rangeDataType = FieldSpec.DataType.STRING;
+        }
+        boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
+        boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
+        boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
+        boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+        Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
+        Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
+        FieldSpec.DataType dt = rangeDataType;
+        return value -> {
+          Object valueObj = dt.convert(value);
+          boolean lowerOk = lowerUnbounded || (lowerInclusive ? dt.compare(valueObj, lowerBound) >= 0
+              : dt.compare(valueObj, lowerBound) > 0);
+          boolean upperOk = upperUnbounded || (upperInclusive ? dt.compare(valueObj, upperBound) <= 0
+              : dt.compare(valueObj, upperBound) < 0);
+          return lowerOk && upperOk;
+        };
+      }
+      case IS_NOT_NULL:
+        return value -> true;
+      default:
+        throw new IllegalStateException("Unsupported predicate type for distinct values: " + predicate.getType());
+    }
+  }
+
+  /// Normalizes the predicate's key path to match the internal dictionary format.
+  @Nullable
+  private String normalizePredicateKey(Predicate predicate) {
+    ExpressionContext lhs = predicate.getLhs();
+    if (lhs.getType() != ExpressionContext.Type.IDENTIFIER) {
+      return null;
+    }
+    String key = lhs.getIdentifier();
+    if (_version == BaseJsonIndexCreator.VERSION_2) {
+      if (key.startsWith("$")) {
+        key = key.substring(1);
+      } else {
+        key = JsonUtils.KEY_SEPARATOR + key;
+      }
+    } else {
+      if (key.startsWith("$.")) {
+        key = key.substring(2);
+      }
+    }
+    // Only handle simple paths without array indices
+    Pair<String, ImmutableRoaringBitmap> pair = getKeyAndFlattenedDocIds(key);
+    if (pair.getRight() != null) {
+      return null;
+    }
+    return pair.getLeft();
+  }
+
+  /// Falls back to the default approach: build full flattened docs map and return keys.
+  private Set<String> collectValuesFromFlattenedDocsMap(String normalizedKey, @Nullable String filterString) {
+    // Need to denormalize the key back to original format for getMatchingFlattenedDocsMap
+    // Instead, use the default interface method which handles normalization
+    return JsonIndexReader.super.getMatchingDistinctValues(
+        denormalizeKey(normalizedKey), filterString);
+  }
+
+  private String denormalizeKey(String normalizedKey) {
+    if (_version == BaseJsonIndexCreator.VERSION_2) {
+      return "$" + normalizedKey;
+    } else {
+      return "$." + normalizedKey;
+    }
+  }
+
+  @Override
   public String[][] getValuesMV(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
     String[][] result = new String[length][];
     List<PriorityQueue<Pair<String, Integer>>> docIdToFlattenedDocIdsAndValues = new ArrayList<>();
@@ -620,9 +842,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return values;
   }
 
-  /**
-   * For a JSON key path, returns an int array of the range [min, max] spanning all values for the JSON key path
-   */
+  /// For a JSON key path, returns an int array of the range \[min, max\] spanning all values for the JSON key path
   private int[] getDictIdRangeForKey(String key) {
     // json_index uses \0 as the separator (or \u0000 in unicode)
     // therefore, use the unicode char \u0001 to get the range of dict entries that have this prefix
@@ -643,12 +863,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return new int[]{minDictId, maxDictId};
   }
 
-  /**
-   *  If key doesn't contain the array index, return <original key, null bitmap>
-   *  Elif the key, i.e. the json path provided by user doesn't match any data, return <null, empty bitmap>
-   *  Else, return the json path that is generated by replacing array index with . on the original key
-   *  and the associated flattenDocId bitmap
-   */
+  /// If key doesn't contain the array index, return <original key, null bitmap>
+  /// Elif the key, i.e. the json path provided by user doesn't match any data, return <null, empty bitmap>
+  /// Else, return the json path that is generated by replacing array index with . on the original key
+  /// and the associated flattenDocId bitmap
   private Pair<String, ImmutableRoaringBitmap> getKeyAndFlattenedDocIds(String key) {
     ImmutableRoaringBitmap matchingDocIds = null;
 

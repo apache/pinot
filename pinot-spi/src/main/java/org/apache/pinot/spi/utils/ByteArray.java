@@ -28,14 +28,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Wrapper around byte[] that provides additional features such as:
- * <ul>
- *   <li>Implements comparable interface, so comparison and sorting can be performed</li>
- *   <li>Implements equals() and hashCode(), so it can be used as key for HashMap/Set</li>
- *   <li>Caches the hash code of the byte[]</li>
- * </ul>
- */
+/// Wrapper around byte\[\] that provides additional features such as:
+///
+/// - Implements comparable interface, so comparison and sorting can be performed
+/// - Implements equals() and hashCode(), so it can be used as key for HashMap/Set
+/// - Caches the hash code of the byte\[\]
 public class ByteArray implements Comparable<ByteArray>, Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ByteArray.class);
 
@@ -133,40 +130,34 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
     return compare(_bytes, that._bytes);
   }
 
-  /**
-   * Compares two byte[] values. The comparison performed is on unsigned value for each byte.
-   * Returns:
-   * <ul>
-   *   <li> 0 if both values are identical. </li>
-   *   <li> -ve integer if first value is smaller than the second. </li>
-   *   <li> +ve integer if first value is larger than the second. </li>
-   * </ul>
-   *
-   * @param left First byte[] to compare.
-   * @param right Second byte[] to compare.
-   * @return Result of comparison as stated above.
-   */
+  /// Compares two byte\[\] values. The comparison performed is on unsigned value for each byte.
+  /// Returns:
+  ///
+  /// - 0 if both values are identical.
+  /// - -ve integer if first value is smaller than the second.
+  /// - +ve integer if first value is larger than the second.
+  ///
+  /// @param left First byte\[\] to compare.
+  /// @param right Second byte\[\] to compare.
+  /// @return Result of comparison as stated above.
   public static int compare(byte[] left, byte[] right) {
     return compare(left, 0, left.length, right, 0, right.length);
   }
 
-  /**
-   * Compares two byte[] values. The comparison performed is on unsigned value for each byte.
-   * Returns:
-   * <ul>
-   *   <li> 0 if both values are identical. </li>
-   *   <li> -ve integer if first value is smaller than the second. </li>
-   *   <li> +ve integer if first value is larger than the second. </li>
-   * </ul>
-   *
-   * @param left First byte[] to compare.
-   * @param leftFromIndex inclusive index of first byte to compare in left
-   * @param leftToIndex exclusive index of last byte to compare in left
-   * @param right Second byte[] to compare.
-   * @param rightFromIndex inclusive index of first byte to compare in right
-   * @param rightToIndex exclusive index of last byte to compare in right
-   * @return Result of comparison as stated above.
-   */
+  /// Compares two byte\[\] values. The comparison performed is on unsigned value for each byte.
+  /// Returns:
+  ///
+  /// - 0 if both values are identical.
+  /// - -ve integer if first value is smaller than the second.
+  /// - +ve integer if first value is larger than the second.
+  ///
+  /// @param left First byte\[\] to compare.
+  /// @param leftFromIndex inclusive index of first byte to compare in left
+  /// @param leftToIndex exclusive index of last byte to compare in left
+  /// @param right Second byte\[\] to compare.
+  /// @param rightFromIndex inclusive index of first byte to compare in right
+  /// @param rightToIndex exclusive index of last byte to compare in right
+  /// @return Result of comparison as stated above.
   public static int compare(byte[] left, int leftFromIndex, int leftToIndex, byte[] right, int rightFromIndex,
       int rightToIndex) {
     if (COMPARE_UNSIGNED != null) {
@@ -175,7 +166,8 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
             rightToIndex);
       } catch (ArrayIndexOutOfBoundsException outOfBounds) {
         throw outOfBounds;
-      } catch (Throwable ignore) {
+      } catch (Throwable t) {
+        LOGGER.debug("MethodHandle invocation for Arrays.compareUnsigned failed, falling back to manual comparison", t);
       }
     }
     return compareFallback(left, leftFromIndex, leftToIndex, right, rightFromIndex, rightToIndex);

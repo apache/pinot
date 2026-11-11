@@ -23,9 +23,7 @@ import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
-/**
- * Defines and builds the offset criteria for consumption from a stream
- */
+/// Defines and builds the offset criteria for consumption from a stream
 public class OffsetCriteria {
 
   public static final OffsetCriteria SMALLEST_OFFSET_CRITERIA =
@@ -34,9 +32,7 @@ public class OffsetCriteria {
   public static final OffsetCriteria LARGEST_OFFSET_CRITERIA =
       new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest();
 
-  /**
-   * Enumerates the supported offset types
-   */
+  /// Enumerates the supported offset types
   private enum OffsetType {
 
     // Consumes from the smallest available offset
@@ -69,57 +65,43 @@ public class OffsetCriteria {
     _offsetString = offsetString;
   }
 
-  /**
-   * True if the offset criteria is defined to read from smallest available offset
-   * @return
-   */
+  /// True if the offset criteria is defined to read from smallest available offset
+  /// @return
   public boolean isSmallest() {
     return _offsetType != null && _offsetType.equals(OffsetType.SMALLEST);
   }
 
-  /**
-   * True if the offset criteria is defined to read from the largest known offset
-   * @return
-   */
+  /// True if the offset criteria is defined to read from the largest known offset
+  /// @return
   public boolean isLargest() {
     return _offsetType != null && _offsetType.equals(OffsetType.LARGEST);
   }
 
-  /**
-   * True if the offset criteria is defined as a period string
-   * @return
-   */
+  /// True if the offset criteria is defined as a period string
+  /// @return
   public boolean isPeriod() {
     return _offsetType != null && _offsetType.equals(OffsetType.PERIOD);
   }
 
-  /**
-   * True if the offset criteria is defined as a timestamp string
-   * @return
-   */
+  /// True if the offset criteria is defined as a timestamp string
+  /// @return
   public boolean isTimestamp() {
     return _offsetType != null && _offsetType.equals(OffsetType.TIMESTAMP);
   }
 
-  /**
-   * True if the offset criteria is defined as a custom format string
-   * @return
-   */
+  /// True if the offset criteria is defined as a custom format string
+  /// @return
   public boolean isCustom() {
     return _offsetType != null && _offsetType.equals(OffsetType.CUSTOM);
   }
 
-  /**
-   * Getter for offset string
-   * @return
-   */
+  /// Getter for offset string
+  /// @return
   public String getOffsetString() {
     return _offsetString;
   }
 
-  /**
-   * Builds an {@link OffsetCriteria}
-   */
+  /// Builds an [OffsetCriteria]
   public static class OffsetCriteriaBuilder {
     private OffsetCriteria _offsetCriteria;
 
@@ -127,31 +109,25 @@ public class OffsetCriteria {
       _offsetCriteria = new OffsetCriteria();
     }
 
-    /**
-     * Builds an {@link OffsetCriteria} with {@link OffsetType} SMALLEST
-     * @return
-     */
+    /// Builds an [OffsetCriteria] with [OffsetType] SMALLEST
+    /// @return
     public OffsetCriteria withOffsetSmallest() {
       _offsetCriteria.setOffsetType(OffsetType.SMALLEST);
       _offsetCriteria.setOffsetString(OffsetType.SMALLEST.toString().toLowerCase());
       return _offsetCriteria;
     }
 
-    /**
-     * Builds an {@link OffsetCriteria} with {@link OffsetType} LARGEST
-     * @return
-     */
+    /// Builds an [OffsetCriteria] with [OffsetType] LARGEST
+    /// @return
     public OffsetCriteria withOffsetLargest() {
       _offsetCriteria.setOffsetType(OffsetType.LARGEST);
       _offsetCriteria.setOffsetString(OffsetType.LARGEST.toString().toLowerCase());
       return _offsetCriteria;
     }
 
-    /**
-     * Builds an {@link OffsetCriteria} with {@link OffsetType} PERIOD
-     * @param periodString
-     * @return
-     */
+    /// Builds an [OffsetCriteria] with [OffsetType] PERIOD
+    /// @param periodString
+    /// @return
     public OffsetCriteria withOffsetAsPeriod(String periodString) {
       Preconditions.checkNotNull(periodString, "Must provide period string eg. 10d, 4h30m etc");
       _offsetCriteria.setOffsetType(OffsetType.PERIOD);
@@ -159,11 +135,9 @@ public class OffsetCriteria {
       return _offsetCriteria;
     }
 
-    /**
-     * Builds an {@link OffsetCriteria} with {@link OffsetType} TIMESTAMP
-     * @param timestamp
-     * @return
-     */
+    /// Builds an [OffsetCriteria] with [OffsetType] TIMESTAMP
+    /// @param timestamp
+    /// @return
     public OffsetCriteria withOffsetAsTimestamp(String timestamp) {
       Preconditions.checkNotNull(timestamp, "Must provide timestamp string of format "
           + "yyyy-MM-dd'T'HH:mm:ss.SSSZ eg. 2022-08-09T12:31:38.222Z");
@@ -172,11 +146,9 @@ public class OffsetCriteria {
       return _offsetCriteria;
     }
 
-    /**
-     * Builds an {@link OffsetCriteria} with {@link OffsetType} CUSTOM
-     * @param customString
-     * @return
-     */
+    /// Builds an [OffsetCriteria] with [OffsetType] CUSTOM
+    /// @param customString
+    /// @return
     public OffsetCriteria withOffsetCustom(String customString) {
       Preconditions.checkNotNull(customString, "Must provide custom offset criteria string");
       _offsetCriteria.setOffsetType(OffsetType.CUSTOM);
@@ -184,11 +156,9 @@ public class OffsetCriteria {
       return _offsetCriteria;
     }
 
-    /**
-     * Builds an {@link OffsetCriteria} with the right {@link OffsetType} given the offset string
-     * @param offsetString
-     * @return
-     */
+    /// Builds an [OffsetCriteria] with the right [OffsetType] given the offset string
+    /// @param offsetString
+    /// @return
     public OffsetCriteria withOffsetString(String offsetString) {
       Preconditions.checkNotNull(offsetString, "Must provide offset string");
 

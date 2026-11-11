@@ -83,7 +83,8 @@ public class LLCSegmentCompletionHandlers {
   // We don't want to document these in swagger since they are internal APIs
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_EXTEND_BUILD_TIME)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String extendBuildTime(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -114,12 +115,14 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_CONSUMED)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentConsumed(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode,
       @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
@@ -133,6 +136,7 @@ public class LLCSegmentCompletionHandlers {
         .withSegmentName(segmentName)
         .withStreamPartitionMsgOffset(streamPartitionMsgOffset)
         .withReason(stopReason)
+        .withReasonCodeParam(stopReasonCode)
         .withMemoryUsedBytes(memoryUsedBytes)
         .withNumRows(numRows);
     LOGGER.info("Processing segmentConsumed: {}", requestParams);
@@ -144,12 +148,14 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentStoppedConsuming(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, streamPartitionMsgOffset={}", segmentName, instanceId,
           streamPartitionMsgOffset);
@@ -160,7 +166,8 @@ public class LLCSegmentCompletionHandlers {
         .withInstanceId(instanceId)
         .withSegmentName(segmentName)
         .withStreamPartitionMsgOffset(streamPartitionMsgOffset)
-        .withReason(stopReason);
+        .withReason(stopReason)
+        .withReasonCodeParam(stopReasonCode);
     LOGGER.info("Processing segmentStoppedConsuming: {}", requestParams);
 
     String response = _segmentCompletionManager.segmentStoppedConsuming(requestParams).toJsonString();
@@ -170,7 +177,8 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_START)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitStart(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -179,7 +187,9 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode) {
     if (instanceId == null || segmentName == null || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, streamPartitionMsgOffset={}", segmentName, instanceId,
           streamPartitionMsgOffset);
@@ -194,7 +204,9 @@ public class LLCSegmentCompletionHandlers {
         .withBuildTimeMillis(buildTimeMillis)
         .withWaitTimeMillis(waitTimeMillis)
         .withNumRows(numRows)
-        .withSegmentSizeBytes(segmentSizeBytes);
+        .withSegmentSizeBytes(segmentSizeBytes)
+        .withReason(stopReason)
+        .withReasonCodeParam(stopReasonCode);
     LOGGER.info("Processing segmentCommitStart: {}", requestParams);
 
     String response = _segmentCompletionManager.segmentCommitStart(requestParams).toJsonString();
@@ -269,7 +281,9 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason, FormDataMultiPart metadataFiles) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode,
+      FormDataMultiPart metadataFiles) {
     if (instanceId == null || segmentName == null || segmentLocation == null || metadataFiles == null
         || streamPartitionMsgOffset == null) {
       LOGGER.error("Invalid call: segmentName={}, instanceId={}, segmentLocation={}, streamPartitionMsgOffset={}",
@@ -288,7 +302,8 @@ public class LLCSegmentCompletionHandlers {
         .withWaitTimeMillis(waitTimeMillis)
         .withNumRows(numRows)
         .withMemoryUsedBytes(memoryUsedBytes)
-        .withReason(stopReason);
+        .withReason(stopReason)
+        .withReasonCodeParam(stopReasonCode);
     LOGGER.info("Processing segmentCommitEndWithMetadata: {}", requestParams);
 
     SegmentMetadataImpl segmentMetadata;
@@ -309,7 +324,8 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_BUILD_DETERMINISTIC_FAILURE)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Authenticate(AccessType.CREATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Produces(MediaType.APPLICATION_JSON)
   public String reduceSegmentSize(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -329,9 +345,7 @@ public class LLCSegmentCompletionHandlers {
     return _segmentCompletionManager.reduceSegmentSizeAndReset(requestParams).toJsonString();
   }
 
-  /**
-   * Extracts the segment file from the form into a local temporary file under file upload temporary directory.
-   */
+  /// Extracts the segment file from the form into a local temporary file under file upload temporary directory.
   private static File extractSegmentFromFormToLocalTempFile(FormDataMultiPart form, String segmentName)
       throws IOException {
     try {
@@ -356,10 +370,8 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
-  /**
-   * Extracts the segment metadata from the local segment file. Use the untarred file temporary directory to store the
-   * metadata files temporarily.
-   */
+  /// Extracts the segment metadata from the local segment file. Use the untarred file temporary directory to store the
+  /// metadata files temporarily.
   private static SegmentMetadataImpl extractMetadataFromLocalSegmentFile(File segmentFile)
       throws Exception {
     File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
@@ -384,10 +396,8 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
-  /**
-   * Extracts the segment metadata from the form. Use the untarred file temporary directory to store the metadata files
-   * temporarily.
-   */
+  /// Extracts the segment metadata from the form. Use the untarred file temporary directory to store the metadata files
+  /// temporarily.
   private static SegmentMetadataImpl extractSegmentMetadataFromForm(FormDataMultiPart form, String segmentName)
       throws IOException, ConfigurationException {
     File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
@@ -410,9 +420,7 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
-  /**
-   * Extracts a file from the form into the given directory.
-   */
+  /// Extracts a file from the form into the given directory.
   private static void extractFileFromForm(FormDataMultiPart form, String fileName, File outputDir)
       throws IOException {
     FormDataBodyPart bodyPart = form.getField(fileName);

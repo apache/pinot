@@ -24,11 +24,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
@@ -54,7 +56,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected static final int NUM_REALTIME_SEGMENTS = 48;
   protected static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
   protected static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
-  private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000;
 
   protected List<File> _avroFiles;
   protected boolean _failureEnabled = false;
@@ -100,10 +101,10 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     startZk();
+    startKafka();
     startController();
     startBroker();
     startServer();
-    setMaxSegmentCompletionTimeMillis();
     setupNonPauselessTable();
     injectFailure();
     setupPauselessTable();
@@ -113,7 +114,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected void setupNonPauselessTable()
       throws Exception {
     _avroFiles = unpackAvroData(_tempDir);
-    startKafka();
     pushAvroIntoKafka(_avroFiles);
 
     Schema schema = createSchema();
@@ -126,7 +126,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
     addTableConfig(tableConfig);
 
-    waitForDocsLoaded(600_000L, true, tableConfig.getTableName());
+    waitForAllDocsLoaded(tableConfig.getTableName(), 600_000L);
     TestUtils.waitForCondition((aVoid) -> {
       List<SegmentZKMetadata> segmentZKMetadataList =
           _helixResourceManager.getSegmentsZKMetadata(tableConfig.getTableName());
@@ -137,7 +137,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected void setupPauselessTable()
       throws Exception {
     Schema schema = createSchema();
-    schema.setSchemaName(DEFAULT_TABLE_NAME);
+    schema.setSchemaName(getTableName());
     addSchema(schema);
 
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
@@ -152,14 +152,6 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     tableConfig.setIngestionConfig(ingestionConfig);
 
     addTableConfig(tableConfig);
-  }
-
-  protected void setMaxSegmentCompletionTimeMillis() {
-    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
-    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
-          .setMaxSegmentCompletionTimeoutMs(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    }
   }
 
   protected void injectFailure() {
@@ -208,13 +200,30 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       return segmentZKMetadataList.size() == getExpectedZKMetadataWithFailure();
     }, 1000, 100000, "New Segment ZK Metadata not created");
 
-    Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
     disableFailure();
 
-    _controllerStarter.getRealtimeSegmentValidationManager().run();
+    // The repair performed by the validation run below discovers the server hosting each stranded segment through
+    // the external view, so wait for the external view to catch up with the ideal state first. E.g. when commit-end
+    // fails, the stranded segments are already ONLINE in the ideal state, but on a loaded host the server may not
+    // have processed the CONSUMING -> ONLINE transitions yet, and the one-shot repair would permanently miss them.
+    PauselessRealtimeTestUtils.waitForExternalViewToConverge(_helixResourceManager, tableNameWithType, 100_000L);
+
+    // Force-expire the segments stranded by the injected failure instead of waiting out the max segment completion
+    // time: they become immediately eligible for repair, and their in-flight commit attempts keep getting rejected,
+    // so the single validation run below stays the only recovery path under test. Segments created afterwards keep
+    // the production completion time and are never artificially rejected. Clear the expiry right after the run so
+    // that segments re-activated by the repair can commit normally.
+    PauselessRealtimeTestUtils.forceExpireSegments(_helixResourceManager, tableNameWithType);
+    try {
+      Properties periodicTaskProperties = new Properties();
+      periodicTaskProperties.setProperty(ControllerPeriodicTask.RUN_SEGMENT_LEVEL_VALIDATION, Boolean.TRUE.toString());
+      _controllerStarter.getRealtimeSegmentValidationManager().run(periodicTaskProperties);
+    } finally {
+      PauselessRealtimeTestUtils.clearForceExpiredSegments(_helixResourceManager);
+    }
 
     waitForAllDocsLoaded(600_000L);
-    waitForDocsLoaded(600_000L, true, tableNameWithType2);
+    waitForAllDocsLoaded(tableNameWithType2, 600_000L);
 
     PauselessRealtimeTestUtils.verifyIdealState(tableNameWithType, NUM_REALTIME_SEGMENTS, _helixManager);
     PauselessRealtimeTestUtils.verifyIdealState(tableNameWithType2, NUM_REALTIME_SEGMENTS, _helixManager);
@@ -230,9 +239,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
         _helixResourceManager.getSegmentsZKMetadata(tableNameWithType2));
   }
 
-  /**
-   * Basic test to verify segment assignment and metadata without any failures
-   */
+  /// Basic test to verify segment assignment and metadata without any failures
   protected void testBasicSegmentAssignment() {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 

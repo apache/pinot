@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import com.adobe.testing.s3mock.testcontainers.S3MockContainer;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -33,6 +32,8 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -56,7 +57,8 @@ import software.amazon.awssdk.services.s3.model.StorageClass;
 
 @Test
 public class S3PinotFSTest {
-  private static final String S3MOCK_VERSION = System.getProperty("s3mock.version", "2.12.2");
+  private static final String S3MOCK_VERSION = System.getProperty("s3mock.version", "3.12.0");
+  private static final int S3MOCK_HTTP_PORT = 9090;
   private static final File TEMP_FILE = new File(FileUtils.getTempDirectory(), "S3PinotFSTest");
 
   private static final String S3_SCHEME = "s3";
@@ -66,7 +68,7 @@ public class S3PinotFSTest {
   private static final String FILE_FORMAT = "%s://%s/%s";
   private static final String DIR_FORMAT = "%s://%s";
 
-  private S3MockContainer _s3MockContainer;
+  private GenericContainer<?> _s3MockContainer;
   private S3PinotFS _s3PinotFS;
   private S3Client _s3Client;
 
@@ -77,9 +79,12 @@ public class S3PinotFSTest {
 
   @BeforeClass
   public void setUp() {
-    _s3MockContainer = new S3MockContainer(S3MOCK_VERSION);
+    _s3MockContainer = new GenericContainer<>("adobe/s3mock:" + S3MOCK_VERSION)
+        .withExposedPorts(S3MOCK_HTTP_PORT)
+        .waitingFor(Wait.forHttp("/favicon.ico").forPort(S3MOCK_HTTP_PORT).forStatusCode(200));
     _s3MockContainer.start();
-    String endpoint = _s3MockContainer.getHttpEndpoint();
+    String endpoint = "http://" + _s3MockContainer.getHost() + ":"
+        + _s3MockContainer.getMappedPort(S3MOCK_HTTP_PORT);
     _s3Client = createS3ClientV2(endpoint);
     _s3PinotFS = new S3PinotFS();
     _s3PinotFS.init(_s3Client);

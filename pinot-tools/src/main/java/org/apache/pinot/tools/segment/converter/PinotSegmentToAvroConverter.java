@@ -19,29 +19,31 @@
 package org.apache.pinot.tools.segment.converter;
 
 import java.io.File;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Map;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * The <code>PinotSegmentToAvroConverter</code> class is the tool to convert Pinot segment to AVRO format.
- */
+/// The `PinotSegmentToAvroConverter` class is the tool to convert Pinot segment to AVRO format.
 public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
   private final String _segmentDir;
   private final String _outputFile;
+  private final boolean _forwardIndexOnly;
 
   public PinotSegmentToAvroConverter(String segmentDir, String outputFile) {
+    this(segmentDir, outputFile, false);
+  }
+
+  public PinotSegmentToAvroConverter(String segmentDir, String outputFile, boolean forwardIndexOnly) {
     _segmentDir = segmentDir;
     _outputFile = outputFile;
+    _forwardIndexOnly = forwardIndexOnly;
   }
 
   @Override
@@ -49,26 +51,18 @@ public class PinotSegmentToAvroConverter implements PinotSegmentConverter {
       throws Exception {
     File indexDir = new File(_segmentDir);
     Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(new SegmentMetadataImpl(indexDir).getSchema());
-    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(new File(_segmentDir))) {
-      try (DataFileWriter<Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
+    PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader();
+    pinotSegmentRecordReader.init(indexDir, null, null, false, _forwardIndexOnly);
+    try (pinotSegmentRecordReader) {
+      try (DataFileWriter<Record> recordWriter =
+          new DataFileWriter<>(new GenericDatumWriter<>(avroSchema, SegmentProcessorAvroUtils.getAvroDataModel()))) {
         recordWriter.create(avroSchema, new File(_outputFile));
 
         GenericRow row = new GenericRow();
+        Record reusableRecord = new Record(avroSchema);
         while (pinotSegmentRecordReader.hasNext()) {
           row = pinotSegmentRecordReader.next(row);
-          Record record = new Record(avroSchema);
-          for (Map.Entry<String, Object> entry : row.getFieldToValueMap().entrySet()) {
-            String field = entry.getKey();
-            Object value = entry.getValue();
-            if (value instanceof Object[]) {
-              record.put(field, Arrays.asList((Object[]) value));
-            } else if (value instanceof byte[]) {
-              record.put(field, ByteBuffer.wrap((byte[]) value));
-            } else {
-              record.put(field, value);
-            }
-          }
-
+          Record record = SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(row, reusableRecord);
           recordWriter.append(record);
           row.clear();
         }

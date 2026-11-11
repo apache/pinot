@@ -23,12 +23,10 @@ import java.util.Objects;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
-/**
- * {@code QueryServerInstance} is representation used during query dispatch to indicate the
- * physical location of a query server.
- *
- * <p>Note that {@code QueryServerInstance} should only be used during dispatch.</p>
- */
+/// `QueryServerInstance` is representation used during query dispatch to indicate the
+/// physical location of a query server.
+///
+/// Note that `QueryServerInstance` should only be used during dispatch.
 public class QueryServerInstance {
   private final String _instanceId;
   private final String _hostname;

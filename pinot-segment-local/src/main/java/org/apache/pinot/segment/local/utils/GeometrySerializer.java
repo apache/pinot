@@ -36,36 +36,38 @@ import org.locationtech.jts.geom.TopologyException;
 import static org.apache.pinot.segment.local.utils.GeometryType.*;
 
 
-/**
- * Provides methods to efficiently serialize and deserialize geometry types.
- *
- * This serialization is similar to Presto's https://github
- * .com/prestodb/presto/blob/master/presto-geospatial-toolkit/src/main/java/com/facebook/presto/geospatial/serde
- * /JtsGeometrySerde.java,
- * with the following differences:
- *  - The geometry vs geography info is encoded in the type byte.
- *  - The envelope info is not serialized
- */
+/// Provides methods to efficiently serialize and deserialize geometry types.
+///
+/// This serialization is similar to Presto's https://github
+/// .com/prestodb/presto/blob/master/presto-geospatial-toolkit/src/main/java/com/facebook/presto/geospatial/serde
+/// /JtsGeometrySerde.java,
+/// with the following differences:
+///  - The geometry vs geography info is encoded in the type byte.
+///  - The envelope info is not serialized
 public final class GeometrySerializer {
   private static final int TYPE_SIZE = Byte.BYTES;
   private static final int COORDINATE_SIZE = Double.BYTES + Double.BYTES;
 
-  /**
-   * Serializes a geometry object into bytes
-   * @param geometry the geometry object to serialize
-   * @return the serialized bytes
-   */
+  /// Serializes a geometry object into bytes
+  /// @param geometry the geometry object to serialize
+  /// @return the serialized bytes
   public static byte[] serialize(Geometry geometry) {
     return writeGeometry(geometry);
   }
 
-  /**
-   * Deserializes bytes into a geometry object
-   * @param bytes the bytes to deserialize
-   * @return the deserialized object
-   */
+  /// Deserializes bytes into a geometry object
+  /// @param bytes the bytes to deserialize
+  /// @return the deserialized object
   public static Geometry deserialize(byte[] bytes) {
     return readGeometry(bytes);
+  }
+
+  /// Deserializes a geometry object from the big-endian buffer, starting at its position. A geometry collection is
+  /// read up to the buffer limit, so the buffer must end where the serialized geometry ends.
+  /// @param buffer the buffer holding the serialized geometry
+  /// @return the deserialized object
+  public static Geometry deserialize(ByteBuffer buffer) {
+    return readGeometry(buffer);
   }
 
   private static byte[] writeGeometry(Geometry geometry) {
@@ -335,9 +337,7 @@ public final class GeometrySerializer {
     byteBuffer.put(type);
   }
 
-  /**
-   * Writes the byte of type, followed by the two coordinates in double.
-   */
+  /// Writes the byte of type, followed by the two coordinates in double.
   private static void writePoint(ByteBuffer byteBuffer, Point point) {
     writeType(byteBuffer, POINT, point.getSRID());
     if (point.isEmpty()) {
@@ -353,9 +353,7 @@ public final class GeometrySerializer {
     byteBuffer.putDouble(coordinate.getY());
   }
 
-  /**
-   * Writes the byte of type, number of points in int, followed by the collection of points
-   */
+  /// Writes the byte of type, number of points in int, followed by the collection of points
   private static void writeMultiPoint(ByteBuffer byteBuffer, MultiPoint geometry) {
     writeType(byteBuffer, MULTI_POINT, geometry.getSRID());
     byteBuffer.putInt(geometry.getNumPoints());
@@ -370,10 +368,8 @@ public final class GeometrySerializer {
     return Integer.BYTES + Integer.BYTES + numParts * Integer.BYTES + numPoints * COORDINATE_SIZE;
   }
 
-  /**
-   * Writes the byte of type, the number of parts in int, number of points in int, followed by collection of part index
-   * in int, followed by collection of coordinates
-   */
+  /// Writes the byte of type, the number of parts in int, number of points in int, followed by collection of part index
+  /// in int, followed by collection of coordinates
   private static void writePolyline(ByteBuffer byteBuffer, Geometry geometry, boolean multitype) {
     int numParts;
     int numPoints = geometry.getNumPoints();
@@ -419,10 +415,8 @@ public final class GeometrySerializer {
     return size + numParts * Integer.BYTES + numPoints * COORDINATE_SIZE;
   }
 
-  /**
-   * Writes the byte of type, the number of parts in int, number of points in int, followed by collection of part index
-   * in int, followed by the canonicalized coordinates.
-   */
+  /// Writes the byte of type, the number of parts in int, number of points in int, followed by collection of part index
+  /// in int, followed by the canonicalized coordinates.
   private static void writePolygon(ByteBuffer byteBuffer, Geometry geometry, boolean multitype) {
     int numGeometries = geometry.getNumGeometries();
     int numParts = 0;

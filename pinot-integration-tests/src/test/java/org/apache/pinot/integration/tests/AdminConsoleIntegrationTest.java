@@ -33,9 +33,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests that the controller, broker and server admin consoles return the expected pages.
- */
+/// Tests that the controller, broker and server admin consoles return the expected pages.
 public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
 
   @BeforeClass
@@ -61,9 +59,7 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     FileUtils.deleteQuietly(_tempDir);
   }
 
-  /**
-   * Tests responses to /api and /help.
-   */
+  /// Tests responses to /api and /help.
   @Test
   public void testApiHelp()
       throws Exception {

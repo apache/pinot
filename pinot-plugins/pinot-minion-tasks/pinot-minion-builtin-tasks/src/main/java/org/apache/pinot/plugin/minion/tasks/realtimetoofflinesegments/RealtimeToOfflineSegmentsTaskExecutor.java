@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -49,26 +48,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A task to convert segments from a REALTIME table to segments for its corresponding OFFLINE table.
- * The realtime segments could span across multiple time windows.
- * This task extracts data and creates segments for a configured time window.
- * The {@link SegmentProcessorFramework} is used for the segment conversion, which does the following steps
- * 1. Filter records based on the time window
- * 2. Round the time value in the records (optional)
- * 3. Partition the records if partitioning is enabled in the table config
- * 4. Merge records based on the merge type
- * 5. Sort records if sorting is enabled in the table config
- *
- * Before beginning the task, the <code>watermarkMs</code> is checked in the minion task metadata ZNode,
- * located at MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
- * It should match the <code>windowStartMs</code>.
- * The version of the znode is cached.
- *
- * After the segments are uploaded, this task updates the <code>watermarkMs</code> in the minion task metadata ZNode.
- * The znode version is checked during update,
- * and update only succeeds if version matches with the previously cached version
- */
+/// A task to convert segments from a REALTIME table to segments for its corresponding OFFLINE table.
+/// The realtime segments could span across multiple time windows.
+/// This task extracts data and creates segments for a configured time window.
+/// The [SegmentProcessorFramework] is used for the segment conversion, which does the following steps
+/// 1. Filter records based on the time window
+/// 2. Round the time value in the records (optional)
+/// 3. Partition the records if partitioning is enabled in the table config
+/// 4. Merge records based on the merge type
+/// 5. Sort records if sorting is enabled in the table config
+///
+/// Before beginning the task, the `watermarkMs` is checked in the minion task metadata ZNode,
+/// located at MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
+/// It should match the `windowStartMs`.
+/// The version of the znode is cached.
+///
+/// After the segments are uploaded, this task updates the `watermarkMs` in the minion task metadata ZNode.
+/// The znode version is checked during update,
+/// and update only succeeds if version matches with the previously cached version
 public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeToOfflineSegmentsTaskExecutor.class);
 
@@ -81,11 +78,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     _minionTaskZkMetadataManager = minionTaskZkMetadataManager;
   }
 
-  /**
-   * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
-   * Checks that the <code>watermarkMs</code> from the ZNode matches the windowStartMs in the task configs.
-   * If yes, caches the ZNode version to check during update.
-   */
+  /// Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
+  /// Checks that the `watermarkMs` from the ZNode matches the windowStartMs in the task configs.
+  /// If yes, caches the ZNode version to check during update.
   @Override
   public void preProcess(PinotTaskConfig pinotTaskConfig) {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -204,12 +199,10 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     return results;
   }
 
-  /**
-   * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
-   * Checks that the version of the ZNode matches with the version cached earlier. If yes, proceeds to update
-   * watermark in the ZNode
-   * TODO: Making the minion task update the ZK metadata is an anti-pattern, however cannot see another way to do it
-   */
+  /// Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
+  /// Checks that the version of the ZNode matches with the version cached earlier. If yes, proceeds to update
+  /// watermark in the ZNode
+  /// TODO: Making the minion task update the ZK metadata is an anti-pattern, however cannot see another way to do it
   @Override
   public void postProcess(PinotTaskConfig pinotTaskConfig) {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -225,6 +218,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.emptyMap());
+        Map.of());
   }
 }

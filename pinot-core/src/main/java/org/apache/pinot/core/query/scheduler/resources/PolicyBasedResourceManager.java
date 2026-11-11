@@ -26,28 +26,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * ResourceManager class to manage threadpools as per the configured policy
- */
+/// ResourceManager class to manage threadpools as per the configured policy
 public class PolicyBasedResourceManager extends ResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PolicyBasedResourceManager.class);
 
-  private final ResourceLimitPolicy _resourcePolicy;
+  private volatile ResourceLimitPolicy _resourcePolicy;
 
   public PolicyBasedResourceManager(PinotConfiguration config) {
     super(config);
     _resourcePolicy = new ResourceLimitPolicy(config, _numQueryWorkerThreads);
   }
 
-  /**
-   * Returns an executor service that query executor can use like a dedicated
-   * service for submitting jobs for parallel execution.
-   * @param query
-   * @param accountant Accountant for a scheduler group
-   * @return BoundedAccountingExecutor service that limits the number of threads available
-   * for query execution. Query execution can submit tasks for parallel execution without need
-   * for limiting their parallelism.
-   */
+  @Override
+  protected void onThreadPoolsResized(int newRunnerThreads, int newWorkerThreads) {
+    _resourcePolicy = new ResourceLimitPolicy(_config, newWorkerThreads);
+  }
+
+  /// Returns an executor service that query executor can use like a dedicated
+  /// service for submitting jobs for parallel execution.
+  /// @param query
+  /// @param accountant Accountant for a scheduler group
+  /// @return BoundedAccountingExecutor service that limits the number of threads available
+  /// for query execution. Query execution can submit tasks for parallel execution without need
+  /// for limiting their parallelism.
   @Override
   public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {
     int numSegments = query.getSegmentsToQuery().size();

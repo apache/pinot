@@ -32,10 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The class for transforming validating GenericRow data against table schema and table config.
- * It is used mainly but not limited by RealTimeDataManager for each row that is going to be indexed into Pinot.
- */
+/// The class for transforming validating GenericRow data against table schema and table config.
+/// It is used mainly but not limited by RealTimeDataManager for each row that is going to be indexed into Pinot.
 public class TransformPipeline {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformPipeline.class);
 
@@ -81,7 +79,7 @@ public class TransformPipeline {
 
   public Result processRow(GenericRow decodedRow) {
     if (Boolean.TRUE.equals(decodedRow.getValue(GenericRow.SKIP_RECORD_KEY))) {
-      return new Result(List.of(), 0, 0, 0);
+      return new Result(List.of(), 0, 1, 0);
     }
     //noinspection unchecked
     List<GenericRow> rows = (List<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
@@ -110,7 +108,7 @@ public class TransformPipeline {
         _numRowsSanitized++;
       }
     }
-    return new Result(rows, skippedRowCount, incompleteRowCount, sanitizedRowCount);
+    return new Result(rows, incompleteRowCount, skippedRowCount, sanitizedRowCount);
   }
 
   /// Reports stats after all rows are processed.
@@ -124,9 +122,7 @@ public class TransformPipeline {
         _tableNameWithType);
   }
 
-  /**
-   * Wrapper for transforming results. For efficiency, right now the failed rows have only a counter
-   */
+  /// Wrapper for transforming results. For efficiency, right now the failed rows have only a counter
   public static class Result {
     private final List<GenericRow> _transformedRows;
     private final int _incompleteRowCount;

@@ -23,43 +23,35 @@ import java.util.regex.Pattern;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Optimized implementation of regexp_extract that assumes pattern is constant.
- */
+/// Optimized implementation of regexp_extract that assumes pattern is constant.
 public class RegexpExtractConstFunctions {
 
   private Matcher _matcher;
 
-  /**
-   * @param value
-   * @param regexp
-   * @return the matched result.
-   */
+  /// @param value
+  /// @param regexp
+  /// @return the matched result.
   @ScalarFunction
   public String regexpExtract(String value, String regexp) {
     return regexpExtract(value, regexp, 0, "");
   }
 
-  /**
-   * @param value
-   * @param regexp
-   * @param group
-   * @return the matched result.
-   */
+  /// @param value
+  /// @param regexp
+  /// @param group
+  /// @return the matched result.
   @ScalarFunction
   public String regexpExtract(String value, String regexp, int group) {
     return regexpExtract(value, regexp, group, "");
   }
 
-  /**
-   * Regular expression that extract first matched substring.
-   *
-   * @param value        input value
-   * @param regexp       regular expression
-   * @param group        the group number within the regular expression to extract.
-   * @param defaultValue the default value if no match found
-   * @return the matched result
-   */
+  /// Regular expression that extract first matched substring.
+  ///
+  /// @param value        input value
+  /// @param regexp       regular expression
+  /// @param group        the group number within the regular expression to extract.
+  /// @param defaultValue the default value if no match found
+  /// @return the matched result
   @ScalarFunction
   public String regexpExtract(String value, String regexp, int group, String defaultValue) {
     if (_matcher == null) {

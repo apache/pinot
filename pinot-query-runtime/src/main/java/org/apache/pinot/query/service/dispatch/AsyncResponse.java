@@ -18,16 +18,13 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
-import io.grpc.stub.StreamObserver;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
-/**
- * Response returned by {@link DispatchClient} asynchronously using a callback. If the {@link StreamObserver#onError}
- * was called (i.e. the dispatch failed), then the exception is stored in the response and the caller should use
- * {@link #getThrowable()} to check if it is null.
- */
+/// Response returned by [DispatchClient] asynchronously using a callback. If the
+/// [io.grpc.stub.StreamObserver#onError] was called (i.e. the dispatch failed), then the exception is stored in
+/// the response and the caller should use [#getThrowable()] to check if it is null.
 class AsyncResponse<E> {
   private final QueryServerInstance _serverInstance;
   private final E _response;

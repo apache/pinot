@@ -29,6 +29,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
@@ -42,10 +43,8 @@ public class TimeSeriesResponseMapper {
   private TimeSeriesResponseMapper() {
   }
 
-  /**
-   * Creates a BrokerResponseNativeV2 from a TimeSeriesBlock.
-   * This method converts the time series data into a format compatible with the broker response.
-   */
+  /// Creates a BrokerResponseNativeV2 from a TimeSeriesBlock.
+  /// This method converts the time series data into a format compatible with the broker response.
   public static BrokerResponse toBrokerResponse(TimeSeriesBlock timeSeriesBlock) {
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     if (timeSeriesBlock == null) {
@@ -60,6 +59,9 @@ public class TimeSeriesResponseMapper {
 
     ResultTable resultTable = new ResultTable(dataSchema, rows);
     brokerResponse.setResultTable(resultTable);
+    for (QueryException exception : timeSeriesBlock.getExceptions()) {
+      brokerResponse.addException(QueryProcessingException.fromQueryException(exception));
+    }
     setStats(brokerResponse, timeSeriesBlock.getMetadata());
     return brokerResponse;
   }
@@ -73,8 +75,8 @@ public class TimeSeriesResponseMapper {
   private static DataSchema deriveDataSchemaFromTimeSeriesBlock(TimeSeriesBlock timeSeriesBlock) {
     List<String> columnNames = new ArrayList<>(List.of(TS_COLUMN, VALUES_COLUMN, NAME_COLUMN));
     List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>(List.of(
-      DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
-      DataSchema.ColumnDataType.STRING));
+        DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
+        DataSchema.ColumnDataType.STRING));
 
     // Add tag columns if any series exist
     if (!timeSeriesBlock.getSeriesMap().isEmpty()) {
@@ -93,7 +95,7 @@ public class TimeSeriesResponseMapper {
   }
 
   private static List<Object[]> deriveRowsFromTimeSeriesBlock(TimeSeriesBlock timeSeriesBlock,
-    String[] columnNames) {
+      String[] columnNames) {
     List<Object[]> rows = new ArrayList<>();
     if (columnNames.length == 0) {
       return rows;
@@ -154,7 +156,52 @@ public class TimeSeriesResponseMapper {
         getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED));
     map.merge(BrokerResponseNativeV2.StatKey.TOTAL_DOCS,
         getLongMetadataValue(metadata, DataTable.MetadataKey.TOTAL_DOCS));
+    map.merge(BrokerResponseNativeV2.StatKey.MIN_CONSUMING_FRESHNESS_TIME_MS,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_INVALID,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_LIMIT,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE,
+        getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_REMOTE_ACCESSES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_REMOTE_ACCESSES));
+    map.merge(BrokerResponseNativeV2.StatKey.REMOTE_ACCESS_BYTES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.REMOTE_ACCESS_BYTES));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_DIRECT_REMOTE_ACCESSES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_DIRECT_REMOTE_ACCESSES));
+    map.merge(BrokerResponseNativeV2.StatKey.DIRECT_REMOTE_ACCESS_BYTES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.DIRECT_REMOTE_ACCESS_BYTES));
     brokerResponse.addBrokerStats(map);
+    brokerResponse.setTimeUsedMs(getLongMetadataValue(metadata, DataTable.MetadataKey.TIME_USED_MS));
+  }
+
+  public static void setStatsInRequestContext(RequestContext requestContext, Map<String, String> metadata) {
+    if (metadata == null || metadata.isEmpty() || requestContext == null) {
+      return;
+    }
+    requestContext.setNumDocsScanned(getLongMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_DOCS_SCANNED));
+    requestContext.setNumEntriesScannedInFilter(getLongMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER));
+    requestContext.setNumEntriesScannedPostFilter(getLongMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER));
+    requestContext.setTotalDocs(getLongMetadataValue(metadata,
+        DataTable.MetadataKey.TOTAL_DOCS));
+    requestContext.setNumSegmentsQueried(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_SEGMENTS_QUERIED));
+    requestContext.setNumSegmentsProcessed(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED));
+    requestContext.setNumSegmentsMatched(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_SEGMENTS_MATCHED));
+    requestContext.setNumConsumingSegmentsMatched(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED));
+    requestContext.setNumConsumingSegmentsProcessed(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED));
+    requestContext.setNumConsumingSegmentsQueried(getIntMetadataValue(metadata,
+        DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED));
   }
 
   private static long getLongMetadataValue(Map<String, String> metadata, DataTable.MetadataKey key) {

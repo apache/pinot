@@ -21,14 +21,13 @@ package org.apache.pinot.core.periodictask;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A base class to implement periodic task interface.
- */
+/// A base class to implement periodic task interface.
 @ThreadSafe
 public abstract class BasePeriodicTask implements PeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(BasePeriodicTask.class);
@@ -40,6 +39,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   protected final String _taskName;
   protected final long _intervalInSeconds;
   protected final long _initialDelayInSeconds;
+  protected final String _cronExpression;
   protected final ReentrantLock _runLock;
 
   // Lock used to synchronize life-cycle functions
@@ -47,6 +47,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
 
   private volatile boolean _started;
   private volatile boolean _running;
+  private volatile boolean _completedAtLeastOnce;
 
   // Default properties that tasks may use during execution. This variable is private and does not have any get or set
   // methods to prevent subclasses from gaining direct access to this variable. See run(Properties) method to see how
@@ -60,11 +61,30 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
+    this(taskName, runFrequencyInSeconds, initialDelayInSeconds, null);
+  }
+
+  public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
+      @Nullable String cronExpression) {
     _taskName = taskName;
-    _intervalInSeconds = runFrequencyInSeconds;
-    _initialDelayInSeconds = initialDelayInSeconds;
     _runLock = new ReentrantLock();
     _lifeCycleLock = new Object();
+    boolean hasCronScheduling = cronExpression != null && !cronExpression.trim().isEmpty();
+    boolean hasFrequencyScheduling = runFrequencyInSeconds > 0;
+
+    if (hasCronScheduling && hasFrequencyScheduling) {
+      LOGGER.warn("Task '{}' is configured with both a cron expression ('{}') "
+              + "and a fixed execution frequency ({}s). Preferring cron scheduling.",
+          taskName, cronExpression, runFrequencyInSeconds);
+      _intervalInSeconds = 0;
+      _initialDelayInSeconds = 0;
+      _cronExpression = cronExpression;
+    } else {
+      _intervalInSeconds = runFrequencyInSeconds;
+      _initialDelayInSeconds = initialDelayInSeconds;
+      //this will be null/empty anyway if it's not set.
+      _cronExpression = cronExpression;
+    }
   }
 
   @Override
@@ -82,26 +102,31 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     return _initialDelayInSeconds;
   }
 
-  /**
-   * Returns the status of the {@code started} flag. This flag will be set after calling {@link #start()}, and reset
-   * after calling {@link #stop()}.
-   */
+  @Override
+  public String getCronExpression() {
+    return _cronExpression;
+  }
+
+  /// Returns the status of the `started` flag. This flag will be set after calling [#start()], and reset
+  /// after calling [#stop()].
   public final boolean isStarted() {
     return _started;
   }
 
-  /**
-   * Returns the status of the {@code running} flag. This flag will be set during the task execution.
-   */
+  /// Returns the status of the `running` flag. This flag will be set during the task execution.
   public final boolean isRunning() {
     return _running;
   }
 
-  /**
-   * {@inheritDoc}
-   * <p>
-   * This method sets {@code started} flag to true.
-   */
+  /// Returns the status of the `completedAtLeastOnce` flag. This flag will be set after a task has
+  /// completed at least once.
+  public final boolean hasCompletedAtLeastOnce() {
+    return _completedAtLeastOnce;
+  }
+
+  /// {@inheritDoc}
+  ///
+  /// This method sets `started` flag to true.
   @Override
   public final void start() {
     synchronized (_lifeCycleLock) {
@@ -122,19 +147,15 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     }
   }
 
-  /**
-   * Can be overridden for extra task setups. This method will be called when the periodic task starts.
-   * <p>
-   * Possible setups include adding or resetting the metric values.
-   */
+  /// Can be overridden for extra task setups. This method will be called when the periodic task starts.
+  ///
+  /// Possible setups include adding or resetting the metric values.
   protected void setUpTask() {
   }
 
-  /**
-   * {@inheritDoc}
-   * <p>
-   * During the task execution, the {@code running} flag will be set.
-   */
+  /// {@inheritDoc}
+  ///
+  /// During the task execution, the `running` flag will be set.
   @Override
   public final void run() {
     // Pass default properties object to the actual run method.
@@ -160,6 +181,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
         }
         LOGGER.info("[TaskRequestId: {}] Finish running task: {} in {}ms", periodicTaskRequestId, _taskName,
             System.currentTimeMillis() - startTime);
+        _completedAtLeastOnce = true;
       } else {
         LOGGER.warn("[TaskRequestId: {}] Task: {} is skipped because it is not started or already stopped",
             periodicTaskRequestId, _taskName);
@@ -170,18 +192,14 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     }
   }
 
-  /**
-   * Executes the task. This method should early terminate if {@code started} flag is set to false by {@link #stop()}
-   * during execution.
-   */
+  /// Executes the task. This method should early terminate if `started` flag is set to false by [#stop()]
+  /// during execution.
   protected abstract void runTask(Properties periodicTaskProperties);
 
-  /**
-   * {@inheritDoc}
-   * <p>
-   * This method sets {@code started} flag to false. If the task is running, this method will block for at most 30
-   * seconds until the task finishes.
-   */
+  /// {@inheritDoc}
+  ///
+  /// This method sets `started` flag to false. If the task is running, this method will block for at most 30
+  /// seconds until the task finishes.
   @Override
   public final void stop() {
     synchronized (_lifeCycleLock) {
@@ -218,11 +236,9 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     }
   }
 
-  /**
-   * Can be overridden for extra task cleanups. This method will be called when the periodic task stops.
-   * <p>
-   * Possible cleanups include removing or resetting the metric values.
-   */
+  /// Can be overridden for extra task cleanups. This method will be called when the periodic task stops.
+  ///
+  /// Possible cleanups include removing or resetting the metric values.
   protected void cleanUpTask() {
   }
 

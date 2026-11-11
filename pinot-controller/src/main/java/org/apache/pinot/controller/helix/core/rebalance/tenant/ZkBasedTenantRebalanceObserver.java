@@ -31,10 +31,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -216,14 +216,12 @@ public class ZkBasedTenantRebalanceObserver {
     }
   }
 
-  /**
-   * Cancel the tenant rebalance job.
-   * @param isCancelledByUser true if the cancellation is triggered by user, false if it is triggered by system
-   *                           (e.g. tenant rebalance checker retrying a job)
-   * @return a pair of "list of TABLE rebalance job IDs that are successfully cancelled" and "whether the TENANT
-   * rebalance
-   * job cancellation is successful"
-   */
+  /// Cancel the tenant rebalance job.
+  /// @param isCancelledByUser true if the cancellation is triggered by user, false if it is triggered by system
+  ///                           (e.g. tenant rebalance checker retrying a job)
+  /// @return a pair of "list of TABLE rebalance job IDs that are successfully cancelled" and "whether the TENANT
+  /// rebalance
+  /// job cancellation is successful"
   public Pair<List<String>, Boolean> cancelJob(boolean isCancelledByUser) {
     List<String> cancelledJobs = new ArrayList<>();
     try {

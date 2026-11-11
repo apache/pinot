@@ -24,53 +24,40 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A delegator executor service that sets MDC context for the query.
- *
- * By using this executor, all tasks submitted to the executor will have the MDC context set to the query context.
- * This is easier and safer to apply than setting the MDC context manually for each task.
- * You can read more about MDC in <a href="https://www.baeldung.com/mdc-in-log4j-2-logback">this baeldung post</a>
- *
- * TODO: Convert this class and its usages into an Executor instead of an ExecutorService
- *
- */
+/// A delegator executor service that sets MDC context for the query.
+///
+/// By using this executor, all tasks submitted to the executor will have the MDC context set to the query context.
+/// This is easier and safer to apply than setting the MDC context manually for each task.
+/// You can read more about MDC in [this baeldung post](https://www.baeldung.com/mdc-in-log4j-2-logback)
+///
+/// TODO: Convert this class and its usages into an Executor instead of an ExecutorService
 public abstract class MdcExecutor extends DecoratorExecutorService {
 
-  /**
-   * The logger for the class.
-   *
-   * Notice this is using the name of the final class as the logger name.
-   */
+  /// The logger for the class.
+  ///
+  /// Notice this is using the name of the final class as the logger name.
   private final Logger _logger = LoggerFactory.getLogger(this.getClass());
 
   public MdcExecutor(ExecutorService executorService) {
     super(executorService);
   }
 
-  /**
-   * Get the logger for the class
-   */
+  /// Get the logger for the class
   protected Logger getLogger() {
     return _logger;
   }
 
-  /**
-   * Check if the MDC context is already set.
-   *
-   * This indicates that the MDC context may have been leaked from a previous task, which would mean incorrect logging
-   * while tasks are executed by this executor or after they finish. Therefore if this returns true a warning will be
-   * logged and the MDC context will not be modified
-   */
+  /// Check if the MDC context is already set.
+  ///
+  /// This indicates that the MDC context may have been leaked from a previous task, which would mean incorrect logging
+  /// while tasks are executed by this executor or after they finish. Therefore if this returns true a warning will be
+  /// logged and the MDC context will not be modified
   protected abstract boolean alreadyRegistered();
 
-  /**
-   * Register the MDC context for the query.
-   */
+  /// Register the MDC context for the query.
   protected abstract void registerInMdc();
 
-  /**
-   * Unregister the MDC context for the query.
-   */
+  /// Unregister the MDC context for the query.
   protected abstract void unregisterFromMdc();
 
   @Override

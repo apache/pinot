@@ -23,19 +23,15 @@ import java.io.Serializable;
 import javax.annotation.Nullable;
 
 
-/**
- * Interface for segment name generator based on the segment sequence id and time range.
- */
+/// Interface for segment name generator based on the segment sequence id and time range.
 public interface SegmentNameGenerator extends Serializable {
   Joiner JOINER = Joiner.on('_').skipNulls();
 
-  /**
-   * Generates the segment name.
-   *
-   * @param sequenceId Segment sequence id (negative value means INVALID)
-   * @param minTimeValue Minimum time value
-   * @param maxTimeValue Maximum time value
-   * @return Segment name generated
-   */
+  /// Generates the segment name.
+  ///
+  /// @param sequenceId Segment sequence id (negative value means INVALID)
+  /// @param minTimeValue Minimum time value
+  /// @param maxTimeValue Maximum time value
+  /// @return Segment name generated
   String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue);
 }

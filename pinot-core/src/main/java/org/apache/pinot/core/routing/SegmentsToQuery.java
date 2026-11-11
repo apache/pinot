@@ -20,38 +20,30 @@ package org.apache.pinot.core.routing;
 
 import java.util.List;
 
-/**
- * Wrapper class around the list of segments and optional segments that need to be queried on a particular server.
- */
+/// Wrapper class around the list of segments and optional segments that need to be queried on a particular server.
 public class SegmentsToQuery {
   private final List<String> _segments;
   private final List<String> _optionalSegments;
 
-  /**
-   * Constructor for SegmentsToQuery.
-   *
-   * @param segments List of segments assigned to the server.
-   * @param optionalSegments List of optional segments assigned to the server.
-   */
+  /// Constructor for SegmentsToQuery.
+  ///
+  /// @param segments List of segments assigned to the server.
+  /// @param optionalSegments List of optional segments assigned to the server.
   public SegmentsToQuery(List<String> segments, List<String> optionalSegments) {
     _segments = segments;
     _optionalSegments = optionalSegments;
   }
 
-  /**
-   * Gets the list of segments assigned to the server.
-   *
-   * @return List of segments.
-   */
+  /// Gets the list of segments assigned to the server.
+  ///
+  /// @return List of segments.
   public List<String> getSegments() {
     return _segments;
   }
 
-  /**
-   * Gets the list of optional segments assigned to the server.
-   *
-   * @return List of optional segments.
-   */
+  /// Gets the list of optional segments assigned to the server.
+  ///
+  /// @return List of optional segments.
   public List<String> getOptionalSegments() {
     return _optionalSegments;
   }

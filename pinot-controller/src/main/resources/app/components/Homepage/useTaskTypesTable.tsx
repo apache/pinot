@@ -26,14 +26,24 @@ const useTaskTypesTable = () => {
   const [fetching, setFetching] = useState(true);
   const [taskTypes, setTaskTypes] = useState<TableData>({ records: [], columns: [] });
 
-  const fetchData = async () => {
-    setFetching(true);
-    const taskTypesRes = await PinotMethodUtils.getAllTaskTypes();
-    setTaskTypes(taskTypesRes);
-    setFetching(false);
-  };
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      setFetching(true);
+      const taskTypesRes = await PinotMethodUtils.getAllTaskTypes();
+      if (!isMounted) {
+        return;
+      }
+      setTaskTypes(taskTypesRes);
+      setFetching(false);
+    };
+
     fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return {

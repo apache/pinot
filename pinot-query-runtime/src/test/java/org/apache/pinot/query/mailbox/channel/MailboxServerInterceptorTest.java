@@ -55,7 +55,7 @@ public class MailboxServerInterceptorTest {
 
     interceptor.interceptCall(serverCall, inboundHeaders, dummyHandler);
     assertEquals(dummyHandler._capturedMailboxId, TEST_MAILBOX_ID,
-      "MailboxIdServerInterceptor should attach mailboxId to Context when present");
+        "MailboxIdServerInterceptor should attach mailboxId to Context when present");
   }
 
   @Test
@@ -79,8 +79,8 @@ public class MailboxServerInterceptorTest {
 
     ServerCall.Listener<String> resultingListener = interceptor.interceptCall(serverCall, new Metadata(), dummyHandler);
     assertNull(dummyHandler._capturedMailboxId,
-      "MailboxIdServerInterceptor should not set Context when mailbox-id header is absent");
+        "MailboxIdServerInterceptor should not set Context when mailbox-id header is absent");
     assertSame(resultingListener, dummyHandler._listenerToReturn,
-      "When no mailboxId is present, interceptor should return the original listener from next");
+        "When no mailboxId is present, interceptor should return the original listener from next");
   }
 }

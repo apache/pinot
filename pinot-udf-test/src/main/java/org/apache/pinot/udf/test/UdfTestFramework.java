@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -35,6 +36,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 /// This is the entry paint for the UDF test framework. It allows to run tests for UDFs using a given cluster.
 public class UdfTestFramework {
@@ -215,7 +217,7 @@ public class UdfTestFramework {
       switch (this) {
         case EQUAL:
           if (expected instanceof Double && actual instanceof Double
-            && !doubleEquals((Double) expected, (Double) actual)) {
+              && !doubleEquals((Double) expected, (Double) actual)) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
           if (!Objects.equals(expected, actual)) {
@@ -270,6 +272,12 @@ public class UdfTestFramework {
       if (value == null) {
         return null;
       }
+      if (value instanceof UUID) {
+        return value.toString();
+      }
+      if (value instanceof byte[]) {
+        return BytesUtils.toHexString((byte[]) value);
+      }
       if (value.getClass().isArray()) {
         Class<?> componentType = value.getClass().getComponentType();
         if (componentType == int.class) {
@@ -284,14 +292,6 @@ public class UdfTestFramework {
           ArrayList<Float> list = new ArrayList<>(floatArray.length);
           for (float f : floatArray) {
             list.add(f);
-          }
-          return list;
-        } else if (componentType == byte.class) {
-          // Convert byte array to List<Byte> for consistency
-          byte[] byteArray = (byte[]) value;
-          ArrayList<Byte> list = new ArrayList<>(byteArray.length);
-          for (byte b : byteArray) {
-            list.add(b);
           }
           return list;
         } else {

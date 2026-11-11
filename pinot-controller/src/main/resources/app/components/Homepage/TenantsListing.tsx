@@ -32,8 +32,13 @@ const TenantsTable = () => {
     columns: columns,
   });
 
-  const fetchData = async () => {
+  useEffect(() => {
+    let isMounted = true;
+
     getTenants().then((res) => {
+      if (!isMounted) {
+        return;
+      }
       const tenantNames = union(
         res.data.SERVER_TENANTS,
         res.data.BROKER_TENANTS
@@ -57,6 +62,9 @@ const TenantsTable = () => {
             return res?.data?.tables?.length || 0;
           }),
         ]).then((res) => {
+          if (!isMounted) {
+            return;
+          }
           const numServers = res[0];
           const numBrokers = res[1];
           const numTables = res[2];
@@ -75,10 +83,10 @@ const TenantsTable = () => {
         });
       });
     });
-  };
 
-  useEffect(() => {
-    fetchData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

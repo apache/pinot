@@ -33,10 +33,15 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 
 
-/**
- * The {@code BaseResultsBlock} class is the holder of the server side results.
- */
+/// The `BaseResultsBlock` class is the holder of the server side results.
 public abstract class BaseResultsBlock implements Block {
+  public enum EarlyTerminationReason {
+    NONE,
+    DISTINCT_MAX_ROWS,
+    DISTINCT_MAX_ROWS_WITHOUT_CHANGE,
+    DISTINCT_MAX_EXECUTION_TIME
+  }
+
   private List<QueryErrorMessage> _processingExceptions;
   private long _numTotalDocs;
   private long _numDocsScanned;
@@ -49,6 +54,7 @@ public abstract class BaseResultsBlock implements Block {
   private long _executionThreadCpuTimeNs;
   private long _executionThreadMemAllocatedBytes;
   private int _numServerThreads;
+  private EarlyTerminationReason _earlyTerminationReason = EarlyTerminationReason.NONE;
 
   @Nullable
   public List<QueryErrorMessage> getErrorMessages() {
@@ -163,40 +169,36 @@ public abstract class BaseResultsBlock implements Block {
     _numServerThreads = numServerThreads;
   }
 
-  /**
-   * Returns the total size (number of rows) in this result block, without having to materialize the rows.
-   *
-   * @see BaseResultsBlock#getRows()
-   */
+  public EarlyTerminationReason getEarlyTerminationReason() {
+    return _earlyTerminationReason;
+  }
+
+  public void setEarlyTerminationReason(EarlyTerminationReason earlyTerminationReason) {
+    _earlyTerminationReason = earlyTerminationReason;
+  }
+
+  /// Returns the total size (number of rows) in this result block, without having to materialize the rows.
+  ///
+  /// @see BaseResultsBlock#getRows()
   public abstract int getNumRows();
 
-  /**
-   * Returns the query for the results. Return {@code null} when the block only contains metadata.
-   */
+  /// Returns the query for the results. Return `null` when the block only contains metadata.
   @Nullable
   public abstract QueryContext getQueryContext();
 
-  /**
-   * Returns the data schema for the results. Return {@code null} when the block only contains metadata.
-   */
+  /// Returns the data schema for the results. Return `null` when the block only contains metadata.
   @Nullable
   public abstract DataSchema getDataSchema();
 
-  /**
-   * Returns the rows for the results. Return {@code null} when the block only contains metadata.
-   */
+  /// Returns the rows for the results. Return `null` when the block only contains metadata.
   @Nullable
   public abstract List<Object[]> getRows();
 
-  /**
-   * Returns a data table without metadata or exception attached.
-   */
+  /// Returns a data table without metadata or exception attached.
   public abstract DataTable getDataTable()
       throws IOException;
 
-  /**
-   * Returns the metadata for the results.
-   */
+  /// Returns the metadata for the results.
   public Map<String, String> getResultsMetadata() {
     Map<String, String> metadata = new HashMap<>();
     metadata.put(MetadataKey.TOTAL_DOCS.getName(), Long.toString(_numTotalDocs));
@@ -208,6 +210,9 @@ public abstract class BaseResultsBlock implements Block {
     metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(),
         Integer.toString(_numConsumingSegmentsProcessed));
     metadata.put(MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED.getName(), Integer.toString(_numConsumingSegmentsMatched));
+    if (_earlyTerminationReason != EarlyTerminationReason.NONE) {
+      metadata.put(MetadataKey.EARLY_TERMINATION_REASON.getName(), _earlyTerminationReason.name());
+    }
     return metadata;
   }
 }

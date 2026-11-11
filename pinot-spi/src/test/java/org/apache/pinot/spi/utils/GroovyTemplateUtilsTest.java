@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -76,7 +77,7 @@ public class GroovyTemplateUtilsTest {
       throws IOException, ClassNotFoundException {
     InputStream resourceAsStream =
         GroovyTemplateUtils.class.getClassLoader().getResourceAsStream("ingestion_job_spec_template.yaml");
-    String yamlTemplate = IOUtils.toString(resourceAsStream);
+    String yamlTemplate = IOUtils.toString(resourceAsStream, StandardCharsets.UTF_8);
     Map<String, Object> context =
         GroovyTemplateUtils.getTemplateContext(Arrays.asList("year=2020", "month=05", "day=06"));
     String yamlStr = GroovyTemplateUtils.renderTemplate(yamlTemplate, context);

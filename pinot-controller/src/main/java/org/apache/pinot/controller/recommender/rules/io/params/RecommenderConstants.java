@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.controller.recommender.rules.io.params;
 
-/**
- * The default parameters used int each algorithm and default values for general inputs
- * parameters usage are explained in the *Params class
- */
+/// The default parameters used int each algorithm and default values for general inputs
+/// parameters usage are explained in the \*Params class
 public class RecommenderConstants {
   private RecommenderConstants() {
   }

@@ -23,36 +23,33 @@ import java.io.IOException;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Raw (non-dictionary-encoded) forward index creator for multi-value column of fixed length data type (INT, LONG,
- * FLOAT, DOUBLE).
- */
-public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
+/// Raw (non-dictionary-encoded) forward index creator for multi-value column of fixed length data type (INT, LONG,
+/// FLOAT, DOUBLE).
+public class MultiValueFixedByteRawIndexCreator implements CompressionStatsTrackingForwardIndexCreator {
 
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
+  private final ChunkCompressionType _chunkCompressionType;
 
-  /**
-   * Create a var-byte raw index creator for the given column
-   *
-   * @param baseIndexDir Index directory
-   * @param compressionType Type of compression to use
-   * @param column Name of column to index
-   * @param totalDocs Total number of documents to index
-   * @param valueType Type of the values
-   * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
-   * @param writerVersion writer format version
-   * @param targetMaxChunkSizeBytes target max chunk size in bytes, applicable only for V4 or when
-   *                                deriveNumDocsPerChunk is true
-   */
+  /// Create a var-byte raw index creator for the given column
+  ///
+  /// @param baseIndexDir Index directory
+  /// @param compressionType Type of compression to use
+  /// @param column Name of column to index
+  /// @param totalDocs Total number of documents to index
+  /// @param valueType Type of the values
+  /// @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
+  /// @param writerVersion writer format version
+  /// @param targetMaxChunkSizeBytes target max chunk size in bytes, applicable only for V4 or when
+  ///                                deriveNumDocsPerChunk is true
   public MultiValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk,
       int writerVersion, int targetMaxChunkSizeBytes, int targetDocsPerChunk)
@@ -83,7 +80,13 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
           new VarByteChunkForwardIndexWriter(indexFile, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
               writerVersion);
     } else {
-      if (writerVersion == VarByteChunkForwardIndexWriterV5.VERSION) {
+      if (writerVersion == VarByteChunkForwardIndexWriterV6.VERSION) {
+        // V6: delta-encoded chunk header, store only the values (implicit length)
+        int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
+        int chunkSize =
+            ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+        _indexWriter = new VarByteChunkForwardIndexWriterV6(indexFile, compressionType, chunkSize);
+      } else if (writerVersion == VarByteChunkForwardIndexWriterV5.VERSION) {
         // Store only the values
         int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
         int chunkSize =
@@ -98,6 +101,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       }
     }
     _valueType = valueType;
+    _chunkCompressionType = compressionType;
   }
 
   @Override
@@ -139,5 +143,20 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void close()
       throws IOException {
     _indexWriter.close();
+  }
+
+  @Override
+  public long getRawForwardIndexUncompressedValueSizeInBytes() {
+    return _indexWriter.getRawForwardIndexUncompressedValueSizeInBytes();
+  }
+
+  @Override
+  public ChunkCompressionType getRawForwardIndexChunkCompressionType() {
+    return _chunkCompressionType;
+  }
+
+  @Override
+  public void enableRawForwardIndexUncompressedValueSizeTracking() {
+    _indexWriter.enableRawForwardIndexUncompressedValueSizeTracking();
   }
 }

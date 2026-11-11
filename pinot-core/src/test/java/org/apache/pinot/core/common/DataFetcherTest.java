@@ -147,7 +147,7 @@ public class DataFetcherTest {
     for (String column : _indexSegment.getPhysicalColumnNames()) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
-    _dataFetcher = new DataFetcher(dataSourceMap);
+    _dataFetcher = new DataFetcher(dataSourceMap, Map.of());
   }
 
   @Test

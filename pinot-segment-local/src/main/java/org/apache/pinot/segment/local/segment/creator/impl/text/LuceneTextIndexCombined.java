@@ -26,51 +26,63 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class to combine all Lucene text index files into a single buffer in V2 format.
- * This class handles the serialization of Lucene index directory into a compact buffer format
- * that can be efficiently stored and loaded.
- *
- * <p>The V2 format structure:</p>
- * <pre>
- * [Header Section]
- * - Magic number: "LUCENE_V2" (9 bytes)
- * - Version: 2 (4 bytes)
- * - Total buffer size: 8 bytes
- * - File count: 4 bytes
- * - Reserved: 4 bytes (for future use)
- *
- * [File Metadata Section]
- * - File name length: 2 bytes
- * - File name: variable length
- * - File offset: 8 bytes
- * - File size: 8 bytes
- *
- * [File Data Section]
- * - Raw file data concatenated in order
- * </pre>
- */
+/// Utility class to combine all Lucene text index files into a single buffer in V2 format.
+/// This class handles the serialization of Lucene index directory into a compact buffer format
+/// that can be efficiently stored and loaded.
+///
+/// The V2 format structure:
+///
+/// ```
+/// [Header Section]
+/// - Magic number: "LUCENE_V2" (9 bytes)
+/// - Version: 2 (4 bytes)
+/// - Total buffer size: 8 bytes
+/// - File count: 4 bytes
+/// - Reserved: 4 bytes (for future use)
+///
+/// [File Metadata Section]
+/// - File name length: 2 bytes
+/// - File name: variable length
+/// - File offset: 8 bytes
+/// - File size: 8 bytes
+///
+/// [File Data Section]
+/// - Raw file data concatenated in order
+/// ```
 public class LuceneTextIndexCombined {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCombined.class);
 
-  /**
-   * Private constructor to prevent instantiation of utility class.
-   */
+  /// Private constructor to prevent instantiation of utility class.
   private LuceneTextIndexCombined() {
   }
 
-  /**
-   * Combines all files from a Lucene text index directory into a single file.
-   *
-   * @param luceneIndexDir the Lucene index directory to combine
-   * @param outputFilePath the output file path to write the combined data
-   * @throws IOException if any file operations fail
-   */
+  /// Combines all files from a Lucene text index directory into a single file.
+  ///
+  /// @param luceneIndexDir the Lucene index directory to combine
+  /// @param outputFilePath the output file path to write the combined data
+  /// @throws IOException if any file operations fail
   public static void combineLuceneIndexFiles(File luceneIndexDir, String outputFilePath)
+      throws IOException {
+    combineLuceneIndexFiles(luceneIndexDir, outputFilePath, null, null);
+  }
+
+  /// Combines all files from a Lucene text index directory into a single file.
+  /// Also collects the docIdMapping file from the segment directory if present.
+  ///
+  /// @param luceneIndexDir the Lucene index directory to combine
+  /// @param outputFilePath the output file path to write the combined data
+  /// @param segmentIndexDir the segment index directory (optional, used to find docIdMapping file)
+  /// @param column the column name (optional, used to find docIdMapping file)
+  /// @throws IOException if any file operations fail
+  public static void combineLuceneIndexFiles(File luceneIndexDir, String outputFilePath,
+      @Nullable File segmentIndexDir, @Nullable String column)
       throws IOException {
     if (!luceneIndexDir.exists() || !luceneIndexDir.isDirectory()) {
       throw new IllegalArgumentException(
@@ -80,7 +92,7 @@ public class LuceneTextIndexCombined {
     LOGGER.info("Combining Lucene text index files from directory: {}", luceneIndexDir.getAbsolutePath());
 
     // Step 1: Collect all files and calculate total size
-    Map<String, FileInfo> fileInfoMap = collectFiles(luceneIndexDir);
+    Map<String, FileInfo> fileInfoMap = collectFiles(luceneIndexDir, segmentIndexDir, column);
     int fileCount = fileInfoMap.size();
 
     if (fileCount == 0) {
@@ -113,13 +125,18 @@ public class LuceneTextIndexCombined {
     LOGGER.info("Successfully combined {} files into file: {} (size: {} bytes)", fileCount, outputFilePath, totalSize);
   }
 
-  /**
-   * Collects all files from the Lucene index directory and their metadata.
-   */
-  private static Map<String, FileInfo> collectFiles(File luceneIndexDir)
+  /// Collects all files from the Lucene index directory and their metadata.
+  /// Also collects the docIdMapping file from the segment directory if present.
+  ///
+  /// @param luceneIndexDir the Lucene index directory
+  /// @param segmentIndexDir the segment index directory (optional, used to find docIdMapping file)
+  /// @param column the column name (optional, used to find docIdMapping file)
+  private static Map<String, FileInfo> collectFiles(File luceneIndexDir, @Nullable File segmentIndexDir,
+      @Nullable String column)
       throws IOException {
     Map<String, FileInfo> fileInfoMap = new TreeMap<>(); // Use TreeMap for consistent ordering
 
+    // Collect files from the Lucene index directory
     File[] files = luceneIndexDir.listFiles();
     if (files != null) {
       for (File file : files) {
@@ -132,12 +149,23 @@ public class LuceneTextIndexCombined {
       }
     }
 
+    // Collect the docIdMapping file from the segment directory if it exists
+    if (segmentIndexDir != null && column != null) {
+      File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir);
+      File docIdMappingFile = new File(segmentDir,
+          column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+      if (docIdMappingFile.exists() && docIdMappingFile.isFile()) {
+        String mappingFileName = docIdMappingFile.getName();
+        long mappingFileSize = docIdMappingFile.length();
+        fileInfoMap.put(mappingFileName, new FileInfo(docIdMappingFile, mappingFileName, mappingFileSize));
+        LOGGER.info("Including docIdMapping file: {} ({} bytes)", mappingFileName, mappingFileSize);
+      }
+    }
+
     return fileInfoMap;
   }
 
-  /**
-   * Calculates the total buffer size needed.
-   */
+  /// Calculates the total buffer size needed.
   private static long calculateTotalBufferSize(Map<String, FileInfo> fileInfoMap) {
     long totalSize = LuceneCombinedTextIndexConstants.getHeaderSize();
     totalSize += calculateMetadataSize(fileInfoMap);
@@ -149,9 +177,7 @@ public class LuceneTextIndexCombined {
     return totalSize;
   }
 
-  /**
-   * Calculates the size needed for file metadata section.
-   */
+  /// Calculates the size needed for file metadata section.
   private static long calculateMetadataSize(Map<String, FileInfo> fileInfoMap) {
     long metadataSize = 0;
     for (FileInfo fileInfo : fileInfoMap.values()) {
@@ -160,9 +186,7 @@ public class LuceneTextIndexCombined {
     return metadataSize;
   }
 
-  /**
-   * Writes the header section to the file.
-   */
+  /// Writes the header section to the file.
   private static void writeHeader(FileChannel outputChannel, int fileCount, int totalSize)
       throws IOException {
     // Magic number
@@ -193,9 +217,7 @@ public class LuceneTextIndexCombined {
     outputChannel.write(reservedBuffer);
   }
 
-  /**
-   * Writes the file metadata section to the file.
-   */
+  /// Writes the file metadata section to the file.
   private static void writeFileMetadata(FileChannel outputChannel, Map<String, FileInfo> fileInfoMap, long dataOffset)
       throws IOException {
     for (FileInfo fileInfo : fileInfoMap.values()) {
@@ -224,9 +246,7 @@ public class LuceneTextIndexCombined {
     }
   }
 
-  /**
-   * Writes the file data section to the file.
-   */
+  /// Writes the file data section to the file.
   private static void writeFileData(FileChannel outputChannel, Map<String, FileInfo> fileInfoMap)
       throws IOException {
     for (FileInfo fileInfo : fileInfoMap.values()) {
@@ -243,9 +263,7 @@ public class LuceneTextIndexCombined {
     }
   }
 
-  /**
-   * Internal class to hold file information.
-   */
+  /// Internal class to hold file information.
   private static class FileInfo {
     final File _file;
     final String _name;

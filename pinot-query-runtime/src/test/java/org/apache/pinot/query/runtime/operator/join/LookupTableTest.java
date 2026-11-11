@@ -463,9 +463,7 @@ public class LookupTableTest {
     assertEquals(table.size(), 2, "ObjectLookupTable size should be 2");
   }
 
-  /**
-   * Helper method to get appropriate test keys for different lookup table types
-   */
+  /// Helper method to get appropriate test keys for different lookup table types
   private Object getTestKey(LookupTable table, int index) {
     if (table instanceof IntLookupTable) {
       return index;

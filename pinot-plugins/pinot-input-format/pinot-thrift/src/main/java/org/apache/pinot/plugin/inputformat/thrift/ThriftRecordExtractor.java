@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
@@ -30,25 +33,32 @@ import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.meta_data.FieldMetaData;
 
 
-/**
- * Extractor for records of Thrift input
- */
+/// Extracts Pinot [GenericRow] from a Thrift-generated [TBase] via `getFieldValue(fieldForId(...))`.
+///
+/// **Thrift source type → Java input → Java output type:**
+/// - `bool` → `Boolean` → `Boolean`
+/// - `i8` → `Byte` → `Integer` (widened)
+/// - `i16` → `Short` → `Integer` (widened)
+/// - `i32` → `Integer` → `Integer`
+/// - `i64` → `Long` → `Long`
+/// - `double` → `Double` → `Double`
+/// - `string` → `String` → `String`
+/// - `binary` → `ByteBuffer` → `byte[]`
+/// - `enum` → `TEnum` → enum name `String` (via `toString()`)
+/// - `struct` → [TBase] → `Map<String, Object>`
+/// - `list<X>` / `set<X>` → `List<X>` / `Set<X>` → `Object[]`
+/// - `map<K, V>` → `Map<K, V>` → `Map<String, Object>` (keys stringified via [BaseRecordExtractor#stringifyMapKey])
+/// - unset optional field → `null`
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
 
   private Map<String, Integer> _fieldIds;
-  private Set<String> _fields;
-  private boolean _extractAll = false;
 
   @Override
-  public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
-    _fieldIds = ((ThriftRecordExtractorConfig) recordExtractorConfig).getFieldIds();
-    if (fields == null || fields.isEmpty()) {
-      _extractAll = true;
-      _fields = Set.of();
-    } else {
-      _fields = Set.copyOf(fields);
-    }
+  protected void initConfig(RecordExtractorConfig config) {
+    Preconditions.checkArgument(config instanceof ThriftRecordExtractorConfig,
+        "ThriftRecordExtractor requires a ThriftRecordExtractorConfig");
+    _fieldIds = ((ThriftRecordExtractorConfig) config).getFieldIds();
   }
 
   @Override
@@ -56,52 +66,98 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
     if (_extractAll) {
       for (Map.Entry<String, Integer> nameToId : _fieldIds.entrySet()) {
         Object value = from.getFieldValue(from.fieldForId(nameToId.getValue()));
-        if (value != null) {
-          value = convert(value);
-        }
-        to.putValue(nameToId.getKey(), value);
+        to.putValue(nameToId.getKey(), value != null ? convert(value) : null);
       }
     } else {
       for (String fieldName : _fields) {
-        Object value = null;
         Integer fieldId = _fieldIds.get(fieldName);
         if (fieldId != null) {
-          //noinspection unchecked
-          value = from.getFieldValue(from.fieldForId(fieldId));
+          Object value = from.getFieldValue(from.fieldForId(fieldId));
+          to.putValue(fieldName, value != null ? convert(value) : null);
         }
-        if (value != null) {
-          value = convert(value);
-        }
-        to.putValue(fieldName, value);
       }
     }
     return to;
   }
 
-  /**
-   * Returns whether the object is a Thrift object.
-   */
-  @Override
-  protected boolean isRecord(Object value) {
-    return value instanceof TBase;
+  /// Dispatches a non-null Thrift value off its runtime Java type: `Object[]` for `Collection` (list / set),
+  /// `Map<String, Object>` for `Map` and for nested `TBase` records, single-value normalization for scalars.
+  private static Object convert(Object value) {
+    // List
+    if (value instanceof Collection) {
+      return convertCollection((Collection<Object>) value);
+    }
+    // Map
+    if (value instanceof Map) {
+      return convertMap((Map<Object, Object>) value);
+    }
+    // Record
+    if (value instanceof TBase) {
+      return convertRecord((TBase) value);
+    }
+    // Single value
+    return convertSingleValue(value);
   }
 
-  /**
-   * Handles the conversion of each field of a Thrift object.
-   *
-   * @param value should be verified to be a Thrift TBase type prior to calling this method as it will be casted
-   *              without checking
-   */
-  @Override
-  protected Map<Object, Object> convertRecord(Object value) {
-    TBase record = (TBase) value;
-    Set<TFieldIdEnum> fields = FieldMetaData.getStructMetaDataMap(record.getClass()).keySet();
-    Map<Object, Object> convertedRecord = Maps.newHashMapWithExpectedSize(fields.size());
-    for (TFieldIdEnum field : fields) {
-      Object fieldValue = record.getFieldValue(field);
-      Object convertedValue = fieldValue != null ? convert(fieldValue) : null;
-      convertedRecord.put(field.getFieldName(), convertedValue);
+  private static Object[] convertCollection(Collection<Object> collection) {
+    Object[] result = new Object[collection.size()];
+    int i = 0;
+    for (Object value : collection) {
+      result[i++] = value != null ? convert(value) : null;
     }
-    return convertedRecord;
+    return result;
+  }
+
+  /// Converts a `map<K, V>`. Keys flow through `convertSingleValue` (Thrift's allowed key types — bool /
+  /// i8 / i16 / i32 / i64 / double / string / binary — cover the same matrix), then are stringified via
+  /// [BaseRecordExtractor#stringifyMapKey] per the `Map<String, Object>` contract.
+  private static Map<String, Object> convertMap(Map<Object, Object> map) {
+    Map<String, Object> result = Maps.newHashMapWithExpectedSize(map.size());
+    for (Map.Entry<Object, Object> entry : map.entrySet()) {
+      Object key = entry.getKey();
+      if (key == null) {
+        continue;
+      }
+      Object convertedKey = convertSingleValue(key);
+      if (convertedKey == null) {
+        continue;
+      }
+      Object value = entry.getValue();
+      result.put(stringifyMapKey(convertedKey), value != null ? convert(value) : null);
+    }
+    return result;
+  }
+
+  private static Map<String, Object> convertRecord(TBase record) {
+    Set<TFieldIdEnum> fields = FieldMetaData.getStructMetaDataMap(record.getClass()).keySet();
+    Map<String, Object> result = Maps.newHashMapWithExpectedSize(fields.size());
+    for (TFieldIdEnum field : fields) {
+      Object value = record.getFieldValue(field);
+      result.put(field.getFieldName(), value != null ? convert(value) : null);
+    }
+    return result;
+  }
+
+  /// Single-value normalization for Thrift's scalar Java types: `Byte` / `Short` widen to `Integer`,
+  /// `ByteBuffer` materializes to `byte[]` (slice-safely so the source buffer's position is not advanced),
+  /// other `Number` / `Boolean` / `byte[]` pass through, anything else (e.g. `TEnum`) → `toString()`.
+  @VisibleForTesting
+  static Object convertSingleValue(Object value) {
+    if (value instanceof Number) {
+      if (value instanceof Byte || value instanceof Short) {
+        return ((Number) value).intValue();
+      }
+      return value;
+    }
+    if (value instanceof Boolean || value instanceof byte[]) {
+      return value;
+    }
+    if (value instanceof ByteBuffer) {
+      ByteBuffer slice = ((ByteBuffer) value).slice();
+      byte[] bytes = new byte[slice.limit()];
+      slice.get(bytes);
+      return bytes;
+    }
+    return value.toString();
   }
 }
