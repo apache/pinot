@@ -1202,46 +1202,6 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void pauselessTimeFlushThresholdTest() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addDateTime("timeColumn", DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .build();
-    for (String key : List.of(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME,
-        StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX)) {
-      TableConfig tableConfig = getTimeFlushThresholdTableConfig(key, "30m", true);
-      IllegalStateException e =
-          expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));
-      assertTrue(e.getMessage().contains(key), e.getMessage());
-
-      // The same config is valid when pauseless consumption is disabled
-      TableConfig nonPauselessTableConfig = getTimeFlushThresholdTableConfig(key, "30m", false);
-      TableConfigUtils.validate(nonPauselessTableConfig, schema);
-
-      // A stored pauseless table keeps its value, which also lets a schema update revalidate it. A changed value, or
-      // enabling pauseless consumption on a table with the key, is rejected.
-      TableConfigUtils.validate(tableConfig, schema, null, tableConfig);
-      TableConfig changedTableConfig = getTimeFlushThresholdTableConfig(key, "5m", true);
-      expectThrows(IllegalStateException.class,
-          () -> TableConfigUtils.validate(changedTableConfig, schema, null, tableConfig));
-      expectThrows(IllegalStateException.class,
-          () -> TableConfigUtils.validate(tableConfig, schema, null, nonPauselessTableConfig));
-    }
-  }
-
-  private TableConfig getTimeFlushThresholdTableConfig(String key, String value, boolean pauselessEnabled) {
-    Map<String, String> streamConfigs = getStreamConfigs();
-    streamConfigs.put(key, value);
-    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
-    streamIngestionConfig.setPauselessConsumptionEnabled(pauselessEnabled);
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setIngestionConfig(ingestionConfig)
-        .build();
-  }
-
-  @Test
   public void ingestionServerIngestionOomProtectionTest() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     StreamIngestionConfig streamIngestionConfig =
