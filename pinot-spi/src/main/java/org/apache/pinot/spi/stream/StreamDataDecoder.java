@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.spi.stream;
 
-import javax.annotation.Nullable;
-
-
 /// A decoder for [StreamMessage]
 public interface StreamDataDecoder {
   /// Decodes a [StreamMessage]
@@ -31,11 +28,4 @@ public interface StreamDataDecoder {
   /// @param message [StreamMessage] that contains the data payload and optionally, a key and row metadata
   /// @return [StreamDataDecoderResult] that either contains the decoded row or the exception
   StreamDataDecoderResult decode(StreamMessage message);
-
-  /// @return the wrapped value [StreamMessageDecoder], or `null` if unavailable. Lets callers report the concrete
-  ///         decoder class without every implementation needing to support it.
-  @Nullable
-  default StreamMessageDecoder getValueDecoder() {
-    return null;
-  }
 }

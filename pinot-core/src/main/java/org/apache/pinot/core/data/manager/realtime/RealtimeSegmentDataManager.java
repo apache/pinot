@@ -249,6 +249,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final StreamDataDecoder _streamDataDecoder;
+  private final String _decoderClassName;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final Schema _schema;
@@ -1504,12 +1505,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   /// @return the FQCN of the [StreamMessageDecoder] actually instantiated on this consumer (the source of truth for
-  ///         what is decoding this segment), or `null` if decoder init has not completed.
-  @Nullable
+  ///         what is decoding this segment)
   public String getDecoderClassName() {
-    StreamDataDecoder decoder = _streamDataDecoder;
-    StreamMessageDecoder valueDecoder = decoder == null ? null : decoder.getValueDecoder();
-    return valueDecoder == null ? null : valueDecoder.getClass().getName();
+    return _decoderClassName;
   }
 
   /// Cleans up the metrics that reflects the state of the realtime segment.
@@ -2049,12 +2047,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
     RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f);
     AtomicReference<StreamDataDecoder> localStreamDataDecoder = new AtomicReference<>();
+    AtomicReference<String> localDecoderClassName = new AtomicReference<>();
     try {
       retryPolicy.attempt(() -> {
         try {
           StreamMessageDecoder streamMessageDecoder = createMessageDecoder(fieldsToRead);
           boolean isKeyBytesType = StreamDataDecoderImpl.isKeyBytesType(_schema);
           localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder, isKeyBytesType));
+          localDecoderClassName.set(streamMessageDecoder.getClass().getName());
           return true;
         } catch (Exception e) {
           _segmentLogger.warn("Failed to initialize the StreamMessageDecoder: ", e);
@@ -2067,6 +2067,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       throw e;
     }
     _streamDataDecoder = localStreamDataDecoder.get();
+    _decoderClassName = localDecoderClassName.get();
 
     try {
       _transformPipeline = new TransformPipeline(tableConfig, schema);

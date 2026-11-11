@@ -33,7 +33,8 @@ public class SegmentConsumerInfo {
   private final long _lastConsumedTimestamp;
   private final Map<String, String> _partitionToOffsetMap;
   private final PartitionOffsetInfo _partitionOffsetInfo;
-  // FQCN of the StreamMessageDecoder instantiated on the consumer, or null if decoder init has not completed.
+  // FQCN of the StreamMessageDecoder instantiated on the consumer. Null only when the response comes from an older
+  // server that does not report it (e.g. during a rolling upgrade).
   @Nullable
   private final String _decoderClassName;
 
@@ -63,11 +64,6 @@ public class SegmentConsumerInfo {
     return _segmentName;
   }
 
-  @Nullable
-  public String getDecoderClassName() {
-    return _decoderClassName;
-  }
-
   public String getConsumerState() {
     return _consumerState;
   }
@@ -82,6 +78,11 @@ public class SegmentConsumerInfo {
 
   public PartitionOffsetInfo getPartitionOffsetInfo() {
     return _partitionOffsetInfo;
+  }
+
+  @Nullable
+  public String getDecoderClassName() {
+    return _decoderClassName;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)

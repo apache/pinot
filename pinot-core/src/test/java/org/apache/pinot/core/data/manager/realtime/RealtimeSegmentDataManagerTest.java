@@ -283,7 +283,7 @@ public class RealtimeSegmentDataManagerTest {
   public void testGetDecoderClassName()
       throws Exception {
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
-      // Reports the actual instantiated decoder wrapped by StreamDataDecoderImpl, resolved via the SPI accessor.
+      // Reports the actual instantiated decoder class, not the one configured on the table
       assertEquals(segmentDataManager.getDecoderClassName(), FakeStreamMessageDecoder.class.getName());
     }
   }

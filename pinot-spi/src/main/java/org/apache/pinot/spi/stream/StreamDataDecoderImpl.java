@@ -61,11 +61,6 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
   }
 
   @Override
-  public StreamMessageDecoder getValueDecoder() {
-    return _valueDecoder;
-  }
-
-  @Override
   public StreamDataDecoderResult decode(StreamMessage message) {
     try {
       _reuse.clear();

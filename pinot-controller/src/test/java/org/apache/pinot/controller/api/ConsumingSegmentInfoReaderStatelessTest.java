@@ -371,22 +371,17 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     assertNull(info.getDecoderClassName());
   }
 
-  /// The pre-decoderClassName constructors must remain source/binary compatible for DTO builders outside this repo, and
-  /// delegate with a null decoder class name.
+  /// The pre-decoderClassName `SegmentConsumerInfo` constructor must remain source/binary compatible for DTO builders
+  /// outside this repo, and delegate with a null decoder class name.
   @Test
-  public void testLegacyConstructorsDelegateWithNullDecoderClassName() {
+  public void testLegacyConstructorDelegatesWithNullDecoderClassName() {
     SegmentConsumerInfo.PartitionOffsetInfo offsetInfo =
         new SegmentConsumerInfo.PartitionOffsetInfo(Map.of(), Map.of(), Map.of(), Map.of());
     assertNull(new SegmentConsumerInfo("seg", "CONSUMING", 0, Map.of(), offsetInfo).getDecoderClassName());
-
-    ConsumingSegmentInfoReader.ConsumingSegmentInfo info =
-        new ConsumingSegmentInfoReader.ConsumingSegmentInfo("server0", "CONSUMING", 0, Map.of(),
-            new ConsumingSegmentInfoReader.PartitionOffsetInfo(Map.of(), Map.of(), Map.of(), Map.of()));
-    assertNull(info._decoderClassName);
   }
 
-  /// With both a legacy and a full constructor present, Jackson must resolve exactly one creator and round-trip the
-  /// decoder class name, for both DTOs.
+  /// Jackson must resolve exactly one creator for each DTO (`SegmentConsumerInfo` also has a legacy constructor) and
+  /// round-trip the decoder class name.
   @Test
   public void testDecoderClassNameJsonRoundTrip()
       throws IOException {

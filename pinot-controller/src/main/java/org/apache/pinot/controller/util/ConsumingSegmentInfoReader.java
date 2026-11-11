@@ -216,14 +216,6 @@ public class ConsumingSegmentInfoReader {
     @Nullable
     public String _decoderClassName;
 
-
-    /// Kept for source and binary compatibility with callers that build this DTO without the decoder class name. Not a
-    /// Jackson creator; deserialization goes through the `@JsonCreator` constructor below.
-    public ConsumingSegmentInfo(String serverName, String consumerState, long lastConsumedTimestamp,
-        Map<String, String> partitionToOffsetMap, PartitionOffsetInfo partitionOffsetInfo) {
-      this(serverName, consumerState, lastConsumedTimestamp, partitionToOffsetMap, partitionOffsetInfo, null);
-    }
-
     @JsonCreator
     public ConsumingSegmentInfo(@JsonProperty("serverName") String serverName,
         @JsonProperty("consumerState") String consumerState,
