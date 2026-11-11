@@ -382,7 +382,6 @@ public class StatelessRealtimeSegmentWriterTest {
     return new Object[][]{{false}, {true}};
   }
 
-  /// Also runs against a stream that, like Kinesis, fetches from after the offset it is given.
   @Test(timeOut = 30_000, dataProvider = "fetchAfterStartOffset")
   public void testRetriableDecodeErrorFetchesTheMessageAgainInsteadOfDroppingIt(boolean fetchAfterStartOffset)
       throws Exception {
@@ -397,8 +396,7 @@ public class StatelessRealtimeSegmentWriterTest {
       assertThat(writer.isSuccess()).isTrue();
       assertThat(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS).containsExactly(FAILING_OFFSET, FAILING_OFFSET,
           FAILING_OFFSET);
-      // Every message of the segment was decoded once, including the one that failed first, and the failing message was
-      // the first one decoded after each fetch
+      // Every message was decoded once, and each refetch started at the failing message
       long firstOffset = fetchAfterStartOffset ? 1 : 0;
       assertThat(OffsetPayloadDecoder.DECODED_OFFSETS).containsExactlyElementsOf(
           LongStream.range(firstOffset, 20).boxed().collect(Collectors.toList()));
@@ -451,9 +449,8 @@ public class StatelessRealtimeSegmentWriterTest {
       writer.stopConsumption();
 
       assertThat(writer.isSuccess()).isTrue();
-      // The first failing message is retried until the outage has lasted 1s, then dropped, and the later failing
-      // messages of the outage are dropped on their first failure. After 2s without retriable failure, a new outage
-      // starts and the failing message is retried again.
+      // The first message is retried until the outage has lasted 1s, then dropped; later failures of that outage are
+      // dropped at once. The failure 2s later starts a new outage and is retried.
       assertThat(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS).containsExactly(FAILING_OFFSET, FAILING_OFFSET,
           FAILING_OFFSET, FAILING_OFFSET + 2, FAILING_OFFSET + 4, nextOutageOffset);
       assertThat(OffsetPayloadConsumerFactory.FETCH_START_OFFSETS).containsExactly(0L, FAILING_OFFSET, FAILING_OFFSET,
@@ -465,16 +462,14 @@ public class StatelessRealtimeSegmentWriterTest {
     }
   }
 
-  /// Creates a writer re-ingesting offsets [0, 20) of [OffsetPayloadConsumerFactory] with [OffsetPayloadDecoder]. It
-  /// records the decode retry backoffs instead of sleeping them, unless `backoffStarted` is given: then the first
-  /// backoff counts it down and sleeps until interrupted.
+  /// Creates a writer re-ingesting offsets [0, 20). It records backoffs without sleeping, unless `backoffStarted` is
+  /// given: then the first backoff counts it down and sleeps until interrupted.
   private static StatelessRealtimeSegmentWriter createOffsetPayloadWriter(String decodeRetryMaxBackoffMillis,
       List<Long> sleeps, @Nullable CountDownLatch backoffStarted)
       throws Exception {
     return createOffsetPayloadWriter(decodeRetryMaxBackoffMillis, sleeps, backoffStarted, Map.of(), null);
   }
 
-  /// Like above, with extra stream configs, and a clock to use instead of the system one.
   private static StatelessRealtimeSegmentWriter createOffsetPayloadWriter(String decodeRetryMaxBackoffMillis,
       List<Long> sleeps, @Nullable CountDownLatch backoffStarted, Map<String, String> streamConfigs,
       @Nullable AtomicLong clock)
@@ -516,7 +511,7 @@ public class StatelessRealtimeSegmentWriterTest {
     };
   }
 
-  /// Endless stream whose message at offset `n` carries `n` as its payload. Records the start offset of every fetch.
+  /// Endless stream whose message at offset `n` has payload `n`.
   public static class OffsetPayloadConsumerFactory extends StreamConsumerFactory {
     static final List<Long> FETCH_START_OFFSETS = new CopyOnWriteArrayList<>();
     // Like Kinesis, fetch from after the given offset, and give each message its own offset as next offset
@@ -581,10 +576,9 @@ public class StatelessRealtimeSegmentWriterTest {
     }
   }
 
-  /// Decodes the payloads of [OffsetPayloadConsumerFactory], first throwing [RetriableDecodeException] for
-  /// [#FAILING_OFFSET] the number of times passed to [#reset(int)], or for the offsets in [#RETRIABLE_FAILURES].
+  /// Throws [RetriableDecodeException] for [#RETRIABLE_FAILURES], as many times as given, then decodes.
   public static class OffsetPayloadDecoder implements StreamMessageDecoder<byte[]> {
-    // Offset -> number of decode attempts that throw RetriableDecodeException before the message decodes
+    // Offset -> number of attempts that throw RetriableDecodeException before the message decodes
     static final Map<Long, AtomicInteger> RETRIABLE_FAILURES = new ConcurrentHashMap<>();
     static final List<Long> RETRIABLE_FAILURE_OFFSETS = new CopyOnWriteArrayList<>();
     static final List<Long> DECODED_OFFSETS = new CopyOnWriteArrayList<>();

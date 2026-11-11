@@ -23,9 +23,8 @@ public interface StreamDataDecoder {
   /// Decodes a [StreamMessage]
   ///
   /// Please note that the expectation is that the implementations of this class should never throw an exception.
-  /// Instead, it should encapsulate the exception within the [StreamDataDecoderResult] object. A
-  /// [RetriableDecodeException] is encapsulated as is, so that [StreamDataDecoderResult#isRetriable()] tells the caller
-  /// to decode the message again instead of dropping it.
+  /// Instead, it should encapsulate the exception within the [StreamDataDecoderResult] object.
+  /// A [RetriableDecodeException] is encapsulated as is, so that [StreamDataDecoderResult#isRetriable()] reports it.
   ///
   /// @param message [StreamMessage] that contains the data payload and optionally, a key and row metadata
   /// @return [StreamDataDecoderResult] that either contains the decoded row or the exception

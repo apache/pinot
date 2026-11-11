@@ -22,16 +22,13 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-/// Thrown by a [StreamMessageDecoder] when a message could not be decoded now but may decode later, for example
-/// because a schema registry it depends on timed out, throttled the request or returned a server error.
+/// Thrown by a [StreamMessageDecoder] when a message failed to decode but may decode later, e.g. because a schema
+/// registry it depends on is unavailable. Instead of dropping the message, the realtime consumer keeps its offset,
+/// backs off and fetches the message again, even when `stopOnDecodeError` is set.
 ///
-/// Any other decode failure drops the message permanently (unless `stopOnDecodeError` is set). On this exception the
-/// realtime consumer instead keeps its offset, backs off and fetches the same message again, so a transient outage of
-/// a decoder dependency delays ingestion rather than losing data. Do not throw it for failures of the message itself,
-/// such as a malformed payload or an unknown schema: unless [StreamConfigProperties#DECODE_RETRY_MAX_DURATION_MILLIS]
-/// is set, the consumer would retry that message indefinitely and stop ingesting the partition. That setting bounds an
-/// outage rather than each message: retriable failures less than that duration apart belong to the same outage, and
-/// once it has lasted that long, they are handled like any other decode failure until none happens for that long.
+/// Do not throw it for failures of the message itself, such as a malformed payload: unless
+/// [StreamConfigProperties#DECODE_RETRY_MAX_DURATION_MILLIS] is set, the consumer retries that message forever and
+/// stops ingesting the partition.
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class RetriableDecodeException extends RuntimeException {

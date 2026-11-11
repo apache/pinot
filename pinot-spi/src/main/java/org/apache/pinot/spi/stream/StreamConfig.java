@@ -46,11 +46,10 @@ public class StreamConfig {
   public static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
   public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = 3 * 60 * 1000;
-  /// First backoff before a message whose decoder threw [RetriableDecodeException] is fetched and decoded again. It
-  /// doubles on every retry, up to [#getDecodeRetryMaxBackoffMillis()].
+  /// First decode retry backoff; it doubles on every retry up to [#getDecodeRetryMaxBackoffMillis()].
   public static final long INITIAL_DECODE_RETRY_BACKOFF_MILLIS = 100;
   public static final long DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS = 10_000;
-  /// No limit: a message whose decoder throws [RetriableDecodeException] is retried until it decodes.
+  /// No limit: a message is retried until it decodes.
   public static final long DEFAULT_DECODE_RETRY_MAX_DURATION_MILLIS = Long.MAX_VALUE;
 
   public static final double CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED = -1;
@@ -226,8 +225,6 @@ public class StreamConfig {
     return _serverUploadToDeepStore;
   }
 
-  /// Returns the configured [StreamConfigProperties#DECODE_RETRY_MAX_BACKOFF_MILLIS], or
-  /// [#DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS] when it is missing, not a number or not positive.
   public static long extractDecodeRetryMaxBackoffMillis(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.DECODE_RETRY_MAX_BACKOFF_MILLIS;
     String value = streamConfigMap.get(key);
@@ -247,8 +244,6 @@ public class StreamConfig {
     return DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS;
   }
 
-  /// Returns the configured [StreamConfigProperties#DECODE_RETRY_MAX_DURATION_MILLIS], or
-  /// [#DEFAULT_DECODE_RETRY_MAX_DURATION_MILLIS] (no limit) when it is missing, not a number or negative.
   public static long extractDecodeRetryMaxDurationMillis(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.DECODE_RETRY_MAX_DURATION_MILLIS;
     String value = streamConfigMap.get(key);
@@ -439,15 +434,11 @@ public class StreamConfig {
     return _idleTimeoutMillis;
   }
 
-  /// Cap of the backoff before a message whose decoder threw [RetriableDecodeException] is fetched and decoded again.
   public long getDecodeRetryMaxBackoffMillis() {
     return _decodeRetryMaxBackoffMillis;
   }
 
-  /// How long messages whose decoder throws [RetriableDecodeException] are retried during an outage, i.e. while
-  /// retriable failures keep happening less than this duration apart. See
-  /// [StreamConfigProperties#DECODE_RETRY_MAX_DURATION_MILLIS]. [Long#MAX_VALUE] means no limit, and 0 means no
-  /// retries.
+  /// See [StreamConfigProperties#DECODE_RETRY_MAX_DURATION_MILLIS]; [Long#MAX_VALUE] means no limit.
   public long getDecodeRetryMaxDurationMillis() {
     return _decodeRetryMaxDurationMillis;
   }

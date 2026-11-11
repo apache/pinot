@@ -128,18 +128,14 @@ public class StreamConfigProperties {
   public static final String BACKFILL_TOPIC = "realtime.segment.isBackfillTopic";
 
   /// Cap, in milliseconds, of the backoff before a message whose decoder threw [RetriableDecodeException] is fetched
-  /// and decoded again. The backoff starts at [StreamConfig#INITIAL_DECODE_RETRY_BACKOFF_MILLIS] (or the cap, if lower)
-  /// and doubles up to the cap. Defaults to [StreamConfig#DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS] (10 seconds).
+  /// again. The backoff starts at [StreamConfig#INITIAL_DECODE_RETRY_BACKOFF_MILLIS] and doubles up to the cap.
+  /// Defaults to [StreamConfig#DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS] (10 seconds).
   public static final String DECODE_RETRY_MAX_BACKOFF_MILLIS = "decodeRetryMaxBackoffMillis";
 
-  /// How long, in milliseconds, messages whose decoder throws [RetriableDecodeException] are retried during an outage
-  /// of a decoder dependency. An outage starts at a retriable decode failure, and lasts while a message is being
-  /// retried and while retriable failures keep happening less than this duration after the previous one, whether or
-  /// not other messages decode in between. Once the outage has lasted this long, its retriable failures are handled
-  /// like any other decode failure (dropped, or stopping consumption when `stopOnDecodeError` is set) without backoff
-  /// or fetching again; a retriable failure after this long without any starts a new outage. By default there is no
-  /// limit, so a message is retried until it decodes. `0` never retries, which restores the behaviour from before
-  /// [RetriableDecodeException] existed.
+  /// How long, in milliseconds, retriable decode failures are retried during an outage of a decoder dependency. An
+  /// outage lasts while a message is being retried or retriable failures keep happening less than this apart; once it
+  /// has lasted this long, its failures are handled like any other decode failure. No limit by default; `0` disables
+  /// retries.
   public static final String DECODE_RETRY_MAX_DURATION_MILLIS = "decodeRetryMaxDurationMillis";
 
   /// Helper method to create a stream specific property

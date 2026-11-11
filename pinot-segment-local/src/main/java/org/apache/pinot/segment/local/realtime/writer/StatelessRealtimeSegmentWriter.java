@@ -273,13 +273,9 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         _consumer.start(_startOffset);
         _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
-        // Retries of the message whose decoder threw RetriableDecodeException: number of failures, and the backoff
-        // before fetching the message again
+        // Decode retry state of the current message, and the ongoing decode outage as in RealtimeSegmentDataManager
         int numDecodeRetries = 0;
         long decodeRetryBackoffMs = 0;
-        // The ongoing decode outage, as in RealtimeSegmentDataManager: it lasts while a message is being retried and
-        // while retriable failures keep happening within the maximum retry duration of the previous one, and its
-        // retriable failures are retried until it has lasted that long
         boolean inDecodeOutage = false;
         long decodeOutageStartTimeMs = 0;
         long decodeOutageLastFailureTimeMs = 0;
@@ -305,8 +301,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
           }
 
           int messageCount = messageBatch.getMessageCount();
-          // Where to fetch from to get the current message again: the next offset of the previous message, since some
-          // streams fetch from after the offset they are given
+          // Refetch from the previous message's next offset, as some streams fetch from after the given offset
           StreamPartitionMsgOffset currentMessageFetchOffset = _currentOffset;
           boolean decodeRetryNeeded = false;
 
@@ -340,8 +335,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
               }
             }
             if (retryDecode) {
-              // The message may decode later. Fetch it again after a backoff instead of dropping it, which would leave
-              // it out of the re-ingested segment. The re-ingestion timeout also bounds the retries.
+              // Refetch after a backoff rather than leave the message out; the re-ingestion timeout bounds retries
               if (numDecodeRetries++ == 0) {
                 decodeRetryBackoffMs = Math.min(StreamConfig.INITIAL_DECODE_RETRY_BACKOFF_MILLIS,
                     _streamConfig.getDecodeRetryMaxBackoffMillis());
@@ -397,8 +391,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     }
   }
 
-  /// Sleeps before a message whose decoder threw `RetriableDecodeException` is fetched again. [#stopConsumption()]
-  /// interrupts the sleep.
+  /// Sleeps the decode retry backoff; [#stopConsumption()] interrupts it.
   @VisibleForTesting
   void sleepBeforeDecodeRetry(long backoffMs)
       throws InterruptedException {
