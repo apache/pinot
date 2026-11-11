@@ -638,7 +638,14 @@ public class RealtimeSegmentDataManagerTest {
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
       ServerMetrics serverMetrics)
       throws Exception {
-    SegmentZKMetadata segmentZKMetadata = createZkMetadata();
+    return createFakeSegmentManager(noUpsert, timeSupplier, maxRows, maxDuration, tableConfig, serverMetrics,
+        createZkMetadata());
+  }
+
+  private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
+      @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
+      ServerMetrics serverMetrics, SegmentZKMetadata segmentZKMetadata)
+      throws Exception {
     if (tableConfig == null) {
       tableConfig = createTableConfig();
     }
@@ -1567,6 +1574,41 @@ public class RealtimeSegmentDataManagerTest {
     segmentDataManager.setPartitionUpsertMetadataManager(upsertMetadataManager);
     segmentDataManager._useRealDownloadAndReplace = true;
     return segmentDataManager;
+  }
+
+  /// A replica that starts consuming late, for example after a restart, must stop at the same time as the other
+  /// replicas of a pauseless segment. The minimum consume time still applies to non-pauseless tables, and to all tables
+  /// after the end time has passed.
+  @Test
+  public void testConsumeEndTimeOnLateStart()
+      throws Exception {
+    long tenMinutesMs = TimeUnit.MINUTES.toMillis(10);
+
+    // 5 of 30 minutes left: pauseless keeps the end time, non-pauseless consumes for at least 10 more minutes
+    long creationTimeMs = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(25);
+    assertEquals(getConsumeEndTime(true, "30m", creationTimeMs), creationTimeMs + TimeUnit.MINUTES.toMillis(30));
+    long nowMs = System.currentTimeMillis();
+    assertTrue(getConsumeEndTime(false, "30m", creationTimeMs) >= nowMs + tenMinutesMs);
+
+    // 4 of 5 minutes left: pauseless keeps the end time, also when the threshold is below the minimum consume time
+    creationTimeMs = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(1);
+    assertEquals(getConsumeEndTime(true, "5m", creationTimeMs), creationTimeMs + TimeUnit.MINUTES.toMillis(5));
+
+    // End time already passed: pauseless also consumes for at least 10 more minutes
+    creationTimeMs = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(40);
+    nowMs = System.currentTimeMillis();
+    assertTrue(getConsumeEndTime(true, "30m", creationTimeMs) >= nowMs + tenMinutesMs);
+  }
+
+  private long getConsumeEndTime(boolean pauseless, String maxConsumeTime, long creationTimeMs)
+      throws Exception {
+    SegmentZKMetadata segmentZKMetadata = createZkMetadata();
+    segmentZKMetadata.setCreationTime(creationTimeMs);
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, new TimeSupplier(), null,
+        maxConsumeTime, createTableConfigWithStreamIngestion(pauseless, null),
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), segmentZKMetadata)) {
+      return segmentDataManager.getConsumeEndTime();
+    }
   }
 
   private TableConfig createPauselessTableConfig()
