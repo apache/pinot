@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +65,8 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
 
   private int _blockEndDocId = 0;
   private PeekableIntIterator _docIdIterator;
+  @Nullable
+  private RestrictedProjection _restrictedProjection;
 
   // NOTE: Number of entries scanned is not accurate because we might need to scan multiple columns in order to solve
   //       the expression, but we only track the number of entries scanned for the resolved expression.
@@ -151,6 +154,47 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
         processProjectionBlock(projectionBlock, matchingDocIds);
       }
       return matchingDocIds;
+    }
+  }
+
+  @Override
+  public int getRestrictedScanBatchSize() {
+    return ProjectionOperatorUtils.isDefaultImplementation() ? _docIdBuffer.length : 0;
+  }
+
+  @Override
+  public int matchDocIds(int[] docIds, int length) {
+    if (length == 0) {
+      return 0;
+    }
+    RestrictedProjection restrictedProjection = _restrictedProjection;
+    if (restrictedProjection == null) {
+      Preconditions.checkState(ProjectionOperatorUtils.isDefaultImplementation(),
+          "Restricted expression scans require the default projection");
+      CandidateDocIdSetOperator docIdSetOperator = new CandidateDocIdSetOperator();
+      restrictedProjection = new RestrictedProjection(docIdSetOperator,
+          new ProjectionOperator(_dataSourceMap, docIdSetOperator, _queryContext));
+      _restrictedProjection = restrictedProjection;
+    }
+    // The default projection pulls exactly one staged block. Keep its reader contexts across batches.
+    restrictedProjection.docIdSource().setDocIds(docIds, length);
+    ProjectionBlock projectionBlock = restrictedProjection.operator().nextBlock();
+    RoaringBitmap matchingDocIds = new RoaringBitmap();
+    processProjectionBlock(projectionBlock, matchingDocIds);
+    IntIterator matches = matchingDocIds.getIntIterator();
+    int numMatches = 0;
+    while (matches.hasNext()) {
+      docIds[numMatches++] = matches.next();
+    }
+    return numMatches;
+  }
+
+  @Override
+  public void close() {
+    RestrictedProjection restrictedProjection = _restrictedProjection;
+    if (restrictedProjection != null) {
+      _restrictedProjection = null;
+      restrictedProjection.operator().close();
     }
   }
 
@@ -424,6 +468,51 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public long getNumEntriesScanned() {
     return _numEntriesScanned;
+  }
+
+  private record RestrictedProjection(CandidateDocIdSetOperator docIdSource, ProjectionOperator operator) {
+  }
+
+  /// Presents one candidate batch to the default projection. A new batch must be staged before each pull.
+  private static final class CandidateDocIdSetOperator extends BaseDocIdSetOperator {
+    private static final String EXPLAIN_NAME = "DOC_ID_SET_RESTRICTED";
+
+    @Nullable
+    private DocIdSetBlock _docIdSetBlock;
+
+    void setDocIds(int[] docIds, int length) {
+      _docIdSetBlock = new DocIdSetBlock(docIds, length);
+    }
+
+    @Override
+    protected DocIdSetBlock getNextBlock() {
+      DocIdSetBlock docIdSetBlock = Preconditions.checkNotNull(_docIdSetBlock, "No candidate batch was staged");
+      _docIdSetBlock = null;
+      return docIdSetBlock;
+    }
+
+    @Override
+    public String toExplainString() {
+      return EXPLAIN_NAME;
+    }
+
+    @Override
+    public List<Operator> getChildOperators() {
+      return List.of();
+    }
+
+    @Override
+    public boolean isCompatibleWith(DocIdOrder order) {
+      return order == DocIdOrder.ASC;
+    }
+
+    @Override
+    public BaseDocIdSetOperator withOrder(DocIdOrder order) {
+      if (isCompatibleWith(order)) {
+        return this;
+      }
+      throw new UnsupportedOperationException(EXPLAIN_NAME + " doesn't support descending order");
+    }
   }
 
   /// NOTE: This operator contains only one block.

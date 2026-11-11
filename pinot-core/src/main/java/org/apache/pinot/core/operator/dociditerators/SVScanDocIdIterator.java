@@ -143,6 +143,18 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
+  public int getRestrictedScanBatchSize() {
+    return _batch.length;
+  }
+
+  @Override
+  public int matchDocIds(int[] docIds, int length) {
+    int matches = _valueMatcher.matchValues(length, docIds);
+    _numEntriesScanned += length;
+    return matches;
+  }
+
+  @Override
   public long getNumEntriesScanned() {
     return _numEntriesScanned;
   }

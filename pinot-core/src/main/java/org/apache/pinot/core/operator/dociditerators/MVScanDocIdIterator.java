@@ -117,6 +117,23 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   }
 
   @Override
+  public int getRestrictedScanBatchSize() {
+    return OPTIMAL_ITERATOR_BATCH_SIZE;
+  }
+
+  @Override
+  public int matchDocIds(int[] docIds, int length) {
+    int matches = 0;
+    for (int i = 0; i < length; i++) {
+      int docId = docIds[i];
+      if (_valueMatcher.doesValueMatch(docId)) {
+        docIds[matches++] = docId;
+      }
+    }
+    return matches;
+  }
+
+  @Override
   public long getNumEntriesScanned() {
     return _numEntriesScanned;
   }

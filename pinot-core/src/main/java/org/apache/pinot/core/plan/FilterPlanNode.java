@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
+import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapCollection;
@@ -109,6 +110,68 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
+    return run(_filter, false);
+  }
+
+  BaseFilterOperator runForEarlyTermination() {
+    FilterContext userFilter = getStreamingUserFilter();
+    return userFilter != null ? run(userFilter, true) : run();
+  }
+
+  /// Select the streaming shape before segment-specific planning. Removing an empty or match-all child based on
+  /// the segment dictionary must not make a compound user predicate eligible.
+  @Nullable
+  private FilterContext getStreamingUserFilter() {
+    if (_rowFilter == null || _filter == null) {
+      return null;
+    }
+    FilterContext userFilter = _filter;
+    if (_filter.getType() == FilterContext.Type.AND) {
+      List<FilterContext> children = _filter.getChildren();
+      if (children.size() != 2 || _rowFilter.getType() != FilterContext.Type.PREDICATE
+          || _rowFilter.getPredicate().getLhs().getType() != ExpressionContext.Type.IDENTIFIER
+          || !isOrdinaryComparison(_rowFilter.getPredicate())) {
+        return null;
+      }
+      // The broker also adds the policy to WHERE. Drop only an exact copy because the server still applies the
+      // independent policy to the candidate documents.
+      if (_rowFilter.equals(children.getFirst())) {
+        userFilter = children.get(1);
+      } else if (_rowFilter.equals(children.get(1))) {
+        userFilter = children.getFirst();
+      } else {
+        return null;
+      }
+    }
+    if (userFilter.getType() != FilterContext.Type.PREDICATE || _rowFilter.equals(userFilter)) {
+      return null;
+    }
+    Predicate predicate = userFilter.getPredicate();
+    if (!isOrdinaryComparison(predicate)) {
+      return null;
+    }
+    ExpressionContext lhs = predicate.getLhs();
+    if (lhs.getType() == ExpressionContext.Type.IDENTIFIER) {
+      return userFilter;
+    }
+    if (lhs.getType() != ExpressionContext.Type.FUNCTION || !ProjectionOperatorUtils.isDefaultImplementation()) {
+      return null;
+    }
+    return switch (lhs.getFunction().getFunctionName()) {
+      case "stdistance", "st_distance", "stcontains", "st_contains", "stwithin", "st_within",
+          ItemTransformFunction.FUNCTION_NAME -> null;
+      default -> userFilter;
+    };
+  }
+
+  private static boolean isOrdinaryComparison(Predicate predicate) {
+    return switch (predicate.getType()) {
+      case EQ, NOT_EQ, IN, NOT_IN, RANGE -> true;
+      default -> false;
+    };
+  }
+
+  private BaseFilterOperator run(@Nullable FilterContext filter, boolean streamingRestrictionEnabled) {
     // Read the snapshot before the document count, never the other way round. A consuming segment publishes a row by
     // adding it, then raising the count, then marking it valid, so reading the count last guarantees every document in
     // the snapshot is below it. See FilterPlanNodeTest#testConsistentSnapshot.
@@ -122,7 +185,21 @@ public class FilterPlanNode implements PlanNode {
     // Candidate generation and the outer valid-document AND must observe the same document set for this query.
     ImmutableRoaringBitmap outerDocIdsSnapshot = docIdsSnapshot;
 
-    BaseFilterOperator filterOperator = _filter != null ? constructPhysicalOperator(_filter, numDocs) : null;
+    if (streamingRestrictionEnabled) {
+      assert filter != null;
+      BaseFilterOperator rowFilterOperator = constructRowFilterOperator(numDocs);
+      if (rowFilterOperator.isResultEmpty()) {
+        return EmptyFilterOperator.getInstance();
+      }
+      BaseFilterOperator userFilterOperator = constructPhysicalOperator(filter, numDocs);
+      if (userFilterOperator.isResultEmpty()) {
+        return userFilterOperator;
+      }
+      return new RowLevelSecurityFilterOperator(rowFilterOperator, userFilterOperator, outerDocIdsSnapshot,
+          _queryContext, numDocs, true);
+    }
+
+    BaseFilterOperator filterOperator = filter != null ? constructPhysicalOperator(filter, numDocs) : null;
     if (_rowFilter != null && (filterOperator == null || !filterOperator.isResultEmpty())) {
       BaseFilterOperator rowFilterOperator = constructRowFilterOperator(numDocs);
       if (rowFilterOperator.isResultEmpty()) {
@@ -153,7 +230,7 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /// Builds the operator of the row-level security filter. Its predicate evaluators are not added to
-  /// [#getPredicateEvaluators()]: that list describes [#_filter], which already holds the RLS predicate.
+  /// [#getPredicateEvaluators()]: that list describes the user filter being planned.
   private BaseFilterOperator constructRowFilterOperator(int numDocs) {
     int numPredicateEvaluators = _predicateEvaluators.size();
     BaseFilterOperator rowFilterOperator = constructPhysicalOperator(_rowFilter, numDocs);

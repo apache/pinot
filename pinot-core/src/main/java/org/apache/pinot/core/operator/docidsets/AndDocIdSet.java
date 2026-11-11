@@ -32,6 +32,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RestrictedScanDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.core.util.SortedRangeIntersection;
@@ -80,6 +81,29 @@ public final class AndDocIdSet implements BlockDocIdSet {
     List<BlockDocIdSet> docIdSets = _docIdSets;
     Preconditions.checkState(docIdSets != null, "iterator() called on an already consumed AndDocIdSet");
     return buildIterator(docIdSets);
+  }
+
+  /// Streams an RLS bitmap AND a single supported scan. Eligibility must be decided from the logical filter
+  /// before segment planning, since pruning a compound filter can otherwise change its evaluation strategy.
+  /// Returns null without consuming the set if the leaf does not use a supported scan.
+  /// The caller must close the returned iterator when it stops before EOF.
+  @Nullable
+  public BlockDocIdIterator iteratorForEarlyTermination(int chunkSize, Runnable afterBatch) {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    Preconditions.checkState(docIdSets != null, "Already consumed AndDocIdSet");
+    if (docIdSets.size() != 2 || !(docIdSets.getFirst() instanceof BitmapDocIdSet candidates)) {
+      return null;
+    }
+    BlockDocIdSet userFilter = docIdSets.get(1);
+    if (!(userFilter instanceof SVScanDocIdSet || userFilter instanceof MVScanDocIdSet
+        || userFilter instanceof ExpressionDocIdSet)) {
+      return null;
+    }
+    ScanBasedDocIdIterator scan = (ScanBasedDocIdIterator) userFilter.iterator();
+    BlockDocIdIterator iterator = new RestrictedScanDocIdIterator(candidates.iterator(), scan, chunkSize, afterBatch);
+    _scanBasedDocIdSets.set(List.of(userFilter));
+    _docIdSets = null;
+    return iterator;
   }
 
   /// Builds the iterator over the given children and consumes this DocIdSet. [#applyAnd] passes the children with

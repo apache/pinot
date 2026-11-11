@@ -34,6 +34,11 @@ public class ProjectionOperatorUtils {
     _instance = newImplementation;
   }
 
+  /// Returns whether the built-in projection is installed. It pulls one source block per call.
+  public static boolean isDefaultImplementation() {
+    return _instance.getClass() == DefaultImplementation.class;
+  }
+
   public static ProjectionOperator getProjectionOperator(Map<String, DataSource> dataSourceMap,
       @Nullable BaseDocIdSetOperator docIdSetOperator, QueryContext queryContext) {
     return _instance.getProjectionOperator(dataSourceMap, docIdSetOperator, queryContext);

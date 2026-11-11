@@ -24,7 +24,10 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
+import org.apache.pinot.core.operator.dociditerators.RestrictedScanDocIdIterator;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.RowLevelSecurityFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.query.QueryScanCostContext;
@@ -40,7 +43,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// The returned [org.apache.pinot.core.operator.blocks.DocIdSetBlock] wraps a thread-local scratch buffer shared by
 /// all `DocIdSetOperator` instances on the same thread: its contents are invalidated by the next [#nextBlock()] call
 /// on any instance on this thread. Consumers that hold on to a block across pulls must copy the array.
-public class DocIdSetOperator extends BaseDocIdSetOperator {
+public class DocIdSetOperator extends BaseDocIdSetOperator implements AutoCloseable {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
@@ -69,7 +72,13 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
     // Initialize filter block document Id set
     if (_blockDocIdSet == null) {
       _blockDocIdSet = _filterOperator.nextBlock().getBlockDocIdSet();
-      _blockDocIdIterator = _blockDocIdSet.iterator();
+      BlockDocIdIterator earlyTerminationIterator = null;
+      if (_filterOperator instanceof RowLevelSecurityFilterOperator rls && rls.isStreamingRestrictionEnabled()
+          && _blockDocIdSet instanceof AndDocIdSet andDocIdSet) {
+        earlyTerminationIterator = andDocIdSet.iteratorForEarlyTermination(
+            BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE, this::afterRestrictedBatch);
+      }
+      _blockDocIdIterator = earlyTerminationIterator != null ? earlyTerminationIterator : _blockDocIdSet.iterator();
     }
 
     QueryThreadContext.sampleUsage();
@@ -83,20 +92,37 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
       }
       docIds[pos++] = _currentDocId;
     }
-    if (pos > 0) {
-      // Push scan cost delta for proactive query killing
-      QueryScanCostContext scanCost = getScanCostContext();
-      if (scanCost != null) {
-        long currentTotal = _blockDocIdSet.getNumEntriesScannedInFilter();
-        long delta = currentTotal - _lastReportedEntriesScanned;
-        if (delta > 0) {
-          scanCost.addEntriesScannedInFilter(delta);
-          _lastReportedEntriesScanned = currentTotal;
-        }
+    if (pos > 0 || _blockDocIdIterator instanceof RestrictedScanDocIdIterator) {
+      // A restricted scan can reach EOF without producing a block.
+      reportEntriesScannedInFilter();
+    }
+    return pos > 0 ? new DocIdSetBlock(docIds, pos) : null;
+  }
+
+  private void afterRestrictedBatch() {
+    // A batch can scan candidates without producing any matching documents.
+    reportEntriesScannedInFilter();
+    checkTerminationAndSampleUsage();
+  }
+
+  private void reportEntriesScannedInFilter() {
+    QueryScanCostContext scanCost = getScanCostContext();
+    if (scanCost != null) {
+      long currentTotal = _blockDocIdSet.getNumEntriesScannedInFilter();
+      long delta = currentTotal - _lastReportedEntriesScanned;
+      if (delta > 0) {
+        scanCost.addEntriesScannedInFilter(delta);
+        _lastReportedEntriesScanned = currentTotal;
       }
-      return new DocIdSetBlock(docIds, pos);
-    } else {
-      return null;
+    }
+  }
+
+  /// Releases the restricted iterator when a selection finishes, including when it stops before EOF.
+  @Override
+  public void close() {
+    if (_blockDocIdIterator instanceof RestrictedScanDocIdIterator restrictedIterator) {
+      _currentDocId = Constants.EOF;
+      restrictedIterator.close();
     }
   }
 
