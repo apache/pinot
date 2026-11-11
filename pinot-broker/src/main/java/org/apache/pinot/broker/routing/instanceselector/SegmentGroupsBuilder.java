@@ -258,7 +258,7 @@ final class SegmentGroupsBuilder {
   /// Returns the instances unavailable for any old segment, keyed by the instances in the ideal state of the segment:
   /// the instances that are not online for routing in both the ideal state and the external view.
   private Map<Set<String>, Set<String>> computeUnavailableInstancesMap(List<InstanceStateMaps> instanceStateMapsList) {
-    Map<Set<String>, Set<String>> unavailableInstancesMap =
+    Object2ObjectOpenCustomHashMap<Set<String>, Set<String>> unavailableInstancesMap =
         new Object2ObjectOpenCustomHashMap<>(INSTANCE_SET_STRATEGY);
     for (InstanceStateMaps instanceStateMaps : instanceStateMapsList) {
       if (instanceStateMaps._numOldSegments == 0) {
