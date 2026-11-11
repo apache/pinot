@@ -47,6 +47,7 @@ import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 public class TableMetadataReaderTest {
@@ -117,11 +118,27 @@ public class TableMetadataReaderTest {
     assertEquals(segmentNames(metadata), Set.of("seg0", "seg1", "seg2"));
   }
 
+  /// A server whose table-level request fails must fail the whole call instead of returning partial metadata.
+  @Test
+  public void testTableLevelMetadataFailsWhenServerReturnsError() {
+    Map<String, List<String>> serverToSegments = new LinkedHashMap<>();
+    serverToSegments.put("server0", List.of("seg0"));
+    serverToSegments.put("server1", List.of("seg1"));
+
+    assertThrows(RuntimeException.class, () -> getSegmentsMetadata(serverToSegments, Set.of("server1")));
+  }
+
   private JsonNode getSegmentsMetadata(Map<String, List<String>> serverToSegments)
+      throws Exception {
+    return getSegmentsMetadata(serverToSegments, Set.of());
+  }
+
+  private JsonNode getSegmentsMetadata(Map<String, List<String>> serverToSegments, Set<String> failingServers)
       throws Exception {
     BiMap<String, String> serverToEndpoint = HashBiMap.create();
     for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
-      HttpServer httpServer = startServer(entry.getValue());
+      HttpServer httpServer =
+          failingServers.contains(entry.getKey()) ? startFailingServer() : startServer(entry.getValue());
       serverToEndpoint.put(entry.getKey(), "http://localhost:" + httpServer.getAddress().getPort());
     }
 
@@ -148,6 +165,19 @@ public class TableMetadataReaderTest {
       try (OutputStream out = exchange.getResponseBody()) {
         out.write(tableLevelBody);
       }
+    });
+    httpServer.start();
+    _httpServers.add(httpServer);
+    return httpServer;
+  }
+
+  /// Starts a fake server whose table-level endpoint always returns 500.
+  private HttpServer startFailingServer()
+      throws IOException {
+    HttpServer httpServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    httpServer.createContext("/tables/" + TABLE_NAME + "/segments/metadata", exchange -> {
+      exchange.sendResponseHeaders(500, -1);
+      exchange.close();
     });
     httpServer.start();
     _httpServers.add(httpServer);
