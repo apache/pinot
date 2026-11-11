@@ -48,7 +48,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
-import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
@@ -528,26 +527,13 @@ public final class TableConfigUtils {
         || CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme);
   }
 
-  /// Returns whether the stored table config is already pauseless and sets `key` to `value` in one of its stream
-  /// configs. This value stays valid, so that updates to an existing table and to its schema keep working.
-  private static boolean hasSamePauselessTimeFlushThreshold(@Nullable TableConfig existingTableConfig, String key,
-      String value) {
-    if (existingTableConfig == null || !PauselessConsumptionUtils.isPauselessEnabled(existingTableConfig)) {
-      return false;
-    }
-    // Pauseless consumption is enabled in the stream ingestion config, so the ingestion config is not null
-    return existingTableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().stream()
-        .anyMatch(streamConfigMap -> value.equals(streamConfigMap.get(key)));
-  }
-
   /// Validates the table's [IngestionConfig] together with the closely related metrics-aggregation config, covering:
   /// - Metrics aggregation (both the `aggregateMetrics` flag and ingestion `aggregationConfigs`), delegated to
   ///   [#validateMetricsAggregation].
   /// - Batch ingestion: each batch config map is well-formed, and a dimension table has batch ingestion configured
   ///   with `REFRESH` segment ingestion type.
   /// - Stream ingestion: streams are declared in only one place, at least one stream is present, and pauseless
-  ///   consumption has a valid `peerSegmentDownloadScheme` and no time flush threshold, except the unchanged value of
-  ///   a stored pauseless table.
+  ///   consumption has a valid `peerSegmentDownloadScheme`.
   /// - Filter config: the filter function is valid and not a disabled Groovy expression.
   /// - Source field configs: no source field is duplicated within the same complex-type phase.
   /// - Enrichment configs: each config is valid.
@@ -621,20 +607,6 @@ public final class TableConfigUtils {
               "Must have a valid peerSegmentDownloadScheme set in validation config for pauseless consumption");
         } else {
           LOGGER.warn("It's not recommended to create pauseless tables with replication 1 for stability reasons.");
-        }
-        // Each replica checks a time flush threshold on its own clock, and a replica that restarts near the end time
-        // extends it. So the replicas of a pauseless segment can stop at different offsets. A replica past the
-        // committed end offset can only download the segment, so if the committer fails before the upload, no replica
-        // has a copy. Reject an explicit time threshold (the default threshold still applies). A stored pauseless
-        // table keeps its unchanged value, so that updates to the table and to its schema keep working.
-        for (Map<String, String> streamConfigMap : streamConfigMaps) {
-          for (String key : List.of(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME,
-              StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX)) {
-            String value = streamConfigMap.get(key);
-            Preconditions.checkState(
-                value == null || hasSamePauselessTimeFlushThreshold(existingTableConfig, key, value),
-                "%s is not supported with pauseless consumption enabled, use a row or size based flush threshold", key);
-          }
         }
       }
     }
