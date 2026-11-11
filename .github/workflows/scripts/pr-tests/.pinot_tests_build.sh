@@ -44,7 +44,6 @@ else
       -am -B -T 16 -ntp \
       -P github-actions \
       -P tesseracta-build \
-      -Dtest=WorkloadBudgetManagerTest \
       -pl 'pinot-bom' \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
