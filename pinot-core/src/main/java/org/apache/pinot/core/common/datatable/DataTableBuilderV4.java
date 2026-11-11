@@ -71,11 +71,12 @@ public class DataTableBuilderV4 extends BaseDataTableBuilder {
   }
 
   private int getDictId(String value) {
-    int dictId = _dictionary.getInt(value);
+    int newDictId = _dictionary.size();
+    // Returns the default value -1 when it inserts the new id, with a single probe of the hash table
+    int dictId = _dictionary.putIfAbsent(value, newDictId);
     if (dictId < 0) {
-      dictId = _dictionary.size();
-      _dictionary.put(value, dictId);
       _dictionarySizeBytes += Integer.BYTES + value.length();
+      return newDictId;
     }
     return dictId;
   }

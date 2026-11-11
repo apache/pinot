@@ -181,7 +181,7 @@ public abstract class QueryScheduler {
     Long maxResponseSizeBytes =
         QueryOptionsUtils.getMaxServerResponseSizeBytes(queryRequest.getQueryContext().getQueryOptions());
     if (maxResponseSizeBytes != null) {
-      executionContext.setMaxResponseSizeBytes(maxResponseSizeBytes);
+      executionContext.setMaxServerResponseSizeBytes(maxResponseSizeBytes);
     }
     _latestQueryTime.accumulate(executionContext.getStartTimeMs());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
@@ -206,26 +206,28 @@ public abstract class QueryScheduler {
       responseMetadata.put(MetadataKey.QUERY_ID.getName(), queryId);
       responseMetadata.put(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
       DataBuffer response;
-      boolean responseSizeExceeded = false;
+      ResponseSizeLimitExceededException responseSizeLimitException = null;
       try {
         response = serializeResponse(queryRequest, instanceResponse);
       } catch (ResponseSizeLimitExceededException e) {
-        // A data table builder stopped because the rows already exceed the limit. The full size is unknown, so the
-        // meter records the bytes written until the builder stopped.
-        _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERY_RESPONSE_SIZE,
-            e.getSizeBytes());
-        response = responseSizeExceeded(queryRequest, executionContext, e.getMessage());
-        responseSizeExceeded = true;
+        response = null;
+        responseSizeLimitException = e;
       }
 
-      // Log the statistics
+      // Log the statistics before an error response replaces the serialization timer of the query
       if (_queryLogger != null) {
         _queryLogger.logQuery(queryRequest, instanceResponse, name());
       }
 
-      // This check also counts the header, the data schema, the exceptions and the metadata, which the data table
-      // builders do not count.
-      if (response != null && !responseSizeExceeded) {
+      if (responseSizeLimitException != null) {
+        // A data table builder stopped because the rows already exceed the limit. The full size is unknown, so the
+        // meter records the bytes written until the builder stopped.
+        _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERY_RESPONSE_SIZE,
+            responseSizeLimitException.getSizeBytes());
+        response = responseSizeExceeded(queryRequest, executionContext, responseSizeLimitException.getMessage());
+      } else if (response != null) {
+        // This check also counts the header, the data schema, the exceptions and the metadata, which the data table
+        // builders do not count.
         long responseSizeBytes = response.size();
         _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERY_RESPONSE_SIZE,
             responseSizeBytes);

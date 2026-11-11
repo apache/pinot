@@ -48,8 +48,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -110,6 +113,8 @@ public class QuerySchedulerResponseSizeTest {
     assertEquals(numRowsWritten.get(), 13);
     verify(_serverMetrics).addMeteredTableValue(TABLE_NAME, ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
     verify(_serverMetrics).addMeteredTableValue(TABLE_NAME, ServerMeter.QUERY_RESPONSE_SIZE, 104);
+    verify(_serverMetrics, times(1)).addMeteredTableValue(eq(TABLE_NAME), eq(ServerMeter.QUERY_RESPONSE_SIZE),
+        anyLong());
   }
 
   /// The rows fit in the limit, but the header, the data schema and the metadata take the response over it.
@@ -125,6 +130,8 @@ public class QuerySchedulerResponseSizeTest {
     assertTrue(error.endsWith(" exceeds threshold 8000 for requestId 123 from broker unknown"), error);
     assertEquals(numRowsWritten.get(), NUM_ROWS);
     verify(_serverMetrics).addMeteredTableValue(TABLE_NAME, ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
+    verify(_serverMetrics, times(1)).addMeteredTableValue(eq(TABLE_NAME), eq(ServerMeter.QUERY_RESPONSE_SIZE),
+        anyLong());
   }
 
   @Test

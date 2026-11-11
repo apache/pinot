@@ -24,6 +24,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -150,6 +152,33 @@ public class DataTableBuilderSizeLimitTest {
     }
   }
 
+  /// A query that the accountant terminates while it builds a large response stops at the next 1 MB, although the
+  /// callers check termination only every 8192 rows.
+  @Test
+  public void testStopsWhenQueryIsTerminated()
+      throws IOException {
+    QueryExecutionContext executionContext = QueryExecutionContext.forSseTest();
+    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(BYTES_SCHEMA);
+      byte[] value = new byte[64 * 1024];
+      builder.startRow();
+      builder.setColumn(0, new ByteArray(value));
+      builder.finishRow();
+      executionContext.terminate(QueryErrorCode.QUERY_CANCELLATION, "Killed by the accountant");
+      // Each row is 65544 bytes. 15 rows stay under 1 MB, and the 16th row crosses it.
+      for (int i = 0; i < 14; i++) {
+        builder.startRow();
+        builder.setColumn(0, new ByteArray(value));
+        builder.finishRow();
+      }
+      builder.startRow();
+      builder.setColumn(0, new ByteArray(value));
+      TerminationException e = expectThrows(TerminationException.class, builder::finishRow);
+      assertEquals(e.getMessage(), "Killed by the accountant");
+    }
+  }
+
   @Test
   public void testDoesNotSampleSmallTables()
       throws IOException {
@@ -172,7 +201,7 @@ public class DataTableBuilderSizeLimitTest {
 
   private static QueryThreadContext openContext(long maxResponseSizeBytes, ThreadAccountant accountant) {
     QueryExecutionContext executionContext = QueryExecutionContext.forSseTest();
-    executionContext.setMaxResponseSizeBytes(maxResponseSizeBytes);
+    executionContext.setMaxServerResponseSizeBytes(maxResponseSizeBytes);
     return QueryThreadContext.open(executionContext, accountant);
   }
 

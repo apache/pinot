@@ -53,7 +53,7 @@ import org.roaringbitmap.RoaringBitmap;
 ///
 /// [#finishRow] stops the build early, so that the server never holds a response larger than the query allows:
 /// - It throws [ResponseSizeLimitExceededException] when the rows written so far are larger than the maximum response
-///   size of the query (see [org.apache.pinot.spi.query.QueryExecutionContext#getMaxResponseSizeBytes]).
+///   size of the query (see [org.apache.pinot.spi.query.QueryExecutionContext#getMaxServerResponseSizeBytes]).
 /// - It checks termination and samples the resource usage every [#SAMPLE_USAGE_BYTES] bytes. Callers sample every
 ///   8192 rows, which misses responses with few large rows.
 ///
@@ -111,8 +111,9 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     _storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     _nullBitmaps = new RoaringBitmap[dataSchema.size()];
     QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
-    _maxSizeBytes = threadContext != null ? Math.min(threadContext.getExecutionContext().getMaxResponseSizeBytes(),
-        Integer.MAX_VALUE) : Integer.MAX_VALUE;
+    _maxSizeBytes = threadContext != null
+        ? Math.min(threadContext.getExecutionContext().getMaxServerResponseSizeBytes(), Integer.MAX_VALUE)
+        : Integer.MAX_VALUE;
   }
 
   @VisibleForTesting
