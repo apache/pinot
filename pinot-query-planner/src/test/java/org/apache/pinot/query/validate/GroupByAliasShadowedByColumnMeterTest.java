@@ -18,11 +18,18 @@
  */
 package org.apache.pinot.query.validate;
 
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.core.routing.MockRoutingManagerFactory;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
+import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -39,10 +46,29 @@ public class GroupByAliasShadowedByColumnMeterTest extends QueryEnvironmentTestB
 
   private static final CountingBrokerMetrics BROKER_METRICS = new CountingBrokerMetrics();
 
+  /// Like the multi-stage broker, marks the meter. [#_queryEnvironment] keeps the default and does not.
+  private QueryEnvironment _meteringQueryEnvironment;
+
   @BeforeClass
   public void registerBrokerMetrics() {
     assertTrue(BrokerMetrics.register(BROKER_METRICS) || BrokerMetrics.get() == BROKER_METRICS,
         "Another BrokerMetrics instance is already registered in this JVM");
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1, 2);
+    for (Map.Entry<String, Schema> entry : TABLE_SCHEMAS.entrySet()) {
+      factory.registerTable(entry.getValue(), entry.getKey());
+    }
+    for (Map.Entry<String, List<String>> entry : SERVER1_SEGMENTS.entrySet()) {
+      for (String segment : entry.getValue()) {
+        factory.registerSegment(1, entry.getKey(), segment);
+      }
+    }
+    _meteringQueryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
+        .requestId(-1L)
+        .database(CommonConstants.DEFAULT_DATABASE)
+        .tableCache(factory.buildTableCache())
+        .workerManager(new WorkerManager("Broker_localhost", "localhost", 3, factory.buildRoutingManager(null)))
+        .meterGroupByAliasShadowedByColumn(true)
+        .build());
   }
 
   @DataProvider
@@ -56,6 +82,9 @@ public class GroupByAliasShadowedByColumnMeterTest extends QueryEnvironmentTestB
             "SELECT col2 AS col1, col1 AS col2, COUNT(*) FROM a GROUP BY col1, col2", 1},
         {"shadowed alias in a subquery",
             "SELECT * FROM (SELECT UPPER(col1) AS col1, COUNT(*) AS cnt FROM a GROUP BY col1) WHERE cnt > 1", 1},
+        {"shadowed alias in rollup", "SELECT UPPER(col1) AS col1, COUNT(*) FROM a GROUP BY ROLLUP(col1)", 1},
+        {"shadowed alias in a row of grouping sets",
+            "SELECT UPPER(col1) AS col1, col2, COUNT(*) FROM a GROUP BY GROUPING SETS ((col1, col2), ())", 1},
         {"column aliased to its own name", "SELECT col1 AS col1, COUNT(*) FROM a GROUP BY col1", 0},
         {"qualified column aliased to its own name", "SELECT a.col1 AS col1, COUNT(*) FROM a GROUP BY col1", 0},
         {"alias that is not a column", "SELECT UPPER(col1) AS upper_col1, COUNT(*) FROM a GROUP BY upper_col1", 0},
@@ -66,16 +95,27 @@ public class GroupByAliasShadowedByColumnMeterTest extends QueryEnvironmentTestB
 
   @Test(dataProvider = "queries")
   public void testMeter(String description, String sql, int expectedIncrease) {
+    assertEquals(explainAndCountMeter(_meteringQueryEnvironment, sql), expectedIncrease, description);
+  }
+
+  /// Single-stage queries always resolve a `GROUP BY` name to the alias. The single-stage paths that compile with the
+  /// multi-stage validator use the default config, so they must not mark the meter.
+  @Test(dataProvider = "queries")
+  public void testDefaultConfigDoesNotMarkMeter(String description, String sql, int expectedIncrease) {
+    assertEquals(explainAndCountMeter(_queryEnvironment, sql), 0, description);
+  }
+
+  private static long explainAndCountMeter(QueryEnvironment queryEnvironment, String sql) {
     String explain = sql.startsWith(FLAG)
         ? FLAG + "EXPLAIN PLAN FOR " + sql.substring(FLAG.length())
         : "EXPLAIN PLAN FOR " + sql;
     long before = meterCount();
     try {
-      _queryEnvironment.explainQuery(explain, 1L);
+      queryEnvironment.explainQuery(explain, 1L);
     } catch (RuntimeException e) {
       // Some queries fail validation. The meter is marked before the failure.
     }
-    assertEquals(meterCount() - before, expectedIncrease, description);
+    return meterCount() - before;
   }
 
   private static long meterCount() {

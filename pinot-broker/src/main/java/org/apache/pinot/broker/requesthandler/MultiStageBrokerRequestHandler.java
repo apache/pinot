@@ -639,6 +639,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
         .defaultSealedInListThreshold(sealedInListThreshold)
         .defaultPreferSelectAliasInGroupBy(preferSelectAliasInGroupBy)
+        .meterGroupByAliasShadowedByColumn(true)
         .build();
   }
 
@@ -744,8 +745,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(subquery);
       RequestUtils.setOptions(sqlNodeAndOptions, queryOptions);
-      QueryEnvironment queryEnv = new QueryEnvironment(
-          getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(), requestId), _multiClusterRoutingContext);
+      // The subquery is compiled again later, either on its own or inside the query, so do not mark the meter here
+      ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(),
+          requestId).withMeterGroupByAliasShadowedByColumn(false);
+      QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf, _multiClusterRoutingContext);
       queryEnv.validate(sqlNodeAndOptions);
       return true;
     } catch (RuntimeException e) {

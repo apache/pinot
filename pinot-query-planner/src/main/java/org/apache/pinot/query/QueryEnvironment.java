@@ -97,6 +97,7 @@ import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.query.validate.GroupByAliasShadowedByColumnException;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -442,6 +443,19 @@ public class QueryEnvironment {
   /// may be slightly different. For example, a function call may have its arguments casted to the correct type (only
   /// in case it was legal to apply an automatic cast for these types!).
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
+    try {
+      return validateAndClassifyErrors(sqlNode, plannerContext);
+    } catch (QueryException e) {
+      if (e.getErrorCode() == QueryErrorCode.QUERY_VALIDATION
+          && plannerContext.getValidator().isGroupByNameResolvedToShadowedColumn()) {
+        // Lets callers retry with preferSelectAliasInGroupBy
+        throw new GroupByAliasShadowedByColumnException(e);
+      }
+      throw e;
+    }
+  }
+
+  private SqlNode validateAndClassifyErrors(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
       if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
@@ -988,6 +1002,14 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultPreferSelectAliasInGroupBy() {
       return CommonConstants.Broker.DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY;
+    }
+
+    /// Whether the validator marks `BrokerMeter.QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN`. Only the broker that
+    /// runs multi-stage queries turns it on. Other users of the validator, like the single-stage paths that compile a
+    /// query only to check it or to get its schema, and the controller, must not change the meter.
+    @Value.Default
+    default boolean meterGroupByAliasShadowedByColumn() {
+      return false;
     }
   }
 

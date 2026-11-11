@@ -984,6 +984,27 @@
         ]
       },
       {
+        "description": "group by rollup of a name that is both a column and a select alias groups by the column by default",
+        "ignoreV2Optimizer": true,
+        "sql": "SELECT CASE WHEN col1 = 'foo' THEN 'bar' ELSE col1 END AS col1, SUM(int_col) FROM {tbl} GROUP BY ROLLUP(col1)",
+        "outputs": [
+          ["bar", 3],
+          ["bar", 4],
+          ["baz", 8],
+          [null, 15]
+        ]
+      },
+      {
+        "description": "group by rollup of a name that is both a column and a select alias groups by the alias with preferSelectAliasInGroupBy",
+        "ignoreV2Optimizer": true,
+        "sql": "SET preferSelectAliasInGroupBy=true; SELECT CASE WHEN col1 = 'foo' THEN 'bar' ELSE col1 END AS col1, SUM(int_col) FROM {tbl} GROUP BY ROLLUP(col1)",
+        "outputs": [
+          ["bar", 7],
+          ["baz", 8],
+          [null, 15]
+        ]
+      },
+      {
         "description": "group by the alias of another column groups by that column with preferSelectAliasInGroupBy",
         "sql": "SET preferSelectAliasInGroupBy=true; SELECT col2 AS col1, SUM(int_col) FROM {tbl} GROUP BY col1",
         "outputs": [

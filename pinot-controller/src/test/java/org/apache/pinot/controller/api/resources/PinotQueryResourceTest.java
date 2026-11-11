@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -30,6 +31,7 @@ import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
+import org.apache.pinot.common.config.provider.StaticTableCache;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -44,11 +46,14 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatement;
 import org.apache.pinot.sql.parsers.dml.DataManipulationStatementParser;
@@ -72,6 +77,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -776,6 +782,60 @@ public class PinotQueryResourceTest {
             "sqlOptionsMode=reject", null));
     Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())), response);
     Assert.assertTrue(response.contains("useMultistageEngine"), response);
+  }
+
+  @DataProvider
+  public Object[][] groupByAliasQueries() {
+    String query = "SELECT col2 AS col1, COUNT(*) FROM a GROUP BY col1";
+    return new Object[][]{
+        // Valid on a broker with CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY: the controller finds the tables and the
+        // query reaches broker selection, which fails because no table exists in the cluster
+        {"SET useMultistageEngine = 'true'; " + query, QueryErrorCode.TABLE_DOES_NOT_EXIST},
+        // The query option is set explicitly, so the controller does not retry
+        {"SET useMultistageEngine = 'true'; SET preferSelectAliasInGroupBy = false; " + query,
+            QueryErrorCode.QUERY_VALIDATION},
+        // Invalid with or without the option
+        {"SET useMultistageEngine = 'true'; SELECT col2, COUNT(*) FROM a GROUP BY col1",
+            QueryErrorCode.QUERY_VALIDATION},
+    };
+  }
+
+  @Test(dataProvider = "groupByAliasQueries")
+  public void testMultiStageTableNamesIgnoreHowGroupByNamesResolve(String sql, QueryErrorCode expectedError) {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("a")
+        .addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("col2", FieldSpec.DataType.STRING)
+        .build();
+    TableCache tableCache = new StaticTableCache(
+        List.of(new TableConfigBuilder(TableType.OFFLINE).setTableName("a").build()), List.of(schema), null, false);
+    when(_resourceManager.getTableCache()).thenReturn(tableCache);
+    when(_resourceManager.getActualTableName(any(), any())).then(AdditionalAnswers.returnsFirstArg());
+    when(_controllerConf.getProperty(eq(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED),
+        any(Boolean.class))).thenReturn(true);
+    AccessControl accessControl = mock(AccessControl.class);
+    when(accessControl.hasAccess(any(AccessType.class), any(), any())).thenReturn(true);
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    String response = streamingOutputToString(_pinotQueryResource.handleGetSql(sql, null, null, null));
+
+    assertTrue(response.contains("\"errorCode\":" + expectedError.getId()), response);
+  }
+
+  @Test
+  public void testRetryWithSelectAliasKeepsRequestOptions() {
+    String query = "SET timeoutMs = 1000; SELECT col2 AS col1, COUNT(*) FROM a GROUP BY col1";
+    SqlNodeAndOptions original = RequestUtils.parseQuery(query);
+    RequestUtils.setOptions(original, Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE,
+        "true"));
+    Map<String, String> originalOptions = Map.copyOf(original.getOptions());
+
+    SqlNodeAndOptions retry = PinotQueryResource.preferSelectAliasInGroupBy(query, original);
+
+    Map<String, String> expectedOptions = new HashMap<>(originalOptions);
+    expectedOptions.put(CommonConstants.Broker.Request.QueryOptionKey.PREFER_SELECT_ALIAS_IN_GROUP_BY, "true");
+    assertEquals(retry.getOptions(), expectedOptions);
+    assertEquals(original.getOptions(), originalOptions, "The retry must not change the original options");
+    assertNotSame(retry.getSqlNode(), original.getSqlNode(), "The retry must use a new parsed query");
   }
 
   /// Lets a single-stage query get as far as broker selection, which fails with BROKER_RESOURCE_MISSING because no

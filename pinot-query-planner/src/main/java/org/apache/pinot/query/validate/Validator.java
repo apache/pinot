@@ -28,6 +28,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
@@ -72,20 +73,25 @@ public class Validator extends SqlValidatorImpl {
       };
 
   private final boolean _preferSelectAliasInGroupBy;
+  private final boolean _meterGroupByAliasShadowedByColumn;
   /// `GROUP BY` names that match a `SELECT` alias, per `SELECT`. See [#rewriteGroupByAliases].
   private final Map<SqlSelect, List<String>> _groupByAliasNames = new IdentityHashMap<>();
-  /// Whether [BrokerMeter#QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN] was already marked for this query.
+  /// Whether a `GROUP BY` name of this query matches a `SELECT` alias and a column. See [#validateGroupClause].
   private boolean _groupByAliasShadowedByColumnFound;
 
   /// @param preferSelectAliasInGroupBy whether a simple name in `GROUP BY` resolves to a `SELECT` alias before a
   ///                                   column of the same name. See [#rewriteGroupByAliases].
+  /// @param meterGroupByAliasShadowedByColumn whether to mark
+  ///                                          [BrokerMeter#QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN]. See
+  ///                                          [#validateGroupClause].
   public Validator(SqlOperatorTable opTab, SqlValidatorCatalogReader catalogReader, RelDataTypeFactory typeFactory,
-      boolean preferSelectAliasInGroupBy) {
+      boolean preferSelectAliasInGroupBy, boolean meterGroupByAliasShadowedByColumn) {
     super(opTab, catalogReader, typeFactory,
         Config.DEFAULT.withConformance(PINOT_CONFORMANCE)
             .withIdentifierExpansion(true)
             .withTypeCoercionFactory(PinotTypeCoercion::new));
     _preferSelectAliasInGroupBy = preferSelectAliasInGroupBy;
+    _meterGroupByAliasShadowedByColumn = meterGroupByAliasShadowedByColumn;
   }
 
   @Override
@@ -110,54 +116,86 @@ public class Validator extends SqlValidatorImpl {
   /// The names found are kept in [#_groupByAliasNames]. [#validateGroupClause] later checks which of them are also
   /// columns. That check needs the scopes, which do not exist yet at this point.
   ///
-  /// Only top-level `GROUP BY` items are considered. Names inside `ROLLUP`, `CUBE` and `GROUPING SETS` keep the
-  /// Calcite 1.42 resolution.
+  /// The rewrite also applies to the names inside `ROLLUP`, `CUBE`, `GROUPING SETS` and their `ROW` operands, because
+  /// Calcite 1.40 resolved those names to the alias too, and Calcite 1.42 expands ordinals there as well.
   private void rewriteGroupByAliases(SqlSelect select) {
     SqlNodeList groupList = select.getGroup();
     if (groupList == null) {
       return;
     }
-    SqlNameMatcher nameMatcher = getCatalogReader().nameMatcher();
-    List<SqlNode> selectList = select.getSelectList().getList();
     List<String> aliasNames = new ArrayList<>();
-    for (int i = 0; i < groupList.size(); i++) {
-      SqlNode groupItem = groupList.get(i);
-      if (!(groupItem instanceof SqlIdentifier) || !((SqlIdentifier) groupItem).isSimple()) {
-        continue;
-      }
-      String name = ((SqlIdentifier) groupItem).getSimple();
-      int matchIndex = -1;
-      int matchCount = 0;
-      for (int j = 0; j < selectList.size(); j++) {
-        String alias = SqlValidatorUtil.alias(selectList.get(j));
-        if (alias != null && nameMatcher.matches(alias, name)) {
-          matchIndex = j;
-          matchCount++;
-        }
-      }
-      // With more than one match, Calcite 1.40 failed with an ambiguity error. Keep the Calcite 1.42 resolution.
-      if (matchCount != 1) {
-        continue;
-      }
-      SqlNode expr = SqlUtil.stripAs(selectList.get(matchIndex));
-      if (expr instanceof SqlIdentifier && nameMatcher.matches(Util.last(((SqlIdentifier) expr).names), name)) {
-        continue;
-      }
-      aliasNames.add(name);
-      if (_preferSelectAliasInGroupBy) {
-        groupList.set(i, SqlLiteral.createExactNumeric(String.valueOf(matchIndex + 1), groupItem.getParserPosition()));
-      }
-    }
+    rewriteGroupByAliases(groupList, select.getSelectList().getList(), getCatalogReader().nameMatcher(), aliasNames);
     if (!aliasNames.isEmpty()) {
       _groupByAliasNames.put(select, aliasNames);
     }
   }
 
-  /// Marks [BrokerMeter#QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN] when a name found by [#rewriteGroupByAliases]
-  /// is also exactly one column of the `FROM` clause. Calcite 1.40 and Calcite 1.42 resolve such a name differently.
+  /// Rewrites the `GROUP BY` items in `nodes` in place, and recurses into grouping-set operators.
+  private void rewriteGroupByAliases(List<SqlNode> nodes, List<SqlNode> selectList, SqlNameMatcher nameMatcher,
+      List<String> aliasNames) {
+    for (int i = 0; i < nodes.size(); i++) {
+      SqlNode node = nodes.get(i);
+      if (node instanceof SqlNodeList) {
+        rewriteGroupByAliases((SqlNodeList) node, selectList, nameMatcher, aliasNames);
+      } else if (node instanceof SqlCall && isGroupingSetOperator(node.getKind())) {
+        SqlCall call = (SqlCall) node;
+        List<SqlNode> operands = new ArrayList<>(call.getOperandList());
+        rewriteGroupByAliases(operands, selectList, nameMatcher, aliasNames);
+        for (int j = 0; j < operands.size(); j++) {
+          if (operands.get(j) != call.operand(j)) {
+            call.setOperand(j, operands.get(j));
+          }
+        }
+      } else if (node instanceof SqlIdentifier && ((SqlIdentifier) node).isSimple()) {
+        SqlNode replacement = rewriteGroupByName((SqlIdentifier) node, selectList, nameMatcher, aliasNames);
+        if (replacement != node) {
+          nodes.set(i, replacement);
+        }
+      }
+    }
+  }
+
+  private static boolean isGroupingSetOperator(SqlKind kind) {
+    return kind == SqlKind.ROLLUP || kind == SqlKind.CUBE || kind == SqlKind.GROUPING_SETS || kind == SqlKind.ROW;
+  }
+
+  /// Returns the ordinal that replaces `identifier`, or `identifier` itself when it is not replaced.
+  private SqlNode rewriteGroupByName(SqlIdentifier identifier, List<SqlNode> selectList, SqlNameMatcher nameMatcher,
+      List<String> aliasNames) {
+    String name = identifier.getSimple();
+    int matchIndex = -1;
+    int matchCount = 0;
+    for (int j = 0; j < selectList.size(); j++) {
+      String alias = SqlValidatorUtil.alias(selectList.get(j));
+      if (alias != null && nameMatcher.matches(alias, name)) {
+        matchIndex = j;
+        matchCount++;
+      }
+    }
+    // With more than one match, Calcite 1.40 failed with an ambiguity error. Keep the Calcite 1.42 resolution.
+    if (matchCount != 1) {
+      return identifier;
+    }
+    SqlNode expr = SqlUtil.stripAs(selectList.get(matchIndex));
+    if (expr instanceof SqlIdentifier && nameMatcher.matches(Util.last(((SqlIdentifier) expr).names), name)) {
+      return identifier;
+    }
+    aliasNames.add(name);
+    if (!_preferSelectAliasInGroupBy) {
+      return identifier;
+    }
+    return SqlLiteral.createExactNumeric(String.valueOf(matchIndex + 1), identifier.getParserPosition());
+  }
+
+  /// Finds whether a name found by [#rewriteGroupByAliases] is also exactly one column of the `FROM` clause. Calcite
+  /// 1.40 and Calcite 1.42 resolve such a name differently. On the first such name, marks
+  /// [BrokerMeter#QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN] if [#_meterGroupByAliasShadowedByColumn] is set.
   ///
-  /// This runs before the validation of the `SELECT` list, so the meter is also marked when the query then fails with
-  /// `Expression '...' is not being grouped`.
+  /// This runs before the validation of the `SELECT` list, so the name is also found when the query then fails with
+  /// `Expression '...' is not being grouped`. See [#isGroupByNameResolvedToShadowedColumn].
+  ///
+  /// Only multi-stage queries mark the meter. Single-stage queries always resolve the name to the alias, so the
+  /// Calcite change does not affect them.
   @Override
   protected void validateGroupClause(SqlSelect select) {
     List<String> aliasNames = _groupByAliasNames.get(select);
@@ -167,12 +205,21 @@ public class Validator extends SqlValidatorImpl {
       for (String name : aliasNames) {
         if (selectScope != null && selectScope.findQualifyingTableNames(name, select, nameMatcher).size() == 1) {
           _groupByAliasShadowedByColumnFound = true;
-          BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN, 1);
+          if (_meterGroupByAliasShadowedByColumn) {
+            BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_GROUP_BY_ALIAS_SHADOWED_BY_COLUMN, 1);
+          }
           break;
         }
       }
     }
     super.validateGroupClause(select);
+  }
+
+  /// Returns whether the validation resolved a `GROUP BY` name to a column although a `SELECT` alias has the same
+  /// name. That is, a name matches an alias and a column, and `preferSelectAliasInGroupBy` is not set. With the option
+  /// set, the same query can validate.
+  public boolean isGroupByNameResolvedToShadowedColumn() {
+    return _groupByAliasShadowedByColumnFound && !_preferSelectAliasInGroupBy;
   }
 
   /// Expand the star in the select list.

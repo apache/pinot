@@ -844,8 +844,10 @@ public class CommonConstants {
     /// `SELECT CASE WHEN c = 'a' THEN 'x' ELSE c END AS c, COUNT(*) FROM t GROUP BY c`.
     ///
     /// This value can always be overridden by the [Request.QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY] query
-    /// option. Planning outside the broker's multi-stage request handler (for example for the controller `/sql`
-    /// endpoint) does not read this broker config and uses the default. The query option works everywhere.
+    /// option. Planning outside the broker's multi-stage request handler does not read this broker config and uses
+    /// the default. The query option works everywhere. The controller `/sql` endpoint compiles a query only to find
+    /// its tables: when a `GROUP BY` name that matches an alias and a column makes that compile fail, it retries with
+    /// the option set and lets the broker decide.
     public static final String CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY =
         "pinot.broker.multistage.prefer.select.alias.in.group.by";
     public static final boolean DEFAULT_PREFER_SELECT_ALIAS_IN_GROUP_BY = false;
