@@ -59,7 +59,6 @@ public class QuickstartServerProcessTest {
       throws Exception {
     _processDir = Files.createTempDirectory("quickstart-server-process-test");
     _pidFile = _processDir.resolve("child.pid");
-    Files.createDirectory(_processDir.resolve("tmp"));
   }
 
   @AfterMethod(alwaysRun = true)
@@ -80,8 +79,7 @@ public class QuickstartServerProcessTest {
   public void testReadyChildAndRepeatedStop()
       throws Exception {
     int port = availablePort();
-    QuickstartServerProcess server = QuickstartServerProcess.start(childCommand("ready", port), _processDir.toFile(),
-        port, Duration.ofSeconds(15));
+    QuickstartServerProcess server = startServer("ready", port, Duration.ofSeconds(15));
     try {
       assertNotEquals(readPid(), ProcessHandle.current().pid());
       assertEquals(server.getProcess().pid(), readPid());
@@ -103,8 +101,7 @@ public class QuickstartServerProcessTest {
       throws Exception {
     int port = availablePort();
     IOException failure = expectThrows(IOException.class,
-        () -> QuickstartServerProcess.start(childCommand("exit", port), _processDir.toFile(), port,
-            Duration.ofSeconds(15)));
+        () -> startServer("exit", port, Duration.ofSeconds(15)));
     assertTrue(failure.getMessage().contains("23"), failure.getMessage());
     assertTrue(failure.getMessage().contains(_processDir.toString()), failure.getMessage());
     assertFalse(isChildAlive());
@@ -115,8 +112,7 @@ public class QuickstartServerProcessTest {
       throws Exception {
     int port = availablePort();
     expectThrows(IOException.class,
-        () -> QuickstartServerProcess.start(childCommand("unready", port), _processDir.toFile(), port,
-            Duration.ofSeconds(5)));
+        () -> startServer("unready", port, Duration.ofSeconds(5)));
     assertTrue(Files.exists(_processDir.resolve("health-checked")), "The child must run but remain unready");
     assertFalse(isChildAlive(), "A failed startup must not leave its child running");
   }
@@ -137,8 +133,7 @@ public class QuickstartServerProcessTest {
       // A marker from a previous run must not be accepted either.
       Files.writeString(_processDir.resolve(QuickstartServerProcess.STARTED_FILE_NAME), "stale");
       IOException failure = expectThrows(IOException.class,
-          () -> QuickstartServerProcess.start(childCommand("no-marker", port), _processDir.toFile(), port,
-              Duration.ofSeconds(5)));
+          () -> startServer("no-marker", port, Duration.ofSeconds(5)));
       assertTrue(failure.getMessage().contains("Timed out"), failure.getMessage());
       assertFalse(isChildAlive(), "A child that did not start its own server must be stopped");
     } finally {
@@ -150,8 +145,7 @@ public class QuickstartServerProcessTest {
   public void testParentPipeClosureStopsChild()
       throws Exception {
     int port = availablePort();
-    QuickstartServerProcess server = QuickstartServerProcess.start(childCommand("watch-parent", port),
-        _processDir.toFile(), port, Duration.ofSeconds(15));
+    QuickstartServerProcess server = startServer("watch-parent", port, Duration.ofSeconds(15));
     try {
       server.getProcess().getOutputStream().close();
       assertTrue(server.getProcess().waitFor(10, TimeUnit.SECONDS), "The child must exit when its parent disappears");
@@ -170,8 +164,7 @@ public class QuickstartServerProcessTest {
   public void testNormalStopPreservesGracefulShutdownDeadline()
       throws Exception {
     int port = availablePort();
-    QuickstartServerProcess server = QuickstartServerProcess.start(childCommand("watch-parent-slow-shutdown", port),
-        _processDir.toFile(), port, Duration.ofSeconds(15));
+    QuickstartServerProcess server = startServer("watch-parent-slow-shutdown", port, Duration.ofSeconds(15));
     try {
       server.stop();
       assertTrue(Files.exists(_processDir.resolve("shutdown-completed")),
@@ -186,8 +179,7 @@ public class QuickstartServerProcessTest {
   public void testParentPipeClosureStopsChildWithBlockingShutdownHook(boolean shutdownAlreadyStarted)
       throws Exception {
     int port = availablePort();
-    QuickstartServerProcess server = QuickstartServerProcess.start(childCommand("watch-parent-blocking-shutdown", port),
-        _processDir.toFile(), port, Duration.ofSeconds(15));
+    QuickstartServerProcess server = startServer("watch-parent-blocking-shutdown", port, Duration.ofSeconds(15));
     try {
       if (shutdownAlreadyStarted) {
         server.getProcess().toHandle().destroy();
@@ -227,9 +219,19 @@ public class QuickstartServerProcessTest {
     assertEquals(loaded.getProperty("test.literal"), properties.get("test.literal"));
   }
 
+  private QuickstartServerProcess startServer(String mode, int port, Duration timeout)
+      throws Exception {
+    QuickstartServerProcess server =
+        QuickstartServerProcess.launch(childCommand(mode, port), _processDir.toFile(), port);
+    server.awaitReady(timeout);
+    return server;
+  }
+
   private List<String> childCommand(String mode, int port) {
     List<String> command = new ArrayList<>(QuickstartServerProcess.buildCommand(
         _processDir.resolve("server.properties").toFile(), _processDir.toFile()));
+    command.set(command.indexOf("-cp") + 1,
+        System.getProperty("surefire.test.class.path", System.getProperty("java.class.path")));
     int mainIndex = command.indexOf(QuickstartServerProcess.class.getName());
     command.subList(mainIndex, command.size()).clear();
     command.addAll(List.of(TestServer.class.getName(), mode, Integer.toString(port), _pidFile.toString()));

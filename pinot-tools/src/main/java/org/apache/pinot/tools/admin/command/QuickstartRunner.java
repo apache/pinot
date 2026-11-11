@@ -207,7 +207,7 @@ public class QuickstartRunner {
   }
 
   /// Starts servers in separate JVMs, isolating server-local static state such as dimension-table managers.
-  /// Configure this before calling {@link #startAll()}.
+  /// Configure this before calling [#startAll].
   public QuickstartRunner setForkServers(boolean forkServers) {
     _forkServers = forkServers;
     return this;

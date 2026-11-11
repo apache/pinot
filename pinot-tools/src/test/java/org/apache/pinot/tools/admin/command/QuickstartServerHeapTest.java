@@ -96,6 +96,8 @@ public class QuickstartServerHeapTest {
       setProperty(QuickstartServerProcess.INITIAL_HEAP_PROPERTY, previousInitialHeap);
       setProperty(QuickstartServerProcess.MAX_HEAP_PROPERTY, previousMaxHeap);
     }
+    command.set(command.indexOf("-cp") + 1,
+        System.getProperty("surefire.test.class.path", System.getProperty("java.class.path")));
     int mainIndex = command.indexOf(QuickstartServerProcess.class.getName());
     command.subList(mainIndex, command.size()).clear();
     command.addAll(List.of(HeapProbe.class.getName(), reportFile.toString()));

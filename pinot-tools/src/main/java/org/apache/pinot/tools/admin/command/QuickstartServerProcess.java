@@ -68,7 +68,6 @@ final class QuickstartServerProcess {
   static QuickstartServerProcess launch(Map<String, Object> effectiveConfig, File processDir)
       throws Exception {
     Files.createDirectories(processDir.toPath());
-    Files.createDirectories(new File(processDir, "tmp").toPath());
     File configFile = new File(processDir, "server.properties");
     writeConfig(effectiveConfig, configFile);
     int port = Integer.parseInt(effectiveConfig.get(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT).toString());
@@ -115,23 +114,15 @@ final class QuickstartServerProcess {
     command.add("-Djava.io.tmpdir=" + new File(processDir, "tmp").getAbsolutePath());
     command.add("-Dpinot.admin.system.exit=true");
     command.add("-cp");
-    command.add(System.getProperty("surefire.test.class.path", System.getProperty("java.class.path")));
+    command.add(System.getProperty("java.class.path"));
     command.add(QuickstartServerProcess.class.getName());
     command.add(configFile.getAbsolutePath());
     command.add(new File(processDir, STARTED_FILE_NAME).getAbsolutePath());
     return command;
   }
 
-  static QuickstartServerProcess start(List<String> command, File processDir, int port, Duration timeout)
-      throws Exception {
-    QuickstartServerProcess serverProcess = launch(command, processDir, port);
-    serverProcess.awaitReady(timeout);
-    return serverProcess;
-  }
-
-  private static QuickstartServerProcess launch(List<String> command, File processDir, int port)
+  static QuickstartServerProcess launch(List<String> command, File processDir, int port)
       throws IOException {
-    Files.createDirectories(processDir.toPath());
     Files.createDirectories(new File(processDir, "tmp").toPath());
     File logDir = new File(processDir, "logs");
     Files.createDirectories(logDir.toPath());
@@ -150,7 +141,7 @@ final class QuickstartServerProcess {
     awaitReady(STARTUP_TIMEOUT);
   }
 
-  private void awaitReady(Duration timeout)
+  void awaitReady(Duration timeout)
       throws Exception {
     try {
       waitForReadiness(timeout);
