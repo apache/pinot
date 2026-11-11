@@ -23,6 +23,7 @@ on:
   push:
     branches:
       - master
+      - tesseracta-pinot-demo
     paths-ignore:
       - "contrib/**"
       - "docs/**"
