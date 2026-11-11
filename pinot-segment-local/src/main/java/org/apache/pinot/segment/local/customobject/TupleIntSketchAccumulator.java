@@ -86,19 +86,13 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSket
 
   @Override
   public TupleSketch<IntegerSummary> getResult() {
-    if (_union == null) {
-      _union = new TupleUnion<>(_nominalEntries, _setOperations);
-    }
-    // Return the default update "gadget" sketch as a compact sketch
-    if (isEmpty()) {
-      return _union.getResult();
-    }
-    // Corner-case: the parameters are not strictly respected when there is a single sketch.
-    // This single sketch might have been the result of a previously accumulated union and
-    // would already have the parameters set.  The sketch is returned as-is without adjusting
-    // nominal entries which requires an additional union operation.
+    // A deserialized accumulator contains one sketch but does not yet have union parameters set.
+    // Return that sketch unchanged, without creating an unused union or adjusting its nominal entries.
     if (getNumInputs() == 1 && _accumulator != null && _accumulator.size() == 1) {
       return _accumulator.get(0);
+    }
+    if (_union == null) {
+      _union = new TupleUnion<>(_nominalEntries, _setOperations);
     }
     flush();
     return _union.getResult();

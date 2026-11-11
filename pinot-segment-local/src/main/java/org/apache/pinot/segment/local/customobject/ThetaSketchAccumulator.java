@@ -78,19 +78,16 @@ public class ThetaSketchAccumulator extends CustomObjectAccumulator<ThetaSketch>
 
   @Override
   public ThetaSketch getResult() {
-    if (_union == null) {
-      _union = _setOperationBuilder.buildUnion();
-    }
-    // Return the default update "gadget" sketch as a compact sketch
-    if (isEmpty()) {
-      return _union.getResult(false, null);
-    }
     // Corner-case: the parameters are not strictly respected when there is a single sketch.
     // This single sketch might have been the result of a previously accumulated union and
     // would already have the parameters set.  The sketch is returned as-is without adjusting
     // nominal entries which requires an additional union operation.
+    // Do not create a union until needed: deserialized accumulators have not restored their parameters yet.
     if (getNumInputs() == 1 && _accumulator != null && _accumulator.size() == 1) {
       return _accumulator.get(0);
+    }
+    if (_union == null) {
+      _union = _setOperationBuilder.buildUnion();
     }
     flush();
     return _union.getResult(false, null);

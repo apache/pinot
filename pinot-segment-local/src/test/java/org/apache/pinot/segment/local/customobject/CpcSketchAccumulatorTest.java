@@ -25,6 +25,9 @@ import org.apache.datasketches.cpc.CpcUnion;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+
 
 public class CpcSketchAccumulatorTest {
   private final int _lgNominalEntries = 20;
@@ -47,6 +50,41 @@ public class CpcSketchAccumulatorTest {
 
     Assert.assertFalse(accumulator.isEmpty());
     Assert.assertEquals(accumulator.getResult().getEstimate(), sketch.getEstimate());
+  }
+
+  @Test
+  public void testSingleSketchWithoutUnionParameters() {
+    for (int numEntries : new int[]{0, 2}) {
+      CpcSketch sketch = new CpcSketch(12);
+      IntStream.range(0, numEntries).forEach(sketch::update);
+      CpcSketchAccumulator accumulator = new CpcSketchAccumulator();
+      accumulator.apply(sketch);
+
+      assertSame(accumulator.getResult(), sketch);
+      assertSame(accumulator.getResult(), sketch);
+    }
+  }
+
+  @Test
+  public void testRestoreUnionParametersAfterSingleSketchResult() {
+    CpcSketch sketch1 = new CpcSketch(12);
+    IntStream.range(0, 1000).forEach(sketch1::update);
+    CpcSketch sketch2 = new CpcSketch(12);
+    IntStream.range(500, 1500).forEach(sketch2::update);
+    CpcSketchAccumulator accumulator = new CpcSketchAccumulator();
+    accumulator.apply(sketch1);
+    assertSame(accumulator.getResult(), sketch1);
+
+    accumulator.setLgNominalEntries(12);
+    CpcSketchAccumulator other = new CpcSketchAccumulator();
+    other.apply(sketch2);
+    accumulator.merge(other);
+    CpcUnion expected = new CpcUnion(12);
+    expected.update(sketch1);
+    expected.update(sketch2);
+    CpcSketch result = accumulator.getResult();
+    assertEquals(result.getLgK(), 12);
+    assertEquals(result.getEstimate(), expected.getResult().getEstimate(), 0.0);
   }
 
   @Test

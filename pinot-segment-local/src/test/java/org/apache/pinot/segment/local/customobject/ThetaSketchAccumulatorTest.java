@@ -28,6 +28,9 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+
 
 public class ThetaSketchAccumulatorTest {
   private ThetaSetOperationBuilder _setOperationBuilder;
@@ -55,6 +58,45 @@ public class ThetaSketchAccumulatorTest {
 
     Assert.assertFalse(accumulator.isEmpty());
     Assert.assertEquals(accumulator.getResult().getEstimate(), sketch.getEstimate());
+  }
+
+  @Test
+  public void testSingleSketchWithoutUnionParameters() {
+    for (int numEntries : new int[]{0, 2}) {
+      UpdatableThetaSketch input = UpdatableThetaSketch.builder().build();
+      IntStream.range(0, numEntries).forEach(input::update);
+      ThetaSketch sketch = input.compact();
+      ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator();
+      accumulator.apply(sketch);
+
+      assertSame(accumulator.getResult(), sketch);
+      assertSame(accumulator.getResult(), sketch);
+    }
+  }
+
+  @Test
+  public void testRestoreUnionParametersAfterSingleSketchResult() {
+    UpdatableThetaSketch input1 = UpdatableThetaSketch.builder().build();
+    IntStream.range(0, 1000).forEach(input1::update);
+    ThetaSketch sketch1 = input1.compact();
+    UpdatableThetaSketch input2 = UpdatableThetaSketch.builder().build();
+    IntStream.range(500, 1500).forEach(input2::update);
+    ThetaSketch sketch2 = input2.compact();
+    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator();
+    accumulator.apply(sketch1);
+    assertSame(accumulator.getResult(), sketch1);
+
+    ThetaSetOperationBuilder builder = new ThetaSetOperationBuilder().setNominalEntries(128);
+    accumulator.setSetOperationBuilder(builder);
+    ThetaSketchAccumulator other = new ThetaSketchAccumulator();
+    other.apply(sketch2);
+    accumulator.merge(other);
+    ThetaUnion expected = builder.buildUnion();
+    expected.union(sketch1);
+    expected.union(sketch2);
+    ThetaSketch result = accumulator.getResult();
+    assertEquals(result.getRetainedEntries(true), 128);
+    assertEquals(result.getEstimate(), expected.getResult().getEstimate(), 0.0);
   }
 
   @Test
