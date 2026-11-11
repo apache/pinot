@@ -122,6 +122,7 @@ import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigSchemaRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
+import org.apache.pinot.common.messages.TenantConfigRefreshMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
@@ -183,6 +184,7 @@ import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableType;
@@ -3757,6 +3759,17 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public void sendTenantConfigRefreshMessage(String tenantName) {
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    TenantConfigRefreshMessage message = new TenantConfigRefreshMessage(tenantName);
+    int numMessagesSent = MessagingServiceUtils.send(messagingService, message, Helix.BROKER_RESOURCE_INSTANCE);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} tenant config refresh messages to brokers for tenant: {}", numMessagesSent, tenantName);
+    } else {
+      LOGGER.warn("No tenant config refresh message sent to brokers for tenant: {}", tenantName);
+    }
+  }
+
   public void sendRoutingTableRebuildMessage(String tableNameWithType) {
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     RoutingTableRebuildMessage message = new RoutingTableRebuildMessage(tableNameWithType);
@@ -4038,6 +4051,35 @@ public class PinotHelixResourceManager {
   @Nullable
   public DatabaseConfig getDatabaseConfig(String databaseName) {
     return ZKMetadataProvider.getDatabaseConfig(_propertyStore, databaseName);
+  }
+
+  /// Returns the quota defaults of the given tenant, or null if none are set.
+  @Nullable
+  public QuotaConfig getTenantQuotaConfig(String tenantName) {
+    return ZKMetadataProvider.getTenantQuotaConfig(_propertyStore, tenantName);
+  }
+
+  /// Returns whether quota defaults are stored for the given tenant, even if they cannot be read.
+  public boolean hasTenantQuotaConfig(String tenantName) {
+    return _propertyStore.exists(ZKMetadataProvider.constructPropertyStorePathForTenantConfig(tenantName),
+        AccessOption.PERSISTENT);
+  }
+
+  /// Sets the quota defaults of the given tenant and sends out a tenant config refresh message to brokers. The
+  /// controller quota checkers read the defaults on every check, so they need no notification.
+  public void setTenantQuotaConfig(String tenantName, QuotaConfig quotaConfig) {
+    if (!ZKMetadataProvider.setTenantQuotaConfig(_propertyStore, tenantName, quotaConfig)) {
+      throw new RuntimeException("Failed to update quota config in Zookeeper for tenant: " + tenantName);
+    }
+    sendTenantConfigRefreshMessage(tenantName);
+  }
+
+  /// Removes the quota defaults of the given tenant and sends out a tenant config refresh message to brokers.
+  public void deleteTenantQuotaConfig(String tenantName) {
+    if (!ZKMetadataProvider.removeTenantQuotaConfig(_propertyStore, tenantName)) {
+      throw new RuntimeException("Failed to remove quota config in Zookeeper for tenant: " + tenantName);
+    }
+    sendTenantConfigRefreshMessage(tenantName);
   }
 
   /// Get the database config for the given database name.

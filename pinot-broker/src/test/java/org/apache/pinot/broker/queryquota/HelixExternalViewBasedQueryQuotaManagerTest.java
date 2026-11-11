@@ -38,6 +38,7 @@ import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
@@ -141,6 +142,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
       ZKMetadataProvider.removeDatabaseConfig(_testPropertyStore, CommonConstants.DEFAULT_DATABASE);
       ZKMetadataProvider.removeApplicationQuotas(_testPropertyStore);
+      ZKMetadataProvider.removeTenantQuotaConfig(_testPropertyStore, TagNameUtils.DEFAULT_TENANT_NAME);
       CLUSTER_CONFIG_MAP.clear();
     }
     _queryQuotaManager.cleanUpRateLimiterMap();
@@ -664,6 +666,61 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     _queryQuotaManager.processQueryRateLimitingExternalViewChange(brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
     Assert.assertEquals(queryQuotaMode(REALTIME_TABLE_NAME), QuotaEnforcementMode.ENFORCED);
+  }
+
+  @Test
+  public void testTenantDefaultQueryQuota()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTenantQuotaConfig(_testPropertyStore, TagNameUtils.DEFAULT_TENANT_NAME,
+        new QuotaConfig(null, "50", null, QuotaEnforcementMode.SHADOW));
+
+    // Table without a quota on the default broker tenant inherits the tenant QPS quota and enforcement mode
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 50.0);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.SHADOW);
+
+    // Table quota overrides the tenant quota, the enforcement mode is still inherited
+    setQps(tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), TABLE_MAX_QPS);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.SHADOW);
+
+    // Table on another broker tenant does not inherit it
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)
+        .setBrokerTenant("otherBroker").build();
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 0.0);
+  }
+
+  @Test
+  public void testRefreshTenantQueryQuotas()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 0.0);
+
+    // Setting the tenant quota does not change the table config, so it is picked up on the tenant refresh
+    ZKMetadataProvider.setTenantQuotaConfig(_testPropertyStore, TagNameUtils.DEFAULT_TENANT_NAME,
+        new QuotaConfig(null, "50"));
+    _queryQuotaManager.refreshTenantQueryQuotas("otherTenant");
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 0.0);
+    _queryQuotaManager.refreshTenantQueryQuotas(TagNameUtils.DEFAULT_TENANT_NAME);
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 50.0);
+
+    // Updating and removing the tenant quota
+    ZKMetadataProvider.setTenantQuotaConfig(_testPropertyStore, TagNameUtils.DEFAULT_TENANT_NAME,
+        new QuotaConfig(null, "80"));
+    _queryQuotaManager.refreshTenantQueryQuotas(TagNameUtils.DEFAULT_TENANT_NAME);
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 80.0);
+    ZKMetadataProvider.removeTenantQuotaConfig(_testPropertyStore, TagNameUtils.DEFAULT_TENANT_NAME);
+    _queryQuotaManager.refreshTenantQueryQuotas(TagNameUtils.DEFAULT_TENANT_NAME);
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 0.0);
   }
 
   private QuotaEnforcementMode queryQuotaMode(String tableName) {

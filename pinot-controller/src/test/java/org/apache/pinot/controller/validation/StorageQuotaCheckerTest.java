@@ -312,6 +312,38 @@ public class StorageQuotaCheckerTest {
     assertEquals(disabledChecker.getEnforcementMode(tableConfig), QuotaEnforcementMode.DISABLED);
   }
 
+  @Test
+  public void testTenantQuotaDefaults()
+      throws InvalidConfigException {
+    String serverTenant = "storageQuotaTestTenant";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(REALTIME_TABLE_NAME)
+        .setServerTenant(serverTenant).setNumReplicas(NUM_REPLICAS).build();
+    _tableSizeReader = mock(TableSizeReader.class);
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(pinotHelixResourceManager.getNumReplicas(eq(tableConfig))).thenReturn(NUM_REPLICAS);
+    when(pinotHelixResourceManager.getTenantQuotaConfig(serverTenant)).thenReturn(
+        new QuotaConfig("2.8K", null, QuotaEnforcementMode.SHADOW, null));
+    _storageQuotaChecker =
+        new StorageQuotaChecker(_tableSizeReader, new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
+            mock(LeadControllerManager.class), pinotHelixResourceManager, _controllerConf);
+    mockTableSizeResult(REALTIME_TABLE_NAME, 8 * 1024, 1);
+
+    // No table quota: the tenant storage limit and enforcement mode apply
+    tableConfig.setQuotaConfig(null);
+    assertTrue(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
+    assertEquals(_storageQuotaChecker.getEnforcementMode(tableConfig), QuotaEnforcementMode.SHADOW);
+
+    // Table storage limit overrides the tenant one, the enforcement mode is still inherited
+    tableConfig.setQuotaConfig(new QuotaConfig("10K", null));
+    assertFalse(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
+    assertEquals(_storageQuotaChecker.getEnforcementMode(tableConfig), QuotaEnforcementMode.SHADOW);
+
+    // Table opts out of the tenant limit by disabling enforcement
+    tableConfig.setQuotaConfig(new QuotaConfig(null, null, QuotaEnforcementMode.DISABLED, null));
+    assertFalse(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
+    assertEquals(_storageQuotaChecker.getEnforcementMode(tableConfig), QuotaEnforcementMode.DISABLED);
+  }
+
   private boolean isSegmentWithinQuota(TableConfig tableConfig)
       throws InvalidConfigException {
     return _storageQuotaChecker

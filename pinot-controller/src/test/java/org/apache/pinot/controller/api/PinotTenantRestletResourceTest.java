@@ -25,24 +25,30 @@ import java.util.List;
 import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.Assert.ThrowingRunnable;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Sets;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -205,6 +211,84 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.dropOfflineTable(RAW_TABLE_NAME);
     DEFAULT_INSTANCE.deleteSchema(RAW_TABLE_NAME);
     DEFAULT_INSTANCE.waitForEVToDisappear(OFFLINE_TABLE_NAME);
+  }
+
+  @Test
+  public void testTenantQuotaConfig()
+      throws Exception {
+    String tenant = TagNameUtils.DEFAULT_TENANT_NAME;
+    String baseUrl = DEFAULT_INSTANCE.getControllerBaseApiUrl();
+    String url = baseUrl + "/tenants/" + tenant + "/quotas";
+    PinotHelixResourceManager resourceManager = DEFAULT_INSTANCE.getHelixResourceManager();
+
+    try {
+      // Not set yet
+      assertHttpStatus(() -> sendGetRequest(url), 404);
+      assertHttpStatus(() -> sendDeleteRequest(url), 404);
+
+      // Set and read back
+      QuotaConfig quotaConfig = new QuotaConfig("10G", null, QuotaEnforcementMode.SHADOW, null);
+      sendPutRequest(url, quotaConfig.toJsonString());
+      assertEquals(JsonUtils.stringToObject(sendGetRequest(url), QuotaConfig.class), quotaConfig);
+      assertEquals(resourceManager.getTenantQuotaConfig(tenant), quotaConfig);
+
+      // Overwrite, with both storage and query quota since the default tenant is both a server and a broker tenant
+      QuotaConfig newQuotaConfig = new QuotaConfig("20G", "100");
+      sendPutRequest(url, newQuotaConfig.toJsonString());
+      assertEquals(resourceManager.getTenantQuotaConfig(tenant), newQuotaConfig);
+
+      // Invalid configs are rejected and do not overwrite the existing one
+      assertHttpStatus(() -> sendPutRequest(url, new QuotaConfig(null, null).toJsonString()), 400);
+      assertHttpStatus(() -> sendPutRequest(url, "{\"storage\": \"invalid\"}"), 400);
+      assertHttpStatus(() -> sendPutRequest(url, "null"), 400);
+      assertEquals(resourceManager.getTenantQuotaConfig(tenant), newQuotaConfig);
+
+      // Unknown tenant
+      assertHttpStatus(() -> sendPutRequest(baseUrl + "/tenants/unknownTenant/quotas", newQuotaConfig.toJsonString()),
+          404);
+
+      // Delete
+      sendDeleteRequest(url);
+      assertNull(resourceManager.getTenantQuotaConfig(tenant));
+      assertHttpStatus(() -> sendGetRequest(url), 404);
+    } finally {
+      // Don't leak quota defaults on the shared default tenant into other tests
+      if (resourceManager.hasTenantQuotaConfig(tenant)) {
+        resourceManager.deleteTenantQuotaConfig(tenant);
+      }
+    }
+  }
+
+  @Test
+  public void testBrokerTenantQuotaConfig()
+      throws Exception {
+    // A broker-only tenant accepts query quota defaults but rejects storage quota defaults
+    String tenant = "quotaBrokerTenant";
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    Instance brokerInstance =
+        new Instance("3.4.5.6", 3456, InstanceType.BROKER, List.of(TagNameUtils.getBrokerTagForTenant(tenant)), null,
+            0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(brokerInstance.toJsonString());
+    String url = DEFAULT_INSTANCE.getControllerBaseApiUrl() + "/tenants/" + tenant + "/quotas";
+    PinotHelixResourceManager resourceManager = DEFAULT_INSTANCE.getHelixResourceManager();
+    try {
+      assertHttpStatus(() -> sendPutRequest(url, new QuotaConfig("10G", null).toJsonString()), 400);
+      assertHttpStatus(() -> sendPutRequest(url, new QuotaConfig("10G", "100").toJsonString()), 400);
+      QuotaConfig quotaConfig = new QuotaConfig(null, "100", null, QuotaEnforcementMode.SHADOW);
+      sendPutRequest(url, quotaConfig.toJsonString());
+      assertEquals(resourceManager.getTenantQuotaConfig(tenant), quotaConfig);
+    } finally {
+      if (resourceManager.hasTenantQuotaConfig(tenant)) {
+        resourceManager.deleteTenantQuotaConfig(tenant);
+      }
+      adminClient.getInstanceClient().dropInstance("Broker_3.4.5.6_3456");
+    }
+  }
+
+  private static void assertHttpStatus(ThrowingRunnable request, int expectedStatusCode) {
+    IOException e = expectThrows(IOException.class, request);
+    assertTrue(e.getCause() instanceof HttpErrorStatusException, "Unexpected exception: " + e);
+    assertEquals(((HttpErrorStatusException) e.getCause()).getStatusCode(), expectedStatusCode);
   }
 
   @AfterClass

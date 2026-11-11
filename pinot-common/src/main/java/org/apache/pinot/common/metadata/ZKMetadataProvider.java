@@ -77,6 +77,8 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
   private static final String PROPERTYSTORE_DATABASE_CONFIGS_PREFIX = "/CONFIGS/DATABASE";
+  private static final String PROPERTYSTORE_TENANT_CONFIGS_PREFIX = "/CONFIGS/TENANT";
+  private static final String TENANT_QUOTA_CONFIG_KEY = "quota";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
   private static final String PROPERTYSTORE_USER_CONFIGS_PREFIX = "/CONFIGS/USER";
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
@@ -124,6 +126,45 @@ public class ZKMetadataProvider {
   public static void removeApplicationQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     propertyStore.remove(constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS),
         AccessOption.PERSISTENT);
+  }
+
+  /// Sets (creates or overwrites) the quota defaults of a server tenant, applied to every table on the tenant that does
+  /// not set the corresponding field in its own quota config.
+  ///
+  /// @return true if the update is successful.
+  public static boolean setTenantQuotaConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tenantName,
+      QuotaConfig quotaConfig) {
+    ZNRecord znRecord = new ZNRecord(tenantName);
+    znRecord.setSimpleField(TENANT_QUOTA_CONFIG_KEY, quotaConfig.toJsonString());
+    return propertyStore.set(constructPropertyStorePathForTenantConfig(tenantName), znRecord, -1,
+        AccessOption.PERSISTENT);
+  }
+
+  /// Returns the quota defaults of a server tenant, or null if none are set (or they cannot be parsed).
+  @Nullable
+  public static QuotaConfig getTenantQuotaConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tenantName) {
+    ZNRecord znRecord =
+        propertyStore.get(constructPropertyStorePathForTenantConfig(tenantName), null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return null;
+    }
+    String quotaConfigString = znRecord.getSimpleField(TENANT_QUOTA_CONFIG_KEY);
+    if (quotaConfigString == null) {
+      return null;
+    }
+    try {
+      return JsonUtils.stringToObject(quotaConfigString, QuotaConfig.class);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while reading quota config for tenant: {}", tenantName, e);
+      return null;
+    }
+  }
+
+  /// Removes the quota defaults of a server tenant.
+  ///
+  /// @return true if the removal is successful (including when there was nothing to remove).
+  public static boolean removeTenantQuotaConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tenantName) {
+    return propertyStore.remove(constructPropertyStorePathForTenantConfig(tenantName), AccessOption.PERSISTENT);
   }
 
   private static ZNRecord toZNRecord(DatabaseConfig databaseConfig) {
@@ -230,6 +271,10 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForDatabaseConfig(String resourceName) {
     return StringUtil.join("/", PROPERTYSTORE_DATABASE_CONFIGS_PREFIX, resourceName);
+  }
+
+  public static String constructPropertyStorePathForTenantConfig(String tenantName) {
+    return StringUtil.join("/", PROPERTYSTORE_TENANT_CONFIGS_PREFIX, tenantName);
   }
 
   public static String constructPropertyStorePathForResourceConfig(String resourceName) {

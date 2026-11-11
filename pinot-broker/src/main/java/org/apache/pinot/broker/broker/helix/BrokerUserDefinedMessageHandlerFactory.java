@@ -31,6 +31,7 @@ import org.apache.pinot.common.messages.LogicalTableConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
+import org.apache.pinot.common.messages.TenantConfigRefreshMessage;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +68,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
         return new RebuildRoutingTableMessageHandler(new RoutingTableRebuildMessage(message), context);
       case DatabaseConfigRefreshMessage.REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE:
         return new RefreshDatabaseConfigMessageHandler(new DatabaseConfigRefreshMessage(message), context);
+      case TenantConfigRefreshMessage.REFRESH_TENANT_CONFIG_MSG_SUB_TYPE:
+        return new RefreshTenantConfigMessageHandler(new TenantConfigRefreshMessage(message), context);
       case ApplicationQpsQuotaRefreshMessage.REFRESH_APP_QUOTA_MSG_SUB_TYPE:
         return new RefreshApplicationQpsQuotaMessageHandler(new ApplicationQpsQuotaRefreshMessage(message), context);
       default:
@@ -188,6 +191,30 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error while refreshing database config for database: {} (error code: {}, error type: {})",
           _databaseName, code, type, e);
+    }
+  }
+
+  private class RefreshTenantConfigMessageHandler extends MessageHandler {
+    final String _tenantName;
+
+    RefreshTenantConfigMessageHandler(TenantConfigRefreshMessage tenantConfigRefreshMessage,
+        NotificationContext context) {
+      super(tenantConfigRefreshMessage, context);
+      _tenantName = tenantConfigRefreshMessage.getTenantName();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _queryQuotaManager.refreshTenantQueryQuotas(_tenantName);
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error while refreshing tenant config for tenant: {} (error code: {}, error type: {})",
+          _tenantName, code, type, e);
     }
   }
 
