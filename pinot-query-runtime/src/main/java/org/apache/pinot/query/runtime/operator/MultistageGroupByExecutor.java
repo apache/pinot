@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,11 +48,13 @@ import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGenerator;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorFactory;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
@@ -67,6 +71,9 @@ public class MultistageGroupByExecutor {
   private static final Object UNINITIALIZED_SORT_VALUE = new Object();
 
   private static final int[] NO_GROUP_IDS = new int[0];
+  /// The default maximum number of MV group ids that one batch creates and keeps: 4 MB of ids.
+  static final int DEFAULT_MAX_GROUP_IDS_PER_BATCH = 1 << 20;
+  private static final String MV_AGGREGATE_SCOPE = "MultistageGroupByExecutor#processMvAggregate";
 
   private final int[] _groupKeyIds;
   /// For each group key, whether it is an MV key. `null` when there is no MV key.
@@ -80,6 +87,7 @@ public class MultistageGroupByExecutor {
   private final DataSchema _resultSchema;
   private int _rowsProcessed;
   private final int _numGroupsLimit;
+  private int _maxGroupIdsPerBatch = DEFAULT_MAX_GROUP_IDS_PER_BATCH;
   private final int _numGroupsWarningLimit;
   private final boolean _filteredAggregationsSkipEmptyGroups;
 
@@ -424,17 +432,19 @@ public class MultistageGroupByExecutor {
     return _rowsProcessed;
   }
 
+  @VisibleForTesting
+  void setMaxGroupIdsPerBatch(int maxGroupIdsPerBatch) {
+    Preconditions.checkArgument(maxGroupIdsPerBatch > 0, "maxGroupIdsPerBatch must be positive");
+    _maxGroupIdsPerBatch = maxGroupIdsPerBatch;
+  }
+
   public boolean isNumGroupsLimitReached() {
     return _groupIdGenerator.getNumGroups() == _numGroupsLimit;
   }
 
   private void processAggregate(MseBlock.Data block) {
     if (_isMvKey != null) {
-      if (_maxFilterArgId < 0) {
-        processMvAggregateWithoutFilter(block);
-      } else {
-        processMvAggregateWithFilter(block);
-      }
+      processMvAggregate(block);
     } else if (_maxFilterArgId < 0) {
       processAggregateWithoutFilter(block);
     } else {
@@ -668,8 +678,76 @@ public class MultistageGroupByExecutor {
     return intKeys;
   }
 
-  private void processMvAggregateWithoutFilter(MseBlock.Data block) {
-    int[][] mvKeys = generateMvGroupByKeys(block, null);
+  /// Aggregates a block in MV mode. A row creates one group id for each combination of its MV key elements, so a few
+  /// rows can create a very large number of group ids. When a block needs more than [#_maxGroupIdsPerBatch] group ids,
+  /// the block is processed in batches of at most that many group ids, and termination is checked after each batch.
+  private void processMvAggregate(MseBlock.Data block) {
+    if (!processMvBatch(block, null, null)) {
+      processMvAggregateInBatches(block);
+    }
+  }
+
+  /// Splits the rows of `block` into batches of at most [#_maxGroupIdsPerBatch] group ids and aggregates each batch. A
+  /// row with more combinations than one batch holds is split into ranges of combinations, and each range goes into its
+  /// own batch. This is correct because a row that adds its values to the groups of two ranges gives the same result
+  /// as a row that adds them to the groups of both ranges at once.
+  private void processMvAggregateInBatches(MseBlock.Data block) {
+    RowHeapDataBlock rowHeap = block.asRowHeap();
+    DataSchema dataSchema = rowHeap.getDataSchema();
+    AggregationFunction[] aggFunctions = rowHeap.getAggFunctions();
+    List<Object[]> batchRows = new ArrayList<>();
+    IntArrayList batchFroms = new IntArrayList();
+    IntArrayList batchTos = new IntArrayList();
+    int batchSize = 0;
+    for (Object[] row : rowHeap.getRows()) {
+      int numCombinations = countMvCombinations(row);
+      int from = 0;
+      while (from < numCombinations) {
+        int to = from + Math.min(numCombinations - from, _maxGroupIdsPerBatch - batchSize);
+        batchRows.add(row);
+        batchFroms.add(from);
+        batchTos.add(to);
+        batchSize += to - from;
+        from = to;
+        if (batchSize == _maxGroupIdsPerBatch) {
+          processMvBatchAndCheckTermination(new RowHeapDataBlock(batchRows, dataSchema, aggFunctions), batchFroms,
+              batchTos);
+          batchRows = new ArrayList<>();
+          batchFroms.clear();
+          batchTos.clear();
+          batchSize = 0;
+        }
+      }
+    }
+    if (!batchRows.isEmpty()) {
+      processMvBatchAndCheckTermination(new RowHeapDataBlock(batchRows, dataSchema, aggFunctions), batchFroms,
+          batchTos);
+    }
+  }
+
+  private void processMvBatchAndCheckTermination(MseBlock.Data batch, IntArrayList froms, IntArrayList tos) {
+    boolean processed = processMvBatch(batch, froms.toIntArray(), tos.toIntArray());
+    assert processed;
+    QueryThreadContext.checkTerminationAndSampleUsage(MV_AGGREGATE_SCOPE);
+  }
+
+  /// Aggregates `block` in MV mode.
+  ///
+  /// @param froms for each row of `block`, the first combination of its MV key elements to aggregate, or `null` for
+  ///              every combination of every row
+  /// @param tos for each row of `block`, the end (exclusive) of its combinations to aggregate, or `null`
+  /// @return `false`, with no aggregation done, when `froms` is `null` and the block needs more than
+  ///         [#_maxGroupIdsPerBatch] group ids
+  private boolean processMvBatch(MseBlock.Data block, @Nullable int[] froms, @Nullable int[] tos) {
+    return _maxFilterArgId < 0 ? processMvAggregateWithoutFilter(block, froms, tos)
+        : processMvAggregateWithFilter(block, froms, tos);
+  }
+
+  private boolean processMvAggregateWithoutFilter(MseBlock.Data block, @Nullable int[] froms, @Nullable int[] tos) {
+    int[][] mvKeys = generateMvGroupByKeys(block, null, froms, tos);
+    if (mvKeys == null) {
+      return false;
+    }
     int numGroups = _groupIdGenerator.getNumGroups();
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
@@ -678,13 +756,23 @@ public class MultistageGroupByExecutor {
       groupByResultHolder.ensureCapacity(numGroups);
       aggFunction.aggregateGroupByMV(block.getNumRows(), mvKeys, groupByResultHolder, blockValSetMap);
     }
+    return true;
   }
 
   /// The MV counterpart of [#processAggregateWithFilter(MseBlock.Data)]: a filtered aggregation receives the group
   /// ids of the matched rows only, in matched order.
-  private void processMvAggregateWithFilter(MseBlock.Data block) {
+  ///
+  /// When this method returns `false`, it can already have created group ids for some rows. The batches create the
+  /// same group ids again for the same rows, so the result does not change.
+  private boolean processMvAggregateWithFilter(MseBlock.Data block, @Nullable int[] froms, @Nullable int[] tos) {
     // In the first loop, generate all the group keys, cache the matching rows
-    int[][] mvKeys = _filteredAggregationsSkipEmptyGroups ? null : generateMvGroupByKeys(block, null);
+    int[][] mvKeys = null;
+    if (!_filteredAggregationsSkipEmptyGroups) {
+      mvKeys = generateMvGroupByKeys(block, null, froms, tos);
+      if (mvKeys == null) {
+        return false;
+      }
+    }
     RoaringBitmap[] matchedBitmaps = new RoaringBitmap[_maxFilterArgId + 1];
     int[] numMatchedRowsArray = new int[_maxFilterArgId + 1];
     int[][][] filteredMvKeysArray = new int[_maxFilterArgId + 1][][];
@@ -692,15 +780,22 @@ public class MultistageGroupByExecutor {
       if (filterArgId < 0) {
         // No filter for this aggregation function
         if (mvKeys == null) {
-          mvKeys = generateMvGroupByKeys(block, null);
+          mvKeys = generateMvGroupByKeys(block, null, froms, tos);
+          if (mvKeys == null) {
+            return false;
+          }
         }
       } else {
         // Need to filter the block before aggregation
         if (matchedBitmaps[filterArgId] == null) {
           RoaringBitmap matchedBitmap = AggregateOperator.getMatchedBitmap(block, filterArgId);
+          int[][] filteredMvKeys = generateMvGroupByKeys(block, matchedBitmap, froms, tos);
+          if (filteredMvKeys == null) {
+            return false;
+          }
           matchedBitmaps[filterArgId] = matchedBitmap;
           numMatchedRowsArray[filterArgId] = matchedBitmap.getCardinality();
-          filteredMvKeysArray[filterArgId] = generateMvGroupByKeys(block, matchedBitmap);
+          filteredMvKeysArray[filterArgId] = filteredMvKeys;
         }
       }
     }
@@ -723,14 +818,21 @@ public class MultistageGroupByExecutor {
             groupByResultHolder, blockValSetMap);
       }
     }
+    return true;
   }
 
   /// Creates the group ids of each row in MV mode: one id per combination of the row's MV key elements.
   ///
   /// @param matchedBitmap the rows to read, or `null` for every row of the block
+  /// @param froms for each row of the block (not only the matched rows), the first combination to create, or `null`
+  ///              for every combination
+  /// @param tos for each row of the block, the end (exclusive) of the combinations to create, or `null`
   /// @return for each selected row, in order, its group ids ([GroupIdGenerator#INVALID_ID] when the groups limit is
-  ///         reached), or an empty array when one of its MV keys is an empty array
-  private int[][] generateMvGroupByKeys(MseBlock.Data block, @Nullable RoaringBitmap matchedBitmap) {
+  ///         reached), or an empty array when one of its MV keys is an empty array. Returns `null`, before any group id
+  ///         is created, when `froms` is `null` and the rows need more than [#_maxGroupIdsPerBatch] group ids.
+  @Nullable
+  private int[][] generateMvGroupByKeys(MseBlock.Data block, @Nullable RoaringBitmap matchedBitmap,
+      @Nullable int[] froms, @Nullable int[] tos) {
     int numKeys = _groupKeyIds.length;
     int numRows = matchedBitmap == null ? block.getNumRows() : matchedBitmap.getCardinality();
     Object[][] columns = new Object[numKeys][];
@@ -764,11 +866,31 @@ public class MultistageGroupByExecutor {
       }
     }
 
+    if (froms == null) {
+      // Bound the number of group ids before creating any of them.
+      long numGroupIds = 0;
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        numGroupIds += countMvCombinations(columns, rowId);
+        if (numGroupIds > _maxGroupIdsPerBatch) {
+          return null;
+        }
+      }
+    }
+
     int[][] mvKeys = new int[numRows][];
     Object[][] elements = new Object[numKeys][];
     Object[] key = numKeys > 1 ? new Object[numKeys] : null;
-    for (int rowId = 0; rowId < numRows; rowId++) {
-      mvKeys[rowId] = getMvGroupIds(columns, rowId, elements, key);
+    if (froms == null) {
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        mvKeys[rowId] = getMvGroupIds(columns, rowId, elements, key, 0, -1);
+      }
+    } else {
+      assert tos != null;
+      PeekableIntIterator iterator = matchedBitmap != null ? matchedBitmap.getIntIterator() : null;
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        int blockRowId = iterator != null ? iterator.next() : rowId;
+        mvKeys[rowId] = getMvGroupIds(columns, rowId, elements, key, froms[blockRowId], tos[blockRowId]);
+      }
     }
     return mvKeys;
   }
@@ -783,14 +905,56 @@ public class MultistageGroupByExecutor {
     return numMvKeys;
   }
 
-  /// Returns the group ids of one row. The combinations are generated as in the single-stage engine
-  /// (`DictionaryBasedGroupKeyGenerator.getIntRawKeys`): the last key varies fastest, the first key slowest. This order
-  /// is an implementation detail, not a contract: without ORDER BY, the groups that survive the groups limit are not
-  /// defined.
+  /// Returns the number of combinations of the MV key elements of one row of `columns`, 0 when one of its MV keys is an
+  /// empty array.
+  private int countMvCombinations(Object[][] columns, int rowId) {
+    int numCombinations = 1;
+    for (int i = 0; i < columns.length; i++) {
+      if (_isMvKey[i]) {
+        numCombinations = multiplyCombinations(numCombinations, MvKeyExpander.numElements(columns[i][rowId]));
+        if (numCombinations == 0) {
+          return 0;
+        }
+      }
+    }
+    return numCombinations;
+  }
+
+  /// Returns the number of combinations of the MV key elements of an input row, 0 when one of its MV keys is an empty
+  /// array.
+  private int countMvCombinations(Object[] row) {
+    int numCombinations = 1;
+    for (int i = 0; i < _groupKeyIds.length; i++) {
+      if (_isMvKey[i]) {
+        numCombinations = multiplyCombinations(numCombinations, MvKeyExpander.numElements(row[_groupKeyIds[i]]));
+        if (numCombinations == 0) {
+          return 0;
+        }
+      }
+    }
+    return numCombinations;
+  }
+
+  private int multiplyCombinations(int numCombinations, int numElements) {
+    try {
+      return Math.multiplyExact(numCombinations, numElements);
+    } catch (ArithmeticException e) {
+      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
+          "Too many MV group key combinations in one row: more than " + Integer.MAX_VALUE + " for " + countMvKeys()
+              + " MV keys", e);
+    }
+  }
+
+  /// Returns the group ids of the combinations `[from, to)` of one row. The combinations are numbered as in the
+  /// single-stage engine (`DictionaryBasedGroupKeyGenerator.getIntRawKeys`): the last key varies fastest, the first
+  /// key slowest. This order is an implementation detail, not a contract: without ORDER BY, the groups that survive the
+  /// groups limit are not defined.
   ///
   /// @param elements scratch storage for the elements of each MV key
   /// @param key scratch storage for a multi-column key, `null` when there is one key
-  private int[] getMvGroupIds(Object[][] columns, int rowId, Object[][] elements, @Nullable Object[] key) {
+  /// @param to the end (exclusive) of the combinations, or -1 for every combination
+  private int[] getMvGroupIds(Object[][] columns, int rowId, Object[][] elements, @Nullable Object[] key, int from,
+      int to) {
     int numKeys = columns.length;
     int numCombinations = 1;
     for (int i = 0; i < numKeys; i++) {
@@ -800,25 +964,20 @@ public class MultistageGroupByExecutor {
           return NO_GROUP_IDS;
         }
         elements[i] = keyElements;
-        try {
-          numCombinations = Math.multiplyExact(numCombinations, keyElements.length);
-        } catch (ArithmeticException e) {
-          throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
-              "Too many MV group key combinations in one row: more than " + Integer.MAX_VALUE + " for "
-                  + countMvKeys() + " MV keys", e);
-        }
+        numCombinations = multiplyCombinations(numCombinations, keyElements.length);
       }
     }
-    int[] groupIds = new int[numCombinations];
+    int end = to < 0 ? numCombinations : to;
+    int[] groupIds = new int[end - from];
     if (key == null) {
       // A single key, which is the MV key
       Object[] keyElements = elements[0];
-      for (int j = 0; j < numCombinations; j++) {
-        groupIds[j] = _groupIdGenerator.getGroupId(keyElements[j]);
+      for (int j = from; j < end; j++) {
+        groupIds[j - from] = _groupIdGenerator.getGroupId(keyElements[j]);
       }
       return groupIds;
     }
-    for (int j = 0; j < numCombinations; j++) {
+    for (int j = from; j < end; j++) {
       int remainder = j;
       for (int i = numKeys - 1; i >= 0; i--) {
         if (_isMvKey[i]) {
@@ -830,7 +989,7 @@ public class MultistageGroupByExecutor {
           key[i] = columns[i][rowId];
         }
       }
-      groupIds[j] = _groupIdGenerator.getGroupId(key);
+      groupIds[j - from] = _groupIdGenerator.getGroupId(key);
     }
     return groupIds;
   }

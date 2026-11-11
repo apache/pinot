@@ -139,6 +139,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///  </Loggers>
   /// ```
   private static final Marker MSE_STATS_MARKER = MarkerFactory.getMarker("MSE_STATS_MARKER");
+  /// The `pinot.all.*` alias of [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE] in the cluster config.
+  private static final String ALL_ROLES_USE_MV_AGGREGATE = "pinot.all.multistage.use.mv.aggregate";
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
   // Extra column of the EXPLAIN response with the IdSet subqueries as a JSON array. EXPLAIN does not run them: the plan
@@ -553,22 +555,31 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   /// Applies [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE] from the cluster config, so that a change applies to
-  /// the next query without a broker restart. The cluster config wins over the broker config. A removed key restores
-  /// the broker config value. An invalid value is logged and falls back to the broker config value.
+  /// the next query without a broker restart. The value comes from the first of:
+  /// 1. The cluster config key [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE].
+  /// 2. The cluster config key `pinot.all.multistage.use.mv.aggregate`, which applies to every role.
+  /// 3. The broker config.
+  ///
+  /// A removed key restores the next value in this list. An invalid value is logged and falls back to the broker config
+  /// value. The broker starter registers this listener after startup with every cluster config key as changed, so the
+  /// cluster config value applies at startup too.
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     super.onChange(changedConfigs, clusterConfigs);
-    if (!changedConfigs.contains(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE)) {
+    if (!changedConfigs.contains(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE)
+        && !changedConfigs.contains(ALL_ROLES_USE_MV_AGGREGATE)) {
       return;
     }
-    String value = clusterConfigs.get(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE);
+    String key = clusterConfigs.containsKey(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE)
+        ? CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE : ALL_ROLES_USE_MV_AGGREGATE;
+    String value = clusterConfigs.get(key);
     MvAggregateMode mvAggregateMode = _mvAggregateModeBrokerConf;
     if (value != null) {
       try {
         mvAggregateMode = MvAggregateMode.fromString(value);
       } catch (IllegalArgumentException e) {
         LOGGER.error("Ignoring invalid value '{}' for cluster config: {}, falling back to the broker config: {}", value,
-            CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, _mvAggregateModeBrokerConf);
+            key, _mvAggregateModeBrokerConf);
       }
     }
     _mvAggregateMode = mvAggregateMode;

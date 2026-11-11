@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.lang.reflect.Array;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -41,6 +42,23 @@ final class MvKeyExpander {
   private static final Object[] NO_ELEMENT = new Object[0];
 
   private MvKeyExpander() {
+  }
+
+  /// Returns the number of elements that [#elements(Object)] returns for `value`, without the copy of the elements.
+  ///
+  /// @throws IllegalArgumentException when `value` is not an array or a [List]
+  static int numElements(@Nullable Object value) {
+    if (value == null) {
+      return 1;
+    }
+    if (value instanceof List) {
+      return ((List<?>) value).size();
+    }
+    if (value.getClass().isArray()) {
+      return Array.getLength(value);
+    }
+    throw new IllegalArgumentException(
+        "Unsupported value for a multi-value group key: " + value.getClass().getName());
   }
 
   /// Returns the elements of `value`. The caller must not modify the returned array.

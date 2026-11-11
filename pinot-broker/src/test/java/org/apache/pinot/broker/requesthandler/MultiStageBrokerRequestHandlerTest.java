@@ -26,9 +26,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
@@ -273,6 +275,44 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     // An invalid value falls back to the broker config value.
     handler.onChange(Set.of(key), Map.of(key, "true"));
     handler.onChange(Set.of(key), Map.of(key, "sometimes"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.FALSE);
+  }
+
+  /// The cluster config alias `pinot.all.multistage.use.mv.aggregate` applies at startup and on a live change. The
+  /// broker-specific cluster config key wins over the alias, and the alias wins over the broker config.
+  @Test
+  public void testUseMvAggregateClusterConfigAlias()
+      throws Exception {
+    String key = CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE;
+    String alias = "pinot.all.multistage.use.mv.aggregate";
+
+    // Startup: the broker starter registers the listener after the cluster config is read, and the registration
+    // reports every key as changed.
+    DefaultClusterConfigChangeHandler clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    ClusterConfig clusterConfig = new ClusterConfig("testCluster");
+    clusterConfig.getRecord().setSimpleField(alias, "false");
+    clusterConfigChangeHandler.onClusterConfigChange(clusterConfig, null);
+    MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration());
+    clusterConfigChangeHandler.registerClusterConfigChangeListener(handler);
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.FALSE);
+
+    // Live update of the alias.
+    handler.onChange(Set.of(alias), Map.of(alias, "true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.TRUE);
+
+    // The broker-specific key wins over the alias, and its removal restores the alias value.
+    handler.onChange(Set.of(key), Map.of(key, "auto", alias, "true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.AUTO);
+    handler.onChange(Set.of(key), Map.of(alias, "true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.TRUE);
+
+    // A removed alias restores the broker config value.
+    handler.onChange(Set.of(alias), Map.of());
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.AUTO);
+    handler = newHandler(mvAggregateConfig("false"));
+    handler.onChange(Set.of(alias), Map.of(alias, "true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.TRUE);
+    handler.onChange(Set.of(alias), Map.of());
     Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.FALSE);
   }
 

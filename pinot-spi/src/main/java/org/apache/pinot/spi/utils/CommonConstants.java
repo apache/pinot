@@ -740,8 +740,9 @@ public class CommonConstants {
     /// A server that predates the MV aggregate cannot run it. The `auto` mode is safe during a rolling upgrade: it
     /// sends the MV aggregate only for queries that fail without it.
     ///
-    /// The value can also be set in the cluster config, under the same key. The cluster config wins over the broker
-    /// config, and a change applies to the next query without a broker restart. When the key is removed from the
+    /// The value can also be set in the cluster config, under the same key or under the alias
+    /// `pinot.all.multistage.use.mv.aggregate`. The same key wins over the alias, and the cluster config wins over the
+    /// broker config. A change applies to the next query without a broker restart. When the keys are removed from the
     /// cluster config, the broker config applies again.
     ///
     /// The query option [Request.QueryOptionKey#USE_MV_AGGREGATE] overrides this value for one query.

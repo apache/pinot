@@ -277,6 +277,31 @@ public class MvAggregateOperatorTest {
     assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 7);
   }
 
+  /// A block that needs more group ids than one batch holds is aggregated in batches, and a row with more combinations
+  /// than one batch holds is split across batches. The result is the same as without batches, for unfiltered and
+  /// filtered aggregations. With 4 group ids per batch, the 6 combinations of the first row go into two batches.
+  @Test(dataProvider = "serialized")
+  public void testBatchesGiveTheSameResult(boolean serialized) {
+    DataSchema inSchema = new DataSchema(new String[]{"mv1", "mv2", "v", "flag"},
+        new ColumnDataType[]{INT_ARRAY, STRING_ARRAY, DOUBLE, BOOLEAN});
+    mockInput(serialized, inSchema, new Object[]{new int[]{1, 2}, new String[]{"x", "y", "z"}, 1.0, 1},
+        new Object[]{new int[]{1}, new String[]{"x"}, 10.0, 0}, new Object[]{new int[0], new String[]{"x"}, 100.0, 1},
+        new Object[]{new int[]{2}, new String[]{"z", "z"}, 5.0, 1});
+    DataSchema resultSchema = new DataSchema(new String[]{"mv1", "mv2", "sum", "filteredCnt"},
+        new ColumnDataType[]{INT, STRING, DOUBLE, LONG});
+    MvAggregateOperator operator =
+        getOperator(resultSchema, List.of(getSum(new RexExpression.InputRef(2)), getCountStar()), List.of(-1, 3),
+            List.of(0, 1), List.of(0, 1));
+    operator._groupByExecutor.setMaxGroupIdsPerBatch(4);
+
+    Map<List<Object>, List<Object>> result = getResult(operator, 2);
+
+    assertEquals(result,
+        Map.of(List.of(1, "x"), List.of(11.0, 1L), List.of(1, "y"), List.of(1.0, 1L), List.of(1, "z"),
+            List.of(1.0, 1L), List.of(2, "x"), List.of(1.0, 1L), List.of(2, "y"), List.of(1.0, 1L), List.of(2, "z"),
+            List.of(11.0, 3L)));
+  }
+
   /// More combinations in one row than an int holds fail the query as a resource limit.
   @Test
   public void testTooManyCombinations() {
