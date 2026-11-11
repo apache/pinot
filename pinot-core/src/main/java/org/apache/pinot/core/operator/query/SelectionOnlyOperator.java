@@ -22,6 +22,7 @@ import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -30,6 +31,7 @@ import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -48,6 +50,8 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
   private final QueryContext _queryContext;
   private final boolean _nullHandlingEnabled;
   private final BaseProjectOperator<?> _projectOperator;
+  @Nullable
+  private final DocIdSetOperator _docIdSetOperator;
   private final List<ExpressionContext> _expressions;
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
@@ -59,10 +63,17 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
 
   public SelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator) {
+    this(indexSegment, queryContext, expressions, projectOperator, null);
+  }
+
+  public SelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
+      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator,
+      @Nullable DocIdSetOperator docIdSetOperator) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _projectOperator = projectOperator;
+    _docIdSetOperator = docIdSetOperator;
     _expressions = expressions;
 
     int numExpressions = expressions.size();
@@ -113,6 +124,12 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
 
   @Override
   protected SelectionResultsBlock getNextBlock() {
+    try (_docIdSetOperator) {
+      return collectRows();
+    }
+  }
+
+  private SelectionResultsBlock collectRows() {
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       int numExpressions = _expressions.size();

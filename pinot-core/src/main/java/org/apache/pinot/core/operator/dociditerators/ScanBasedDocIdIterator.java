@@ -46,6 +46,18 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
     return applyAnd(docIds.getBatchIterator(), OptionalInt.of(docIds.first()), OptionalInt.of(docIds.last()));
   }
 
+  /// Returns the maximum number of candidate doc ids accepted by [#matchDocIds], or zero if unsupported.
+  default int getRestrictedScanBatchSize() {
+    return 0;
+  }
+
+  /// Evaluates only the first `length` candidate doc ids and compacts matching ids into the array prefix in order.
+  /// Returns the number of matches. Candidates must be strictly increasing and `length` must be positive and no
+  /// greater than [#getRestrictedScanBatchSize]. Calls can be repeated before closing the iterator.
+  default int matchDocIds(int[] docIds, int length) {
+    throw new UnsupportedOperationException();
+  }
+
   /// Returns the number of entries (SV value contains one entry, MV value contains multiple entries) scanned during the
   /// iteration. This method should be called after the iteration is done.
   long getNumEntriesScanned();
