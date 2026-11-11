@@ -30,6 +30,7 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedResult;
 import org.roaringbitmap.RoaringBitmap;
@@ -81,6 +82,22 @@ public class FunnelCountSerDeTest {
         + "00000004" + "00000000");
     assertListSteps(function, List.of(new ObjectOpenHashSet<>(List.of("a")), new ObjectOpenHashSet<>()), stringSets,
         new long[]{1, 0});
+  }
+
+  /// A segment without rows contributes empty step sets whatever the stored type of the correlation column. Merged on
+  /// either side of typed step sets, they leave the typed sets, which go out with the set type of that stored type.
+  @Test
+  public void testMergeSetStepsWithEmptySegment() {
+    AggregationFunction function = funnelCount("set");
+    AggregationResultHolder emptySegment = function.createAggregationResultHolder();
+    List intSteps = List.of(new IntOpenHashSet(new int[]{7}), new IntOpenHashSet());
+    byte[] intSets = HexFormat.of().parseHex("00000002" + "00000009"
+        + "00000008" + "0000000100000007"
+        + "00000004" + "00000000");
+    assertListSteps(function, (List) function.merge(function.extractAggregationResult(emptySegment), intSteps),
+        intSets, new long[]{1, 0});
+    assertListSteps(function, (List) function.merge(intSteps, function.extractAggregationResult(emptySegment)),
+        intSets, new long[]{1, 0});
   }
 
   /// Step sketches go out as `[int size][int DATA_SKETCH_TYPE]`, then `[int length]` and the compact sketch bytes per
