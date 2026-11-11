@@ -24,6 +24,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
+import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.FetchContext;
@@ -36,12 +41,16 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -128,6 +137,156 @@ public class InstancePlanMakerImplV2Test {
     config.setProperty(Server.MAX_EXECUTION_THREADS, 4);
     config.setProperty(Server.DEFAULT_EXECUTION_THREADS, 8);
     planMaker.init(config);
+  }
+
+  @Test
+  public void testRowFilterExpressionOverrideRefreshesColumns() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("rawTenant", DataType.STRING)
+        .addSingleValueDimension("tenantLower", DataType.STRING)
+        .build();
+    QueryContext queryContext = buildRowFilterQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE tenantLower = 'o''hara'", "lower(rawTenant) = 'o''hara'", schema);
+    queryContext.setRowFilterExpressionOverrideMap(Map.of(CalciteSqlParser.compileToExpression("lower(rawTenant)"),
+        CalciteSqlParser.compileToExpression("tenantLower")));
+    assertEquals(queryContext.getColumns(), Set.of("rawTenant", "tenantLower"));
+
+    new InstancePlanMakerImplV2().applyQueryOptions(queryContext);
+
+    assertEquals(queryContext.getRowFilter(),
+        RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression("tenantLower = 'o''hara'")));
+    assertEquals(queryContext.getColumns(), Set.of("tenantLower"));
+  }
+
+  @Test
+  public void testRowFilterExpressionOverridesDoNotChainAcrossPlanningCalls() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("rawTenant", DataType.STRING)
+        .addSingleValueDimension("tenantLower", DataType.STRING)
+        .addSingleValueDimension("otherTenant", DataType.STRING)
+        .build();
+    QueryContext queryContext = buildRowFilterQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE tenantLower = 'a'", "lower(rawTenant) = 'a'", schema);
+    Expression originalPolicy = queryContext.getRowFilterExpression().deepCopy();
+    Expression replacement = CalciteSqlParser.compileToExpression("tenantLower");
+    Map<Expression, Expression> overrides = Map.of(CalciteSqlParser.compileToExpression("lower(rawTenant)"),
+        replacement, CalciteSqlParser.compileToExpression("tenantLower"),
+        CalciteSqlParser.compileToExpression("otherTenant"));
+    queryContext.setRowFilterExpressionOverrideMap(overrides);
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+
+    for (int i = 0; i < 2; i++) {
+      planMaker.applyQueryOptions(queryContext);
+      assertEquals(queryContext.getRowFilter(),
+          RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression("tenantLower = 'a'")));
+      assertEquals(queryContext.getColumns(), Set.of("tenantLower"));
+      assertEquals(queryContext.getRowFilterExpression(), originalPolicy);
+      assertEquals(replacement, CalciteSqlParser.compileToExpression("tenantLower"));
+    }
+  }
+
+  @Test
+  public void testRowFilterIgnoresFullPredicateOverridesAndNormalizesNumericLiterals() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("rawTenantId", DataType.INT)
+        .addSingleValueDimension("tenantId", DataType.INT)
+        .build();
+    QueryContext queryContext = buildRowFilterQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE rawTenantId = 2", "rawTenantId = 2.0", schema);
+    Expression replacement = CalciteSqlParser.compileToExpression("tenantId = 3.0");
+    // Use the exact optimized AST so a whole-predicate rewrite would match, even after numeric normalization.
+    Expression optimizedPolicy = new QueryOptimizer().optimizeFilter(
+        CalciteSqlParser.compileToExpression("rawTenantId = 2.0"), schema);
+    queryContext.setRowFilterExpressionOverrideMap(Map.of(
+        CalciteSqlParser.compileToExpression("rawTenantId = 2.0"), CalciteSqlParser.compileToExpression("FALSE"),
+        optimizedPolicy, replacement));
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+
+    for (int i = 0; i < 2; i++) {
+      planMaker.applyQueryOptions(queryContext);
+      assertEquals(queryContext.getRowFilter(),
+          RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression("rawTenantId = 2")));
+      assertEquals(queryContext.getColumns(), Set.of("rawTenantId"));
+      assertEquals(queryContext.getRowFilterExpression(), CalciteSqlParser.compileToExpression("rawTenantId = 2.0"));
+      assertEquals(replacement, CalciteSqlParser.compileToExpression("tenantId = 3.0"));
+    }
+  }
+
+  @Test
+  public void testRowFilterIgnoresOverridesOfPolicyBooleanStructure() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("tenant", DataType.STRING)
+        .addSingleValueDimension("region", DataType.STRING)
+        .build();
+    String policy = "tenant = 'a' AND region = 'west'";
+    QueryContext queryContext = buildRowFilterQueryContext(
+        "SELECT COUNT(*) FROM testTable WHERE tenant = 'a' AND region = 'west' AND region <> 'east'", policy, schema);
+    Expression matchAll = CalciteSqlParser.compileToExpression("TRUE");
+    queryContext.setRowFilterExpressionOverrideMap(Map.of(
+        CalciteSqlParser.compileToExpression(policy), matchAll,
+        CalciteSqlParser.compileToExpression("tenant = 'a'"), matchAll,
+        CalciteSqlParser.compileToExpression("region = 'west'"), matchAll));
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+
+    for (int i = 0; i < 2; i++) {
+      planMaker.applyQueryOptions(queryContext);
+      assertEquals(queryContext.getRowFilter(),
+          RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(policy)));
+      assertFalse(queryContext.getRowFilter().isConstantTrue());
+      assertEquals(queryContext.getColumns(), Set.of("tenant", "region"));
+      assertEquals(queryContext.getRowFilterExpression(), CalciteSqlParser.compileToExpression(policy));
+    }
+  }
+
+  @Test
+  public void testRowFilterTimestampHintAppliesAfterExpressionOverride() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("rawTime", DataType.LONG)
+        .addSingleValueDimension("eventTime", DataType.LONG)
+        .addSingleValueDimension("eventDay", DataType.LONG)
+        .build();
+    Expression dayExpression = CalciteSqlParser.compileToExpression("DATETRUNC('DAY', eventTime)");
+    // NOT_EQUALS keeps DATETRUNC intact instead of letting the time-predicate optimizer turn it into a range.
+    for (boolean streaming : new boolean[]{false, true}) {
+      for (boolean hasDayColumn : new boolean[]{false, true}) {
+        PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+            "SELECT COUNT(*) FROM testTable WHERE DATETRUNC('DAY', eventTime) <> 172800000");
+        pinotQuery.putToQueryOptions(RlsUtils.buildRlsFilterKey("testTable"), "rawTime <> 172800000");
+        pinotQuery.setExpressionOverrideHints(
+            Map.of(dayExpression, CalciteSqlParser.compileToExpression("eventDay")));
+        QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+        queryContext.setSchema(schema);
+        queryContext.setRowFilterExpressionOverrideMap(
+            Map.of(CalciteSqlParser.compileToExpression("rawTime"), dayExpression));
+        IndexSegment segment = mock(IndexSegment.class);
+        when(segment.getColumnNames()).thenReturn(
+            hasDayColumn ? Set.of("eventTime", "eventDay") : Set.of("eventTime"));
+        List<SegmentContext> segments = List.of(new SegmentContext(segment));
+        InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+
+        for (int i = 0; i < 2; i++) {
+          if (streaming) {
+            planMaker.makeStreamingInstancePlan(segments, queryContext, null, mock(ResultsBlockStreamer.class));
+          } else {
+            planMaker.makeInstancePlan(segments, queryContext, null);
+          }
+          String expectedFilter = hasDayColumn ? "eventDay <> 172800000"
+              : "DATETRUNC('DAY', eventTime) <> 172800000";
+          assertEquals(queryContext.getRowFilter(),
+              RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(expectedFilter)));
+          assertEquals(queryContext.getRowFilter(), queryContext.getFilter());
+          assertEquals(queryContext.getColumns(), hasDayColumn ? Set.of("eventDay") : Set.of("eventTime"));
+        }
+      }
+    }
+  }
+
+  private static QueryContext buildRowFilterQueryContext(String query, String rowFilter, Schema schema) {
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    pinotQuery.putToQueryOptions(RlsUtils.buildRlsFilterKey("testTable"), rowFilter);
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    queryContext.setSchema(schema);
+    return queryContext;
   }
 
   @Test

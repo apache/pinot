@@ -44,6 +44,7 @@ import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -92,6 +93,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.slf4j.MDC;
@@ -1036,17 +1038,10 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     };
   }
 
-  /// Bug: FULL_REWRITE overwrites tableName to the materialized view table name, so
-  /// accessControl.getRowColFilters(requesterIdentity, tableName) fetches RLS
-  /// policy for the materialized view table instead of the base table.
-  ///
-  /// Before fix: getRowColFilters is called with the materialized view table name
-  /// "mv_baseTable_OFFLINE".
-  ///
-  /// After fix: getRowColFilters is called with the original base table
-  /// name "baseTable_OFFLINE".
+  /// A query with an RLS filter skips the MV rewrite: the broker looks up the RLS filter of the base table
+  /// "baseTable_OFFLINE", and the query runs on the base table with that filter in its options.
   @Test
-  public void testMaterializedViewFullRewriteRlsLookupUsesBaseTable()
+  public void testMaterializedViewRewriteSkippedUnderRls()
       throws Exception {
     String baseOfflineTable = "baseTable_OFFLINE";
     String materializedViewOfflineTable = "mv_baseTable_OFFLINE";
@@ -1101,6 +1096,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
             new SegmentsToQuery(List.of("seg01"), List.of())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
 
+    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
     QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
     when(quotaManager.acquire(anyString())).thenReturn(true);
     when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
@@ -1157,6 +1153,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
               BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
               TableRouteInfo route, long timeoutMs, ServerStats serverStats,
               RequestContext requestContext) {
+            capturedServerRequest.set(serverBrokerRequest);
             return BrokerResponseNative.empty();
           }
 
@@ -1184,11 +1181,13 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "RLS filter lookup must use base table '" + baseRawTable
             + "' not materialized view table, but got: " + rlsTable);
     Assert.assertTrue(response.getRLSFiltersApplied(), "response should report that RLS filters were applied");
-    PinotQuery rewriteInput = querySeenByMaterializedViewRewrite.get();
-    Assert.assertNotNull(rewriteInput, "MV rewrite should see the server query after RLS rewrite");
-    Assert.assertNotNull(rewriteInput.getFilterExpression(), "MV rewrite input must carry the base-table RLS filter");
-    Assert.assertTrue(rewriteInput.getFilterExpression().toString().contains("allowed"),
-        "MV rewrite input must include the RLS predicate, got: " + rewriteInput.getFilterExpression());
+    /// The server applies the RLS filter from the `rlsFilters-<rawTableName>` query option, so a query with an RLS
+    /// filter must not be rewritten onto the MV: it runs on the base table, with the option of the base table.
+    Assert.assertNull(querySeenByMaterializedViewRewrite.get(), "A query with an RLS filter must skip the MV rewrite");
+    PinotQuery serverQuery = capturedServerRequest.get().getPinotQuery();
+    Assert.assertEquals(serverQuery.getDataSource().getTableName(), baseOfflineTable);
+    Assert.assertEquals(serverQuery.getQueryOptions().get(RlsUtils.buildRlsFilterKey(baseRawTable)),
+        "( ts = 'allowed' )");
   }
 
   /// The split-mode time-boundary filter attach helpers moved to
@@ -1333,6 +1332,162 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         "combined filter must include the RLS predicate, got literals: " + literalValues);
     Assert.assertTrue(literalValues.contains("x"),
         "combined filter must retain the original WHERE clause, got literals: " + literalValues);
+  }
+
+  /// The broker fails the query when it cannot apply the RLS filter, instead of running it without the filter.
+  @Test
+  public void testRlsRewriteFailureFailsTheQuery()
+      throws Exception {
+    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        newRlsHandler("ts = = 'allowed'", capturedServerRequest, BrokerResponseNative.empty());
+
+    BrokerResponseNative response =
+        (BrokerResponseNative) handler.handleRequest("SELECT COUNT(*) FROM faroEvents WHERE ts = 'x'");
+
+    Assert.assertNull(capturedServerRequest.get(), "The query must not reach the servers without its RLS filter");
+    Assert.assertEquals(response.getExceptions().size(), 1, response.getExceptions().toString());
+    Assert.assertEquals(response.getExceptions().get(0).getErrorCode(), QueryErrorCode.QUERY_VALIDATION.getId());
+    Assert.assertFalse(response.getExceptions().get(0).getMessage().contains("allowed"),
+        "The error must not show the RLS filter: " + response.getExceptions().get(0).getMessage());
+    verify(BrokerMetrics.get()).addMeteredTableValue("faroEvents", BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1L);
+  }
+
+  /// The broker optimizes the query again after it adds the RLS filter to the WHERE clause, as the server optimizes
+  /// its copy of the RLS filter: `level = 2.0` on an INT column becomes `level = 2`.
+  @Test
+  public void testRlsFilterInWhereClauseIsOptimized()
+      throws Exception {
+    AtomicReference<BrokerRequest> capturedServerRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        newRlsHandler("level = 2.0", capturedServerRequest, BrokerResponseNative.empty());
+
+    BrokerResponseNative response =
+        (BrokerResponseNative) handler.handleRequest("SELECT COUNT(*) FROM faroEvents WHERE ts = 'x'");
+
+    Assert.assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    Expression filter = capturedServerRequest.get().getPinotQuery().getFilterExpression();
+    Function policy = filter.getFunctionCall().getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(policy.getOperator(), FilterKind.EQUALS.name(), filter.toString());
+    Assert.assertEquals(policy.getOperands().get(0).getIdentifier().getName(), "level", filter.toString());
+    // The optimizer turns the decimal literal into a long literal
+    Assert.assertEquals(policy.getOperands().get(1).getLiteral().getLongValue(), 2L, filter.toString());
+  }
+
+  /// Under RLS, the broker hides the stats that show the layout of the whole table, also when an old server sends
+  /// them.
+  @Test
+  public void testRlsHidesTableLayoutStats()
+      throws Exception {
+    BrokerResponseNative serverResponse = BrokerResponseNative.empty();
+    serverResponse.setTotalDocs(1000);
+    serverResponse.setNumSegmentsQueried(10);
+    serverResponse.setNumSegmentsProcessed(8);
+    serverResponse.setNumSegmentsMatched(5);
+    serverResponse.setNumConsumingSegmentsQueried(2);
+    serverResponse.setNumSegmentsPrunedByServer(2);
+    serverResponse.setNumSegmentsPrunedByValue(1);
+    serverResponse.setNumDocsScanned(42);
+    BaseSingleStageBrokerRequestHandler handler =
+        newRlsHandler("ts = 'allowed'", new AtomicReference<>(), serverResponse);
+
+    BrokerResponseNative response =
+        (BrokerResponseNative) handler.handleRequest("SELECT COUNT(*) FROM faroEvents WHERE ts = 'x'");
+
+    Assert.assertTrue(response.getRLSFiltersApplied());
+    Assert.assertEquals(response.getTotalDocs(), 0L);
+    Assert.assertEquals(response.getNumSegmentsQueried(), 0L);
+    Assert.assertEquals(response.getNumSegmentsProcessed(), 0L);
+    Assert.assertEquals(response.getNumSegmentsMatched(), 0L);
+    Assert.assertEquals(response.getNumConsumingSegmentsQueried(), 0L);
+    Assert.assertEquals(response.getNumSegmentsPrunedByServer(), 0L);
+    Assert.assertEquals(response.getNumSegmentsPrunedByValue(), 0L);
+    // numDocsScanned only counts the rows of the tenant, so it stays
+    Assert.assertEquals(response.getNumDocsScanned(), 42L);
+  }
+
+  /// Builds a single-stage handler for the offline table `faroEvents` with row-level auth on. The access control
+  /// returns `rlsFilter` for the table. The servers are not called: the handler captures the server request and
+  /// returns `serverResponse`.
+  private static BaseSingleStageBrokerRequestHandler newRlsHandler(String rlsFilter,
+      AtomicReference<BrokerRequest> capturedServerRequest, BrokerResponseNative serverResponse) {
+    String rawTable = "faroEvents";
+    String offlineTable = "faroEvents_OFFLINE";
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(rawTable)
+        .addSingleValueDimension("ts", DataType.STRING)
+        .addSingleValueDimension("level", DataType.INT)
+        .build();
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(rawTable)).thenReturn(rawTable);
+    when(tableCache.getSchema(rawTable)).thenReturn(schema);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts", "level", "level"));
+    // As in production for a table without expression overrides. The broker then does not optimize the query again
+    // for the overrides.
+    when(tableCache.getExpressionOverrideMap(anyString())).thenReturn(null);
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("t_BROKER", "t_SERVER", null));
+    when(tableCache.getTableConfig(offlineTable)).thenReturn(tableCfg);
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(offlineTable)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    AccessControl accessControl = new AccessControl() {
+      @Override
+      public AuthorizationResult authorize(RequesterIdentity identity, BrokerRequest request) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableAuthorizationResult authorize(RequesterIdentity identity, Set<String> tables) {
+        return TableAuthorizationResult.success();
+      }
+
+      @Override
+      public TableRowColAccessResult getRowColFilters(RequesterIdentity identity, String tableWithType) {
+        return new TableRowColAccessResultImpl(List.of(rlsFilter));
+      }
+    };
+    AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
+    when(accessControlFactory.create()).thenReturn(accessControl);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration(
+        Map.of(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH, "true"));
+    BrokerQueryEventListenerFactory.init(config);
+
+    return new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+        routingManager, accessControlFactory, quotaManager, tableCache,
+        ThreadAccountantUtils.getNoOpAccountant(), null) {
+      @Override
+      public void start() {
+      }
+
+      @Override
+      public void shutDown() {
+      }
+
+      @Override
+      protected BrokerResponseNative processBrokerRequest(long requestId,
+          BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+          TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+          RequestContext requestContext) {
+        capturedServerRequest.set(serverBrokerRequest);
+        return serverResponse;
+      }
+    };
   }
 
   /// When an expression override rewrites a nested predicate to a literal (e.g. `REGEXP_LIKE(foo, '.*') -> TRUE`),

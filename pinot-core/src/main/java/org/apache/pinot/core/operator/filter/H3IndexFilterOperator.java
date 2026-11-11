@@ -32,9 +32,11 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
@@ -240,13 +242,33 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
   /// Returns the filter block document IDs based on the given full match doc ids and the partial match doc ids.
   private BlockDocIdSet getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
-    ExpressionFilterOperator expressionFilterOperator =
-        new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs);
-    ScanBasedDocIdIterator docIdIterator =
-        (ScanBasedDocIdIterator) expressionFilterOperator.getTrues().iterator();
+    return getFilterBlock(_segment, _queryContext, _predicate, _numDocs, fullMatchDocIds, partialMatchDocIds);
+  }
+
+  /// Returns the documents that match an H3 predicate: the full match documents, plus the partial match documents on
+  /// which the predicate expression evaluates to true.
+  ///
+  /// Without row-level security (RLS), the expression is evaluated here, so the result is a bitmap and the operator
+  /// stays index-based for the AND that encloses it.
+  ///
+  /// With RLS, the result is the lazy `OR(fullMatch, AND(partialMatch, expression))`. The AND of the RLS filter
+  /// pushes its documents into it (see `RowLevelSecurityFilterOperator`), so the expression runs only on the partial
+  /// match documents that the RLS filter allows. An eager bitmap would evaluate the expression on hidden rows and
+  /// report their number in `numEntriesScannedInFilter`.
+  static BlockDocIdSet getFilterBlock(IndexSegment segment, QueryContext queryContext, Predicate predicate,
+      int numDocs, MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
+    BlockDocIdSet expressionDocIdSet =
+        new ExpressionFilterOperator(segment, queryContext, predicate, numDocs).getTrues();
+    if (queryContext.getRowFilter() != null) {
+      BlockDocIdSet partialMatch =
+          new AndDocIdSet(List.of(BitmapDocIdSet.create(partialMatchDocIds, numDocs), expressionDocIdSet),
+              queryContext.getQueryOptions(), queryContext.isAndRestrictionPushdownEnabled());
+      return new OrDocIdSet(List.of(BitmapDocIdSet.create(fullMatchDocIds, numDocs), partialMatch), numDocs);
+    }
+    ScanBasedDocIdIterator docIdIterator = (ScanBasedDocIdIterator) expressionDocIdSet.iterator();
     MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
     result.or(fullMatchDocIds);
-    return BitmapDocIdSet.create(result, _numDocs, docIdIterator.getNumEntriesScanned());
+    return BitmapDocIdSet.create(result, numDocs, docIdIterator.getNumEntriesScanned());
   }
 
   /// Returns the null document IDs for the indexed column when query null handling is enabled and the column has a

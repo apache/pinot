@@ -170,7 +170,12 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   ///
   /// Only for operators that override [#getNotFalses]. The default [#getNotFalses] reads [#getNulls], so an operator
   /// that keeps it would recurse; a leaf returns its UNKNOWN documents directly instead.
-  protected BlockDocIdSet deriveNulls(@Nullable Map<String, String> queryOptions) {
+  ///
+  /// `restrictionPushdownEnabled` is the AND restriction push-down flag for the AND of the not-false and the not-true
+  /// documents. Without the push-down, a composite child of that AND (for example the NOT of an OR over a scan)
+  /// evaluates its scans on the whole segment.
+  protected BlockDocIdSet deriveNulls(@Nullable Map<String, String> queryOptions,
+      boolean restrictionPushdownEnabled) {
     BlockDocIdSet notFalses = getNotFalses();
     if (notFalses instanceof EmptyDocIdSet) {
       return EmptyDocIdSet.unscanned();
@@ -184,7 +189,7 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     }
     BlockDocIdSet notTrues = new NotDocIdSet(trues, _numDocs);
     return notFalses instanceof MatchAllDocIdSet ? notTrues
-        : new AndDocIdSet(List.of(notFalses, notTrues), queryOptions);
+        : new AndDocIdSet(List.of(notFalses, notTrues), queryOptions, restrictionPushdownEnabled);
   }
 
   /// @return document IDs in which the predicate evaluates to false.

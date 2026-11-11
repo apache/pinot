@@ -27,9 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -77,6 +79,12 @@ public class QueryContext implements QueryScopedCache {
   private final boolean _distinct;
   private final List<String> _aliasList;
   private final FilterContext _filter;
+  @Nullable
+  private final Expression _rowFilterExpression;
+  @Nullable
+  private FilterContext _rowFilter;
+  @Nullable
+  private Map<Expression, Expression> _rowFilterExpressionOverrideMap;
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
   private final List<OrderByExpressionContext> _orderByExpressions;
@@ -114,6 +122,11 @@ public class QueryContext implements QueryScopedCache {
   private boolean _skipStarTree;
   // Whether to skip reordering scan filters for the query
   private boolean _skipScanFilterReorder;
+  // Time spent to materialize the row-level security bitmap, summed over the segments. The segments run on several
+  // threads, so the sum is a LongAdder.
+  private final LongAdder _rowFilterTimeNs = new LongAdder();
+  // Entries scanned to materialize the row-level security bitmap, summed over the segments. Kept out of the response.
+  private final LongAdder _rowFilterNumEntriesScanned = new LongAdder();
   // Whether an AND may push the document ids it has matched into its composite (AND/OR/NOT) children.
   // Resolved from the query option and the server default by InstancePlanMakerImplV2#applyQueryOptions.
   private boolean _andRestrictionPushdownEnabled;
@@ -179,16 +192,19 @@ public class QueryContext implements QueryScopedCache {
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
-      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
-      @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
-      int offset, Map<String, String> queryOptions,
-      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, ExplainMode explain) {
+      @Nullable FilterContext filter, @Nullable Expression rowFilterExpression, @Nullable FilterContext rowFilter,
+      @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
+      @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
+      Map<String, String> queryOptions, @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
+      ExplainMode explain) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
     _distinct = distinct;
     _aliasList = Collections.unmodifiableList(aliasList);
     _filter = filter;
+    _rowFilterExpression = rowFilterExpression;
+    _rowFilter = rowFilter;
     _groupByExpressions = groupByExpressions;
     _havingFilter = havingFilter;
     _orderByExpressions = orderByExpressions;
@@ -249,6 +265,61 @@ public class QueryContext implements QueryScopedCache {
   @Nullable
   public FilterContext getFilter() {
     return _filter;
+  }
+
+  /// Returns the row-level security (RLS) filter of the table, or `null` if the query has no RLS filter.
+  ///
+  /// The broker also ANDs this filter into the WHERE clause, so [#getFilter()] includes it. The server evaluates this
+  /// filter first, per segment, and evaluates the WHERE clause only on the documents that match it. Then no user
+  /// expression runs on a row that the RLS filter hides.
+  @Nullable
+  public FilterContext getRowFilter() {
+    return _rowFilter;
+  }
+
+  /// Returns the row-level security (RLS) filter as the broker sent it, before any optimization, or `null` if the
+  /// query has no RLS filter.
+  @Nullable
+  public Expression getRowFilterExpression() {
+    return _rowFilterExpression;
+  }
+
+  /// Replaces the row-level security filter with an equivalent one, for example the result of the query optimizer.
+  /// See [#getRowFilter()].
+  public void setRowFilter(FilterContext rowFilter) {
+    _rowFilter = rowFilter;
+  }
+
+  /// Returns the physical table overrides for the independent RLS policy. The broker already applies them to the
+  /// WHERE clause; the server must apply the same overrides to its policy copy before materializing it.
+  @Nullable
+  public Map<Expression, Expression> getRowFilterExpressionOverrideMap() {
+    return _rowFilterExpressionOverrideMap;
+  }
+
+  public void setRowFilterExpressionOverrideMap(@Nullable Map<Expression, Expression> expressionOverrideMap) {
+    _rowFilterExpressionOverrideMap = expressionOverrideMap;
+  }
+
+  /// Adds the time spent to materialize the row-level security bitmap of one segment. Thread-safe.
+  public void addRowFilterTimeNs(long rowFilterTimeNs) {
+    _rowFilterTimeNs.add(rowFilterTimeNs);
+  }
+
+  /// Returns the time spent to materialize the row-level security bitmap, summed over the segments.
+  public long getRowFilterTimeNs() {
+    return _rowFilterTimeNs.sum();
+  }
+
+  /// Adds the entries scanned to materialize the row-level security bitmap of one segment. Thread-safe.
+  public void addRowFilterNumEntriesScanned(long numEntriesScanned) {
+    _rowFilterNumEntriesScanned.add(numEntriesScanned);
+  }
+
+  /// Returns the entries scanned to materialize the row-level security bitmap, summed over the segments. The server
+  /// query log and metrics count them in `numEntriesScannedInFilter`, the response does not.
+  public long getRowFilterNumEntriesScanned() {
+    return _rowFilterNumEntriesScanned.sum();
   }
 
   /// Returns a list of expressions in the GROUP-BY clause (aggregation keys), or `null` if there is no GROUP-BY
@@ -513,8 +584,12 @@ public class QueryContext implements QueryScopedCache {
   /// Whether an AND may hand the document ids matched by its index-based children to its composite (AND/OR/NOT)
   /// children, so that a scan-based predicate nested inside an OR is only evaluated on the documents that can still
   /// match. See [org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode].
+  ///
+  /// Always `true` for a query with a row-level security filter, whatever the query option and the server default
+  /// say: every nested AND must restrict its composite children to the documents the RLS filter matches, so that no
+  /// user expression is evaluated on a row the RLS filter hides.
   public boolean isAndRestrictionPushdownEnabled() {
-    return _andRestrictionPushdownEnabled;
+    return _andRestrictionPushdownEnabled || _rowFilter != null;
   }
 
   public void setAndRestrictionPushdownEnabled(boolean andRestrictionPushdownEnabled) {
@@ -841,6 +916,8 @@ public class QueryContext implements QueryScopedCache {
     private boolean _distinct;
     private List<String> _aliasList;
     private FilterContext _filter;
+    private Expression _rowFilterExpression;
+    private FilterContext _rowFilter;
     private List<ExpressionContext> _groupByExpressions;
     private List<int[]> _groupingSets;
     private FilterContext _havingFilter;
@@ -883,6 +960,14 @@ public class QueryContext implements QueryScopedCache {
 
     public Builder setFilter(FilterContext filter) {
       _filter = filter;
+      return this;
+    }
+
+    /// Sets the row-level security filter: the expression that the broker sent, and the filter built from it. See
+    /// [QueryContext#getRowFilter()] and [QueryContext#getRowFilterExpression()].
+    public Builder setRowFilter(@Nullable Expression rowFilterExpression, @Nullable FilterContext rowFilter) {
+      _rowFilterExpression = rowFilterExpression;
+      _rowFilter = rowFilter;
       return this;
     }
 
@@ -942,8 +1027,8 @@ public class QueryContext implements QueryScopedCache {
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList,
-              _filter, _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
-              _expressionOverrideHints, _explain);
+              _filter, _rowFilterExpression, _rowFilter, _groupByExpressions, _havingFilter, _orderByExpressions,
+              _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
       queryContext.setServerReturnFinalResultKeyUnpartitioned(
@@ -1063,6 +1148,9 @@ public class QueryContext implements QueryScopedCache {
       }
       if (query._filter != null) {
         query._filter.getColumns(columns);
+      }
+      if (query._rowFilter != null) {
+        query._rowFilter.getColumns(columns);
       }
       if (query._groupByExpressions != null) {
         for (ExpressionContext expression : query._groupByExpressions) {
