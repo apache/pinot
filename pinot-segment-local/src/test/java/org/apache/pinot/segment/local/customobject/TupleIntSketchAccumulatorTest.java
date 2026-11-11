@@ -19,21 +19,23 @@
 
 package org.apache.pinot.segment.local.customobject;
 
+import java.lang.foreign.MemorySegment;
 import java.util.stream.IntStream;
 import org.apache.datasketches.tuple.CompactTupleSketch;
 import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleSketchIterator;
 import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
-import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 public class TupleIntSketchAccumulatorTest {
@@ -49,8 +51,8 @@ public class TupleIntSketchAccumulatorTest {
   @Test
   public void testEmptyAccumulator() {
     TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(_setOps, _nominalEntries, 2);
-    Assert.assertTrue(accumulator.isEmpty());
-    Assert.assertEquals(accumulator.getResult().getEstimate(), 0.0);
+    assertTrue(accumulator.isEmpty());
+    assertEquals(accumulator.getResult().getEstimate(), 0.0);
   }
 
   @Test
@@ -62,41 +64,44 @@ public class TupleIntSketchAccumulatorTest {
     TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(_setOps, _nominalEntries, 2);
     accumulator.apply(sketch);
 
-    Assert.assertFalse(accumulator.isEmpty());
-    Assert.assertEquals(accumulator.getResult().getEstimate(), sketch.getEstimate());
+    assertFalse(accumulator.isEmpty());
+    assertEquals(accumulator.getResult().getEstimate(), sketch.getEstimate());
   }
 
   @Test
-  public void testSingleSketchWithoutUnionParameters() {
-    for (int numEntries : new int[]{0, 2}) {
+  public void testSeededSketchIsReturnedUnchanged() {
+    for (int numEntries : new int[]{0, 1000}) {
       IntegerTupleSketch input = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
       IntStream.range(0, numEntries).forEach(i -> input.update(i, 1));
       CompactTupleSketch<IntegerSummary> sketch = input.compact();
-      TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator();
-      accumulator.apply(sketch);
+      for (int threshold = 1; threshold <= 3; threshold++) {
+        TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(_setOps, 16, threshold, sketch);
 
-      // Deserialization stores one sketch without restoring the union parameters, even for an empty sketch.
-      assertFalse(accumulator.isEmpty());
-      assertSame(accumulator.getResult(), sketch);
-      assertSame(accumulator.getResult(), sketch);
+        // A received sketch stays intact until another input needs to be merged, even at threshold 1.
+        assertFalse(accumulator.isEmpty());
+        assertEquals(accumulator.getNumInputs(), 1);
+        assertSame(accumulator.getResult(), sketch);
+        assertSame(accumulator.getResult(), sketch);
+      }
     }
   }
 
   @Test
-  public void testMergeSingleSketchWithoutUnionParameters() {
+  public void testMergeSeededSketches() {
     IntegerTupleSketch input1 = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
     input1.update(1L, 2);
     IntegerTupleSketch input2 = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
     input2.update(1L, 3);
     input2.update(2L, 4);
-    for (int threshold : new int[]{2, 3}) {
-      TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(_setOps, _nominalEntries, threshold);
-      accumulator.apply(input1.compact());
-      TupleIntSketchAccumulator other = new TupleIntSketchAccumulator();
-      other.apply(input2.compact());
+    for (int threshold = 1; threshold <= 3; threshold++) {
+      TupleIntSketchAccumulator accumulator =
+          new TupleIntSketchAccumulator(_setOps, _nominalEntries, threshold, input1.compact());
+      TupleIntSketchAccumulator other =
+          new TupleIntSketchAccumulator(_setOps, _nominalEntries, threshold, input2.compact());
       accumulator.merge(other);
 
       TupleSketch<IntegerSummary> result = accumulator.getResult();
+      assertEquals(accumulator.getNumInputs(), 2);
       assertEquals(result.getEstimate(), 2.0);
       assertEquals(summarySum(result), 9L);
       assertEquals(summarySum(accumulator.getResult()), 9L);
@@ -104,32 +109,33 @@ public class TupleIntSketchAccumulatorTest {
   }
 
   @Test
-  public void testRestoreUnionParametersAfterSingleSketchResult() {
+  public void testMergeAfterReadingSeededSketch() {
     IntegerTupleSketch input1 = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
     IntegerTupleSketch input2 = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
     IntStream.range(0, 1000).forEach(i -> {
       input1.update(i, 1);
       input2.update(i, 2);
     });
-    CompactTupleSketch<IntegerSummary> sketch1 = input1.compact();
+    byte[] bytes = input1.compact().toByteArray();
     CompactTupleSketch<IntegerSummary> sketch2 = input2.compact();
-    TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator();
-    accumulator.apply(sketch1);
-    assertSame(accumulator.getResult(), sketch1);
-
     IntegerSummarySetOperations setOps =
         new IntegerSummarySetOperations(IntegerSummary.Mode.Max, IntegerSummary.Mode.Max);
-    accumulator.setNominalEntries(16);
-    accumulator.setSetOperations(setOps);
-    accumulator.apply(sketch2);
-    TupleUnion<IntegerSummary> expected = new TupleUnion<>(16, setOps);
-    expected.union(sketch1);
-    expected.union(sketch2);
-    TupleSketch<IntegerSummary> result = accumulator.getResult();
-    TupleSketch<IntegerSummary> expectedResult = expected.getResult();
-    assertEquals(result.getRetainedEntries(), expectedResult.getRetainedEntries());
-    assertEquals(result.getTheta(), expectedResult.getTheta());
-    assertEquals(summarySum(result), summarySum(expectedResult));
+    for (int threshold = 1; threshold <= 3; threshold++) {
+      TupleSketch<IntegerSummary> sketch1 =
+          TupleSketch.heapifySketch(MemorySegment.ofArray(bytes), new IntegerSummaryDeserializer());
+      TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(setOps, 16, threshold, sketch1);
+      assertEquals(accumulator.getResult().toByteArray(), bytes);
+      accumulator.merge(new TupleIntSketchAccumulator(setOps, 16, threshold, sketch2));
+
+      TupleUnion<IntegerSummary> expected = new TupleUnion<>(16, setOps);
+      expected.union(sketch1);
+      expected.union(sketch2);
+      TupleSketch<IntegerSummary> result = accumulator.getResult();
+      TupleSketch<IntegerSummary> expectedResult = expected.getResult();
+      assertEquals(result.getRetainedEntries(), expectedResult.getRetainedEntries());
+      assertEquals(result.getTheta(), expectedResult.getTheta());
+      assertEquals(summarySum(result), summarySum(expectedResult));
+    }
   }
 
   @Test
@@ -147,7 +153,7 @@ public class TupleIntSketchAccumulatorTest {
     accumulator2.apply(sketch2);
     accumulator1.merge(accumulator2);
 
-    Assert.assertEquals(accumulator1.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
+    assertEquals(accumulator1.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
   }
 
   @Test
@@ -163,7 +169,7 @@ public class TupleIntSketchAccumulatorTest {
     accumulator.apply(sketch1);
     accumulator.apply(sketch2);
 
-    Assert.assertEquals(accumulator.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
+    assertEquals(accumulator.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
   }
 
   // Summaries are summed, so a sketch merged twice doubles a summary while leaving the estimate right.
@@ -182,8 +188,8 @@ public class TupleIntSketchAccumulatorTest {
       }
       TupleSketch<IntegerSummary> actual = accumulator.getResult();
       TupleSketch<IntegerSummary> want = expected.getResult();
-      Assert.assertEquals(actual.getEstimate(), want.getEstimate(), 0.0, "threshold " + threshold);
-      Assert.assertEquals(summarySum(actual), summarySum(want), "threshold " + threshold);
+      assertEquals(actual.getEstimate(), want.getEstimate(), 0.0, "threshold " + threshold);
+      assertEquals(summarySum(actual), summarySum(want), "threshold " + threshold);
     }
   }
 
@@ -197,8 +203,8 @@ public class TupleIntSketchAccumulatorTest {
       accumulator.apply(input.compact());
     }
     long first = summarySum(accumulator.getResult());
-    Assert.assertEquals(summarySum(accumulator.getResult()), first);
-    Assert.assertEquals(summarySum(accumulator.getResult()), first);
+    assertEquals(summarySum(accumulator.getResult()), first);
+    assertEquals(summarySum(accumulator.getResult()), first);
   }
 
   private static long summarySum(TupleSketch<IntegerSummary> sketch) {
@@ -217,7 +223,7 @@ public class TupleIntSketchAccumulatorTest {
 
     accumulator.merge(emptyAccumulator);
 
-    Assert.assertTrue(accumulator.isEmpty());
-    Assert.assertEquals(accumulator.getResult().getEstimate(), 0.0);
+    assertTrue(accumulator.isEmpty());
+    assertEquals(accumulator.getResult().getEstimate(), 0.0);
   }
 }

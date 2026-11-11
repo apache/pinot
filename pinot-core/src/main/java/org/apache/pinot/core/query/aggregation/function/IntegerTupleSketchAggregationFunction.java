@@ -236,9 +236,6 @@ public class IntegerTupleSketchAggregationFunction
     if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
-    intermediateResult1.setThreshold(_accumulatorThreshold);
-    intermediateResult1.setNominalEntries(_nominalEntries);
-    intermediateResult1.setSetOperations(_setOps);
     intermediateResult1.merge(intermediateResult2);
     return intermediateResult1;
   }
@@ -255,11 +252,8 @@ public class IntegerTupleSketchAggregationFunction
 
   @Override
   public TupleIntSketchAccumulator deserializeIntermediateResult(CustomObject customObject) {
-    // The accumulator serializes as its sketch, so a new accumulator takes the sketch read back
-    TupleIntSketchAccumulator tupleIntSketchAccumulator = new TupleIntSketchAccumulator();
-    tupleIntSketchAccumulator.apply(TupleSketch.heapifySketch(MemorySegment.ofBuffer(customObject.getBuffer()),
-        new IntegerSummaryDeserializer()));
-    return tupleIntSketchAccumulator;
+    return new TupleIntSketchAccumulator(_setOps, _nominalEntries, _accumulatorThreshold,
+        TupleSketch.heapifySketch(MemorySegment.ofBuffer(customObject.getBuffer()), new IntegerSummaryDeserializer()));
   }
 
   @Override
@@ -278,9 +272,6 @@ public class IntegerTupleSketchAggregationFunction
       }
       accumulator = emptyAccumulator();
     }
-    accumulator.setNominalEntries(_nominalEntries);
-    accumulator.setSetOperations(_setOps);
-    accumulator.setThreshold(_accumulatorThreshold);
     return Base64.getEncoder().encodeToString(accumulator.getResult().toByteArray());
   }
 

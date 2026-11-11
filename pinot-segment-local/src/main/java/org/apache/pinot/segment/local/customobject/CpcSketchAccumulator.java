@@ -22,26 +22,20 @@ import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
 
 
-/// Intermediate state used by `DistinctCountCPCSketchAggregationFunction` which gives
-/// the end user more control over how sketches are merged for performance.
-/// The end user can set parameters that trade-off more memory usage for more pre-aggregation.
+/// Buffers CPC sketches for deferred merges with the configured precision.
+/// Instances are mutable and not thread-safe.
 public class CpcSketchAccumulator extends CustomObjectAccumulator<CpcSketch> {
-  private int _lgNominalEntries = 4;
+  private final int _lgNominalEntries;
   private CpcUnion _union;
 
-  public CpcSketchAccumulator() {
-  }
-
-  // Note: The accumulator is serialized as a sketch.  This means that the majority of the processing
-  // happens on serialization. Therefore, when deserialized, the values may be null and will
-  // require re-initialisation. Since the primary use case is at query time for the Broker
-  // and Server, these properties are already in memory and are re-set.
   public CpcSketchAccumulator(int lgNominalEntries, int threshold) {
     super(threshold);
     _lgNominalEntries = lgNominalEntries;
   }
 
-  public void setLgNominalEntries(int lgNominalEntries) {
+  /// Retains a deserialized sketch without unioning it, using the receiving query's configuration for future merges.
+  public CpcSketchAccumulator(int lgNominalEntries, int threshold, CpcSketch initialSketch) {
+    super(threshold, initialSketch);
     _lgNominalEntries = lgNominalEntries;
   }
 
@@ -61,12 +55,8 @@ public class CpcSketchAccumulator extends CustomObjectAccumulator<CpcSketch> {
 
   @Override
   public CpcSketch getResult() {
-    // Corner-case: the parameters are not strictly respected when there is a single sketch.
-    // This single sketch might have been the result of a previously accumulated union and
-    // would already have the parameters set.  The sketch is returned as-is without adjusting
-    // nominal entries which requires an additional union operation.
-    // Do not create a union until needed: deserialized accumulators have not restored their parameters yet.
-    if (getNumInputs() == 1 && _accumulator != null && _accumulator.size() == 1) {
+    // Return a single pending sketch unchanged. Its precision is not adjusted until a union is needed.
+    if (getNumInputs() == 1 && _accumulator.size() == 1) {
       return _accumulator.get(0);
     }
     if (_union == null) {

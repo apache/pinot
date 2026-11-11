@@ -266,8 +266,8 @@ public class PercentileKLLAggregationFunction
     return sketch;
   }
 
-  /// Deserializes a sketch from the bytes of a non-null input row.
-  protected KllDoublesSketch deserializeSketch(byte[] serializedSketch) {
+  /// Wraps the serialized sketch for a non-null input row without copying its bytes.
+  private static KllDoublesSketch deserializeSketch(byte[] serializedSketch) {
     return KllDoublesSketch.wrap(MemorySegment.ofArray(serializedSketch).asReadOnly());
   }
 

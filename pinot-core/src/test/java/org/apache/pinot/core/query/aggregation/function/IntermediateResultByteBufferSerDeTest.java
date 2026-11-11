@@ -50,9 +50,11 @@ import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.frequencies.FrequentItemsSketch;
 import org.apache.datasketches.frequencies.FrequentLongsSketch;
 import org.apache.datasketches.kll.KllDoublesSketch;
+import org.apache.datasketches.theta.ThetaSetOperationBuilder;
 import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.datasketches.theta.UpdatableThetaSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.Literal;
@@ -228,24 +230,19 @@ public class IntermediateResultByteBufferSerDeTest {
     CpcSketch sketch = new CpcSketch(12);
     sketch.update(1);
     sketch.update(2);
-    CpcSketchAccumulator accumulator = new CpcSketchAccumulator();
-    accumulator.apply(sketch);
-    return accumulator;
+    return new CpcSketchAccumulator(12, 2, sketch);
   }
 
   private static TupleIntSketchAccumulator tupleIntSketchAccumulator() {
     IntegerTupleSketch sketch = new IntegerTupleSketch(12, IntegerSummary.Mode.Sum);
     sketch.update(1L, 1);
     sketch.update(2L, 1);
-    TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator();
-    accumulator.apply(sketch.compact());
-    return accumulator;
+    return new TupleIntSketchAccumulator(
+        new IntegerSummarySetOperations(IntegerSummary.Mode.Sum, IntegerSummary.Mode.Sum), 16384, 2, sketch.compact());
   }
 
   private static ThetaSketchAccumulator thetaSketchAccumulator() {
-    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator();
-    accumulator.apply(thetaSketch(1, 2));
-    return accumulator;
+    return new ThetaSketchAccumulator(new ThetaSetOperationBuilder(), 2, thetaSketch(1, 2));
   }
 
   private static ThetaSketch thetaSketch(long... values) {

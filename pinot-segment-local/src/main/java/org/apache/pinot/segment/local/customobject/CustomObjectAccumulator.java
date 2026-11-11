@@ -22,32 +22,25 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 
 
-/// Intermediate state used by some aggregation functions which gives the end user more control over how custom objects
-/// are merged for performance reasons.  Some custom objects such as DataSketches have better merge performance when
-/// more than two items are merged at once through the elimination of intermediate bookkeeping overheads.
-///
-/// The end user can set a value for the "threshold" parameter that defers the merge operation until at least as many
-/// items are ready to be merged, or the callee forces the merge directly via "getResult" - e.g. on serialization.
-/// This data structure trades-off more memory usage for a greater degree of pre-aggregation in the accumulator state.
+/// Buffers intermediate values until the configured threshold is reached or a result is requested.
+/// Subclasses merge pending values in [#flush()]. Instances are mutable and not thread-safe.
 public abstract class CustomObjectAccumulator<T> {
   protected ArrayList<T> _accumulator;
-  private int _threshold;
+  private final int _threshold;
   private int _numInputs = 0;
 
-  public CustomObjectAccumulator() {
-    this(2);
-  }
-
-  public CustomObjectAccumulator(int threshold) {
-    setThreshold(threshold);
-  }
-
-  /// Sets the threshold that determines how much memory to use for the internal accumulator state before
-  /// the intermediate state is merged.
-  /// @param threshold the threshold \[> 0\].
-  public void setThreshold(int threshold) {
+  protected CustomObjectAccumulator(int threshold) {
     Preconditions.checkArgument(threshold > 0, "Invalid threshold: %s, must be positive", threshold);
     _threshold = threshold;
+  }
+
+  /// Retains an initial result without flushing, even when the threshold is one. A deserialized sketch can then
+  /// be returned unchanged until another input is added, rather than being unioned again during deserialization.
+  protected CustomObjectAccumulator(int threshold, T initialResult) {
+    this(threshold);
+    _accumulator = new ArrayList<>(1);
+    _accumulator.add(Preconditions.checkNotNull(initialResult));
+    _numInputs = 1;
   }
 
   /// Returns the configured threshold for this accumulator.
@@ -65,9 +58,7 @@ public abstract class CustomObjectAccumulator<T> {
     return _numInputs == 0;
   }
 
-  /// Forces the item T in internal state to be merged with all pending items in the accumulator state
-  /// and returns the result.
-  /// @return T result of the merge.
+  /// Returns the accumulated result, merging pending inputs as needed.
   public abstract T getResult();
 
   /// Merges the pending items into the internal state and clears them, without building a result.
@@ -83,8 +74,7 @@ public abstract class CustomObjectAccumulator<T> {
     applyInternal(result);
   }
 
-  /// Adds a new item to the accumulator state.  If the accumulator state is equal to the threshold value,
-  /// the internal state is updated and the accumulator state is cleared.
+  /// Adds an input and flushes pending inputs when their count reaches the threshold.
   /// @param item the item to add to the accumulator state, cannot be null.
   public void apply(T item) {
     Preconditions.checkNotNull(item);
