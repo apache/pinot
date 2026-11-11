@@ -70,6 +70,12 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 /// The check is conservative: it does not use the size of the data, so it also refuses plans whose data fits in the
 /// mailbox buffers. It also does not trust an early end of the input (for example a `LIMIT`) to free a spool.
 ///
+/// The rules above describe the operators that the runtime builds by default. Aggregate and join operators are
+/// pluggable: a `QueryOperatorFactoryProvider` can replace `AggregateOperatorFactory` and `JoinOperatorFactory`. A
+/// replacement that reads its inputs in another way (for example an aggregate that emits before it reads its whole
+/// input, or a join that reads its left input first) makes this check unsound, and `auto` can then build a spool that
+/// blocks. Such a replacement must keep the read order of the default operators, or this class must learn its order.
+///
 /// This class is stateless and thread-safe.
 public final class SpoolDeadlockGuard {
   /// Marks the absence of a shared stage in the matrix of [Analysis#findRisk]. Stage ids are never negative.
