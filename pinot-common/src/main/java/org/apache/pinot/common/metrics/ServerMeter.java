@@ -45,7 +45,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_ROWS_FETCHED("rows", false),
   REALTIME_ROWS_FILTERED("rows", false),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
-  // Times a message was fetched to be decoded again after its decoder threw RetriableDecodeException
+  // Messages fetched again after their decoder threw RetriableDecodeException
   REALTIME_DECODE_RETRIES("retries", false),
   INCOMPLETE_REALTIME_ROWS_CONSUMED("rows", false),
   REALTIME_CLP_TOO_MANY_ENCODED_VARS("rows", false),

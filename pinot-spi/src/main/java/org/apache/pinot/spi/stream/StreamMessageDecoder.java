@@ -29,19 +29,13 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 /// Interface for a decoder of messages fetched from the stream
 ///
-/// Failure contract of the `decode` methods, as applied by the realtime consumer:
-/// - Returning `null` or throwing any exception other than [RetriableDecodeException] drops the message permanently:
-///   the consumer counts it as an invalid row and moves past it, unless the stream config `stopOnDecodeError` is set,
-///   in which case consumption stops with an error instead.
-/// - Throwing [RetriableDecodeException] means the same message may decode later, e.g. because a schema registry is
-///   temporarily unavailable. The consumer does not move past the message: regardless of `stopOnDecodeError`, it backs
-///   off, then fetches and decodes it again until it decodes. The stream config
-///   [StreamConfigProperties#DECODE_RETRY_MAX_DURATION_MILLIS] (no limit by default) bounds how long retriable failures
-///   are retried during an outage, i.e. while they keep happening less than that duration apart; past it, they are
-///   handled as above until none happens for that long. A segment that reaches its time threshold meanwhile ends
-///   before that message, and the next segment starts from it; if the message is the first of the segment, the segment
-///   is extended instead, as when no message arrives. A force commit, which pausing consumption also sends, ends the
-///   segment before that message as well.
+/// Failure contract of the `decode` methods:
+/// - Returning `null` or throwing any exception other than [RetriableDecodeException] drops the message, or stops
+///   consumption if the stream config `stopOnDecodeError` is set.
+/// - Throwing [RetriableDecodeException] means the message may decode later, e.g. once a schema registry is reachable
+///   again. Regardless of `stopOnDecodeError`, the consumer backs off and fetches the message again until it decodes or
+///   the outage outlasts [StreamConfigProperties#DECODE_RETRY_MAX_DURATION_MILLIS] (no limit by default). A segment
+///   that reaches its time threshold or is force committed (also on pause) meanwhile ends before that message.
 /// @param <T>
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -77,7 +71,7 @@ public interface StreamMessageDecoder<T> {
   /// @param payload The buffer from which to read the row.
   /// @return A new row decoded from the buffer. If the returned value is `null` the row is dropped from the
   ///         segment.
-  /// @throws RetriableDecodeException If the message may decode later, see the failure contract above
+  /// @throws RetriableDecodeException If the message may decode later (see the class doc)
   @Nullable
   GenericRow decode(T payload, GenericRow destination);
 
@@ -89,7 +83,7 @@ public interface StreamMessageDecoder<T> {
   /// @param destination The [GenericRow] to write the decoded row into
   /// @return A new row decoded from the buffer If the returned value is `null` the row is dropped from the
   ///         segment.
-  /// @throws RetriableDecodeException If the message may decode later, see the failure contract above
+  /// @throws RetriableDecodeException If the message may decode later (see the class doc)
   @Nullable
   GenericRow decode(T payload, int offset, int length, GenericRow destination);
 }

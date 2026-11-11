@@ -90,7 +90,7 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
             new RuntimeException("Encountered unknown exception when decoding a Stream message"));
       }
     } catch (RetriableDecodeException e) {
-      // Not logged here, since the message is decoded again until it succeeds: the consumer logs the first failure
+      // Not logged here: the consumer logs retriable failures, rate-limited
       return new StreamDataDecoderResult(null, e);
     } catch (Exception e) {
       LOGGER.error("Failed to decode StreamMessage", e);

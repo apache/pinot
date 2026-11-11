@@ -2048,8 +2048,6 @@ public class RealtimeSegmentDataManagerTest {
     };
   }
 
-  /// Also runs against a stream that, like Kinesis, fetches from after the offset it is given, and with
-  /// `stopOnDecodeError`, which must not turn retriable failures into errors.
   @Test(dataProvider = "decodeRetryModes")
   public void testRetriableDecodeErrorFetchesTheMessageAgainInsteadOfDroppingIt(boolean fetchAfterStartOffset,
       boolean stopOnDecodeError)
@@ -2060,8 +2058,7 @@ public class RealtimeSegmentDataManagerTest {
     long secondFailingOffset = START_OFFSET_VALUE + 12;
     OffsetPayloadDecoder.RETRIABLE_FAILURES.put(firstFailingOffset, new AtomicInteger(3));
     OffsetPayloadDecoder.RETRIABLE_FAILURES.put(secondFailingOffset, new AtomicInteger(1));
-    // Where the consumer stands before a message: at the message itself, or at the previous one for a stream that
-    // fetches from after the given offset
+    // A stream that fetches from after the given offset stands at the previous message
     long fetchOffsetDelta = fetchAfterStartOffset ? 1 : 0;
     long firstFetchOffset = firstFailingOffset - fetchOffsetDelta;
     long secondFetchOffset = secondFailingOffset - fetchOffsetDelta;
@@ -2087,8 +2084,6 @@ public class RealtimeSegmentDataManagerTest {
       softAssert.assertEquals(
           getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES) - retriesBefore, 4,
           "decode retries");
-      // The consumer did not move past a failing message, fetched again from where it stood, and the failing message
-      // was the first one decoded after each fetch
       softAssert.assertEquals(offsetsWhileFailing,
           List.of(firstFetchOffset, firstFetchOffset, firstFetchOffset, secondFetchOffset),
           "current offset during the retriable decode failures");
@@ -2097,10 +2092,9 @@ public class RealtimeSegmentDataManagerTest {
           "fetch start offsets");
       softAssert.assertEquals(OffsetPayloadDecoder.getFirstDecodeAttemptAfterEachRetriableFailure(),
           OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS, "first decode attempt after each retriable decode failure");
-      // The backoff doubled up to the cap, and started over for the second failing message
+      // Doubles up to the cap, and starts over for the second failing message
       softAssert.assertEquals(segmentDataManager._decodeRetrySleeps, List.of(100L, 200L, 250L, 100L),
           "decode retry backoffs");
-      // Every message up to the row limit was indexed, including the ones that failed first
       softAssert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), OFFSET_STREAM_SEGMENT_ROWS,
           "rows indexed");
       softAssert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
@@ -2108,7 +2102,7 @@ public class RealtimeSegmentDataManagerTest {
       softAssert.assertEquals(segmentDataManager._state.get(segmentDataManager),
           RealtimeSegmentDataManager.State.COMMITTED, "state");
       softAssert.assertAll();
-      // Both failing messages belong to one outage, whose first failure is recorded as a segment error
+      // Both failures belong to one outage, reported once
       verify(segmentDataManager.getTableDataManager(), times(1)).addSegmentError(eq(SEGMENT_NAME_STR), any());
     }
   }
@@ -2141,12 +2135,11 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertEquals(
           getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
           0);
-      // A clean exit: no error state and no stoppedConsuming message to the controller
+      // Clean exit: no ERROR state and no stoppedConsuming message
       Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
           RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager._postConsumeStoppedCalled);
-      // The ingestion delay is taken from the last consumed message, neither from the end of the batch nor reset to
-      // zero as for an empty batch
+      // The ingestion delay comes from the last consumed message, not the batch end, and is not reset to zero
       RealtimeTableDataManager tableDataManager = segmentDataManager.getTableDataManager();
       verify(tableDataManager, atLeastOnce()).updateIngestionMetrics(eq(SEGMENT_NAME_STR), anyInt(), anyLong(),
           anyLong(), argThat(offset -> isLongOffset(offset, failingOffset - 1)));
@@ -2171,7 +2164,7 @@ public class RealtimeSegmentDataManagerTest {
       consumerThread.start();
       Assert.assertTrue(segmentDataManager._decodeRetrySleepStarted.await(10, TimeUnit.SECONDS));
 
-      // The production stop(), which interrupts the consumer thread and waits for it
+      // The real stop() interrupts the consumer thread and waits for it
       segmentDataManager.setConsumerThread(consumerThread);
       segmentDataManager.invokeRealStop();
 
@@ -2211,7 +2204,6 @@ public class RealtimeSegmentDataManagerTest {
 
       segmentDataManager.createPartitionConsumer().run();
 
-      // The segment ended on its time limit at the failing message, which the next segment starts from
       Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
       Assert.assertTrue(segmentDataManager._commitSegmentCalled);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(), failingOffset);
@@ -2225,8 +2217,6 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /// A force commit, which pausing consumption also sends, ends the segment at the message being retried without
-  /// waiting for it to decode or for another backoff; the next segment starts from that message.
   @Test(timeOut = 30_000)
   public void testForceCommitWhileRetryingDecodeEndsTheSegmentAtTheMessage()
       throws Exception {
@@ -2268,8 +2258,6 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /// A force commit that arrives during a decode retry backoff wakes it, so the segment ends at the message being
-  /// retried at once instead of after the backoff.
   @Test(timeOut = 30_000)
   public void testForceCommitWakesTheDecodeRetryBackoff()
       throws Exception {
@@ -2305,8 +2293,7 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /// CONSUMING_TO_ONLINE: catching up on the Helix thread has a deadline, which caps the backoff. Catching up gives up
-  /// at the deadline without moving past the failing message, and the segment is downloaded instead.
+  /// The catch-up deadline caps the backoff; at the deadline, the segment is downloaded instead.
   @Test(timeOut = 30_000)
   public void testCatchUpForOnlineTransitionGivesUpAtTheDeadlineWhileRetryingDecode()
       throws Exception {
@@ -2351,8 +2338,6 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /// CATCHING_UP: there is no deadline, so the message is retried with a growing backoff, even past the consumption
-  /// end time, until stop() interrupts the consumer thread, which exits without moving past the message.
   @Test(timeOut = 30_000)
   public void testCatchingUpRetriesDecodeWithoutDeadlineUntilStopped()
       throws Exception {
@@ -2398,7 +2383,7 @@ public class RealtimeSegmentDataManagerTest {
     TimeSupplier timeSupplier = new TimeSupplier();
     try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics,
         timeSupplier, Map.of(StreamConfigProperties.DECODE_RETRY_MAX_DURATION_MILLIS, "1000"))) {
-      // The second failure happens once the message has been retried for longer than the limit
+      // The second failure comes after the 1s limit
       OffsetPayloadDecoder.ON_RETRIABLE_FAILURE.set(() -> timeSupplier.add(1000));
       long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
       long retriesBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_DECODE_RETRIES);
@@ -2441,9 +2426,8 @@ public class RealtimeSegmentDataManagerTest {
 
       consumeToRowLimitAndCommit(segmentDataManager);
 
-      // The first failing message is retried until the outage has lasted 1s, then dropped, and the later failing
-      // messages of the outage are dropped on their first failure, without backoff or fetching again. After 2s without
-      // retriable failure, a new outage starts and the failing message is retried again.
+      // The first message is retried until the outage has lasted 1s, then dropped; later failures of that outage are
+      // dropped at once. The failure 2s later starts a new outage and is retried.
       long firstOffset = outageOffsets.get(0);
       Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS,
           List.of(firstOffset, firstOffset, firstOffset, outageOffsets.get(1), outageOffsets.get(2), nextOutageOffset));
@@ -2493,7 +2477,6 @@ public class RealtimeSegmentDataManagerTest {
 
       consumeToRowLimitAndCommit(segmentDataManager);
 
-      // Every failing message is retried and indexed
       Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS,
           List.of(firstOffset, laterOffset, soonAfterOffset));
       Assert.assertEquals(
@@ -2504,8 +2487,7 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), OFFSET_STREAM_SEGMENT_ROWS);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS);
-      // The first failure and the one 5 minutes later are each reported with a segment error; the one 10 seconds
-      // after that is not
+      // Reported: the first failure and the one 5 minutes later, not the one 10 seconds after that
       verify(segmentDataManager.getTableDataManager(), times(2)).addSegmentError(eq(SEGMENT_NAME_STR), any());
     }
   }
@@ -2526,11 +2508,8 @@ public class RealtimeSegmentDataManagerTest {
 
       Assert.assertEquals(OffsetPayloadConsumerFactory.FETCH_START_OFFSETS,
           List.of(START_OFFSET_VALUE, failingOffset, failingOffset, failingOffset + OFFSET_STREAM_BATCH_SIZE));
-      // 1. The first batch (9 messages and a tombstone) is charged in full when fetched, like any batch.
-      // 2. The batch fetched again stops at the failing message, so it is charged for that message only, by the size
-      //    of its record (3-digit offset value and record overhead).
-      // 3. The batch fetched again is processed in full, so it is charged like any batch, tombstone included.
-      // 4. The next batch is charged in full when fetched, like any batch.
+      // Charged: the first batch (9 messages and a tombstone) when fetched, the refetch stopped at the failing message
+      // for that message only, the refetch processed in full like any batch, and the next batch when fetched
       int recordSizeInBytes = 3 + OffsetPayloadConsumerFactory.RECORD_OVERHEAD_IN_BYTES;
       Assert.assertEquals(segmentDataManager._throttledMessageCounts, List.of(9, 1, 9, 10));
       Assert.assertEquals(segmentDataManager._throttledSizesInBytes,
@@ -2557,7 +2536,6 @@ public class RealtimeSegmentDataManagerTest {
 
       consumeToRowLimitAndCommit(segmentDataManager);
 
-      // Dropped on its first failure, as before retriable decode errors existed
       Assert.assertEquals(OffsetPayloadDecoder.RETRIABLE_FAILURE_OFFSETS, List.of(failingOffset));
       Assert.assertTrue(segmentDataManager._decodeRetrySleeps.isEmpty());
       Assert.assertEquals(
@@ -2582,7 +2560,7 @@ public class RealtimeSegmentDataManagerTest {
       throws Exception {
     TableConfig tableConfig = Fixtures.createTableConfig(OffsetPayloadConsumerFactory.class.getName(),
         OffsetPayloadDecoder.class.getName());
-    // The live stream config map of the table, wherever it is configured
+    // getStreamConfigMaps() returns the table's own map, not a copy
     IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0).putAll(streamConfigs);
     return createFakeSegmentManager(true, timeSupplier, String.valueOf(OFFSET_STREAM_SEGMENT_ROWS), "10m",
         tableConfig, serverMetrics);
@@ -2778,7 +2756,7 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  /// Endless stream whose message at offset `n` has payload `n`. Records the start offset of every fetch.
+  /// Endless stream whose message at offset `n` has payload `n`.
   public static class OffsetPayloadConsumerFactory extends FakeStreamConsumerFactory {
     static final List<Long> FETCH_START_OFFSETS = new CopyOnWriteArrayList<>();
     // Like Kinesis, fetch from after the given offset, and give each message its own offset as next offset
@@ -2853,11 +2831,10 @@ public class RealtimeSegmentDataManagerTest {
   public static class OffsetPayloadDecoder implements StreamMessageDecoder<byte[]> {
     static final Set<Long> DROPPED_OFFSETS = ConcurrentHashMap.newKeySet();
     static final Set<Long> FILTERED_OFFSETS = ConcurrentHashMap.newKeySet();
-    // Offset -> number of decode attempts that throw RetriableDecodeException before the message decodes
+    // Offset -> number of attempts that throw RetriableDecodeException before the message decodes
     static final Map<Long, AtomicInteger> RETRIABLE_FAILURES = new ConcurrentHashMap<>();
-    // Offset of every decode attempt that threw RetriableDecodeException
     static final List<Long> RETRIABLE_FAILURE_OFFSETS = new CopyOnWriteArrayList<>();
-    // Offset of every decode attempt, and the indexes of the attempts that threw RetriableDecodeException
+    // Offsets of all decode attempts, and indexes into it of the attempts that threw RetriableDecodeException
     static final List<Long> DECODE_ATTEMPT_OFFSETS = new CopyOnWriteArrayList<>();
     static final List<Integer> RETRIABLE_FAILURE_ATTEMPTS = new CopyOnWriteArrayList<>();
     // Run before each RetriableDecodeException is thrown
@@ -2877,7 +2854,6 @@ public class RealtimeSegmentDataManagerTest {
       OffsetPayloadConsumerFactory.TOMBSTONE_OFFSETS.clear();
     }
 
-    /// Returns the offset of the decode attempt that follows each retriable failure.
     static List<Long> getFirstDecodeAttemptAfterEachRetriableFailure() {
       List<Long> offsets = new ArrayList<>(RETRIABLE_FAILURE_ATTEMPTS.size());
       for (int attempt : RETRIABLE_FAILURE_ATTEMPTS) {
@@ -2961,12 +2937,11 @@ public class RealtimeSegmentDataManagerTest {
     public RealtimeTableDataManager _tableDataManager;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
-    // Backoffs requested before retrying a decode. They are not slept, unless _decodeRetrySleepStarted is set: then the
-    // one numbered _blockOnDecodeRetrySleep (the first by default) counts it down and sleeps until interrupted.
+    // Requested decode retry backoffs, not slept. If _decodeRetrySleepStarted is set, backoff number
+    // _blockOnDecodeRetrySleep counts it down and blocks until interrupted or woken.
     public final List<Long> _decodeRetrySleeps = new CopyOnWriteArrayList<>();
     public volatile CountDownLatch _decodeRetrySleepStarted;
     public volatile int _blockOnDecodeRetrySleep = 1;
-    // Message counts and sizes the rate limiters were charged for
     public final List<Integer> _throttledMessageCounts = new CopyOnWriteArrayList<>();
     public final List<Long> _throttledSizesInBytes = new CopyOnWriteArrayList<>();
 
@@ -3127,7 +3102,7 @@ public class RealtimeSegmentDataManagerTest {
       super.stop();
     }
 
-    /// Sets the thread that the production stop() interrupts, which startConsumption() normally creates.
+    /// Sets the thread the real stop() interrupts, normally created by startConsumption().
     public void setConsumerThread(Thread consumerThread)
         throws Exception {
       Field consumerThreadField = RealtimeSegmentDataManager.class.getDeclaredField("_consumerThread");

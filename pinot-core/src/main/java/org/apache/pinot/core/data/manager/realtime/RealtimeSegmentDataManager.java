@@ -248,8 +248,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
   private static final int CONSUMER_THREAD_INTERRUPT_INTERVAL_MS = 10000;
-  // While a message keeps failing with RetriableDecodeException, its failures are logged at WARN at most this often.
-  // A retriable failure this long after the previous one, with no message being retried, is reported afresh.
+  // Retriable decode failures are logged at WARN at most this often, see shouldRetryDecode()
   private static final long DECODE_RETRY_WARN_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
 
   private final SegmentZKMetadata _segmentZKMetadata;
@@ -288,18 +287,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile long _numBytesDropped = 0;
   private volatile int _consecutiveErrorCount = 0;
   private volatile boolean _firstDecodeErrorLogged = false;
-  // Retries of the message whose decoder threw RetriableDecodeException: number of failures, and the backoff before
-  // fetching the message again. Reset once the message is decoded or given up on.
+  // Decode retry state, only accessed by the consumer thread
   private int _numDecodeRetries = 0;
   private long _decodeRetryBackoffMs = 0;
-  // The ongoing decode outage (see shouldRetryDecode()): when it started, when its last retriable failure happened and
-  // was logged at WARN, and whether its retry budget is spent.
+  // The ongoing decode outage, see shouldRetryDecode()
   private boolean _inDecodeOutage = false;
   private long _decodeOutageStartTimeMs = 0;
   private long _decodeOutageLastFailureTimeMs = 0;
   private long _decodeOutageLastWarnTimeMs = 0;
   private boolean _decodeOutageRetryBudgetSpent = false;
-  // The retry state above is only accessed by the thread running consumeLoop().
 
   // Configuration constants
   private static final String STOP_ON_DECODE_ERROR_CONFIG = "stopOnDecodeError";
@@ -390,18 +386,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   /// Outcome of [#processStreamEvents].
   private enum BatchOutcome {
-    /// Every message of the batch was processed.
     PROCESSED,
-    /// Processing stopped early because consumption is stopping or an end criterion was reached.
+    /// Stopped early because consumption is stopping or an end criterion was reached.
     STOPPED_EARLY,
-    /// Processing stopped at a message whose decoder threw `RetriableDecodeException`. [#_currentOffset] was not moved
-    /// past it, so the message is fetched and decoded again.
+    /// Stopped at a message to decode again, without moving [#_currentOffset] past it.
     DECODE_RETRY_NEEDED
   }
 
-  /// The first messages of a batch, which the rate limiters are charged for when the batch was fetched again to retry a
-  /// decode and stopped processing after them. Like the stream batches, it is sized with the serialized size of each
-  /// record when known (key, value and headers for Kafka), otherwise with the size of its value.
+  /// The first messages of a batch fetched again to retry a decode, to charge the rate limiters for those processed.
+  /// Sized like stream batches: by serialized record size when known, otherwise by value size.
   private static final class ProcessedMessages<T> implements MessageBatch<T> {
     private final MessageBatch<T> _messageBatch;
     private final int _numMessages;
@@ -606,8 +599,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
-      // A batch fetched again to retry a decode is charged to the rate limiters and the fetched rows meter after
-      // processing, since the messages after the one to retry are fetched again later
+      // A batch fetched again to retry a decode is charged to the rate limiters and fetched rows meter after
+      // processing, for the processed messages only: the rest are fetched again later
       boolean decodeRetryFetch = _numDecodeRetries > 0;
       try {
         messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, _streamConfig.getFetchTimeoutMillis());
@@ -665,8 +658,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
         // We check this flag again further down
       } else if (decodeRetryNeeded) {
-        // The first message of the batch has to be decoded again. Unlike a batch whose messages were all filtered out,
-        // this batch must not be skipped: it is fetched again from the same offset after the backoff below.
+        // Unlike an all-filtered batch, don't skip it: its first message is fetched again after the backoff below
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("No messages processed before a retriable decode error. Staying at offset {}",
               _currentOffset);
@@ -701,8 +693,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         break;
       }
       if (decodeRetryNeeded) {
-        // The loop condition is checked again before the next fetch, so stopping and end criteria are honored between
-        // retries
+        // The loop condition checks stopping and end criteria again before the next fetch
         backOffBeforeDecodeRetry();
       }
     }
@@ -761,12 +752,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   /// @param messageBatch batch of messages to process
   /// @param idlePipeSleepTimeMillis wait time in case no messages were read
-  /// @param decodeRetryFetch whether the batch was fetched again to retry a decode, in which case it is charged to the
-  ///                         rate limiters and the fetched rows meter after processing: in full if it is processed in
-  ///                         full, otherwise only for the messages it processed
-  /// @return [BatchOutcome#STOPPED_EARLY] if the process loop ended before processing the whole batch because of
-  /// stopping or an end criterion, [BatchOutcome#DECODE_RETRY_NEEDED] if it stopped at a message that has to be decoded
-  /// again, [BatchOutcome#PROCESSED] otherwise
+  /// @param decodeRetryFetch whether the batch was fetched again to retry a decode; it is then charged after processing
+  /// @return how processing of the batch ended
   private BatchOutcome processStreamEvents(MessageBatch<?> messageBatch, long idlePipeSleepTimeMillis,
       boolean decodeRetryFetch) {
     int messageCount = messageBatch.getMessageCount();
@@ -827,8 +814,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
       int rowSizeInBytes = metadata.getRecordSerializedSize();
       if (decodedRow.isRetriable() && shouldRetryDecode(offset, decodedRow.getException())) {
-        // The message may decode later, e.g. once its schema registry is reachable again. Stop here without moving
-        // _currentOffset past it, so that consumeLoop() backs off and fetches it again instead of dropping it.
+        // Stop without moving _currentOffset past the message, so that consumeLoop() backs off and fetches it again
         decodeRetryNeeded = true;
         break;
       }
@@ -931,15 +917,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         // The message to decode again counts as processed
         chargeProcessedMessages(messageBatch, decodeRetryNeeded ? streamMessageCount + 1 : streamMessageCount);
       } else {
-        // Processed in full: charged like any other batch
         throttle(messageBatch);
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,
             messageBatch.getUnfilteredMessageCount());
       }
     }
     updateCurrentDocumentCountMetrics();
-    // When stopped at a message to decode again, only the messages before it were consumed. The ingestion delay is then
-    // computed from the last of them, so that it keeps growing while that message is retried.
+    // On a decode retry, the ingestion delay comes from the last consumed message, so it grows while retrying
     boolean consumedFromStream =
         decodeRetryNeeded ? streamMessageCount > 0 : messageBatch.getUnfilteredMessageCount() > 0;
     if (consumedFromStream) {
@@ -979,11 +963,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _serverRateLimiter.throttle(messageBatch);
   }
 
-  /// Charges the rate limiters and the fetched rows meter for the first `numMessages` messages of a batch fetched again
-  /// to retry a decode, which stopped processing after them. Charging after processing keeps the rate, since the rate
-  /// limiters let a caller acquire permits ahead of the rate and make the next caller wait instead.
-  /// The fetched rows meter misses the messages filtered out of the batch (e.g. tombstones) before the stopping point,
-  /// since a batch does not tell where they are.
+  /// Charges the rate limiters and fetched rows meter for the first `numMessages` messages of a batch fetched again to
+  /// retry a decode. Charging after processing still holds the rate: the rate limiters let a caller take permits ahead
+  /// of the rate and make the next caller wait. Filtered messages (e.g. tombstones) are not counted, as the batch does
+  /// not tell where they are.
   private void chargeProcessedMessages(MessageBatch<?> messageBatch, int numMessages) {
     if (numMessages > 0) {
       throttle(new ProcessedMessages<>(messageBatch, numMessages));
@@ -991,13 +974,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Handles a retriable decode failure of the message at `offset`, and returns whether to fetch and decode it again.
-  /// Otherwise, it is handled like any other decode failure.
-  ///
-  /// Retriable failures belong to a decode outage, e.g. of a schema registry. It starts at a retriable failure, and
-  /// lasts while a message is being retried and while retriable failures keep happening within
-  /// [StreamConfig#getDecodeRetryMaxDurationMillis()] of the previous one, whether or not messages decode in between.
-  /// Messages are retried until the outage has lasted that long; after that, its retriable failures are not retried.
+  /// Returns whether to fetch and decode the message at `offset` again after a retriable decode failure; if not, it is
+  /// handled like any other decode failure. Retriable failures form an outage while a message is being retried or they
+  /// keep happening within [StreamConfig#getDecodeRetryMaxDurationMillis()] of each other, and are retried until the
+  /// outage has lasted that long.
   private boolean shouldRetryDecode(StreamPartitionMsgOffset offset, Exception cause) {
     long nowMs = now();
     long maxDurationMillis = _streamConfig.getDecodeRetryMaxDurationMillis();
@@ -1021,10 +1001,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       return false;
     }
 
-    // Retry the message, counting the retry. A failure that starts an outage, or that comes a minute or more after the
-    // previous one with no message being retried, is logged at WARN with its cause and recorded as a segment error.
-    // The rest are logged at WARN at most once a minute. Reporting does not follow the retry budget, so that with no
-    // retry limit, where an outage never ends, a failure long after the last one is still reported with its cause.
+    // A failure that starts an outage or follows a quiet minute is reported with its cause and a segment error, even
+    // mid-outage, since with no retry limit an outage never ends. Other failures WARN at most once a minute.
     _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_DECODE_RETRIES, 1L);
     boolean reportFailure =
         outageStarts || (_numDecodeRetries == 0 && sinceLastFailureMs >= DECODE_RETRY_WARN_INTERVAL_MS);
@@ -1048,11 +1026,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  /// Sleeps before a message whose decoder threw `RetriableDecodeException` is fetched again, doubling the next backoff
-  /// up to the configured cap. The sleep ends at the consumption deadline of states that have one, so that
-  /// [#endCriteriaReached()] can end the segment (or give up catching up) at `_currentOffset`, which still points at
-  /// that message. A force commit, which pausing consumption also sends, ends the segment there: it skips the sleep, or
-  /// wakes it. [#stop()] interrupts the sleep.
+  /// Sleeps the decode retry backoff, then doubles it up to the cap. The sleep ends at the consumption deadline, if
+  /// any, so that [#endCriteriaReached()] ends the segment (or gives up catching up) on time, at the message being
+  /// retried. A force commit, also sent on pause, skips or wakes the sleep; [#stop()] interrupts it.
   private void backOffBeforeDecodeRetry()
       throws InterruptedException {
     if (_shouldStop || forceCommitEndsSegment()) {
@@ -1084,7 +1060,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Whether a force commit ends the segment at the next end criteria check, which it only does in INITIAL_CONSUMING.
+  /// Whether a force commit ends the segment at the next end criteria check (only in INITIAL_CONSUMING).
   private boolean forceCommitEndsSegment() {
     return _state == State.INITIAL_CONSUMING && _forceCommitMessageReceived;
   }

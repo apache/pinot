@@ -157,12 +157,11 @@ public class StreamDataDecoderImplTest {
     StreamDataDecoderResult nullResult = new StreamDataDecoderImpl(new NullDecoder()).decode(message);
     Assert.assertNotNull(nullResult.getException());
     Assert.assertFalse(nullResult.isRetriable());
-    // So does any other exception, even one caused by a RetriableDecodeException: only the exception itself counts
+    // So does any other exception, even one caused by a RetriableDecodeException
     StreamDataDecoderResult wrappedResult = new StreamDataDecoderImpl(
         new ThrowingDecoder(new IllegalStateException(new RetriableDecodeException("wrapped")))).decode(message);
     Assert.assertNotNull(wrappedResult.getException());
     Assert.assertFalse(wrappedResult.isRetriable());
-    // A decoded row is not a failure at all
     Assert.assertFalse(new StreamDataDecoderImpl(new TestDecoder()).decode(message).isRetriable());
   }
 
