@@ -54,7 +54,7 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
-      <version>1.5.0-SNAPSHOT</version>
+      <version>1.7.0-SNAPSHOT</version>
       <classifier>${dependency.classifier}</classifier>
     </dependency>
     <dependency>
