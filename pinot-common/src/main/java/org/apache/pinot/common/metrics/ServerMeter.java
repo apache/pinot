@@ -33,10 +33,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SECONDARY_QUERIES("queries", false),
   NUM_SECONDARY_QUERIES_SCHEDULED("queries", false),
   SERVER_OUT_OF_CAPACITY_EXCEPTIONS("exceptions", false),
-  /// Requests that reached the server after the broker's deadline for them (plus the clock-skew allowance) and were
-  /// answered with a timeout error instead of being executed. Rises when a stalled broker connection recovers and
-  /// delivers the requests that queued up on it while it was stuck. Server-wide, as the backlog belongs to a
-  /// connection rather than to a table; the server log names the tables.
+  /// Requests that reached the server after the broker's deadline plus the clock-skew allowance and were answered with
+  /// a timeout error instead of being executed.
   QUERIES_EXPIRED_ON_ARRIVAL("queries", true),
 
   QUERY_EXECUTION_EXCEPTIONS("exceptions", false),

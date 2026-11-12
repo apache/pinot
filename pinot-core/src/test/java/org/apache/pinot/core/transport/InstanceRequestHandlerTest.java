@@ -30,14 +30,13 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.LongAccumulator;
-import java.util.function.Supplier;
+import java.util.function.LongSupplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
@@ -82,6 +81,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class InstanceRequestHandlerTest {
+  private static final long TIMEOUT_MS = 10_000L;
 
   @BeforeClass
   public void setUp() {
@@ -258,9 +258,9 @@ public class InstanceRequestHandlerTest {
     assertTrue(message.contains("Aggregation function: EXPRMIN is only supported in selection without alias"), message);
   }
 
-  /// A request whose broker deadline is further in the past than the clock-skew allowance is answered with a
-  /// scheduling-timeout error right away and never reaches the scheduler. This is the backlog of a stalled
-  /// connection being delivered after it recovers.
+  /// A request that arrives more than the clock-skew allowance after the broker's deadline is answered with a
+  /// scheduling-timeout error right away and never reaches the scheduler: the backlog of a stalled connection that
+  /// recovered.
   @Test
   public void testRequestPastDeadlineIsAnsweredWithoutScheduling()
       throws Exception {
@@ -268,23 +268,19 @@ public class InstanceRequestHandlerTest {
     InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
     long expiredBefore = ServerMetrics.get().getMeteredValue(ServerMeter.QUERIES_EXPIRED_ON_ARRIVAL).count();
 
-    DataTable response = handle(handler, 123L, () -> Long.toString(System.currentTimeMillis() - 60_000L));
+    DataTable response = handle(handler, 123L, () -> System.currentTimeMillis() - 60_000L);
 
     assertTrue(submitted.isEmpty(), "an expired request must not be scheduled");
-    assertEquals(response.getMetadata().get(MetadataKey.REQUEST_ID.getName()), "123");
     Map<Integer, String> exceptions = response.getExceptions();
-    assertEquals(exceptions.size(), 1);
+    assertEquals(exceptions.keySet(), Set.of(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()));
     String message = exceptions.get(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId());
-    // The fixed prefix is what tells this rejection apart from a scheduler queue timeout, which has the same code
-    assertTrue(message != null && message.startsWith(InstanceRequestHandler.EXPIRED_ON_ARRIVAL_MESSAGE_PREFIX)
-        && message.contains("after the broker deadline"), String.valueOf(exceptions));
+    assertTrue(message.startsWith(InstanceRequestHandler.EXPIRED_ON_ARRIVAL_MESSAGE_PREFIX), message);
     assertEquals(ServerMetrics.get().getMeteredValue(ServerMeter.QUERIES_EXPIRED_ON_ARRIVAL).count(),
         expiredBefore + 1);
   }
 
-  /// The deadline is read before the query is compiled, so the backlog of a recovered connection costs only its
-  /// deserialization on the event loop: an expired request whose query could not even be compiled is answered with
-  /// the timeout rather than with the compile error that [#testRepliesWithErrorWhenQueryCannotBeCompiled] gets.
+  /// The deadline is checked before the query is compiled: an expired request whose query cannot be compiled gets the
+  /// timeout, not the compile error that [#testRepliesWithErrorWhenQueryCannotBeCompiled] gets.
   @Test
   public void testExpiredRequestIsNotCompiled()
       throws Exception {
@@ -292,30 +288,44 @@ public class InstanceRequestHandlerTest {
     InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
 
     DataTable response = handle(handler, 123L, "SELECT EXPR_MIN(a, b) FROM testTable_OFFLINE",
-        () -> Long.toString(System.currentTimeMillis() - 60_000L));
+        () -> System.currentTimeMillis() - 60_000L);
 
     assertTrue(submitted.isEmpty());
     assertEquals(response.getExceptions().keySet(), Set.of(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()),
         String.valueOf(response.getExceptions()));
   }
 
-  /// A deadline that is in the past by less than the allowance is treated as clock skew, not as a stale request.
+  /// A request that arrives after the deadline but within the allowance is executed, but only until the allowance is
+  /// used up rather than for its full timeout from arrival.
   @Test
-  public void testRequestWithinClockSkewAllowanceIsExecuted()
+  public void testLateRequestWithinAllowanceRunsUntilAllowanceEnds()
       throws Exception {
     List<ServerQueryRequest> submitted = new ArrayList<>();
     InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
-    // Warm up the compile and request path so that the second request's offset is not eaten by class loading
-    handle(handler, 1L, null);
+    long[] deadlineMs = new long[1];
 
-    DataTable response = handle(handler, 2L,
-        () -> Long.toString(System.currentTimeMillis() - Server.DEFAULT_REQUEST_DEADLINE_CLOCK_SKEW_MS / 2));
+    DataTable response = handle(handler, 1L,
+        () -> deadlineMs[0] = System.currentTimeMillis() - Server.DEFAULT_REQUEST_DEADLINE_CLOCK_SKEW_MS / 2);
 
-    assertEquals(submitted.size(), 2);
     assertTrue(response.getExceptions().isEmpty(), String.valueOf(response.getExceptions()));
+    assertEquals(submitted.size(), 1);
+    assertEquals(executionDeadlineMs(submitted.get(0)), deadlineMs[0] + Server.DEFAULT_REQUEST_DEADLINE_CLOCK_SKEW_MS);
   }
 
-  /// Old brokers send no deadline, and a non-positive one means the same: the request is executed as before.
+  /// A request that arrives before its deadline keeps its full timeout from arrival.
+  @Test
+  public void testRequestBeforeDeadlineKeepsItsTimeout()
+      throws Exception {
+    List<ServerQueryRequest> submitted = new ArrayList<>();
+    InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
+
+    assertTrue(handle(handler, 1L, () -> System.currentTimeMillis() + 10_000L).getExceptions().isEmpty());
+
+    assertEquals(submitted.size(), 1);
+    assertEquals(executionDeadlineMs(submitted.get(0)), arrivalTimeMs(submitted.get(0)) + TIMEOUT_MS);
+  }
+
+  /// Old brokers send no deadline: the request is executed as before, with its full timeout.
   @Test
   public void testRequestWithoutDeadlineIsExecuted()
       throws Exception {
@@ -323,58 +333,49 @@ public class InstanceRequestHandlerTest {
     InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
 
     assertTrue(handle(handler, 1L, null).getExceptions().isEmpty());
-    assertTrue(handle(handler, 2L, () -> "0").getExceptions().isEmpty());
-    assertTrue(handle(handler, 3L, () -> "-1").getExceptions().isEmpty());
-    assertEquals(submitted.size(), 3);
+
+    assertEquals(submitted.size(), 1);
+    assertEquals(executionDeadlineMs(submitted.get(0)), arrivalTimeMs(submitted.get(0)) + TIMEOUT_MS);
   }
 
-  /// A huge deadline, which only an old broker forwarding a user's value can send, is far in the future rather than
-  /// overflowing into a rejection: the check subtracts the deadline from the arrival time instead of adding the
-  /// allowance to the deadline.
+  /// A far-off deadline overflows neither into a rejection nor into a capped execution deadline.
   @Test
   public void testHugeDeadlineIsExecuted()
       throws Exception {
     List<ServerQueryRequest> submitted = new ArrayList<>();
     InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
 
-    assertTrue(handle(handler, 1L, () -> Long.toString(Long.MAX_VALUE)).getExceptions().isEmpty());
-    assertTrue(handle(handler, 2L, () -> Long.toString(Long.MAX_VALUE - 1)).getExceptions().isEmpty());
-    assertEquals(submitted.size(), 2);
+    assertTrue(handle(handler, 1L, () -> Long.MAX_VALUE).getExceptions().isEmpty());
+
+    assertEquals(submitted.size(), 1);
+    assertEquals(executionDeadlineMs(submitted.get(0)), arrivalTimeMs(submitted.get(0)) + TIMEOUT_MS);
   }
 
-  /// A value that is not a number (only an old broker forwards user input unchanged) is answered with the parse error
-  /// under the request's own id, so the broker does not wait for the query to time out, and is not scheduled.
-  @Test
-  public void testMalformedDeadlineIsAnsweredWithParseError()
-      throws Exception {
-    List<ServerQueryRequest> submitted = new ArrayList<>();
-    InstanceRequestHandler handler = createHandler(new PinotConfiguration(), submitted);
-
-    DataTable response = handle(handler, 7L, () -> "soon");
-
-    assertTrue(submitted.isEmpty());
-    Map<Integer, String> exceptions = response.getExceptions();
-    assertEquals(exceptions.keySet(), Set.of(QueryErrorCode.QUERY_EXECUTION.getId()));
-    assertTrue(exceptions.get(QueryErrorCode.QUERY_EXECUTION.getId()).contains(QueryOptionKey.REQUEST_DEADLINE_MS),
-        String.valueOf(exceptions));
-  }
-
-  /// A negative allowance switches the check off; a zero allowance drops any request past its deadline.
+  /// A negative allowance switches both the check and the cap off; a zero allowance drops any request past its
+  /// deadline.
   @Test
   public void testClockSkewAllowanceConfig()
       throws Exception {
     List<ServerQueryRequest> submitted = new ArrayList<>();
     InstanceRequestHandler disabled = createHandler(
         new PinotConfiguration(Map.of(Server.CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS, "-1")), submitted);
-    assertTrue(handle(disabled, 1L, () -> Long.toString(System.currentTimeMillis() - 60_000L)).getExceptions()
-        .isEmpty());
+    assertTrue(handle(disabled, 1L, () -> System.currentTimeMillis() - 60_000L).getExceptions().isEmpty());
     assertEquals(submitted.size(), 1);
+    assertEquals(executionDeadlineMs(submitted.get(0)), arrivalTimeMs(submitted.get(0)) + TIMEOUT_MS);
 
     InstanceRequestHandler strict = createHandler(
         new PinotConfiguration(Map.of(Server.CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS, "0")), submitted);
-    DataTable response = handle(strict, 2L, () -> Long.toString(System.currentTimeMillis() - 50L));
+    DataTable response = handle(strict, 2L, () -> System.currentTimeMillis() - 50L);
     assertEquals(submitted.size(), 1, "a request past its deadline must not be scheduled with a zero allowance");
     assertEquals(response.getExceptions().keySet(), Set.of(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId()));
+  }
+
+  private static long executionDeadlineMs(ServerQueryRequest queryRequest) {
+    return queryRequest.toExecutionContext("server01").getActiveDeadlineMs();
+  }
+
+  private static long arrivalTimeMs(ServerQueryRequest queryRequest) {
+    return queryRequest.getTimerContext().getQueryArrivalTimeMs();
   }
 
   /// A handler whose scheduler records what it is given and answers each request with an empty data table.
@@ -404,30 +405,27 @@ public class InstanceRequestHandlerTest {
         ThreadAccountantUtils.getNoOpAccountant());
   }
 
-  /// Feeds the handler a serialized request for `testTable_OFFLINE` with a 10s timeout and the `requestDeadlineMs`
-  /// option the supplier gives (none when the supplier is null), and returns the data table it wrote back. The
-  /// supplier is read after the SQL has been compiled, right before the request is handed over, so that a slow first
-  /// compile cannot eat into an offset relative to the current time.
-  private static DataTable handle(InstanceRequestHandler handler, long requestId,
-      @Nullable Supplier<String> requestDeadlineMs)
+  /// Feeds the handler a serialized request for `testTable_OFFLINE` with a [#TIMEOUT_MS] timeout and the deadline the
+  /// supplier gives (none when the supplier is null), and returns the data table it wrote back. The supplier is read
+  /// after the SQL has been compiled, right before the request is handed over, so that a slow first compile cannot
+  /// eat into an offset relative to the current time.
+  private static DataTable handle(InstanceRequestHandler handler, long requestId, @Nullable LongSupplier deadlineMs)
       throws Exception {
-    return handle(handler, requestId, "SELECT * FROM testTable_OFFLINE", requestDeadlineMs);
+    return handle(handler, requestId, "SELECT * FROM testTable_OFFLINE", deadlineMs);
   }
 
   private static DataTable handle(InstanceRequestHandler handler, long requestId, String sql,
-      @Nullable Supplier<String> requestDeadlineMs)
+      @Nullable LongSupplier deadlineMs)
       throws Exception {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    Map<String, String> queryOptions = new HashMap<>();
-    queryOptions.put(QueryOptionKey.TIMEOUT_MS, "10000");
-    if (requestDeadlineMs != null) {
-      queryOptions.put(QueryOptionKey.REQUEST_DEADLINE_MS, requestDeadlineMs.get());
-    }
-    pinotQuery.setQueryOptions(queryOptions);
+    pinotQuery.setQueryOptions(Map.of(QueryOptionKey.TIMEOUT_MS, Long.toString(TIMEOUT_MS)));
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);
-    byte[] requestBytes =
-        new TSerializer(new TCompactProtocol.Factory()).serialize(new InstanceRequest(requestId, brokerRequest));
+    InstanceRequest instanceRequest = new InstanceRequest(requestId, brokerRequest);
+    if (deadlineMs != null) {
+      instanceRequest.setDeadlineMs(deadlineMs.getAsLong());
+    }
+    byte[] requestBytes = new TSerializer(new TCompactProtocol.Factory()).serialize(instanceRequest);
 
     ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
     when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));

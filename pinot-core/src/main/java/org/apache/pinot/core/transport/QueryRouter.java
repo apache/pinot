@@ -153,6 +153,11 @@ public class QueryRouter {
         new AsyncQueryResponse(this, requestId, requestMap.keySet(), System.currentTimeMillis(), timeoutMs,
             _serverRoutingStatsManager, skipUnavailableServers);
     _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
+    // Lets a server skip a request that reaches it after this broker stopped waiting, see InstanceRequestHandler
+    long deadlineMs = asyncQueryResponse.getMaxEndTimeMs();
+    for (InstanceRequest instanceRequest : requestMap.values()) {
+      instanceRequest.setDeadlineMs(deadlineMs);
+    }
     for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
       ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
