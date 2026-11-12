@@ -162,6 +162,12 @@ public class LogicalTableConfigUtils {
           "Invalid logical table. Reason: 'quota.storage' should not be set for logical table");
     }
 
+    // validate quota.maxPrimaryKeysPerPartition is not set, it only applies to upsert-enabled physical realtime tables
+    if (quotaConfig != null && quotaConfig.getMaxPrimaryKeysPerPartition() != null) {
+      throw new IllegalArgumentException(
+          "Invalid logical table. Reason: 'quota.maxPrimaryKeysPerPartition' should not be set for logical table");
+    }
+
     // validate time boundary config is not null for hybrid tables
     TimeBoundaryConfig timeBoundaryConfig = logicalTableConfig.getTimeBoundaryConfig();
     if (logicalTableConfig.isHybridLogicalTable() && timeBoundaryConfig == null) {

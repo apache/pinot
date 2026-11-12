@@ -218,6 +218,7 @@ public final class TableConfigUtils {
         existingOverriddenColumns);
 
     validateValidationConfig(tableConfig, schema);
+    validateQuotaConfig(tableConfig);
     validateSegmentAssignmentConfigs(tableConfig);
     validatePartitionColumnConsistency(tableConfig);
     validateIngestionConfig(tableConfig, schema, existingTableConfig);
@@ -1067,6 +1068,19 @@ public final class TableConfigUtils {
         throw new IllegalStateException("Missing property of protoClassName for ProtoBufMessageDecoder");
       }
     }
+  }
+
+  /// Validates the quota config. The per-partition primary key quota only applies to upsert-enabled realtime tables,
+  /// since only those maintain the per-partition primary key map it bounds.
+  @VisibleForTesting
+  static void validateQuotaConfig(TableConfig tableConfig) {
+    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    if (quotaConfig == null || quotaConfig.getMaxPrimaryKeysPerPartition() == null) {
+      return;
+    }
+    Preconditions.checkState(
+        tableConfig.getTableType() == TableType.REALTIME && tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE,
+        "Quota 'maxPrimaryKeysPerPartition' is only applicable to upsert-enabled realtime tables");
   }
 
   /// Validates the requirements shared by upsert and dedup tables: the primary key columns exist in the schema and are
@@ -2417,9 +2431,10 @@ public final class TableConfigUtils {
             tableConfig.getTableName());
       } else {
         if (quotaConfig.getStorage() == null) {
-          // set a default storage quota and keep the RPS value and the enforcement modes
+          // set a default storage quota and keep all other quota fields (QPS, enforcement modes, PK quota)
           tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond(),
-              quotaConfig.getStorageQuotaEnforcementMode(), quotaConfig.getQueryQuotaEnforcementMode()));
+              quotaConfig.getStorageQuotaEnforcementMode(), quotaConfig.getQueryQuotaEnforcementMode(),
+              quotaConfig.getMaxPrimaryKeysPerPartition(), quotaConfig.getPrimaryKeyQuotaEnforcementMode()));
           LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
               tableConfig.getTableName());
         } else {
