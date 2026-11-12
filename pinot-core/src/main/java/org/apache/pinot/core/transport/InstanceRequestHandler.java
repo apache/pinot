@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.math.LongMath;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -71,6 +72,10 @@ import org.slf4j.LoggerFactory;
 /// instance requests sent from Pinot Broker.
 @ChannelHandler.Sharable
 public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
+  /// Start of the error message for a request that arrived after the broker's deadline, which tells it apart from a
+  /// scheduler queue timeout (both carry [QueryErrorCode#QUERY_SCHEDULING_TIMEOUT]).
+  public static final String EXPIRED_ON_ARRIVAL_MESSAGE_PREFIX = "Expired on arrival:";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceRequestHandler.class);
 
   // TODO: make it configurable
@@ -91,6 +96,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private final AccessControl _accessControl;
   private final ThreadAccountant _threadAccountant;
   private final ConcurrentHashMap<String, QueryExecutionContext> _executionContexts;
+  // See Server.CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS; negative disables the deadline check.
+  private final long _requestDeadlineClockSkewMs;
   private final ServerMetrics _serverMetrics = ServerMetrics.get();
 
   public InstanceRequestHandler(String instanceName, PinotConfiguration config, QueryScheduler queryScheduler,
@@ -106,6 +113,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     } else {
       _executionContexts = null;
     }
+    _requestDeadlineClockSkewMs = config.getProperty(Server.CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS,
+        Server.DEFAULT_REQUEST_DEADLINE_CLOCK_SKEW_MS);
   }
 
   @Override
@@ -141,6 +150,9 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       sendPingResponse(ctx, instanceRequest.getRequestId());
       return;
     }
+    if (rejectIfExpired(instanceRequest, ctx, queryArrivalTimeMs)) {
+      return;
+    }
     ServerQueryRequest queryRequest;
     try {
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
@@ -153,6 +165,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
           DataTableBuilderFactory.getEmptyDataTable(), e);
       return;
+    }
+    if (_requestDeadlineClockSkewMs >= 0 && instanceRequest.isSetDeadlineMs()) {
+      // A request that arrived late but within the allowance runs only until the allowance is used up
+      queryRequest.setMaxDeadlineMs(
+          LongMath.saturatedAdd(instanceRequest.getDeadlineMs(), _requestDeadlineClockSkewMs));
     }
     _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES_ON_TABLE, 1);
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
@@ -181,6 +198,38 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     } catch (Exception e) {
       LOGGER.warn("Failed to answer ping request: {}", requestId, e);
     }
+  }
+
+  /// Answers a request that arrived more than the clock-skew allowance after the broker's deadline with a timeout error
+  /// instead of executing it, e.g. the backlog a stalled connection delivers once it recovers, and returns `true`. The
+  /// check runs before the query is compiled, so such a backlog costs little more than its deserialization.
+  private boolean rejectIfExpired(InstanceRequest instanceRequest, ChannelHandlerContext ctx,
+      long queryArrivalTimeMs) {
+    if (_requestDeadlineClockSkewMs < 0 || !instanceRequest.isSetDeadlineMs()) {
+      return false;
+    }
+    long deadlineMs = instanceRequest.getDeadlineMs();
+    // Subtract rather than add, so that a far-off deadline cannot overflow into a rejection
+    long lateByMs = queryArrivalTimeMs - deadlineMs;
+    if (lateByMs <= _requestDeadlineClockSkewMs) {
+      return false;
+    }
+    long requestId = instanceRequest.getRequestId();
+    String tableNameWithType = getTableNameWithType(instanceRequest);
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_EXPIRED_ON_ARRIVAL, 1);
+    LOGGER.debug("Not executing request: {} from broker: {} on table: {}, arrived {}ms after the broker deadline",
+        requestId, instanceRequest.getBrokerId(), tableNameWithType, lateByMs);
+    try {
+      DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+      dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+      dataTable.addException(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT,
+          String.format("%s request reached %s at %d, %dms after the broker deadline %d, and was not executed",
+              EXPIRED_ON_ARRIVAL_MESSAGE_PREFIX, _instanceName, queryArrivalTimeMs, lateByMs, deadlineMs));
+      sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, dataTable.toDataBuffer());
+    } catch (Exception e) {
+      LOGGER.error("Exception while sending the expired response for request: {}", requestId, e);
+    }
+    return true;
   }
 
   /// Submit query for execution and register callback for execution results.
@@ -293,8 +342,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     return new HashSet<>(_executionContexts.keySet());
   }
 
-  /// Returns the table name of a deserialized request that could not be compiled, or `null` if the request does not
-  /// carry one.
+  /// Returns the table name of a deserialized request that is not compiled yet (or could not be), or `null` if the
+  /// request does not carry one.
   @Nullable
   private static String getTableNameWithType(InstanceRequest instanceRequest) {
     BrokerRequest brokerRequest = instanceRequest.getQuery();

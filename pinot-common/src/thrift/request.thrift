@@ -64,4 +64,7 @@ struct InstanceRequest {
   // without running anything; an older server ignores the field and answers it as an ordinary query, once the queries
   // queued ahead of it have run.
   9: optional bool ping;
+  // Epoch time in milliseconds at which the broker stops waiting for the response. A server that understands it does
+  // not execute a request that arrives too long after it; an older server ignores the field.
+  10: optional i64 deadlineMs;
 }
