@@ -306,6 +306,96 @@ public class ArrayLiteralTransformFunctionTest {
   }
 
   @Test
+  public void testCastWithWhitespaceTrimming() {
+    FunctionContext castTimestampMillis = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, " 1577865600000 "),
+            ExpressionContext.forLiteral(DataType.STRING, "TIMESTAMP")));
+    ArrayLiteralTransformFunction timestampArray =
+        new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castTimestampMillis)));
+    Assert.assertEquals(timestampArray.getResultMetadata().getDataType(), DataType.TIMESTAMP);
+    Assert.assertEquals(timestampArray.getLongArrayLiteral(), new long[]{1577865600000L});
+
+    FunctionContext castTimestampStr = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, " 2020-01-01 00:00:00 "),
+            ExpressionContext.forLiteral(DataType.STRING, "TIMESTAMP")));
+    ArrayLiteralTransformFunction timestampStrArray =
+        new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castTimestampStr)));
+    Assert.assertEquals(timestampStrArray.getResultMetadata().getDataType(), DataType.TIMESTAMP);
+    Assert.assertEquals(timestampStrArray.getLongArrayLiteral(),
+        new long[]{Timestamp.valueOf("2020-01-01 00:00:00").getTime()});
+
+    UUID uuid = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    FunctionContext castUuid = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, " 550e8400-e29b-41d4-a716-446655440000 "),
+            ExpressionContext.forLiteral(DataType.STRING, "UUID")));
+    ArrayLiteralTransformFunction uuidArray =
+        new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castUuid)));
+    Assert.assertEquals(uuidArray.getResultMetadata().getDataType(), DataType.UUID);
+    Assert.assertEquals(uuidArray.getBytesArrayLiteral(), new byte[][]{UuidUtils.toBytes(uuid)});
+
+    FunctionContext castInt = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, " 123 "),
+            ExpressionContext.forLiteral(DataType.STRING, "INT")));
+    ArrayLiteralTransformFunction intArray =
+        new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castInt)));
+    Assert.assertEquals(intArray.getIntArrayLiteral(), new int[]{123});
+
+    FunctionContext castLong = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, " 123456789012 "),
+            ExpressionContext.forLiteral(DataType.STRING, "BIGINT")));
+    ArrayLiteralTransformFunction longArray =
+        new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castLong)));
+    Assert.assertEquals(longArray.getLongArrayLiteral(), new long[]{123456789012L});
+
+    FunctionContext castBigDecimal = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, " 123.45 "),
+            ExpressionContext.forLiteral(DataType.STRING, "DECIMAL")));
+    ArrayLiteralTransformFunction bigDecimalArray =
+        new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castBigDecimal)));
+    Assert.assertEquals(bigDecimalArray.getBigDecimalArrayLiteral(), new BigDecimal[]{new BigDecimal("123.45")});
+
+    FunctionContext castBoolean = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.STRING, " true "),
+            ExpressionContext.forLiteral(DataType.STRING, "BOOL")));
+    ArrayLiteralTransformFunction booleanArray =
+        new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castBoolean)));
+    Assert.assertEquals(booleanArray.getIntArrayLiteral(), new int[]{1});
+  }
+
+  @Test
+  public void testRejectsNullElements() {
+    FunctionContext castNullTimestamp = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.UNKNOWN, null),
+            ExpressionContext.forLiteral(DataType.STRING, "TIMESTAMP")));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castNullTimestamp))));
+
+    FunctionContext castNullString = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.UNKNOWN, null),
+            ExpressionContext.forLiteral(DataType.STRING, "VARCHAR")));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castNullString))));
+
+    FunctionContext castNullUuid = new FunctionContext(FunctionContext.Type.TRANSFORM, "cast",
+        List.of(ExpressionContext.forLiteral(DataType.UNKNOWN, null),
+            ExpressionContext.forLiteral(DataType.STRING, "UUID")));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new ArrayLiteralTransformFunction(List.of(ExpressionContext.forFunction(castNullUuid))));
+
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new ArrayLiteralTransformFunction(List.of(ExpressionContext.forLiteral(DataType.UNKNOWN, null))));
+
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new ArrayLiteralTransformFunction(new LiteralContext(DataType.TIMESTAMP, new Timestamp[]{null})));
+
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new ArrayLiteralTransformFunction(new LiteralContext(DataType.STRING, new String[]{null})));
+
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> new ArrayLiteralTransformFunction(new LiteralContext(DataType.UUID, new UUID[]{null})));
+  }
+
+  @Test
   public void testEmptyArrayTransform() {
     List<ExpressionContext> arrayExpressions = new ArrayList<>();
     ArrayLiteralTransformFunction emptyLiteral = new ArrayLiteralTransformFunction(arrayExpressions);

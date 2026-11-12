@@ -62,4 +62,10 @@ public class ArrayFunctionsTest {
 
     Assert.assertEquals(ArrayFunctions.arrayValueConstructor(expected[0], expected[1]), expected);
   }
+
+  @Test
+  public void testArrayValueConstructorRejectsNull() {
+    Assert.assertThrows(IllegalArgumentException.class, () -> ArrayFunctions.arrayValueConstructor((Object) null));
+    Assert.assertThrows(IllegalArgumentException.class, () -> ArrayFunctions.arrayValueConstructor("foo", null));
+  }
 }

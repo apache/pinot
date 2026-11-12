@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -303,6 +304,9 @@ public class ArrayFunctions {
   public static Object arrayValueConstructor(Object... arr) {
     if (arr == null || arr.length == 0) {
       return arr;
+    }
+    for (Object elem : arr) {
+      Preconditions.checkArgument(elem != null, "Null element in array is not supported");
     }
     Class<?> clazz = arr[0].getClass();
     if (clazz == Integer.class) {

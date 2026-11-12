@@ -20,6 +20,7 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -61,6 +62,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
 
 
 public class TransformQueriesTest extends BaseQueriesTest {
@@ -337,5 +339,25 @@ public class TransformQueriesTest extends BaseQueriesTest {
 
     assertEquals(dataSchema.getColumnDataType(3), ColumnDataType.UUID_ARRAY);
     assertEquals(row[3], new String[]{"550e8400-e29b-41d4-a716-446655440000"});
+
+    // Trimmed whitespace in logical array literals
+    query = "SELECT ARRAY[CAST(' 1577865600000 ' AS TIMESTAMP)], "
+        + "ARRAY[CAST(' 550e8400-e29b-41d4-a716-446655440000 ' AS UUID)] FROM testTable LIMIT 1";
+    resultTable = getBrokerResponse(query).getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    row = resultTable.getRows().get(0);
+    dataSchema = resultTable.getDataSchema();
+
+    assertEquals(dataSchema.getColumnDataType(0), ColumnDataType.TIMESTAMP_ARRAY);
+    assertEquals(row[0], new String[]{new Timestamp(1577865600000L).toString()});
+
+    assertEquals(dataSchema.getColumnDataType(1), ColumnDataType.UUID_ARRAY);
+    assertEquals(row[1], new String[]{"550e8400-e29b-41d4-a716-446655440000"});
+
+    // Reject null elements in array literals
+    assertThrows(IllegalArgumentException.class,
+        () -> getBrokerResponse("SELECT ARRAY[CAST(NULL AS TIMESTAMP)] FROM testTable LIMIT 1"));
+    assertThrows(IllegalArgumentException.class,
+        () -> getBrokerResponse("SELECT ARRAY[CAST(NULL AS VARCHAR)] FROM testTable LIMIT 1"));
   }
 }
