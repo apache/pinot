@@ -691,15 +691,25 @@ public class MultistageGroupByExecutor {
   /// row with more combinations than one batch holds is split into ranges of combinations, and each range goes into its
   /// own batch. This is correct because a row that adds its values to the groups of two ranges gives the same result
   /// as a row that adds them to the groups of both ranges at once.
+  ///
+  /// When only the rows that match a filter create group ids (see [#getRowsWithGroups(MseBlock.Data)]), the batches
+  /// contain only those rows.
   private void processMvAggregateInBatches(MseBlock.Data block) {
     RowHeapDataBlock rowHeap = block.asRowHeap();
     DataSchema dataSchema = rowHeap.getDataSchema();
     AggregationFunction[] aggFunctions = rowHeap.getAggFunctions();
+    List<Object[]> rows = rowHeap.getRows();
+    RoaringBitmap rowsWithGroups = getRowsWithGroups(rowHeap);
     List<Object[]> batchRows = new ArrayList<>();
     IntArrayList batchFroms = new IntArrayList();
     IntArrayList batchTos = new IntArrayList();
     int batchSize = 0;
-    for (Object[] row : rowHeap.getRows()) {
+    int numRows = rows.size();
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      if (rowsWithGroups != null && !rowsWithGroups.contains(rowId)) {
+        continue;
+      }
+      Object[] row = rows.get(rowId);
       int numCombinations = countMvCombinations(row);
       int from = 0;
       while (from < numCombinations) {
@@ -723,6 +733,31 @@ public class MultistageGroupByExecutor {
       processMvBatchAndCheckTermination(new RowHeapDataBlock(batchRows, dataSchema, aggFunctions), batchFroms,
           batchTos);
     }
+  }
+
+  /// Returns the rows of `block` that create group ids, or `null` when every row creates group ids.
+  ///
+  /// When [#_filteredAggregationsSkipEmptyGroups] is set and every aggregation has a filter, a row creates group ids
+  /// only when it matches at least one of the filters. The other rows do not change the result, so the batches skip
+  /// them. This also keeps a row that matches no filter from causing an overflow error when its combinations are
+  /// counted.
+  @Nullable
+  private RoaringBitmap getRowsWithGroups(MseBlock.Data block) {
+    if (!_filteredAggregationsSkipEmptyGroups || _maxFilterArgId < 0) {
+      return null;
+    }
+    RoaringBitmap rowsWithGroups = new RoaringBitmap();
+    boolean[] seen = new boolean[_maxFilterArgId + 1];
+    for (int filterArgId : _filterArgIds) {
+      if (filterArgId < 0) {
+        return null;
+      }
+      if (!seen[filterArgId]) {
+        seen[filterArgId] = true;
+        rowsWithGroups.or(AggregateOperator.getMatchedBitmap(block, filterArgId));
+      }
+    }
+    return rowsWithGroups;
   }
 
   private void processMvBatchAndCheckTermination(MseBlock.Data batch, IntArrayList froms, IntArrayList tos) {

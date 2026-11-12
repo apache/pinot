@@ -402,5 +402,167 @@
         "expectedException": ".*GROUP BY ARRAY_TO_MV\\(\\) is not supported with WITHIN GROUP ordered aggregates.*"
       }
     ]
+  },
+  "array_to_mv_null_filter_tests": {
+    "queries": [
+      {
+        "description": "COALESCE with a default that does not match: the null check becomes IS NOT NULL",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') = 'a'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[AND(IS NOT NULL(ARRAY_TO_MV($7)), =(ARRAY_TO_MV($7), _UTF-8'a'))])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "COALESCE with a default that matches: null rows match",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') = 'x'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[OR(IS NULL(ARRAY_TO_MV($7)), =(ARRAY_TO_MV($7), _UTF-8'x'))])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "COALESCE with <>",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') <> 'a'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[OR(IS NULL(ARRAY_TO_MV($7)), <>(ARRAY_TO_MV($7), _UTF-8'a'))])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "COALESCE with IN",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') IN ('a', 'x')",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[OR(IS NULL(ARRAY_TO_MV($7)), AND(IS NOT NULL(ARRAY_TO_MV($7)), =(ARRAY_TO_MV($7), _UTF-8'a')), =(ARRAY_TO_MV($7), _UTF-8'x'))])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "COALESCE with <",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') < 'b'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[AND(IS NOT NULL(ARRAY_TO_MV($7)), <(ARRAY_TO_MV($7), _UTF-8'b'))])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "COALESCE with LIKE",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') LIKE 'x%'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[OR(IS NULL(ARRAY_TO_MV($7)), LIKE(ARRAY_TO_MV($7), _UTF-8'x%'))])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "CASE WHEN IS NULL form",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE CASE WHEN ARRAY_TO_MV(mcol1) IS NULL THEN 'x' ELSE ARRAY_TO_MV(mcol1) END = 'a'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[AND(IS NOT NULL(ARRAY_TO_MV($7)), =(ARRAY_TO_MV($7), _UTF-8'a'))])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "COALESCE with a column as default: the null branch is kept",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), col1) = 'a'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[OR(AND(IS NULL(ARRAY_TO_MV($7)), =($0, _UTF-8'a')), AND(IS NOT NULL(ARRAY_TO_MV($7)), =(ARRAY_TO_MV($7), _UTF-8'a')))])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "COALESCE with three operands",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), NULL, 'x') = 'x'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[OR(IS NULL(ARRAY_TO_MV($7)), =(ARRAY_TO_MV($7), _UTF-8'x'))])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "COALESCE inside another function is not rewritten",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE UPPER(COALESCE(ARRAY_TO_MV(mcol1), 'x')) = 'A'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[=(UPPER(COALESCE(ARRAY_TO_MV($7), _UTF-8'x')), _UTF-8'A')])",
+          "\n        PinotLogicalTableScan(table=[[default, f]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Non-nullable MV column: Calcite removes COALESCE, the rule does nothing",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM e WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') = 'a'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalFilter(condition=[=(ARRAY_TO_MV($7), _UTF-8'a')])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Above a LEFT JOIN with a default that does not match: Calcite keeps the LEFT JOIN, so the filter stays in the intermediate stage",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM a LEFT JOIN f ON a.col1 = f.col1 WHERE COALESCE(ARRAY_TO_MV(f.mcol1), 'x') = 'a'",
+        "expectedException": ".*ARRAY_TO_MV found in FILTER in the intermediate stage.*"
+      },
+      {
+        "description": "Above a LEFT JOIN with a default that matches: the filter stays in the intermediate stage",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM a LEFT JOIN f ON a.col1 = f.col1 WHERE COALESCE(ARRAY_TO_MV(f.mcol1), 'x') = 'x'",
+        "expectedException": ".*ARRAY_TO_MV found in FILTER in the intermediate stage.*"
+      },
+      {
+        "description": "A plain ARRAY_TO_MV predicate above a LEFT JOIN also stays in the intermediate stage",
+        "sql": "EXPLAIN PLAN FOR SELECT COUNT(*) FROM a LEFT JOIN f ON a.col1 = f.col1 WHERE ARRAY_TO_MV(f.mcol1) = 'a'",
+        "expectedException": ".*ARRAY_TO_MV found in FILTER in the intermediate stage.*"
+      }
+    ]
   }
 }

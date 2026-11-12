@@ -302,6 +302,33 @@ public class MvAggregateOperatorTest {
             List.of(11.0, 3L)));
   }
 
+  /// With only filtered aggregations and empty groups skipped, the batches skip the rows that match no filter. The
+  /// second row has 50,000^2 combinations, more than an int holds, and must not cause an overflow error.
+  @Test(dataProvider = "serialized")
+  public void testBatchesSkipRowsThatMatchNoFilter(boolean serialized) {
+    DataSchema inSchema = new DataSchema(new String[]{"mv1", "mv2", "v", "flag"},
+        new ColumnDataType[]{INT_ARRAY, INT_ARRAY, DOUBLE, BOOLEAN});
+    int[] values = new int[50_000];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = i;
+    }
+    mockInput(serialized, inSchema, new Object[]{new int[]{1, 2}, new int[]{10, 20, 30}, 1.0, 1},
+        new Object[]{values, values, 100.0, 0}, new Object[]{new int[]{2}, new int[]{30, 30}, 5.0, 1});
+    DataSchema resultSchema = new DataSchema(new String[]{"mv1", "mv2", "sum", "filteredCnt"},
+        new ColumnDataType[]{INT, INT, DOUBLE, LONG});
+    MvAggregateOperator operator =
+        getOperator(resultSchema, List.of(getSum(new RexExpression.InputRef(2)), getCountStar()), List.of(3, 3),
+            List.of(0, 1), List.of(0, 1), PlanNode.NodeHint.EMPTY,
+            Map.of(QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS, "true"));
+    operator._groupByExecutor.setMaxGroupIdsPerBatch(4);
+
+    Map<List<Object>, List<Object>> result = getResult(operator, 2);
+
+    assertEquals(result,
+        Map.of(List.of(1, 10), List.of(1.0, 1L), List.of(1, 20), List.of(1.0, 1L), List.of(1, 30), List.of(1.0, 1L),
+            List.of(2, 10), List.of(1.0, 1L), List.of(2, 20), List.of(1.0, 1L), List.of(2, 30), List.of(11.0, 3L)));
+  }
+
   /// More combinations in one row than an int holds fail the query as a resource limit.
   @Test
   public void testTooManyCombinations() {
