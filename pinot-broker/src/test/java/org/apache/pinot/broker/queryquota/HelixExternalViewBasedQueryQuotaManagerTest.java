@@ -682,11 +682,11 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 50.0);
     Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.SHADOW);
 
-    // Table quota overrides the tenant quota, the enforcement mode is still inherited
+    // Table quota overrides the tenant quota, and the tenant enforcement mode does not weaken it
     setQps(tableConfig);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), TABLE_MAX_QPS);
-    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.SHADOW);
+    Assert.assertEquals(queryQuotaMode(OFFLINE_TABLE_NAME), QuotaEnforcementMode.ENFORCED);
 
     // Table on another broker tenant does not inherit it
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)

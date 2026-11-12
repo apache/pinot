@@ -241,13 +241,35 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
       assertHttpStatus(() -> sendPutRequest(url, new QuotaConfig(null, null).toJsonString()), 400);
       assertHttpStatus(() -> sendPutRequest(url, "{\"storage\": \"invalid\"}"), 400);
       assertHttpStatus(() -> sendPutRequest(url, "null"), 400);
+      assertHttpStatus(
+          () -> sendPutRequest(url, new QuotaConfig(null, null, null, QuotaEnforcementMode.SHADOW).toJsonString()),
+          400);
       assertEquals(resourceManager.getTenantQuotaConfig(tenant), newQuotaConfig);
 
       // Unknown tenant
       assertHttpStatus(() -> sendPutRequest(baseUrl + "/tenants/unknownTenant/quotas", newQuotaConfig.toJsonString()),
           404);
 
-      // Delete
+      // Setting the quota of one role keeps the quota of the other role
+      sendPutRequest(url, new QuotaConfig(null, "200", null, QuotaEnforcementMode.SHADOW).toJsonString());
+      assertEquals(resourceManager.getTenantQuotaConfig(tenant),
+          new QuotaConfig("20G", "200", null, QuotaEnforcementMode.SHADOW));
+      sendPutRequest(url, new QuotaConfig("30G", null).toJsonString());
+      assertEquals(resourceManager.getTenantQuotaConfig(tenant),
+          new QuotaConfig("30G", "200", null, QuotaEnforcementMode.SHADOW));
+
+      // Deleting the quota of one role keeps the quota of the other role
+      assertHttpStatus(() -> sendDeleteRequest(url + "?type=minion"), 400);
+      sendDeleteRequest(url + "?type=broker");
+      assertEquals(resourceManager.getTenantQuotaConfig(tenant), new QuotaConfig("30G", null));
+      assertHttpStatus(() -> sendDeleteRequest(url + "?type=broker"), 404);
+      sendDeleteRequest(url + "?type=server");
+      assertNull(resourceManager.getTenantQuotaConfig(tenant));
+      assertHttpStatus(() -> sendGetRequest(url), 404);
+      assertHttpStatus(() -> sendDeleteRequest(url + "?type=server"), 404);
+
+      // Delete all
+      sendPutRequest(url, newQuotaConfig.toJsonString());
       sendDeleteRequest(url);
       assertNull(resourceManager.getTenantQuotaConfig(tenant));
       assertHttpStatus(() -> sendGetRequest(url), 404);

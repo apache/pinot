@@ -24,18 +24,20 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 
 
-/// Resolves the effective quota of a table from its own [QuotaConfig] and the quota defaults of its tenants.
+/// Resolves the effective quota of a table from its own [QuotaConfig] and the quota defaults of its tenants, and
+/// manages the quota defaults of a tenant.
 ///
 /// Each quota is inherited from the tenant whose role enforces it:
 /// - storage (and its enforcement mode) from the table's server tenant, enforced by the controller
 /// - query QPS (and its enforcement mode) from the table's broker tenant, enforced by the brokers
 ///
-/// Resolution is per field: a field set in the table quota config wins, otherwise the tenant default applies. Each
-/// enforcement mode is resolved independently of its limit, so a tenant can e.g. put all its tables in SHADOW mode
-/// while tables still set their own limits, and a table can opt out of a tenant limit by setting the corresponding
-/// enforcement mode to DISABLED.
+/// A table that sets a limit in its own quota config uses its own limit and enforcement mode, so tenant defaults never
+/// weaken a limit set on the table (e.g. the storage limit of dimension tables). A table without a limit inherits the
+/// tenant limit, with its own enforcement mode if set (so a table can opt out of a tenant limit by setting the
+/// corresponding enforcement mode to DISABLED), otherwise the tenant enforcement mode.
 ///
 /// Stateless and thread-safe.
 public class QuotaConfigUtils {
@@ -56,17 +58,24 @@ public class QuotaConfigUtils {
     return brokerTenant != null ? brokerTenant : TagNameUtils.DEFAULT_TENANT_NAME;
   }
 
-  /// Returns the effective quota config of the table, looking up the quota defaults of its server and broker tenants
-  /// with the given provider (which returns null when a tenant has no quota defaults).
+  /// Returns the table's quota config with the storage quota resolved against the quota defaults of its server tenant,
+  /// looked up with the given provider (which returns null when a tenant has no quota defaults). Query quota fields
+  /// are the table's own.
   @Nullable
-  public static QuotaConfig getEffectiveQuotaConfig(TableConfig tableConfig,
+  public static QuotaConfig getEffectiveStorageQuotaConfig(TableConfig tableConfig,
       Function<String, QuotaConfig> tenantQuotaConfigProvider) {
-    String serverTenant = getServerTenantName(tableConfig);
-    String brokerTenant = getBrokerTenantName(tableConfig);
-    QuotaConfig serverTenantQuotaConfig = tenantQuotaConfigProvider.apply(serverTenant);
-    QuotaConfig brokerTenantQuotaConfig =
-        brokerTenant.equals(serverTenant) ? serverTenantQuotaConfig : tenantQuotaConfigProvider.apply(brokerTenant);
-    return mergeWithTenantQuotaConfigs(tableConfig, serverTenantQuotaConfig, brokerTenantQuotaConfig);
+    return mergeWithTenantQuotaConfigs(tableConfig, tenantQuotaConfigProvider.apply(getServerTenantName(tableConfig)),
+        null);
+  }
+
+  /// Returns the table's quota config with the query quota resolved against the quota defaults of its broker tenant,
+  /// looked up with the given provider (which returns null when a tenant has no quota defaults). Storage quota fields
+  /// are the table's own.
+  @Nullable
+  public static QuotaConfig getEffectiveQueryQuotaConfig(TableConfig tableConfig,
+      Function<String, QuotaConfig> tenantQuotaConfigProvider) {
+    return mergeWithTenantQuotaConfigs(tableConfig, null,
+        tenantQuotaConfigProvider.apply(getBrokerTenantName(tableConfig)));
   }
 
   /// Returns the effective quota config of the table given the quota defaults of its server and broker tenants.
@@ -83,15 +92,16 @@ public class QuotaConfigUtils {
     }
     String storage = tableQuotaConfig.getStorage();
     QuotaEnforcementMode storageQuotaEnforcementMode = tableQuotaConfig.getStorageQuotaEnforcementMode();
-    if (serverTenantQuotaConfig != null) {
-      storage = firstNonNull(storage, serverTenantQuotaConfig.getStorage());
+    if (storage == null && serverTenantQuotaConfig != null && serverTenantQuotaConfig.getStorage() != null) {
+      storage = serverTenantQuotaConfig.getStorage();
       storageQuotaEnforcementMode =
           firstNonNull(storageQuotaEnforcementMode, serverTenantQuotaConfig.getStorageQuotaEnforcementMode());
     }
     String maxQueriesPerSecond = tableQuotaConfig.getMaxQueriesPerSecond();
     QuotaEnforcementMode queryQuotaEnforcementMode = tableQuotaConfig.getQueryQuotaEnforcementMode();
-    if (brokerTenantQuotaConfig != null) {
-      maxQueriesPerSecond = firstNonNull(maxQueriesPerSecond, brokerTenantQuotaConfig.getMaxQueriesPerSecond());
+    if (maxQueriesPerSecond == null && brokerTenantQuotaConfig != null
+        && brokerTenantQuotaConfig.getMaxQueriesPerSecond() != null) {
+      maxQueriesPerSecond = brokerTenantQuotaConfig.getMaxQueriesPerSecond();
       queryQuotaEnforcementMode =
           firstNonNull(queryQuotaEnforcementMode, brokerTenantQuotaConfig.getQueryQuotaEnforcementMode());
     }
@@ -99,22 +109,64 @@ public class QuotaConfigUtils {
   }
 
   /// Validates a quota config to be set as the quota defaults of a tenant. Storage fields require the tenant to be a
-  /// server tenant and query fields require it to be a broker tenant, since only those roles inherit them.
+  /// server tenant and query fields require it to be a broker tenant, since only those roles inherit them. An
+  /// enforcement mode requires the corresponding limit, since a tenant enforcement mode only applies to the tables
+  /// inheriting the tenant limit.
   ///
   /// @throws IllegalArgumentException if the quota config is not valid for the tenant
   public static void validateTenantQuotaConfig(QuotaConfig quotaConfig, boolean isServerTenant,
       boolean isBrokerTenant) {
-    boolean hasStorageFields =
-        quotaConfig.getStorage() != null || quotaConfig.getStorageQuotaEnforcementMode() != null;
-    boolean hasQueryFields =
-        quotaConfig.getMaxQueriesPerSecond() != null || quotaConfig.getQueryQuotaEnforcementMode() != null;
-    Preconditions.checkArgument(hasStorageFields || hasQueryFields,
-        "Tenant quota config must set at least one of 'storage', 'storageQuotaEnforcementMode', "
-            + "'maxQueriesPerSecond' and 'queryQuotaEnforcementMode'");
-    Preconditions.checkArgument(!hasStorageFields || isServerTenant,
+    boolean hasStorageQuota = hasStorageQuota(quotaConfig);
+    boolean hasQueryQuota = hasQueryQuota(quotaConfig);
+    Preconditions.checkArgument(hasStorageQuota || hasQueryQuota,
+        "Tenant quota config must set at least one of 'storage' and 'maxQueriesPerSecond'");
+    Preconditions.checkArgument(
+        quotaConfig.getStorageQuotaEnforcementMode() == null || quotaConfig.getStorage() != null,
+        "'storageQuotaEnforcementMode' requires 'storage' to be set");
+    Preconditions.checkArgument(
+        quotaConfig.getQueryQuotaEnforcementMode() == null || quotaConfig.getMaxQueriesPerSecond() != null,
+        "'queryQuotaEnforcementMode' requires 'maxQueriesPerSecond' to be set");
+    Preconditions.checkArgument(!hasStorageQuota || isServerTenant,
         "Storage quota ('storage', 'storageQuotaEnforcementMode') can only be set on a server tenant");
-    Preconditions.checkArgument(!hasQueryFields || isBrokerTenant,
+    Preconditions.checkArgument(!hasQueryQuota || isBrokerTenant,
         "Query quota ('maxQueriesPerSecond', 'queryQuotaEnforcementMode') can only be set on a broker tenant");
+  }
+
+  /// Returns the quota defaults of a tenant after replacing the fields of the roles set in the given quota config: the
+  /// storage fields if it sets a storage quota, and the query fields if it sets a query quota. The fields of the other
+  /// role are kept from the existing quota defaults.
+  public static QuotaConfig replaceTenantQuotaConfigRoles(@Nullable QuotaConfig existingQuotaConfig,
+      QuotaConfig quotaConfig) {
+    QuotaConfig storageSource =
+        hasStorageQuota(quotaConfig) || existingQuotaConfig == null ? quotaConfig : existingQuotaConfig;
+    QuotaConfig querySource =
+        hasQueryQuota(quotaConfig) || existingQuotaConfig == null ? quotaConfig : existingQuotaConfig;
+    return new QuotaConfig(storageSource.getStorage(), querySource.getMaxQueriesPerSecond(),
+        storageSource.getStorageQuotaEnforcementMode(), querySource.getQueryQuotaEnforcementMode());
+  }
+
+  /// Returns the quota defaults of a tenant after removing the fields of the given role: the storage fields for the
+  /// server role and the query fields for the broker role.
+  public static QuotaConfig removeTenantQuotaConfigRole(QuotaConfig quotaConfig, TenantRole tenantRole) {
+    switch (tenantRole) {
+      case SERVER:
+        return new QuotaConfig(null, quotaConfig.getMaxQueriesPerSecond(), null,
+            quotaConfig.getQueryQuotaEnforcementMode());
+      case BROKER:
+        return new QuotaConfig(quotaConfig.getStorage(), null, quotaConfig.getStorageQuotaEnforcementMode(), null);
+      default:
+        throw new IllegalArgumentException("Tenant quota defaults are not supported for tenant role: " + tenantRole);
+    }
+  }
+
+  /// Returns whether the quota config sets any storage quota field.
+  public static boolean hasStorageQuota(QuotaConfig quotaConfig) {
+    return quotaConfig.getStorage() != null || quotaConfig.getStorageQuotaEnforcementMode() != null;
+  }
+
+  /// Returns whether the quota config sets any query quota field.
+  public static boolean hasQueryQuota(QuotaConfig quotaConfig) {
+    return quotaConfig.getMaxQueriesPerSecond() != null || quotaConfig.getQueryQuotaEnforcementMode() != null;
   }
 
   @Nullable

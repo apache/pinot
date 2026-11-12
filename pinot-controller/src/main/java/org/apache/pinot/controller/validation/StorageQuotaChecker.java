@@ -77,10 +77,11 @@ public class StorageQuotaChecker {
     return QuotaEnforcementMode.ENFORCED;
   }
 
-  /// Returns the table's quota config with unset fields filled from its server tenant's quota defaults.
+  /// Returns the table's quota config with the storage quota resolved against its server tenant's quota defaults.
   @Nullable
   private QuotaConfig getEffectiveQuotaConfig(TableConfig tableConfig) {
-    return QuotaConfigUtils.getEffectiveQuotaConfig(tableConfig, _pinotHelixResourceManager::getTenantQuotaConfig);
+    return QuotaConfigUtils.getEffectiveStorageQuotaConfig(tableConfig,
+        _pinotHelixResourceManager::getTenantQuotaConfig);
   }
 
   public static class QuotaCheckerResponse {
@@ -110,7 +111,7 @@ public class StorageQuotaChecker {
     if (!_isEnabled) {
       return success("Storage quota check is disabled, skipping the check");
     }
-    // 1. Read table config, with unset fields filled from the server tenant quota defaults
+    // 1. Read table config, with the storage quota resolved against the server tenant quota defaults
     // 2. read table size from all the servers
     // 3. update predicted segment sizes
     // 4. is the updated size within quota

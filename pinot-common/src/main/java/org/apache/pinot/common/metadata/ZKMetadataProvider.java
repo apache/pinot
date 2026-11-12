@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -42,6 +43,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
+import org.apache.pinot.common.utils.config.QuotaConfigUtils;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
@@ -128,39 +130,57 @@ public class ZKMetadataProvider {
         AccessOption.PERSISTENT);
   }
 
-  /// Sets (creates or overwrites) the quota defaults of a server tenant, applied to every table on the tenant that does
-  /// not set the corresponding field in its own quota config.
+  /// Sets (creates or overwrites) the quota defaults of a tenant.
   ///
   /// @return true if the update is successful.
   public static boolean setTenantQuotaConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tenantName,
       QuotaConfig quotaConfig) {
-    ZNRecord znRecord = new ZNRecord(tenantName);
-    znRecord.setSimpleField(TENANT_QUOTA_CONFIG_KEY, quotaConfig.toJsonString());
-    return propertyStore.set(constructPropertyStorePathForTenantConfig(tenantName), znRecord, -1,
-        AccessOption.PERSISTENT);
+    return updateTenantQuotaConfig(propertyStore, tenantName, existingQuotaConfig -> quotaConfig);
   }
 
-  /// Returns the quota defaults of a server tenant, or null if none are set (or they cannot be parsed).
+  /// Atomically updates the quota defaults of a tenant with the given function, which receives the current quota
+  /// defaults (null if none are set or they cannot be parsed) and returns the new ones. Other fields of the tenant
+  /// config are kept, and the update is retried on concurrent modification.
+  ///
+  /// @return true if the update is successful.
+  public static boolean updateTenantQuotaConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tenantName,
+      UnaryOperator<QuotaConfig> updater) {
+    return propertyStore.update(constructPropertyStorePathForTenantConfig(tenantName), currentRecord -> {
+      ZNRecord newRecord = currentRecord != null ? new ZNRecord(currentRecord) : new ZNRecord(tenantName);
+      QuotaConfig currentQuotaConfig = currentRecord != null ? parseTenantQuotaConfig(currentRecord, tenantName) : null;
+      newRecord.setSimpleField(TENANT_QUOTA_CONFIG_KEY, updater.apply(currentQuotaConfig).toJsonString());
+      return newRecord;
+    }, AccessOption.PERSISTENT);
+  }
+
+  /// Returns the quota defaults of a tenant, or null if none are set (or they cannot be parsed).
   @Nullable
   public static QuotaConfig getTenantQuotaConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tenantName) {
     ZNRecord znRecord =
         propertyStore.get(constructPropertyStorePathForTenantConfig(tenantName), null, AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      return null;
-    }
+    return znRecord != null ? parseTenantQuotaConfig(znRecord, tenantName) : null;
+  }
+
+  /// Parses the quota defaults from a tenant config record. Returns null if none are set (including when all the
+  /// defaults were removed role by role) or they cannot be parsed.
+  @Nullable
+  private static QuotaConfig parseTenantQuotaConfig(ZNRecord znRecord, String tenantName) {
     String quotaConfigString = znRecord.getSimpleField(TENANT_QUOTA_CONFIG_KEY);
     if (quotaConfigString == null) {
       return null;
     }
+    QuotaConfig quotaConfig;
     try {
-      return JsonUtils.stringToObject(quotaConfigString, QuotaConfig.class);
+      quotaConfig = JsonUtils.stringToObject(quotaConfigString, QuotaConfig.class);
     } catch (Exception e) {
       LOGGER.error("Caught exception while reading quota config for tenant: {}", tenantName, e);
       return null;
     }
+    return QuotaConfigUtils.hasStorageQuota(quotaConfig) || QuotaConfigUtils.hasQueryQuota(quotaConfig) ? quotaConfig
+        : null;
   }
 
-  /// Removes the quota defaults of a server tenant.
+  /// Removes the quota defaults of a tenant.
   ///
   /// @return true if the removal is successful (including when there was nothing to remove).
   public static boolean removeTenantQuotaConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tenantName) {

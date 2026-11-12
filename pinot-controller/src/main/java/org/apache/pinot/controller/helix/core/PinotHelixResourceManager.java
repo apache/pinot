@@ -142,6 +142,7 @@ import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.config.QuotaConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -193,6 +194,7 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
@@ -4065,16 +4067,34 @@ public class PinotHelixResourceManager {
         AccessOption.PERSISTENT);
   }
 
-  /// Sets the quota defaults of the given tenant and sends out a tenant config refresh message to brokers. The
-  /// controller quota checkers read the defaults on every check, so they need no notification.
-  public void setTenantQuotaConfig(String tenantName, QuotaConfig quotaConfig) {
-    if (!ZKMetadataProvider.setTenantQuotaConfig(_propertyStore, tenantName, quotaConfig)) {
+  /// Sets the quota defaults of the given tenant for the roles whose fields are set in the given quota config (see
+  /// [QuotaConfigUtils#replaceTenantQuotaConfigRoles]), keeping the defaults of the other role. Sends out a tenant
+  /// config refresh message to brokers if the query quota defaults are set. The controller quota checkers read the
+  /// defaults on every check, so they need no notification.
+  public void updateTenantQuotaConfig(String tenantName, QuotaConfig quotaConfig) {
+    if (!ZKMetadataProvider.updateTenantQuotaConfig(_propertyStore, tenantName,
+        existingQuotaConfig -> QuotaConfigUtils.replaceTenantQuotaConfigRoles(existingQuotaConfig, quotaConfig))) {
       throw new RuntimeException("Failed to update quota config in Zookeeper for tenant: " + tenantName);
     }
-    sendTenantConfigRefreshMessage(tenantName);
+    if (QuotaConfigUtils.hasQueryQuota(quotaConfig)) {
+      sendTenantConfigRefreshMessage(tenantName);
+    }
   }
 
-  /// Removes the quota defaults of the given tenant and sends out a tenant config refresh message to brokers.
+  /// Removes the quota defaults of the given tenant for the given role, keeping the defaults of the other role. Sends
+  /// out a tenant config refresh message to brokers if the query quota defaults are removed.
+  public void deleteTenantQuotaConfig(String tenantName, TenantRole tenantRole) {
+    if (!ZKMetadataProvider.updateTenantQuotaConfig(_propertyStore, tenantName,
+        existingQuotaConfig -> existingQuotaConfig != null ? QuotaConfigUtils.removeTenantQuotaConfigRole(
+            existingQuotaConfig, tenantRole) : new QuotaConfig(null, null))) {
+      throw new RuntimeException("Failed to update quota config in Zookeeper for tenant: " + tenantName);
+    }
+    if (tenantRole == TenantRole.BROKER) {
+      sendTenantConfigRefreshMessage(tenantName);
+    }
+  }
+
+  /// Removes all the quota defaults of the given tenant and sends out a tenant config refresh message to brokers.
   public void deleteTenantQuotaConfig(String tenantName) {
     if (!ZKMetadataProvider.removeTenantQuotaConfig(_propertyStore, tenantName)) {
       throw new RuntimeException("Failed to remove quota config in Zookeeper for tenant: " + tenantName);

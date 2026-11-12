@@ -235,10 +235,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         tenantName);
   }
 
-  /// Returns the table's quota config with unset fields filled from the quota defaults of its tenants.
+  /// Returns the table's quota config with the query quota resolved against its broker tenant's quota defaults.
   @Nullable
   private QuotaConfig getEffectiveQuotaConfig(TableConfig tableConfig) {
-    return QuotaConfigUtils.getEffectiveQuotaConfig(tableConfig,
+    return QuotaConfigUtils.getEffectiveQueryQuotaConfig(tableConfig,
         tenantName -> ZKMetadataProvider.getTenantQuotaConfig(_propertyStore, tenantName));
   }
 

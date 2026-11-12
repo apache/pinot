@@ -27,6 +27,7 @@ import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -91,10 +92,15 @@ public class QuotaConfigUtilsTest {
     QuotaConfig serverTenantQuota = new QuotaConfig("10G", null, QuotaEnforcementMode.SHADOW, null);
     QuotaConfig brokerTenantQuota = new QuotaConfig(null, "50", null, QuotaEnforcementMode.SHADOW);
 
-    // Table sets the limits only: the limits are overridden, the enforcement modes are inherited
+    // Table sets the limits: the table keeps its own limits and enforcement modes, so the tenant modes cannot weaken
+    // the table limits
     assertEquals(QuotaConfigUtils.mergeWithTenantQuotaConfigs(table(new QuotaConfig("20G", "100")),
+            serverTenantQuota, brokerTenantQuota), new QuotaConfig("20G", "100"));
+
+    // Table sets one limit only: the other limit is inherited together with the tenant enforcement mode
+    assertEquals(QuotaConfigUtils.mergeWithTenantQuotaConfigs(table(new QuotaConfig("20G", null)),
             serverTenantQuota, brokerTenantQuota),
-        new QuotaConfig("20G", "100", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.SHADOW));
+        new QuotaConfig("20G", "50", null, QuotaEnforcementMode.SHADOW));
 
     // Table sets the enforcement modes only: the limits are inherited, so a table can opt out with DISABLED
     assertEquals(QuotaConfigUtils.mergeWithTenantQuotaConfigs(
@@ -106,29 +112,33 @@ public class QuotaConfigUtilsTest {
   @Test
   public void testTenantQuotaLookup() {
     Map<String, QuotaConfig> tenantQuotas =
-        Map.of(SERVER_TENANT, new QuotaConfig("10G", null), BROKER_TENANT, new QuotaConfig(null, "50"));
-    assertEquals(QuotaConfigUtils.getEffectiveQuotaConfig(table(null), tenantQuotas::get),
-        new QuotaConfig("10G", "50"));
+        Map.of(SERVER_TENANT, new QuotaConfig("10G", "20"), BROKER_TENANT, new QuotaConfig("30G", "50"));
+    QuotaConfig tableQuota = new QuotaConfig(null, null, null, QuotaEnforcementMode.SHADOW);
 
-    // A tenant used for both roles is looked up only once
-    TableConfig sameTenantTable = table(null);
-    sameTenantTable.setTenantConfig(new TenantConfig(SERVER_TENANT, SERVER_TENANT, null));
+    // Each role only looks up the quota defaults of its own tenant, and only resolves its own quota
     List<String> lookups = new ArrayList<>();
-    QuotaConfigUtils.getEffectiveQuotaConfig(sameTenantTable, tenantName -> {
+    assertEquals(QuotaConfigUtils.getEffectiveStorageQuotaConfig(table(tableQuota), tenantName -> {
       lookups.add(tenantName);
       return tenantQuotas.get(tenantName);
-    });
+    }), new QuotaConfig("10G", null, null, QuotaEnforcementMode.SHADOW));
     assertEquals(lookups, List.of(SERVER_TENANT));
+    lookups.clear();
+    assertEquals(QuotaConfigUtils.getEffectiveQueryQuotaConfig(table(tableQuota), tenantName -> {
+      lookups.add(tenantName);
+      return tenantQuotas.get(tenantName);
+    }), new QuotaConfig(null, "50", null, QuotaEnforcementMode.SHADOW));
+    assertEquals(lookups, List.of(BROKER_TENANT));
 
     TableConfig otherTenantTable = table(null);
     otherTenantTable.setTenantConfig(new TenantConfig("otherBroker", "otherServer", null));
-    assertNull(QuotaConfigUtils.getEffectiveQuotaConfig(otherTenantTable, tenantQuotas::get));
+    assertNull(QuotaConfigUtils.getEffectiveStorageQuotaConfig(otherTenantTable, tenantQuotas::get));
+    assertNull(QuotaConfigUtils.getEffectiveQueryQuotaConfig(otherTenantTable, tenantQuotas::get));
   }
 
   @Test
   public void testValidateTenantQuotaConfig() {
     QuotaConfig storageQuota = new QuotaConfig("10G", null);
-    QuotaConfig queryQuota = new QuotaConfig(null, null, null, QuotaEnforcementMode.SHADOW);
+    QuotaConfig queryQuota = new QuotaConfig(null, "100", null, QuotaEnforcementMode.SHADOW);
     QuotaConfig bothQuotas = new QuotaConfig("10G", "100");
 
     QuotaConfigUtils.validateTenantQuotaConfig(storageQuota, true, false);
@@ -143,5 +153,42 @@ public class QuotaConfigUtilsTest {
         () -> QuotaConfigUtils.validateTenantQuotaConfig(bothQuotas, true, false));
     assertThrows(IllegalArgumentException.class,
         () -> QuotaConfigUtils.validateTenantQuotaConfig(new QuotaConfig(null, null), true, true));
+
+    // A tenant enforcement mode only applies together with the tenant limit
+    assertThrows(IllegalArgumentException.class, () -> QuotaConfigUtils.validateTenantQuotaConfig(
+        new QuotaConfig(null, null, QuotaEnforcementMode.SHADOW, null), true, true));
+    assertThrows(IllegalArgumentException.class, () -> QuotaConfigUtils.validateTenantQuotaConfig(
+        new QuotaConfig(null, null, null, QuotaEnforcementMode.SHADOW), true, true));
+  }
+
+  @Test
+  public void testReplaceTenantQuotaConfigRoles() {
+    QuotaConfig existing =
+        new QuotaConfig("10G", "100", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.SHADOW);
+
+    // Setting a query quota keeps the storage quota defaults, and replaces both query fields
+    assertEquals(QuotaConfigUtils.replaceTenantQuotaConfigRoles(existing, new QuotaConfig(null, "200")),
+        new QuotaConfig("10G", "200", QuotaEnforcementMode.SHADOW, null));
+    // Setting a storage quota keeps the query quota defaults
+    assertEquals(QuotaConfigUtils.replaceTenantQuotaConfigRoles(existing, new QuotaConfig("20G", null)),
+        new QuotaConfig("20G", "100", null, QuotaEnforcementMode.SHADOW));
+    // Setting both replaces both
+    assertEquals(QuotaConfigUtils.replaceTenantQuotaConfigRoles(existing, new QuotaConfig("20G", "200")),
+        new QuotaConfig("20G", "200"));
+    // No existing quota defaults
+    assertEquals(QuotaConfigUtils.replaceTenantQuotaConfigRoles(null, new QuotaConfig(null, "200")),
+        new QuotaConfig(null, "200"));
+  }
+
+  @Test
+  public void testRemoveTenantQuotaConfigRole() {
+    QuotaConfig existing =
+        new QuotaConfig("10G", "100", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.SHADOW);
+    assertEquals(QuotaConfigUtils.removeTenantQuotaConfigRole(existing, TenantRole.SERVER),
+        new QuotaConfig(null, "100", null, QuotaEnforcementMode.SHADOW));
+    assertEquals(QuotaConfigUtils.removeTenantQuotaConfigRole(existing, TenantRole.BROKER),
+        new QuotaConfig("10G", null, QuotaEnforcementMode.SHADOW, null));
+    assertThrows(IllegalArgumentException.class,
+        () -> QuotaConfigUtils.removeTenantQuotaConfigRole(existing, TenantRole.MINION));
   }
 }

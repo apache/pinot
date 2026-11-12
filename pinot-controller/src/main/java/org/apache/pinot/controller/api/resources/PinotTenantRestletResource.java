@@ -391,7 +391,7 @@ public class PinotTenantRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the quota defaults of a tenant",
       notes = "Storage quota defaults apply to the tables on the server tenant and query quota defaults to the tables "
-          + "on the broker tenant, unless a table sets the corresponding field in its own quota config")
+          + "on the broker tenant, unless a table sets the corresponding limit in its own quota config")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success", response = QuotaConfig.class),
       @ApiResponse(code = 404, message = "Quota defaults not found")
@@ -416,9 +416,14 @@ public class PinotTenantRestletResource {
       notes = "Storage quota defaults (storage, storageQuotaEnforcementMode) apply to the tables on the server tenant "
           + "and take effect on the next storage quota check. Query quota defaults (maxQueriesPerSecond, "
           + "queryQuotaEnforcementMode) apply to the tables on the broker tenant and take effect when brokers process "
-          + "the refresh message. A table that sets a field in its own quota config overrides the default. "
-          + "Enforcement modes are inherited too, so setting a limit without a mode enforces it on every table that "
-          + "does not set its own mode; set the mode to SHADOW first to observe breaches before enforcing")
+          + "the refresh message. Only the defaults of the roles set in the request are replaced, e.g. setting a query "
+          + "quota keeps the existing storage quota defaults; use DELETE with a type to remove the defaults of one "
+          + "role. A table that sets a limit in its own quota config keeps its own limit and enforcement mode. The "
+          + "tenant enforcement mode requires the tenant limit and applies to the tables inheriting it, unless a table "
+          + "sets its own mode (e.g. DISABLED to opt out). Setting a limit without a mode enforces it on every table "
+          + "inheriting it; set the mode to SHADOW first to observe breaches before enforcing. Quota defaults are "
+          + "removed when the tenant is deleted with DELETE /tenants/{tenantName}, but are kept if the tenant "
+          + "disappears otherwise (e.g. its instances are untagged or dropped), and apply again if it is re-created")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 400, message = "Invalid quota config"),
@@ -443,7 +448,7 @@ public class PinotTenantRestletResource {
           Response.Status.BAD_REQUEST, e);
     }
     try {
-      _pinotHelixResourceManager.setTenantQuotaConfig(tenantName, quotaConfig);
+      _pinotHelixResourceManager.updateTenantQuotaConfig(tenantName, quotaConfig);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to set quota defaults for tenant: " + tenantName,
           Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -456,14 +461,22 @@ public class PinotTenantRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TENANT)
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Delete the quota defaults of a tenant")
+  @ApiOperation(value = "Delete the quota defaults of a tenant",
+      notes = "Deletes all the quota defaults of the tenant, or only the storage (type=server) or query (type=broker) "
+          + "quota defaults")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Invalid tenant type"),
       @ApiResponse(code = 404, message = "Quota defaults not found"),
       @ApiResponse(code = 500, message = "Error deleting the quota defaults")
   })
   public SuccessResponse deleteTenantQuotaConfig(
-      @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName) {
+      @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "Tenant type (server|broker), to only delete the quota defaults of that role")
+      @QueryParam("type") @Nullable String tenantType) {
+    if (tenantType != null) {
+      return deleteTenantQuotaConfigForRole(tenantName, tenantType);
+    }
     // Check existence rather than reading the config, so that an unreadable config can still be deleted
     if (!_pinotHelixResourceManager.hasTenantQuotaConfig(tenantName)) {
       throw new ControllerApplicationException(LOGGER, "Quota defaults not found for tenant: " + tenantName,
@@ -476,6 +489,32 @@ public class PinotTenantRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     return new SuccessResponse("Successfully deleted quota defaults for tenant: " + tenantName);
+  }
+
+  private SuccessResponse deleteTenantQuotaConfigForRole(String tenantName, String tenantType) {
+    TenantRole tenantRole;
+    try {
+      tenantRole = TenantRole.valueOf(tenantType.toUpperCase());
+      Preconditions.checkArgument(tenantRole == TenantRole.SERVER || tenantRole == TenantRole.BROKER);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Invalid tenant type: " + tenantType + ", must be one of: server, broker", Response.Status.BAD_REQUEST, e);
+    }
+    QuotaConfig quotaConfig = _pinotHelixResourceManager.getTenantQuotaConfig(tenantName);
+    boolean hasRoleQuota = quotaConfig != null && (tenantRole == TenantRole.SERVER
+        ? QuotaConfigUtils.hasStorageQuota(quotaConfig) : QuotaConfigUtils.hasQueryQuota(quotaConfig));
+    if (!hasRoleQuota) {
+      throw new ControllerApplicationException(LOGGER,
+          "Quota defaults not found for " + tenantType + " tenant: " + tenantName, Response.Status.NOT_FOUND);
+    }
+    try {
+      _pinotHelixResourceManager.deleteTenantQuotaConfig(tenantName, tenantRole);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to delete quota defaults for " + tenantType + " tenant: " + tenantName,
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+    return new SuccessResponse("Successfully deleted quota defaults for " + tenantType + " tenant: " + tenantName);
   }
 
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
@@ -796,8 +835,9 @@ public class PinotTenantRestletResource {
         Response.Status.INTERNAL_SERVER_ERROR);
   }
 
-  /// Deletes the quota defaults of a tenant once it no longer exists as either a server or a broker tenant, so that
-  /// they don't silently apply to a tenant later re-created with the same name.
+  /// Deletes the quota defaults of a tenant deleted with this API once it no longer exists as either a server or a
+  /// broker tenant, so that they don't silently apply to a tenant later re-created with the same name. Quota defaults
+  /// of a tenant that disappears otherwise (e.g. its instances are untagged or dropped) are kept.
   private void deleteTenantQuotaConfigIfTenantGone(String tenantName) {
     if (!_pinotHelixResourceManager.hasTenantQuotaConfig(tenantName)
         || _pinotHelixResourceManager.getAllServerTenantNames().contains(tenantName)

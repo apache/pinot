@@ -333,10 +333,13 @@ public class StorageQuotaCheckerTest {
     assertTrue(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
     assertEquals(_storageQuotaChecker.getEnforcementMode(tableConfig), QuotaEnforcementMode.SHADOW);
 
-    // Table storage limit overrides the tenant one, the enforcement mode is still inherited
+    // Table storage limit overrides the tenant one, and the tenant enforcement mode does not weaken it
     tableConfig.setQuotaConfig(new QuotaConfig("10K", null));
     assertFalse(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
-    assertEquals(_storageQuotaChecker.getEnforcementMode(tableConfig), QuotaEnforcementMode.SHADOW);
+    assertEquals(_storageQuotaChecker.getEnforcementMode(tableConfig), QuotaEnforcementMode.ENFORCED);
+    tableConfig.setQuotaConfig(new QuotaConfig("2K", null));
+    assertTrue(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
+    assertEquals(_storageQuotaChecker.getEnforcementMode(tableConfig), QuotaEnforcementMode.ENFORCED);
 
     // Table opts out of the tenant limit by disabling enforcement
     tableConfig.setQuotaConfig(new QuotaConfig(null, null, QuotaEnforcementMode.DISABLED, null));

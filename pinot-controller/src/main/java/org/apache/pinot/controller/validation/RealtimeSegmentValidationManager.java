@@ -214,8 +214,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // if quota breach and pause flag is not in sync, update the IS
     if (shouldPauseForQuota) {
       // Report the effective limit, which may come from the server tenant's quota defaults
-      QuotaConfig quotaConfig =
-          QuotaConfigUtils.getEffectiveQuotaConfig(tableConfig, _pinotHelixResourceManager::getTenantQuotaConfig);
+      QuotaConfig quotaConfig = QuotaConfigUtils.getEffectiveStorageQuotaConfig(tableConfig,
+          _pinotHelixResourceManager::getTenantQuotaConfig);
       String storageQuota = quotaConfig != null ? quotaConfig.getStorage() : "NA";
       // as quota is breached pause the consumption right away
       _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
