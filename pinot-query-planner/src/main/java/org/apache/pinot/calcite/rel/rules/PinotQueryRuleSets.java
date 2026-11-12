@@ -108,8 +108,8 @@ public class PinotQueryRuleSets {
       PinotEvaluateLiteralRule.Filter
           .instanceWithDescription(PlannerRuleNames.EVALUATE_LITERAL_FILTER),
       // rewrite COALESCE(ARRAY_TO_MV(array), default) in filters, so the leaf stage can run them
-      PinotArrayToMvNullFilterRule
-          .instanceWithDescription(PlannerRuleNames.ARRAY_TO_MV_NULL_FILTER),
+      PinotArrayToMvCoalesceFilterRule
+          .instanceWithDescription(PlannerRuleNames.ARRAY_TO_MV_COALESCE_FILTER),
 
       // sort join rules
       // push sort through join for left/right outer join only, disabled by default

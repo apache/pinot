@@ -270,7 +270,7 @@
     ]
   },
   "mv_aggregate_null_handling": {
-    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. ARRAY_TO_MV is nullable when its array is nullable, so the planner keeps IS NULL checks and COALESCE around it. COALESCE around an ARRAY_TO_MV group key nests ARRAY_TO_MV in another expression, which is not supported, so those queries fail. In a filter, the planner rewrites COALESCE around ARRAY_TO_MV (see mv_null_filter).",
+    "comment": "With column-based null handling the MV column is nullable. A null row forms one null group, as in the single-stage engine. CROSS JOIN UNNEST differs here: it drops the null row. ARRAY_TO_MV is nullable when its array is nullable, so the planner keeps IS NULL checks and COALESCE around it. COALESCE around an ARRAY_TO_MV group key nests ARRAY_TO_MV in another expression, which is not supported, so those queries fail. In a filter, the planner rewrites COALESCE around ARRAY_TO_MV (see mv_coalesce_filter).",
     "extraProps": {
       "enableColumnBasedNullHandling": true
     },
@@ -341,7 +341,7 @@
       }
     ]
   },
-  "mv_null_filter": {
+  "mv_coalesce_filter": {
     "comment": "COALESCE(ARRAY_TO_MV(col), default) in a filter. The planner rewrites pred(COALESCE(A, d)) to (A IS NOT NULL AND pred(A)) OR (A IS NULL AND pred(d)). pred(A) keeps the multi-value meaning: = matches when an element matches, <> when no element matches. An empty array is read as null.",
     "extraProps": {
       "enableColumnBasedNullHandling": true

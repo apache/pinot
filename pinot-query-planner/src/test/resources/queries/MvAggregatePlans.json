@@ -403,7 +403,7 @@
       }
     ]
   },
-  "array_to_mv_null_filter_tests": {
+  "array_to_mv_coalesce_filter_tests": {
     "queries": [
       {
         "description": "COALESCE with a default that does not match: the null check becomes IS NOT NULL",

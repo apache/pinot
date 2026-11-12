@@ -63,15 +63,15 @@ import org.apache.calcite.tools.RelBuilderFactory;
 /// still has `ARRAY_TO_MV` in an intermediate stage fails the `ARRAY_TO_MV` validation, as before.
 ///
 /// The rule is stateless and thread-safe.
-public class PinotArrayToMvNullFilterRule extends RelOptRule {
-  public static final PinotArrayToMvNullFilterRule INSTANCE =
-      new PinotArrayToMvNullFilterRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
+public class PinotArrayToMvCoalesceFilterRule extends RelOptRule {
+  public static final PinotArrayToMvCoalesceFilterRule INSTANCE =
+      new PinotArrayToMvCoalesceFilterRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
-  public static PinotArrayToMvNullFilterRule instanceWithDescription(String description) {
-    return new PinotArrayToMvNullFilterRule(PinotRuleUtils.PINOT_REL_FACTORY, description);
+  public static PinotArrayToMvCoalesceFilterRule instanceWithDescription(String description) {
+    return new PinotArrayToMvCoalesceFilterRule(PinotRuleUtils.PINOT_REL_FACTORY, description);
   }
 
-  private PinotArrayToMvNullFilterRule(RelBuilderFactory factory, @Nullable String description) {
+  private PinotArrayToMvCoalesceFilterRule(RelBuilderFactory factory, @Nullable String description) {
     super(operand(LogicalFilter.class, any()), factory, description);
   }
 

@@ -1364,7 +1364,7 @@ public class CommonConstants {
       public static final String PROJECT_WINDOW_TRANSPOSE = "ProjectWindowTranspose";
       public static final String EVALUATE_LITERAL_PROJECT = "EvaluateProjectLiteral";
       public static final String EVALUATE_LITERAL_FILTER = "EvaluateFilterLiteral";
-      public static final String ARRAY_TO_MV_NULL_FILTER = "ArrayToMvNullFilter";
+      public static final String ARRAY_TO_MV_COALESCE_FILTER = "ArrayToMvCoalesceFilter";
       public static final String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressions";
       public static final String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoin";
       public static final String SEMI_JOIN_DISTINCT_PROJECT = "SemiJoinDistinctProject";
