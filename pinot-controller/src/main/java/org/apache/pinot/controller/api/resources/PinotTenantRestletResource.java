@@ -416,12 +416,14 @@ public class PinotTenantRestletResource {
       notes = "Storage quota defaults (storage, storageQuotaEnforcementMode) apply to the tables on the server tenant "
           + "and take effect on the next storage quota check. Query quota defaults (maxQueriesPerSecond, "
           + "queryQuotaEnforcementMode) apply to the tables on the broker tenant and take effect when brokers process "
-          + "the refresh message. Only the defaults of the roles set in the request are replaced, e.g. setting a query "
+          + "the refresh message. Only the defaults of the roles set in the request are updated, e.g. setting a query "
           + "quota keeps the existing storage quota defaults; use DELETE with a type to remove the defaults of one "
           + "role. A table that sets a limit in its own quota config keeps its own limit and enforcement mode. The "
           + "tenant enforcement mode requires the tenant limit and applies to the tables inheriting it, unless a table "
-          + "sets its own mode (e.g. DISABLED to opt out). Setting a limit without a mode enforces it on every table "
-          + "inheriting it; set the mode to SHADOW first to observe breaches before enforcing. Quota defaults are "
+          + "sets its own mode (e.g. DISABLED to opt out). A limit set without a mode keeps the existing mode of the "
+          + "tenant, so raising a limit in SHADOW mode does not enforce it; set the mode to ENFORCED explicitly to "
+          + "enforce it. A new limit without any mode is enforced on every table inheriting it; set the mode to SHADOW "
+          + "first to observe breaches before enforcing. Quota defaults are "
           + "removed when the tenant is deleted with DELETE /tenants/{tenantName}, but are kept if the tenant "
           + "disappears otherwise (e.g. its instances are untagged or dropped), and apply again if it is re-created")
   @ApiResponses(value = {

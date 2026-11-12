@@ -166,15 +166,17 @@ public class QuotaConfigUtilsTest {
     QuotaConfig existing =
         new QuotaConfig("10G", "100", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.SHADOW);
 
-    // Setting a query quota keeps the storage quota defaults, and replaces both query fields
+    // Setting a query limit keeps the storage quota defaults and the query enforcement mode, so raising a limit in
+    // SHADOW mode does not start enforcing it
     assertEquals(QuotaConfigUtils.replaceTenantQuotaConfigRoles(existing, new QuotaConfig(null, "200")),
-        new QuotaConfig("10G", "200", QuotaEnforcementMode.SHADOW, null));
-    // Setting a storage quota keeps the query quota defaults
+        new QuotaConfig("10G", "200", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.SHADOW));
+    // Setting a storage limit keeps the query quota defaults and the storage enforcement mode
     assertEquals(QuotaConfigUtils.replaceTenantQuotaConfigRoles(existing, new QuotaConfig("20G", null)),
-        new QuotaConfig("20G", "100", null, QuotaEnforcementMode.SHADOW));
-    // Setting both replaces both
-    assertEquals(QuotaConfigUtils.replaceTenantQuotaConfigRoles(existing, new QuotaConfig("20G", "200")),
-        new QuotaConfig("20G", "200"));
+        new QuotaConfig("20G", "100", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.SHADOW));
+    // Setting the enforcement modes explicitly replaces them
+    assertEquals(QuotaConfigUtils.replaceTenantQuotaConfigRoles(existing,
+            new QuotaConfig("20G", "200", QuotaEnforcementMode.ENFORCED, QuotaEnforcementMode.DISABLED)),
+        new QuotaConfig("20G", "200", QuotaEnforcementMode.ENFORCED, QuotaEnforcementMode.DISABLED));
     // No existing quota defaults
     assertEquals(QuotaConfigUtils.replaceTenantQuotaConfigRoles(null, new QuotaConfig(null, "200")),
         new QuotaConfig(null, "200"));

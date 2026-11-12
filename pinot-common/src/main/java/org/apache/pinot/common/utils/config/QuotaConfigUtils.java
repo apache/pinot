@@ -132,17 +132,29 @@ public class QuotaConfigUtils {
         "Query quota ('maxQueriesPerSecond', 'queryQuotaEnforcementMode') can only be set on a broker tenant");
   }
 
-  /// Returns the quota defaults of a tenant after replacing the fields of the roles set in the given quota config: the
-  /// storage fields if it sets a storage quota, and the query fields if it sets a query quota. The fields of the other
-  /// role are kept from the existing quota defaults.
+  /// Returns the quota defaults of a tenant after applying the given (validated) quota config, which only updates the
+  /// roles it sets: the storage fields if it sets a storage quota, and the query fields if it sets a query quota. The
+  /// fields of the other role are kept from the existing quota defaults. An enforcement mode that is not set is kept
+  /// too, so that e.g. raising a limit in SHADOW mode does not start enforcing it; set the mode to ENFORCED to enforce.
   public static QuotaConfig replaceTenantQuotaConfigRoles(@Nullable QuotaConfig existingQuotaConfig,
       QuotaConfig quotaConfig) {
-    QuotaConfig storageSource =
-        hasStorageQuota(quotaConfig) || existingQuotaConfig == null ? quotaConfig : existingQuotaConfig;
-    QuotaConfig querySource =
-        hasQueryQuota(quotaConfig) || existingQuotaConfig == null ? quotaConfig : existingQuotaConfig;
-    return new QuotaConfig(storageSource.getStorage(), querySource.getMaxQueriesPerSecond(),
-        storageSource.getStorageQuotaEnforcementMode(), querySource.getQueryQuotaEnforcementMode());
+    if (existingQuotaConfig == null) {
+      return quotaConfig;
+    }
+    String storage = existingQuotaConfig.getStorage();
+    QuotaEnforcementMode storageQuotaEnforcementMode = existingQuotaConfig.getStorageQuotaEnforcementMode();
+    if (hasStorageQuota(quotaConfig)) {
+      storage = quotaConfig.getStorage();
+      storageQuotaEnforcementMode =
+          firstNonNull(quotaConfig.getStorageQuotaEnforcementMode(), storageQuotaEnforcementMode);
+    }
+    String maxQueriesPerSecond = existingQuotaConfig.getMaxQueriesPerSecond();
+    QuotaEnforcementMode queryQuotaEnforcementMode = existingQuotaConfig.getQueryQuotaEnforcementMode();
+    if (hasQueryQuota(quotaConfig)) {
+      maxQueriesPerSecond = quotaConfig.getMaxQueriesPerSecond();
+      queryQuotaEnforcementMode = firstNonNull(quotaConfig.getQueryQuotaEnforcementMode(), queryQuotaEnforcementMode);
+    }
+    return new QuotaConfig(storage, maxQueriesPerSecond, storageQuotaEnforcementMode, queryQuotaEnforcementMode);
   }
 
   /// Returns the quota defaults of a tenant after removing the fields of the given role: the storage fields for the

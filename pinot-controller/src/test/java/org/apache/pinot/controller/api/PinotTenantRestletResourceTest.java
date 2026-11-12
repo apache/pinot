@@ -232,9 +232,10 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
       assertEquals(JsonUtils.stringToObject(sendGetRequest(url), QuotaConfig.class), quotaConfig);
       assertEquals(resourceManager.getTenantQuotaConfig(tenant), quotaConfig);
 
-      // Overwrite, with both storage and query quota since the default tenant is both a server and a broker tenant
-      QuotaConfig newQuotaConfig = new QuotaConfig("20G", "100");
-      sendPutRequest(url, newQuotaConfig.toJsonString());
+      // Overwrite, with both storage and query quota since the default tenant is both a server and a broker tenant.
+      // Raising the storage limit without a mode keeps the SHADOW mode, so it does not start enforcing it.
+      QuotaConfig newQuotaConfig = new QuotaConfig("20G", "100", QuotaEnforcementMode.SHADOW, null);
+      sendPutRequest(url, new QuotaConfig("20G", "100").toJsonString());
       assertEquals(resourceManager.getTenantQuotaConfig(tenant), newQuotaConfig);
 
       // Invalid configs are rejected and do not overwrite the existing one
@@ -253,15 +254,16 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
       // Setting the quota of one role keeps the quota of the other role
       sendPutRequest(url, new QuotaConfig(null, "200", null, QuotaEnforcementMode.SHADOW).toJsonString());
       assertEquals(resourceManager.getTenantQuotaConfig(tenant),
-          new QuotaConfig("20G", "200", null, QuotaEnforcementMode.SHADOW));
-      sendPutRequest(url, new QuotaConfig("30G", null).toJsonString());
+          new QuotaConfig("20G", "200", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.SHADOW));
+      sendPutRequest(url, new QuotaConfig("30G", null, QuotaEnforcementMode.ENFORCED, null).toJsonString());
       assertEquals(resourceManager.getTenantQuotaConfig(tenant),
-          new QuotaConfig("30G", "200", null, QuotaEnforcementMode.SHADOW));
+          new QuotaConfig("30G", "200", QuotaEnforcementMode.ENFORCED, QuotaEnforcementMode.SHADOW));
 
       // Deleting the quota of one role keeps the quota of the other role
       assertHttpStatus(() -> sendDeleteRequest(url + "?type=minion"), 400);
       sendDeleteRequest(url + "?type=broker");
-      assertEquals(resourceManager.getTenantQuotaConfig(tenant), new QuotaConfig("30G", null));
+      assertEquals(resourceManager.getTenantQuotaConfig(tenant),
+          new QuotaConfig("30G", null, QuotaEnforcementMode.ENFORCED, null));
       assertHttpStatus(() -> sendDeleteRequest(url + "?type=broker"), 404);
       sendDeleteRequest(url + "?type=server");
       assertNull(resourceManager.getTenantQuotaConfig(tenant));
