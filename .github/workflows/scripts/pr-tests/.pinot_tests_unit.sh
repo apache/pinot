@@ -75,7 +75,8 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
-      -P github-actions,no-integration-tests${COVERAGE_PROFILE} || exit 1
+      -Dtest=WorkloadBudgetManagerTest \
+      -P github-actions,no-integration-tests${COVERAGE_PROFILE},tesseracta-build || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
   mvn test ${FORK_OPTS} \
@@ -86,7 +87,8 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
     -pl '!:pinot-yammer' \
-    -P github-actions,no-integration-tests${COVERAGE_PROFILE} || exit 1
+    -Dtest=WorkloadBudgetManagerTest \
+    -P github-actions,no-integration-tests${COVERAGE_PROFILE},tesseracta-build || exit 1
 fi
 
 # Aggregate coverage across all per-fork exec files (jacoco-*.exec) written under forkCount>1,

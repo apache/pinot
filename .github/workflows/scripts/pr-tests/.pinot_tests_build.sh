@@ -60,8 +60,6 @@ else
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
       -am -B -T 16 -ntp \
       -P github-actions \
-      -P tesseracta-build \
-      -Dtest=WorkloadBudgetManagerTest \
       -pl '!pinot-integration-tests' \
       -pl '!pinot-perf' \
       -pl '!pinot-distribution' || exit 1
