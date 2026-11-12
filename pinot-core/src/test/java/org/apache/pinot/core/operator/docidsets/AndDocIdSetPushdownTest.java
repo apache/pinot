@@ -124,15 +124,47 @@ public class AndDocIdSetPushdownTest {
     assertEquals(collectDocIds(docIdSet), expected.toArray());
   }
 
-  /// The push-down must never change the matching documents, whatever the shape of the filter tree.
+  /// The push-down must never change the matching documents, whatever the shape of the filter tree and the strategy.
+  /// `streaming(0)` makes every AND with candidates stream, which is the hardest case for the lazy path.
   @Test
   public void testRandomTreesMatchTheSameDocumentsWithAndWithoutPushdown() {
-    for (int i = 0; i < 200; i++) {
+    for (int i = 0; i < 300; i++) {
       long seed = RANDOM_SEED + i;
-      BlockDocIdSet withPushdown = randomTree(new Random(seed), 3, true);
-      BlockDocIdSet withoutPushdown = randomTree(new Random(seed), 3, false);
-      assertEquals(collectDocIds(withPushdown), collectDocIds(withoutPushdown), ERROR_MESSAGE + ", iteration: " + i);
+      int[] expected = collectDocIds(randomTree(new Random(seed), 3, AndRestrictionPushdown.OFF));
+      String message = ERROR_MESSAGE + ", iteration: " + i;
+      assertEquals(collectDocIds(randomTree(new Random(seed), 3, AndRestrictionPushdown.EAGER)), expected, message);
+      assertEquals(collectDocIds(randomTree(new Random(seed), 3, AndRestrictionPushdown.streaming(0))), expected,
+          message);
+      assertEquals(collectDocIds(randomTree(new Random(seed), 3, AndRestrictionPushdown.streaming(50))), expected,
+          message);
     }
+  }
+
+  /// Consumers such as `AndDocIdIterator` read their children through `advance()`. The lazy path must return the same
+  /// documents when it is read through a mix of `next()` and `advance()` with random targets.
+  @Test
+  public void testRandomTreesMatchTheSameDocumentsThroughAdvance() {
+    for (int i = 0; i < 300; i++) {
+      long seed = RANDOM_SEED + i;
+      String message = ERROR_MESSAGE + ", iteration: " + i;
+      int[] eager = collectDocIdsThroughAdvance(randomTree(new Random(seed), 3, AndRestrictionPushdown.EAGER),
+          new Random(seed));
+      int[] streaming = collectDocIdsThroughAdvance(
+          randomTree(new Random(seed), 3, AndRestrictionPushdown.streaming(0)), new Random(seed));
+      assertEquals(streaming, eager, message);
+    }
+  }
+
+  /// Reads the iterator with `advance()` to a random target ahead of the last returned document, or with `next()`.
+  private static int[] collectDocIdsThroughAdvance(BlockDocIdSet docIdSet, Random random) {
+    BlockDocIdIterator iterator = docIdSet.iterator();
+    List<Integer> docIds = new ArrayList<>();
+    int docId = random.nextBoolean() ? iterator.next() : iterator.advance(random.nextInt(200));
+    while (docId != Constants.EOF) {
+      docIds.add(docId);
+      docId = random.nextBoolean() ? iterator.next() : iterator.advance(docId + 1 + random.nextInt(200));
+    }
+    return docIds.stream().mapToInt(Integer::intValue).toArray();
   }
 
   /// The candidate set can carry document ids beyond numDocs, because `BitmapDocIdIterator#getDocIds()` hands out the
@@ -287,31 +319,31 @@ public class AndDocIdSetPushdownTest {
 
   /// Builds a random filter tree. Two calls with equally seeded [Random] instances build the same tree, which is what
   /// lets the same tree be evaluated with and without the push-down.
-  private static BlockDocIdSet randomTree(Random random, int depth, boolean pushdownEnabled) {
+  private static BlockDocIdSet randomTree(Random random, int depth, AndRestrictionPushdown pushdown) {
     if (depth == 0) {
       return randomLeaf(random);
     }
     switch (random.nextInt(5)) {
       case 0: {
-        List<BlockDocIdSet> children = randomChildren(random, depth, pushdownEnabled);
-        return new AndDocIdSet(children, null, pushdownEnabled);
+        List<BlockDocIdSet> children = randomChildren(random, depth, pushdown);
+        return new AndDocIdSet(children, null, pushdown);
       }
       case 1: {
-        List<BlockDocIdSet> children = randomChildren(random, depth, pushdownEnabled);
+        List<BlockDocIdSet> children = randomChildren(random, depth, pushdown);
         return new OrDocIdSet(children, NUM_DOCS);
       }
       case 2:
-        return new NotDocIdSet(randomTree(random, depth - 1, pushdownEnabled), NUM_DOCS);
+        return new NotDocIdSet(randomTree(random, depth - 1, pushdown), NUM_DOCS);
       default:
         return randomLeaf(random);
     }
   }
 
-  private static List<BlockDocIdSet> randomChildren(Random random, int depth, boolean pushdownEnabled) {
+  private static List<BlockDocIdSet> randomChildren(Random random, int depth, AndRestrictionPushdown pushdown) {
     int numChildren = 2 + random.nextInt(2);
     List<BlockDocIdSet> children = new ArrayList<>(numChildren);
     for (int i = 0; i < numChildren; i++) {
-      children.add(randomTree(random, depth - 1, pushdownEnabled));
+      children.add(randomTree(random, depth - 1, pushdown));
     }
     return children;
   }
@@ -319,9 +351,15 @@ public class AndDocIdSetPushdownTest {
   /// Builds a leaf of every kind that [BlockDocIdSet#applyAnd] dispatches on, so that the bitmap, scan, sorted-range
   /// and match-all/empty arms are all exercised by the randomized equivalence test.
   private static BlockDocIdSet randomLeaf(Random random) {
-    switch (random.nextInt(8)) {
+    switch (random.nextInt(9)) {
       case 0:
         return new MatchAllDocIdSet(NUM_DOCS);
+      case 8: {
+        // A mutable index can hold document ids at or above numDocs: the iterator hides them, the raw bitmap does not
+        MutableRoaringBitmap bitmap = randomBitmap(random);
+        bitmap.add((long) NUM_DOCS, NUM_DOCS + 1 + random.nextInt(500));
+        return BitmapDocIdSet.create(bitmap, NUM_DOCS);
+      }
       case 1:
         return EmptyDocIdSet.unscanned();
       case 2:
@@ -437,6 +475,18 @@ public class AndDocIdSetPushdownTest {
         }
       }
       return docIds;
+    }
+
+    @Override
+    public int matchDocIds(int[] docIds, int limit) {
+      int numMatchingDocIds = 0;
+      for (int i = 0; i < limit; i++) {
+        _numEntriesScanned++;
+        if (_matchingDocIds.contains(docIds[i])) {
+          docIds[numMatchingDocIds++] = docIds[i];
+        }
+      }
+      return numMatchingDocIds;
     }
 
     @Override

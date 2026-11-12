@@ -27,6 +27,7 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.spi.utils.Pairs;
@@ -205,6 +206,33 @@ public final class OrDocIdSet implements BlockDocIdSet {
       }
     }
     return docIdsToReturn;
+  }
+
+  /// Unions the branches, each restricted to the candidate document ids and evaluated lazily.
+  ///
+  /// Unlike [#applyAnd], a branch cannot skip the candidates that an earlier branch matched, because the branches are
+  /// read side by side, and the "every candidate matched" short-circuit does not exist. A consumer that reads every
+  /// document therefore scans more than with [#applyAnd]; one that stops early scans much less. The
+  /// [OrDocIdIterator] closes each branch when it reaches its end.
+  @Override
+  public BlockDocIdIterator restrictedIterator(ImmutableRoaringBitmap docIds) {
+    List<BlockDocIdSet> docIdSets = _docIdSets;
+    Preconditions.checkState(docIdSets != null, "restrictedIterator() called on an already consumed OrDocIdSet");
+    // Publish the stats state before dropping the branches, see applyAnd()
+    _scanBasedDocIdSets.set(docIdSets);
+    _docIdSets = null;
+    // NOTE: Bound the candidates like applyAnd() does
+    ImmutableRoaringBitmap boundedDocIds = NotDocIdSet.bound(docIds, _numDocs);
+    if (boundedDocIds.isEmpty()) {
+      releaseFrom(docIdSets, 0);
+      return EmptyDocIdIterator.getInstance();
+    }
+    int numDocIdSets = docIdSets.size();
+    BlockDocIdIterator[] docIdIterators = new BlockDocIdIterator[numDocIdSets];
+    for (int i = 0; i < numDocIdSets; i++) {
+      docIdIterators[i] = docIdSets.get(i).restrictedIterator(boundedDocIds);
+    }
+    return new OrDocIdIterator(docIdIterators);
   }
 
   private static void releaseFrom(List<BlockDocIdSet> docIdSets, int fromIndex) {

@@ -20,7 +20,9 @@ package org.apache.pinot.core.operator.docidsets;
 
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.NotDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RestrictedNotDocIdIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -77,6 +79,19 @@ public final class NotDocIdSet implements BlockDocIdSet {
     // Within the candidate set, NOT(child) is the candidates the child does not match, so the child only has to be
     // evaluated on the candidates: (NOT child) AND docIds == docIds MINUS (child AND docIds).
     return ImmutableRoaringBitmap.andNot(boundedDocIds, _childDocIdSet.applyAnd(boundedDocIds));
+  }
+
+  /// Returns the candidates that the child does not match, lazily: the child is only evaluated on the candidates, as
+  /// far as the consumer reads. The candidates are bounded like in [#applyAnd].
+  @Override
+  public BlockDocIdIterator restrictedIterator(ImmutableRoaringBitmap docIds) {
+    ImmutableRoaringBitmap boundedDocIds = bound(docIds, _numDocs);
+    if (boundedDocIds.isEmpty()) {
+      _childDocIdSet.release();
+      return EmptyDocIdIterator.getInstance();
+    }
+    return new RestrictedNotDocIdIterator(boundedDocIds.getIntIterator(),
+        _childDocIdSet.restrictedIterator(boundedDocIds));
   }
 
   /// Drops the document ids that are not below `numDocs`, without copying when there are none.

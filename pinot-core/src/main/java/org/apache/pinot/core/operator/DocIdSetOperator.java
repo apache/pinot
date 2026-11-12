@@ -83,21 +83,18 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
       }
       docIds[pos++] = _currentDocId;
     }
-    if (pos > 0) {
-      // Push scan cost delta for proactive query killing
-      QueryScanCostContext scanCost = getScanCostContext();
-      if (scanCost != null) {
-        long currentTotal = _blockDocIdSet.getNumEntriesScannedInFilter();
-        long delta = currentTotal - _lastReportedEntriesScanned;
-        if (delta > 0) {
-          scanCost.addEntriesScannedInFilter(delta);
-          _lastReportedEntriesScanned = currentTotal;
-        }
+    // Push the scan cost delta for proactive query killing. Also on the last call, which returns no document: a lazy
+    // filter can scan the rest of the segment in that call.
+    QueryScanCostContext scanCost = getScanCostContext();
+    if (scanCost != null) {
+      long currentTotal = _blockDocIdSet.getNumEntriesScannedInFilter();
+      long delta = currentTotal - _lastReportedEntriesScanned;
+      if (delta > 0) {
+        scanCost.addEntriesScannedInFilter(delta);
+        _lastReportedEntriesScanned = currentTotal;
       }
-      return new DocIdSetBlock(docIds, pos);
-    } else {
-      return null;
     }
+    return pos > 0 ? new DocIdSetBlock(docIds, pos) : null;
   }
 
   @Override

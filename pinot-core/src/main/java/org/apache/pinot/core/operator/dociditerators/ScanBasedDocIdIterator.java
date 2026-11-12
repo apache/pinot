@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.dociditerators;
 import java.util.OptionalInt;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.roaringbitmap.BatchIterator;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -48,21 +47,14 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
   }
 
   /// Evaluates the predicate on the first `limit` document ids of `docIds`, compacts the matching ones to the front
-  /// of the array and returns how many matched.
+  /// of the array and returns how many matched. `docIds` holds ascending document ids and `limit` is at most
+  /// [org.apache.pinot.core.plan.DocIdSetPlanNode#MAX_DOC_PER_CALL].
   ///
   /// Unlike [#applyAnd], this does **not** consume the iterator: it can be called once per chunk, which is what lets
-  /// a restriction be pushed into a scan without materializing the whole result. The caller owns [#close].
-  default int matchDocIds(int[] docIds, int limit) {
-    MutableRoaringBitmap candidateDocIds = new MutableRoaringBitmap();
-    candidateDocIds.addN(docIds, 0, limit);
-    MutableRoaringBitmap matchingDocIds = applyAnd(candidateDocIds);
-    int numMatchingDocIds = 0;
-    PeekableIntIterator docIdIterator = matchingDocIds.getIntIterator();
-    while (docIdIterator.hasNext()) {
-      docIds[numMatchingDocIds++] = docIdIterator.next();
-    }
-    return numMatchingDocIds;
-  }
+  /// a restriction be pushed into a scan without materializing the whole result. It must not release any resource,
+  /// and it must not use the thread-local document id buffer of [org.apache.pinot.core.operator.DocIdSetOperator]: it
+  /// runs while the outer `DocIdSetOperator` fills that buffer. The caller owns [#close].
+  int matchDocIds(int[] docIds, int limit);
 
   /// Returns the number of entries (SV value contains one entry, MV value contains multiple entries) scanned during the
   /// iteration. This method should be called after the iteration is done.

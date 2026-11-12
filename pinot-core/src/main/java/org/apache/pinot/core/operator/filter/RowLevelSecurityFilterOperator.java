@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -36,7 +37,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 ///
 /// On its first block, this operator materializes the result of the RLS filter into a bitmap, bounded by the number of
 /// documents that the plan read. It then ANDs that bitmap with the user filter, with the AND restriction push-down on,
-/// so the user filter only evaluates scans and transform functions on the documents that the RLS filter matches. When
+/// so the user filter only evaluates scans and transform functions on the documents that the RLS filter matches. The
+/// push-down is eager, or streaming for a query that can stop at its LIMIT, see
+/// `QueryContext#getAndRestrictionPushdown()`. When
 /// the segment has a valid-document snapshot (upsert), the bitmap is also ANDed with that snapshot.
 ///
 /// The bitmap is materialized once and reused for every later block, for example when a filtered aggregation reads
@@ -89,7 +92,13 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
       return rowFilterDocIdSet;
     }
     BlockDocIdSet userFilterDocIdSet = _userFilterOperator.nextBlock().getBlockDocIdSet();
-    return new AndDocIdSet(List.of(rowFilterDocIdSet, userFilterDocIdSet), _queryContext.getQueryOptions(), true);
+    // QueryContext never returns OFF under RLS; keep the RLS invariant even for a context built without a row filter
+    AndRestrictionPushdown restrictionPushdown = _queryContext.getAndRestrictionPushdown();
+    if (restrictionPushdown == null || !restrictionPushdown.isEnabled()) {
+      restrictionPushdown = AndRestrictionPushdown.EAGER;
+    }
+    return new AndDocIdSet(List.of(rowFilterDocIdSet, userFilterDocIdSet), _queryContext.getQueryOptions(),
+        restrictionPushdown);
   }
 
   /// Returns the documents that the RLS filter matches, ANDed with the valid-document snapshot. Materializes them on

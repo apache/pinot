@@ -110,6 +110,6 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
       return new EmptyDocIdSet(blockDocIdSet.getNumEntriesScannedInFilter());
     }
     return new AndDocIdSet(List.of(blockDocIdSet, nonNulls), _queryContext.getQueryOptions(),
-        _queryContext.isAndRestrictionPushdownEnabled());
+        _queryContext.getAndRestrictionPushdown());
   }
 }

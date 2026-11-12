@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
@@ -39,7 +40,7 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   private final List<BaseFilterOperator> _filterOperators;
   private final Map<String, String> _queryOptions;
-  private final boolean _restrictionPushdownEnabled;
+  private final AndRestrictionPushdown _restrictionPushdown;
 
   public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
       int numDocs, boolean nullHandlingEnabled) {
@@ -48,10 +49,16 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
       int numDocs, boolean nullHandlingEnabled, boolean restrictionPushdownEnabled) {
+    this(filterOperators, queryOptions, numDocs, nullHandlingEnabled,
+        AndRestrictionPushdown.of(restrictionPushdownEnabled));
+  }
+
+  public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled, AndRestrictionPushdown restrictionPushdown) {
     super(numDocs, nullHandlingEnabled);
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
-    _restrictionPushdownEnabled = restrictionPushdownEnabled;
+    _restrictionPushdown = restrictionPushdown;
   }
 
   @Override
@@ -73,7 +80,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     if (blockDocIdSets.isEmpty()) {
       return new MatchAllDocIdSet(_numDocs);
     }
-    return new AndDocIdSet(blockDocIdSets, _queryOptions, _restrictionPushdownEnabled);
+    return new AndDocIdSet(blockDocIdSets, _queryOptions, _restrictionPushdown);
   }
 
   /// A conjunction is not false where no child is false: the intersection of the children's not-false documents.
@@ -94,12 +101,12 @@ public class AndFilterOperator extends BaseFilterOperator {
       return new MatchAllDocIdSet(_numDocs);
     }
     return notFalses.size() == 1 ? notFalses.get(0)
-        : new AndDocIdSet(notFalses, _queryOptions, _restrictionPushdownEnabled);
+        : new AndDocIdSet(notFalses, _queryOptions, _restrictionPushdown);
   }
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return mayHaveNulls() ? deriveNulls(_queryOptions, _restrictionPushdownEnabled) : EmptyDocIdSet.unscanned();
+    return mayHaveNulls() ? deriveNulls(_queryOptions, _restrictionPushdown) : EmptyDocIdSet.unscanned();
   }
 
   @Override

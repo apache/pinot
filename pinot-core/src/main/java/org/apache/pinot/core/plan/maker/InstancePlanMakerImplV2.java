@@ -43,6 +43,7 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.plan.AcquireReleaseColumnsSegmentPlanNode;
 import org.apache.pinot.core.plan.AggregationPlanNode;
 import org.apache.pinot.core.plan.CombinePlanNode;
@@ -266,33 +267,63 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         new InstanceResponsePlanNode(combinePlanNode, fetchSegmentContexts, fetchContexts, queryContext));
   }
 
-  /// Resolves [AndRestrictionPushdownMode] for a query.
+  /// Resolves [AndRestrictionPushdownMode] for a query into an [AndRestrictionPushdown].
   ///
-  /// The push-down materializes the filter result instead of streaming it, so under AUTO it is only applied to a
-  /// query that is going to read every matching document anyway. That is exactly the aggregation and group-by
-  /// queries:
+  /// - `NEVER`: no push-down.
+  /// - `ALWAYS`: the eager push-down, which materializes the filter result.
+  /// - `STREAMING`: the streaming push-down, which evaluates the filter lazily, one chunk at a time.
+  /// - `AUTO`: picks by query shape, see [#resolveAutoAndRestrictionPushdown].
   ///
-  /// - a selection query without ORDER BY stops as soon as it has LIMIT rows;
-  /// - a DISTINCT query without ORDER BY stops the same way, in `DistinctOperator#getNextBlock`;
-  /// - whether a selection query *with* ORDER BY can stop early is decided per segment, because
-  ///   [org.apache.pinot.core.plan.SelectionPlanNode] picks `SelectionPartiallyOrderedBy*` from the segment's sorted
-  ///   column, so it cannot be ruled out here and is excluded conservatively;
-  /// - LIMIT 0 reads nothing at all.
-  ///
-  /// Use ALWAYS to push down on a workload known not to terminate early.
-  private static boolean isAndRestrictionPushdownEnabled(AndRestrictionPushdownMode mode, QueryContext queryContext) {
+  /// A query with a row-level security (RLS) filter never runs without the push-down: every nested AND must restrict
+  /// its children to the documents the RLS filter matches. For it, `NEVER` falls back to the `AUTO` choice.
+  @VisibleForTesting
+  static AndRestrictionPushdown resolveAndRestrictionPushdown(AndRestrictionPushdownMode mode,
+      QueryContext queryContext) {
     switch (mode) {
       case ALWAYS:
-        return true;
+        return AndRestrictionPushdown.EAGER;
       case NEVER:
-        return false;
+        return queryContext.getRowFilter() != null ? resolveAutoAndRestrictionPushdown(queryContext)
+            : AndRestrictionPushdown.OFF;
+      case STREAMING:
+        return AndRestrictionPushdown.streaming(getMaxDocsToRead(queryContext));
       case AUTO:
-        // NOTE: DISTINCT is modelled as an aggregation function, so it has to be excluded explicitly
-        return queryContext.getLimit() > 0 && QueryContextUtils.isAggregationQuery(queryContext)
-            && !QueryContextUtils.isDistinctQuery(queryContext);
+        return resolveAutoAndRestrictionPushdown(queryContext);
       default:
         throw new IllegalStateException("Unsupported AND restriction push-down mode: " + mode);
     }
+  }
+
+  /// Picks the push-down for `AUTO` from the shape of the query:
+  ///
+  /// - An aggregation or group-by query reads every matching document, so it gets the eager push-down, which is the
+  ///   fastest when the filter is drained.
+  /// - A selection query without ORDER BY stops as soon as it has `limit + offset` rows, so it gets the streaming
+  ///   push-down, which keeps that early termination. The multi-stage leaf runs its selection with an unbounded limit,
+  ///   so it does not count.
+  /// - Everything else gets no push-down, as before the push-down existed, or the eager one under RLS:
+  ///   - DISTINCT: its LIMIT counts distinct values, not rows, so it often reads the whole filter;
+  ///   - selection with ORDER BY: whether it can stop early is decided per segment, because
+  ///     [org.apache.pinot.core.plan.SelectionPlanNode] picks `SelectionPartiallyOrderedBy*` from the sorted column of
+  ///     the segment, and ORDER BY DESC reads the whole filter through `ReverseDocIdSetOperator`;
+  ///   - LIMIT 0, which reads nothing at all.
+  private static AndRestrictionPushdown resolveAutoAndRestrictionPushdown(QueryContext queryContext) {
+    if (queryContext.getLimit() > 0) {
+      // NOTE: DISTINCT is modelled as an aggregation function, so it has to be excluded explicitly
+      if (QueryContextUtils.isAggregationQuery(queryContext) && !QueryContextUtils.isDistinctQuery(queryContext)) {
+        return AndRestrictionPushdown.EAGER;
+      }
+      if (QueryContextUtils.isSelectionOnlyQuery(queryContext)
+          && (long) queryContext.getLimit() + queryContext.getOffset() < Integer.MAX_VALUE) {
+        return AndRestrictionPushdown.streaming(getMaxDocsToRead(queryContext));
+      }
+    }
+    return queryContext.getRowFilter() != null ? AndRestrictionPushdown.EAGER : AndRestrictionPushdown.OFF;
+  }
+
+  /// Returns the most matching documents that the query reads from one segment: its limit plus its offset.
+  private static int getMaxDocsToRead(QueryContext queryContext) {
+    return (int) Math.min((long) queryContext.getLimit() + queryContext.getOffset(), Integer.MAX_VALUE);
   }
 
   /// Optimizes the row-level security (RLS) filter with the schema of the table, as the WHERE clause that holds the
@@ -348,10 +379,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     optimizeRowFilter(queryContext);
 
     // Set andRestrictionPushdown, letting the query option override the server default. A query with a row-level
-    // security filter always pushes down, see QueryContext#isAndRestrictionPushdownEnabled().
+    // security filter always pushes down, see QueryContext#getAndRestrictionPushdown().
     AndRestrictionPushdownMode andRestrictionPushdownMode =
         QueryOptionsUtils.getAndRestrictionPushdownMode(queryOptions);
-    queryContext.setAndRestrictionPushdownEnabled(isAndRestrictionPushdownEnabled(
+    queryContext.setAndRestrictionPushdown(resolveAndRestrictionPushdown(
         andRestrictionPushdownMode != null ? andRestrictionPushdownMode : _andRestrictionPushdownMode, queryContext));
 
     queryContext.setSkipIndexes(QueryOptionsUtils.getSkipIndexes(queryOptions));
