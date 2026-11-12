@@ -18,10 +18,20 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.util.Locale;
+import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -45,6 +55,14 @@ public class RetentionUtilsTest {
     segment.setTimeUnit(TimeUnit.MILLISECONDS);
     segment.setCreationTime(creationTimeMs);
     return segment;
+  }
+
+  private static SegmentMetadata mockSegmentMetadata(TimeUnit timeUnit, long endTime) {
+    SegmentMetadata metadata = mock(SegmentMetadata.class);
+    when(metadata.getName()).thenReturn("seg");
+    when(metadata.getTimeUnit()).thenReturn(timeUnit);
+    when(metadata.getEndTime()).thenReturn(endTime);
+    return metadata;
   }
 
   @Test
@@ -126,5 +144,151 @@ public class RetentionUtilsTest {
     long now = System.currentTimeMillis();
     SegmentZKMetadata segment = makeSegmentWithCreationTime(now - 2 * ONE_DAY_MS, now - 10 * ONE_DAY_MS);
     assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, true));
+  }
+
+  @Test
+  public void testSegmentMetadataExpiredSegmentIsPurgeable() {
+    long now = System.currentTimeMillis();
+    assertTrue(RetentionUtils.isPurgeable(TABLE_NAME,
+        mockSegmentMetadata(TimeUnit.MILLISECONDS, now - 10 * ONE_DAY_MS), RETENTION_MS, now));
+  }
+
+  @Test
+  public void testSegmentMetadataExactBoundaryIsNotPurgeable() {
+    long now = System.currentTimeMillis();
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, mockSegmentMetadata(TimeUnit.MILLISECONDS, now - RETENTION_MS),
+        RETENTION_MS, now));
+  }
+
+  @Test
+  public void testSegmentMetadataOneMsPastBoundaryIsPurgeable() {
+    long now = System.currentTimeMillis();
+    assertTrue(RetentionUtils.isPurgeable(TABLE_NAME,
+        mockSegmentMetadata(TimeUnit.MILLISECONDS, now - RETENTION_MS - 1), RETENTION_MS, now));
+  }
+
+  @Test
+  public void testSegmentMetadataEndTimeConvertedWithTimeUnit() {
+    long nowDays = 20_000;
+    long now = TimeUnit.DAYS.toMillis(nowDays);
+    assertTrue(RetentionUtils.isPurgeable(TABLE_NAME, mockSegmentMetadata(TimeUnit.DAYS, nowDays - 8), RETENTION_MS,
+        now));
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, mockSegmentMetadata(TimeUnit.DAYS, nowDays - 6), RETENTION_MS,
+        now));
+  }
+
+  @Test
+  public void testSegmentMetadataInvalidEndTimeIsNotPurgeable() {
+    long now = System.currentTimeMillis();
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, mockSegmentMetadata(TimeUnit.MILLISECONDS, -1), RETENTION_MS,
+        now));
+  }
+
+  @Test
+  public void testSegmentMetadataWithoutTimeInfoIsNotPurgeable() {
+    // Segments without time metadata have no time unit and an unset end time
+    long now = System.currentTimeMillis();
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, mockSegmentMetadata(null, Long.MIN_VALUE), RETENTION_MS, now));
+  }
+
+  @Test
+  public void shouldManageTimeBasedDataRetentionRealtime() {
+    TableConfig cfg = new TableConfigBuilder(TableType.REALTIME).setTableName("t").build();
+    assertTrue(RetentionUtils.shouldManageTimeBasedDataRetention(cfg));
+  }
+
+  @Test
+  public void shouldManageTimeBasedDataRetentionOfflineAppendDefault() {
+    TableConfig cfg = new TableConfigBuilder(TableType.OFFLINE).setTableName("t_OFFLINE").build();
+    assertTrue(RetentionUtils.shouldManageTimeBasedDataRetention(cfg));
+  }
+
+  @Test
+  public void shouldManageTimeBasedDataRetentionOfflineRefreshSkipped() {
+    TableConfig cfg = new TableConfigBuilder(TableType.OFFLINE).setTableName("t_OFFLINE").setSegmentPushType("REFRESH")
+        .build();
+    assertFalse(RetentionUtils.shouldManageTimeBasedDataRetention(cfg));
+  }
+
+  @Test
+  public void testParseTableDataRetentionMillisValidDays() {
+    SegmentsValidationAndRetentionConfig cfg = new SegmentsValidationAndRetentionConfig();
+    cfg.setRetentionTimeUnit("DAYS");
+    cfg.setRetentionTimeValue("7");
+    assertTrue(RetentionUtils.parseTableDataRetentionMillis(cfg).isPresent());
+    assertEquals(RetentionUtils.parseTableDataRetentionMillis(cfg).getAsLong(), TimeUnit.DAYS.toMillis(7));
+  }
+
+  @Test
+  public void testParseTableDataRetentionMillisMissingReturnsEmpty() {
+    assertFalse(RetentionUtils.parseTableDataRetentionMillis(new SegmentsValidationAndRetentionConfig()).isPresent());
+  }
+
+  @Test
+  public void testParseTableDataRetentionMillisInvalidUnitReturnsEmpty() {
+    SegmentsValidationAndRetentionConfig cfg = new SegmentsValidationAndRetentionConfig();
+    cfg.setRetentionTimeUnit("FORTNIGHTS");
+    cfg.setRetentionTimeValue("1");
+    assertFalse(RetentionUtils.parseTableDataRetentionMillis(cfg).isPresent());
+  }
+
+  @Test
+  public void testParseTableDataRetentionMillisEmptyUnitReturnsEmpty() {
+    SegmentsValidationAndRetentionConfig cfg = new SegmentsValidationAndRetentionConfig();
+    cfg.setRetentionTimeUnit("");
+    cfg.setRetentionTimeValue("7");
+    assertFalse(RetentionUtils.parseTableDataRetentionMillis(cfg).isPresent());
+  }
+
+  @Test
+  public void testParseTableDataRetentionMillisEmptyValueReturnsEmpty() {
+    SegmentsValidationAndRetentionConfig cfg = new SegmentsValidationAndRetentionConfig();
+    cfg.setRetentionTimeUnit("DAYS");
+    cfg.setRetentionTimeValue("");
+    assertFalse(RetentionUtils.parseTableDataRetentionMillis(cfg).isPresent());
+  }
+
+  @Test
+  public void testParseTableDataRetentionMillisInvalidValueReturnsEmpty() {
+    SegmentsValidationAndRetentionConfig cfg = new SegmentsValidationAndRetentionConfig();
+    cfg.setRetentionTimeUnit("DAYS");
+    cfg.setRetentionTimeValue("not-a-number");
+    assertFalse(RetentionUtils.parseTableDataRetentionMillis(cfg).isPresent());
+  }
+
+  @Test
+  public void testParseTableDataRetentionMillisLowerCaseUnitParses() {
+    SegmentsValidationAndRetentionConfig cfg = new SegmentsValidationAndRetentionConfig();
+    cfg.setRetentionTimeUnit("days");
+    cfg.setRetentionTimeValue("7");
+    OptionalLong parsed = RetentionUtils.parseTableDataRetentionMillis(cfg);
+    assertTrue(parsed.isPresent());
+    assertEquals(parsed.getAsLong(), TimeUnit.DAYS.toMillis(7));
+  }
+
+  @Test
+  public void testParseTableDataRetentionMillisLowerCaseUnitUsesLocaleRoot() {
+    Locale previous = Locale.getDefault();
+    try {
+      Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+      SegmentsValidationAndRetentionConfig cfg = new SegmentsValidationAndRetentionConfig();
+      cfg.setRetentionTimeUnit("minutes");
+      cfg.setRetentionTimeValue("5");
+      OptionalLong parsed = RetentionUtils.parseTableDataRetentionMillis(cfg);
+      assertTrue(parsed.isPresent());
+      assertEquals(parsed.getAsLong(), TimeUnit.MINUTES.toMillis(5));
+    } finally {
+      Locale.setDefault(previous);
+    }
+  }
+
+  @Test
+  public void testParseTableDataRetentionMillisValidHours() {
+    SegmentsValidationAndRetentionConfig cfg = new SegmentsValidationAndRetentionConfig();
+    cfg.setRetentionTimeUnit("HOURS");
+    cfg.setRetentionTimeValue("12");
+    OptionalLong parsed = RetentionUtils.parseTableDataRetentionMillis(cfg);
+    assertTrue(parsed.isPresent());
+    assertEquals(parsed.getAsLong(), TimeUnit.HOURS.toMillis(12));
   }
 }

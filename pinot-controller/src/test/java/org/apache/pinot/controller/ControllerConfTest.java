@@ -32,6 +32,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class ControllerConfTest {
@@ -295,5 +297,20 @@ public class ControllerConfTest {
     Assert.assertEquals(conf.getSegmentReplaceExternalViewMaxWaitMs(), 45 * 60_000L);
     Assert.assertEquals(conf.getSegmentReplaceExternalViewCheckIntervalMs(), 500L);
     Assert.assertEquals(conf.getSegmentReplaceMaxRetryAttempts(), 2);
+  }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionDefault() {
+    ControllerConf conf = new ControllerConf();
+    assertFalse(conf.isSegmentUploadRejectOutOfRetention());
+  }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionOverride() {
+    ControllerConf conf = new ControllerConf();
+    conf.setSegmentUploadRejectOutOfRetention(true);
+    assertTrue(conf.isSegmentUploadRejectOutOfRetention());
+    conf.setSegmentUploadRejectOutOfRetention(false);
+    assertFalse(conf.isSegmentUploadRejectOutOfRetention());
   }
 }

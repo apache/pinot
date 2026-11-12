@@ -18,17 +18,36 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.util.Locale;
+import java.util.OptionalLong;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/// Utility methods for evaluating segment retention eligibility.
+/// Utility methods for evaluating segment retention eligibility and parsing table data retention from config.
 public class RetentionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionUtils.class);
 
   private RetentionUtils() {
+  }
+
+  /// Whether time-based data retention should run for this table's segments, matching the controller retention manager:
+  /// for {@link TableType#OFFLINE} tables, retention applies only when batch segment ingestion type is {@code APPEND}.
+  public static boolean shouldManageTimeBasedDataRetention(TableConfig tableConfig) {
+    if (tableConfig.getTableType() == TableType.OFFLINE && !"APPEND"
+        .equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))) {
+      return false;
+    }
+    return true;
   }
 
   /// Implements the time-comparison and creation-time fallback logic used by `TimeRetentionStrategy` for
@@ -68,5 +87,57 @@ public class RetentionUtils {
           + "Creation time fallback is disabled", segmentName, tableNameWithType, endTimeMs);
     }
     return false;
+  }
+
+  /// Whether segment file metadata is past the retention window, using the end time from
+  /// {@link SegmentMetadata#getEndTime()} converted with {@link SegmentMetadata#getTimeUnit()}. Unlike the
+  /// {@link SegmentZKMetadata} overload, there is no creation-time fallback.
+  ///
+  /// - If end time is valid: purgeable when `currentTimeMs - endTimeMs > retentionMs`.
+  /// - Otherwise: not purgeable (fail-open).
+  public static boolean isPurgeable(String tableNameWithType, SegmentMetadata segmentMetadata, long retentionMs,
+      long currentTimeMs) {
+    long endTimeMs = getSegmentMetadataEndTimeMillis(segmentMetadata);
+    if (TimeUtils.timeValueInValidRange(endTimeMs)) {
+      return currentTimeMs - endTimeMs > retentionMs;
+    }
+    LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}. Cannot determine retention, skipping",
+        segmentMetadata.getName(), tableNameWithType, endTimeMs);
+    return false;
+  }
+
+  /// Parses {@link SegmentsValidationAndRetentionConfig#getRetentionTimeUnit()} and
+  /// {@link SegmentsValidationAndRetentionConfig#getRetentionTimeValue()} into table data retention duration in
+  /// milliseconds (same interpretation as controller time-based retention).
+  ///
+  /// @return millis, or empty if unset or not parseable
+  public static OptionalLong parseTableDataRetentionMillis(SegmentsValidationAndRetentionConfig validationConfig) {
+    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
+    String retentionTimeValue = validationConfig.getRetentionTimeValue();
+    if (StringUtils.isEmpty(retentionTimeUnit) || StringUtils.isEmpty(retentionTimeValue)) {
+      return OptionalLong.empty();
+    }
+    try {
+      return OptionalLong.of(TimeUnit.valueOf(retentionTimeUnit.toUpperCase(Locale.ROOT))
+          .toMillis(Long.parseLong(retentionTimeValue)));
+    } catch (Exception e) {
+      LOGGER.debug("Failed to parse table data retention: unit='{}' value='{}'", retentionTimeUnit, retentionTimeValue,
+          e);
+      return OptionalLong.empty();
+    }
+  }
+
+  /// Returns segment end time in epoch millis from on-disk {@link SegmentMetadata} for retention comparison, using
+  /// {@link SegmentMetadata#getTimeUnit()} and {@link SegmentMetadata#getEndTime()} (same raw fields minion task
+  /// executors pass when configuring generation from segment files). When `timeUnit` is non-null and raw end time is
+  /// not {@link Long#MIN_VALUE}, returns `timeUnit.toMillis(endTime)`; otherwise returns the raw end time (typically
+  /// `Long.MIN_VALUE` when unset).
+  private static long getSegmentMetadataEndTimeMillis(SegmentMetadata segmentMetadata) {
+    TimeUnit timeUnit = segmentMetadata.getTimeUnit();
+    long endTime = segmentMetadata.getEndTime();
+    if (timeUnit != null && endTime != Long.MIN_VALUE) {
+      return timeUnit.toMillis(endTime);
+    }
+    return endTime;
   }
 }
