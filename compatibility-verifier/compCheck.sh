@@ -43,7 +43,8 @@ RM="/bin/rm"
 logCount=1
 #Declare the number of mandatory args
 cmdName=`basename $0`
-source `dirname $0`/utils.inc
+source "$(dirname "$0")/utils.inc"
+source "$(dirname "$0")/server-readiness.inc"
 
 function cleanupControllerDirs() {
   local dirName=$(grep -F controller.data.dir "${CONTROLLER_CONF}" | awk '{print $3}')
@@ -126,26 +127,6 @@ function waitForBrokerReady() {
   done
 }
 
-function waitForServerReady() {
-  local status=1
-  while [ $status -ne 0 ]; do
-    sleep 1
-    echo "Checking port ${SERVER_ADMIN_PORT} for server ready"
-    curl localhost:${SERVER_ADMIN_PORT}/health 1>/dev/null 2>&1
-    status=$?
-  done
-}
-
-function waitForServer2Ready() {
-  local status=1
-  while [ $status -ne 0 ]; do
-    sleep 1
-    echo "Checking port ${SERVER_2_ADMIN_PORT} for server ready"
-    curl localhost:${SERVER_2_ADMIN_PORT}/health 1>/dev/null 2>&1
-    status=$?
-  done
-}
-
 function waitForClusterReady() {
   waitForBrokerReady
   waitForServerReady
@@ -189,12 +170,8 @@ function startService() {
   elif [ "$serviceName" = "broker" ]; then
     ./pinot-admin.sh StartBroker ${configFileArg} 1>${LOG_DIR}/broker.${logCount}.log 2>&1 &
     echo $! >${PID_DIR}/broker.pid
-  elif [ "$serviceName" = "server" ]; then
-    ./pinot-admin.sh StartServer ${configFileArg} 1>${LOG_DIR}/server.${logCount}.log 2>&1 &
-    echo $! >${PID_DIR}/server.pid
-  elif [ "$serviceName" = "server2" ]; then
-    ./pinot-admin.sh StartServer ${configFileArg} 1>${LOG_DIR}/server2.${logCount}.log 2>&1 &
-        echo $! >${PID_DIR}/server2.pid
+  elif [ "$serviceName" = "server" ] || [ "$serviceName" = "server2" ]; then
+    startServerWithLogs "$serviceName" "$PWD/pinot-admin.sh" "$3"
   elif [ "$serviceName" = "kafka" ]; then
     startKafkaService
   fi
@@ -435,7 +412,7 @@ while [ "$1" != "" ]; do
     shift
     testSuiteDir=$(absPath $1)
     ;;
-  -k | keep-cluster-on-failure)
+  -k | --keep-cluster-on-failure)
     keepClusterOnFailure="true"
     ;;
   -h | --help)
@@ -524,11 +501,7 @@ if [ -f $testSuiteDir/pre-controller-upgrade.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/pre-controller-upgrade.yaml $genNum
   if [ $? -ne 0 ]; then
-    if [ $keepClusterOnFailure == "false" ]; then
-      stopServices
-    fi
-    echo "Failed before controller upgrade"
-    exit 1
+    abortCompatibilityCheck "Failed before controller upgrade"
   fi
 fi
 
@@ -542,11 +515,7 @@ if [ -f $testSuiteDir/pre-broker-upgrade.yaml ]; then
   echo "Running tests after controller upgrade"
   $COMPAT_TESTER $testSuiteDir/pre-broker-upgrade.yaml $genNum
   if [ $? -ne 0 ]; then
-    if [ $keepClusterOnFailure == "false" ]; then
-      stopServices
-    fi
-    echo "Failed before broker upgrade"
-    exit 1
+    abortCompatibilityCheck "Failed before broker upgrade"
   fi
 fi
 
@@ -560,11 +529,7 @@ if [ -f $testSuiteDir/pre-server-upgrade.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/pre-server-upgrade.yaml $genNum
   if [ $? -ne 0 ]; then
-    if [ $keepClusterOnFailure == "false" ]; then
-      stopServices
-    fi
-    echo "Failed before server upgrade"
-    exit 1
+    abortCompatibilityCheck "Failed before server upgrade"
   fi
 fi
 
@@ -578,11 +543,7 @@ if [ -f $testSuiteDir/post-server-upgrade.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/post-server-upgrade.yaml $genNum
   if [ $? -ne 0 ]; then
-    if [ $keepClusterOnFailure == "false" ]; then
-      stopServices
-    fi
-    echo "Failed after server upgrade"
-    exit 1
+    abortCompatibilityCheck "Failed after server upgrade"
   fi
 fi
 
@@ -597,11 +558,7 @@ if [ -f "${SERVER_CONF_2}" ]; then
     genNum=$((genNum+1))
     $COMPAT_TESTER $testSuiteDir/post-server-2-upgrade.yaml $genNum
     if [ $? -ne 0 ]; then
-      if [ $keepClusterOnFailure == "false" ]; then
-        stopServices
-      fi
-      echo "Failed after server 2 upgrade"
-      exit 1
+      abortCompatibilityCheck "Failed after server 2 upgrade"
     fi
   fi
 
@@ -616,11 +573,7 @@ if [ -f "${SERVER_CONF_2}" ]; then
     genNum=$((genNum+1))
     $COMPAT_TESTER $testSuiteDir/post-server-2-rollback.yaml $genNum
     if [ $? -ne 0 ]; then
-      if [ $keepClusterOnFailure == "false" ]; then
-        stopServices
-      fi
-      echo "Failed after server 2 downgrade"
-      exit 1
+      abortCompatibilityCheck "Failed after server 2 downgrade"
     fi
   fi
 fi
@@ -636,11 +589,7 @@ if [ -f $testSuiteDir/post-server-rollback.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/post-server-rollback.yaml $genNum
   if [ $? -ne 0 ]; then
-    if [ $keepClusterOnFailure == "false" ]; then
-      stopServices
-    fi
-    echo "Failed after server downgrade"
-    exit 1
+    abortCompatibilityCheck "Failed after server downgrade"
   fi
 fi
 
@@ -654,11 +603,7 @@ if [ -f $testSuiteDir/post-broker-rollback.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/post-broker-rollback.yaml $genNum
   if [ $? -ne 0 ]; then
-    if [ $keepClusterOnFailure == "false" ]; then
-      stopServices
-    fi
-    echo "Failed after broker downgrade"
-    exit 1
+    abortCompatibilityCheck "Failed after broker downgrade"
   fi
 fi
 
@@ -673,11 +618,7 @@ if [ -f $testSuiteDir/post-controller-rollback.yaml ]; then
   genNum=$((genNum+1))
   $COMPAT_TESTER $testSuiteDir/post-controller-rollback.yaml $genNum
   if [ $? -ne 0 ]; then
-    if [ $keepClusterOnFailure == "false" ]; then
-      stopServices
-    fi
-    echo "Failed after controller downgrade"
-    exit 1
+    abortCompatibilityCheck "Failed after controller downgrade"
   fi
 fi
 

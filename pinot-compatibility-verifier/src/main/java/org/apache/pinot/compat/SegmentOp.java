@@ -23,14 +23,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SqlResultComparator;
 import org.apache.pinot.common.utils.TarCompressionUtils;
-import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -315,36 +315,44 @@ public class SegmentOp extends BaseOp {
   }
 
   /// Retrieve external view for the given table name.
-  /// @return TableViews.TableView of OFFLINE and REALTIME segments.
-  private TableViews.TableView getExternalViewForTable()
+  /// @return TableView of OFFLINE and REALTIME segments.
+  private TableView getExternalViewForTable()
       throws IOException {
     return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
-            .forTableExternalView(_tableName)), TableViews.TableView.class);
+            .forTableExternalView(_tableName)), TableView.class);
   }
 
-  /// Retrieve the number of segments for OFFLINE which are in state matching the parameter.
+  /// Check whether the OFFLINE segment has replicas that all match the requested state.
   /// @param state of the segment to be verified in the controller.
-  /// @return -1 in case of ERROR, 1 if all matches the state else 0.
+  /// @return -1 in case of ERROR, 1 if replicas exist and all match the state, else 0.
   private long getSegmentCountInState(String state)
       throws IOException {
-    final Set<String> segmentState =
-        getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
-            .filter(k -> k.getKey().equals(_segmentName)).flatMap(x -> x.getValue().values().stream())
-            .collect(Collectors.toSet()) : Set.of();
+    return getSegmentCountInState(getExternalViewForTable(), _segmentName, state);
+  }
 
-    if (segmentState.contains(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
+  static long getSegmentCountInState(@Nullable TableView externalView, String segmentName, String state) {
+    if (externalView == null || externalView._offline == null) {
+      return 0;
+    }
+    Map<String, String> segmentStates = externalView._offline.get(segmentName);
+    if (segmentStates == null || segmentStates.isEmpty()) {
+      return 0;
+    }
+    if (segmentStates.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
       return -1;
     }
 
-    return segmentState.stream().allMatch(x -> x.contains(state)) ? 1 : 0;
+    return segmentStates.values().stream().allMatch(state::equals) ? 1 : 0;
   }
 
   /// Retrieve the number of segments for both OFFLINE irrespective of the state.
   /// @return count for OFFLINE segments.
   private long getCountForSegmentName()
       throws IOException {
-    return getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
-        .filter(k -> k.getKey().equals(_segmentName)).count() : 0;
+    TableView externalView = getExternalViewForTable();
+    return externalView != null && externalView._offline != null && externalView._offline.containsKey(_segmentName)
+        ? 1
+        : 0;
   }
 }
