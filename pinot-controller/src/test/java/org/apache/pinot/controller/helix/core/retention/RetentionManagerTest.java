@@ -603,8 +603,11 @@ public class RetentionManagerTest {
     ControllerConf conf = new ControllerConf();
     conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, clusterLevel);
 
-    RetentionManager retentionManager = spy(createSizeRetentionManager(realtimeTableConfig, List.of(), resourceManager,
-        mock(ControllerMetrics.class), conf, mock(BrokerServiceHelper.class)));
+    // Spy a plain RetentionManager rather than going through createRetentionManager(...), so the package-private
+    // methods stubbed below stay interceptable when a subclass suite overrides that factory
+    stubSizeRetentionResourceManager(realtimeTableConfig, List.of(), resourceManager, conf);
+    RetentionManager retentionManager = spy(new RetentionManager(resourceManager, mock(LeadControllerManager.class),
+        conf, mock(ControllerMetrics.class), mock(BrokerServiceHelper.class)));
 
     // Only the retention strategy selection is under test, so stub out both branches
     doNothing().when(retentionManager).manageRetentionForHybridTable(any(), any());
