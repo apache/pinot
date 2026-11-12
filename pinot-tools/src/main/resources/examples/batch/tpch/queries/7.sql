@@ -34,7 +34,7 @@ from
         )
       )
       and l_shipdate between '1995-01-01'
-      and '1997-01-01'
+      and '1996-12-31'
   ) as shipping
 group by
   supp_nation,

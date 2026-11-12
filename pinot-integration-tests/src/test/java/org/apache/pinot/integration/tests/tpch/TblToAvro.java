@@ -28,6 +28,7 @@ import java.nio.file.Paths;
 import java.util.Map;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
+import org.apache.avro.file.CodecFactory;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -35,12 +36,13 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumWriter;
 
 
-/// A helper class to convert TPC-H .tbl files to Avro format.
+/// Converts the TPC-H `.tbl` files written by `dbgen` to the Avro files used by the TPC-H quickstart and
+/// [TPCHQueryIntegrationTest]. The only argument is the folder with the `.tbl` files. The Avro files are written to
+/// the same folder, compressed with deflate.
 public final class TblToAvro {
   private static final String LONG_TYPE = "long";
   private static final String DOUBLE_TYPE = "double";
   private static final String STRING_TYPE = "string";
-  private static final String FOLDER_PATH = "/Users/haitaozhang/Downloads/TPC-H-V3.0.1/dbgen/";
   private static final String TBL_FILE_SUFFIX = ".tbl";
   private static final Map<String, String[]> TABLE_NAME_FIELDS_MAP = Map.of(
   // One example record:
@@ -135,8 +137,10 @@ public final class TblToAvro {
 
   public static void main(String[] args)
       throws IOException {
-//    String tpchTblFileFolder = args[0];
-    String tpchTblFileFolder = FOLDER_PATH;
+    if (args.length != 1) {
+      throw new IllegalArgumentException("Usage: TblToAvro <folder with the dbgen .tbl files>");
+    }
+    Path tpchTblFileFolder = Paths.get(args[0]);
     for (Map.Entry<String, String[]> entry : TABLE_NAME_FIELDS_MAP.entrySet()) {
       String tableName = entry.getKey();
       String[] fieldsAndTypes = entry.getValue();
@@ -163,14 +167,15 @@ public final class TblToAvro {
       // Open Avro data file for writing
       DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema);
       DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
-      Path avroFilePath = Paths.get(tpchTblFileFolder + tableName + Constants.AVRO_FILE_SUFFIX);
-      Files.delete(avroFilePath);
+      Path avroFilePath = tpchTblFileFolder.resolve(tableName + Constants.AVRO_FILE_SUFFIX);
+      Files.deleteIfExists(avroFilePath);
       OutputStream outputStream = Files.newOutputStream(avroFilePath);
+      dataFileWriter.setCodec(CodecFactory.deflateCodec(9));
       dataFileWriter.create(schema, outputStream);
 
       // Read TPC-H .tbl files and convert to Avro format
       try (BufferedReader reader = new BufferedReader(
-          new FileReader(tpchTblFileFolder + tableName + TBL_FILE_SUFFIX))) {
+          new FileReader(tpchTblFileFolder.resolve(tableName + TBL_FILE_SUFFIX).toFile()))) {
         String line;
         while ((line = reader.readLine()) != null) {
           String[] fields = line.split("\\|");
