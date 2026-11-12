@@ -43,6 +43,12 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-spi</artifactId>
       <version>1.7.0-SNAPSHOT</version>
       <classifier>${dependency.classifier}</classifier>
@@ -55,7 +61,19 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner</artifactId>
       <version>1.7.0-SNAPSHOT</version>
       <classifier>${dependency.classifier}</classifier>
     </dependency>
@@ -63,12 +81,6 @@
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-query-planner</artifactId>
-      <version>1.7.0-SNAPSHOT</version>
-      <classifier>${dependency.classifier}</classifier>
     </dependency>
   </dependencies>
 
