@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
 
 /// Interface for cross-segment merge strategy.
@@ -29,14 +30,23 @@ import javax.annotation.concurrent.ThreadSafe;
 /// @param <I> Intermediate result at segment level (extracted from aggregation strategy result).
 @ThreadSafe
 interface MergeStrategy<I> {
+  /// Wire type value of the intermediate result, a list of per-step states.
+  int LIST_TYPE = 21;
+
   I merge(I intermediateResult1, I intermediateResult2);
 
+  /// Serializes the intermediate result, as [AggregationFunction#serializeIntermediateResult] does.
+  AggregationFunction.SerializedResult serializeIntermediateResult(I intermediateResult);
+
+  /// Deserializes the intermediate result, as [AggregationFunction#deserializeIntermediateResult] does.
+  I deserializeIntermediateResult(CustomObject customObject);
+
+  long[] extractFinalResult(I intermediateResult);
+
   /// Whether [#merge] is valid for intermediates of DIFFERENT groups (see
-  /// [org.apache.pinot.core.query.aggregation.function.AggregationFunction#canMergeIntermediatesAcrossGroups]).
+  /// [AggregationFunction#canMergeIntermediatesAcrossGroups]).
   /// Partitioned strategies keep per-segment-final counts and must only merge the same group across segments.
   default boolean isMergeableAcrossGroups() {
     return true;
   }
-
-  LongArrayList extractFinalResult(I intermediateResult);
 }

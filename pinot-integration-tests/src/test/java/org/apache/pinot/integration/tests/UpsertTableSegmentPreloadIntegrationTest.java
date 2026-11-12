@@ -231,7 +231,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
         assertNotNull(files);
         assertEquals(files.length, 3);
         for (File file : files) {
-          if (!new File(new File(file, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).exists()) {
+          if (!new File(new File(file, "v3"), V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME).exists()) {
             return false;
           }
         }

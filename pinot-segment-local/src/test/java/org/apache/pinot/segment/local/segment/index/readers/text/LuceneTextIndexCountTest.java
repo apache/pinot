@@ -55,6 +55,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Covers the `count(*)` short-circuit: [LuceneTextIndexReader#getNumMatchingDocs] and the
@@ -216,23 +217,20 @@ public class LuceneTextIndexCountTest {
     }
   }
 
-  /// A Lucene index larger than the segment means a broken doc-id mapping. Counting does not consult the
-  /// translator, so it must refuse the fast path and fall back to the doc-id path, which fails loudly rather
-  /// than returning an inflated count.
+  /// Both query paths reject an oversized index even when a persisted Skip setting removes translator bounds checks.
   @Test
-  public void testOversizedIndexFallsBackInsteadOfCountingWrong()
+  public void testOversizedIndexRejectsInvalidDocIds()
       throws Exception {
     int understatedNumDocs = DOCS.length - 4;
     try (LuceneTextIndexReader reader =
         new LuceneTextIndexReader(COLUMN, INDEX_DIR, understatedNumDocs, Map.of())) {
-      try {
-        int count = reader.getNumMatchingDocs("sentinelall", null);
-        assertTrue(count <= understatedNumDocs,
-            "returned a count larger than the segment (" + count + " > " + understatedNumDocs + ")");
-      } catch (RuntimeException e) {
-        // Falling back and failing loudly is the intended behaviour for a broken mapping. The fallback runs
-        // getDocIds, whose translator throws, and getNumMatchingDocs rewraps it with its own wording.
-        assertTrue(e.getMessage().contains("text index"), "unexpected failure: " + e.getMessage());
+      RuntimeException countFailure =
+          expectThrows(RuntimeException.class, () -> reader.getNumMatchingDocs("sentinelall", null));
+      RuntimeException idsFailure = expectThrows(RuntimeException.class, () -> reader.getDocIds("sentinelall", null));
+      for (RuntimeException failure : new RuntimeException[]{countFailure, idsFailure}) {
+        assertTrue(failure.getMessage().contains("text index"));
+        assertTrue(failure.getCause() instanceof IllegalStateException);
+        assertTrue(failure.getCause().getMessage().contains("exceeding segment document count"));
       }
     }
   }

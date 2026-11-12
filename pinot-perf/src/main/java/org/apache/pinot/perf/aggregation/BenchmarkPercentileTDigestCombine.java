@@ -34,19 +34,19 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedResult;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -164,6 +164,7 @@ public class BenchmarkPercentileTDigestCombine {
   private ReducerAggregationFunction[] _functions;
   private TDigest[] _sources;
   private byte[][] _serializedSources;
+  private int _serializedSourceType;
   private TDigest[] _firstSources;
   private int[] _sourceOrder;
   private double _averageInputCentroidCount;
@@ -299,9 +300,10 @@ public class BenchmarkPercentileTDigestCombine {
       if (isAccumulatorSource()) {
         PercentileTDigestAggregationFunction function = new PercentileTDigestAggregationFunction(
             ExpressionContext.forIdentifier("metric"), 75.0, _compression, false);
-        SerializedIntermediateResult serialized = function.serializeIntermediateResult(digest);
+        SerializedResult serialized = function.serializeIntermediateResult(digest);
         byte[] bytes = serialized.getBytes();
         _serializedSources[sourceId] = bytes;
+        _serializedSourceType = serialized.getType();
         digest = function.deserializeIntermediateResult(
             new CustomObject(serialized.getType(), ByteBuffer.wrap(bytes)));
         if (_implementation == Implementation.ACCUMULATOR_LOCAL) {
@@ -340,7 +342,7 @@ public class BenchmarkPercentileTDigestCombine {
         if (isAccumulatorSource()) {
           _serializedSources[expandedIndex] = bytes;
           TDigest source = function.deserializeIntermediateResult(
-              new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(bytes)));
+              new CustomObject(_serializedSourceType, ByteBuffer.wrap(bytes)));
           if (_implementation == Implementation.ACCUMULATOR_LOCAL) {
             source.compress();
           }
@@ -486,7 +488,7 @@ public class BenchmarkPercentileTDigestCombine {
     if (isAccumulatorSource()) {
       byte[] bytes = _serializedSources[sourceIndex];
       TDigest target = _functions[metricId].deserializeIntermediateResult(
-          new CustomObject(ObjectSerDeUtils.ObjectType.TDigest.getValue(), ByteBuffer.wrap(bytes)));
+          new CustomObject(_serializedSourceType, ByteBuffer.wrap(bytes)));
       if (_implementation == Implementation.ACCUMULATOR_LOCAL) {
         target.compress();
       }

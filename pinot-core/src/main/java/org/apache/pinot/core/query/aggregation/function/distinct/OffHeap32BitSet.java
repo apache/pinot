@@ -144,7 +144,7 @@ public class OffHeap32BitSet extends BaseOffHeapSet {
   @Override
   public byte[] serialize() {
     int size = size();
-    byte[] bytes = new byte[Integer.BYTES + size << 2];
+    byte[] bytes = new byte[Integer.BYTES + (size << 2)];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     byteBuffer.putInt(size);
     IntIterator iterator = iterator();

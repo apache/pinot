@@ -416,9 +416,12 @@ public class CommonConstants {
         "pinot.broker.query.regex.dict.size.threshold";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final boolean DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION = true;
+    /// Enabled by default. A cluster-config value overrides the broker configuration without a restart; removing it
+    /// restores the broker value. This key takes precedence over `pinot.all.enable.query.fingerprinting` in cluster
+    /// config. Literal-value SQL redaction always requires fingerprinting, even if this is false.
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING =
         "pinot.broker.enable.query.fingerprinting";
-    public static final boolean DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING = false;
+    public static final boolean DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING = true;
     public static final String DEFAULT_QUERY_HASH = "";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
@@ -643,6 +646,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD =
         "pinot.broker.mse.streaming.distinct.flush.threshold";
     public static final int DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD = -1;
+
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -797,6 +801,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";
+    /// Default of the [Request.QueryOptionKey#INFER_ANY_VALUE_TYPE] query option, read from the broker conf and, live,
+    /// from the cluster config.
+    public static final String CONFIG_OF_BROKER_QUERY_INFER_ANY_VALUE_TYPE = "pinot.broker.query.infer.any.value.type";
+    public static final boolean DEFAULT_BROKER_QUERY_INFER_ANY_VALUE_TYPE = false;
 
     /// Config for sort exchange copy threshold in multi-stage engine.
     ///
@@ -985,6 +993,19 @@ public class CommonConstants {
         /// exchange over the distinct columns provides. Do not set it on the gRPC streaming query path, where
         /// there is no such stage and the client would observe duplicate rows across flush windows.
         public static final String STREAMING_DISTINCT_FLUSH_THRESHOLD = "streamingDistinctFlushThreshold";
+
+        /// Selects the streaming k-way-merge selection ORDER BY combine over sorted segments. One of
+        /// [Server.SortedSelectionMergeMode] (case-insensitive); defaults to
+        /// [Server#DEFAULT_SORTED_SELECTION_MERGE_MODE]. [Server.SortedSelectionMergeMode#ON] and
+        /// [Server.SortedSelectionMergeMode#AUTO] are experimental.
+        public static final String SORTED_SELECTION_MERGE_MODE = "sortedSelectionMergeMode";
+        /// Minimum fraction of segments that must be physically sorted on the leading ORDER BY column for
+        /// [Server.SortedSelectionMergeMode#AUTO] to select the streaming merge. Overrides
+        /// [Server#DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO].
+        public static final String SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO =
+            "sortedSelectionMergeAutoMinSortedRatio";
+        /// Output block size (rows) for the streaming selection ORDER BY combine.
+        public static final String SORTED_SELECTION_MERGE_BLOCK_SIZE = "sortedSelectionMergeBlockSize";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
@@ -1216,6 +1237,10 @@ public class CommonConstants {
         // MAX(stringCol) -> MAXSTRING(stringCol)
         // SUM(intCol) -> SUMINT(intCol)
         public static final String AUTO_REWRITE_AGGREGATION_TYPE = "autoRewriteAggregationType";
+        /// Whether ANY_VALUE(expr) is rewritten to ANY_VALUE(expr, 'dataType') to return the type of `expr`, instead of
+        /// the legacy result type, which is STRING in the single-stage engine. Defaults to
+        /// [Broker#CONFIG_OF_BROKER_QUERY_INFER_ANY_VALUE_TYPE].
+        public static final String INFER_ANY_VALUE_TYPE = "inferAnyValueType";
         // When enabled, allows multi cluster/federated queries to be executed.
         public static final String ENABLE_MULTI_CLUSTER_ROUTING = "enableMultiClusterRouting";
 
@@ -1352,7 +1377,8 @@ public class CommonConstants {
         // Do not detect any failure
         NO_OP,
 
-        // Detect connection failures
+        // Detect connection failures, and optionally servers that leave a query unanswered and then fail a ping (see
+        // CONFIG_OF_ENABLE_PING_ON_TIMEOUT)
         CONNECTION,
 
         // Use the custom failure detector of the configured class name
@@ -1371,6 +1397,50 @@ public class CommonConstants {
       public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
       public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
       public static final int DEFAULT_MAX_RETRIES = 10;
+
+      /// When a single-stage query times out on a server, ping the server and mark it unhealthy if the ping goes
+      /// unanswered. Unhealthy servers are then retried with a ping too, instead of a TCP connect. This is how a server
+      /// whose node is gone or whose JVM is frozen is detected, since such a server keeps its connection open and
+      /// raises no connection failure. A server that is merely busy still answers the ping, so it is left alone.
+      ///
+      /// Enable only once every server runs a version that answers pings. An older server runs a ping like a query,
+      /// behind the queries already queued on it, so a busy one can miss the ping timeout and be taken out of routing.
+      public static final String CONFIG_OF_ENABLE_PING_ON_TIMEOUT =
+          "pinot.broker.failure.detector.enable.ping.on.timeout";
+      public static final boolean DEFAULT_ENABLE_PING_ON_TIMEOUT = false;
+
+      /// With pings enabled, how long to wait for a server to answer one before treating it as unhealthy, both when
+      /// checking a server after a query timeout and when retrying an unhealthy one. Keep it above the longest
+      /// stop-the-world GC pause expected on a server, or a pause will briefly take that server out of routing.
+      public static final String CONFIG_OF_PING_TIMEOUT_MS = "pinot.broker.failure.detector.ping.timeout.ms";
+      public static final long DEFAULT_PING_TIMEOUT_MS = 5_000L;
+
+      /// Single-stage queries a server leaves unanswered are also counted per channel, with or without pings. A query
+      /// counts once its timeout has passed and, a further grace period later, the server has still sent nothing on
+      /// the channel since the query was written to it. The grace lets the server's own late timeout response through,
+      /// so a burst of slow queries or a broker pause does not look like a dead channel; a half-open channel answers
+      /// nothing, ever. At the threshold the channel is marked suspect, so the next query to it (or the failure
+      /// detector's retry) replaces it with a fresh connection. That never takes the server out of routing; see
+      /// [#CONFIG_OF_REPORT_UNANSWERED_SERVERS] for that. Any response from the server, decodable or not, resets the
+      /// count. A non-positive threshold disables the check.
+      public static final String CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD =
+          "pinot.broker.failure.detector.unanswered.queries.threshold";
+      public static final int DEFAULT_UNANSWERED_QUERIES_THRESHOLD = 5;
+      public static final String CONFIG_OF_UNANSWERED_QUERY_GRACE_MS =
+          "pinot.broker.failure.detector.unanswered.query.grace.ms";
+      public static final long DEFAULT_UNANSWERED_QUERY_GRACE_MS = 2_000L;
+
+      /// With pings disabled, whether a server that crosses [#CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD] on a channel is
+      /// also reported to the failure detector, which with the `CONNECTION` detector takes it out of routing until the
+      /// retry probe re-establishes its channels. Off by default: a tenant whose heavy queries routinely overrun their
+      /// timeout, or a long GC pause, can cross the threshold on a healthy server. Without pings the retry probe is a
+      /// TCP connect, which a frozen JVM's kernel still completes, so such a server is readmitted at every retry and
+      /// can leave up to the threshold of queries per channel unanswered again before it is reported once more;
+      /// enabling pings, where every server supports them, is the better way to catch it. With pings enabled this
+      /// setting has no effect: the ping that follows every timeout decides.
+      public static final String CONFIG_OF_REPORT_UNANSWERED_SERVERS =
+          "pinot.broker.failure.detector.report.unanswered.servers";
+      public static final boolean DEFAULT_REPORT_UNANSWERED_SERVERS = false;
     }
 
     // Configs related to AdaptiveServerSelection.
@@ -1517,6 +1587,11 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         FileUtils.getTempDirectoryPath() + File.separator + "PinotServer";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
+    // Require a pre-existing data directory at server startup when enabled.
+    public static final String INSTANCE_DATA_DIR_FAIL_ON_MISSING = "dataDir.failOnMissing";
+    public static final String CONFIG_OF_INSTANCE_DATA_DIR_FAIL_ON_MISSING =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + INSTANCE_DATA_DIR_FAIL_ON_MISSING;
+    public static final boolean DEFAULT_INSTANCE_DATA_DIR_FAIL_ON_MISSING = false;
     public static final String CONSUMER_DIR = "consumerDir";
     public static final String CONFIG_OF_CONSUMER_DIR = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + CONSUMER_DIR;
     public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
@@ -1688,6 +1763,56 @@ public class CommonConstants {
     // Sequential combine utilizes N + 1 threads, N for processing and 1 for merge. Pair-wise only uses N.
     public static final int DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD =
         Runtime.getRuntime().availableProcessors();
+
+    /// Selects the streaming k-way-merge selection ORDER BY combine
+    /// ([Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_MODE]).
+    ///
+    /// The merge runs single-threaded on the consumer thread, so it trades `maxExecutionThreads` worth of parallel
+    /// segment processing for the ability to emit sorted blocks incrementally. That trade only pays off when the
+    /// segments are physically sorted on the leading ORDER BY column, since an unsorted child must do a full scan
+    /// plus top-K synchronously before the merge can take its first row.
+    public enum SortedSelectionMergeMode {
+      /// Never use the streaming merge. Selection ORDER BY keeps its existing combine operators.
+      OFF,
+      /// Always use the streaming merge, including when the leading ORDER BY expression is not an identifier and no
+      /// segment is sorted. Children then materialize their top-K eagerly and the merge is strictly slower than
+      /// [#OFF]; intended for benchmarking and A/B, not for production traffic.
+      ON,
+      /// Use the streaming merge only when at least
+      /// [Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO] of the queried segments are
+      /// physically sorted on the leading ORDER BY column. Decided from segment metadata alone, without acquiring
+      /// any segment.
+      ///
+      /// Experimental, like [#ON]: the default ratio is not measured yet, and the check ignores segment size and
+      /// overlap, so it does not predict a speedup (#19924).
+      AUTO
+    }
+
+    public static final SortedSelectionMergeMode DEFAULT_SORTED_SELECTION_MERGE_MODE =
+        SortedSelectionMergeMode.OFF;
+
+    /// Default for [Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO].
+    ///
+    /// Consuming segments are never reported as sorted ([org.apache.pinot.segment.spi.datasource.DataSourceMetadata]
+    /// on a mutable segment hardcodes `isSorted()` to false), so a realtime table always has a few unsorted segments
+    /// among many sorted ones. This default is chosen to tolerate that while still rejecting a mostly-unsorted table.
+    /// It is a starting point rather than a measured optimum.
+    public static final double DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO = 0.8;
+    /// Server-wide override of [#DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO], applied to queries that do not
+    /// set the query option.
+    public static final String SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO =
+        "sorted.selection.merge.auto.min.sorted.ratio";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO;
+
+    /// Default output block size (rows) for the streaming selection ORDER BY combine
+    /// ([Broker.Request.QueryOptionKey#SORTED_SELECTION_MERGE_BLOCK_SIZE]).
+    public static final int DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE = 10_000;
+    /// Server-wide override of [#DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE], applied to queries that do not set the
+    /// query option.
+    public static final String SORTED_SELECTION_MERGE_BLOCK_SIZE = "sorted.selection.merge.block.size";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_SORTED_SELECTION_MERGE_BLOCK_SIZE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + SORTED_SELECTION_MERGE_BLOCK_SIZE;
     public static final String CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE = MSE_CONFIG_PREFIX + ".min.group.trim.size";
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;

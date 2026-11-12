@@ -73,6 +73,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.h2.jdbc.JdbcArray;
@@ -319,6 +320,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         assertTrue(value instanceof String,
             "Got unexpected value type: " + value.getClass() + " for BYTES column, expected: String or byte[]");
         return value;
+      case UUID:
+        return UuidUtils.toUUID(value).toString();
       case INT_ARRAY:
         if (value instanceof List) {
           return ((List) value).stream().mapToInt(i -> (int) i).toArray();
@@ -427,6 +430,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       case TIMESTAMP:
       case STRING:
       case BYTES:
+      case UUID:
         return actual.equals(expected);
       case INT_ARRAY:
         return Arrays.equals((int[]) actual, (int[]) expected);
@@ -523,6 +527,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
               case BYTES:
                 h2Statement.setBytes(h2Index++, Hex.decodeHex((String) value));
                 break;
+              case UUID:
+                h2Statement.setObject(h2Index++, UuidUtils.toUUID(value));
+                break;
               default:
                 h2Statement.setObject(h2Index++, value);
                 break;
@@ -566,6 +573,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         return "BYTEA";
       case TIMESTAMP:
         return "TIMESTAMP";
+      case UUID:
+        return "UUID";
       default:
         throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
     }

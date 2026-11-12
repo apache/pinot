@@ -29,12 +29,13 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.SerializedQuantileDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /// The `PercentileRawEstAggregationFunction` returns the serialized `QuantileDigest` data structure of the
 /// `PercentileEstAggregationFunction`.
 public class PercentileRawEstAggregationFunction
-    extends BaseSingleInputAggregationFunction<QuantileDigest, SerializedQuantileDigest> {
+    extends BaseSingleInputAggregationFunction<QuantileDigest, Comparable<?>> {
   private final PercentileEstAggregationFunction _percentileEstAggregationFunction;
 
   public PercentileRawEstAggregationFunction(ExpressionContext expressionContext, double percentile,
@@ -119,7 +120,7 @@ public class PercentileRawEstAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(QuantileDigest quantileDigest) {
+  public SerializedResult serializeIntermediateResult(QuantileDigest quantileDigest) {
     return _percentileEstAggregationFunction.serializeIntermediateResult(quantileDigest);
   }
 
@@ -145,5 +146,17 @@ public class PercentileRawEstAggregationFunction
               _percentileEstAggregationFunction._percentile);
     }
     return new SerializedQuantileDigest(intermediateResult, _percentileEstAggregationFunction._percentile);
+  }
+
+  /// Merges two final results, which are serialized digests in string form, into the string form of the merged
+  /// digest.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    QuantileDigest merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedQuantileDigest(merged, _percentileEstAggregationFunction._percentile).toString();
+  }
+
+  private static QuantileDigest deserializeFinalResult(Comparable<?> finalResult) {
+    return QuantileDigest.fromBytes(BytesUtils.toBytes((String) finalResult));
   }
 }

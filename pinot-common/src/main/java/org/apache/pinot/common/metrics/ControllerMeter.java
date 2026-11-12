@@ -37,7 +37,6 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_TABLE_TENANT_CREATE_ERROR("TableTenantCreateError", true),
   CONTROLLER_TABLE_TENANT_DELETE_ERROR("TableTenantDeleteError", true),
   CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR("errors", true),
-  CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_MISMATCH("mismatch", true),
   CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK("leadershipChangeWithoutCallback", true),
   LLC_STATE_MACHINE_ABORTS("aborts", false),
   LLC_ZOOKEEPER_FETCH_FAILURES("failures", false),
@@ -59,6 +58,11 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_SUCCESS("LLCSegmentDeepStoreUploadRetrySuccess", false),
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR("LLCSegmentDeepStoreUploadRetryError", false),
   SEGMENT_MISSING_DEEP_STORE_LINK("RealtimeSegmentMissingDeepStoreLink", false),
+  // Number of ERROR-segment repairs the periodic repair pass failed to initiate: a reset that could not be sent, or a
+  // re-ingestion trigger that failed. Counted once per affected segment per pass, so a segment that fails again on a
+  // later pass is counted again. Repairs skipped by policy, and repairs that fail asynchronously after they were sent,
+  // are not counted.
+  LLC_ERROR_SEGMENT_REPAIR_FAILURES("failures", false),
   DELETED_TMP_SEGMENT_COUNT("DeletedTmpSegmentCount", false),
   TABLE_REBALANCE_FAILURE_DETECTED("TableRebalanceFailureDetected", false),
   TABLE_REBALANCE_RETRY("TableRebalanceRetry", false),
@@ -96,7 +100,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   QUERY_WORKLOAD_REQUEST_DROPPED("count", true),
   QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true),
   // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
-  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false),
+  // Storage quota breach detected for a table whose enforcement mode is ENFORCED or SHADOW (not DISABLED)
+  STORAGE_QUOTA_EXCEEDED("StorageQuotaExceeded", false);
 
   private final String _brokerMeterName;
   private final String _unit;

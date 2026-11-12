@@ -26,6 +26,7 @@ import java.util.Properties;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -150,6 +151,34 @@ public class StaleInstancesCleanupTaskTest {
 
     verify(_pinotHelixResourceManager).dropInstance(SERVER_NOT_IN_USE);
     verify(_pinotHelixResourceManager, never()).dropInstance(SERVER_IN_USE);
+  }
+
+  /// Verifies that an offline server referenced only in the partition assignment of a table's IdealState (the
+  /// instances of a partition without segment) is NOT dropped, since the new segments of the partition are assigned
+  /// to it.
+  @Test
+  public void testServerInPartitionAssignmentIsNotDropped() {
+    String serverInPartitionAssignment = "Server_server3.example.com_8098";
+    IdealState tableIdealState = buildTableIdealState(TABLE_NAME, Map.of(SEGMENT_1, Map.of(SERVER_IN_USE, "ONLINE")));
+    PartitionAssignmentUtils.setInstances(tableIdealState, 1, List.of(serverInPartitionAssignment));
+
+    when(_pinotHelixResourceManager.getAllTables()).thenReturn(List.of(TABLE_NAME));
+    when(_pinotHelixResourceManager.getTableIdealState(TABLE_NAME)).thenReturn(tableIdealState);
+
+    IdealState brokerIdealState = buildBrokerIdealState(Map.of());
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(_pinotHelixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+    when(helixAdmin.getResourceIdealState(CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE))
+        .thenReturn(brokerIdealState);
+
+    when(_pinotHelixResourceManager.getAllInstances()).thenReturn(List.of(SERVER_IN_USE, serverInPartitionAssignment));
+    when(_pinotHelixResourceManager.getOnlineInstanceList()).thenReturn(List.of());
+    when(_pinotHelixResourceManager.isInstanceOfflineFor(anyString(), eq(RETENTION_MS))).thenReturn(true);
+
+    _task.runTask(new Properties());
+
+    verify(_pinotHelixResourceManager, never()).dropInstance(SERVER_IN_USE);
+    verify(_pinotHelixResourceManager, never()).dropInstance(serverInPartitionAssignment);
   }
 
   /// Verifies behavior with multiple tables — a server referenced in ANY table's

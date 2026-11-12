@@ -38,6 +38,7 @@
 </div>
 
 - [What is Apache Pinot?](#what-is-apache-pinot)
+  - [Docker quickstart](#docker-quickstart)
   - [Features](#features)
   - [When should I use Pinot?](#when-should-i-use-pinot)
   - [Contributing to Pinot](#contributing-to-pinot)
@@ -52,9 +53,44 @@
 
 [Apache Pinot](https://pinot.apache.org) is a real-time distributed OLAP datastore, built to deliver scalable real-time analytics with low latency. It can ingest from batch data sources (such as Hadoop HDFS, Amazon S3, Azure ADLS, Google Cloud Storage) as well as stream data sources (such as Apache Kafka).
 
+Pinot also supports [vector similarity search](https://docs.pinot.apache.org/build-with-pinot/indexing/vector-index) for vector database use cases such as semantic search, recommendations, and retrieval-augmented generation (RAG). Its low-latency SQL queries over fresh data make it well suited to [agent-facing analytics](https://pinot.apache.org/agent-facing-analytics/), including AI assistants and automated decision systems.
+
 Pinot was built by engineers at LinkedIn and Uber and is designed to scale up and out with no upper bound. Performance always remains constant based on the size of your cluster and an expected query per second (QPS) threshold.
 
 For getting started guides, deployment recipes, tutorials, and more, please visit our project documentation at [https://docs.pinot.apache.org](https://docs.pinot.apache.org).
+
+## Docker quickstart
+
+With Docker running and at least 6 GB of memory allocated to it, start Pinot with a bundled sample dataset:
+
+```bash
+docker run --rm --name pinot-quickstart \
+  -p 127.0.0.1:9000:9000 \
+  apachepinot/pinot:1.6.0 QuickStart -type batch
+```
+
+The first run downloads the image and loads sample tables, which can take a few minutes.
+Wait for `***** Quick start setup complete *****` in the logs, then open the
+[query console](http://localhost:9000/#/query) and run this query to find the players with the most recorded home runs:
+
+```sql
+SELECT playerID, SUM(homeRuns) AS totalHomeRuns
+FROM baseballStats
+GROUP BY playerID
+ORDER BY totalHomeRuns DESC
+LIMIT 3;
+```
+
+Expected result for the bundled dataset:
+
+| playerID | totalHomeRuns |
+| --- | ---: |
+| bondsba01 | 762 |
+| aaronha01 | 755 |
+| ruthba01 | 714 |
+
+To stop the demo, run `docker stop pinot-quickstart` in another terminal. The container and its demo data are removed.
+For streaming examples and other ways to run Pinot, see the [quickstart guide](https://docs.pinot.apache.org/basics/getting-started/quick-start).
 
 <img src="https://pinot.apache.org/static/images/hero_diagram.svg" align="center" alt="Apache Pinot"/>
 

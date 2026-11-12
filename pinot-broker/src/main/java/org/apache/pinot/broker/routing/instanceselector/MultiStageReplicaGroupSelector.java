@@ -20,15 +20,16 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.time.Clock;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -44,8 +45,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /// Instance selector for multi-stage queries which can ensure that Colocated Tables always leverage Colocated Join
@@ -56,7 +55,7 @@ import org.slf4j.LoggerFactory;
 /// strategy will try to pick another replica-group. For realtime tables, this strategy uses only CONSUMING partitions.
 /// This is feature is in **Beta**.
 public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageReplicaGroupSelector.class);
+  private static final int NOT_QUERIED = -1;
 
   private volatile InstancePartitions _instancePartitions;
 
@@ -83,9 +82,9 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   }
 
   @Override
-  public InstanceMapping select(List<String> segments, int requestId,
-      SegmentStates segmentStates, Map<String, String> queryOptions) {
-    // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
+  public SelectionResult select(Collection<String> segments, int requestId, SegmentStates segmentStates,
+      Map<String, String> queryOptions) {
+    // Read the instance partitions once, so that the whole selection uses the same instance partitions
     InstancePartitions instancePartitions = _instancePartitions;
     int replicaGroupSelected;
     ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
@@ -100,72 +99,138 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
     }
 
-    return assign(Sets.newHashSet(segments), segmentStates, instancePartitions, replicaGroupSelected);
+    return assign(segments, segmentStates, instancePartitions, replicaGroupSelected);
   }
 
-  /// Returns a map from the segmentName to the corresponding server. It tries to select all servers from the
-  /// preferredReplicaGroup, but if it fails, it will try to select the relevant server from other instance partitions.
+  /// Returns the segments to query on each instance. A segment is queried in the instance partitions of its
+  /// candidates. For each instance partition, selects the first replica group, starting from the preferred one, whose
+  /// instances serve all the segments queried in the partition, and throws if there is none. Each segment is then
+  /// selected on the last instance (in instance partitions order) serving it in the selected replica group of the
+  /// highest instance partition it is queried in. Segments without candidate in the instance partitions are not
+  /// selected. A queried segment that cannot be routed (not tracked, or without enabled candidate) is skipped when it
+  /// is a new LLC segment, and fails the selection otherwise.
   ///
-  /// @return An [InstanceMapping] whose `segmentToInstanceMap` contains the segments assigned to a server and whose
-  /// `optionalSegmentToInstanceMap` contains segments that are optional (i.e., the server is not online to serve that
-  /// segment).
-  /// Example:
-  /// {
-  ///   "required_segments": {
-  ///     "segment1": "server1",
-  ///     "segment2": "server2"
-  ///   },
-  ///   "optional_segments": {
-  ///     "segment3": "server3",
-  ///     "segment4": "server4"
-  ///   }
-  /// }
-  private InstanceMapping assign(Set<String> segments,
-      SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
-    Map<String, Integer> instanceToPartitionMap = instancePartitions.getInstanceToPartitionIdMap();
-    Map<String, Set<String>> instanceToSegmentsMap = new HashMap<>();
+  /// As the candidates are the same for all the segments of a group, all of this is computed once per queried group.
+  private SelectionResult assign(Collection<String> segments, SegmentStates segmentStates,
+      InstancePartitions instancePartitions, int preferredReplicaGroup) {
+    SelectionCollector collector = new SelectionCollector(segmentStates, segments.size(), false);
 
-    // instanceToSegmentsMap stores the mapping from instance to the active segments it can serve.
+    // Resolve the group of each segment once, and index the queried groups in the order they are first queried
+    int[] queriedGroupIndexes = new int[segments.size()];
+    Int2IntOpenHashMap groupIdToQueriedGroupIndex = new Int2IntOpenHashMap();
+    groupIdToQueriedGroupIndex.defaultReturnValue(NOT_QUERIED);
+    List<GroupRouting> queriedRoutings = new ArrayList<>();
+    int index = 0;
     for (String segment : segments) {
-      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
-      if (CollectionUtils.isEmpty(candidates)) {
-        if (isNewLLCSegment(segment)) {
-          // New segments might not be tracked in segmentStates yet.
+      int groupId = segmentStates.getGroupId(segment);
+      GroupRouting routing = collector.resolveRouting(segment, groupId);
+      if (routing == null) {
+        // New segments might not be tracked in segmentStates yet.
+        Preconditions.checkState(isNewLLCSegment(segment), "Failed to find servers for segment: %s", segment);
+        queriedGroupIndexes[index++] = NOT_QUERIED;
+        continue;
+      }
+      int queriedGroupIndex = groupIdToQueriedGroupIndex.get(groupId);
+      if (queriedGroupIndex == NOT_QUERIED) {
+        queriedGroupIndex = queriedRoutings.size();
+        groupIdToQueriedGroupIndex.put(groupId, queriedGroupIndex);
+        queriedRoutings.add(routing);
+      }
+      queriedGroupIndexes[index++] = queriedGroupIndex;
+    }
+
+    // Collect the queried groups of each instance partition, and the highest instance partition of each queried group
+    Map<String, Integer> instanceToPartitionMap = instancePartitions.getInstanceToPartitionIdMap();
+    int numPartitions = instancePartitions.getNumPartitions();
+    IntArrayList[] queriedGroupIndexesByPartition = new IntArrayList[numPartitions];
+    int numQueriedGroups = queriedRoutings.size();
+    int[] maxPartitions = new int[numQueriedGroups];
+    for (int queriedGroupIndex = 0; queriedGroupIndex < numQueriedGroups; queriedGroupIndex++) {
+      int maxPartition = -1;
+      for (SegmentInstanceCandidate candidate : queriedRoutings.get(queriedGroupIndex).getCandidates()) {
+        Integer partition = instanceToPartitionMap.get(candidate.getInstance());
+        // Only the candidates in the instance partitions are selected
+        if (partition == null || partition < 0 || partition >= numPartitions) {
           continue;
-        } else {
-          throw new IllegalStateException(String.format("Failed to find servers for segment: %s", segment));
+        }
+        IntArrayList queriedGroupIndexesOfPartition = queriedGroupIndexesByPartition[partition];
+        if (queriedGroupIndexesOfPartition == null) {
+          queriedGroupIndexesOfPartition = new IntArrayList();
+          queriedGroupIndexesByPartition[partition] = queriedGroupIndexesOfPartition;
+        }
+        // Groups are processed one at a time, so the group is already added only if it is the last one
+        int numGroupsOfPartition = queriedGroupIndexesOfPartition.size();
+        if (numGroupsOfPartition == 0
+            || queriedGroupIndexesOfPartition.getInt(numGroupsOfPartition - 1) != queriedGroupIndex) {
+          queriedGroupIndexesOfPartition.add(queriedGroupIndex);
+        }
+        maxPartition = Math.max(maxPartition, partition);
+      }
+      maxPartitions[queriedGroupIndex] = maxPartition;
+    }
+
+    // Select the replica group of each queried instance partition, along with the candidate of the queried groups
+    // whose highest instance partition it is
+    int[] candidateIndexes = new int[numQueriedGroups];
+    Arrays.fill(candidateIndexes, -1);
+    InstancePositions instancePositions = new InstancePositions(segmentStates);
+    for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
+      IntArrayList queriedGroupIndexesOfPartition = queriedGroupIndexesByPartition[partitionId];
+      if (queriedGroupIndexesOfPartition != null) {
+        selectReplicaGroup(instancePartitions, partitionId, preferredReplicaGroup, queriedRoutings,
+            queriedGroupIndexesOfPartition, maxPartitions, instancePositions, candidateIndexes);
+      }
+    }
+
+    index = 0;
+    for (String segment : segments) {
+      int queriedGroupIndex = queriedGroupIndexes[index++];
+      if (queriedGroupIndex != NOT_QUERIED) {
+        int candidateIndex = candidateIndexes[queriedGroupIndex];
+        if (candidateIndex >= 0) {
+          collector.add(queriedRoutings.get(queriedGroupIndex), candidateIndex, segment);
         }
       }
-      for (SegmentInstanceCandidate candidate : candidates) {
-        instanceToSegmentsMap
-          .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
-            .add(segment);
+    }
+    return collector.build();
+  }
+
+  /// Selects the first replica group whose instances serve all the given queried groups of the given instance
+  /// partition, iterating the replica groups in a round-robin fashion starting from the preferred replica group, or
+  /// throws if there is none. Sets the candidate of each given group whose highest instance partition is this one: the
+  /// candidate that comes last in the instances of the selected replica group.
+  private void selectReplicaGroup(InstancePartitions instancePartitions, int partitionId, int preferredReplicaGroup,
+      List<GroupRouting> queriedRoutings, IntArrayList queriedGroupIndexes, int[] maxPartitions,
+      InstancePositions instancePositions, int[] candidateIndexes) {
+    int numReplicaGroups = instancePartitions.getNumReplicaGroups();
+    int numGroups = queriedGroupIndexes.size();
+    for (int replicaGroupOffset = 0; replicaGroupOffset < numReplicaGroups; replicaGroupOffset++) {
+      int replicaGroup = (replicaGroupOffset + preferredReplicaGroup) % numReplicaGroups;
+      instancePositions.record(instancePartitions.getInstances(partitionId, replicaGroup));
+      boolean servesAllGroups = true;
+      for (int i = 0; i < numGroups; i++) {
+        if (instancePositions.getLastCandidateIndex(queriedRoutings.get(queriedGroupIndexes.getInt(i))) < 0) {
+          servesAllGroups = false;
+          break;
+        }
+      }
+      if (servesAllGroups) {
+        for (int i = 0; i < numGroups; i++) {
+          int queriedGroupIndex = queriedGroupIndexes.getInt(i);
+          if (maxPartitions[queriedGroupIndex] == partitionId) {
+            candidateIndexes[queriedGroupIndex] =
+                instancePositions.getLastCandidateIndex(queriedRoutings.get(queriedGroupIndex));
+          }
+        }
+      }
+      instancePositions.clear();
+      if (servesAllGroups) {
+        return;
       }
     }
-
-    // partitionToRequiredSegmentsMap stores the mapping from partition to the segments that need to be served. This
-    // is necessary to select appropriate replica group at the instance partition level.
-    Map<Integer, Set<String>> partitionToRequiredSegmentsMap = new HashMap<>();
-    for (Map.Entry<String, Set<String>> entry : instanceToSegmentsMap.entrySet()) {
-      Integer partitionId = instanceToPartitionMap.get(entry.getKey());
-      partitionToRequiredSegmentsMap
-        .computeIfAbsent(partitionId, k -> new HashSet<>())
-          .addAll(entry.getValue());
-    }
-
-    // Assign segments to instances based on the partitionToRequiredSegmentsMap. This ensures that we select the
-    // appropriate replica group for each set of segments belonging to the same instance partition.
-    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>();
-    int numPartitions = instancePartitions.getNumPartitions();
-    for (int partition = 0; partition < numPartitions; partition++) {
-      Set<String> requiredSegments = partitionToRequiredSegmentsMap.get(partition);
-      if (requiredSegments != null) {
-        getSelectedInstancesForPartition(instanceToSegmentsMap, requiredSegments, partition, preferredReplicaId,
-            segmentToSelectedInstanceMap);
-      }
-    }
-
-    return computeOptionalSegments(segmentToSelectedInstanceMap, segmentStates);
+    throw new RuntimeException(
+        String.format("Unable to find any replica-group to serve segments in the instance-partition %s for table: %s",
+            partitionId, _tableNameWithType));
   }
 
   private boolean isNewLLCSegment(String segmentName) {
@@ -175,82 +240,6 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     }
     return InstanceSelector.isNewSegment(llcSegmentName.getCreationTimeMs(), System.currentTimeMillis(),
         _newSegmentExpirationTimeInSeconds * 1000);
-  }
-
-  /// This method selects the instances for the given partition and segments. It iterates over the replica groups
-  /// in a round-robin fashion, starting from the preferred replica group. It only selects the replica group if all
-  /// the segments are available in the selected instances.
-  /// If no replica group is found, it throws an exception.
-  private void getSelectedInstancesForPartition(Map<String, Set<String>> instanceToSegmentsMap,
-      Set<String> requiredSegments, int partitionId, int preferredReplicaId,
-      Map<String, String> segmentToSelectedInstanceMapSink) {
-    int numReplicaGroups = _instancePartitions.getNumReplicaGroups();
-
-    for (int replicaGroupOffset = 0; replicaGroupOffset < numReplicaGroups; replicaGroupOffset++) {
-      int selectedReplicaGroup = (replicaGroupOffset + preferredReplicaId) % numReplicaGroups;
-      List<String> selectedInstances = _instancePartitions.getInstances(partitionId, selectedReplicaGroup);
-
-      Set<String> segmentsFromSelectedInstances = new HashSet<>();
-      for (String instance : selectedInstances) {
-        Set<String> servedSegments = instanceToSegmentsMap.get(instance);
-        if (servedSegments != null) {
-          segmentsFromSelectedInstances.addAll(servedSegments);
-        }
-      }
-
-      if (segmentsFromSelectedInstances.containsAll(requiredSegments)) {
-        for (String instance: selectedInstances) {
-          Set<String> servedSegments = instanceToSegmentsMap.get(instance);
-          if (servedSegments == null || servedSegments.isEmpty()) {
-            continue;
-          }
-          for (String segment : servedSegments) {
-            if (requiredSegments.contains(segment)) {
-              segmentToSelectedInstanceMapSink.put(segment, instance);
-            }
-          }
-        }
-        return; // Successfully selected instances for the partition.
-      }
-    }
-
-    throw new RuntimeException(
-      String.format("Unable to find any replica-group to serve segments in the instance-partition %s for table: %s",
-        partitionId, _tableNameWithType));
-  }
-
-  /// Based on whether the selected instance for the segment is online to serve that segment or not,
-  /// this method computes the segments that are optional and the segments that are not.
-  private InstanceMapping computeOptionalSegments(
-      Map<String, String> segmentToSelectedInstanceMap, SegmentStates segmentStates) {
-
-    Map<String, String> segmentsToInstanceMap = new HashMap<>();
-    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-
-    for (Map.Entry<String, String> entry : segmentToSelectedInstanceMap.entrySet()) {
-      String segment = entry.getKey();
-      String selectedInstance = entry.getValue();
-
-      List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
-      // If candidates are null, we will throw an exception and log a warning.
-      Preconditions.checkState(candidates != null && !candidates.isEmpty(),
-          "Failed to find servers for segment: %s", segment);
-
-      for (SegmentInstanceCandidate candidate : candidates) {
-        if (selectedInstance.equals(candidate.getInstance())) {
-          // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
-          // broker or server can skip it upon any issue to process it.
-          if (candidate.isOnline()) {
-            segmentsToInstanceMap.put(segment, selectedInstance);
-          } else {
-            optionalSegmentToInstanceMap.put(segment, selectedInstance);
-          }
-          break;
-        }
-      }
-    }
-
-    return new InstanceMapping(segmentsToInstanceMap, optionalSegmentToInstanceMap);
   }
 
   @VisibleForTesting
@@ -264,5 +253,55 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
         InstancePartitionsUtils.getInstancePartitionsName(_tableNameWithType, instancePartitionsType));
     Preconditions.checkNotNull(instancePartitions);
     return instancePartitions;
+  }
+
+  /// The positions of the instances of one replica group of an instance partition, by slot, to find the candidate of a
+  /// group that comes last among them without comparing instance names. Not thread safe. One instance per query.
+  private static final class InstancePositions {
+    final SegmentStates _segmentStates;
+    // Position + 1 of each slot in the recorded instances, 0 when absent
+    final int[] _positionBySlot;
+    final IntArrayList _recordedSlots = new IntArrayList();
+
+    InstancePositions(SegmentStates segmentStates) {
+      _segmentStates = segmentStates;
+      _positionBySlot = new int[segmentStates.getNumSlots()];
+    }
+
+    /// Records the positions of the given instances. An instance listed several times gets its last position.
+    void record(List<String> instances) {
+      int numInstances = instances.size();
+      for (int i = 0; i < numInstances; i++) {
+        int slot = _segmentStates.getSlot(instances.get(i));
+        if (slot != SegmentGroups.NO_SLOT) {
+          _positionBySlot[slot] = i + 1;
+          _recordedSlots.add(slot);
+        }
+      }
+    }
+
+    /// Returns the index of the candidate of the given routing that comes last in the recorded instances, or -1 if
+    /// none of its candidates is recorded.
+    int getLastCandidateIndex(GroupRouting routing) {
+      int candidateIndex = -1;
+      int lastPosition = 0;
+      int numCandidates = routing.getNumCandidates();
+      for (int i = 0; i < numCandidates; i++) {
+        int position = _positionBySlot[routing.getSlot(i)];
+        if (position > lastPosition) {
+          lastPosition = position;
+          candidateIndex = i;
+        }
+      }
+      return candidateIndex;
+    }
+
+    void clear() {
+      int numRecordedSlots = _recordedSlots.size();
+      for (int i = 0; i < numRecordedSlots; i++) {
+        _positionBySlot[_recordedSlots.getInt(i)] = 0;
+      }
+      _recordedSlots.clear();
+    }
   }
 }

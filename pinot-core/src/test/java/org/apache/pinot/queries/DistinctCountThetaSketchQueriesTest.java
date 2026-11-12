@@ -25,12 +25,12 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.datasketches.theta.UpdatableThetaSketch;
 import org.apache.datasketches.theta.UpdatableThetaSketchBuilder;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -50,6 +51,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -301,6 +303,11 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     String serializedSketch = (String) brokerResponse.getResultTable().getRows().get(0)[0];
     ThetaSketch sketch =
         ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(Base64.getDecoder().decode(serializedSketch));
+    assertEquals(Math.round(sketch.getEstimate()), NUM_RECORDS);
+
+    brokerResponse = getBrokerResponse(query, Map.of(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true"));
+    serializedSketch = (String) brokerResponse.getResultTable().getRows().get(0)[0];
+    sketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(Base64.getDecoder().decode(serializedSketch));
     assertEquals(Math.round(sketch.getEstimate()), NUM_RECORDS);
   }
 

@@ -19,6 +19,10 @@
 package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
@@ -31,6 +35,16 @@ import org.apache.parquet.io.OutputFile;
 public class ParquetTestUtils {
 
   private ParquetTestUtils() {
+  }
+
+  /// Encodes an instant as little-endian INT96 with a nonnegative nanosecond-of-day and Julian day number.
+  static byte[] int96Bytes(Instant instant) {
+    long secondsPerDay = TimeUnit.DAYS.toSeconds(1);
+    long day = Math.floorDiv(instant.getEpochSecond(), secondsPerDay);
+    long nanosOfDay = Math.floorMod(instant.getEpochSecond(), secondsPerDay) * TimeUnit.SECONDS.toNanos(1)
+        + instant.getNano();
+    return ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN).putLong(nanosOfDay)
+        .putInt(Math.toIntExact(day + ParquetUtils.JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH)).array();
   }
 
   /// Returns a ParquetWriter with the given path and schema.

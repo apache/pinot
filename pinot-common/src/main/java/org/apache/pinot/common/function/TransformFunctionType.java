@@ -306,6 +306,12 @@ public enum TransformFunctionType {
     return _operandTypeChecker;
   }
 
+  /// Returns whether the canonicalized function name belongs to the `jsonExtractScalar` family.
+  public static boolean isJsonExtractScalar(String canonicalName) {
+    return canonicalName.equals("jsonextractscalar") || canonicalName.equals("jsonextractscalarfast")
+        || canonicalName.equals("jsonextractscalarfirstmatch") || canonicalName.equals("jsonextractscalarfory");
+  }
+
   /// Returns the optional explicit returning type specification.
   private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos) {
     return positionalReturnTypeInferenceFromStringLiteral(opBinding, pos, SqlTypeName.ANY);

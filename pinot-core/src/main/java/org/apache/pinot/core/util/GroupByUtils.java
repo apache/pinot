@@ -52,7 +52,8 @@ import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedBytes;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedResult;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -186,7 +187,7 @@ public final class GroupByUtils {
     /// CPC / tuple sketch accumulators flush their pending lists in getResult), so concurrent serialization of
     /// the same base object by multiple derive tasks corrupts it. After this pass, derive tasks read only the
     /// immutable bytes and deserialize their own private copies.
-    SerializedIntermediateResult[][] serializedIntermediates =
+    SerializedResult[][] serializedIntermediates =
         preSerializeObjectIntermediates(baseEntries, aggregationFunctions, numUnionColumns, numTasks,
             queryContext, executorService);
 
@@ -311,7 +312,7 @@ public final class GroupByUtils {
   /// intermediates (scalar intermediates are immutable and need no cloning). Row `i` of the result corresponds
   /// to `baseEntries.get(i)`; column `j` is `null` for non-OBJECT aggregation `j`.
   @Nullable
-  private static SerializedIntermediateResult[][] preSerializeObjectIntermediates(
+  private static SerializedResult[][] preSerializeObjectIntermediates(
       List<Map.Entry<Key, Record>> baseEntries, AggregationFunction[] aggregationFunctions, int numUnionColumns,
       int numTasks, QueryContext queryContext, ExecutorService executorService) {
     int numAggregationFunctions = aggregationFunctions.length;
@@ -323,7 +324,7 @@ public final class GroupByUtils {
       return null;
     }
     int numEntries = baseEntries.size();
-    SerializedIntermediateResult[][] serialized = new SerializedIntermediateResult[numEntries][];
+    SerializedResult[][] serialized = new SerializedResult[numEntries][];
     int numChunks = Math.max(1, Math.min(numTasks, numEntries));
     if (numChunks == 1) {
       serializeChunk(baseEntries, serialized, 0, numEntries, numUnionColumns, aggregationFunctions);
@@ -347,22 +348,21 @@ public final class GroupByUtils {
   }
 
   private static void serializeChunk(List<Map.Entry<Key, Record>> baseEntries,
-      SerializedIntermediateResult[][] serialized, int from, int to, int numUnionColumns,
+      SerializedResult[][] serialized, int from, int to, int numUnionColumns,
       AggregationFunction[] aggregationFunctions) {
     int numAggregationFunctions = aggregationFunctions.length;
     for (int e = from; e < to; e++) {
       QueryThreadContext.checkTerminationAndSampleUsagePeriodically(e - from, "GroupByUtils#serializeChunk");
       Object[] baseValues = baseEntries.get(e).getValue().getValues();
-      SerializedIntermediateResult[] row = new SerializedIntermediateResult[numAggregationFunctions];
+      SerializedResult[] row = new SerializedResult[numAggregationFunctions];
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object intermediate = baseValues[numUnionColumns + i];
         if (intermediate != null
             && aggregationFunctions[i].getIntermediateResultColumnType() == ColumnDataType.OBJECT) {
           // The derive tasks read these bytes later, so take a snapshot instead of keeping a result that serializes
           // the live intermediate result on demand.
-          SerializedIntermediateResult serializedResult =
-              aggregationFunctions[i].serializeIntermediateResult(intermediate);
-          row[i] = new SerializedIntermediateResult(serializedResult.getType(), serializedResult.getBytes());
+          SerializedResult serializedResult = aggregationFunctions[i].serializeIntermediateResult(intermediate);
+          row[i] = new SerializedBytes(serializedResult.getType(), serializedResult.getBytes());
         }
       }
       serialized[e] = row;
@@ -382,7 +382,7 @@ public final class GroupByUtils {
   /// never merge (base keys are unique) and after the pre-pass no other task touches those objects.
   @SuppressWarnings("unchecked")
   private static Map<Key, Record>[] deriveSets(List<Map.Entry<Key, Record>> baseEntries,
-      @Nullable SerializedIntermediateResult[][] serializedIntermediates, boolean[][] setContains,
+      @Nullable SerializedResult[][] serializedIntermediates, boolean[][] setContains,
       boolean[] isFullUnionSet, int taskIndex, int numTaskSlots, int numUnionColumns, int numAggregationFunctions,
       AggregationFunction[] aggregationFunctions) {
     int numSets = setContains.length;
@@ -403,8 +403,7 @@ public final class GroupByUtils {
       Map.Entry<Key, Record> baseEntry = baseEntries.get(e);
       Object[] baseKeys = baseEntry.getKey().getValues();
       Object[] baseValues = baseEntry.getValue().getValues();
-      SerializedIntermediateResult[] serializedRow =
-          serializedIntermediates != null ? serializedIntermediates[e] : null;
+      SerializedResult[] serializedRow = serializedIntermediates != null ? serializedIntermediates[e] : null;
       for (int s = taskIndex; s < numSets; s += numTaskSlots) {
         // Keep the derive responsive to query timeout / cancellation and visible to resource accounting, like
         // the segment-merge loop in GroupByCombineOperator.
@@ -498,8 +497,8 @@ public final class GroupByUtils {
   /// (`serializedRow[i]` is null for them); `null` (nothing aggregated) is the merge identity; OBJECT
   /// accumulators are deserialized from the pre-serialized bytes, never touching the shared base object.
   private static Object cloneIntermediate(AggregationFunction aggregationFunction, Object[] baseValues,
-      @Nullable SerializedIntermediateResult[] serializedRow, int numUnionColumns, int i) {
-    SerializedIntermediateResult serialized = serializedRow != null ? serializedRow[i] : null;
+      @Nullable SerializedResult[] serializedRow, int numUnionColumns, int i) {
+    SerializedResult serialized = serializedRow != null ? serializedRow[i] : null;
     if (serialized == null) {
       return baseValues[numUnionColumns + i];
     }

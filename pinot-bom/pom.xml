@@ -103,7 +103,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.6.3</version>
+        <version>3.7.0</version>
         <configuration>
           <skip>true</skip>
         </configuration>
@@ -118,7 +118,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.15</version>
+        <version>0.8.16</version>
         <configuration>
           <skip>true</skip>
         </configuration>
@@ -275,12 +275,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-3.0</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-3.0</artifactId>
+        <artifactId>pinot-kafka-4.0</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>

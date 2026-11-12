@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel.window;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,7 +39,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggregationFunction<DoubleArrayList> {
+public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggregationFunction<double[]> {
 
   private static final AvgValueAggregator AVG_VALUE_AGGREGATOR = new AvgValueAggregator();
   private static final PercentileEstValueAggregator PERCENTILE_EST_VALUE_AGGREGATOR =
@@ -93,9 +92,9 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
   }
 
   @Override
-  public DoubleArrayList extractFinalResult(@Nullable PriorityQueue<FunnelStepEvent> stepEvents) {
+  public double[] extractFinalResult(@Nullable PriorityQueue<FunnelStepEvent> stepEvents) {
     if (stepEvents == null || stepEvents.isEmpty()) {
-      return new DoubleArrayList();
+      return new double[0];
     }
     stepEvents = new PriorityQueue<>(stepEvents);
     Map<Integer, List<Object>> stepValueAggregators = initValueAggregator();
@@ -126,7 +125,7 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
       }
     }
     if (_canSkipNonMatchedFunnel && !hasMatchedFunnel) {
-      return new DoubleArrayList();
+      return new double[0];
     }
     return getStepDurationResults(stepValueAggregators, hasMatchedFunnel);
   }
@@ -173,9 +172,10 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
     return stepValueAggregators;
   }
 
-  private DoubleArrayList getStepDurationResults(Map<Integer, List<Object>> valueAggregatorResults,
+  private double[] getStepDurationResults(Map<Integer, List<Object>> valueAggregatorResults,
       boolean hasMatchedFunnel) {
-    DoubleArrayList result = new DoubleArrayList(_durationFunctions.size() * (_numSteps - 1));
+    int numDurationFunctions = _durationFunctions.size();
+    double[] result = new double[_numSteps * numDurationFunctions];
     for (int step = 0; step < _numSteps; step++) {
       AtomicReference<AvgPair> avgPair = new AtomicReference<>();
       AtomicReference<QuantileDigest> quantileDigest = new AtomicReference<>();
@@ -191,27 +191,28 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
           count.set(((AtomicInteger) valueAggregator).intValue());
         }
       });
-      for (int i = 0; i < _durationFunctions.size(); i++) {
+      for (int i = 0; i < numDurationFunctions; i++) {
         String durationFunction = _durationFunctions.get(i);
+        int index = step * numDurationFunctions + i;
         if (durationFunction.equals("COUNT")) {
-          result.add(count.get());
+          result[index] = count.get();
           continue;
         }
         if (!hasMatchedFunnel || step == _numSteps - 1) {
-          result.add(CommonConstants.NullValuePlaceHolder.DOUBLE);
+          result[index] = CommonConstants.NullValuePlaceHolder.DOUBLE;
           continue;
         }
         if (durationFunction.equals("AVG")) {
-          result.add(avgPair.get().getSum() / avgPair.get().getCount());
+          result[index] = avgPair.get().getSum() / avgPair.get().getCount();
         } else if (durationFunction.equals("MEDIAN")) {
-          result.add(quantileDigest.get().getQuantile(0.5));
+          result[index] = quantileDigest.get().getQuantile(0.5);
         } else if (durationFunction.equals("MIN")) {
-          result.add(quantileDigest.get().getQuantile(0));
+          result[index] = quantileDigest.get().getQuantile(0);
         } else if (durationFunction.equals("MAX")) {
-          result.add(quantileDigest.get().getQuantile(1));
+          result[index] = quantileDigest.get().getQuantile(1);
         } else if (durationFunction.startsWith("PERCENTILE")) {
           double quantile = Double.parseDouble(durationFunction.substring("PERCENTILE".length())) / 100.0;
-          result.add(quantileDigest.get().getQuantile(quantile));
+          result[index] = quantileDigest.get().getQuantile(quantile);
         }
       }
     }
@@ -255,10 +256,5 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
       }
     }
     return maxStep;
-  }
-
-  @Override
-  public DoubleArrayList mergeFinalResult(DoubleArrayList finalResult1, DoubleArrayList finalResult2) {
-    return finalResult1;
   }
 }

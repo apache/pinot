@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.queryquota;
 
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
+
 public interface QueryQuotaManager {
 
   /// Try to acquire a quota for the given table.
@@ -54,4 +56,13 @@ public interface QueryQuotaManager {
   /// @param applicationName table name with type
   /// @return effective quota qps. 0 if no qps quota is set.
   double getApplicationQueryQuota(String applicationName);
+
+  ///  Resolves the effective query QPS quota enforcement mode for a table: the table's own mode if configured,
+  ///  otherwise ENFORCED. Mirrors [#acquire(String)] / [#acquireLogicalTable(String)] in
+  ///  how the name is resolved: a name without type suffix covers both its OFFLINE and REALTIME tables, and since
+  ///  acquire cannot tell which of them was breached, the strictest mode among the existing ones wins.
+  ///  @param tableName Table name with or without type suffix, or logical table name
+  default QuotaEnforcementMode getQueryQuotaEnforcementMode(String tableName) {
+    return QuotaEnforcementMode.ENFORCED;
+  }
 }

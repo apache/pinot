@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.utils.exprminmax;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -41,8 +42,8 @@ public class ExprMinMaxObjectTest {
   @Test
   public void testTiedSerializedResultsKeepAllRows()
       throws IOException {
-    // The broker merges deserialized (immutable) server results. Tied rows from every server must survive, including
-    // the first one, and the merged result must still expose its key for the next merge.
+    // The broker merges deserialized server results. Tied rows from every server must survive, including the first
+    // one, and the merged result must still expose its key for the next merge.
     ExprMinMaxObject merged = serialized(5, "a1", "a2")
         .merge(serialized(5, "b1"), true)
         .merge(serialized(5, "c1"), true)
@@ -56,10 +57,41 @@ public class ExprMinMaxObjectTest {
   public void testTiedSerializedResultSurvivesReserialization()
       throws IOException {
     ExprMinMaxObject merged = serialized(5, "a1").merge(serialized(5, "b1"), false);
-    ExprMinMaxObject roundTripped = ExprMinMaxObject.fromBytes(merged.toBytes());
+    ExprMinMaxObject roundTripped = new ExprMinMaxObject(ByteBuffer.wrap(merged.toBytes()));
 
     assertEquals(roundTripped.getExtremumKey(), new Comparable[]{5});
     assertEquals(projections(roundTripped), List.of("a1", "b1"));
+  }
+
+  @Test
+  public void testDeserializedResultDoesNotReadTheBufferAfterwards()
+      throws IOException {
+    byte[] bytes = serialized(5, "a1", "a2").toBytes();
+    ByteBuffer buffer = ByteBuffer.allocateDirect(bytes.length).put(bytes).flip();
+    ExprMinMaxObject deserialized = new ExprMinMaxObject(buffer);
+    assertEquals(buffer.remaining(), 0);
+    buffer.clear();
+    while (buffer.hasRemaining()) {
+      buffer.put((byte) 0x5a);
+    }
+
+    assertEquals(deserialized.getExtremumKey(), new Comparable[]{5});
+    assertEquals(projections(deserialized), List.of("a1", "a2"));
+  }
+
+  @Test
+  public void testDeserializesFromTheBufferPosition()
+      throws IOException {
+    byte[] bytes = serialized(5, "a1", "a2").toBytes();
+    ByteBuffer buffer = ByteBuffer.allocate(bytes.length + 8);
+    buffer.position(3);
+    buffer.put(bytes);
+    buffer.position(3);
+    ExprMinMaxObject deserialized = new ExprMinMaxObject(buffer);
+    assertEquals(buffer.position(), 3 + bytes.length);
+
+    assertEquals(deserialized.getExtremumKey(), new Comparable[]{5});
+    assertEquals(projections(deserialized), List.of("a1", "a2"));
   }
 
   /// Builds a single-server result through the segment accumulation path, then serializes it as a server would.
@@ -82,7 +114,7 @@ public class ExprMinMaxObjectTest {
         object.addVal(projection, i);
       }
     }
-    return ExprMinMaxObject.fromBytes(object.toBytes());
+    return new ExprMinMaxObject(ByteBuffer.wrap(object.toBytes()));
   }
 
   private static List<Object> projections(ExprMinMaxObject object) {

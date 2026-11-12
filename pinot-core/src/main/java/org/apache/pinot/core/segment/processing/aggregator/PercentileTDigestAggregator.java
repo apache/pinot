@@ -20,9 +20,9 @@ package org.apache.pinot.core.segment.processing.aggregator;
 
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 
 

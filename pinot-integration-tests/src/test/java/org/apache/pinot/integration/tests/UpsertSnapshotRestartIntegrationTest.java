@@ -184,13 +184,13 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
 
   private static File findSnapshot(File segmentDir) {
     File v3 = new File(segmentDir, "v3");
-    File snap = new File(v3, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+    File snap = new File(v3, V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
     if (snap.exists()) {
       return snap;
     }
     File[] found = new File[1];
     FileUtils.listFiles(segmentDir, null, true).forEach(f -> {
-      if (f.getName().equals(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)) {
+      if (f.getName().equals(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME)) {
         found[0] = f;
       }
     });
@@ -233,7 +233,8 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     assertNotNull(segmentDataManager, "segment " + segmentName + " not found");
     try {
       ImmutableSegmentImpl segment = (ImmutableSegmentImpl) segmentDataManager.getSegment();
-      MutableRoaringBitmap snapshot = segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+      MutableRoaringBitmap snapshot = segment.loadDocIdsFromSnapshot(
+          V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
       return snapshot != null && snapshot.equals(segment.getValidDocIds().getMutableRoaringBitmap());
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);

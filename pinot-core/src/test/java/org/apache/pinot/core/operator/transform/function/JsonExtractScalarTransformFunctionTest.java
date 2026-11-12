@@ -799,6 +799,13 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   }
 
   @Test
+  public void testExtractLongPreservesBitsAboveDoublePrecision() {
+    assertJsonExtractScalar("{\"v\": 9007199254740993}", "LONG", 9007199254740993L);
+    assertJsonExtractScalar("{\"v\": 9.223372036854775807E18}", "LONG", Long.MAX_VALUE);
+    assertJsonExtractScalar("{\"v\": -9.223372036854775808E18}", "LONG", Long.MIN_VALUE);
+  }
+
+  @Test
   public void testExtractBigDecimalPreservesPrecision() {
     // The BIG_DECIMAL parser preserves full numeric precision — beyond what Double can represent.
     // Broker formats BIG_DECIMAL as String via BigDecimal.toPlainString().
@@ -900,7 +907,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testExtractStringPreservesNumericPrecision() {
-    // STRING uses JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL so floats that exceed Double precision survive
+    // STRING uses JsonFunctions.PARSE_CONTEXT_WITH_BIG_DECIMAL so floats that exceed Double precision survive
     // the JSON → Java → JSON round-trip without truncation. Symmetric with BIG_DECIMAL precision.
     assertJsonExtractScalar(
         "{\"v\": 12345678901234567890.123456789}", "STRING",
@@ -969,6 +976,31 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     assertJsonExtractMv(
         "{\"v\": [12345678901234567890.123456789, 0.0000000000000001, 3.14]}",
         "BIG_DECIMAL_ARRAY", expected);
+  }
+
+  @Test
+  public void testArrayTypeOnNonArrayValueIsEmpty() {
+    // The transform casts the JsonPath result to List. A scalar or object is therefore empty, not wrapped.
+    assertJsonExtractMv("{\"v\": 42}", "INT_ARRAY", new int[0]);
+    assertJsonExtractMv("{\"v\": {\"a\": 1}}", "INT_ARRAY", new int[0]);
+
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField("json", DataType.JSON)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+    Object[] expectedRow = new Object[]{new int[0]};
+    for (String functionName : JSON_EXTRACT_SCALAR_FUNCTIONS) {
+      FluentQueryTest.withBaseDir(_baseDir)
+          .withNullHandling(true)
+          .givenTable(schema, tableConfig)
+          .onFirstInstance(new Object[]{"{\"v\":42}"})
+          .whenQuery("SELECT " + functionName + "(json, '$.v', 'INT_ARRAY', NULL) FROM testTable")
+          .thenResultIs(expectedRow, expectedRow);
+    }
   }
 
   @Test

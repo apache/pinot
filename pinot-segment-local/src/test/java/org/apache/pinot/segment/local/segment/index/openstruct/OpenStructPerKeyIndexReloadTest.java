@@ -101,6 +101,22 @@ public class OpenStructPerKeyIndexReloadTest {
         "a reload must apply the key's index settings, the way it does for any other column");
   }
 
+  @Test
+  public void testMappedMetadataDetectsMissingPerKeyIndex()
+      throws Exception {
+    File segmentDir = buildSegment("mappedReloadDetectsIndex", withoutPerKeyIndex());
+    try (SegmentLocalFSDirectory directory =
+        new SegmentLocalFSDirectory(segmentDir, new SegmentMetadataImpl(segmentDir), ReadMode.mmap)) {
+      directory.loadMappedMetadata();
+      assertTrue(directory.getSegmentMetadata().isMapped());
+      assertTrue(directory.getSegmentMetadata().getColumnMetadataFor(CHILD).isMaterializedChild());
+      try (SegmentPreProcessor preProcessor =
+          new SegmentPreProcessor(directory, indexLoadingConfig(withPerKeyInvertedIndex()))) {
+        assertTrue(preProcessor.needProcess(), "mapped child metadata must trigger the missing index reload");
+      }
+    }
+  }
+
   /// A segment whose keys already carry what the config asks for must need no reprocessing, and a reload of one
   /// must leave the indexes alone -- otherwise every reload rewrites indexes that are already correct.
   @Test

@@ -28,6 +28,7 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
@@ -65,9 +66,9 @@ public class WorkloadScheduler extends QueryScheduler {
   }
 
   @Override
-  public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+  public ListenableFuture<DataBuffer> submitResponse(ServerQueryRequest queryRequest) {
     if (!_isRunning) {
-      return shuttingDown(queryRequest);
+      return shuttingDownResponse(queryRequest);
     }
 
     boolean isSecondary = QueryOptionsUtils.isSecondaryWorkload(queryRequest.getQueryContext().getQueryOptions());
@@ -85,11 +86,11 @@ public class WorkloadScheduler extends QueryScheduler {
       _serverMetrics.addMeteredValue(workloadName, ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
       _serverMetrics.addMeteredTableValue(tableName, ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
-      return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
+      return errorResponse(queryRequest, QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, null);
-    ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, executorService);
+    ListenableFutureTask<DataBuffer> queryTask = createResponseFutureTask(queryRequest, executorService);
     _resourceManager.getQueryRunners().submit(queryTask);
     return queryTask;
   }

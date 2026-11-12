@@ -25,14 +25,16 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
 import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
 public class ArrayAggDistinctBigDecimalFunction extends BaseArrayAggBigDecimalFunction<ObjectSet<BigDecimal>> {
+  private static final int BIG_DECIMAL_SET_TYPE = 53;
+
   public ArrayAggDistinctBigDecimalFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -93,9 +95,8 @@ public class ArrayAggDistinctBigDecimalFunction extends BaseArrayAggBigDecimalFu
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ObjectSet<BigDecimal> set) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BigDecimalSet.getValue(),
-        ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE.serialize(set));
+  public SerializedResult serializeIntermediateResult(ObjectSet<BigDecimal> bigDecimalSet) {
+    return new SerializedValue<>(BIG_DECIMAL_SET_TYPE, bigDecimalSet, ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE);
   }
 
   @Override

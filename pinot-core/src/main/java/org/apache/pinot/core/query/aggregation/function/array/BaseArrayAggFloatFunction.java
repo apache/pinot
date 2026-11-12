@@ -18,22 +18,21 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.floats.FloatCollection;
 import it.unimi.dsi.fastutil.floats.FloatIterator;
 import it.unimi.dsi.fastutil.floats.FloatSet;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
 import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggFloatFunction<I extends FloatCollection>
-    extends BaseArrayAggFunction<I, FloatArrayList> {
+    extends BaseArrayAggFunction<I, float[]> {
   public BaseArrayAggFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, DataType.FLOAT, nullHandlingEnabled);
   }
@@ -143,10 +142,10 @@ public abstract class BaseArrayAggFloatFunction<I extends FloatCollection>
   }
 
   @Override
-  public FloatArrayList extractFinalResult(I floats) {
+  public float[] extractFinalResult(I floats) {
     if (floats == null) {
-      return new FloatArrayList();
+      return new float[0];
     }
-    return new FloatArrayList(floats);
+    return floats.toFloatArray();
   }
 }

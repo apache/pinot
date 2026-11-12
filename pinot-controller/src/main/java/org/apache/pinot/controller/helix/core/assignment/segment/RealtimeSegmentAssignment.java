@@ -19,6 +19,9 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -28,9 +31,15 @@ import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
@@ -57,10 +66,19 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 ///   - If COMPLETED instance partitions are not provided, reassign COMPLETED segments the same way as CONSUMING
 ///     segments with CONSUMING instance partitions to ensure COMPLETED segments are served by the correct instances
 ///     when instances for the table has been changed.
+/// - For a partition-pinned table (strict replica-group routing), the instances of each partition are recorded in
+///   the partition assignment of the ideal state (see
+///   [org.apache.pinot.common.assignment.PartitionAssignmentUtils]), and the CONSUMING segments of a partition are
+///   assigned to them even when the instance partitions have changed, so that at any time all segments of the
+///   partition are hosted by the same instances. Table rebalance moves the partitions and their segments together,
+///   and the COMPLETED segments not relocated to COMPLETED instance partitions or to a tier follow the partition as
+///   well. Upsert and dedup rely on this to serve all segments of a partition from the same instance, so these tables
+///   cannot relocate COMPLETED segments, must include CONSUMING segments in the rebalance, and upsert tables cannot
+///   use tiers.
 public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
 
   @Override
-  public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+  public List<String> assignSegment(String segmentName, IdealState idealState,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
     Preconditions.checkState(instancePartitionsMap.size() == 1, "One instance partition type should be provided");
     Map.Entry<InstancePartitionsType, InstancePartitions> typeToInstancePartitions =
@@ -74,11 +92,16 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     // See https://github.com/apache/pinot/issues/9047
     List<String> instancesAssigned;
     if (instancePartitionsType == InstancePartitionsType.COMPLETED) {
+      Preconditions.checkState(!_tableConfig.isUpsertEnabled() && !_tableConfig.isDedupEnabled(),
+          "Failed to find CONSUMING instance partitions for upsert/dedup table: %s", _tableNameWithType);
       // Gets Segment assignment strategy for instance partitions
       SegmentAssignmentStrategy segmentAssignmentStrategy =
           SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(_helixManager, _tableConfig,
               instancePartitionsType.toString(), instancePartitions);
-      instancesAssigned = segmentAssignmentStrategy.assignSegment(segmentName, currentAssignment, instancePartitions);
+      instancesAssigned = segmentAssignmentStrategy.assignSegment(segmentName, idealState.getRecord().getMapFields(),
+          instancePartitions);
+    } else if (_partitionPinned) {
+      instancesAssigned = assignPinnedConsumingSegment(segmentName, idealState, instancePartitions);
     } else {
       instancesAssigned = assignConsumingSegment(segmentName, instancePartitions);
     }
@@ -94,7 +117,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     return assignConsumingSegment(segmentPartitionId, instancePartitions);
   }
 
-  protected List<String> assignConsumingSegment(int segmentPartitionId, InstancePartitions instancePartitions) {
+  private List<String> assignConsumingSegment(int segmentPartitionId, InstancePartitions instancePartitions) {
     // For multi-stream tables, Pinot partition IDs are encoded as (streamIndex * 10000 + streamPartitionId).
     // Extract the stream-level partition id before computing the instance index to avoid incorrect slot mapping.
     segmentPartitionId =
@@ -158,8 +181,110 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     }
   }
 
+  /// Assigns a CONSUMING segment of a partition-pinned table to the instances of its partition, see
+  /// [BaseSegmentAssignment#getOrCreatePartitionInstances].
+  private List<String> assignPinnedConsumingSegment(String segmentName, IdealState idealState,
+      InstancePartitions instancePartitions) {
+    int partitionId = getPartitionId(segmentName);
+    if (partitionId == NO_PARTITION_ID) {
+      return assignSegmentWithoutPartitionId(segmentName, instancePartitions);
+    }
+    return getOrCreatePartitionInstances(idealState, partitionId,
+        assignConsumingSegment(partitionId, instancePartitions));
+  }
+
+  /// Assigns a segment of a partition-pinned table whose partition id cannot be determined, with a partition id
+  /// derived from the segment name as for a table that is not partition-pinned. Upsert and dedup tables, whose segments
+  /// must be collocated per partition, reject such a segment instead.
+  private List<String> assignSegmentWithoutPartitionId(String segmentName, InstancePartitions instancePartitions) {
+    Preconditions.checkState(!_tableConfig.isUpsertEnabled() && !_tableConfig.isDedupEnabled(),
+        "Failed to find partition id for segment: %s of upsert/dedup table: %s", segmentName, _tableNameWithType);
+    _logger.warn("Failed to find partition id for segment: {} of partition-pinned table: {}, assigning it with a "
+        + "partition id derived from its name", segmentName, _tableNameWithType);
+    return assignConsumingSegment(SegmentUtils.getDefaultPartitionId(segmentName), instancePartitions);
+  }
+
+  /// OFFLINE segments are skipped because they are not rebalanced, so their assignment can be stale. The instances are
+  /// taken from, in order:
+  /// - The CONSUMING segment of the partition, which is always hosted by the CONSUMING instances of the partition.
+  /// - The latest LLC segment of the partition, else an uploaded segment of the partition, whose partition id is in
+  ///   its name or in its ZK metadata (read with a single batched request for the uploaded segments not read before,
+  ///   a segment without ZK metadata is skipped). Completed segments are not used when they are relocated to the
+  ///   COMPLETED instances, or when the segment has been moved to a tier, because they are not on the CONSUMING
+  ///   instances of the partition then. The tier is read from the segment ZK metadata whether or not the table still
+  ///   has tiers configured, because removing the tier config does not move the segments back.
+  @Nullable
   @Override
-  public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
+  protected Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
+    boolean relocateCompletedSegments = InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(_tableConfig);
+    LLCSegmentName latestLLCSegmentName = null;
+    Map<String, String> latestInstanceStateMap = null;
+    List<String> uploadedSegments = new ArrayList<>();
+    for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> instanceStateMap = entry.getValue();
+      boolean completed;
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
+        completed = true;
+      } else if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
+        completed = false;
+      } else {
+        // All instances are OFFLINE, and OFFLINE segments are not rebalanced, so their assignment can be stale
+        continue;
+      }
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName == null) {
+        if (!relocateCompletedSegments) {
+          uploadedSegments.add(segmentName);
+        }
+        continue;
+      }
+      if (llcSegmentName.getPartitionGroupId() != partitionId) {
+        continue;
+      }
+      if (!completed) {
+        return instanceStateMap.keySet();
+      }
+      if (!relocateCompletedSegments && (latestLLCSegmentName == null
+          || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber())) {
+        latestLLCSegmentName = llcSegmentName;
+        latestInstanceStateMap = instanceStateMap;
+      }
+    }
+    String latestSegmentName = null;
+    if (latestLLCSegmentName != null) {
+      latestSegmentName = latestLLCSegmentName.getSegmentName();
+    } else if (!uploadedSegments.isEmpty()) {
+      Object2IntMap<String> uploadedSegmentPartitionIds = getPartitionIds(uploadedSegments);
+      for (String uploadedSegment : uploadedSegments) {
+        if (uploadedSegmentPartitionIds.getInt(uploadedSegment) == partitionId) {
+          latestSegmentName = uploadedSegment;
+          latestInstanceStateMap = currentAssignment.get(uploadedSegment);
+          break;
+        }
+      }
+    }
+    if (latestSegmentName == null) {
+      return null;
+    }
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _tableNameWithType,
+            latestSegmentName);
+    if (segmentZKMetadata == null) {
+      _logger.warn("Failed to find ZK metadata for latest segment: {} of partition: {}, skipping existing assignment",
+          latestSegmentName, partitionId);
+      return null;
+    }
+    if (segmentZKMetadata.getTier() != null) {
+      _logger.warn("Latest segment: {} of partition: {} is on tier: {}, skipping existing assignment",
+          latestSegmentName, partitionId, segmentZKMetadata.getTier());
+      return null;
+    }
+    return latestInstanceStateMap.keySet();
+  }
+
+  @Override
+  public TableAssignment rebalanceTable(IdealState idealState,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, RebalanceConfig config) {
     InstancePartitions completedInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.COMPLETED);
@@ -168,15 +293,30 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
         "Failed to find CONSUMING instance partitions for table: %s", _tableNameWithType);
     boolean includeConsuming = config.isIncludeConsuming();
     boolean bootstrap = config.isBootstrap();
+    warnIfNotPinned();
+    if (_tableConfig.isUpsertEnabled() || _tableConfig.isDedupEnabled()) {
+      Preconditions.checkState(completedInstancePartitions == null,
+          "COMPLETED instance partitions must not be provided for upsert/dedup table: %s", _tableNameWithType);
+      Preconditions.checkArgument(includeConsuming,
+          "Consuming segments must be included when rebalancing upsert/dedup table: %s", _tableNameWithType);
+      Preconditions.checkState(sortedTiers == null || !_tableConfig.isUpsertEnabled(),
+          "Tiers must not be specified for upsert table: %s", _tableNameWithType);
+    }
     _logger.info("Rebalancing table: {} with COMPLETED instance partitions: {}, CONSUMING instance partitions: {}, "
-            + "includeConsuming: {}, bootstrap: {}", _tableNameWithType, completedInstancePartitions,
-        consumingInstancePartitions, includeConsuming, bootstrap);
+            + "includeConsuming: {}, bootstrap: {}, partitionPinned: {}", _tableNameWithType,
+        completedInstancePartitions, consumingInstancePartitions, includeConsuming, bootstrap, _partitionPinned);
+    Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+
     // Rebalance tiers first
     Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
         rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap);
 
     List<Map<String, Map<String, String>>> newTierAssignments = pair.getLeft();
     Map<String, Map<String, String>> nonTierAssignment = pair.getRight();
+    // Partition ids of the non-tier segments, for the partition-pinned assignment and for the strict replica-group
+    // batching of the rebalance, read from the segment ZK metadata for the segments without partition id in their name
+    Object2IntMap<String> segmentPartitionIds =
+        _partitionPinned ? getPartitionIds(nonTierAssignment.keySet()) : EMPTY_SEGMENT_PARTITION_IDS;
 
     Set<String> committingSegments = null;
     if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
@@ -188,6 +328,24 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
     }
     SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment completedConsumingOfflineSegmentAssignment =
         new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(nonTierAssignment, committingSegments);
+
+    // For a partition-pinned table, compute the target instances of every partition in the partition assignment that
+    // still has segments from the CONSUMING instance partitions, and drop the entries of the partitions without
+    // segment (e.g. ended stream partitions whose segments were deleted). Partitions found from the segments are added
+    // on the fly.
+    Map<Integer, List<String>> partitionAssignment;
+    if (_partitionPinned) {
+      IntSet partitionsWithSegments = new IntOpenHashSet(segmentPartitionIds.values());
+      partitionAssignment = new TreeMap<>();
+      for (int partitionId : PartitionAssignmentUtils.getPartitionAssignment(idealState).keySet()) {
+        if (partitionsWithSegments.contains(partitionId)) {
+          partitionAssignment.put(partitionId, PartitionAssignmentUtils.toInstanceList(
+              assignConsumingSegment(partitionId, consumingInstancePartitions)));
+        }
+      }
+    } else {
+      partitionAssignment = Map.of();
+    }
     Map<String, Map<String, String>> newAssignment;
 
     // Reassign COMPLETED segments first
@@ -213,7 +371,8 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
 
       newAssignment = new TreeMap<>();
       for (String segmentName : completedSegmentAssignment.keySet()) {
-        List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
+        List<String> instancesAssigned =
+            getTargetInstances(segmentName, consumingInstancePartitions, partitionAssignment, segmentPartitionIds);
         Map<String, String> instanceStateMap =
             SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE);
         newAssignment.put(segmentName, instanceStateMap);
@@ -236,7 +395,8 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
         // The target state should be determined based on the current state in the original instanceStateMap
         String targetState = originalInstanceStateMap.containsValue(SegmentStateModel.ONLINE)
             ? SegmentStateModel.ONLINE : SegmentStateModel.CONSUMING;
-        List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
+        List<String> instancesAssigned =
+            getTargetInstances(segmentName, consumingInstancePartitions, partitionAssignment, segmentPartitionIds);
         Map<String, String> instanceStateMap =
             SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, targetState);
         newAssignment.put(segmentName, instanceStateMap);
@@ -256,6 +416,21 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
 
     _logger.info("Rebalanced table: {}, number of segments to be added/removed for each instance: {}",
         _tableNameWithType, SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment));
-    return newAssignment;
+    return new TableAssignment(newAssignment, partitionAssignment, segmentPartitionIds);
+  }
+
+  /// Returns the target instances of the given segment with the CONSUMING instance partitions. For a partition-pinned
+  /// table, the segment follows its partition, which is added to the given target partition assignment if absent.
+  private List<String> getTargetInstances(String segmentName, InstancePartitions consumingInstancePartitions,
+      Map<Integer, List<String>> partitionAssignment, Object2IntMap<String> segmentPartitionIds) {
+    if (!_partitionPinned) {
+      return assignConsumingSegment(segmentName, consumingInstancePartitions);
+    }
+    int partitionId = segmentPartitionIds.getInt(segmentName);
+    if (partitionId == NO_PARTITION_ID) {
+      return assignSegmentWithoutPartitionId(segmentName, consumingInstancePartitions);
+    }
+    return partitionAssignment.computeIfAbsent(partitionId,
+        k -> PartitionAssignmentUtils.toInstanceList(assignConsumingSegment(k, consumingInstancePartitions)));
   }
 }

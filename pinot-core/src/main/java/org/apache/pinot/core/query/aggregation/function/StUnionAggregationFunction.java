@@ -25,7 +25,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -40,6 +39,7 @@ import org.locationtech.jts.operation.union.UnaryUnionOp;
 
 
 public class StUnionAggregationFunction extends BaseSingleInputAggregationFunction<Geometry, ByteArray> {
+  private static final int GEOMETRY_TYPE = 13;
 
   public StUnionAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(verifySingleArgument(arguments, "ST_UNION"), nullHandlingEnabled);
@@ -206,14 +206,13 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Geometry geometry) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Geometry.getValue(),
-        ObjectSerDeUtils.GEOMETRY_SER_DE.serialize(geometry));
+  public SerializedResult serializeIntermediateResult(Geometry geometry) {
+    return new SerializedBytes(GEOMETRY_TYPE, GeometrySerializer.serialize(geometry));
   }
 
   @Override
   public Geometry deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.GEOMETRY_SER_DE.deserialize(customObject.getBuffer());
+    return GeometrySerializer.deserialize(customObject.getBuffer());
   }
 
   @Override
@@ -231,6 +230,13 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
       return _nullHandlingEnabled ? null : new ByteArray(GeometrySerializer.serialize(GeometryUtils.EMPTY_POINT));
     }
     return new ByteArray(GeometrySerializer.serialize(geometry));
+  }
+
+  @Override
+  public ByteArray mergeFinalResult(ByteArray finalResult1, ByteArray finalResult2) {
+    Geometry geometry1 = GeometrySerializer.deserialize(finalResult1.getBytes());
+    Geometry geometry2 = GeometrySerializer.deserialize(finalResult2.getBytes());
+    return new ByteArray(GeometrySerializer.serialize(merge(geometry1, geometry2)));
   }
 
   /// Returns the union of the supplied geometries.

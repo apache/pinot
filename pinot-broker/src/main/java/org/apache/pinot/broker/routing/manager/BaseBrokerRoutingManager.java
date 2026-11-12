@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -139,13 +140,22 @@ public abstract class BaseBrokerRoutingManager
   private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the _globalLock write lock
   private final Set<String> _excludedServers = new HashSet<>();
+  // Servers that were enabled at some point and are now disabled or shutting down but still part of the cluster, with
+  // the instance each was last seen as, so that their later removal from the cluster can be reported (see
+  // addServerRemovedCallback). An entry leaves when its server is enabled again, or when the server is removed from
+  // the cluster altogether (its instance config is gone), so the map is bounded by the servers currently disabled.
+  // Only accessed within the _globalLock write lock.
+  private final Map<String, ServerInstance> _disabledServers = new HashMap<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
   private final boolean _enablePartitionMetadataManager;
   private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
+  private final List<Consumer<ServerInstance>> _serverEnabledCallbacks = new CopyOnWriteArrayList<>();
+  private final List<Consumer<ServerInstance>> _serverRemovedCallbacks = new CopyOnWriteArrayList<>();
+  // The callback installed through setServerEnabledCallback, so that setting it again replaces it rather than piling up
   @Nullable
-  private Consumer<ServerInstance> _serverReenableCallback;
+  private Consumer<ServerInstance> _serverEnabledCallback;
 
   // Providers of extra per-table segment ZK metadata fetch listeners, registered alongside the built-in segment
   // pruners on every table's routing entry. Each provider is invoked once per table (with the table name with type)
@@ -235,10 +245,34 @@ public abstract class BaseBrokerRoutingManager
     return _partitionPruningPreparationThreshold;
   }
 
-  /// Sets a callback to be invoked when a server is re-enabled after being excluded.
-  /// This is useful for resetting gRPC channel state to avoid exponential backoff delays.
-  public void setServerReenableCallback(Consumer<ServerInstance> callback) {
-    _serverReenableCallback = callback;
+  /// Registers a callback invoked with the [ServerInstance] of a server that becomes routable: when it starts, and when
+  /// it is enabled again after it was disabled (for example while it restarted) or excluded. Callers use it to drop
+  /// state that may be tied to a previous process of the server: gRPC reconnection backoff and connections to a stale
+  /// address, cached Netty channels that may be half-open. Callbacks run on the Helix callback thread while the routing
+  /// manager holds its write lock, so they must be quick and must not block.
+  public void addServerEnabledCallback(Consumer<ServerInstance> callback) {
+    _serverEnabledCallbacks.add(callback);
+  }
+
+  /// Sets a callback to be invoked when a server becomes routable, see [#addServerEnabledCallback(Consumer)]. Setting
+  /// it again replaces the callback set before through this method, and only that one, so callbacks registered
+  /// through `addServerEnabledCallback` are never dropped.
+  public synchronized void setServerEnabledCallback(Consumer<ServerInstance> callback) {
+    if (_serverEnabledCallback != null) {
+      _serverEnabledCallbacks.remove(_serverEnabledCallback);
+    }
+    _serverEnabledCallback = callback;
+    _serverEnabledCallbacks.add(callback);
+  }
+
+  /// Registers a callback invoked with the last known [ServerInstance] of a server that has been removed from the
+  /// cluster altogether (its instance config is gone) after having been enabled at some point, and with the previous
+  /// instance of a server that is back under the same id at a different address (see [#notifyIfAddressChanged]).
+  /// Callers drop whatever they still hold for that instance, such as cached connections: a server later added back
+  /// under the same id, or moved back to that address, is a new process. Same threading rules as
+  /// [#addServerEnabledCallback(Consumer)].
+  public void addServerRemovedCallback(Consumer<ServerInstance> callback) {
+    _serverRemovedCallbacks.add(callback);
   }
 
   /// Registers a provider of an extra [SegmentZkMetadataFetchListener] that is attached to every table's routing
@@ -446,11 +480,18 @@ public abstract class BaseBrokerRoutingManager
 
     // Calculate new enabled and disabled servers
     Set<String> enabledServers = new HashSet<>();
+    // Every server that still has an instance config, enabled or not. Holds the raw ids from the records, while
+    // _enabledServerInstanceMap and _disabledServers are keyed by the interned ids: lookups compare ids with equals(),
+    // so the two match by value; interning only gives those maps an identity fast path.
+    Set<String> presentServers = new HashSet<>();
     List<String> newEnabledServers = new ArrayList<>();
     for (ZNRecord instanceConfigZNRecord : instanceConfigZNRecords) {
       // Put instance initialization logics into try-catch block to prevent bad server configs affecting the entire
       // cluster
       String instanceId = instanceConfigZNRecord.getId();
+      if (InstanceTypeUtils.isServer(instanceId)) {
+        presentServers.add(instanceId);
+      }
       try {
         if (isEnabledServer(instanceConfigZNRecord)) {
           // Always refresh the server instance with the latest instance config in case it changes
@@ -460,19 +501,22 @@ public abstract class BaseBrokerRoutingManager
           // hit the identity fast path
           instanceId = serverInstance.getInstanceId();
           enabledServers.add(instanceId);
-          if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
+          ServerInstance previousInstance = _enabledServerInstanceMap.put(instanceId, serverInstance);
+          if (previousInstance == null) {
             newEnabledServers.add(instanceId);
 
             // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
             if (_excludedServers.remove(instanceId)) {
               LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
-              // We clear any GRPC channel reconnection backoff in this callback when a server is re-enabled. Otherwise,
-              // MSE queries to this server may fail fast until the next backoff retry succeeds.
-              if (_serverReenableCallback != null) {
-                LOGGER.info("Calling server re-enable callback for server: {}", instanceId);
-                _serverReenableCallback.accept(serverInstance);
-              }
             }
+            notifyIfAddressChanged(_disabledServers.remove(instanceId), serverInstance);
+            // The server likely restarted, possibly at a new address. The callbacks drop what may be tied to its
+            // previous process: the GRPC channel's reconnection backoff, without which MSE queries to this server may
+            // fail fast until the next backoff retry succeeds, and its stale resolved address; cached Netty channels
+            // that may be half-open.
+            notifyServerEnabled(serverInstance);
+          } else {
+            notifyIfAddressChanged(previousInstance, serverInstance);
           }
         }
       } catch (Exception e) {
@@ -483,6 +527,16 @@ public abstract class BaseBrokerRoutingManager
     for (String instance : _enabledServerInstanceMap.keySet()) {
       if (!enabledServers.contains(instance)) {
         newDisabledServers.add(instance);
+      }
+    }
+    // Disabled servers since removed from the cluster altogether are forgotten, and the listeners drop whatever they
+    // still hold for them. Done before the early return below: a removal changes no routing, so nothing else notices.
+    Iterator<Map.Entry<String, ServerInstance>> disabledServerIterator = _disabledServers.entrySet().iterator();
+    while (disabledServerIterator.hasNext()) {
+      Map.Entry<String, ServerInstance> entry = disabledServerIterator.next();
+      if (!presentServers.contains(entry.getKey())) {
+        disabledServerIterator.remove();
+        notifyServerRemoved(entry.getValue());
       }
     }
 
@@ -525,7 +579,17 @@ public abstract class BaseBrokerRoutingManager
     // Remove new disabled servers from _enabledServerInstanceMap after updating all routing entries to ensure it
     // always contains the selected servers
     for (String newDisabledInstance : newDisabledServers) {
-      _enabledServerInstanceMap.remove(newDisabledInstance);
+      ServerInstance serverInstance = _enabledServerInstanceMap.remove(newDisabledInstance);
+      if (serverInstance == null) {
+        continue;
+      }
+      if (presentServers.contains(newDisabledInstance)) {
+        // Still in the cluster, just disabled or shutting down: remember it so that a later removal is reported
+        _disabledServers.put(newDisabledInstance, serverInstance);
+      } else {
+        // Went from enabled to removed in one step
+        notifyServerRemoved(serverInstance);
+      }
     }
 
     LOGGER.info("Processed instance config change in {}ms "
@@ -554,6 +618,52 @@ public abstract class BaseBrokerRoutingManager
       return false;
     }
     return true;
+  }
+
+  private void notifyServerEnabled(ServerInstance serverInstance) {
+    for (Consumer<ServerInstance> callback : _serverEnabledCallbacks) {
+      try {
+        callback.accept(serverInstance);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception in server enabled callback for server: {}, ignoring it",
+            serverInstance.getInstanceId(), e);
+      }
+    }
+  }
+
+  private void notifyServerRemoved(ServerInstance serverInstance) {
+    LOGGER.info("Server: {} has been removed from the cluster", serverInstance.getInstanceId());
+    invokeServerRemovedCallbacks(serverInstance);
+  }
+
+  /// A server back under the same id at a different address (hostname, Netty port or Netty TLS port) has left its
+  /// previous address for good. Listeners key what they cache by address rather than by id, so they get the removed
+  /// callback with the previous instance: otherwise its cached channels would never be dropped, and one gone
+  /// half-open would be picked up again if the server ever moved back to that address. Channels at an address that
+  /// did not change are dropped too: a server writes its address into its instance config as it starts up, so a
+  /// changed address means a new process, those channels lead to the previous one like the others, and whatever was
+  /// still in flight on them was sent to it.
+  private void notifyIfAddressChanged(@Nullable ServerInstance previousInstance, ServerInstance serverInstance) {
+    if (previousInstance == null || (previousInstance.getHostname().equals(serverInstance.getHostname())
+        && previousInstance.getPort() == serverInstance.getPort()
+        && previousInstance.getNettyTlsPort() == serverInstance.getNettyTlsPort())) {
+      return;
+    }
+    LOGGER.info("Server: {} moved from {}:{} (TLS port {}) to {}:{} (TLS port {})", serverInstance.getInstanceId(),
+        previousInstance.getHostname(), previousInstance.getPort(), previousInstance.getNettyTlsPort(),
+        serverInstance.getHostname(), serverInstance.getPort(), serverInstance.getNettyTlsPort());
+    invokeServerRemovedCallbacks(previousInstance);
+  }
+
+  private void invokeServerRemovedCallbacks(ServerInstance serverInstance) {
+    for (Consumer<ServerInstance> callback : _serverRemovedCallbacks) {
+      try {
+        callback.accept(serverInstance);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception in server removed callback for server: {}, ignoring it",
+            serverInstance.getInstanceId(), e);
+      }
+    }
   }
 
   /// Excludes a server from the routing.
@@ -755,8 +865,8 @@ public abstract class BaseBrokerRoutingManager
   ///
   /// Only the routing entry's own selector is asked. The per-sampler selectors see a subset of the table's
   /// segments and share its name, so reporting from them would overwrite the table's real values with
-  /// numbers measured over that subset. They still measure their own subset - the wasted work is a counter
-  /// per sampled segment, cheap enough not to be worth a switch that could be set wrong.
+  /// numbers measured over that subset. They still measure their own subset - the wasted work is a few
+  /// counter updates per candidate group, cheap enough not to be worth a switch that could be set wrong.
   ///
   /// Callers must hold the table's routing build lock: that is what makes the `_disabled` read below see the
   /// value written by the assignment change, and what keeps two changes from interleaving a report with a
@@ -1047,8 +1157,8 @@ public abstract class BaseBrokerRoutingManager
     Set<String> onlineSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       Map<String, String> instanceStateMap = entry.getValue();
-      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE) || instanceStateMap.containsValue(
-          SegmentStateModel.CONSUMING)) {
+      if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)
+          || instanceStateMap.containsValue(SegmentStateModel.CONSUMING)) {
         onlineSegments.add(entry.getKey());
       }
     }
@@ -1233,33 +1343,29 @@ public abstract class BaseBrokerRoutingManager
 
   private Map<ServerInstance, SegmentsToQuery> getServerInstanceToSegmentsMap(String tableNameWithType,
       InstanceSelector.SelectionResult selectionResult) {
-    Map<ServerInstance, SegmentsToQuery> merged = new HashMap<>();
-    // Flat selection maps can traverse their arrays directly without allocating an entry object per segment.
-    selectionResult.getSegmentToInstanceMap().forEach((segment, instanceId) -> {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
+    Map<String, SegmentsToQuery> instanceToSegmentsMap = selectionResult.getInstanceToSegmentsMap();
+    Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
+        Maps.newHashMapWithExpectedSize(instanceToSegmentsMap.size());
+    for (Map.Entry<String, SegmentsToQuery> entry : instanceToSegmentsMap.entrySet()) {
+      SegmentsToQuery segmentsToQuery = entry.getValue();
+      int numSegments = segmentsToQuery.getSegments().size();
+      // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
+      // to process, to be backward compatible.
+      // TODO: allow servers only with optional segments
+      if (numSegments == 0) {
+        continue;
+      }
+      // The server instance is looked up per query, because an instance config change replaces it
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getKey());
       if (serverInstance != null) {
-        SegmentsToQuery segmentsToQuery =
-            merged.computeIfAbsent(serverInstance, k -> new SegmentsToQuery(new ArrayList<>(), new ArrayList<>()));
-        segmentsToQuery.getSegments().add(segment);
+        serverInstanceToSegmentsMap.put(serverInstance, segmentsToQuery);
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
-        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, numSegments);
+        // TODO: Report missing server metrics for optional segments when we allow servers only with optional segments.
       }
-    });
-    selectionResult.getOptionalSegmentToInstanceMap().forEach((segment, instanceId) -> {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
-      if (serverInstance != null) {
-        SegmentsToQuery segmentsToQuery = merged.get(serverInstance);
-        // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
-        // to process, to be backward compatible.
-        // TODO: allow servers only with optional segments
-        if (segmentsToQuery != null) {
-          segmentsToQuery.getOptionalSegments().add(segment);
-        }
-      }
-      // TODO: Report missing server metrics when we allow servers only with optional segments.
-    });
-    return merged;
+    }
+    return serverInstanceToSegmentsMap;
   }
 
   @Nullable
@@ -1604,7 +1710,7 @@ public abstract class BaseBrokerRoutingManager
       int numPrunedSegments = selectedSegments.getNumPruned();
       if (!survivingSegments.isEmpty()) {
         InstanceSelector.SelectionResult selectionResult =
-            instanceSelector.select(brokerRequest, new ArrayList<>(survivingSegments), requestId);
+            instanceSelector.select(brokerRequest, survivingSegments, requestId);
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {

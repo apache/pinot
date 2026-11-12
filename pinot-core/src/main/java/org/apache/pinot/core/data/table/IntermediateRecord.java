@@ -21,15 +21,14 @@ package org.apache.pinot.core.data.table;
 /// Helper class to store the values to be ordered. It also wraps the Key and Record of the record.
 /// - When ordering on an aggregation, stores the final result of the aggregation
 /// - When ordering on a column/transform, stores the actual value of the expression
-@SuppressWarnings("rawtypes")
 public class IntermediateRecord {
-  private static final Comparable[] NO_ORDER_BY_VALUES = new Comparable[0];
+  private static final Object[] NO_ORDER_BY_VALUES = new Object[0];
 
   public final Key _key;
   public final Record _record;
-  public final Comparable[] _values;
+  public final Object[] _values;
 
-  IntermediateRecord(Key key, Record record, Comparable[] values) {
+  IntermediateRecord(Key key, Record record, Object[] values) {
     _key = key;
     _record = record;
     _values = values;

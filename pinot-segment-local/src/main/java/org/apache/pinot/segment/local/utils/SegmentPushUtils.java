@@ -210,10 +210,7 @@ public class SegmentPushUtils implements Serializable {
     try {
       for (String tarFilePath : tarFilePaths) {
         URI tarFileURI = URI.create(tarFilePath);
-        File tarFile = new File(tarFilePath);
-        String fileName = tarFile.getName();
-        Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
-        String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
+        String segmentName = getSegmentNameFromTarFile(tarFilePath);
         for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
           URI controllerURI;
           try {
@@ -462,13 +459,25 @@ public class SegmentPushUtils implements Serializable {
     return generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
   }
 
-  /// Segments stored in the deep store do not have the .tar.gz extension.
-  private static String getSegmentName(String tarFilePath) {
+  /// Resolves and validates the segment name from a supported gzip, LZ4, or Zstandard archive path.
+  public static String getSegmentNameFromTarFile(String tarFilePath) {
     String fileName = new File(tarFilePath).getName();
-    String segmentName = fileName.endsWith(Constants.TAR_GZ_FILE_EXT)
-        ? fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length()) : fileName;
+    Preconditions.checkArgument(Constants.isSegmentTarFile(fileName), "Unsupported segment archive: %s", fileName);
+    String extension = Constants.SEGMENT_TAR_FILE_EXTENSIONS.values().stream().filter(fileName::endsWith)
+        .findFirst().orElseThrow();
+    String segmentName = fileName.substring(0, fileName.length() - extension.length());
     SegmentNameUtils.validatePartialOrFullSegmentName(segmentName);
     return segmentName;
+  }
+
+  /// Segments stored in the deep store can omit the archive extension.
+  private static String getSegmentName(String tarFilePath) {
+    String fileName = new File(tarFilePath).getName();
+    if (Constants.isSegmentTarFile(fileName)) {
+      return getSegmentNameFromTarFile(tarFilePath);
+    }
+    SegmentNameUtils.validatePartialOrFullSegmentName(fileName);
+    return fileName;
   }
 
   private static String getSegmentNameFromMetadataFile(File segmentMetadataFile) {
@@ -684,16 +693,21 @@ public class SegmentPushUtils implements Serializable {
         }
       }
 
-      URI uri = URI.create(file);
+      URI uri = outputDirURI != null && "file".equals(outputDirURI.getScheme()) && new File(file).isAbsolute()
+          ? new File(file).toURI() : URI.create(file);
       if (uri.getPath().endsWith(Constants.METADATA_TAR_GZ_FILE_EXT)) {
         // Skip segment metadata tar gz files
         continue;
       }
-      if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
+      if (Constants.isSegmentTarFile(uri.getPath())) {
         URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri, pushSpec.getSegmentUriPrefix(),
             pushSpec.getSegmentUriSuffix());
         segmentUriToTarPathMap.put(updatedURI.toString(), file);
       }
+    }
+    if (segmentUriToTarPathMap.isEmpty()) {
+      LOGGER.warn("No segment archives selected under outputDirURI: {} with pushFileNamePattern: {}", outputDirURI,
+          pushSpec.getPushFileNamePattern());
     }
     return segmentUriToTarPathMap;
   }
@@ -711,8 +725,9 @@ public class SegmentPushUtils implements Serializable {
     File tarFile =
         new File(FileUtils.getTempDirectory(), "segmentTar-" + uuid + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     File segmentMetadataDir = new File(FileUtils.getTempDirectory(), "segmentMetadataDir-" + uuid);
+    boolean localFileSystem = PinotFSFactory.isFileSystemInstanceOf(fileSystem, LocalPinotFS.class);
     try {
-      if (fileSystem instanceof LocalPinotFS) {
+      if (localFileSystem) {
         // For local file system, we don't need to copy the tar file.
         tarFile = new File(URIUtils.decode(tarFileURI.getRawPath()));
       } else {
@@ -743,7 +758,7 @@ public class SegmentPushUtils implements Serializable {
       TarCompressionUtils.createCompressedTarFile(segmentMetadataDir, segmentMetadataTarFile);
       return segmentMetadataTarFile;
     } finally {
-      if (!(fileSystem instanceof LocalPinotFS)) {
+      if (!localFileSystem) {
         // For local file system, we don't need to delete the tar file.
         FileUtils.deleteQuietly(tarFile);
       }

@@ -21,8 +21,13 @@ package org.apache.pinot.common.failuredetector;
 import javax.annotation.concurrent.ThreadSafe;
 
 
-/// The `ConnectionFailureDetector` marks failed server (connection failure) from query response as unhealthy, and
-/// retries the unhealthy servers with exponential increasing delays.
+/// The `ConnectionFailureDetector` marks a server as unhealthy when a query response reports it as failed
+/// (connection failure), or, with pings enabled, when a query to it times out and the server then fails to answer a
+/// ping (see [FailureDetector#notifyServerNotResponded]). It retries the unhealthy servers with exponentially
+/// increasing delays.
+///
+/// Only the single-stage Netty query path reports timeouts today; the gRPC and multi-stage paths report connection
+/// failures only.
 ///
 /// This class doesn't currently implement any additional logic over BaseExponentialBackoffRetryFailureDetector and is
 /// retained for backward compatibility.

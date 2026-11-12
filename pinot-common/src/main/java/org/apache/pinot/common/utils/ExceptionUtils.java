@@ -18,12 +18,17 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 
 public class ExceptionUtils {
+  private static final String CAUSE_SEPARATOR = " -> ";
+  private static final String ELLIPSIS = "...";
 
   private ExceptionUtils() {
   }
@@ -59,6 +64,46 @@ public class ExceptionUtils {
     return sb.toString();
   }
 
+  /// Appends the messages of `cause` and its causes to `message`, each after `" -> "`, skipping any message the text
+  /// already contains. Each cause, then the appended part, is abbreviated in the middle to `maxLength` characters,
+  /// which keeps the root cause at the end and the work bounded however long a cause's message is.
+  @Nullable
+  public static String appendCauses(@Nullable String message, @Nullable Throwable cause, int maxLength) {
+    String text = message != null ? message : "";
+    StringBuilder causes = new StringBuilder();
+    Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    for (Throwable t = cause; t != null && visited.add(t); t = t.getCause()) {
+      String causeMessage = t.getMessage();
+      if (StringUtils.isBlank(causeMessage) || isGeneratedFrom(t.getCause(), causeMessage)
+          || text.contains(causeMessage)) {
+        continue;
+      }
+      String shownMessage = StringUtils.abbreviateMiddle(causeMessage, ELLIPSIS, maxLength);
+      if (causes.indexOf(shownMessage) < 0) {
+        causes.append(CAUSE_SEPARATOR).append(shownMessage);
+      }
+    }
+    if (causes.length() == 0) {
+      return message;
+    }
+    String chain = text.isEmpty() ? causes.substring(CAUSE_SEPARATOR.length()) : causes.toString();
+    return text + StringUtils.abbreviateMiddle(chain, ELLIPSIS, maxLength);
+  }
+
+  /// Whether `message` is the one a wrapper such as `new RuntimeException(cause)` takes from its cause, i.e. equals
+  /// `cause.toString()`, checked without building that string.
+  private static boolean isGeneratedFrom(@Nullable Throwable cause, String message) {
+    if (cause == null) {
+      return false;
+    }
+    String className = cause.getClass().getName();
+    String causeMessage = cause.getLocalizedMessage();
+    if (causeMessage == null) {
+      return message.equals(className);
+    }
+    return message.length() == className.length() + 2 + causeMessage.length() && message.startsWith(className)
+        && message.startsWith(": ", className.length()) && message.endsWith(causeMessage);
+  }
 
   public static String getStackTrace(Throwable e) {
     return getStackTrace(e, Integer.MAX_VALUE);

@@ -79,6 +79,17 @@ import org.slf4j.LoggerFactory;
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
 ///
+/// A batch that reports data loss (records between the requested offset and the batch were deleted from the stream
+/// before they could be replayed) fails the replay before anything from it is indexed: the replayed segment would
+/// otherwise silently miss part of its offset range. The segment then stays in ERROR until the operator restores the
+/// range from another source or deletes the segment to accept the loss.
+///
+/// A batch without unfiltered messages never moves the writer, whatever next offset it reports: the writer polls again
+/// from its own offset. A Kafka consumer reports its client position there, which can lie past transaction markers,
+/// but also past deleted records after an out-of-range reset it has not reported as loss yet. The loss check of the
+/// next batch with records then covers the whole gap. Reaching the end offset never needs that position, since the
+/// data manager only moves its own offset on fetched records.
+///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
 ///   2. Use a different segment impl for better performance because it doesn't need to serve queries.
@@ -272,6 +283,14 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
+          Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s: "
+              + "the stream no longer holds this range (e.g. it aged out of retention), so the segment cannot be "
+              + "rebuilt from it. Restore the range from another source, or delete the segment to accept the loss",
+              _currentOffset, _endOffset);
+          if (messageBatch.getUnfilteredMessageCount() == 0) {
+            // Poll again from the same offset (see the class Javadoc)
+            continue;
+          }
 
           int messageCount = messageBatch.getMessageCount();
 

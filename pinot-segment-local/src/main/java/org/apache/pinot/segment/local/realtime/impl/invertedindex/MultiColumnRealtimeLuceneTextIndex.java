@@ -290,7 +290,7 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
       while (luceneDocIDIterator.hasNext()) {
         int luceneDocId = luceneDocIDIterator.next();
         Document document = indexSearcher.doc(luceneDocId);
-        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
         actualDocIDs.add(pinotDocId);
       }
     } catch (Exception e) {

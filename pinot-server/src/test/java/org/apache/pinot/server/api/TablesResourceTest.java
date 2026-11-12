@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -492,8 +493,8 @@ public class TablesResourceTest extends BaseResourceTest {
     // Upgrade both legacy fixtures to real persisted captures, without changing the live bitmaps.
     DocIdsSnapshot.Trigger trigger = new DocIdsSnapshot.Trigger("testTable__0__2__0", "123");
     Map<String, DocIdsSnapshot.DocIdsType> fileTypes =
-        Map.of(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME, DocIdsSnapshot.DocIdsType.VALID_DOC_IDS,
-            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME, DocIdsSnapshot.DocIdsType.QUERYABLE_DOC_IDS);
+        Map.of(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, DocIdsSnapshot.DocIdsType.VALID_DOC_IDS,
+            V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, DocIdsSnapshot.DocIdsType.QUERYABLE_DOC_IDS);
     for (Map.Entry<String, DocIdsSnapshot.DocIdsType> fileType : fileTypes.entrySet()) {
       ThreadSafeMutableRoaringBitmap bitmap =
           new ThreadSafeMutableRoaringBitmap(segment.loadDocIdsFromSnapshot(fileType.getKey()));
@@ -515,8 +516,8 @@ public class TablesResourceTest extends BaseResourceTest {
       return;
     }
     JsonNode diagnostics = metadata.get("diagnostics");
-    String file = expectedType.equals("SNAPSHOT") ? V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME
-        : V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME;
+    String file = expectedType.equals("SNAPSHOT") ? V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME
+        : V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME;
     long capturedAt = segment.loadDocIdsSnapshot(file).metadata().snapshotCapturedAtMs();
     assertEquals(diagnostics.get("snapshotCapturedAtMs").asLong(), capturedAt);
     assertTrue(diagnostics.get("snapshotAgeMs").asLong() >= beforeRequest - capturedAt);
@@ -534,8 +535,22 @@ public class TablesResourceTest extends BaseResourceTest {
       throws IOException, ConfigurationException {
     String segmentPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName();
 
+    File segmentDir = new File(_tableDataManagerMap.get(tableNameWithType).getTableDataDir(), segment.getSegmentName());
+    // The fixture loads without an instance config; create the local serving sidecar to test its tar exclusion.
+    try (SegmentMetadataImpl mappedMetadata = SegmentMetadataImpl.loadMapped(segmentDir)) {
+      assertTrue(mappedMetadata.isMapped());
+    }
+    assertTrue(new File(segmentDir, "segment_metadata.bin").isFile());
+    File temporarySidecar = new File(segmentDir, ".segment_metadata.test.tmp");
+    Files.writeString(temporarySidecar.toPath(), "in progress");
+
     // Download the segment and save to a temp local file.
-    Response response = _webTarget.path(segmentPath).request().get(Response.class);
+    Response response;
+    try {
+      response = _webTarget.path(segmentPath).request().get(Response.class);
+    } finally {
+      Files.deleteIfExists(temporarySidecar.toPath());
+    }
     assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     File segmentFile = response.readEntity(File.class);
 
@@ -549,6 +564,11 @@ public class TablesResourceTest extends BaseResourceTest {
     // Extract creation.meta
     TarCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
         new File(tempMetadataDir, V1Constants.SEGMENT_CREATION_META));
+
+    assertThrows(IOException.class, () -> TarCompressionUtils.untarOneFile(segmentFile, "segment_metadata.bin",
+        new File(tempMetadataDir, "sidecar")));
+    assertThrows(IOException.class, () -> TarCompressionUtils.untarOneFile(segmentFile, temporarySidecar.getName(),
+        new File(tempMetadataDir, "temporary-sidecar")));
 
     // Load segment metadata
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(tempMetadataDir);
@@ -565,26 +585,26 @@ public class TablesResourceTest extends BaseResourceTest {
     when(upsertMetadataManager.getLastSnapshotPass()).thenReturn(new SnapshotPass(1234L, 2, true, 5678L));
     ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
     ThreadSafeMutableRoaringBitmap queryableDocIds = new ThreadSafeMutableRoaringBitmap();
-    ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap validDocIdsOnDiskBitmap = new ThreadSafeMutableRoaringBitmap();
 
     int[] docIds = new int[]{1, 4, 6, 10, 15, 17, 18, 20};
     for (int docId : docIds) {
       validDocIds.add(docId);
       queryableDocIds.add(docId + 1);
-      validDocIdsSnapshot.add(docId + 2);
+      validDocIdsOnDiskBitmap.add(docId + 2);
     }
     segment.enableUpsert(upsertMetadataManager, validDocIds, queryableDocIds);
-    File validDocIdsSnapshotFile =
+    File validDocIdsOnDiskBitmapFile =
         new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-    FileUtils.writeByteArrayToFile(validDocIdsSnapshotFile,
-        RoaringBitmapUtils.serialize(validDocIdsSnapshot.getMutableRoaringBitmap()));
+            V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+    FileUtils.writeByteArrayToFile(validDocIdsOnDiskBitmapFile,
+        RoaringBitmapUtils.serialize(validDocIdsOnDiskBitmap.getMutableRoaringBitmap()));
 
     // Create the queryableDocIds snapshot file needed for SNAPSHOT_WITH_DELETE
-    File queryableDocIdsSnapshotFile =
+    File queryableDocIdsOnDiskBitmapFile =
         new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
-    FileUtils.writeByteArrayToFile(queryableDocIdsSnapshotFile,
+            V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+    FileUtils.writeByteArrayToFile(queryableDocIdsOnDiskBitmapFile,
         RoaringBitmapUtils.serialize(queryableDocIds.getMutableRoaringBitmap()));
 
     // Check no type (default should be validDocIdsSnapshot)
@@ -595,7 +615,7 @@ public class TablesResourceTest extends BaseResourceTest {
     byte[] validDocIdsSnapshotBitmap = response.getBitmap();
     assertNotNull(validDocIdsSnapshotBitmap);
     assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIdsSnapshot.getMutableRoaringBitmap());
+        validDocIdsOnDiskBitmap.getMutableRoaringBitmap());
 
     // Check snapshot type
     response = _webTarget.path(snapshotPath)
@@ -608,7 +628,7 @@ public class TablesResourceTest extends BaseResourceTest {
     validDocIdsSnapshotBitmap = response.getBitmap();
     assertNotNull(validDocIdsSnapshotBitmap);
     assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIdsSnapshot.getMutableRoaringBitmap());
+        validDocIdsOnDiskBitmap.getMutableRoaringBitmap());
 
     // Check onHeap type
     response = _webTarget.path(snapshotPath)

@@ -25,7 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -51,18 +50,25 @@ import org.roaringbitmap.IntIterator;
 public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
     extends BaseSingleInputAggregationFunction<ValueLongPair<V>, V> {
   protected final ExpressionContext _timeCol;
-  private final ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
 
   public FirstWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
-      ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe, boolean nullHandlingEnabled) {
+      boolean nullHandlingEnabled) {
     super(dataCol, nullHandlingEnabled);
     _timeCol = timeCol;
-    _objectSerDe = objectSerDe;
   }
 
   public abstract ValueLongPair<V> constructValueLongPair(V value, long time);
 
+  /// Deserializes a value-time pair from the bytes of a pre-aggregated value.
+  public abstract ValueLongPair<V> deserializeValueLongPair(byte[] bytes);
+
   public abstract ValueLongPair<V> getDefaultValueTimePair();
+
+  /// Whether the data input holds serialized value-time pairs, as a pre-aggregated BYTES column does, rather than data
+  /// values.
+  protected boolean isSerializedPairInput(BlockValSet blockValSet) {
+    return blockValSet.getValueType() == DataType.BYTES;
+  }
 
   public abstract V readCell(BlockValSet block, int docId);
 
@@ -99,7 +105,7 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet blockTimeSet = blockValSetMap.get(_timeCol);
-    if (blockValSet.getValueType() != DataType.BYTES) {
+    if (!isSerializedPairInput(blockValSet)) {
       IntLongPair defaultPair = new IntLongPair(Integer.MIN_VALUE, Long.MAX_VALUE);
       long[] timeValues = blockTimeSet.getLongValuesSV();
 
@@ -129,7 +135,7 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+          ValueLongPair<V> firstWithTimePair = deserializeValueLongPair(bytesValues[i]);
           long time = firstWithTimePair.getTime();
           if (time < result.getTime()) {
             result.setTime(time);
@@ -154,7 +160,7 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet timeValSet = blockValSetMap.get(_timeCol);
-    if (blockValSet.getValueType() != DataType.BYTES) {
+    if (!isSerializedPairInput(blockValSet)) {
       aggregateGroupResultWithRawDataSv(length, groupKeyArray, groupByResultHolder,
           blockValSet, timeValSet);
     } else {
@@ -162,7 +168,7 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+          ValueLongPair<V> firstWithTimePair = deserializeValueLongPair(bytesValues[i]);
           setGroupByResult(groupKeyArray[i],
               groupByResultHolder,
               firstWithTimePair.getValue(),
@@ -177,14 +183,14 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet timeValSet = blockValSetMap.get(_timeCol);
-    if (blockValSet.getValueType() != DataType.BYTES) {
+    if (!isSerializedPairInput(blockValSet)) {
       aggregateGroupResultWithRawDataMv(length, groupKeysArray, groupByResultHolder, blockValSet, timeValSet);
     } else {
       // Serialized ValueTimePair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+          ValueLongPair<V> firstWithTimePair = deserializeValueLongPair(bytesValues[i]);
           V data = firstWithTimePair.getValue();
           long time = firstWithTimePair.getTime();
           for (int groupKey : groupKeysArray[i]) {

@@ -27,9 +27,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
-/// Tests exception logging modes used by Controller API responses.
+/// Tests exception logging modes used by Controller API responses, and which exceptions keep their cause for them.
 public class ControllerApplicationExceptionTest {
   private static final String PUBLIC_MESSAGE = "Request failed";
   private static final String SENSITIVE_MESSAGE = "file:///private/controller-secret.csv?signature=secret";
@@ -59,6 +63,36 @@ public class ControllerApplicationExceptionTest {
     assertEquals(exception.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
     assertEquals(exception.getMessage(), PUBLIC_MESSAGE);
     verify(logger).error("{} exception type: {}", PUBLIC_MESSAGE, IllegalStateException.class.getName());
+    verifyNoMoreInteractions(logger);
+  }
+
+  @Test
+  public void testConstructorsKeepTheCauseOutOfTheResponse() {
+    Logger logger = mock(Logger.class);
+    IllegalStateException cause = new IllegalStateException(SENSITIVE_MESSAGE);
+
+    ControllerApplicationException exception = new ControllerApplicationException(logger, PUBLIC_MESSAGE,
+        Response.Status.INTERNAL_SERVER_ERROR, cause);
+
+    assertNull(exception.getCause());
+    assertFalse(exception.shouldIncludeCausesInResponse());
+    verify(logger).error(PUBLIC_MESSAGE, cause);
+    verifyNoMoreInteractions(logger);
+  }
+
+  @Test
+  public void testWithCausesInResponseKeepsTheCauseAndLogsItAsUsual() {
+    Logger logger = mock(Logger.class);
+    IllegalArgumentException cause = new IllegalArgumentException("Cannot read single-value for column: name");
+
+    ControllerApplicationException exception =
+        ControllerApplicationException.withCausesInResponse(logger, PUBLIC_MESSAGE, Response.Status.BAD_REQUEST, cause);
+
+    assertSame(exception.getCause(), cause);
+    assertTrue(exception.shouldIncludeCausesInResponse());
+    assertEquals(exception.getMessage(), PUBLIC_MESSAGE);
+    assertEquals(exception.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    verify(logger).info("{} exception: {}", PUBLIC_MESSAGE, cause.getMessage());
     verifyNoMoreInteractions(logger);
   }
 }

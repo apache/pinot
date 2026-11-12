@@ -20,7 +20,7 @@ package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.controller.helix.core.assignment.segment.OfflineSegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -61,12 +61,12 @@ public class RoundRobinSegmentAssignmentStrategyTest {
 
   @BeforeClass
   public void setUp() {
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
-                new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY, null)))
-            .build();
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
+            new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY, null)))
+        .build();
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
 
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
@@ -84,11 +84,12 @@ public class RoundRobinSegmentAssignmentStrategyTest {
 
   @Test
   public void testAssignSegment() {
-    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    IdealState idealState = new IdealState(RAW_TABLE_NAME);
+    Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
 
     // The counter initializes to a random starting value, so derive the start from the first observed result.
     List<String> firstInstances =
-        _segmentAssignment.assignSegment(SEGMENTS.get(0), currentAssignment, _instancePartitionsMap);
+        _segmentAssignment.assignSegment(SEGMENTS.get(0), idealState, _instancePartitionsMap);
     assertEquals(firstInstances.size(), NUM_REPLICAS);
     // Counter advances once per replica, so replicas within each segment occupy consecutive instance slots.
     int startIdx = INSTANCES.indexOf(firstInstances.get(0));
@@ -102,7 +103,7 @@ public class RoundRobinSegmentAssignmentStrategyTest {
     int nextIdx = (startIdx + NUM_REPLICAS) % NUM_INSTANCES;
     for (int segId = 1; segId < NUM_SEGMENTS; segId++) {
       List<String> instances =
-          _segmentAssignment.assignSegment(SEGMENTS.get(segId), currentAssignment, _instancePartitionsMap);
+          _segmentAssignment.assignSegment(SEGMENTS.get(segId), idealState, _instancePartitionsMap);
       assertEquals(instances.size(), NUM_REPLICAS);
       for (int r = 0; r < NUM_REPLICAS; r++) {
         assertEquals(instances.get(r), INSTANCES.get((nextIdx - r + NUM_INSTANCES) % NUM_INSTANCES));
@@ -115,11 +116,12 @@ public class RoundRobinSegmentAssignmentStrategyTest {
 
   @Test
   public void testAssignSegmentWithChangedInstanceCount() {
-    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    IdealState idealState = new IdealState(RAW_TABLE_NAME);
+    Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
 
     // Assign one segment to observe the current counter position
     List<String> firstInstances =
-        _segmentAssignment.assignSegment("changeTest_0", currentAssignment, _instancePartitionsMap);
+        _segmentAssignment.assignSegment("changeTest_0", idealState, _instancePartitionsMap);
     int prevInstanceId = INSTANCES.indexOf(firstInstances.get(0));
 
     // Switch to a new instance list with a different count (7 instead of 10)
@@ -133,7 +135,7 @@ public class RoundRobinSegmentAssignmentStrategyTest {
     // Counter after the first assignment is prevInstanceId. Next compute advances by NUM_REPLICAS modulo the new size.
     int expectedStartIdx = (prevInstanceId + NUM_REPLICAS) % newNumInstances;
     List<String> secondInstances =
-        _segmentAssignment.assignSegment("changeTest_1", currentAssignment, newInstancePartitionsMap);
+        _segmentAssignment.assignSegment("changeTest_1", idealState, newInstancePartitionsMap);
     assertEquals(secondInstances.size(), NUM_REPLICAS);
     for (int r = 0; r < NUM_REPLICAS; r++) {
       assertEquals(secondInstances.get(r),

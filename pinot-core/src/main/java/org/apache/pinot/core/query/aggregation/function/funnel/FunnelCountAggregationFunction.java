@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function.funnel;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +27,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -66,7 +64,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 ///
 /// @see FunnelCountAggregationFunctionFactory
 /// @see FunnelCountSortedAggregationFunction
-public class FunnelCountAggregationFunction<A, I> implements AggregationFunction<I, LongArrayList> {
+public class FunnelCountAggregationFunction<A, I> implements AggregationFunction<I, long[]> {
   private final List<ExpressionContext> _expressions;
   private final List<ExpressionContext> _stepExpressions;
   private final List<ExpressionContext> _correlateByExpressions;
@@ -156,16 +154,13 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(I i) {
-    // TODO: Improve the ser/de logic
-    int type = ObjectSerDeUtils.ObjectType.getObjectType(i).getValue();
-    byte[] bytes = ObjectSerDeUtils.serialize(i, type);
-    return new SerializedIntermediateResult(type, bytes);
+  public SerializedResult serializeIntermediateResult(I i) {
+    return _mergeStrategy.serializeIntermediateResult(i);
   }
 
   @Override
   public I deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+    return _mergeStrategy.deserializeIntermediateResult(customObject);
   }
 
   @Override
@@ -174,21 +169,20 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
   }
 
   @Override
-  public LongArrayList extractFinalResult(@Nullable I intermediateResult) {
+  public long[] extractFinalResult(@Nullable I intermediateResult) {
     if (intermediateResult == null) {
-      return LongArrayList.wrap(new long[_numSteps]);
+      return new long[_numSteps];
     }
     return _mergeStrategy.extractFinalResult(intermediateResult);
   }
 
   @Override
-  public LongArrayList mergeFinalResult(LongArrayList finalResult1, LongArrayList finalResult2) {
-    long[] elements1 = finalResult1.elements();
-    long[] elements2 = finalResult2.elements();
+  public long[] mergeFinalResult(long[] finalResult1, long[] finalResult2) {
+    long[] mergedResult = finalResult1.clone();
     for (int i = 0; i < _numSteps; i++) {
-      elements1[i] += elements2[i];
+      mergedResult[i] += finalResult2[i];
     }
-    return finalResult1;
+    return mergedResult;
   }
 
   @Override

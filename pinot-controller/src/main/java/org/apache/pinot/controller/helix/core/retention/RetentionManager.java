@@ -68,6 +68,7 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -361,13 +362,17 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // Scan all segment ZK metadata and purge segments if necessary
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      if (validationConfig.getHybridTableRetentionStrategy() != Enablement.DEFAULT) {
+        LOGGER.warn("hybridTableRetentionStrategy is only applicable to realtime tables, "
+            + "ignoring it for offline table: {}", tableNameWithType);
+      }
       manageRetentionForOfflineTable(context, retentionStrategy, untrackedSegmentsDeletionBatchSize,
           untrackedSegmentsRetentionStrategy);
     } else {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
       // hybrid table check should be performed before the realtime table check.
-      if (_isHybridTableRetentionStrategyEnabled && offlineTableConfig != null) {
+      if (offlineTableConfig != null && shouldEnableHybridTableRetentionStrategy(tableConfig, offlineTableConfig)) {
         // TODO: handle the orphan segment deletion for hybrid table
         manageRetentionForHybridTable(tableConfig, offlineTableConfig);
       } else {
@@ -375,6 +380,17 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             untrackedSegmentsRetentionStrategy);
       }
     }
+  }
+
+  /// Returns whether the hybrid table retention strategy should be applied to the given REALTIME table. Subclasses can
+  /// override this to decide per table.
+  ///
+  /// By default, the table-level `hybridTableRetentionStrategy` takes precedence; when it is `DEFAULT`, the value of
+  /// [ControllerConf#ENABLE_HYBRID_TABLE_RETENTION_STRATEGY] is used.
+  protected boolean shouldEnableHybridTableRetentionStrategy(TableConfig realtimeTableConfig,
+      TableConfig offlineTableConfig) {
+    return realtimeTableConfig.getValidationConfig().getHybridTableRetentionStrategy()
+        .isEnabled(_isHybridTableRetentionStrategyEnabled);
   }
 
   private void manageRetentionForOfflineTable(TableRunContext context, RetentionStrategy retentionStrategy,
@@ -400,7 +416,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private void manageRetentionForRealtimeTable(TableRunContext context, RetentionStrategy retentionStrategy,
+  @VisibleForTesting
+  void manageRetentionForRealtimeTable(TableRunContext context, RetentionStrategy retentionStrategy,
       int untrackedSegmentsDeletionBatchSize, RetentionStrategy untrackedSegmentsRetentionStrategy) {
     String realtimeTableName = context.getTableNameWithType();
     List<SegmentZKMetadata> segmentZKMetadataList = context.getSegmentsZKMetadata();

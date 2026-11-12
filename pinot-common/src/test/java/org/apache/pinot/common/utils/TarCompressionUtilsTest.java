@@ -126,9 +126,11 @@ public class TarCompressionUtilsTest {
     File archive = new File(TAR_DIR, "data" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
     TarCompressionUtils.createCompressedTarFile(inputFile, archive, compressorName);
     if (compressorName.equals(LZ4_FAST)) {
+      assertEquals(TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.get(
+          TarCompressionUtils.TAR_LZ4_FILE_EXTENSION), LZ4_FAST);
       File defaultArchive = new File(TAR_DIR, "default" + TarCompressionUtils.TAR_LZ4_FILE_EXTENSION);
       TarCompressionUtils.createCompressedTarFile(inputFile, defaultArchive);
-      assertEquals(Files.readAllBytes(defaultArchive.toPath()), Files.readAllBytes(archive.toPath()));
+      assertEquals(Files.readAllBytes(TarCompressionUtils.untar(defaultArchive, UNTAR_DIR).get(0).toPath()), content);
     }
 
     List<File> extractedFiles = TarCompressionUtils.untar(archive, UNTAR_DIR);
@@ -266,6 +268,27 @@ public class TarCompressionUtilsTest {
     } catch (IOException e) {
       // Expected
     }
+  }
+
+  @Test
+  public void testFilteredDirectory()
+      throws IOException {
+    File dir = new File(DATA_DIR, "dir");
+    File excludedFile = new File(dir, "segment_metadata.bin");
+    File nestedFile = new File(new File(dir, "nested"), "segment_metadata.bin");
+    FileUtils.write(excludedFile, "local", StandardCharsets.UTF_8);
+    FileUtils.write(new File(dir, "metadata.properties"), "canonical", StandardCharsets.UTF_8);
+    FileUtils.write(nestedFile, "nested", StandardCharsets.UTF_8);
+
+    File compressedTarFile = new File(TAR_DIR, "filtered.tar.gz");
+    TarCompressionUtils.createFilteredCompressedTarFile(dir, compressedTarFile, file -> !file.equals(excludedFile));
+    TarCompressionUtils.untar(compressedTarFile, UNTAR_DIR);
+
+    File untarredDir = new File(UNTAR_DIR, "dir");
+    assertTrue(untarredDir.isDirectory());
+    assertFalse(new File(untarredDir, excludedFile.getName()).exists());
+    assertTrue(new File(untarredDir, "metadata.properties").isFile());
+    assertTrue(new File(new File(untarredDir, "nested"), nestedFile.getName()).isFile());
   }
 
   @Test

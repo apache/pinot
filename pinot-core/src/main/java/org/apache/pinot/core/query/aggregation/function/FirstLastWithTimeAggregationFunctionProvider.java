@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -60,12 +61,24 @@ public final class FirstLastWithTimeAggregationFunctionProvider {
           return new FirstIntValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled, false);
         case LONG:
           return new FirstLongValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case TIMESTAMP:
+          return new FirstLongValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.TIMESTAMP);
         case FLOAT:
           return new FirstFloatValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case DOUBLE:
           return new FirstDoubleValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case BIG_DECIMAL:
+          return new FirstBigDecimalValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case STRING:
+        case JSON:
           return new FirstStringValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case BYTES:
+          return new FirstBytesValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.BYTES);
+        case UUID:
+          return new FirstBytesValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.UUID);
         default:
           throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
       }
@@ -100,12 +113,24 @@ public final class FirstLastWithTimeAggregationFunctionProvider {
           return new LastIntValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled, false);
         case LONG:
           return new LastLongValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case TIMESTAMP:
+          return new LastLongValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.TIMESTAMP);
         case FLOAT:
           return new LastFloatValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case DOUBLE:
           return new LastDoubleValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case BIG_DECIMAL:
+          return new LastBigDecimalValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
         case STRING:
+        case JSON:
           return new LastStringValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled);
+        case BYTES:
+          return new LastBytesValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.BYTES);
+        case UUID:
+          return new LastBytesValueWithTimeAggregationFunction(dataCol, timeCol, nullHandlingEnabled,
+              ColumnDataType.UUID);
         default:
           throw new IllegalArgumentException("Unsupported data type for LAST_WITH_TIME: " + dataType);
       }

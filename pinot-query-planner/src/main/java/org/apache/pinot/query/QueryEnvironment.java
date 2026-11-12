@@ -58,6 +58,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
+import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
@@ -146,6 +147,8 @@ public class QueryEnvironment {
   private final FrameworkConfig _config;
   private final CalciteCatalogReader _catalogReader;
   private final HepProgram _optProgram;
+  // Same as _optProgram, but rewrites ANY_VALUE(expr) to ANY_VALUE(expr, 'dataType') as well
+  private final HepProgram _inferAnyValueTypeOptProgram;
   private final Config _envConfig;
   private final PinotCatalog _catalog;
   private final Set<String> _defaultDisabledPlannerRules;
@@ -170,7 +173,9 @@ public class QueryEnvironment {
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     _defaultDisabledPlannerRules = _envConfig.defaultDisabledPlannerRules();
     // default optProgram with no skip rule options and no use rule options
-    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules);
+    _optProgram = getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, false);
+    _inferAnyValueTypeOptProgram =
+        getOptProgram(_envConfig.getRuleSet(), Set.of(), Set.of(), _defaultDisabledPlannerRules, true);
     _multiClusterRoutingContext = multiClusterRoutingContext;
   }
 
@@ -197,7 +202,8 @@ public class QueryEnvironment {
       _catalog.configureVirtualColumnExclusion(true);
     }
 
-    HepProgram optProgram = _optProgram;
+    boolean inferAnyValueType = QueryOptionsUtils.isInferAnyValueType(options);
+    HepProgram optProgram = inferAnyValueType ? _inferAnyValueTypeOptProgram : _optProgram;
     Set<String> useRuleSet = new HashSet<>(QueryOptionsUtils.getUsePlannerRules(options));
     if (Boolean.parseBoolean(options.get(QueryOptionKey.AUTO_REWRITE_AGGREGATION_TYPE))) {
       useRuleSet.add(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE);
@@ -206,7 +212,8 @@ public class QueryEnvironment {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
       if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules);
+        optProgram = getOptProgram(_envConfig.getRuleSet(), skipRuleSet, useRuleSet, _defaultDisabledPlannerRules,
+            inferAnyValueType);
       }
     }
     int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
@@ -578,9 +585,10 @@ public class QueryEnvironment {
   /// @param skipRuleSet parsed skipped rule name set from query options
   /// @param useRuleSet parsed use rule set from query options
   /// @param defaultDisabledRuleSet parsed default disabled rule set from broker config
+  /// @param inferAnyValueType whether ANY_VALUE gets the data type argument of its argument's type
   /// @return HepProgram that performs logical transformations
   private static HepProgram getOptProgram(PinotRuleSet ruleSet, Set<String> skipRuleSet, Set<String> useRuleSet,
-      Set<String> defaultDisabledRuleSet) {
+      Set<String> defaultDisabledRuleSet, boolean inferAnyValueType) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -602,8 +610,16 @@ public class QueryEnvironment {
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : basicRules) {
+      // Supplies the data type argument before AggregateCaseToFilter, which rewrites only one-argument calls: its
+      // ARRAY_AGG(expression) FILTER (WHERE condition) form of ARRAY_AGG(CASE WHEN ...) fails at runtime.
+      if (relOptRule.toString().equals(CommonConstants.Broker.PlannerRuleNames.AGGREGATE_CASE_TO_FILTER)) {
+        hepProgramBuilder.addRuleInstance(PinotAggregateTypeArgumentRewriteRule.ARRAY_AGG_ONLY);
+      }
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
+    // Required for FIRST_WITH_TIME, LAST_WITH_TIME, ARRAY_AGG and string MODE, so the rule options do not filter it.
+    hepProgramBuilder.addRuleInstance(inferAnyValueType ? PinotAggregateTypeArgumentRewriteRule.INSTANCE
+        : PinotAggregateTypeArgumentRewriteRule.WITHOUT_ANY_VALUE);
 
     // ----
     // Pushdown filters using a single HepInstruction.

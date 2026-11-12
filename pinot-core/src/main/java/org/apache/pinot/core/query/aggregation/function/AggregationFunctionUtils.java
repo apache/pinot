@@ -22,15 +22,10 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
-import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -52,7 +47,6 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -66,6 +60,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -77,6 +72,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// The `AggregationFunctionUtils` class provides utility methods for aggregation function.
@@ -163,7 +159,7 @@ public class AggregationFunctionUtils {
 
   /// Merges two final results, either of which may be `null`, on the same terms as [#merge].
   @Nullable
-  public static <F extends Comparable> F mergeFinalResult(AggregationFunction<?, F> aggregationFunction,
+  public static <F> F mergeFinalResult(AggregationFunction<?, F> aggregationFunction,
       @Nullable F finalResult1, @Nullable F finalResult2) {
     if (finalResult1 == null) {
       return finalResult2;
@@ -295,8 +291,9 @@ public class AggregationFunctionUtils {
     }
   }
 
-  /// Reads the final result from the [DataTable].
-  public static Comparable getFinalResult(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
+  /// Reads the final result from the [DataTable]. The final result is the stored value, see
+  /// [AggregationFunction#extractFinalResult].
+  public static Object getFinalResult(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
     switch (columnDataType.getStoredType()) {
       case INT:
         return dataTable.getInt(rowId, colId);
@@ -313,19 +310,19 @@ public class AggregationFunctionUtils {
       case BYTES:
         return dataTable.getBytes(rowId, colId);
       case INT_ARRAY:
-        return IntArrayList.wrap(dataTable.getIntArray(rowId, colId));
+        return dataTable.getIntArray(rowId, colId);
       case LONG_ARRAY:
-        return LongArrayList.wrap(dataTable.getLongArray(rowId, colId));
+        return dataTable.getLongArray(rowId, colId);
       case FLOAT_ARRAY:
-        return FloatArrayList.wrap(dataTable.getFloatArray(rowId, colId));
+        return dataTable.getFloatArray(rowId, colId);
       case DOUBLE_ARRAY:
-        return DoubleArrayList.wrap(dataTable.getDoubleArray(rowId, colId));
+        return dataTable.getDoubleArray(rowId, colId);
       case BIG_DECIMAL_ARRAY:
-        return ObjectArrayList.wrap(dataTable.getBigDecimalArray(rowId, colId));
+        return dataTable.getBigDecimalArray(rowId, colId);
       case STRING_ARRAY:
-        return ObjectArrayList.wrap(dataTable.getStringArray(rowId, colId));
+        return dataTable.getStringArray(rowId, colId);
       case BYTES_ARRAY:
-        return ObjectArrayList.wrap(dataTable.getBytesArray(rowId, colId));
+        return dataTable.getBytesArray(rowId, colId);
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
     }
@@ -355,6 +352,8 @@ public class AggregationFunctionUtils {
         return dataTable.getString(rowId, colId);
       case BYTES:
         return dataTable.getBytes(rowId, colId).getBytes();
+      case UUID:
+        return UuidUtils.toUUID(dataTable.getBytes(rowId, colId));
       case INT_ARRAY:
         return dataTable.getIntArray(rowId, colId);
       case LONG_ARRAY:
@@ -952,11 +951,11 @@ public class AggregationFunctionUtils {
       // Logical BYTES dictionary entries are serialized UltraLogLog objects.
       try {
         QueryThreadContext.checkTerminationAndSampleUsage(explainPlanName);
-        UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));
+        UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
         for (int i = 1; i < length; i++) {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, explainPlanName);
-          ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(i)));
+          ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_SER_DE.deserialize(dictionary.getBytesValue(i)));
         }
         return ull;
       } catch (Exception e) {

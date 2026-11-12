@@ -431,7 +431,7 @@ public class DistinctCountOffHeapAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(BaseOffHeapSet set) {
+  public SerializedResult serializeIntermediateResult(BaseOffHeapSet set) {
     int type;
     if (set instanceof OffHeap32BitSet) {
       type = 0;
@@ -444,7 +444,7 @@ public class DistinctCountOffHeapAggregationFunction
     }
     byte[] bytes = set.serialize();
     set.close();
-    return new SerializedIntermediateResult(type, bytes);
+    return new SerializedBytes(type, bytes);
   }
 
   @Override

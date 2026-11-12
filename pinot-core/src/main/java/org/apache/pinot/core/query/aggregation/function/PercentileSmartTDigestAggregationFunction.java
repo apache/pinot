@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -29,13 +30,13 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -53,6 +54,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /// - compression: Compression for the converted TDigest, 100 by default.
 /// Example of third argument: 'threshold=10000;compression=50'
 public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAggregationFunction<Object, Double> {
+  private static final int DOUBLE_ARRAY_LIST_TYPE = 3;
+  private static final int TDIGEST_TYPE = 10;
+
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   private final double _percentile;
@@ -173,17 +177,15 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     DoubleArrayList valueList = getOrCreateList(length, aggregationResultHolder);
     if (blockValSet.isSingleValue()) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      forEachNotNull(length, blockValSet, (from, toEx) ->
-          valueList.addElements(valueList.size(), doubleValues, from, toEx - from)
-      );
+      forEachNotNull(length, blockValSet,
+          (from, toEx) -> valueList.addElements(valueList.size(), doubleValues, from, toEx - from));
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
       forEachNotNull(length, blockValSet, (from, toEx) -> {
         for (int i = from; i < toEx; i++) {
           valueList.addElements(valueList.size(), doubleValues[i]);
         }
-      }
-      );
+      });
     }
     if (valueList.size() > _threshold) {
       aggregationResultHolder.setValue(convertValueListToTDigest(valueList));
@@ -309,8 +311,7 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     return valueList1.size() > _threshold ? convertValueListToTDigest(valueList1) : valueList1;
   }
 
-  private static TDigestAccumulator mergeIntoAccumulator(TDigestAccumulator accumulator,
-      Object intermediateResult) {
+  private static TDigestAccumulator mergeIntoAccumulator(TDigestAccumulator accumulator, Object intermediateResult) {
     if (intermediateResult instanceof TDigest) {
       accumulator.add((TDigest) intermediateResult);
     } else {
@@ -332,19 +333,24 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Object o) {
-    if (o instanceof TDigest) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.TDigest.getValue(),
-          ObjectSerDeUtils.TDIGEST_SER_DE.serialize((TDigest) o));
-    } else {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-          ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize((DoubleArrayList) o));
+  public SerializedResult serializeIntermediateResult(Object o) {
+    if (o instanceof TDigest tDigest) {
+      return new SerializedBytes(TDIGEST_TYPE, ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
     }
+    return new SerializedValue<>(DOUBLE_ARRAY_LIST_TYPE, (DoubleArrayList) o,
+        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE);
   }
 
   @Override
   public Object deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.deserialize(customObject);
+    int type = customObject.getType();
+    ByteBuffer buffer = customObject.getBuffer();
+    return switch (type) {
+      case TDIGEST_TYPE -> ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(buffer);
+      case DOUBLE_ARRAY_LIST_TYPE -> ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.deserialize(buffer);
+      default -> throw new IllegalStateException(
+          "Unexpected intermediate result type: " + type + " for function: " + getType());
+    };
   }
 
   @Override
