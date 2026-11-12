@@ -23,9 +23,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
-/**
- * Dictionary of a single BIG_DECIMAL value.
- */
+/// Dictionary of a single BIG_DECIMAL value.
 public class ConstantValueBigDecimalDictionary extends BaseConstantValueDictionary {
   private final BigDecimal _value;
   private final byte[] _bytes;

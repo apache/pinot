@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -62,7 +63,8 @@ import static org.testng.Assert.assertNotNull;
 
 public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR =
-      new File(FileUtils.getTempDirectory(), BaseFSTBasedRegexpLikeQueriesTest.class.getSimpleName());
+      new File(FileUtils.getTempDirectory(), BaseFSTBasedRegexpLikeQueriesTest.class.getSimpleName() + "-"
+          + UUID.randomUUID());
   private static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String DOMAIN_NAMES_COL = "DOMAIN_NAMES";
@@ -101,9 +103,7 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
-  /**
-   * Abstract method to be implemented by derived classes to specify index type.
-   */
+  /// Abstract method to be implemented by derived classes to specify index type.
   protected abstract String getIndexType();
 
   @Override

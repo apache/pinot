@@ -54,11 +54,9 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies {@link ArrowColumnReaderFactory} can consume a caller-managed {@link ArrowStreamReader}
- * backed by a {@link ByteArrayInputStream}, without disk I/O, and that the caller-owned
- * {@link RootAllocator} remains usable after the factory is closed.
- */
+/// Verifies [ArrowColumnReaderFactory] can consume a caller-managed [ArrowStreamReader]
+/// backed by a [ByteArrayInputStream], without disk I/O, and that the caller-owned
+/// [RootAllocator] remains usable after the factory is closed.
 public class ArrowColumnReaderFactoryTest {
 
   private static final int ROW_COUNT = 32;
@@ -148,13 +146,11 @@ public class ArrowColumnReaderFactoryTest {
     }
   }
 
-  /**
-   * A second {@code init()} on the same factory must release the first init's off-heap accumulator
-   * vectors rather than orphaning them. Without the re-init guard the first set leaks, and the
-   * caller-owned allocator throws {@code IllegalStateException} on its own {@code close()} because the
-   * outstanding buffers are still allocated — so reaching the end of the caller-allocator
-   * try-with-resources cleanly is the leak detector.
-   */
+  /// A second `init()` on the same factory must release the first init's off-heap accumulator
+  /// vectors rather than orphaning them. Without the re-init guard the first set leaks, and the
+  /// caller-owned allocator throws `IllegalStateException` on its own `close()` because the
+  /// outstanding buffers are still allocated — so reaching the end of the caller-allocator
+  /// try-with-resources cleanly is the leak detector.
   @Test
   public void testReInitReleasesPriorAccumulators()
       throws Exception {
@@ -183,13 +179,11 @@ public class ArrowColumnReaderFactoryTest {
     }
   }
 
-  /**
-   * Dictionary encoding is the standard Arrow representation for low-cardinality strings. The
-   * column-major path must DECODE it — surfacing the logical string values and the STRING type, not
-   * the underlying Int32 dictionary indices. Verifies the decode end-to-end through the factory and
-   * the resulting {@link ColumnReader} (both the typed {@code getString} and generic {@code getValue}
-   * accessors), and that the caller's allocator is left clean afterward.
-   */
+  /// Dictionary encoding is the standard Arrow representation for low-cardinality strings. The
+  /// column-major path must DECODE it — surfacing the logical string values and the STRING type, not
+  /// the underlying Int32 dictionary indices. Verifies the decode end-to-end through the factory and
+  /// the resulting [ColumnReader] (both the typed `getString` and generic `getValue`
+  /// accessors), and that the caller's allocator is left clean afterward.
   @Test
   public void testDecodesDictionaryEncodedStringColumn()
       throws Exception {
@@ -229,12 +223,10 @@ public class ArrowColumnReaderFactoryTest {
     }
   }
 
-  /**
-   * Writes a single-column ("color") Arrow IPC stream where the column is dictionary-encoded against
-   * {@code dictValues}, following the standard Arrow {@code encode → write with DictionaryProvider}
-   * pattern. The dictionary vector is owned here and closed; the encoded vector is owned by the
-   * VectorSchemaRoot.
-   */
+  /// Writes a single-column ("color") Arrow IPC stream where the column is dictionary-encoded against
+  /// `dictValues`, following the standard Arrow `encode → write with DictionaryProvider`
+  /// pattern. The dictionary vector is owned here and closed; the encoded vector is owned by the
+  /// VectorSchemaRoot.
   private byte[] writeDictionaryEncodedStringStream(RootAllocator allocator, String[] dictValues, String[] rows)
       throws IOException {
     DictionaryEncoding encoding = new DictionaryEncoding(1L, false, new ArrowType.Int(32, true));

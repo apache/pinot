@@ -31,9 +31,7 @@ import org.apache.pinot.tools.Quickstart;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 
-/**
- * This is used in Hybrid Quickstart.
- */
+/// This is used in Hybrid Quickstart.
 public class AirlineDataStream {
   private static final String KAFKA_TOPIC_NAME = "flights-realtime";
   Schema _pinotSchema;

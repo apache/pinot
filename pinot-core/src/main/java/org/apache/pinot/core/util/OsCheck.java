@@ -31,19 +31,15 @@ public final class OsCheck {
   private OsCheck() {
   }
 
-  /**
-   * detect the operating system from the os.name System property and cache
-   * the result
-   *
-   * @return - the operating system detected
-   */
+  /// detect the operating system from the os.name System property and cache
+  /// the result
+  ///
+  /// @return - the operating system detected
   public static OSType getOperatingSystemType() {
     return DETECTED_OS;
   }
 
-  /**
-   * types of Operating Systems
-   */
+  /// types of Operating Systems
   public enum OSType {
     Windows, MacOS, Linux, Other
   }

@@ -40,9 +40,7 @@ public class SegmentZKMetadataUtils {
   private SegmentZKMetadataUtils() {
   }
 
-  /**
-   * Creates the segment ZK metadata for a new segment.
-   */
+  /// Creates the segment ZK metadata for a new segment.
   public static SegmentZKMetadata createSegmentZKMetadata(String tableNameWithType, SegmentMetadata segmentMetadata,
       String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
@@ -51,18 +49,14 @@ public class SegmentZKMetadataUtils {
     return segmentZKMetadata;
   }
 
-  /**
-   * Refreshes the segment ZK metadata for a segment being replaced.
-   */
+  /// Refreshes the segment ZK metadata for a segment being replaced.
   public static void refreshSegmentZKMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
       SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
     updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypterName,
         segmentSizeInBytes, null, false);
   }
 
-  /**
-   * Updates the segment ZK metadata for a committing segment.
-   */
+  /// Updates the segment ZK metadata for a committing segment.
   public static void updateCommittingSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata,
       SegmentMetadata segmentMetadata, String downloadUrl, long segmentSizeInBytes, String endOffset) {
     updateSegmentZKMetadata(realtimeTableName, segmentZKMetadata, segmentMetadata, downloadUrl, null,
@@ -95,7 +89,7 @@ public class SegmentZKMetadataUtils {
       segmentZKMetadata.setEndOffset(endOffset);
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       // for committing segments, we use data CRC to replace but only if the data CRC is present for the segment
-      if (Long.parseLong(segmentMetadata.getDataCrc()) >= 0) {
+      if (segmentMetadata.getDataCrc() >= 0) {
         segmentZKMetadata.setUseDataCrc(true);
       }
 
@@ -165,8 +159,8 @@ public class SegmentZKMetadataUtils {
     SegmentVersion segmentVersion = segmentMetadata.getVersion();
     segmentZKMetadata.setIndexVersion(segmentVersion != null ? segmentVersion.toString() : null);
     segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
-    segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
-    segmentZKMetadata.setDataCrc(Long.parseLong(segmentMetadata.getDataCrc()));
+    segmentZKMetadata.setCrc(segmentMetadata.getCrc());
+    segmentZKMetadata.setDataCrc(segmentMetadata.getDataCrc());
     segmentZKMetadata.setDownloadUrl(downloadUrl);
     segmentZKMetadata.setCrypterName(crypterName);
     segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);

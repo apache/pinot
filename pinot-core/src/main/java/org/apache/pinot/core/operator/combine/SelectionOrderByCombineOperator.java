@@ -25,13 +25,12 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.combine.merger.SelectionOrderByResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
-/**
- * Combine operator for selection order-by queries.
- * <p>When the first order-by expression is an identifier (column), try to use
- * {@link org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator} first, which will
- * skip processing some segments based on the column min/max value. Otherwise fall back to the default combine
- * (process all segments).
- */
+/// Combine operator for selection order-by queries.
+///
+/// When the first order-by expression is an identifier (column), try to use
+/// [org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator] first, which will
+/// skip processing some segments based on the column min/max value. Otherwise fall back to the default combine
+/// (process all segments).
 @SuppressWarnings("rawtypes")
 public class SelectionOrderByCombineOperator extends BaseSingleBlockCombineOperator<SelectionResultsBlock> {
   private static final String EXPLAIN_NAME = "COMBINE_SELECT_ORDERBY";

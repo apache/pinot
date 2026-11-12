@@ -30,11 +30,12 @@ import org.apache.pinot.common.response.CursorResponse;
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
     "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "numSegmentsPrunedByValue", "numRemoteAccesses", "remoteAccessBytes", "numDirectRemoteAccesses",
+    "directRemoteAccessBytes", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tableQueries",
-    "groupsTrimmed",
+    "groupsTrimmed", "approximatedResult",
     // Fields specific to CursorResponse
     "offset", "numRows", "cursorResultWriteTimeMs", "cursorFetchTimeMs", "submissionTimeMs", "expirationTimeMs",
     "brokerHost", "brokerPort", "bytesWritten"
@@ -59,6 +60,7 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
     setNumRowsResultSet(response.getNumRowsResultSet());
     setExceptions(response.getExceptions());
     setGroupsTrimmed(response.isGroupsTrimmed());
+    setApproximatedResult(response.isApproximatedResult());
     setNumGroupsLimitReached(response.isNumGroupsLimitReached());
     setNumGroupsWarningLimitReached(response.isNumGroupsWarningLimitReached());
     setTimeUsedMs(response.getTimeUsedMs());
@@ -82,6 +84,10 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
     setNumSegmentsPrunedInvalid(response.getNumSegmentsPrunedInvalid());
     setNumSegmentsPrunedByLimit(response.getNumSegmentsPrunedByLimit());
     setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
+    setNumRemoteAccesses(response.getNumRemoteAccesses());
+    setRemoteAccessBytes(response.getRemoteAccessBytes());
+    setNumDirectRemoteAccesses(response.getNumDirectRemoteAccesses());
+    setDirectRemoteAccessBytes(response.getDirectRemoteAccessBytes());
     setBrokerReduceTimeMs(response.getBrokerReduceTimeMs());
     setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
     setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());

@@ -24,10 +24,8 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
-/**
- * Base class for controller admin clients backed by a shared {@link PinotAdminTransport}.
- * Implementations are thread-safe as long as the parent {@link PinotAdminClient} remains open.
- */
+/// Base class for controller admin clients backed by a shared [PinotAdminTransport].
+/// Implementations are thread-safe as long as the parent [PinotAdminClient] remains open.
 abstract class BaseServiceAdminClient {
   protected final PinotAdminTransport _transport;
   protected final String _controllerAddress;

@@ -46,6 +46,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.MutableRoaringBitmapUnion;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
@@ -65,9 +66,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Reader for json index.
- */
+/// Reader for json index.
 public class ImmutableJsonIndexReader implements JsonIndexReader {
   // NOTE: Use long type for _numDocs to comply with the RoaringBitmap APIs.
   private final long _numDocs;
@@ -158,9 +157,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     }
   }
 
-  /**
-   * Returns {@code true} if the given predicate type is exclusive for json_match calculation, {@code false} otherwise.
-   */
+  /// Returns `true` if the given predicate type is exclusive for json_match calculation, `false` otherwise.
   private boolean isExclusive(Predicate.Type predicateType) {
     return predicateType == Predicate.Type.IS_NULL;
   }
@@ -178,6 +175,40 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       return other;
     }
     return ImmutableRoaringBitmap.and(target, other);
+  }
+
+  /// Folds many posting lists into one result through a [MutableRoaringBitmapUnion], which unions lazily and
+  /// finalizes the bitmap once at [#get]. The zero- and single-input cases return the borrowed posting list without
+  /// copying, matching the ownership behavior of [#or].
+  private static class UnionAccumulator {
+    @Nullable
+    private ImmutableRoaringBitmap _first;
+    @Nullable
+    private MutableRoaringBitmapUnion _union;
+
+    void add(ImmutableRoaringBitmap docIds) {
+      if (docIds.isEmpty()) {
+        return;
+      }
+      if (_union != null) {
+        _union.add(docIds);
+      } else if (_first == null) {
+        _first = docIds;
+      } else {
+        // The borrowed first posting list is copied into the union, never adopted
+        _union = new MutableRoaringBitmapUnion();
+        _union.add(_first);
+        _union.add(docIds);
+        _first = null;
+      }
+    }
+
+    ImmutableRoaringBitmap get() {
+      if (_union != null) {
+        return _union.take();
+      }
+      return _first != null ? _first : EMPTY_BITMAP;
+    }
   }
 
   private static ImmutableRoaringBitmap or(ImmutableRoaringBitmap target, ImmutableRoaringBitmap other) {
@@ -212,9 +243,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return ImmutableRoaringBitmap.andNot(target, other);
   }
 
-  /**
-   * Returns the matching flattened doc ids for the given filter.
-   */
+  /// Returns the matching flattened doc ids for the given filter.
   private ImmutableRoaringBitmap getMatchingFlattenedDocIds(FilterContext filter) {
     switch (filter.getType()) {
       case AND: {
@@ -250,12 +279,11 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     }
   }
 
-  /**
-   * Returns the matching flattened doc ids for the given predicate.
-   * <p>Exclusive predicate is handled as the inclusive predicate, and the caller should flip the unflattened doc ids in
-   * order to get the correct exclusive predicate result.
-   * Note: returned bitmap could actually be mutable
-   */
+  /// Returns the matching flattened doc ids for the given predicate.
+  ///
+  /// Exclusive predicate is handled as the inclusive predicate, and the caller should flip the unflattened doc ids in
+  /// order to get the correct exclusive predicate result.
+  /// Note: returned bitmap could actually be mutable
   private ImmutableRoaringBitmap getMatchingFlattenedDocIds(Predicate predicate) {
     ExpressionContext lhs = predicate.getLhs();
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
@@ -327,17 +355,17 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         StringBuilder buffer = new StringBuilder(key);
         buffer.append(JsonIndexCreator.KEY_VALUE_SEPARATOR);
         int pos = buffer.length();
-        ImmutableRoaringBitmap result = EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         List<String> values = ((InPredicate) predicate).getValues();
         for (String value : values) {
           buffer.setLength(pos);
           buffer.append(value);
           int dictId = _dictionary.indexOf(buffer.toString());
           if (dictId >= 0) {
-            result = or(result, _invertedIndex.getDocIds(dictId));
+            result.add(_invertedIndex.getDocIds(dictId));
           }
         }
-        return result;
+        return result.get();
       }
 
       case NOT_IN: {
@@ -383,13 +411,13 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
               notInDictIds.add(dictId);
             }
           }
-          ImmutableRoaringBitmap result = EMPTY_BITMAP;
+          UnionAccumulator result = new UnionAccumulator();
           for (int dictId = dictIdRange[0]; dictId < dictIdRange[1]; dictId++) {
             if (!notInDictIds.contains(dictId)) {
-              result = or(result, _invertedIndex.getDocIds(dictId));
+              result.add(_invertedIndex.getDocIds(dictId));
             }
           }
-          return result;
+          return result.get();
         }
       }
 
@@ -411,7 +439,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         }
         Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
         Matcher matcher = pattern.matcher("");
-        ImmutableRoaringBitmap result = EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         byte[] dictBuffer = _dictionary.getBuffer();
         StringBuilder value = new StringBuilder();
         int valueStart = key.length() + 1;
@@ -420,10 +448,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           value.setLength(0);
           value.append(keyValue, valueStart, keyValue.length());
           if (matcher.reset(value).matches()) {
-            result = or(result, _invertedIndex.getDocIds(dictId));
+            result.add(_invertedIndex.getDocIds(dictId));
           }
         }
-        return result;
+        return result.get();
       }
 
       case RANGE: {
@@ -446,7 +474,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
         Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
         Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
-        ImmutableRoaringBitmap result = EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         byte[] dictBuffer = _dictionary.getBuffer();
         int valueStart = key.length() + 1;
         for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
@@ -459,10 +487,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
               upperUnbounded || (upperInclusive ? rangeDataType.compare(valueObj, upperBound) <= 0
                   : rangeDataType.compare(valueObj, upperBound) < 0);
           if (lowerCompareResult && upperCompareResult) {
-            result = or(result, _invertedIndex.getDocIds(dictId));
+            result.add(_invertedIndex.getDocIds(dictId));
           }
         }
-        return result;
+        return result.get();
       }
 
       default:
@@ -814,9 +842,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return values;
   }
 
-  /**
-   * For a JSON key path, returns an int array of the range [min, max] spanning all values for the JSON key path
-   */
+  /// For a JSON key path, returns an int array of the range \[min, max\] spanning all values for the JSON key path
   private int[] getDictIdRangeForKey(String key) {
     // json_index uses \0 as the separator (or \u0000 in unicode)
     // therefore, use the unicode char \u0001 to get the range of dict entries that have this prefix
@@ -837,12 +863,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return new int[]{minDictId, maxDictId};
   }
 
-  /**
-   *  If key doesn't contain the array index, return <original key, null bitmap>
-   *  Elif the key, i.e. the json path provided by user doesn't match any data, return <null, empty bitmap>
-   *  Else, return the json path that is generated by replacing array index with . on the original key
-   *  and the associated flattenDocId bitmap
-   */
+  /// If key doesn't contain the array index, return <original key, null bitmap>
+  /// Elif the key, i.e. the json path provided by user doesn't match any data, return <null, empty bitmap>
+  /// Else, return the json path that is generated by replacing array index with . on the original key
+  /// and the associated flattenDocId bitmap
   private Pair<String, ImmutableRoaringBitmap> getKeyAndFlattenedDocIds(String key) {
     ImmutableRoaringBitmap matchingDocIds = null;
 

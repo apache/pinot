@@ -57,25 +57,24 @@ import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/**
- * JMH Benchmark for ProtoBufRecordExtractor field descriptor caching optimization.
- *
- * <p>This benchmark measures the performance improvement from:
- * <ul>
- *   <li>Field descriptor caching (eliminates repeated findFieldByName() calls)</li>
- *   <li>Direct dispatch off {@code FieldDescriptor} (no per-value wrapper allocation)</li>
- * </ul>
- *
- * <p>Run with:
- * <pre>
- * java -jar pinot-perf/target/benchmarks.jar BenchmarkProtoBufRecordExtractor
- * </pre>
- *
- * <p>Or via generated script:
- * <pre>
- * ./pinot-perf/target/pinot-perf-pkg/bin/pinot-BenchmarkProtoBufRecordExtractor.sh
- * </pre>
- */
+/// JMH Benchmark for ProtoBufRecordExtractor field descriptor caching optimization.
+///
+/// This benchmark measures the performance improvement from:
+///
+/// - Field descriptor caching (eliminates repeated findFieldByName() calls)
+/// - Direct dispatch off `FieldDescriptor` (no per-value wrapper allocation)
+///
+/// Run with:
+///
+/// ```
+/// java -jar pinot-perf/target/benchmarks.jar BenchmarkProtoBufRecordExtractor
+/// ```
+///
+/// Or via generated script:
+///
+/// ```
+/// ./pinot-perf/target/pinot-perf-pkg/bin/pinot-BenchmarkProtoBufRecordExtractor.sh
+/// ```
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Fork(1)
@@ -272,10 +271,8 @@ public class BenchmarkProtoBufRecordExtractor {
     return message;
   }
 
-  /**
-   * Benchmark: Full decode path (parse + extract)
-   * Measures complete ProtoBufMessageDecoder.decode() including protobuf parsing and field extraction.
-   */
+  /// Benchmark: Full decode path (parse + extract)
+  /// Measures complete ProtoBufMessageDecoder.decode() including protobuf parsing and field extraction.
   @Benchmark
   public GenericRow decodeFullPath(Blackhole blackhole) {
     byte[] payload = getNextPayload();
@@ -287,10 +284,8 @@ public class BenchmarkProtoBufRecordExtractor {
     return result;
   }
 
-  /**
-   * Benchmark: Extraction only (pre-parsed messages)
-   * Isolates ProtoBufRecordExtractor.extract() performance - this is where caching helps most.
-   */
+  /// Benchmark: Extraction only (pre-parsed messages)
+  /// Isolates ProtoBufRecordExtractor.extract() performance - this is where caching helps most.
   @Benchmark
   public GenericRow extractOnly(Blackhole blackhole) {
     Message message = getNextParsedMessage();
@@ -302,10 +297,8 @@ public class BenchmarkProtoBufRecordExtractor {
     return result;
   }
 
-  /**
-   * Benchmark: Extraction without caching (simulates old behavior)
-   * Creates a new extractor for each extraction to show the benefit of caching.
-   */
+  /// Benchmark: Extraction without caching (simulates old behavior)
+  /// Creates a new extractor for each extraction to show the benefit of caching.
   @Benchmark
   public GenericRow extractWithoutCaching(Blackhole blackhole) {
     Message message = getNextParsedMessage();

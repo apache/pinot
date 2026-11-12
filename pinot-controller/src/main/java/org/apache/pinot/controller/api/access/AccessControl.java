@@ -31,56 +31,61 @@ public interface AccessControl extends FineGrainedAccessControl {
   String WORKFLOW_NONE = "NONE";
   String WORKFLOW_BASIC = "BASIC";
 
-  /**
-   * Return whether the client has permission to the given table
-   *
-   * @param tableName name of the table to be accessed
-   * @param accessType type of the access
-   * @param httpHeaders HTTP headers containing requester identity
-   * @param endpointUrl the request url for which this access control is called
-   * @return whether the client has permission
-   */
+  /// Return whether the client has permission to the given table
+  ///
+  /// A `null` table name means the endpoint named no table — either it declares no table parameter, or the request
+  /// omitted an optional one — so the request addresses the cluster rather than a table. Implementations must apply
+  /// their cluster policy in that case; returning `true` for a `null` table name grants every cluster endpoint.
+  /// Note that a caller-supplied query parameter only names the table when the endpoint declares it, so a table name
+  /// appended to a cluster endpoint arrives here as `null`.
+  ///
+  /// @param tableName name of the table to be accessed, or `null` when the request names no table
+  /// @param accessType type of the access
+  /// @param httpHeaders HTTP headers containing requester identity
+  /// @param endpointUrl the request url for which this access control is called
+  /// @return whether the client has permission
   default boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
       String endpointUrl) {
     return true;
   }
 
-  /**
-   * Return whether the client has permission to access the endpoints with are not table level
-   *
-   * @param accessType type of the access
-   * @param httpHeaders HTTP headers
-   * @param endpointUrl the request url for which this access control is called
-   * @return whether the client has permission
-   */
+  /// Return whether the client has permission to access the endpoints with are not table level
+  ///
+  /// This is the cluster-wide gate. The request named no table, so it may reach state belonging to any table: grant it
+  /// only to a principal whose authority spans the whole cluster, never to one scoped to a subset of tables. Granting
+  /// it on a narrower scope is what made table-scoped users able to drive cluster endpoints in apache/pinot#14595.
+  ///
+  /// This overload is the one to implement the cluster policy in. Its default delegates to
+  /// [#hasAccess(String, AccessType, HttpHeaders, String)] with a `null` table name, so an implementation that also
+  /// routes a `null` table name back here must override both overloads — overriding only one leaves the two defaults
+  /// delegating to each other.
+  ///
+  /// @param accessType type of the access
+  /// @param httpHeaders HTTP headers
+  /// @param endpointUrl the request url for which this access control is called
+  /// @return whether the client has permission
   default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
     return hasAccess(null, accessType, httpHeaders, endpointUrl);
   }
 
-  /**
-   * Determine whether authentication is required for annotated (controller) endpoints only
-   *
-   * @return {@code true} if annotated methods are protected only, {@code false} otherwise
-   */
+  /// Determine whether authentication is required for annotated (controller) endpoints only
+  ///
+  /// @return `true` if annotated methods are protected only, `false` otherwise
   default boolean protectAnnotatedOnly() {
     return true;
   }
 
-  /**
-   * Return workflow info for authenticating users. Not all workflows may be supported by the pinot UI implementation.
-   *
-   * @return workflow info for user authentication
-   */
+  /// Return workflow info for authenticating users. Not all workflows may be supported by the pinot UI implementation.
+  ///
+  /// @return workflow info for user authentication
   default AuthWorkflowInfo getAuthWorkflowInfo() {
     return new AuthWorkflowInfo(WORKFLOW_NONE);
   }
 
-  /**
-   * Container for authentication workflow info for the Pinot UI. May be extended by implementations.
-   *
-   * Auth workflow info hold any configuration necessary to execute a UI workflow. We currently foresee supporting NONE
-   * (auth disabled) and BASIC (basic auth with username and password)
-   */
+  /// Container for authentication workflow info for the Pinot UI. May be extended by implementations.
+  ///
+  /// Auth workflow info hold any configuration necessary to execute a UI workflow. We currently foresee supporting NONE
+  /// (auth disabled) and BASIC (basic auth with username and password)
   class AuthWorkflowInfo {
     String _workflow;
 

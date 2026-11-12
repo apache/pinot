@@ -31,13 +31,11 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * End-to-end integration tests for polymorphic arithmetic scalar functions over a custom Pinot cluster.
- *
- * <p>This test validates broker/server query execution and result typing for arithmetic scalar functions that now
- * support multiple numeric types, including BIG_DECIMAL. Test methods mutate query-engine mode and are not
- * thread-safe.
- */
+/// End-to-end integration tests for polymorphic arithmetic scalar functions over a custom Pinot cluster.
+///
+/// This test validates broker/server query execution and result typing for arithmetic scalar functions that now
+/// support multiple numeric types, including BIG_DECIMAL. Test methods mutate query-engine mode and are not
+/// thread-safe.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class ArithmeticFunctionsIntegrationTest extends CustomDataQueryClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "ArithmeticFunctionsIntegrationTest";

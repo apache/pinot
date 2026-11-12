@@ -47,10 +47,8 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.testng.Assert.*;
 
-/**
- * Unit test for MultipleTreesBuilder.close() method to verify exception handling
- * when cleanup operations fail.
- */
+/// Unit test for MultipleTreesBuilder.close() method to verify exception handling
+/// when cleanup operations fail.
 public class MultipleTreesBuilderCloseTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MultipleTreesBuilderCloseTest");
   private static final File INDEX_DIR = new File(TEMP_DIR, "testSegment");
@@ -145,7 +143,7 @@ public class MultipleTreesBuilderCloseTest {
     );
 
     // Load the segment to get metadata
-    File segmentDir = INDEX_DIR.listFiles()[0];
+    File segmentDir = INDEX_DIR.listFiles(File::isDirectory)[0];
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
     try {
       return StarTreeBuilderUtils.generateBuilderConfigs(
@@ -170,7 +168,7 @@ public class MultipleTreesBuilderCloseTest {
     );
 
     // Load the segment to get metadata
-    File segmentDir = INDEX_DIR.listFiles()[0];
+    File segmentDir = INDEX_DIR.listFiles(File::isDirectory)[0];
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
     try {
       return StarTreeBuilderUtils.generateBuilderConfigs(

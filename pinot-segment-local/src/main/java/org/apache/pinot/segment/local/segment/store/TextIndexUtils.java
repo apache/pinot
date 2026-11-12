@@ -19,9 +19,11 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +36,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.MultiDocValues;
+import org.apache.lucene.index.NumericDocValues;
+import org.apache.lucene.index.StoredFieldVisitor;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -42,7 +50,10 @@ import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyz
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -57,10 +68,8 @@ public class TextIndexUtils {
   private TextIndexUtils() {
   }
 
-  /**
-   * Configuration change listener for Lucene max clause count.
-   * This allows updating the max clause count dynamically without server restart.
-   */
+  /// Configuration change listener for Lucene max clause count.
+  /// This allows updating the max clause count dynamically without server restart.
   public static class LuceneMaxClauseCountConfigChangeListener implements PinotClusterConfigChangeListener {
     @Override
     public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
@@ -83,6 +92,68 @@ public class TextIndexUtils {
         IndexSearcher.setMaxClauseCount(defaultMaxClauseCount);
         LOGGER.info("Reset Lucene max clause count to default: {} from cluster config", defaultMaxClauseCount);
       }
+    }
+  }
+
+  /// Reads the actual Pinot ids after Lucene merges and sorting, optionally remapping mutable ids during conversion.
+  /// Doc values avoid stored-field decompression. Mutable indexes contain only the stored field; older immutable
+  /// indexes and documents without doc values also use the per-document stored-field fallback.
+  /// Returns whether the final mapping is the identity mapping.
+  public static boolean fillDocIdMapping(IndexReader indexReader, PinotDataBuffer buffer, int numDocs,
+      @Nullable int[] mutableToImmutableDocIdMap)
+      throws IOException {
+    NumericDocValues pinotDocIdValues =
+        MultiDocValues.getNumericValues(indexReader, LuceneTextIndexCreator.PINOT_DOC_ID_DOC_VALUES_FIELD_NAME);
+    if (pinotDocIdValues == null) {
+      // A TEXT column named PinotDocID uses the alternate numeric field to avoid a field-schema collision.
+      pinotDocIdValues =
+          MultiDocValues.getNumericValues(indexReader, LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME);
+    }
+    PinotDocIdVisitor visitor = new PinotDocIdVisitor();
+    StoredFields storedFields = null;
+    boolean isIdentityMapping = true;
+    for (int luceneDocId = 0; luceneDocId < numDocs; luceneDocId++) {
+      int pinotDocId;
+      if (pinotDocIdValues != null && pinotDocIdValues.advanceExact(luceneDocId)) {
+        pinotDocId = Math.toIntExact(pinotDocIdValues.longValue());
+      } else {
+        if (storedFields == null) {
+          storedFields = indexReader.storedFields();
+        }
+        visitor._pinotDocId = Integer.MIN_VALUE;
+        storedFields.document(luceneDocId, visitor);
+        pinotDocId = visitor._pinotDocId;
+        if (pinotDocId == Integer.MIN_VALUE) {
+          throw new IOException("Missing Pinot document id for Lucene document: " + luceneDocId);
+        }
+      }
+      if (mutableToImmutableDocIdMap != null) {
+        // Conversion can reorder Pinot rows independently of Lucene's own document order.
+        pinotDocId = mutableToImmutableDocIdMap[pinotDocId];
+      }
+      isIdentityMapping &= luceneDocId == pinotDocId;
+      buffer.putInt((long) luceneDocId * Integer.BYTES, pinotDocId);
+    }
+    return isIdentityMapping;
+  }
+
+  /// Visits only the stored Pinot document id. Each mapping operation owns its visitor.
+  private static class PinotDocIdVisitor extends StoredFieldVisitor {
+    private int _pinotDocId;
+
+    @Override
+    public Status needsField(FieldInfo fieldInfo) {
+      return LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME.equals(fieldInfo.name) ? Status.YES : Status.NO;
+    }
+
+    @Override
+    public void intField(FieldInfo fieldInfo, int value) {
+      _pinotDocId = value;
+    }
+
+    @Override
+    public void stringField(FieldInfo fieldInfo, String value) {
+      _pinotDocId = Integer.parseInt(value);
     }
   }
 
@@ -113,6 +184,75 @@ public class TextIndexUtils {
         || new File(segDir, column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists();
     //@formatter:on
+  }
+
+  /// Returns a v3 packed text entry, or null only when the store reports that the entry is absent.
+  /// Other store failures propagate. The returned buffer remains owned by the segment directory.
+  @Nullable
+  public static PinotDataBuffer getConsolidatedTextEntry(SegmentDirectory.Reader reader, String column)
+      throws IOException {
+    try {
+      return reader.getIndexFor(column, StandardIndexes.text());
+    } catch (RuntimeException e) {
+      String message = e.getMessage();
+      if (message != null && message.startsWith(SingleFileIndexDirectory.INDEX_NOT_FOUND_MESSAGE_PREFIX)) {
+        return null;
+      }
+      throw e;
+    }
+  }
+
+  /// Bulk form of [#hasTextIndex]: which of `columns` have a Lucene text index in `segDir`.
+  ///
+  /// Prefer this over calling [#hasTextIndex] in a loop over a segment's columns. It lists the
+  /// directory once rather than performing `columns × extensions` existence probes. Finding
+  /// `<column><extension>` in the listing is equivalent to that path existing, so the answer is the
+  /// same.
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithTextIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
+    Set<String> entries = listEntryNames(segDir);
+    Set<String> columnsWithIndex = new HashSet<>();
+    for (String column : columns) {
+      if (entries.contains(column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION)
+          || entries.contains(column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION)) {
+        columnsWithIndex.add(column);
+      }
+    }
+    return columnsWithIndex;
+  }
+
+  /// Which of `columns` still have a deprecated native text index file in `segDir`.
+  ///
+  /// Listing-based for the same reason as [#getColumnsWithTextIndex]: the caller asks this for every
+  /// column of a segment on every reload check, including the overwhelmingly common case where no
+  /// column has ever had a native text index.
+  ///
+  /// A null `segDir` means the segment is not backed by a local directory and therefore not supports sidecar index.
+  public static Set<String> getColumnsWithLegacyNativeTextIndex(@Nullable File segDir, Collection<String> columns) {
+    if (segDir == null) {
+      return Set.of();
+    }
+    Set<String> entries = listEntryNames(segDir);
+    Set<String> columnsWithIndex = new HashSet<>();
+    for (String column : columns) {
+      if (entries.contains(column + Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION)) {
+        columnsWithIndex.add(column);
+      }
+    }
+    return columnsWithIndex;
+  }
+
+  /// Names of the entries directly inside `dir`, files and directories alike (a Lucene text index is
+  /// a directory), or empty when it cannot be listed.
+  private static Set<String> listEntryNames(File dir) {
+    String[] names = dir.list();
+    return names == null ? Set.of() : new HashSet<>(Arrays.asList(names));
   }
 
   public static List<String> extractStopWordsInclude(String colName,
@@ -146,14 +286,13 @@ public class TextIndexUtils {
         .collect(Collectors.toList());
   }
 
-  /**
-   * Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text config.
-   * If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
-   *
-   * @param config Pinot TextIndexConfig to fetch the configuration from
-   * @return Lucene Analyzer class instance
-   * @throws ReflectiveOperationException if instantiation via reflection fails
-   */
+  /// Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text
+  /// config.
+  /// If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
+  ///
+  /// @param config Pinot TextIndexConfig to fetch the configuration from
+  /// @return Lucene Analyzer class instance
+  /// @throws ReflectiveOperationException if instantiation via reflection fails
   public static Analyzer getAnalyzer(TextIndexConfig config)
       throws ReflectiveOperationException {
     String analyzerClassName = config.getLuceneAnalyzerClass();
@@ -173,15 +312,14 @@ public class TextIndexUtils {
     return getCustomAnalyzer(analyzerClassArgs, analyzerClassArgTypes, analyzerClassName);
   }
 
-  /**
-   * Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text config.
-   * If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
-   *
-   * @param config Pinot TextIndexConfig to fetch the configuration from
-   * @param override column-specific configuration that overrides the shared configuration
-   * @return Lucene Analyzer class instance
-   * @throws ReflectiveOperationException if instantiation via reflection fails
-   */
+  /// Retrieves the Lucene Analyzer class instance via reflection from the fully qualified class name of the text
+  /// config.
+  /// If the class name is not specified in the config, the default StandardAnalyzer is instantiated.
+  ///
+  /// @param config Pinot TextIndexConfig to fetch the configuration from
+  /// @param override column-specific configuration that overrides the shared configuration
+  /// @return Lucene Analyzer class instance
+  /// @throws ReflectiveOperationException if instantiation via reflection fails
   public static Analyzer getAnalyzer(TextIndexConfig config, MultiColumnLuceneTextIndexReader.ColumnConfig override)
       throws ReflectiveOperationException {
     String luceneAnalyzerClassName = firstNotNull(override.getLuceneAnalyzerClass(), config.getLuceneAnalyzerClass());
@@ -249,12 +387,10 @@ public class TextIndexUtils {
     return v2;
   }
 
-  /**
-   * Parse the Java value type specified in the type string
-   * @param valueTypeString FQCN of the value type class or the name of the primitive value type
-   * @return Class object of the value type
-   * @throws ClassNotFoundException when the value type is not supported
-   */
+  /// Parse the Java value type specified in the type string
+  /// @param valueTypeString FQCN of the value type class or the name of the primitive value type
+  /// @return Class object of the value type
+  /// @throws ClassNotFoundException when the value type is not supported
   public static Class<?> parseSupportedTypes(String valueTypeString)
       throws ClassNotFoundException {
     try {
@@ -285,13 +421,11 @@ public class TextIndexUtils {
     }
   }
 
-  /**
-   * Attempt to coerce string into supported value type
-   * @param stringValue string representation of the value
-   * @param clazz of the value
-   * @return class object of the value, auto-boxed if it is a primitive type
-   * @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
-   */
+  /// Attempt to coerce string into supported value type
+  /// @param stringValue string representation of the value
+  /// @param clazz of the value
+  /// @return class object of the value, auto-boxed if it is a primitive type
+  /// @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
   public static Object parseSupportedTypeValues(String stringValue, Class<?> clazz)
       throws ReflectiveOperationException {
     try {
@@ -375,13 +509,11 @@ public class TextIndexUtils {
     return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
   }
 
-  /**
-   * Writes the config to the properties file. Configs saved include luceneAnalyzerClass, luceneAnalyzerClassArgs,
-   * luceneAnalyzerClassArgTypes, and luceneQueryParserClass.
-   *
-   * @param indexDir directory where the properties file is saved
-   * @param config config to write to the properties file
-   */
+  /// Writes the config to the properties file. Configs saved include luceneAnalyzerClass, luceneAnalyzerClassArgs,
+  /// luceneAnalyzerClassArgTypes, and luceneQueryParserClass.
+  ///
+  /// @param indexDir directory where the properties file is saved
+  /// @param config config to write to the properties file
   public static void writeConfigToPropertiesFile(File indexDir, TextIndexConfig config) {
     PropertiesConfiguration properties = new PropertiesConfiguration();
     List<String> escapedLuceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs()
@@ -403,15 +535,13 @@ public class TextIndexUtils {
     CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
   }
 
-  /**
-   * Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
-   * The configs overwritten include luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes,
-   * and luceneQueryParserClass.
-   *
-   * @param file properties file to read from
-   * @param config config to update
-   * @return updated TextIndexConfig
-   */
+  /// Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
+  /// The configs overwritten include luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes,
+  /// and luceneQueryParserClass.
+  ///
+  /// @param file properties file to read from
+  /// @param config config to update
+  /// @return updated TextIndexConfig
   public static TextIndexConfig getUpdatedConfigFromPropertiesFile(File file, TextIndexConfig config)
       throws ConfigurationException {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(file);

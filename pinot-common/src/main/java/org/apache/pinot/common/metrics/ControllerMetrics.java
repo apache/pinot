@@ -25,9 +25,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
 
 
-/**
- * Metrics for the controller.
- */
+/// Metrics for the controller.
 public class ControllerMetrics
     extends AbstractMetrics<AbstractMetrics.QueryPhase, ControllerMeter, ControllerGauge, ControllerTimer> {
   private static final ControllerMetrics NOOP = new ControllerMetrics(new NoopPinotMetricsRegistry());

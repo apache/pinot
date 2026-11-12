@@ -117,11 +117,9 @@ public class RecordReaderSampleDataTest {
     }
   }
 
-  /**
-   * Tests that record extractor is able to handle missing fields correctly (incoming and outgoing are missing from
-   * data)
-   * @throws Exception
-   */
+  /// Tests that record extractor is able to handle missing fields correctly (incoming and outgoing are missing from
+  /// data)
+  /// @throws Exception
   @Test
   public void testRecordExtractorAbsentFields()
       throws Exception {
@@ -156,10 +154,8 @@ public class RecordReaderSampleDataTest {
     }
   }
 
-  /**
-   * True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases
-   * (Integer Long etc)
-   */
+  /// True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases
+  /// (Integer Long etc)
   private void checkEqual(GenericRow row1, GenericRow row2) {
     for (Map.Entry<String, Object> entry : row1.getFieldToValueMap().entrySet()) {
       if (entry.getValue() == null) {
@@ -170,11 +166,9 @@ public class RecordReaderSampleDataTest {
     }
   }
 
-  /**
-   * True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases
-   * (Integer Long etc)
-   * Empty string gets treated as null value in CSV, because we no longer have data types
-   */
+  /// True data types are not achieved until DataType transformer. Hence, pure equality might not work in most cases
+  /// (Integer Long etc)
+  /// Empty string gets treated as null value in CSV, because we no longer have data types
   private void checkEqualCSV(GenericRow row, GenericRow csvRecord) {
     for (Map.Entry<String, Object> entry : row.getFieldToValueMap().entrySet()) {
       Object row1Value = entry.getValue();

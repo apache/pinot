@@ -25,49 +25,42 @@ import java.math.BigDecimal;
 import javax.annotation.Nullable;
 
 
-/**
- * The interface used to create indexes.
- *
- * The lifecycle for an IndexCreator is:
- * <ol>
- *   <li>To be created.</li>
- *   <li>Zero or more calls to either {@link #add(Object, int)} or {@link #add(Object[], int[])} (but not mix them).
- *   Calls to add methods must be done in document id order, starting from the first document id.</li>
- *   <li>A call to {@link #seal()}</li>
- *   <li>A call to {@link #close()}</li>
- * </ol>
- */
+/// The interface used to create indexes.
+///
+/// The lifecycle for an IndexCreator is:
+///
+/// 1. To be created.
+/// 2. Zero or more calls to either [#add(Object, int)] or [#add(Object[], int[])] (but not mix them).
+///    Calls to add methods must be done in document id order, starting from the first document id.
+/// 3. A call to [#seal()]
+/// 4. A call to [#close()]
 public interface IndexCreator extends Closeable {
-  /**
-   * Adds the given single value cell to the index.
-   *
-   * Rows will be added in docId order, starting with the one with docId 0.
-   *
-   * @param value The nonnull value of the cell. In case the cell was actually null, a default value is received instead
-   * @param dictId An optional dictionary value of the cell. If there is no dictionary, -1 is received
-   */
+  /// Adds the given single value cell to the index.
+  ///
+  /// Rows will be added in docId order, starting with the one with docId 0.
+  ///
+  /// @param value The nonnull value of the cell. In case the cell was actually null, a default value is received
+  ///              instead
+  /// @param dictId An optional dictionary value of the cell. If there is no dictionary, -1 is received
   void add(Object value, int dictId)
       throws IOException;
 
-  /**
-   * Adds the given multi value cell to the index
-   *
-   * Rows will be added in docId order, starting with the one with docId 0.
-   *
-   * @param values The nonnull value of the cell. In case the cell was actually null, an empty array is received instead
-   * @param dictIds An optional array of dictionary values. If there is no dictionary, null is received.
-   */
+  /// Adds the given multi value cell to the index
+  ///
+  /// Rows will be added in docId order, starting with the one with docId 0.
+  ///
+  /// @param values The nonnull value of the cell. In case the cell was actually null, an empty array is received
+  ///               instead
+  /// @param dictIds An optional array of dictionary values. If there is no dictionary, null is received.
   void add(Object[] values, @Nullable int[] dictIds)
       throws IOException;
 
   void seal()
       throws IOException;
 
-  /**
-   * Primitive type additions for columnar processing optimization.
-   * These methods avoid boxing overhead when iterating over columnar data.
-   * Default implementation boxes the value for backward compatibility.
-   */
+  /// Primitive type additions for columnar processing optimization.
+  /// These methods avoid boxing overhead when iterating over columnar data.
+  /// Default implementation boxes the value for backward compatibility.
 
   default void addInt(int value, int dictId)
       throws IOException {

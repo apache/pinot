@@ -18,77 +18,61 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-/**
- * Enumerates the supported vector index backend types.
- *
- * <p>Each backend type corresponds to a different approximate nearest-neighbor (ANN) algorithm
- * with its own configuration properties, build characteristics, and query behavior.</p>
- *
- * <ul>
- *   <li>{@link #HNSW} - Hierarchical Navigable Small World graph (Lucene-based). Supports both
- *       mutable and immutable segments.</li>
- *   <li>{@link #IVF_FLAT} - Inverted File with flat (uncompressed) vectors. Supported for
- *       immutable/offline segments only in phase 1.</li>
- *   <li>{@link #IVF_PQ} - Inverted File with product-quantized vectors. Supported for
- *       immutable/offline segments only in phase 2.</li>
- *   <li>{@link #IVF_ON_DISK} - Inverted File with disk-backed vectors (FileChannel random reads).</li>
- * </ul>
- */
+/// Enumerates the supported vector index backend types.
+///
+/// Each backend type corresponds to a different approximate nearest-neighbor (ANN) algorithm
+/// with its own configuration properties, build characteristics, and query behavior.
+///
+/// - [#HNSW] - Hierarchical Navigable Small World graph (Lucene-based). Supports both
+///      mutable and immutable segments.
+/// - [#IVF_FLAT] - Inverted File with flat (uncompressed) vectors. Supported for
+///      immutable/offline segments only in phase 1.
+/// - [#IVF_PQ] - Inverted File with product-quantized vectors. Supported for
+///      immutable/offline segments only in phase 2.
+/// - [#IVF_ON_DISK] - Inverted File with disk-backed vectors (FileChannel random reads).
 public enum VectorBackendType {
 
-  /**
-   * Hierarchical Navigable Small World graph index, backed by Apache Lucene.
-   *
-   * <p>Backend-specific properties:</p>
-   * <ul>
-   *   <li>{@code maxCon} - maximum connections per node (default: 16)</li>
-   *   <li>{@code beamWidth} - beam width during construction (default: 100)</li>
-   *   <li>{@code maxDimensions} - maximum vector dimensions</li>
-   *   <li>{@code maxBufferSizeMB} - Lucene RAM buffer size</li>
-   *   <li>{@code useCompoundFile} - whether to use compound file format</li>
-   *   <li>{@code mode} - Lucene codec mode (BEST_SPEED or BEST_COMPRESSION)</li>
-   * </ul>
-   */
+  /// Hierarchical Navigable Small World graph index, backed by Apache Lucene.
+  ///
+  /// Backend-specific properties:
+  ///
+  /// - `maxCon` - maximum connections per node (default: 16)
+  /// - `beamWidth` - beam width during construction (default: 100)
+  /// - `maxDimensions` - maximum vector dimensions
+  /// - `maxBufferSizeMB` - Lucene RAM buffer size
+  /// - `useCompoundFile` - whether to use compound file format
+  /// - `mode` - Lucene codec mode (BEST_SPEED or BEST_COMPRESSION)
   HNSW("Hierarchical Navigable Small World graph (Lucene-based)"),
 
-  /**
-   * Inverted File with flat (uncompressed) vectors.
-   *
-   * <p>Backend-specific properties:</p>
-   * <ul>
-   *   <li>{@code nlist} - number of Voronoi cells/clusters (default: 128)</li>
-   *   <li>{@code trainSampleSize} - number of vectors sampled for training (default: max(nlist * 40, 10000))</li>
-   *   <li>{@code trainingSeed} - random seed for reproducible training</li>
-   *   <li>{@code minRowsForIndex} - minimum rows required to build the index</li>
-   * </ul>
-   */
+  /// Inverted File with flat (uncompressed) vectors.
+  ///
+  /// Backend-specific properties:
+  ///
+  /// - `nlist` - number of Voronoi cells/clusters (default: 128)
+  /// - `trainSampleSize` - number of vectors sampled for training (default: max(nlist \* 40, 10000))
+  /// - `trainingSeed` - random seed for reproducible training
+  /// - `minRowsForIndex` - minimum rows required to build the index
   IVF_FLAT("Inverted File with flat vectors"),
 
-  /**
-   * Inverted File with product-quantized vectors.
-   *
-   * <p>Backend-specific properties:</p>
-   * <ul>
-   *   <li>{@code nlist} - number of Voronoi cells/clusters</li>
-   *   <li>{@code pqM} - number of PQ sub-quantizers</li>
-   *   <li>{@code pqNbits} - bits per PQ codebook entry</li>
-   *   <li>{@code trainSampleSize} - number of vectors sampled for training</li>
-   *   <li>{@code trainingSeed} - random seed for reproducible training</li>
-   * </ul>
-   */
+  /// Inverted File with product-quantized vectors.
+  ///
+  /// Backend-specific properties:
+  ///
+  /// - `nlist` - number of Voronoi cells/clusters
+  /// - `pqM` - number of PQ sub-quantizers
+  /// - `pqNbits` - bits per PQ codebook entry
+  /// - `trainSampleSize` - number of vectors sampled for training
+  /// - `trainingSeed` - random seed for reproducible training
   IVF_PQ("Inverted File with product-quantized vectors"),
 
-  /**
-   * Inverted File with disk-backed vectors (FileChannel random-access).
-   *
-   * <p>Backend-specific properties:</p>
-   * <ul>
-   *   <li>{@code nlist} - number of Voronoi cells/clusters</li>
-   *   <li>{@code trainSampleSize} - number of vectors sampled for training</li>
-   *   <li>{@code trainingSeed} - random seed for reproducible training</li>
-   *   <li>{@code minRowsForIndex} - minimum rows required to build the index</li>
-   * </ul>
-   */
+  /// Inverted File with disk-backed vectors (FileChannel random-access).
+  ///
+  /// Backend-specific properties:
+  ///
+  /// - `nlist` - number of Voronoi cells/clusters
+  /// - `trainSampleSize` - number of vectors sampled for training
+  /// - `trainingSeed` - random seed for reproducible training
+  /// - `minRowsForIndex` - minimum rows required to build the index
   IVF_ON_DISK("Inverted File with disk-backed vectors (FileChannel)");
 
   private final String _description;
@@ -103,10 +87,8 @@ public enum VectorBackendType {
     return _description;
   }
 
-  /**
-   * Returns the query-time capabilities of this backend.
-   * Used by the runtime to select execution modes without backend-specific branching.
-   */
+  /// Returns the query-time capabilities of this backend.
+  /// Used by the runtime to select execution modes without backend-specific branching.
   public VectorBackendCapabilities getCapabilities() {
     return _capabilities;
   }
@@ -167,13 +149,11 @@ public enum VectorBackendType {
     return this == IVF_PQ;
   }
 
-  /**
-   * Parses a backend type string in a case-insensitive manner.
-   *
-   * @param value the string to parse (e.g., "HNSW", "hnsw", "IVF_FLAT")
-   * @return the corresponding {@link VectorBackendType}
-   * @throws IllegalArgumentException if the value does not match any known backend type
-   */
+  /// Parses a backend type string in a case-insensitive manner.
+  ///
+  /// @param value the string to parse (e.g., "HNSW", "hnsw", "IVF_FLAT")
+  /// @return the corresponding [VectorBackendType]
+  /// @throws IllegalArgumentException if the value does not match any known backend type
   public static VectorBackendType fromString(String value) {
     if (value == null) {
       throw new IllegalArgumentException("Vector backend type must not be null");
@@ -186,12 +166,10 @@ public enum VectorBackendType {
     }
   }
 
-  /**
-   * Returns true if the given string is a recognized backend type (case-insensitive).
-   *
-   * @param value the string to check
-   * @return true if recognized, false otherwise
-   */
+  /// Returns true if the given string is a recognized backend type (case-insensitive).
+  ///
+  /// @param value the string to check
+  /// @return true if recognized, false otherwise
   public static boolean isValid(String value) {
     if (value == null) {
       return false;

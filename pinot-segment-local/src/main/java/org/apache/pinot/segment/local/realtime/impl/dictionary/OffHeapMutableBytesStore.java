@@ -26,27 +26,23 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 
 
-/**
- * Off-heap variable length mutable bytes store.
- * <p>The class is thread-safe for single writer and multiple readers.
- * <p>There are two sets of buffers allocated for the store:
- * <ul>
- *   <li>
- *     Offset buffer: stores the value end offsets. The end offset here is the global offset for all the value buffers
- *     instead of the offset inside one value buffer (e.g. offset 9 in the 5th value buffer will have global offset of
- *     4 * VALUE_BUFFER_SIZE + 9). New offset buffer is allocated when the previous buffer is filled up. The first entry
- *     of each offset buffer stores the end offset of the last value (or 0 for the first offset buffer) so that we can
- *     always get the previous and current value's end offset from the same buffer. Note that we use int type for the
- *     offset, so each bytes store can hold at most 2^31 = 2GB total size of values.
- *   </li>
- *   <li>
- *     Value buffer: stores the values. For performance concern, to avoid reading one value from multiple buffers, each
- *     value is stored in one value buffer (no cross-buffer value allowed), and has a size limit of the
- *     VALUE_BUFFER_SIZE (1MB). New value buffer is allocated when the previous buffer cannot hold the new added value.
- *   </li>
- * </ul>
- * <p>The maximum capacity for the bytes store is 2^24 ~= 17M values and 2^31 = 2GB total size of values.
- */
+/// Off-heap variable length mutable bytes store.
+///
+/// The class is thread-safe for single writer and multiple readers.
+///
+/// There are two sets of buffers allocated for the store:
+///
+/// - Offset buffer: stores the value end offsets. The end offset here is the global offset for all the value buffers
+///   instead of the offset inside one value buffer (e.g. offset 9 in the 5th value buffer will have global offset of
+///   4 \* VALUE_BUFFER_SIZE + 9). New offset buffer is allocated when the previous buffer is filled up. The first
+///   entry of each offset buffer stores the end offset of the last value (or 0 for the first offset buffer) so that
+///   we can always get the previous and current value's end offset from the same buffer. Note that we use int type
+///   for the offset, so each bytes store can hold at most 2^31 = 2GB total size of values.
+/// - Value buffer: stores the values. For performance concern, to avoid reading one value from multiple buffers, each
+///   value is stored in one value buffer (no cross-buffer value allowed), and has a size limit of the
+///   VALUE_BUFFER_SIZE (1MB). New value buffer is allocated when the previous buffer cannot hold the new added value.
+///
+/// The maximum capacity for the bytes store is 2^24 ~= 17M values and 2^31 = 2GB total size of values.
 @ThreadSafe
 public class OffHeapMutableBytesStore implements Closeable {
   private static final byte[] EMPTY_BYTES = new byte[0];
@@ -85,10 +81,8 @@ public class OffHeapMutableBytesStore implements Closeable {
     _allocationContext = allocationContext;
   }
 
-  /**
-   * Adds a value into the bytes store. The size of the given value should be smaller or equal to the VALUE_BUFFER_SIZE
-   * (1MB).
-   */
+  /// Adds a value into the bytes store. The size of the given value should be smaller or equal to the VALUE_BUFFER_SIZE
+  /// (1MB).
   public int add(byte[] value) {
     int offsetBufferIndex = _numValues >>> OFFSET_BUFFER_SHIFT_OFFSET;
     int offsetIndex = _numValues & OFFSET_BUFFER_MASK;
@@ -133,9 +127,7 @@ public class OffHeapMutableBytesStore implements Closeable {
     return _numValues++;
   }
 
-  /**
-   * Returns the value at the given index. The given index should be smaller than the number of values already added.
-   */
+  /// Returns the value at the given index. The given index should be smaller than the number of values already added.
   @SuppressWarnings("Duplicates")
   public byte[] get(int index) {
     assert index < _numValues;
@@ -168,13 +160,12 @@ public class OffHeapMutableBytesStore implements Closeable {
     return value;
   }
 
-  /**
-   * Returns whether the value at the given index equals the given value. The given index should be smaller than the
-   * number of values already added.
-   * <p>This method should be preferable when checking whether a value equals the value at a specific index in the bytes
-   * store compared to calling {@link #get(int)} and then compare the values because if the value length does not match,
-   * the value fetch can be skipped.
-   */
+  /// Returns whether the value at the given index equals the given value. The given index should be smaller than the
+  /// number of values already added.
+  ///
+  /// This method should be preferable when checking whether a value equals the value at a specific index in the bytes
+  /// store compared to calling [#get(int)] and then compare the values because if the value length does not
+  /// match, the value fetch can be skipped.
   @SuppressWarnings("Duplicates")
   public boolean equalsValueAt(int index, byte[] valueToCompare) {
     assert index < _numValues;

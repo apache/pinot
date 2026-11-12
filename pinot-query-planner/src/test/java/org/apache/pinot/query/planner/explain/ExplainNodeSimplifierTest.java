@@ -32,19 +32,17 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotSame;
 
 
-/**
- * Tests for {@link ExplainNodeSimplifier}, the broker-side logic that groups the per-segment children of a combine
- * explain node.
- *
- * The simplifier must group mergeable segment plans while keeping genuinely different plans as separate groups, and it
- * must never fail when the inputs are not all mergeable (these tests run with assertions enabled, which previously
- * surfaced as an {@code AssertionError} in the all-or-nothing implementation).
- */
+/// Tests for [ExplainNodeSimplifier], the broker-side logic that groups the per-segment children of a combine
+/// explain node.
+///
+/// The simplifier must group mergeable segment plans while keeping genuinely different plans as separate groups, and it
+/// must never fail when the inputs are not all mergeable (these tests run with assertions enabled, which previously
+/// surfaced as an `AssertionError` in the all-or-nothing implementation).
 public class ExplainNodeSimplifierTest {
   private static final DataSchema SCHEMA = new DataSchema(new String[]{"col"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
-  /// A combine node whose title must contain {@code Combine} for the simplifier to act on it.
+  /// A combine node whose title must contain `Combine` for the simplifier to act on it.
   private static final String COMBINE_TITLE = "LeafStageCombineOperator";
 
   private static ExplainedNode leaf(String title) {
@@ -59,7 +57,7 @@ public class ExplainNodeSimplifierTest {
     return new ExplainedNode(0, SCHEMA, null, Arrays.asList(children), COMBINE_TITLE, Map.of());
   }
 
-  /// Wraps a child the way {@code AcquireReleaseColumnsSegmentOperator} does when prefetch is enabled.
+  /// Wraps a child the way `AcquireReleaseColumnsSegmentOperator` does when prefetch is enabled.
   private static ExplainedNode acquireRelease(PlanNode child) {
     return new ExplainedNode(0, SCHEMA, null, List.of(child), "AcquireReleaseColumnsSegment",
         Map.of());
@@ -70,8 +68,8 @@ public class ExplainNodeSimplifierTest {
     return new ExplainAttributeBuilder().putLong("totalDocs", totalDocs).build();
   }
 
-  /// Finds the "Alternative" group under {@code combine} whose plan matches the given chain of titles (from the
-  /// Alternative's direct child downwards) and returns its {@code segments} count.
+  /// Finds the "Alternative" group under `combine` whose plan matches the given chain of titles (from the
+  /// Alternative's direct child downwards) and returns its `segments` count.
   private static long segmentCountFor(ExplainedNode combine, String... innerTitlePath) {
     for (PlanNode input : combine.getInputs()) {
       ExplainedNode alternative = (ExplainedNode) input;

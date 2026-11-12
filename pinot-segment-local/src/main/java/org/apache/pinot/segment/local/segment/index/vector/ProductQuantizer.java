@@ -22,11 +22,9 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
-/**
- * Product quantizer training and encoding helpers for IVF_PQ.
- *
- * <p>This class is stateless and thread-safe.</p>
- */
+/// Product quantizer training and encoding helpers for IVF_PQ.
+///
+/// This class is stateless and thread-safe.
 public final class ProductQuantizer {
   private ProductQuantizer() {
   }

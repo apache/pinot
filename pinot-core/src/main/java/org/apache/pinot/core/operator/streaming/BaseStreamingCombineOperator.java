@@ -35,7 +35,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
-import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -77,8 +76,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
     try {
       while (!_querySatisfied && _numOperatorsFinished < _numOperators) {
         QueryThreadContext.checkTermination(this::getExplainName);
-        BaseResultsBlock resultsBlock =
-            _blockingQueue.poll(endTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        BaseResultsBlock resultsBlock = pollResultsBlock(_blockingQueue, endTimeMs);
         if (resultsBlock == null) {
           // Query times out, skip streaming the remaining results blocks
           throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timed out while polling results block");
@@ -115,7 +113,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         if (isChildOperatorSingleBlock()) {
-          T resultsBlock = operator.nextBlock();
+          T resultsBlock = detachFromWorkerThreadState(operator.nextBlock());
           addResultsBlock(resultsBlock);
           // When query is satisfied, skip processing the remaining segments
           if (isQuerySatisfied(resultsBlock, tracker)) {
@@ -125,6 +123,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
         } else {
           T resultsBlock;
           while ((resultsBlock = operator.nextBlock()) != null) {
+            resultsBlock = detachFromWorkerThreadState(resultsBlock);
             addResultsBlock(resultsBlock);
             // When query is satisfied, skip processing the remaining segments
             if (isQuerySatisfied(resultsBlock, tracker)) {
@@ -145,6 +144,15 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
     }
   }
 
+  /// Hook invoked on the worker thread for each child results block, before it is handed off to the
+  /// consumer thread via [#addResultsBlock]. Subclasses override this to eagerly materialize any
+  /// per-segment state that is backed by reused worker-thread-local storage (e.g. the group-by
+  /// group-key maps), so the consumer thread never reads state the worker may mutate for its next
+  /// segment. The default implementation returns the block unchanged.
+  protected T detachFromWorkerThreadState(T resultsBlock) {
+    return resultsBlock;
+  }
+
   // NOTE: Throw EarlyTerminationException when interrupted or timed out
   private void addResultsBlock(BaseResultsBlock resultsBlock) {
     try {
@@ -162,12 +170,8 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
     _processingException.compareAndSet(null, t);
     // Clear the blocking queue and add the exception results block to terminate the main thread
     _blockingQueue.clear();
-    QueryErrorMessage errorMsg;
-    if (t instanceof QueryException) {
-      errorMsg = QueryErrorMessage.safeMsg(((QueryException) t).getErrorCode(), t.getMessage());
-    } else {
-      errorMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_EXECUTION, t.getMessage());
-    }
+    QueryErrorMessage errorMsg =
+        QueryErrorMessage.safeMsg(QueryErrorCode.fromThrowable(t, QueryErrorCode.QUERY_EXECUTION), t.getMessage());
     _blockingQueue.offer(new ExceptionResultsBlock(errorMsg));
   }
 
@@ -175,23 +179,17 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
   protected void onProcessSegmentsFinish() {
   }
 
-  /**
-   * Returns whether the child operator returns only a single block.
-   */
+  /// Returns whether the child operator returns only a single block.
   protected boolean isChildOperatorSingleBlock() {
     return true;
   }
 
-  /**
-   * Creates a tracker object to track if the query is satisfied.
-   */
+  /// Creates a tracker object to track if the query is satisfied.
   protected Object createQuerySatisfiedTracker() {
     return null;
   }
 
-  /**
-   * Returns {@code true} if the query is already satisfied with the results block.
-   */
+  /// Returns `true` if the query is already satisfied with the results block.
   protected boolean isQuerySatisfied(T resultsBlock, Object tracker) {
     return _resultsBlockMerger.isQuerySatisfied(resultsBlock);
   }

@@ -49,7 +49,8 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
   private static final Logger LOGGER =
       LoggerFactory.getLogger(RealtimeConsumptionRateLimiterClusterIntegrationTest.class);
 
-  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  private static final String CONSUMER_DIRECTORY =
+      new File(FileUtils.getTempDirectory(), "consumer-test").getAbsolutePath();
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final double SERVER_RATE_LIMIT = 100;

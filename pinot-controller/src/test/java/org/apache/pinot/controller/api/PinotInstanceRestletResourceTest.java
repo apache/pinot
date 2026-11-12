@@ -52,9 +52,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/**
- * Tests for the instances Restlet.
- */
+/// Tests for the instances Restlet.
 public class PinotInstanceRestletResourceTest extends ControllerTest {
 
   @BeforeClass

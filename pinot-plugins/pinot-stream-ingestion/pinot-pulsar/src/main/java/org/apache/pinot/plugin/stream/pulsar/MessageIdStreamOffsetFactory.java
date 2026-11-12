@@ -23,9 +23,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 
 
-/**
- * {@link StreamPartitionMsgOffsetFactory} implementation for Pulsar streams.
- */
+/// [StreamPartitionMsgOffsetFactory] implementation for Pulsar streams.
 public class MessageIdStreamOffsetFactory implements StreamPartitionMsgOffsetFactory {
 
   @Override

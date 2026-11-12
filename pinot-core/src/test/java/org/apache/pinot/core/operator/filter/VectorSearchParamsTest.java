@@ -26,9 +26,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for {@link VectorSearchParams} construction and query option parsing.
- */
+/// Tests for [VectorSearchParams] construction and query option parsing.
 public class VectorSearchParamsTest {
 
   @Test

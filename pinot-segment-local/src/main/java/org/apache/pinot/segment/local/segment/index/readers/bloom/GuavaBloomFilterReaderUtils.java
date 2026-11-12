@@ -33,16 +33,12 @@ public class GuavaBloomFilterReaderUtils {
   // DO NOT change the hash function. It has to be aligned with the bloom filter creator.
   private static final HashFunction HASH_FUNCTION = Hashing.murmur3_128();
 
-  /**
-   * Returns the hash of the given value as a byte array.
-   */
+  /// Returns the hash of the given value as a byte array.
   public static byte[] hash(String value) {
     return HASH_FUNCTION.hashBytes(value.getBytes(UTF_8)).asBytes();
   }
 
-  /**
-   *  Like {@link #hash(String)} but returns the hash as a {@link Hash128AsLongs}.
-   */
+  /// Like [#hash(String)] but returns the hash as a [Hash128AsLongs].
   public static Hash128AsLongs hashAsLongs(String value) {
     byte[] hash = hash(value);
     return new Hash128AsLongs(Longs.fromBytes(hash[7], hash[6], hash[5], hash[4], hash[3], hash[2], hash[1], hash[0]),
@@ -65,9 +61,7 @@ public class GuavaBloomFilterReaderUtils {
      See http://en.wikipedia.org/wiki/Bloom_filter#Probability_of_false_positives for the formula.
    */
 
-  /**
-   * Calculates the fpp (false positive probability) based on the given bloom filter size and number of insertions.
-   */
+  /// Calculates the fpp (false positive probability) based on the given bloom filter size and number of insertions.
   public static double computeFPP(int sizeInBytes, int numInsertions) {
     double b = (double) sizeInBytes * Byte.SIZE / numInsertions;
     double k = b * Math.log(2);

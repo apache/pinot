@@ -50,11 +50,9 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 
-/**
- * Test class for {@link RemoteClusterBrokerRoutingManager}.
- * Tests the remote cluster routing manager with real ZooKeeper to validate table discovery,
- * routing updates, concurrent operations, and lifecycle management.
- */
+/// Test class for [RemoteClusterBrokerRoutingManager].
+/// Tests the remote cluster routing manager with real ZooKeeper to validate table discovery,
+/// routing updates, concurrent operations, and lifecycle management.
 public class RemoteClusterBrokerRoutingManagerTest extends ControllerTest {
   private static final String REMOTE_CLUSTER_NAME = "remoteCluster";
   private static final String RAW_TABLE_NAME = "remoteTable";

@@ -29,10 +29,34 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class EmptyResponseUtilsTest {
+
+  /// An aggregation whose answer over no input is `NULL` has to survive the whole empty-response path.
+  ///
+  /// This is the path that produced the NPE this contract exists to prevent: the result table is built by calling
+  /// `extractFinalResult(extractAggregationResult(createAggregationResultHolder()))` on an untouched holder, and the
+  /// value it returns is then passed to [ColumnDataType#convert]. A function that wraps the `null` in a serializer
+  /// rather than resolving it fails at one of those two steps, not at extraction.
+  @Test
+  public void testBuildEmptyResultTableWithNullFinalResults() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT PERCENTILERAWKLL(a, 50), MAXSTRING(b), MINSTRING(b) FROM testTable WHERE foo = 'bar'");
+    ResultTable resultTable = EmptyResponseUtils.buildEmptyResultTable(queryContext);
+    DataSchema dataSchema = resultTable.getDataSchema();
+    assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING
+    });
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    Object[] row = rows.get(0);
+    assertNull(row[0]);
+    assertNull(row[1]);
+    assertNull(row[2]);
+  }
 
   @Test
   public void testBuildEmptyResultTable() {

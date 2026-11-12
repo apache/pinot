@@ -22,9 +22,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
-/**
- * Exposes vector index configuration independently from whether a vector reader exists.
- */
+/// Exposes vector index configuration independently from whether a vector reader exists.
 public interface VectorIndexConfigProvider {
 
   @Nullable

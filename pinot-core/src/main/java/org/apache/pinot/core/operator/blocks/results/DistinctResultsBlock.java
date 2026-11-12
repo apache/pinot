@@ -26,9 +26,7 @@ import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-/**
- * Results block for distinct queries.
- */
+/// Results block for distinct queries.
 public class DistinctResultsBlock extends BaseResultsBlock {
   private final QueryContext _queryContext;
 

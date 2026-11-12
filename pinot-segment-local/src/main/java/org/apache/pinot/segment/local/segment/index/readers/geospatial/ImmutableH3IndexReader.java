@@ -33,9 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Reader of the H3 index. Please reference {@link BaseH3IndexCreator} for the index file layout.
- */
+/// Reader of the H3 index. Please reference [BaseH3IndexCreator] for the index file layout.
 public class ImmutableH3IndexReader implements H3IndexReader {
   public static final Logger LOGGER = LoggerFactory.getLogger(ImmutableH3IndexReader.class);
 
@@ -43,10 +41,8 @@ public class ImmutableH3IndexReader implements H3IndexReader {
   private final LongDictionary _dictionary;
   private final BitmapInvertedIndexReader _invertedIndex;
 
-  /**
-   * Constructs an inverted index with the specified size.
-   * @param dataBuffer data buffer for the inverted index.
-   */
+  /// Constructs an inverted index with the specified size.
+  /// @param dataBuffer data buffer for the inverted index.
   public ImmutableH3IndexReader(PinotDataBuffer dataBuffer) {
     int version = dataBuffer.getInt(0);
     Preconditions.checkArgument(version == BaseH3IndexCreator.VERSION, "Unsupported H3 index version: %s", version);

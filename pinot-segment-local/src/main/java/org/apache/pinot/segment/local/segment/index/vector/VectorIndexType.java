@@ -63,13 +63,13 @@ import org.slf4j.LoggerFactory;
 
 /// Index type for vector columns.
 ///
-/// Supports multiple vector index backends via the {@link VectorBackendType} enum.
+/// Supports multiple vector index backends via the [VectorBackendType] enum.
 /// Currently supported backends:
-///   - {@link VectorBackendType#HNSW} - Lucene-based HNSW graph index (mutable and immutable segments)
-///   - {@link VectorBackendType#IVF_FLAT} - Inverted file with flat vectors (immutable segments only)
-///   - {@link VectorBackendType#IVF_PQ} - Inverted file with residual product quantization (immutable only)
+///   - [VectorBackendType#HNSW] - Lucene-based HNSW graph index (mutable and immutable segments)
+///   - [VectorBackendType#IVF_FLAT] - Inverted file with flat vectors (immutable segments only)
+///   - [VectorBackendType#IVF_PQ] - Inverted file with residual product quantization (immutable only)
 ///
-/// If the {@code vectorIndexType} field is absent in the config, it defaults to HNSW for
+/// If the `vectorIndexType` field is absent in the config, it defaults to HNSW for
 /// backward compatibility with existing table configurations.
 public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator> {
   private static final Logger LOGGER = LoggerFactory.getLogger(VectorIndexType.class);

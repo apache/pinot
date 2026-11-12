@@ -34,9 +34,7 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * The {@code OffHeapStarTree} class implements the star-tree using off-heap memory.
- */
+/// The `OffHeapStarTree` class implements the star-tree using off-heap memory.
 public class OffHeapStarTree implements StarTree {
   private static final Logger LOGGER = LoggerFactory.getLogger(OffHeapStarTree.class);
   public static final long MAGIC_MARKER = 0xBADDA55B00DAD00DL;
@@ -100,9 +98,7 @@ public class OffHeapStarTree implements StarTree {
     printTreeHelper(dictionaryMap, _root, 0);
   }
 
-  /**
-   * Helper method to print the tree.
-   */
+  /// Helper method to print the tree.
   private void printTreeHelper(Map<String, Dictionary> dictionaryMap, OffHeapStarTreeNode node, int level) {
     StringBuilder stringBuilder = new StringBuilder();
     for (int i = 0; i < level; i++) {

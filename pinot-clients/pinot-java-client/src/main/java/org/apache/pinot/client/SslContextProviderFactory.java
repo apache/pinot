@@ -26,12 +26,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Factory that locates a {@link SslContextProvider}. Lookup order:
- * 1) System property 'pinot.client.sslContextProvider' with a fully qualified class name
- * 2) ServiceLoader on the classpath
- * 3) Default provider
- */
+/// Factory that locates a [SslContextProvider]. Lookup order:
+/// 1) System property 'pinot.client.sslContextProvider' with a fully qualified class name
+/// 2) ServiceLoader on the classpath
+/// 3) Default provider
 public final class SslContextProviderFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SslContextProviderFactory.class);
   private static final String PROVIDER_PROPERTY = "pinot.client.sslContextProvider";

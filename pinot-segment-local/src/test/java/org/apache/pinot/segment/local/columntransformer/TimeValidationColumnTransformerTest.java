@@ -31,9 +31,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for TimeValidationColumnTransformer.
- */
+/// Tests for TimeValidationColumnTransformer.
 public class TimeValidationColumnTransformerTest {
 
   @Test

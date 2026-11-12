@@ -28,13 +28,10 @@ public class BooleanUtils {
   public static final int INTERNAL_TRUE = 1;
   public static final int INTERNAL_FALSE = 0;
 
-  /**
-   * Returns the boolean value for the given boolean string.
-   * <ul>
-   *   <li>'true', '1' (internal representation) -> true</li>
-   *   <li>Others -> false</li>
-   * </ul>
-   */
+  /// Returns the boolean value for the given boolean string.
+  ///
+  /// - 'true', '1' (internal representation) -> true
+  /// - Others -> false
   public static boolean toBoolean(String booleanString) {
     return booleanString.equalsIgnoreCase("true") || booleanString.equals("1");
   }
@@ -53,45 +50,33 @@ public class BooleanUtils {
     }
   }
 
-  /**
-   * Returns the int value (1 for true, 0 for false) for the given boolean string.
-   * <ul>
-   *   <li>'true', '1' (internal representation) -> '1'</li>
-   *   <li>Others -> '0'</li>
-   * </ul>
-   */
+  /// Returns the int value (1 for true, 0 for false) for the given boolean string.
+  ///
+  /// - 'true', '1' (internal representation) -> '1'
+  /// - Others -> '0'
   public static int toInt(String booleanString) {
     return toBoolean(booleanString) ? INTERNAL_TRUE : INTERNAL_FALSE;
   }
 
-  /**
-   * Returns the int value (1 for true, 0 for false) for the given boolean value.
-   * <ul>
-   *   <li> 'true' -> '1'</li>
-   *   <li> 'false' -> '0'</li>
-   * </ul>
-   */
+  /// Returns the int value (1 for true, 0 for false) for the given boolean value.
+  ///
+  /// - 'true' -> '1'
+  /// - 'false' -> '0'
   public static int toInt(boolean booleanValue) {
     return booleanValue ? INTERNAL_TRUE : INTERNAL_FALSE;
   }
 
-  /**
-   * Returns the boolean value for the given non-null Integer object (internal value for BOOLEAN).
-   */
+  /// Returns the boolean value for the given non-null Integer object (internal value for BOOLEAN).
   public static boolean fromNonNullInternalValue(Object value) {
     return (int) value == INTERNAL_TRUE;
   }
 
-  /**
-   * Returns whether the given nullable Integer object (internal value for BOOLEAN) represents true.
-   */
+  /// Returns whether the given nullable Integer object (internal value for BOOLEAN) represents true.
   public static boolean isTrueInternalValue(@Nullable Object value) {
     return value != null && (int) value == INTERNAL_TRUE;
   }
 
-  /**
-   * Returns whether the given nullable Integer object (internal value for BOOLEAN) represents false.
-   */
+  /// Returns whether the given nullable Integer object (internal value for BOOLEAN) represents false.
   public static boolean isFalseInternalValue(@Nullable Object value) {
     return value != null && (int) value == INTERNAL_FALSE;
   }

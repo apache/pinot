@@ -23,13 +23,11 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Default broker routing manager implementation.
- *
- * <p>This class is a thin wrapper over {@link BaseBrokerRoutingManager} and exists primarily to provide the
- * canonical routing manager type for the local broker, while allowing specialized implementations
- * (e.g. remote-cluster routing managers) to extend the shared base behavior.
- */
+/// Default broker routing manager implementation.
+///
+/// This class is a thin wrapper over [BaseBrokerRoutingManager] and exists primarily to provide the
+/// canonical routing manager type for the local broker, while allowing specialized implementations
+/// (e.g. remote-cluster routing managers) to extend the shared base behavior.
 public class BrokerRoutingManager extends BaseBrokerRoutingManager {
 
   public BrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,

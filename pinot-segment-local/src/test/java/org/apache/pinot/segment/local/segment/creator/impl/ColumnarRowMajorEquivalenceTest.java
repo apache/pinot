@@ -27,16 +27,13 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for columnar vs row-major equivalence.
- *
- * <p>This test class validates that:
- * <ul>
- *   <li>Columnar segment building produces identical results to row-major building</li>
- *   <li>All data types are correctly handled in columnar mode</li>
- *   <li>Segment statistics and metadata are preserved</li>
- * </ul>
- */
+/// Tests for columnar vs row-major equivalence.
+///
+/// This test class validates that:
+///
+/// - Columnar segment building produces identical results to row-major building
+/// - All data types are correctly handled in columnar mode
+/// - Segment statistics and metadata are preserved
 public class ColumnarRowMajorEquivalenceTest extends ColumnarSegmentBuildingTestBase {
 
   @Test

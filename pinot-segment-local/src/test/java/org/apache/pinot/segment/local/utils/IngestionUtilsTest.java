@@ -43,14 +43,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests fields extraction from Schema dna TableConfig for ingestion
- */
+/// Tests fields extraction from Schema dna TableConfig for ingestion
 public class IngestionUtilsTest {
 
-  /**
-   * Transform functions have moved to table config. This test remains for backward compatible handling testing
-   */
+  /// Transform functions have moved to table config. This test remains for backward compatible handling testing
   @Test
   public void testExtractFieldsSchema() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();

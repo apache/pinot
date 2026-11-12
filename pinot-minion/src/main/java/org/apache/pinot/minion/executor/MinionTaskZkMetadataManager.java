@@ -23,10 +23,8 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.minion.BaseTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 
-/**
- * An abstraction on top of {@link HelixManager}, created for the {@link PinotTaskExecutor}, restricted to only
- * get/update minion task metadata
- */
+/// An abstraction on top of [HelixManager], created for the [PinotTaskExecutor], restricted to only
+/// get/update minion task metadata
 public class MinionTaskZkMetadataManager {
   private final HelixManager _helixManager;
 
@@ -34,23 +32,19 @@ public class MinionTaskZkMetadataManager {
     _helixManager = helixManager;
   }
 
-  /**
-   * Fetch the ZNRecord under MINION_TASK_METADATA/${tableNameWithType}/${taskType} for
-   * the given tableNameWithType
-   */
+  /// Fetch the ZNRecord under MINION_TASK_METADATA/${tableNameWithType}/${taskType} for
+  /// the given tableNameWithType
   public ZNRecord getTaskMetadataZNRecord(String tableNameWithType, String taskType) {
     return MinionTaskMetadataUtils.fetchTaskMetadata(_helixManager.getHelixPropertyStore(), taskType,
         tableNameWithType);
   }
 
-  /**
-   * Sets the {@link BaseTaskMetadata} ito the ZNode at
-   * MINION_TASK_METADATA/${tableNameWithType}/${taskType}
-   * for the corresponding tableNameWitType
-   * @param taskMetadata Task metadata which is to be written
-   * @param taskType taskType for which metadata is to be updated
-   * @param expectedVersion Version expected to be updating, failing the call if there's a mismatch
-   */
+  /// Sets the [BaseTaskMetadata] ito the ZNode at
+  /// MINION_TASK_METADATA/${tableNameWithType}/${taskType}
+  /// for the corresponding tableNameWitType
+  /// @param taskMetadata Task metadata which is to be written
+  /// @param taskType taskType for which metadata is to be updated
+  /// @param expectedVersion Version expected to be updating, failing the call if there's a mismatch
   public void setTaskMetadataZNRecord(BaseTaskMetadata taskMetadata, String taskType, int expectedVersion) {
     MinionTaskMetadataUtils.persistTaskMetadata(_helixManager.getHelixPropertyStore(), taskType, taskMetadata,
         expectedVersion);

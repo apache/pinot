@@ -30,58 +30,38 @@ import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * The value writer for var-length values (STRING and BYTES).
- *
- * The layout of the file is as follows:
- * <p>
- * Header Section:
- * <ul>
- *   <li>
- *     Magic bytes: Chose this to be ".vl;" to avoid conflicts with the fixed size value buffer implementations. By
- *     having special characters, this avoids conflicts with regular bytes/strings dictionaries.
- *   </li>
- *   <li>
- *     Version number: This is an integer and can be used for the evolution of the store implementation by incrementing
- *     version for every incompatible change to the store/format.
- *   </li>
- *   <li>
- *     Number of elements in the store.
- *   </li>
- *   <li>
- *     The offset where the data section starts. Though the data section usually starts right after he header, having
- *     this explicitly will let the store to be evolved freely without any assumptions about where the data section
- *     starts.
- *   </li>
- * </ul>
- * <p>
- * Data section:
- * <ul>
- *   <li>
- *     Offsets Array: Integer offsets of the start position of the byte arrays.
- *     Example: [O(0), O(1),...O(n)] where O is the Offset function.
- *     Length of nth element is computed as: O(n+1) - O(n). Since the last element's length can't be computed using this
- *     formula, we store an extra offset at the end to be able to compute last element's length with the same formula,
- *     without depending on underlying buffer's size.
- *   </li>
- *   <li>
- *     All byte arrays.
- *   </li>
- * </ul>
- *
- * @see FixedByteValueReaderWriter
- */
+/// The value writer for var-length values (STRING and BYTES).
+///
+/// The layout of the file is as follows:
+///
+/// Header Section:
+///
+/// - Magic bytes: Chose this to be ".vl;" to avoid conflicts with the fixed size value buffer implementations. By
+///   having special characters, this avoids conflicts with regular bytes/strings dictionaries.
+/// - Version number: This is an integer and can be used for the evolution of the store implementation by incrementing
+///   version for every incompatible change to the store/format.
+/// - Number of elements in the store.
+/// - The offset where the data section starts. Though the data section usually starts right after he header, having
+///   this explicitly will let the store to be evolved freely without any assumptions about where the data section
+///   starts.
+///
+/// Data section:
+///
+/// - Offsets Array: Integer offsets of the start position of the byte arrays.
+///   Example: \[O(0), O(1),...O(n)\] where O is the Offset function.
+///   Length of nth element is computed as: O(n+1) - O(n). Since the last element's length can't be computed using
+///   this formula, we store an extra offset at the end to be able to compute last element's length with the same
+///   formula, without depending on underlying buffer's size.
+/// - All byte arrays.
+///
+/// @see FixedByteValueReaderWriter
 public class VarLengthValueWriter implements Closeable {
 
-  /**
-   * Magic bytes used to identify the dictionary files written in variable length bytes format.
-   */
+  /// Magic bytes used to identify the dictionary files written in variable length bytes format.
   static final byte[] MAGIC_BYTES = ".vl;".getBytes(UTF_8);
 
-  /**
-   * Increment this version if there are any structural changes in the store format and
-   * deal with backward compatibility correctly based on old versions.
-   */
+  /// Increment this version if there are any structural changes in the store format and
+  /// deal with backward compatibility correctly based on old versions.
   static final int VERSION = 1;
 
   // Offsets of different fields in the header. Having as constants for readability.

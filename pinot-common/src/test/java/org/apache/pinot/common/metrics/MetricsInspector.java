@@ -21,38 +21,29 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 
 
-/**
- * A helper for accessing metric values from tests in an implementation-agnostic way. Concrete subclasses are provided
- * by each metrics plugin (yammer, dropwizard) and by the in-memory fake registry used by pinot-common's own tests.
- *
- * <p>General usage:
- * <ol>
- *   <li>Build an inspector around a {@code PinotMetricsRegistry}. The inspector wires itself as a listener so it can
- *       observe metric registrations as they happen.</li>
- *   <li>After invoking an {@code AbstractMetrics} mutator that registers a new metric, call {@link #lastMetric()} to
- *       retrieve the {@link PinotMetricName} of the most recently added metric.</li>
- *   <li>Use {@link #getTimerSumMs(PinotMetricName)} / {@link #getMeteredCount(PinotMetricName)} to read values without
- *       knowing the concrete metric type.</li>
- * </ol>
- */
+/// A helper for accessing metric values from tests in an implementation-agnostic way. Concrete subclasses are provided
+/// by each metrics plugin (yammer, dropwizard) and by the in-memory fake registry used by pinot-common's own tests.
+///
+/// General usage:
+///
+/// 1. Build an inspector around a `PinotMetricsRegistry`. The inspector wires itself as a listener so it can
+///       observe metric registrations as they happen.
+/// 2. After invoking an `AbstractMetrics` mutator that registers a new metric, call [#lastMetric()] to
+///       retrieve the [PinotMetricName] of the most recently added metric.
+/// 3. Use [#getTimerSumMs(PinotMetricName)] / [#getMeteredCount(PinotMetricName)] to read values without
+///       knowing the concrete metric type.
 public abstract class MetricsInspector {
 
-  /**
-   * @return the {@code PinotMetricName} of the last metric that was added to the registry.
-   */
+  /// @return the `PinotMetricName` of the last metric that was added to the registry.
   public abstract PinotMetricName lastMetric();
 
-  /**
-   * Total elapsed time recorded on the timer, normalized to milliseconds.
-   *
-   * @throws IllegalArgumentException if the provided name does not correspond to a timer
-   */
+  /// Total elapsed time recorded on the timer, normalized to milliseconds.
+  ///
+  /// @throws IllegalArgumentException if the provided name does not correspond to a timer
   public abstract long getTimerSumMs(PinotMetricName name);
 
-  /**
-   * Total count of events recorded on the metered metric (meter or timer).
-   *
-   * @throws IllegalArgumentException if the provided name does not correspond to a metered metric
-   */
+  /// Total count of events recorded on the metered metric (meter or timer).
+  ///
+  /// @throws IllegalArgumentException if the provided name does not correspond to a metered metric
   public abstract long getMeteredCount(PinotMetricName name);
 }

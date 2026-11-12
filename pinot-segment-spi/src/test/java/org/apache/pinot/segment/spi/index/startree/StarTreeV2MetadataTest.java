@@ -98,7 +98,8 @@ public class StarTreeV2MetadataTest {
   private static Configuration createMetadata(List<String> dimensionsSplitOrder,
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs) {
     Configuration metadataProperties = new PropertiesConfiguration();
-    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, dimensionsSplitOrder, aggregationSpecs, 10000, Set.of());
+    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, dimensionsSplitOrder, aggregationSpecs, 10000, Set.of(),
+        false);
     return metadataProperties;
   }
 

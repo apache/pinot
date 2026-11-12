@@ -23,6 +23,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.avro.file.DataFileStream;
@@ -60,7 +61,10 @@ public class DictionaryOptimiserTest implements PinotBuffersAfterMethodCheckRule
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryOptimiserTest.class);
 
   private static final String AVRO_DATA = "data/mixed_cardinality_data.avro";
-  private static final File INDEX_DIR = new File(DictionariesTest.class.toString());
+  // Per-class unique dir so this test never shares an index directory with DictionariesTest (which
+  // used the same DictionariesTest.class-derived path) when the two run concurrently in parallel forks.
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectoryPath(),
+      DictionaryOptimiserTest.class.getSimpleName() + "-" + UUID.randomUUID());
 
   private static File _segmentDirectory;
 

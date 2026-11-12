@@ -23,11 +23,9 @@ import java.util.UUID;
 import org.apache.helix.model.Message;
 
 
-/**
- * Ingestion metrics remove message is created on controller and get sent to servers to instruct them to remove
- * ingestion metrics for the stream partition of the given segment when the new consuming segment is no longer served by
- * the server.
- */
+/// Ingestion metrics remove message is created on controller and get sent to servers to instruct them to remove
+/// ingestion metrics for the stream partition of the given segment when the new consuming segment is no longer served
+/// by the server.
 public class IngestionMetricsRemoveMessage extends Message {
   public static final String INGESTION_METRICS_REMOVE_MSG_SUB_TYPE = "INGESTION_METRICS_REMOVE";
 

@@ -29,10 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class that creates a {@link PooledByteBufAllocator} with a reduced number of direct arenas to limit the
- * direct memory retained by the pool, and owns the process-wide shared instance of it. Thread-safe.
- */
+/// Utility class that creates a [PooledByteBufAllocator] with a reduced number of direct arenas to limit the
+/// direct memory retained by the pool, and owns the process-wide shared instance of it. Thread-safe.
 public class PooledByteBufAllocatorWithLimits {
   private static final Logger LOGGER = LoggerFactory.getLogger(PooledByteBufAllocatorWithLimits.class);
   private static volatile PooledByteBufAllocator _sharedBufferAllocatorWithLimits;
@@ -40,15 +38,13 @@ public class PooledByteBufAllocatorWithLimits {
   private PooledByteBufAllocatorWithLimits() {
   }
 
-  /**
-   * Returns the shared allocator, creating it on first use. All unshaded Netty query transports within the process
-   * (all broker side {@link ServerChannels} and the server side {@link QueryServer}) must share this single
-   * allocator: pooled arenas retain chunk memory after the buffers allocated from them are released, and free space
-   * in one allocator's pool can never serve another allocator's allocations, so per-connection allocators can retain
-   * many times the intended amount of direct memory and exhaust it. Note that the reduced arena count limits the
-   * worst case retention but is not a hard cap on direct memory usage. The gRPC based transports use shaded Netty
-   * classes and maintain their own allocators.
-   */
+  /// Returns the shared allocator, creating it on first use. All unshaded Netty query transports within the process
+  /// (all broker side [ServerChannels] and the server side [QueryServer]) must share this single
+  /// allocator: pooled arenas retain chunk memory after the buffers allocated from them are released, and free space
+  /// in one allocator's pool can never serve another allocator's allocations, so per-connection allocators can retain
+  /// many times the intended amount of direct memory and exhaust it. Note that the reduced arena count limits the
+  /// worst case retention but is not a hard cap on direct memory usage. The gRPC based transports use shaded Netty
+  /// classes and maintain their own allocators.
   public static PooledByteBufAllocator getSharedBufferAllocatorWithLimits() {
     PooledByteBufAllocator sharedAllocator = _sharedBufferAllocatorWithLimits;
     if (sharedAllocator == null) {

@@ -45,14 +45,14 @@ public class SegmentContext {
     _docIdsSnapshot = docIdsSnapshot;
   }
 
-  /// @deprecated Use {@link #getDocIdsSnapshot} instead; kept for binary compatibility.
+  /// @deprecated Use [#getDocIdsSnapshot] instead; kept for binary compatibility.
   @Deprecated
   @Nullable
   public MutableRoaringBitmap getQueryableDocIdsSnapshot() {
     return getDocIdsSnapshot();
   }
 
-  /// @deprecated Use {@link #setDocIdsSnapshot} instead; kept for binary compatibility.
+  /// @deprecated Use [#setDocIdsSnapshot] instead; kept for binary compatibility.
   @Deprecated
   public void setQueryableDocIdsSnapshot(@Nullable MutableRoaringBitmap queryableDocIdsSnapshot) {
     setDocIdsSnapshot(queryableDocIdsSnapshot);

@@ -26,14 +26,13 @@ import javax.annotation.Nullable;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
+import org.apache.pinot.common.utils.ArrowAllocators;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
-/**
- * Record reader for Apache Arrow IPC file format.
- */
+/// Record reader for Apache Arrow IPC file format.
 public class ArrowRecordReader implements RecordReader {
   private final ArrowRecordExtractor _extractor = new ArrowRecordExtractor();
   private final ArrowRecordExtractor.Record _record = new ArrowRecordExtractor.Record();
@@ -58,7 +57,7 @@ public class ArrowRecordReader implements RecordReader {
     }
     _extractor.init(fieldsToRead, extractorConfig);
     _dataFile = dataFile;
-    _allocator = new RootAllocator(allocatorLimit);
+    _allocator = ArrowAllocators.newRootAllocator(allocatorLimit);
     openFile();
   }
 

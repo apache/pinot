@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-import com.tdunning.math.stats.Centroid;
-import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,19 +38,19 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.SyntheticBlockValSets;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedResult;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest.Centroid;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the {@link Table} operations
- */
+/// Tests the [Table] operations
 @SuppressWarnings({"rawtypes"})
 public class IndexedTableTest {
   private static final int TRIM_SIZE = 10;
@@ -174,7 +172,7 @@ public class IndexedTableTest {
                 Map.of(metricExpression, SyntheticBlockValSets.Double.create(null, values)));
             TDigest digest = function.extractAggregationResult(resultHolder);
             if (serialized) {
-              SerializedIntermediateResult serializedResult = function.serializeIntermediateResult(digest);
+              SerializedResult serializedResult = function.serializeIntermediateResult(digest);
               digest = function.deserializeIntermediateResult(new CustomObject(serializedResult.getType(),
                   ByteBuffer.wrap(serializedResult.getBytes())));
             }
@@ -197,16 +195,16 @@ public class IndexedTableTest {
       Assert.assertEquals(result.getMin(), 0.0);
       Assert.assertEquals(result.getMax(), expectedSize - 1.0);
 
-      long centroidWeight = 0L;
+      double centroidWeight = 0.0;
       double previousMean = Double.NEGATIVE_INFINITY;
       for (Centroid centroid : result.centroids()) {
         Assert.assertTrue(Double.isFinite(centroid.mean()));
-        Assert.assertTrue(centroid.count() > 0);
+        Assert.assertTrue(centroid.weight() > 0);
         Assert.assertTrue(centroid.mean() + 1e-12 >= previousMean);
-        centroidWeight += centroid.count();
+        centroidWeight += centroid.weight();
         previousMean = centroid.mean();
       }
-      Assert.assertEquals(centroidWeight, expectedSize);
+      Assert.assertEquals(centroidWeight, (double) expectedSize, 1e-9);
 
       double previousQuantile = Double.NEGATIVE_INFINITY;
       for (double quantile : new double[]{0.0, 0.5, 0.75, 0.95, 0.99, 1.0}) {

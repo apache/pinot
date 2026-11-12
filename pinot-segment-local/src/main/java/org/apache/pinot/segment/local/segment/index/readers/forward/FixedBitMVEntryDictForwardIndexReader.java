@@ -30,12 +30,10 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Bit-compressed dictionary-encoded forward index reader for multi-value columns, where a second level dictionary
- * encoding for multi-value entries (instead of individual values within the entry) are maintained within the forward
- * index.
- * See {@link FixedBitMVEntryDictForwardIndexWriter} for index layout.
- */
+/// Bit-compressed dictionary-encoded forward index reader for multi-value columns, where a second level dictionary
+/// encoding for multi-value entries (instead of individual values within the entry) are maintained within the forward
+/// index.
+/// See [FixedBitMVEntryDictForwardIndexWriter] for index layout.
 public final class FixedBitMVEntryDictForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext> {
   public static final int MAGIC_MARKER = FixedBitMVEntryDictForwardIndexWriter.MAGIC_MARKER;
   public static final short VERSION = FixedBitMVEntryDictForwardIndexWriter.VERSION;

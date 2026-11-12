@@ -32,11 +32,9 @@ import org.apache.pinot.spi.utils.MapUtils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Utility class to deserialize the {@link GenericRow}.
- * The bytes are read in NATIVE order. The data should be serialized by the {@link GenericRowSerializer} on the same
- * host to ensure that both of them are using the same byte order.
- */
+/// Utility class to deserialize the [GenericRow].
+/// The bytes are read in NATIVE order. The data should be serialized by the [GenericRowSerializer] on the same
+/// host to ensure that both of them are using the same byte order.
 public class GenericRowDeserializer {
   private final PinotDataBuffer _dataBuffer;
   private final int _numFields;
@@ -60,9 +58,7 @@ public class GenericRowDeserializer {
     _includeNullFields = includeNullFields;
   }
 
-  /**
-   * Deserializes the {@link GenericRow} at the given offset.
-   */
+  /// Deserializes the [GenericRow] at the given offset.
   public void deserialize(long offset, GenericRow buffer) {
     for (int i = 0; i < _numFields; i++) {
       String fieldName = _fieldNames[i];
@@ -204,9 +200,7 @@ public class GenericRowDeserializer {
     }
   }
 
-  /**
-   * Compares the rows at the given offsets.
-   */
+  /// Compares the rows at the given offsets.
   public int compare(long offset1, long offset2, int numFieldsToCompare) {
     for (int i = 0; i < numFieldsToCompare; i++) {
       if (_isSingleValueFields[i]) {

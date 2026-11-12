@@ -85,9 +85,7 @@ public class TimeSeriesBlockSerdeTest {
     assertEquals(decodedValues, input);
   }
 
-  /**
-   * Compares time series blocks in a way which makes it easy to debug test failures when/if they happen in CI.
-   */
+  /// Compares time series blocks in a way which makes it easy to debug test failures when/if they happen in CI.
   private static void compareBlocks(TimeSeriesBlock block1, TimeSeriesBlock block2) {
     assertEquals(block1.getTimeBuckets(), block2.getTimeBuckets(), "Time buckets are different across blocks");
     assertEquals(block1.getSeriesMap().size(), block2.getSeriesMap().size(), String.format(

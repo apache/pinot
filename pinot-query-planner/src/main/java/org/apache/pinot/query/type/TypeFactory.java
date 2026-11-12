@@ -30,16 +30,14 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Extends Java-base TypeFactory from Calcite.
- *
- * <p>{@link JavaTypeFactoryImpl} is used here because we are not overriding much of the TypeFactory methods
- * required by Calcite. We will start extending {@link org.apache.calcite.sql.type.SqlTypeFactoryImpl} or even
- * {@link org.apache.calcite.rel.type.RelDataTypeFactory} when necessary for Pinot to override such mechanism.
- *
- * <p>Noted that {@link JavaTypeFactoryImpl} is subject to change. Please pay extra attention to this class when
- * upgrading Calcite versions.
- */
+/// Extends Java-base TypeFactory from Calcite.
+///
+/// [JavaTypeFactoryImpl] is used here because we are not overriding much of the TypeFactory methods
+/// required by Calcite. We will start extending [org.apache.calcite.sql.type.SqlTypeFactoryImpl] or even
+/// [org.apache.calcite.rel.type.RelDataTypeFactory] when necessary for Pinot to override such mechanism.
+///
+/// Noted that [JavaTypeFactoryImpl] is subject to change. Please pay extra attention to this class when
+/// upgrading Calcite versions.
 public class TypeFactory extends JavaTypeFactoryImpl {
 
   public static final TypeFactory INSTANCE = new TypeFactory();

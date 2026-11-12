@@ -63,9 +63,7 @@ import static org.testng.Assert.expectThrows;
 import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 
-/**
- * Tests the Azure implementation of ADLSGen2PinotFS
- */
+/// Tests the Azure implementation of ADLSGen2PinotFS
 public class ADLSGen2PinotFSTest {
 
   @Mock

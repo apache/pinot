@@ -240,8 +240,8 @@ public class UpsertUtilsTest {
     assertFalse(segment.hasNoValidDocs());
   }
 
-  /// Returns a minimal {@link ImmutableSegmentImpl} usable for testing the upsert-aware methods.
-  /// Mirrors the pattern used in {@code BasePartitionUpsertMetadataManagerTest#createImmutableSegment}.
+  /// Returns a minimal [ImmutableSegmentImpl] usable for testing the upsert-aware methods.
+  /// Mirrors the pattern used in `BasePartitionUpsertMetadataManagerTest#createImmutableSegment`.
   private static ImmutableSegmentImpl newSegment() {
     return new ImmutableSegmentImpl(
         mock(SegmentDirectory.class), mock(SegmentMetadataImpl.class), new HashMap<>(), null);

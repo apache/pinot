@@ -502,6 +502,40 @@ public class ServerRoutingStatsManagerTest {
   }
 
   @Test
+  public void testStatsMetricExportKeyRemovalRestoresDefault() throws InterruptedException {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    // Metric export is enabled in the broker config, which also holds the cluster config folded in at startup.
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS, 50L);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    manager.recordStatsForQuerySubmission(requestId++, "keyRemovalServer");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "keyRemovalServer", 100);
+    waitForStatsUpdate(manager, requestId);
+
+    String numInFlightKey = BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS.getGaugeName()
+        + ".server.keyRemovalServer";
+    TestUtils.waitForCondition(aVoid -> _brokerMetrics.getGaugeValue(numInFlightKey) != null,
+        50L, 5000, "Timed out waiting for metrics");
+
+    // Removing the key from the cluster config restores the default (disabled) rather than the broker config value.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_METRIC_EXPORT), Map.of());
+
+    assertNull(_brokerMetrics.getGaugeValue(numInFlightKey));
+  }
+
+  @Test
   public void testStatsMetricExportIntervalDynamicUpdate() throws InterruptedException {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
@@ -577,12 +611,13 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(manager.getStatsMetricExportIntervalMs(), intervalBefore,
         "Interval must not change on negative config value");
 
-    // Key removed from cluster config — must fall back to the static broker config value (100000L).
+    // Key removed from cluster config: restores the default rather than the broker config value.
     manager.onChange(
         Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS),
         Map.of());
-    assertEquals(manager.getStatsMetricExportIntervalMs(), 100000L,
-        "Interval must revert to static config when cluster key is removed");
+    assertEquals(manager.getStatsMetricExportIntervalMs(),
+        CommonConstants.Broker.AdaptiveServerSelector.DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS,
+        "Interval must revert to the default when cluster key is removed");
 
     manager.shutDown();
   }

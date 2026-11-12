@@ -24,8 +24,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.HyperLogLogUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -90,9 +90,7 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
     return value;
   }
 
-  /**
-   * Offers a raw value (single value or multi-value array) to the HyperLogLog.
-   */
+  /// Offers a raw value (single value or multi-value array) to the HyperLogLog.
   protected void offerValue(HyperLogLog hll, Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
@@ -133,12 +131,12 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public byte[] serializeAggregatedValue(HyperLogLog value) {
-    return CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(value);
+    return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(value);
   }
 
   @Override
   public HyperLogLog deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytes);
+    return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytes);
   }
 
   @VisibleForTesting

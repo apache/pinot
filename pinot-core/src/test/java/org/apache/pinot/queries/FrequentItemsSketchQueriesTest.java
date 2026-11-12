@@ -59,15 +59,11 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Tests for FREQUENT_STRINGS_SKETCH and FREQUENT_LONGS_SKETCH aggregation functions.
- *
- * <ul>
- *   <li>Generates a segment with LONG, STRING, SKETCH and a group-by column</li>
- *   <li>Runs aggregation and group-by queries on the generated segment</li>
- *   <li>Compares the results from sketches to exact calculations via count()</li>
- * </ul>
- */
+/// Tests for FREQUENT_STRINGS_SKETCH and FREQUENT_LONGS_SKETCH aggregation functions.
+///
+/// - Generates a segment with LONG, STRING, SKETCH and a group-by column
+/// - Runs aggregation and group-by queries on the generated segment
+/// - Compares the results from sketches to exact calculations via count()
 public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
   protected static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FrequentItemsQueriesTest");
   protected static final String TABLE_NAME = "testTable";

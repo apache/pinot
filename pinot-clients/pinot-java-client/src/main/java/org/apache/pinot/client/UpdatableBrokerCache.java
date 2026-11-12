@@ -21,40 +21,28 @@ package org.apache.pinot.client;
 import java.util.List;
 
 
-/**
- * A updatable cache of table name to list of eligible brokers.
- * Implementations should implement manual refreshing mechanism
- */
+/// A updatable cache of table name to list of eligible brokers.
+/// Implementations should implement manual refreshing mechanism
 public interface UpdatableBrokerCache {
-  /**
-   * Initializes the cache
-   * @throws Exception
-   */
+  /// Initializes the cache
+  /// @throws Exception
   void init()
       throws Exception;
 
-  /**
-   * Method to get one random broker for a given table
-   * @param tableName
-   * @return Broker address corresponding to the table
-   */
+  /// Method to get one random broker for a given table
+  /// @param tableName
+  /// @return Broker address corresponding to the table
   String getBroker(String... tableName);
 
-  /**
-   * Returns all the brokers currently in the cache
-   * @return List of all available brokers
-   */
+  /// Returns all the brokers currently in the cache
+  /// @return List of all available brokers
   List<String> getBrokers();
 
-  /**
-   * Manually trigger a cache refresh
-   * @throws Exception
-   */
+  /// Manually trigger a cache refresh
+  /// @throws Exception
   void triggerBrokerCacheUpdate()
       throws Exception;
 
-  /**
-   * Closes the cache and release any resources
-   */
+  /// Closes the cache and release any resources
   void close();
 }

@@ -26,9 +26,7 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Reader for json index.
- */
+/// Reader for json index.
 public interface JsonIndexReader extends IndexReader {
 
   /// Returns the matching document ids for the given filter string.
@@ -52,58 +50,46 @@ public interface JsonIndexReader extends IndexReader {
     return getMatchingDocIds(documentFilter);
   }
 
-  /**
-   * For an array of docIds and context specific to a JSON key, returns the corresponding sv value for each docId.
-   * @param docIds array of docIds
-   * @param length length of the array
-   * @param matchingValueToDocs Map from each unique value for the jsonPathKey value to the flattened docId
-   *                                     posting list
-   * @param isFlattenedDocIds whether the docIds are flattened or unflattened
-   * @return String[] where String[i] is the sv value for docIds[i]
-   */
+  /// For an array of docIds and context specific to a JSON key, returns the corresponding sv value for each docId.
+  /// @param docIds array of docIds
+  /// @param length length of the array
+  /// @param matchingValueToDocs Map from each unique value for the jsonPathKey value to the flattened docId
+  ///                                     posting list
+  /// @param isFlattenedDocIds whether the docIds are flattened or unflattened
+  /// @return String\[\] where String\[i\] is the sv value for docIds\[i\]
   String[] getValuesSV(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToDocs,
       boolean isFlattenedDocIds);
 
-  /**
-   * For an array of docIds and context specific to a JSON key, returns the corresponding mv array for each docId.
-   * @param docIds array of docIds
-   * @param length length of the array
-   * @param matchingValueToFlattenedDocs Map from each unique value for the jsonPathKey value to the flattened docId
-   *                                     posting list
-   * @return String[][] where String[i] is the mv array for docIds[i]
-   */
+  /// For an array of docIds and context specific to a JSON key, returns the corresponding mv array for each docId.
+  /// @param docIds array of docIds
+  /// @param length length of the array
+  /// @param matchingValueToFlattenedDocs Map from each unique value for the jsonPathKey value to the flattened docId
+  ///                                     posting list
+  /// @return String\[\]\[\] where String\[i\] is the mv array for docIds\[i\]
   String[][] getValuesMV(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
 
-  /**
-   * For a JSON key, returns a Map from each value to the flattened docId posting list. This map should be used to
-   * avoid reading and converting the posting list of flattened docIds to real docIds
-   */
+  /// For a JSON key, returns a Map from each value to the flattened docId posting list. This map should be used to
+  /// avoid reading and converting the posting list of flattened docIds to real docIds
   Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String key, @Nullable String filterJsonString);
 
-  /**
-   * Converts the flattened docIds to real docIds using the map returned by getMatchingFlattenedDocsMap
-   */
+  /// Converts the flattened docIds to real docIds using the map returned by getMatchingFlattenedDocsMap
   void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> flattenedDocIdsMap);
 
-  /**
-   * Returns only the distinct value strings for the given key that match the optional filter, without materializing
-   * per-value posting list bitmaps or converting flattened doc IDs. This is significantly faster than
-   * {@link #getMatchingFlattenedDocsMap} followed by {@link #convertFlattenedDocIdsToDocIds} when only the distinct
-   * values are needed (e.g. fully-pushed-down DISTINCT queries).
-   *
-   * <p>The default implementation delegates to {@link #getMatchingFlattenedDocsMap} and returns its key set.
-   * Implementations should override for better performance.
-   */
+  /// Returns only the distinct value strings for the given key that match the optional filter, without materializing
+  /// per-value posting list bitmaps or converting flattened doc IDs. This is significantly faster than
+  /// [#getMatchingFlattenedDocsMap] followed by [#convertFlattenedDocIdsToDocIds] when only the distinct
+  /// values are needed (e.g. fully-pushed-down DISTINCT queries).
+  ///
+  /// The default implementation delegates to [#getMatchingFlattenedDocsMap] and returns its key set.
+  /// Implementations should override for better performance.
   default Set<String> getMatchingDistinctValues(String key, @Nullable String filterJsonString) {
     return getMatchingFlattenedDocsMap(key, filterJsonString).keySet();
   }
 
-  /**
-   * Returns true if the given JSON path is indexed and can be used for index-based operations
-   * (e.g. getMatchingFlattenedDocsMap, JsonIndexDistinctOperator).
-   * OSS JSON index indexes all paths, so always returns true. Composite JSON index with
-   * selective indexing returns true only for paths in invertedIndexConfigs.
-   */
+  /// Returns true if the given JSON path is indexed and can be used for index-based operations
+  /// (e.g. getMatchingFlattenedDocsMap, JsonIndexDistinctOperator).
+  /// OSS JSON index indexes all paths, so always returns true. Composite JSON index with
+  /// selective indexing returns true only for paths in invertedIndexConfigs.
   default boolean isPathIndexed(String jsonPath) {
     return true;
   }

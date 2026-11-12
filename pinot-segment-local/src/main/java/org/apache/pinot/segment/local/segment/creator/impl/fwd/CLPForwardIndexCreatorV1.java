@@ -43,18 +43,16 @@ import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Writer for CLP forward index.
- * <p>CLP forward index contains 3 parts:
- * <ul>
- *   <li>Header bytes: MAGIC_BYTES, version, </li>
- *   <li>LogType dictionary: dictionary for logType column</li>
- *   <li>DictVars dictionary: dictionary for dictVars column</li>
- *   <li>LogType fwd index: fwd index for logType column</li>
- *   <li>DictVars fwd index: fwd index for dictVars column</li>
- *   <li>EncodedVars fwd index: raw fwd index for encodedVars column</li>
- * </ul>
- */
+/// Writer for CLP forward index.
+///
+/// CLP forward index contains 3 parts:
+///
+/// - Header bytes: MAGIC_BYTES, version,
+/// - LogType dictionary: dictionary for logType column
+/// - DictVars dictionary: dictionary for dictVars column
+/// - LogType fwd index: fwd index for logType column
+/// - DictVars fwd index: fwd index for dictVars column
+/// - EncodedVars fwd index: raw fwd index for encodedVars column
 
 public class CLPForwardIndexCreatorV1 implements CompressionStatsTrackingForwardIndexCreator {
   public static final byte[] MAGIC_BYTES = "CLP.v1".getBytes(StandardCharsets.UTF_8);

@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.queries;
 
-import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import java.io.File;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,6 +28,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -42,6 +41,8 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -70,23 +71,16 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for PERCENTILE_TDIGEST aggregation function.
- *
- * <ul>
- *   <li>
- *     Generates a segment with a double column, a TDigest column, a custom compression TDigest column and a group-by
- *     column
- *   </li>
- *   <li>Runs aggregation and group-by queries on the generated segment</li>
- *   <li>
- *     Compares the results for PERCENTILE_TDIGEST on double column and TDigest column with results for PERCENTILE on
- *     double column
- *   </li>
- * </ul>
- */
+/// Tests for PERCENTILE_TDIGEST aggregation function.
+///
+/// - Generates a segment with a double column, a TDigest column, a custom compression TDigest column and a group-by
+///   column
+/// - Runs aggregation and group-by queries on the generated segment
+/// - Compares the results for PERCENTILE_TDIGEST on double column and TDigest column with results for PERCENTILE on
+///   double column
 public class PercentileTDigestQueriesTest extends BaseQueriesTest {
-  protected static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PercentileTDigestQueriesTest");
+  protected static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), "PercentileTDigestQueriesTest-" + UUID.randomUUID());
   protected static final String TABLE_NAME = "testTable";
   protected static final String SEGMENT_NAME = "testSegment";
 
@@ -142,17 +136,17 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       double value = RANDOM.nextDouble() * VALUE_RANGE;
       row.putValue(DOUBLE_COLUMN, value);
 
-      TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest tDigest =
+          TDigestAccumulator.forLegacyAggregation(
+              PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       tDigest.add(value);
-      ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
-      tDigest.asBytes(byteBuffer);
-      row.putValue(TDIGEST_COLUMN, byteBuffer.array());
+      byte[] digestBytes = tDigest.serialize();
+      row.putValue(TDIGEST_COLUMN, digestBytes);
 
-      TDigest tDigestCustom = TDigest.createMergingDigest(CUSTOM_COMPRESSION);
+      TDigest tDigestCustom = TDigestAccumulator.forLegacyAggregation(CUSTOM_COMPRESSION);
       tDigestCustom.add(value);
-      ByteBuffer byteBufferCustom = ByteBuffer.allocate(tDigestCustom.byteSize());
-      tDigestCustom.asBytes(byteBufferCustom);
-      row.putValue(TDIGEST_CUSTOM_COMPRESSION_COLUMN, byteBufferCustom.array());
+      byte[] customDigestBytes = tDigestCustom.serialize();
+      row.putValue(TDIGEST_CUSTOM_COMPRESSION_COLUMN, customDigestBytes);
 
       String group = GROUPS[RANDOM.nextInt(GROUPS.length)];
       row.putValue(GROUP_BY_COLUMN, group);
@@ -285,6 +279,24 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       totalDigestSize += starTreeDigest.size();
     }
     assertEquals(totalDigestSize, getExpectedTotalDigestSize());
+
+    // Exact PERCENTILE/PERCENTILEMV collects the original samples, independently of both digest paths.
+    AggregationGroupByResult exactResults =
+        getGroupByOperator(getGroupByQuery(0), false).nextBlock().getAggregationGroupByResult();
+    Iterator<GroupKeyGenerator.GroupKey> groupKeys = exactResults.getGroupKeyIterator();
+    while (groupKeys.hasNext()) {
+      GroupKeyGenerator.GroupKey groupKey = groupKeys.next();
+      DoubleList values = (DoubleList) exactResults.getResultForGroupId(0, groupKey._groupId);
+      double percentile = starTreeResults.get((String) groupKey._keys[0]).quantile(0.75);
+      int below = 0;
+      int atOrBelow = 0;
+      for (double value : values) {
+        below += value < percentile ? 1 : 0;
+        atOrBelow += value <= percentile ? 1 : 0;
+      }
+      assertTrue(below <= values.size() * 0.77 && atOrBelow >= values.size() * 0.73,
+          "Star-tree p75 rank exceeds 2% error for " + groupKey._keys[0] + "; " + ERROR_MESSAGE);
+    }
   }
 
   protected long getExpectedTotalDigestSize() {

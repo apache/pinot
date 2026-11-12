@@ -41,10 +41,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>SegmentPurger</code> class takes a segment and purges/modifies its records and generate a new segment with
- * the remaining modified records.
- */
+/// The `SegmentPurger` class takes a segment and purges/modifies its records and generate a new segment with
+/// the remaining modified records.
 public class SegmentPurger {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPurger.class);
 
@@ -242,54 +240,36 @@ public class SegmentPurger {
     }
   }
 
-  /**
-   * Factory for {@link RecordPurger}
-   */
+  /// Factory for [RecordPurger]
   public interface RecordPurgerFactory {
 
-    /**
-     * Get the {@link RecordPurger} for the given table.
-     */
+    /// Get the [RecordPurger] for the given table.
     RecordPurger getRecordPurger(String rawTableName);
 
-    /**
-     * Get the {@link RecordPurger} associated with the given taskConfig, tableConfig and tableSchema
-     */
+    /// Get the [RecordPurger] associated with the given taskConfig, tableConfig and tableSchema
     default RecordPurger getRecordPurger(PinotTaskConfig taskConfig, TableConfig tableConfig, Schema tableSchema) {
       return getRecordPurger(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
     }
   }
 
-  /**
-   * Purger for each {@link GenericRow} record.
-   */
+  /// Purger for each [GenericRow] record.
   public interface RecordPurger {
 
-    /**
-     * Return <code>true</code> if the record should be purged.
-     */
+    /// Return `true` if the record should be purged.
     boolean shouldPurge(GenericRow row);
   }
 
-  /**
-   * Factory for {@link RecordModifier}
-   */
+  /// Factory for [RecordModifier]
   public interface RecordModifierFactory {
 
-    /**
-     * Get the {@link RecordModifier} for the given table.
-     */
+    /// Get the [RecordModifier] for the given table.
     RecordModifier getRecordModifier(String rawTableName);
   }
 
-  /**
-   * Modifier for each {@link GenericRow} record.
-   */
+  /// Modifier for each [GenericRow] record.
   public interface RecordModifier {
 
-    /**
-     * Modify the record inplace, and return <code>true</code> if the record get modified.
-     */
+    /// Modify the record inplace, and return `true` if the record get modified.
     boolean modifyRecord(GenericRow row);
   }
 }

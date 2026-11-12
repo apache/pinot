@@ -42,27 +42,23 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Abstract base class for testing auth and header propagation through
- * {@link DriverManager#getConnection(String, Properties)} for both
- * HTTP ({@code jdbc:pinot://}) and gRPC ({@code jdbc:pinotgrpc://}) driver paths.
- *
- * <p>Subclasses provide the JDBC URL scheme and implement a single method to extract
- * headers from their respective connection types. All assertions are handled in this
- * base class for consistency.
- *
- * <p>A mock gRPC server is started for the pinotgrpc path validation query;
- * the HTTP path does not require a mock server.
- */
+/// Abstract base class for testing auth and header propagation through
+/// [DriverManager#getConnection(String, Properties)] for both
+/// HTTP (`jdbc:pinot://`) and gRPC (`jdbc:pinotgrpc://`) driver paths.
+///
+/// Subclasses provide the JDBC URL scheme and implement a single method to extract
+/// headers from their respective connection types. All assertions are handled in this
+/// base class for consistency.
+///
+/// A mock gRPC server is started for the pinotgrpc path validation query;
+/// the HTTP path does not require a mock server.
 public abstract class AbstractJdbcDriverAuthTest {
 
   protected Server _mockGrpcServer;
   protected int _mockGrpcPort;
   protected MetadataCapturingService _mockService;
 
-  /**
-   * Mock gRPC service that captures metadata from each incoming BrokerRequest.
-   */
+  /// Mock gRPC service that captures metadata from each incoming BrokerRequest.
   protected static class MetadataCapturingService extends PinotQueryBrokerGrpc.PinotQueryBrokerImplBase {
     private final List<Map<String, String>> _capturedMetadata = new CopyOnWriteArrayList<>();
     private final List<String> _capturedSql = new CopyOnWriteArrayList<>();
@@ -117,20 +113,20 @@ public abstract class AbstractJdbcDriverAuthTest {
     }
   }
 
-  /** Returns the JDBC URL for this driver variant. */
+  /// Returns the JDBC URL for this driver variant.
   protected abstract String getJdbcUrl();
 
-  /** Returns base connection properties including brokers. */
+  /// Returns base connection properties including brokers.
   protected abstract Properties getBaseProperties();
 
-  /**
-   * Extracts headers/metadata from the connection for verification.
-   * <p>For HTTP: extracts from {@code JsonAsyncHttpPinotClientTransport._headers}
-   * <p>For gRPC: extracts from {@code PinotGrpcConnection.getMetadataMap()}
-   *
-   * @param conn the JDBC connection
-   * @return map of header names to values
-   */
+  /// Extracts headers/metadata from the connection for verification.
+  ///
+  /// For HTTP: extracts from `JsonAsyncHttpPinotClientTransport._headers`
+  ///
+  /// For gRPC: extracts from `PinotGrpcConnection.getMetadataMap()`
+  ///
+  /// @param conn the JDBC connection
+  /// @return map of header names to values
   protected abstract Map<String, String> extractHeadersFromConnection(Connection conn)
       throws Exception;
 
@@ -186,9 +182,7 @@ public abstract class AbstractJdbcDriverAuthTest {
     }
   }
 
-  /**
-   * Tests that {@code headers.Authorization} (prefixed form) is handled by both driver paths.
-   */
+  /// Tests that `headers.Authorization` (prefixed form) is handled by both driver paths.
   @Test
   public void testHeadersPrefixAuthorizationPropagated()
       throws Exception {
@@ -203,10 +197,8 @@ public abstract class AbstractJdbcDriverAuthTest {
     }
   }
 
-  /**
-   * Tests that multiple {@code headers.*} prefixed properties are handled consistently.
-   * Uses dummy header names to avoid confusion with real Pinot headers.
-   */
+  /// Tests that multiple `headers.*` prefixed properties are handled consistently.
+  /// Uses dummy header names to avoid confusion with real Pinot headers.
   @Test
   public void testMultipleHeadersPrefixProperties()
       throws Exception {
@@ -232,9 +224,7 @@ public abstract class AbstractJdbcDriverAuthTest {
     }
   }
 
-  /**
-   * Tests that {@code headers.Authorization} takes precedence over {@code user}/{@code password}.
-   */
+  /// Tests that `headers.Authorization` takes precedence over `user`/`password`.
   @Test
   public void testHeadersPrefixAuthOverridesUserPassword()
       throws Exception {
@@ -251,11 +241,9 @@ public abstract class AbstractJdbcDriverAuthTest {
     }
   }
 
-  /**
-   * Tests that username and password specified in the JDBC URL query string
-   * (e.g., {@code jdbc:pinot://localhost:9000?user=Foo&password=Bar}) produce
-   * a valid Basic auth header.
-   */
+  /// Tests that username and password specified in the JDBC URL query string
+  /// (e.g., `jdbc:pinot://localhost:9000?user=Foo&password=Bar`) produce
+  /// a valid Basic auth header.
   @Test
   public void testUserPasswordInUrl()
       throws Exception {
@@ -272,10 +260,8 @@ public abstract class AbstractJdbcDriverAuthTest {
     }
   }
 
-  /**
-   * Tests that URL credentials override property credentials.
-   * Per the Javadoc: (username and password in URL) > (user and password specified in properties)
-   */
+  /// Tests that URL credentials override property credentials.
+  /// Per the Javadoc: (username and password in URL) > (user and password specified in properties)
   @Test
   public void testUrlCredentialsOverridePropertyCredentials()
       throws Exception {
@@ -299,12 +285,10 @@ public abstract class AbstractJdbcDriverAuthTest {
     }
   }
 
-  /**
-   * Tests that a direct {@code Authorization} property takes precedence over
-   * {@code headers.Authorization}. In {@link org.apache.pinot.client.utils.DriverUtils#handleAuth},
-   * the direct {@code Authorization} property is applied last, unconditionally overriding
-   * any value already in the headers map (including one extracted from {@code headers.Authorization}).
-   */
+  /// Tests that a direct `Authorization` property takes precedence over
+  /// `headers.Authorization`. In [org.apache.pinot.client.utils.DriverUtils#handleAuth],
+  /// the direct `Authorization` property is applied last, unconditionally overriding
+  /// any value already in the headers map (including one extracted from `headers.Authorization`).
   @Test
   public void testExplicitAuthOverridesHeadersPrefix()
       throws Exception {
@@ -320,10 +304,8 @@ public abstract class AbstractJdbcDriverAuthTest {
     }
   }
 
-  /**
-   * Tests that {@code headers.Authorization} takes precedence over URL credentials.
-   * Per the Javadoc: (headers.Authorization property) > (username and password in URL)
-   */
+  /// Tests that `headers.Authorization` takes precedence over URL credentials.
+  /// Per the Javadoc: (headers.Authorization property) > (username and password in URL)
   @Test
   public void testHeadersAuthOverridesUrlCredentials()
       throws Exception {

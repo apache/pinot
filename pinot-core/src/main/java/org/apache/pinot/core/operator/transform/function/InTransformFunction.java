@@ -39,12 +39,12 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * The IN transform function takes one main expression (lhs) and multiple value expressions.
- * <p>For each docId, the function returns {@code true} if the set of values contains the value of the expression,
- * {@code false} otherwise.
- * <p>E.g. {@code SELECT col IN ('a','b','c') FROM myTable)}
- */
+/// The IN transform function takes one main expression (lhs) and multiple value expressions.
+///
+/// For each docId, the function returns `true` if the set of values contains the value of the expression,
+/// `false` otherwise.
+///
+/// E.g. `SELECT col IN ('a','b','c') FROM myTable)`
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class InTransformFunction extends BaseTransformFunction {
   private TransformFunction _mainFunction;

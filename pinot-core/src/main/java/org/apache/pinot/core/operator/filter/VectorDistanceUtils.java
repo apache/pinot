@@ -24,9 +24,7 @@ import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
-/**
- * Shared exact-distance utilities for vector filter execution.
- */
+/// Shared exact-distance utilities for vector filter execution.
 public final class VectorDistanceUtils {
   private VectorDistanceUtils() {
   }

@@ -20,12 +20,17 @@ package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
@@ -77,5 +82,53 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
     assertEquals(deserialized, node);
     assertEquals(deserialized.isPrunedPassthrough(), false);
     assertEquals(deserialized.getPassthroughInputIndexes(), List.of());
+  }
+
+  /// Enriched joins have been removed, but [EnrichedJoinNode], proto field 17 and the serde are retained so a
+  /// plan produced by an older-version broker still round-trips (see [EnrichedJoinNode] deprecation note). The
+  /// planner no longer produces this node, so this direct round-trip is the only guard on that wire format. Because
+  /// `JoinNode#equals` ignores the enriched-specific fields, assert on them explicitly rather than via equals.
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testEnrichedJoinNodeSerDe() {
+    DataSchema joinResultSchema = new DataSchema(new String[]{"l0", "r0"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    DataSchema projectResultSchema = new DataSchema(new String[]{"p0"},
+        new ColumnDataType[]{ColumnDataType.INT});
+    List<EnrichedJoinNode.FilterProjectRex> filterProjectRexes = List.of(
+        new EnrichedJoinNode.FilterProjectRex(new RexExpression.InputRef(0)),
+        new EnrichedJoinNode.FilterProjectRex(List.of(new RexExpression.InputRef(1)), projectResultSchema));
+    EnrichedJoinNode node = new EnrichedJoinNode(1, joinResultSchema, projectResultSchema, PlanNode.NodeHint.EMPTY,
+        new ArrayList<>(), JoinRelType.INNER, List.of(0), List.of(0), List.of(), JoinNode.JoinStrategy.HASH, null,
+        filterProjectRexes, 10, 5);
+
+    EnrichedJoinNode deserialized = (EnrichedJoinNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized.getFetch(), 10);
+    assertEquals(deserialized.getOffset(), 5);
+    assertEquals(deserialized.getJoinResultSchema(), joinResultSchema);
+    assertEquals(deserialized.getDataSchema(), projectResultSchema);
+    List<EnrichedJoinNode.FilterProjectRex> roundTripped = deserialized.getFilterProjectRexes();
+    assertEquals(roundTripped.size(), 2);
+    assertEquals(roundTripped.get(0).getType(), EnrichedJoinNode.FilterProjectRexType.FILTER);
+    assertEquals(roundTripped.get(0).getFilter(), new RexExpression.InputRef(0));
+    assertEquals(roundTripped.get(1).getType(), EnrichedJoinNode.FilterProjectRexType.PROJECT);
+    assertEquals(roundTripped.get(1).getProjectAndResultSchema().getProject(),
+        List.of(new RexExpression.InputRef(1)));
+    assertEquals(roundTripped.get(1).getProjectAndResultSchema().getSchema(), projectResultSchema);
+  }
+
+  @Test
+  public void testAggregateGroupingSetsSerDe() {
+    /// The grouping sets (member indexes over the union group keys, in ordinal order) must survive serialization
+    /// to the worker. ROLLUP(g0, g1) over the union {g0, g1} expands to the sets (g0, g1), (g0), (). The empty
+    /// grand-total set in particular must round-trip as an entry (not vanish as a proto default).
+    DataSchema schema = new DataSchema(new String[]{"g0", "g1", "sum"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.DOUBLE});
+    List<List<Integer>> groupingSets = List.of(List.of(0, 1), List.of(0), List.of());
+    AggregateNode node = new AggregateNode(0, schema, PlanNode.NodeHint.EMPTY, List.of(), List.of(), List.of(),
+        List.of(0, 1), AggType.DIRECT, false, List.of(), 0, groupingSets);
+    AggregateNode deserialized = (AggregateNode) PlanNodeDeserializer.process(PlanNodeSerializer.process(node));
+    assertEquals(deserialized.getGroupingSets(), groupingSets);
+    assertEquals(deserialized, node);
   }
 }

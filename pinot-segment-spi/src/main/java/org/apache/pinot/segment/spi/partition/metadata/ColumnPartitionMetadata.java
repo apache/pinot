@@ -37,14 +37,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Class for partition related column metadata:
- * <ul>
- *   <li>The name of the Partition function used to map the column values to their partitions</li>
- *   <li>Total number of partitions</li>
- *   <li>Set of partitions the column contains</li>
- * </ul>
- */
+/// Class for partition related column metadata:
+///
+/// - The name of the Partition function used to map the column values to their partitions
+/// - Total number of partitions
+/// - Set of partitions the column contains
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonDeserialize(using = ColumnPartitionMetadata.ColumnPartitionMetadataDeserializer.class)
 public class ColumnPartitionMetadata {
@@ -53,14 +50,12 @@ public class ColumnPartitionMetadata {
   private final Map<String, String> _functionConfig;
   private final Set<Integer> _partitions;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param functionName Name of the partition function
-   * @param numPartitions Number of total partitions for this column
-   * @param partitions Set of partitions the column contains
-   * @param functionConfig Configuration required by partition function.
-   */
+  /// Constructor for the class.
+  ///
+  /// @param functionName Name of the partition function
+  /// @param numPartitions Number of total partitions for this column
+  /// @param partitions Set of partitions the column contains
+  /// @param functionConfig Configuration required by partition function.
   public ColumnPartitionMetadata(String functionName, int numPartitions, Set<Integer> partitions,
       @Nullable Map<String, String> functionConfig) {
     _functionName = functionName;
@@ -104,16 +99,13 @@ public class ColumnPartitionMetadata {
         + Objects.hashCode(_functionConfig);
   }
 
-  /**
-   * Helper method to extract partitions from configuration.
-   * <p>
-   * There are two format of partition strings:
-   * <ul>
-   *   <li>Integer format: e.g. {@code "0"}</li>
-   *   <li>Range format (legacy): e.g. {@code "[0 5]"}</li>
-   *   TODO: remove range format once all segments use integer format
-   * </ul>
-   */
+  /// Helper method to extract partitions from configuration.
+  ///
+  /// There are two format of partition strings:
+  ///
+  /// - Integer format: e.g. `"0"`
+  /// - Range format (legacy): e.g. `"[0 5]"`
+  ///   TODO: remove range format once all segments use integer format
   public static IntSet extractPartitions(List<Object> partitionList) {
     IntSet partitions = new IntOpenHashSet(partitionList.size());
     for (Object partition : partitionList) {
@@ -128,9 +120,7 @@ public class ColumnPartitionMetadata {
     return partitions;
   }
 
-  /**
-   * Helper method to add a partition range to a set of partitions.
-   */
+  /// Helper method to add a partition range to a set of partitions.
   private static void addRangeToPartitions(String rangeString, IntSet partitions) {
     int delimiterIndex = rangeString.indexOf(' ');
     int start = Integer.parseInt(rangeString.substring(1, delimiterIndex));
@@ -140,12 +130,10 @@ public class ColumnPartitionMetadata {
     }
   }
 
-  /**
-   * Custom deserializer for {@link ColumnPartitionMetadata}.
-   * <p>
-   * This deserializer understands the legacy range format: {@code "partitionRanges":"[0 0],[1 1]"}
-   * TODO: remove custom deserializer once all segments use integer format
-   */
+  /// Custom deserializer for [ColumnPartitionMetadata].
+  ///
+  /// This deserializer understands the legacy range format: `"partitionRanges":"[0 0],[1 1]"`
+  /// TODO: remove custom deserializer once all segments use integer format
   public static class ColumnPartitionMetadataDeserializer extends JsonDeserializer<ColumnPartitionMetadata> {
     private static final String FUNCTION_NAME_KEY = "functionName";
     private static final String NUM_PARTITIONS_KEY = "numPartitions";

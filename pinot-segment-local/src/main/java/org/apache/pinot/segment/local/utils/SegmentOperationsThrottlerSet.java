@@ -27,17 +27,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Contains all the segment operation throttlers used to control the total parallel segment related operations that can
- * happen on a given Pinot server. For now this class supports download throttling and index rebuild throttling at the
- * following levels:
- * - All index rebuild throttling
- * - StarTree index rebuild throttling
- * - Server level segment download throttling (this is taken after the table level download semaphore is taken)
- * Code paths that do not need to download or rebuild the index or which don't happen on the server need not utilize
- * this throttler. The throttlers passed in for now cannot be 'null', instead for code paths that do not need
- * throttling, this object itself will be passed in as 'null'.
- */
+/// Contains all the segment operation throttlers used to control the total parallel segment related operations that can
+/// happen on a given Pinot server. For now this class supports download throttling and index rebuild throttling at the
+/// following levels:
+/// - All index rebuild throttling
+/// - StarTree index rebuild throttling
+/// - Server level segment download throttling (this is taken after the table level download semaphore is taken)
+/// Code paths that do not need to download or rebuild the index or which don't happen on the server need not utilize
+/// this throttler. The throttlers passed in for now cannot be 'null', instead for code paths that do not need
+/// throttling, this object itself will be passed in as 'null'.
 public class SegmentOperationsThrottlerSet implements PinotClusterConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOperationsThrottlerSet.class);
 
@@ -46,13 +44,11 @@ public class SegmentOperationsThrottlerSet implements PinotClusterConfigChangeLi
   private final SegmentOperationsThrottler _segmentMultiColTextIndexPreprocessThrottler;
   private final SegmentOperationsThrottler _segmentDownloadThrottler;
 
-  /**
-   * Constructor for SegmentOperationsThrottlerSet
-   * @param segmentAllIndexPreprocessThrottler segment preprocess throttler to use for all indexes
-   * @param segmentStarTreePreprocessThrottler segment preprocess throttler to use for StarTree index
-   * @param segmentDownloadThrottler segment download throttler to throttle download at server level
-   * @param segmentMultiColTextIndexPreprocessThrottler segment preprocess throttler for multi-col text index
-   */
+  /// Constructor for SegmentOperationsThrottlerSet
+  /// @param segmentAllIndexPreprocessThrottler segment preprocess throttler to use for all indexes
+  /// @param segmentStarTreePreprocessThrottler segment preprocess throttler to use for StarTree index
+  /// @param segmentDownloadThrottler segment download throttler to throttle download at server level
+  /// @param segmentMultiColTextIndexPreprocessThrottler segment preprocess throttler for multi-col text index
   public SegmentOperationsThrottlerSet(SegmentOperationsThrottler segmentAllIndexPreprocessThrottler,
       SegmentOperationsThrottler segmentStarTreePreprocessThrottler,
       SegmentOperationsThrottler segmentDownloadThrottler,
@@ -79,11 +75,9 @@ public class SegmentOperationsThrottlerSet implements PinotClusterConfigChangeLi
     return _segmentDownloadThrottler;
   }
 
-  /**
-   * The ServerMetrics may be created after these objects are created. In that case, the initialization that happens
-   * in the constructor may have occurred on the NOOP metrics. This should be called after the server metrics are
-   * created and registered
-   */
+  /// The ServerMetrics may be created after these objects are created. In that case, the initialization that happens
+  /// in the constructor may have occurred on the NOOP metrics. This should be called after the server metrics are
+  /// created and registered
   public void initializeMetrics() {
     _segmentAllIndexPreprocessThrottler.initializeMetrics();
     _segmentStarTreePreprocessThrottler.initializeMetrics();

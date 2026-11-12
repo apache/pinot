@@ -40,23 +40,19 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Benchmark comparing three execution paths for single-column DISTINCT queries:
- *
- * <ul>
- *   <li><b>Sorted index path</b>: merge-iterates filter bitmap against contiguous doc ranges per dictId.
- *       Cost ~ O(dictionaryCardinality + filterCardinality). Only applicable when the column is sorted.</li>
- *   <li><b>Bitmap inverted index path</b>: iterates all dictionary entries, uses {@code intersects()} to check
- *       filter membership per entry. Cost ~ O(dictionaryCardinality * bitmapIntersectionCost).</li>
- *   <li><b>Scan path</b>: iterates all filtered docIds, looks up dictId from forward index, deduplicates.
- *       Cost ~ O(filterCardinality * forwardIndexLookupCost).</li>
- * </ul>
- *
- * <p>The sorted index path is always the fastest when applicable (column is sorted), as it avoids both
- * bitmap intersection and per-doc forward index lookups.
- *
- * <p>Usage: {@code java -jar pinot-perf/target/benchmarks.jar BenchmarkInvertedIndexDistinct}
- */
+/// Benchmark comparing three execution paths for single-column DISTINCT queries:
+///
+/// - **Sorted index path**: merge-iterates filter bitmap against contiguous doc ranges per dictId.
+///      Cost ~ O(dictionaryCardinality + filterCardinality). Only applicable when the column is sorted.
+/// - **Bitmap inverted index path**: iterates all dictionary entries, uses `intersects()` to check
+///      filter membership per entry. Cost ~ O(dictionaryCardinality \* bitmapIntersectionCost).
+/// - **Scan path**: iterates all filtered docIds, looks up dictId from forward index, deduplicates.
+///      Cost ~ O(filterCardinality \* forwardIndexLookupCost).
+///
+/// The sorted index path is always the fastest when applicable (column is sorted), as it avoids both
+/// bitmap intersection and per-doc forward index lookups.
+///
+/// Usage: `java -jar pinot-perf/target/benchmarks.jar BenchmarkInvertedIndexDistinct`
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -160,11 +156,9 @@ public class BenchmarkInvertedIndexDistinct {
     _filterBitmap = mutableFilterBitmap;
   }
 
-  /**
-   * Sorted index path: merge-iterate filter bitmap against contiguous doc ranges.
-   * Uses PeekableIntIterator.advanceIfNeeded() to skip filter docs between ranges.
-   * Cost ~ O(dictionaryCardinality + filterCardinality).
-   */
+  /// Sorted index path: merge-iterate filter bitmap against contiguous doc ranges.
+  /// Uses PeekableIntIterator.advanceIfNeeded() to skip filter docs between ranges.
+  /// Cost ~ O(dictionaryCardinality + filterCardinality).
   @Benchmark
   public int sortedIndexPath(Blackhole bh) {
     MutableRoaringBitmap seenDictIds = new MutableRoaringBitmap();
@@ -191,11 +185,9 @@ public class BenchmarkInvertedIndexDistinct {
     return valuesProcessed;
   }
 
-  /**
-   * Bitmap inverted index path: iterate all dictionary entries, intersect each with filter bitmap.
-   * Uses intersects() for early termination instead of computing full intersection.
-   * Cost ~ O(dictionaryCardinality * bitmapIntersectionCost).
-   */
+  /// Bitmap inverted index path: iterate all dictionary entries, intersect each with filter bitmap.
+  /// Uses intersects() for early termination instead of computing full intersection.
+  /// Cost ~ O(dictionaryCardinality \* bitmapIntersectionCost).
   @Benchmark
   public int invertedIndexPath(Blackhole bh) {
     MutableRoaringBitmap seenDictIds = new MutableRoaringBitmap();
@@ -214,10 +206,8 @@ public class BenchmarkInvertedIndexDistinct {
     return valuesProcessed;
   }
 
-  /**
-   * Scan path: iterate all filtered docIds, look up dictId from forward index, dedup.
-   * Cost ~ O(filterCardinality * forwardIndexLookupCost).
-   */
+  /// Scan path: iterate all filtered docIds, look up dictId from forward index, dedup.
+  /// Cost ~ O(filterCardinality \* forwardIndexLookupCost).
   @Benchmark
   public int scanPath(Blackhole bh) {
     MutableRoaringBitmap seenDictIds = new MutableRoaringBitmap();
@@ -235,11 +225,9 @@ public class BenchmarkInvertedIndexDistinct {
     return docsScanned;
   }
 
-  /**
-   * Inverted index path with ORDER BY ASC LIMIT: iterate dictIds forward, stop after finding
-   * {@code limit} matching values. Exploits dictId order = value order for early termination.
-   * Cost ~ O(limit / hitRate * bitmapIntersectionCost) where hitRate = distinctInFilter / cardinality.
-   */
+  /// Inverted index path with ORDER BY ASC LIMIT: iterate dictIds forward, stop after finding
+  /// `limit` matching values. Exploits dictId order = value order for early termination.
+  /// Cost ~ O(limit / hitRate \* bitmapIntersectionCost) where hitRate = distinctInFilter / cardinality.
   @Benchmark
   public int invertedIndexPathLimitAsc(Blackhole bh) {
     int limit = 10;
@@ -259,11 +247,9 @@ public class BenchmarkInvertedIndexDistinct {
     return found;
   }
 
-  /**
-   * Inverted index path with ORDER BY DESC LIMIT: iterate dictIds backward, stop after finding
-   * {@code limit} matching values. Exploits reverse dictId order for early termination.
-   * Cost ~ O(limit / hitRate * bitmapIntersectionCost).
-   */
+  /// Inverted index path with ORDER BY DESC LIMIT: iterate dictIds backward, stop after finding
+  /// `limit` matching values. Exploits reverse dictId order for early termination.
+  /// Cost ~ O(limit / hitRate \* bitmapIntersectionCost).
   @Benchmark
   public int invertedIndexPathLimitDesc(Blackhole bh) {
     int limit = 10;
@@ -283,11 +269,9 @@ public class BenchmarkInvertedIndexDistinct {
     return found;
   }
 
-  /**
-   * Sorted index path with ORDER BY DESC LIMIT: iterate dictIds backward, check filter presence
-   * using rangeCardinality. Exploits reverse iteration for early termination.
-   * Cost ~ O(limit / hitRate) since rangeCardinality on contiguous ranges is O(1).
-   */
+  /// Sorted index path with ORDER BY DESC LIMIT: iterate dictIds backward, check filter presence
+  /// using rangeCardinality. Exploits reverse iteration for early termination.
+  /// Cost ~ O(limit / hitRate) since rangeCardinality on contiguous ranges is O(1).
   @Benchmark
   public int sortedIndexPathLimitDesc(Blackhole bh) {
     int limit = 10;

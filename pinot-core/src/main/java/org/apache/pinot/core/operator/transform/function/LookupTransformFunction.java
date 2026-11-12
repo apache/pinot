@@ -34,33 +34,36 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * LOOKUP function takes 4 or more arguments:
- * <ul>
- *   <li><b>TableName:</b> name of the dimension table which will be used</li>
- *   <li><b>ColumnName:</b> column name from the dimension table to look up</li>
- *   <li><b>JoinKey:</b> primary key column name for the dimension table. Note: Only primary key[s] are supported for
- *   JoinKey</li>
- *   <li><b>JoinValue:</b> primary key value</li>
- *   ...<br>
- *   *[If the dimension table has more then one primary keys (composite pk)]
- *     <li><b>JoinKey2</b></li>
- *     <li><b>JoinValue2</b></li>
- *   ...
- * </ul>
- * <br>
- * Example:
- * <pre>{@code SELECT
- *    baseballStats.playerName,
- *    baseballStats.teamID,
- *    LOOKUP('dimBaseballTeams', 'teamName', 'teamID', baseballStats.teamID)
- * FROM
- *    baseballStats
- * LIMIT 10}</pre>
- * <br>
- * Above example joins the dimension table 'baseballTeams' into regular table 'baseballStats' on 'teamID' key.
- * Lookup function returns the value of the column 'teamName'.
- */
+/// LOOKUP function takes 4 or more arguments:
+///
+/// - **TableName:** name of the dimension table which will be used
+/// - **ColumnName:** column name from the dimension table to look up
+/// - **JoinKey:** primary key column name for the dimension table. Note: Only primary key\[s\] are supported for
+///   JoinKey
+/// - **JoinValue:** primary key value
+///   ...
+///
+///   \*\[If the dimension table has more then one primary keys (composite pk)\]
+/// - **JoinKey2**
+/// - **JoinValue2**
+///   ...
+///
+/// Example:
+///
+/// ```
+///  SELECT
+///    baseballStats.playerName,
+///    baseballStats.teamID,
+///    LOOKUP('dimBaseballTeams', 'teamName', 'teamID', baseballStats.teamID)
+/// FROM
+///    baseballStats
+/// LIMIT 10
+/// ```
+///
+/// Above example joins the dimension table 'baseballTeams' into regular table 'baseballStats' on 'teamID' key.
+/// Lookup function returns the value of the column 'teamName'.
+///
+/// Listed in DeleteStatement.CROSS_TABLE_FUNCTIONS: a DELETE predicate must not call this function.
 public class LookupTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "lookUp";
 
@@ -374,7 +377,9 @@ public class LookupTransformFunction extends BaseTransformFunction {
   }
 
   private void setBytesSV(int index, Object value) {
-    if (value instanceof byte[]) {
+    if (value instanceof ByteArray) {
+      _bytesValuesSV[index] = ((ByteArray) value).getBytes();
+    } else if (value instanceof byte[]) {
       _bytesValuesSV[index] = (byte[]) value;
     } else {
       _bytesValuesSV[index] = EMPTY_BYTES;

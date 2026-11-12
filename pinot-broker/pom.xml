@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.6.0-SNAPSHOT</version>
+    <version>1.7.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-broker</artifactId>
   <name>Pinot Broker</name>
@@ -76,6 +76,17 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
       <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      Required by ControllerTest in the pinot-controller test-jar above, which uses PinotAdminClient.
+      pinot-controller declares pinot-java-client at test scope, and test-scoped dependencies are not
+      transitive, so it does not reach pinot-broker's test classpath. The other consumers of the
+      controller test-jar already have it, either declared directly or via pinot-integration-test-base.
+    -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-java-client</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

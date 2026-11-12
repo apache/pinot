@@ -27,34 +27,28 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 
-/**
- * Utility class containing helper method for accessing a particular resource
- */
+/// Utility class containing helper method for accessing a particular resource
 public class ResourceFinder {
   private ResourceFinder() {
   }
 
-  /**
-   * Access a resource for a particular URI
-   *
-   * @param uri of the resource
-   * @return InputStream containing file contents
-   * @throws IOException
-   */
+  /// Access a resource for a particular URI
+  ///
+  /// @param uri of the resource
+  /// @return InputStream containing file contents
+  /// @throws IOException
   public static InputStream openResource(URI uri)
       throws IOException {
     File file = new File(uri);
     return new FileInputStream(file);
   }
 
-  /**
-   * Access a resource on a FilePath
-   *
-   * @param classLoader ClassPath for the resource
-   * @param pathName Absolute or Relative Path of the resource
-   * @return InputStream containing file contents
-   * @throws IOException
-   */
+  /// Access a resource on a FilePath
+  ///
+  /// @param classLoader ClassPath for the resource
+  /// @param pathName Absolute or Relative Path of the resource
+  /// @return InputStream containing file contents
+  /// @throws IOException
   public static InputStream openResource(ClassLoader classLoader, String pathName)
       throws IOException {
     Path path = Paths.get(pathName);
@@ -65,14 +59,12 @@ public class ResourceFinder {
     }
   }
 
-  /**
-   * Access a resource on a Relative FilePath
-   *
-   * @param classLoader ClassPath for the resource
-   * @param pathName Relative Path of the resource
-   * @return InputStream containing file contents
-   * @throws IOException
-   */
+  /// Access a resource on a Relative FilePath
+  ///
+  /// @param classLoader ClassPath for the resource
+  /// @param pathName Relative Path of the resource
+  /// @return InputStream containing file contents
+  /// @throws IOException
   public static InputStream openResourceWithRelativePath(ClassLoader classLoader, String pathName)
       throws IOException {
     return classLoader.getResourceAsStream(pathName);

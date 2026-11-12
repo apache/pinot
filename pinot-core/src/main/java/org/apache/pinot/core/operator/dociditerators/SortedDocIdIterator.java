@@ -24,10 +24,8 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 
 
-/**
- * The {@code SortedDocIdIterator} is the iterator for SortedDocIdSet to iterate over a list of matching document id
- * ranges from a sorted column.
- */
+/// The `SortedDocIdIterator` is the iterator for SortedDocIdSet to iterate over a list of matching document id
+/// ranges from a sorted column.
 public final class SortedDocIdIterator implements BlockDocIdIterator {
   private final List<IntPair> _docIdRanges;
   private final int _numRanges;

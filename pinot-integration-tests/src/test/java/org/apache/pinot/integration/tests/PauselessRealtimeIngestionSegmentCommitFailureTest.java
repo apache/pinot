@@ -19,20 +19,19 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
-import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
@@ -56,17 +55,27 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 
 
+/// Verifies recovery from server-side segment commit and consuming-transition failures with one shared cluster.
 public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClusterIntegrationTest {
-  private static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
-  private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000L;
+  private static final String REFERENCE_TABLE_NAME = DEFAULT_TABLE_NAME + "_reference";
+  private static final long VALIDATION_RERUN_INTERVAL_MS = 10_000L;
 
+  private FailureScenario _failureScenario;
+  private File _sampleAvroFile;
+
+  @Override
+  protected String getTableName() {
+    return _failureScenario != null ? getPauselessTableName(_failureScenario) : getNonPauselessTableName();
+  }
+
+  @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, true);
-    // Set the delay more than the time we sleep before triggering RealtimeSegmentValidationManager manually, i.e.
-    // MAX_SEGMENT_COMPLETION_TIME_MILLIS, to ensure that the segment level validations are performed.
+    // Recovery is triggered explicitly by each scenario. Keep the scheduled validator from racing it while this
+    // class shares one controller across both scenarios.
     properties.put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
-        500);
+        3600);
   }
 
   @Override
@@ -75,9 +84,12 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     serverConf.setProperty("pinot.server.instance." + HelixInstanceDataManagerConfig.UPLOAD_SEGMENT_TO_DEEP_STORE,
         "true");
     serverConf.setProperty("pinot.server.instance." + CommonConstants.Server.TABLE_DATA_MANAGER_PROVIDER_CLASS,
-        "org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider");
-    serverConf.setProperty("pinot.server.instance." + FailureInjectingTableDataManagerProvider.FAILURE_CONFIG_KEY + "."
-        + getPauselessTableName(), new FailureInjectingTableConfig(true, false, getExpectedMaxFailures()).toJson());
+        FailureInjectingTableDataManagerProvider.class.getName());
+    for (FailureScenario failureScenario : FailureScenario.values()) {
+      serverConf.setProperty(
+          "pinot.server.instance." + FailureInjectingTableDataManagerProvider.FAILURE_CONFIG_KEY + "."
+              + getPauselessTableName(failureScenario), failureScenario._failureConfig.toJson());
+    }
   }
 
   @Override
@@ -85,48 +97,31 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     return new FailureInjectingControllerStarter();
   }
 
-  @BeforeClass
+  @BeforeClass(alwaysRun = true)
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    // Start the Pinot cluster
     startZk();
-    // Start Kafka
     startKafka();
-    // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
-    startServer();
+    startServers(getNumServersForTest());
 
-    // load data in kafka
     List<File> avroFiles = unpackAvroData(_tempDir);
+    _sampleAvroFile = avroFiles.get(0);
     pushAvroIntoKafka(avroFiles);
+    setupReferenceTable();
+  }
 
-    setMaxSegmentCompletionTimeMillis();
-    // create schema for non-pauseless table
-    Schema schema = createSchema();
-    schema.setSchemaName(DEFAULT_TABLE_NAME_2);
-    addSchema(schema);
+  protected int getNumServersForTest() {
+    return 1;
+  }
 
-    // add non-pauseless table
-    TableConfig tableConfig2 = createRealtimeTableConfig(avroFiles.get(0));
-    tableConfig2.setTableName(DEFAULT_TABLE_NAME_2);
-    tableConfig2.getValidationConfig().setRetentionTimeUnit("DAYS");
-    tableConfig2.getValidationConfig().setRetentionTimeValue("100000");
-    addTableConfig(tableConfig2);
+  protected TableConfig createTestTableConfig(File sampleAvroFile) {
+    return createRealtimeTableConfig(sampleAvroFile);
+  }
 
-    waitForAllDocsLoaded(tableConfig2.getTableName(), 600_000L);
-
-    // create schema for pauseless table
-    schema.setSchemaName(getPauselessTableName());
-    addSchema(schema);
-
-    // add pauseless table
-    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
-    tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
-    tableConfig.getValidationConfig().setRetentionTimeValue("100000");
-
+  protected void configurePauselessTable(TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
     indexingConfig.setStreamConfigs(null);
@@ -137,23 +132,10 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     streamIngestionConfig.setPauselessConsumptionEnabled(true);
     ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     tableConfig.setIngestionConfig(ingestionConfig);
-
-    addTableConfig(tableConfig);
-    String realtimeTableName = tableConfig.getTableName();
-    TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) == getExpectedMaxFailures(),
-        600_000L, "Segments still not in error state");
   }
 
-  protected int getExpectedMaxFailures() {
-    return 10;
-  }
-
-  protected void setMaxSegmentCompletionTimeMillis() {
-    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
-    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).setMaxSegmentCompletionTimeoutMs(
-          MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    }
+  protected boolean hasExpectedErrorSegments(String realtimeTableName, int expectedMaxFailures) {
+    return getNumErrorSegmentsInEV(realtimeTableName) == expectedMaxFailures;
   }
 
   protected int getNumErrorSegmentsInEV(String realtimeTableName) {
@@ -174,34 +156,124 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   }
 
   @Test
-  public void testSegmentAssignment()
+  public void testSegmentCommitFailure()
       throws Exception {
-    String pauselessTableName = TableNameBuilder.REALTIME.tableNameWithType(getPauselessTableName());
+    runFailureScenario(FailureScenario.SEGMENT_COMMIT);
+  }
 
-    // 1) Capture which segments went into the ERROR state
+  @Test
+  public void testConsumingTransitionFailure()
+      throws Exception {
+    runFailureScenario(FailureScenario.CONSUMING_TRANSITION);
+  }
+
+  private synchronized void runFailureScenario(FailureScenario failureScenario)
+      throws Exception {
+    _failureScenario = failureScenario;
+    Throwable testFailure = null;
+    try {
+      setupPauselessTable(failureScenario);
+      verifyRecovery(failureScenario);
+    } catch (Exception e) {
+      testFailure = e;
+      throw e;
+    } catch (Error e) {
+      testFailure = e;
+      throw e;
+    } finally {
+      Throwable cleanupFailure;
+      try {
+        cleanupFailure = tearDownFailureScenario(failureScenario);
+      } finally {
+        _failureScenario = null;
+      }
+      if (cleanupFailure != null) {
+        if (testFailure != null) {
+          testFailure.addSuppressed(cleanupFailure);
+        } else {
+          rethrowCleanupFailure(cleanupFailure);
+        }
+      }
+    }
+  }
+
+  private void setupReferenceTable()
+      throws Exception {
+    Schema schema = createSchema();
+    schema.setSchemaName(getNonPauselessTableName());
+    addSchema(schema);
+
+    TableConfig tableConfig = createTestTableConfig(_sampleAvroFile);
+    tableConfig.setTableName(TableNameBuilder.REALTIME.tableNameWithType(getNonPauselessTableName()));
+    configureRetention(tableConfig);
+    addTableConfig(tableConfig);
+    waitForAllDocsLoaded(tableConfig.getTableName(), 600_000L);
+  }
+
+  private void setupPauselessTable(FailureScenario failureScenario)
+      throws Exception {
+    String tableName = getPauselessTableName(failureScenario);
+    Schema schema = createSchema();
+    schema.setSchemaName(tableName);
+    addSchema(schema);
+
+    TableConfig tableConfig = createTestTableConfig(_sampleAvroFile);
+    tableConfig.setTableName(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    configureRetention(tableConfig);
+    configurePauselessTable(tableConfig);
+    addTableConfig(tableConfig);
+
+    String realtimeTableName = tableConfig.getTableName();
+    TestUtils.waitForCondition(
+        aVoid -> hasExpectedErrorSegments(realtimeTableName, failureScenario._expectedMaxFailures), 600_000L,
+        "Segments still not in error state");
+  }
+
+  private static void configureRetention(TableConfig tableConfig) {
+    tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
+    tableConfig.getValidationConfig().setRetentionTimeValue("100000");
+  }
+
+  private void verifyRecovery(FailureScenario failureScenario) {
+    String pauselessTableName = TableNameBuilder.REALTIME.tableNameWithType(getPauselessTableName(failureScenario));
+
     List<String> erroredSegments = getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR);
     assertFalse(erroredSegments.isEmpty(), "No segments found in ERROR state, expected at least one.");
 
-    // Let the RealtimeSegmentValidationManager run so it can fix up segments
-    Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    _controllerStarter.getRealtimeSegmentValidationManager().run();
+    // Segments in ERROR state are repaired by the segment-level validation (re-ingestion for COMMITTING segments,
+    // reset for IN_PROGRESS segments), which runs periodically in production. Run it periodically here as well
+    // instead of asserting on a single pass: the failure injection keeps producing new ERROR states past any single
+    // pass — replicas hit the injected failures independently while the table is still consuming, and every reset of
+    // a consuming segment creates a new segment data manager that draws from the remaining failure budget. The
+    // re-runs are spaced out so that a pass does not re-trigger repairs (re-ingestion, reset) that are still in
+    // flight from the previous pass, while the ERROR-empty check itself polls at the usual 1s granularity.
+    long[] lastValidationRunMs = new long[1];
+    TestUtils.waitForCondition(aVoid -> {
+      if (getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR).isEmpty()) {
+        return true;
+      }
+      long nowMs = System.currentTimeMillis();
+      if (nowMs - lastValidationRunMs[0] >= VALIDATION_RERUN_INTERVAL_MS) {
+        lastValidationRunMs[0] = nowMs;
+        runSegmentLevelValidation();
+      }
+      return false;
+    }, 1000L, 600_000L, "Some segments are still in ERROR state after repeated validation runs");
 
-    // Wait until there are no ERROR segments in the ExternalView
-    TestUtils.waitForCondition(aVoid -> getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR).isEmpty(),
-        600_000L, "Some segments are still in ERROR state after resetSegments()");
-    // Segment in EV must not be offline for pauseless table
     TestUtils.waitForCondition(aVoid -> getSegmentsInEV(pauselessTableName, SegmentStateModel.OFFLINE).isEmpty(),
         30_000L, "Some segments are in OFFLINE state after resetSegments()");
 
-    // Finally compare metadata across your two tables
     compareZKMetadataForSegments(_helixResourceManager.getSegmentsZKMetadata(pauselessTableName),
         _helixResourceManager.getSegmentsZKMetadata(
             TableNameBuilder.REALTIME.tableNameWithType(getNonPauselessTableName())));
   }
 
-  /**
-   * Returns the list of segment names in the given state from the ExternalView of the given table.
-   */
+  private void runSegmentLevelValidation() {
+    Properties periodicTaskProperties = new Properties();
+    periodicTaskProperties.setProperty(ControllerPeriodicTask.RUN_SEGMENT_LEVEL_VALIDATION, Boolean.TRUE.toString());
+    _controllerStarter.getRealtimeSegmentValidationManager().run(periodicTaskProperties);
+  }
+
   private List<String> getSegmentsInEV(String realtimeTableName, String status) {
     ExternalView externalView = _helixResourceManager.getHelixAdmin()
         .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
@@ -218,25 +290,25 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   }
 
   private void compareZKMetadataForSegments(List<SegmentZKMetadata> segmentsZKMetadata,
-      List<SegmentZKMetadata> segmentsZKMetadata1) {
+      List<SegmentZKMetadata> referenceSegmentsZKMetadata) {
     Map<String, SegmentZKMetadata> segmentZKMetadataMap = getPartitionSegmentNumberToMetadataMap(segmentsZKMetadata);
-    Map<String, SegmentZKMetadata> segmentZKMetadataMap1 = getPartitionSegmentNumberToMetadataMap(segmentsZKMetadata1);
-    segmentZKMetadataMap.forEach((segmentKey, segmentZKMetadata) -> {
-      SegmentZKMetadata segmentZKMetadata1 = segmentZKMetadataMap1.get(segmentKey);
-      areSegmentZkMetadataSame(segmentZKMetadata, segmentZKMetadata1);
-    });
+    Map<String, SegmentZKMetadata> referenceSegmentZKMetadataMap =
+        getPartitionSegmentNumberToMetadataMap(referenceSegmentsZKMetadata);
+    segmentZKMetadataMap.forEach((segmentKey, segmentZKMetadata) ->
+        assertSegmentZKMetadataSame(segmentZKMetadata, referenceSegmentZKMetadataMap.get(segmentKey)));
   }
 
-  private void areSegmentZkMetadataSame(SegmentZKMetadata segmentZKMetadata, SegmentZKMetadata segmentZKMetadata1) {
+  private void assertSegmentZKMetadataSame(SegmentZKMetadata segmentZKMetadata,
+      SegmentZKMetadata referenceSegmentZKMetadata) {
     if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.DONE) {
       return;
     }
-    assertEquals(segmentZKMetadata.getStatus(), segmentZKMetadata1.getStatus());
-    assertEquals(segmentZKMetadata.getStartOffset(), segmentZKMetadata1.getStartOffset());
-    assertEquals(segmentZKMetadata.getEndOffset(), segmentZKMetadata1.getEndOffset());
-    assertEquals(segmentZKMetadata.getTotalDocs(), segmentZKMetadata1.getTotalDocs());
-    assertEquals(segmentZKMetadata.getStartTimeMs(), segmentZKMetadata1.getStartTimeMs());
-    assertEquals(segmentZKMetadata.getEndTimeMs(), segmentZKMetadata1.getEndTimeMs());
+    assertEquals(segmentZKMetadata.getStatus(), referenceSegmentZKMetadata.getStatus());
+    assertEquals(segmentZKMetadata.getStartOffset(), referenceSegmentZKMetadata.getStartOffset());
+    assertEquals(segmentZKMetadata.getEndOffset(), referenceSegmentZKMetadata.getEndOffset());
+    assertEquals(segmentZKMetadata.getTotalDocs(), referenceSegmentZKMetadata.getTotalDocs());
+    assertEquals(segmentZKMetadata.getStartTimeMs(), referenceSegmentZKMetadata.getStartTimeMs());
+    assertEquals(segmentZKMetadata.getEndTimeMs(), referenceSegmentZKMetadata.getEndTimeMs());
   }
 
   private Map<String, SegmentZKMetadata> getPartitionSegmentNumberToMetadataMap(
@@ -251,22 +323,145 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   }
 
   protected String getNonPauselessTableName() {
-    return DEFAULT_TABLE_NAME_2;
+    return REFERENCE_TABLE_NAME;
   }
 
-  protected String getPauselessTableName() {
-    return DEFAULT_TABLE_NAME;
+  private static String getPauselessTableName(FailureScenario failureScenario) {
+    return DEFAULT_TABLE_NAME + "_" + failureScenario._tableNameSuffix;
   }
 
-  @AfterClass
+  private Throwable tearDownFailureScenario(FailureScenario failureScenario) {
+    return cleanUpTableAndSchema(getPauselessTableName(failureScenario), null);
+  }
+
+  @AfterClass(alwaysRun = true)
   public void tearDown()
-      throws IOException {
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+      throws Exception {
+    Throwable cleanupFailure = null;
+    for (FailureScenario failureScenario : FailureScenario.values()) {
+      cleanupFailure = cleanUpTableAndSchema(getPauselessTableName(failureScenario), cleanupFailure);
+    }
+    cleanupFailure = cleanUpTableAndSchema(getNonPauselessTableName(), cleanupFailure);
+    try {
+      if (!_serverStarters.isEmpty()) {
+        stopServer();
+      }
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      if (!_brokerStarters.isEmpty()) {
+        stopBroker();
+      }
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      if (_controllerStarter != null) {
+        stopController();
+      }
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      stopKafka();
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      stopZk();
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    try {
+      FileUtils.deleteDirectory(_tempDir);
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    if (cleanupFailure != null) {
+      rethrowCleanupFailure(cleanupFailure);
+    }
+  }
+
+  private Throwable cleanUpTableAndSchema(String rawTableName, Throwable cleanupFailure) {
+    if (_helixResourceManager == null) {
+      return cleanupFailure;
+    }
+
+    try {
+      if (_helixResourceManager.getRealtimeTableConfig(rawTableName) != null) {
+        dropRealtimeTable(rawTableName);
+      }
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    boolean externalViewRemoved = false;
+    try {
+      waitForEVToDisappear(tableNameWithType);
+      externalViewRemoved = true;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+    boolean tableDataManagerRemoved = false;
+    try {
+      waitForTableDataManagerRemoved(tableNameWithType);
+      tableDataManagerRemoved = true;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    boolean tableConfigRemoved = false;
+    try {
+      tableConfigRemoved = _helixResourceManager.getRealtimeTableConfig(rawTableName) == null;
+    } catch (Throwable t) {
+      cleanupFailure = addCleanupFailure(cleanupFailure, t);
+    }
+
+    if (tableConfigRemoved && externalViewRemoved && tableDataManagerRemoved) {
+      try {
+        if (_helixResourceManager.getSchema(rawTableName) != null) {
+          deleteSchema(rawTableName);
+        }
+      } catch (Throwable t) {
+        cleanupFailure = addCleanupFailure(cleanupFailure, t);
+      }
+    }
+    return cleanupFailure;
+  }
+
+  private static Throwable addCleanupFailure(Throwable cleanupFailure, Throwable failure) {
+    if (cleanupFailure == null) {
+      return failure;
+    }
+    cleanupFailure.addSuppressed(failure);
+    return cleanupFailure;
+  }
+
+  private static void rethrowCleanupFailure(Throwable cleanupFailure)
+      throws Exception {
+    if (cleanupFailure instanceof Error) {
+      throw (Error) cleanupFailure;
+    }
+    if (cleanupFailure instanceof Exception) {
+      throw (Exception) cleanupFailure;
+    }
+    throw new RuntimeException(cleanupFailure);
+  }
+
+  private enum FailureScenario {
+    SEGMENT_COMMIT("segmentCommitFailure", new FailureInjectingTableConfig(true, false, 10)),
+    CONSUMING_TRANSITION("consumingTransitionFailure", new FailureInjectingTableConfig(false, true, 2));
+
+    private final String _tableNameSuffix;
+    private final FailureInjectingTableConfig _failureConfig;
+    private final int _expectedMaxFailures;
+
+    FailureScenario(String tableNameSuffix, FailureInjectingTableConfig failureConfig) {
+      _tableNameSuffix = tableNameSuffix;
+      _failureConfig = failureConfig;
+      _expectedMaxFailures = failureConfig.getMaxFailures();
+    }
   }
 }

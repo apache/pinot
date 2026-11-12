@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -70,9 +69,7 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
     return value;
   }
 
-  /**
-   * Adds a raw value (single value or multi-value array) to the QuantileDigest.
-   */
+  /// Adds a raw value (single value or multi-value array) to the QuantileDigest.
   protected void addToDigest(QuantileDigest digest, Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
@@ -120,11 +117,11 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
 
   @Override
   public byte[] serializeAggregatedValue(QuantileDigest value) {
-    return CustomSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(value);
+    return value.toBytes();
   }
 
   @Override
   public QuantileDigest deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytes);
+    return QuantileDigest.fromBytes(bytes);
   }
 }

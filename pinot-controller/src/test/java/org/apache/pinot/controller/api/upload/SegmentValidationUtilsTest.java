@@ -22,10 +22,11 @@ import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -34,12 +35,14 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.expectThrows;
 
 
@@ -127,10 +130,11 @@ public class SegmentValidationUtilsTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(Map.of(PARTITION_COLUMN,
             new ColumnPartitionConfig("Murmur", NUM_PARTITIONS), "otherPartitionColumn",
             new ColumnPartitionConfig("Modulo", NUM_PARTITIONS))))
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.name(),
+            new SegmentAssignmentConfig(null, PARTITION_COLUMN)))
         .build();
 
     SegmentValidationUtils.validateUpsertSegmentPartitionMetadata(mockSegmentMetadata(Set.of(1)), tableConfig);
@@ -140,7 +144,8 @@ public class SegmentValidationUtilsTest {
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1))
+        .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.name(),
+            new SegmentAssignmentConfig(null, PARTITION_COLUMN)))
         .build();
   }
 
@@ -172,5 +177,31 @@ public class SegmentValidationUtilsTest {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(columnMetadata.getPartitions()).thenReturn(partitions);
     return columnMetadata;
+  }
+
+  @Test
+  public void testCheckStorageQuotaThrowsWhenEnforced()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    StorageQuotaChecker quotaChecker = mock(StorageQuotaChecker.class);
+    when(quotaChecker.isSegmentStorageWithinQuota(tableConfig, SEGMENT_NAME, 1024, 4096))
+        .thenReturn(StorageQuotaChecker.failure("over quota"));
+    when(quotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.ENFORCED);
+
+    assertThrows(ControllerApplicationException.class,
+        () -> SegmentValidationUtils.checkStorageQuota(SEGMENT_NAME, 1024, 4096, tableConfig, quotaChecker));
+  }
+
+  @Test
+  public void testCheckStorageQuotaDoesNotThrowInShadowMode()
+      throws Exception {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    StorageQuotaChecker quotaChecker = mock(StorageQuotaChecker.class);
+    when(quotaChecker.isSegmentStorageWithinQuota(tableConfig, SEGMENT_NAME, 1024, 4096))
+        .thenReturn(StorageQuotaChecker.failure("over quota"));
+    when(quotaChecker.getEnforcementMode(tableConfig)).thenReturn(QuotaEnforcementMode.SHADOW);
+
+    // should not throw despite the quota breach
+    SegmentValidationUtils.checkStorageQuota(SEGMENT_NAME, 1024, 4096, tableConfig, quotaChecker);
   }
 }

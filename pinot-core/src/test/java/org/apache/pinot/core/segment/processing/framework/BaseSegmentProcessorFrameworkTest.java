@@ -71,11 +71,9 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Abstract base class for SegmentProcessorFramework tests.
- * Contains all test logic and setup, with abstract methods for processing that
- * concrete implementations override to use either SPF or CSPF.
- */
+/// Abstract base class for SegmentProcessorFramework tests.
+/// Contains all test logic and setup, with abstract methods for processing that
+/// concrete implementations override to use either SPF or CSPF.
 public abstract class BaseSegmentProcessorFrameworkTest {
   protected static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentProcessorFrameworkTest");
 
@@ -106,10 +104,8 @@ public abstract class BaseSegmentProcessorFrameworkTest {
           new Object[]{null, null, 1597795200000L}, new Object[]{null, 1000, 1597795200000L},
           new Object[]{new String[]{"a", "b"}, null, 1597795200000L});
 
-  /**
-   * Abstract method for processing segments.
-   * Concrete implementations create appropriate readers (RecordReader for SPF, ColumnarDataSource for CSPF).
-   */
+  /// Abstract method for processing segments.
+  /// Concrete implementations create appropriate readers (RecordReader for SPF, ColumnarDataSource for CSPF).
   protected abstract List<File> processSegments(List<File> segmentDirs, SegmentProcessorConfig config, File workingDir)
       throws Exception;
 
@@ -170,10 +166,8 @@ public abstract class BaseSegmentProcessorFrameworkTest {
         createInputSegments(new File(TEMP_DIR, "multi_value_segment"), _rawDataMultiValue, 1, _schemaMV);
   }
 
-  /**
-   * Create input segments and return the list of segment directories.
-   * This is changed from the original to return List<File> instead of List<RecordReader>.
-   */
+  /// Create input segments and return the list of segment directories.
+  /// This is changed from the original to return List<File> instead of List<RecordReader>.
   private List<File> createInputSegments(File inputDir, List<Object[]> rawData, int numSegments, Schema schema)
       throws Exception {
     assertTrue(inputDir.mkdirs());
@@ -602,9 +596,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     FileUtils.cleanDirectory(workingDir);
   }
 
-  /**
-   * Helper method to create multiple input segments with controlled data distribution.
-   */
+  /// Helper method to create multiple input segments with controlled data distribution.
   protected List<File> createMultipleInputSegments(File inputDir, List<List<Object[]>> segmentDataLists,
       Schema schema)
       throws Exception {
@@ -629,9 +621,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     return segmentDirs;
   }
 
-  /**
-   * Helper method to create segment with invalid data for specific column/rows.
-   */
+  /// Helper method to create segment with invalid data for specific column/rows.
   protected List<File> createSegmentWithInvalidData(File inputDir, List<Object[]> data, Schema schema,
       String invalidColumn, Set<Integer> invalidRowIndices)
       throws Exception {
@@ -675,9 +665,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     return List.of(driver.getOutputDirectory());
   }
 
-  /**
-   * Helper method to generate test data with specific partition values and times.
-   */
+  /// Helper method to generate test data with specific partition values and times.
   protected List<Object[]> generatePartitionedData(int numDocs, String campaignValue, long baseTime) {
     List<Object[]> data = new ArrayList<>();
     for (int i = 0; i < numDocs; i++) {

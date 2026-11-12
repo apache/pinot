@@ -164,6 +164,18 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Map<String, String> upsertCompactMergeTaskConfig1 = Map.of("bufferTimePeriod", "5hd");
     Assert.assertThrows(IllegalArgumentException.class,
         () -> _taskGenerator.validateTaskConfigs(validTableConfig, new Schema(), upsertCompactMergeTaskConfig1));
+
+    // metadataTTL enabled is not supported with UpsertCompactMergeTask
+    UpsertConfig ttlUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    ttlUpsertConfig.setSnapshot(Enablement.ENABLE);
+    ttlUpsertConfig.setMetadataTTL(30);
+    TableConfig metadataTtlTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setUpsertConfig(ttlUpsertConfig)
+        .setTaskConfig(
+            new TableTaskConfig(Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, upsertCompactMergeTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> _taskGenerator.validateTaskConfigs(metadataTtlTableConfig, new Schema(), upsertCompactMergeTaskConfig));
   }
 
   @Test
@@ -306,11 +318,9 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertEquals(_taskGenerator.getMaxZKCreationTimeMillis(segmentMergerMetadataList), creationTime2);
   }
 
-  /**
-   * Tests the generateTasks method with various scenarios.
-   * This test is disabled because it requires complex mocking of server segment metadata reader.
-   * The actual integration test covers this scenario.
-   */
+  /// Tests the generateTasks method with various scenarios.
+  /// This test is disabled because it requires complex mocking of server segment metadata reader.
+  /// The actual integration test covers this scenario.
   @Test(enabled = false)
   public void testGenerateTasks()
       throws Exception {
@@ -318,9 +328,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     // which is better covered in the integration test
   }
 
-  /**
-   * Tests task generation with incomplete tasks present.
-   */
+  /// Tests task generation with incomplete tasks present.
   @Test
   public void testGenerateTasksWithIncompleteTasks() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
@@ -350,9 +358,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     }
   }
 
-  /**
-   * Tests processValidDocIdsMetadata method.
-   */
+  /// Tests processValidDocIdsMetadata method.
   @Test
   public void testProcessValidDocIdsMetadata() {
     Map<String, String> taskConfigs = new HashMap<>();
@@ -387,9 +393,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertTrue(segmentsByPartition.containsKey(0), "Should have segments for partition 0");
   }
 
-  /**
-   * Tests processValidDocIdsMetadata with segments that should be deleted.
-   */
+  /// Tests processValidDocIdsMetadata with segments that should be deleted.
   @Test
   public void testProcessValidDocIdsMetadataWithSegmentsForDeletion() {
     Map<String, String> taskConfigs = new HashMap<>();
@@ -420,10 +424,8 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertTrue(result.getSegmentsForDeletion().contains("testTable__0__0__12345"));
   }
 
-  /**
-   * Tests that replica consensus is enforced before a segment is selected. Uses the deletion path (a fully-invalid
-   * segment) as a clean signal: the segment is processed only when its replicas pass the consensus check.
-   */
+  /// Tests that replica consensus is enforced before a segment is selected. Uses the deletion path (a fully-invalid
+  /// segment) as a clean signal: the segment is processed only when its replicas pass the consensus check.
   @Test
   public void testProcessValidDocIdsMetadataConsensus() {
     Map<String, String> taskConfigs = new HashMap<>();
@@ -490,9 +492,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
         ValidDocIdsType.SNAPSHOT, 1000, System.currentTimeMillis(), instanceId, serverStatus);
   }
 
-  /**
-   * Tests getCandidateSegments with various edge cases.
-   */
+  /// Tests getCandidateSegments with various edge cases.
   @Test
   public void testGetCandidateSegmentsEdgeCases() {
     Map<String, String> taskConfigs = new HashMap<>();
@@ -519,17 +519,13 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertEquals(candidates.size(), 1, "Should include segments with endTime = 0");
   }
 
-  /**
-   * Tests task type method.
-   */
+  /// Tests task type method.
   @Test
   public void testGetTaskType() {
     Assert.assertEquals(_taskGenerator.getTaskType(), MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
   }
 
-  /**
-   * Tests validation with offline table (should fail).
-   */
+  /// Tests validation with offline table (should fail).
   @Test(expectedExceptions = IllegalStateException.class)
   public void testValidateTaskConfigsWithOfflineTable() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
@@ -538,9 +534,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), Map.of());
   }
 
-  /**
-   * Tests validation with invalid time period format.
-   */
+  /// Tests validation with invalid time period format.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testValidateTaskConfigsWithInvalidTimePeriod() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
@@ -555,9 +549,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), taskConfigs);
   }
 
-  /**
-   * Tests getAlreadyMergedSegments with complex scenarios.
-   */
+  /// Tests getAlreadyMergedSegments with complex scenarios.
   @Test
   public void testGetAlreadyMergedSegmentsComplex() {
     // Create multiple merged segments
@@ -592,9 +584,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
     Assert.assertTrue(alreadyMerged.contains("seg5"));
   }
 
-  /**
-   * Tests segment name and CRC list generation with edge cases.
-   */
+  /// Tests segment name and CRC list generation with edge cases.
   @Test
   public void testSegmentListGenerationEdgeCases() {
     // Test with segments having special characters

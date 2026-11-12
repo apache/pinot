@@ -45,19 +45,17 @@ public class PredicateComparisonRewriter implements QueryRewriter {
     return pinotQuery;
   }
 
-  /**
-   * This method converts an expression to what Pinot could evaluate.
-   * 1. For comparison expressions, the right operand should be a literal. If the left operand is a
-   *    literal and the right is not, they are swapped. If the right operand is still non-literal
-   *    (column-to-column comparison), the predicate is rewritten using a comparison transform
-   *    function: e.g. 'WHERE a = b' becomes 'WHERE equals(a, b) = true'.
-   * 2. Updates boolean predicates (literals and scalar functions) that are missing an EQUALS filter.
-   *    E.g. 1:  'WHERE a' will be updated to 'WHERE a = true'
-   *    E.g. 2: "WHERE startsWith(col, 'str')" will be updated to "WHERE startsWith(col, 'str') = true"
-   *
-   * @param expression current expression in the expression tree
-   * @return re-written expression.
-   */
+  /// This method converts an expression to what Pinot could evaluate.
+  /// 1. For comparison expressions, the right operand should be a literal. If the left operand is a
+  ///    literal and the right is not, they are swapped. If the right operand is still non-literal
+  ///    (column-to-column comparison), the predicate is rewritten using a comparison transform
+  ///    function: e.g. 'WHERE a = b' becomes 'WHERE equals(a, b) = true'.
+  /// 2. Updates boolean predicates (literals and scalar functions) that are missing an EQUALS filter.
+  ///    E.g. 1:  'WHERE a' will be updated to 'WHERE a = true'
+  ///    E.g. 2: "WHERE startsWith(col, 'str')" will be updated to "WHERE startsWith(col, 'str') = true"
+  ///
+  /// @param expression current expression in the expression tree
+  /// @return re-written expression.
   private static Expression updatePredicate(Expression expression) {
     ExpressionType type = expression.getType();
 
@@ -74,12 +72,10 @@ public class PredicateComparisonRewriter implements QueryRewriter {
     }
   }
 
-  /**
-   * Rewrites a function expression.
-   *
-   * @param expression
-   * @return re-written expression
-   */
+  /// Rewrites a function expression.
+  ///
+  /// @param expression
+  /// @return re-written expression
   private static Expression updateFunctionExpression(Expression expression) {
     Function function = expression.getFunctionCall();
     String functionOperator = function.getOperator();
@@ -193,16 +189,14 @@ public class PredicateComparisonRewriter implements QueryRewriter {
     return expression;
   }
 
-  /**
-   * Rewrite predicates to boolean expressions with EQUALS operator
-   *     Example1: "select * from table where col1" converts to
-   *               "select * from table where col1 = true"
-   *     Example2: "select * from table where startsWith(col1, 'str')" converts to
-   *               "select * from table where startsWith(col1, 'str') = true"
-   *
-   * @param expression Expression
-   * @return Rewritten expression
-   */
+  /// Rewrite predicates to boolean expressions with EQUALS operator
+  ///     Example1: "select \* from table where col1" converts to
+  ///               "select \* from table where col1 = true"
+  ///     Example2: "select \* from table where startsWith(col1, 'str')" converts to
+  ///               "select \* from table where startsWith(col1, 'str') = true"
+  ///
+  /// @param expression Expression
+  /// @return Rewritten expression
   private static Expression convertPredicateToEqualsBooleanExpression(Expression expression) {
     return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), expression,
         RequestUtils.getLiteralExpression(true));
@@ -227,14 +221,12 @@ public class PredicateComparisonRewriter implements QueryRewriter {
     }
   }
 
-  /**
-   * The purpose of this method is to convert expression "0 < columnA" to "columnA > 0".
-   * The conversion would be:
-   *  from ">" to "<",
-   *  from "<" to ">",
-   *  from ">=" to "<=",
-   *  from "<=" to ">=".
-   */
+  /// The purpose of this method is to convert expression "0 < columnA" to "columnA > 0".
+  /// The conversion would be:
+  ///  from ">" to "<",
+  ///  from "<" to ">",
+  ///  from ">=" to "<=",
+  ///  from "<=" to ">=".
   private static FilterKind getOppositeOperator(FilterKind filterKind) {
     switch (filterKind) {
       case GREATER_THAN:

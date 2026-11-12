@@ -20,11 +20,9 @@ package org.apache.pinot.spi.utils.hash;
 
 import java.nio.ByteBuffer;
 
-/**
- Note: This code is taken from
- <a href="https://github.com/tamtam180/CityHash-For-Java/blob/master/src/main/java/at/orz/hash/CityHash.java">...</a>
- and updated with the latest code in the original C++ impl: <a href="https://github.com/google/cityhash">...</a>
- */
+/// Note: This code is taken from
+/// [...](https://github.com/tamtam180/CityHash-For-Java/blob/master/src/main/java/at/orz/hash/CityHash.java)
+/// and updated with the latest code in the original C++ impl: [...](https://github.com/google/cityhash)
 
 public class CityHashFunctions {
 
@@ -42,9 +40,7 @@ public class CityHashFunctions {
   private CityHashFunctions() {
   }
 
-  /**
-   * Computes 32-bit CityHash of input byte array from index pos to pos + len - 1
-   */
+  /// Computes 32-bit CityHash of input byte array from index pos to pos + len - 1
   public static int cityHash32(byte[] s, int pos, int len) {
     if (len <= 24) {
       return len <= 12
@@ -127,16 +123,12 @@ public class CityHashFunctions {
     return h;
   }
 
-  /**
-   * Computes 32-bit CityHash of input byte array
-   */
+  /// Computes 32-bit CityHash of input byte array
   public static long cityHash32(byte[] s) {
     return cityHash32(s, 0, s.length);
   }
 
-  /**
-   * Computes 64-bit CityHash of input byte array from index pos to pos + len - 1
-   */
+  /// Computes 64-bit CityHash of input byte array from index pos to pos + len - 1
   public static long cityHash64(byte[] s, int pos, int len) {
     if (len <= 32) {
       if (len <= 16) {
@@ -178,44 +170,32 @@ public class CityHashFunctions {
     );
   }
 
-  /**
-   * Computes 64-bit CityHash of input byte array
-   */
+  /// Computes 64-bit CityHash of input byte array
   public static long cityHash64(byte[] s) {
     return cityHash64(s, 0, s.length);
   }
 
-  /**
-   * Computes 64-bit CityHash of input byte array from index pos to pos + len - 1 and using a single seed value
-   */
+  /// Computes 64-bit CityHash of input byte array from index pos to pos + len - 1 and using a single seed value
   public static long cityHash64WithSeed(byte[] s, int pos, int len, long seed) {
     return cityHash64WithSeeds(s, pos, len, K2, seed);
   }
 
-  /**
-   * Computes 64-bit CityHash of input byte array and using a single seed value
-   */
+  /// Computes 64-bit CityHash of input byte array and using a single seed value
   public static long cityHash64WithSeed(byte[] s, long seed) {
     return cityHash64WithSeed(s, 0, s.length, seed);
   }
 
-  /**
-   * Computes 64-bit CityHash of input byte array from index pos to pos + len - 1 and using two seed values
-   */
+  /// Computes 64-bit CityHash of input byte array from index pos to pos + len - 1 and using two seed values
   public static long cityHash64WithSeeds(byte[] s, int pos, int len, long seed0, long seed1) {
     return hashLen16(cityHash64(s, pos, len) - seed0, seed1);
   }
 
-  /**
-   * Computes 64-bit CityHash of input byte array and using two seed values
-   */
+  /// Computes 64-bit CityHash of input byte array and using two seed values
   public static long cityHash64WithSeeds(byte[] s, long seed1, long seed2) {
     return cityHash64WithSeeds(s, 0, s.length, seed1, seed2);
   }
 
-  /**
-   * Computes 128-bit CityHash of input byte array from index pos to pos + len - 1  and using two seed values
-   */
+  /// Computes 128-bit CityHash of input byte array from index pos to pos + len - 1  and using two seed values
   public static long[] cityHash128WithSeed(byte[] s, int pos, int len, long seed0, long seed1) {
     if (len < 128) {
       return cityMurmur(s, pos, len, seed0, seed1);
@@ -288,9 +268,7 @@ public class CityHashFunctions {
         hashLen16(x + w[1], y + v[1])
     };
   }
-  /**
-   * Computes 128-bit CityHash of input byte array from index pos to pos + len - 1
-   */
+  /// Computes 128-bit CityHash of input byte array from index pos to pos + len - 1
   public static long[] cityHash128(byte[] s, int pos, int len) {
     if (len >= 16) {
       return cityHash128WithSeed(
@@ -303,9 +281,7 @@ public class CityHashFunctions {
     }
   }
 
-  /**
-   * Computes 128-bit CityHash of input byte array
-   */
+  /// Computes 128-bit CityHash of input byte array
   public static byte[] cityHash128(byte[] s) {
     long[] hash = cityHash128(s, 0, s.length);
     ByteBuffer buffer = ByteBuffer.allocate(16);

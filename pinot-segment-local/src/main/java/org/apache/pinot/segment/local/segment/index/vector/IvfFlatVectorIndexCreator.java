@@ -40,72 +40,72 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Creates an IVF_FLAT (Inverted File with flat vectors) index for immutable segments.
- *
- * <p>The creator buffers all vectors in memory during {@link #add(float[])} calls, then
- * trains k-means centroids, assigns vectors to their nearest centroids, and serializes
- * the complete index to a single {@code .ivfflat.index} file during {@link #seal()}.</p>
- *
- * <h3>Thread safety</h3>
- * <p>This class is NOT thread-safe. It is designed for single-threaded segment creation.</p>
- *
- * <h3>File format (version 1)</h3>
- * <pre>
- * [Header]
- *   magic:                  4 bytes (0x49564646 = "IVFF")
- *   version:                4 bytes (1)
- *   dimension:              4 bytes
- *   numVectors:             4 bytes
- *   nlist:                  4 bytes
- *   distanceFunctionOrd:    4 bytes
- *   quantizerTypeOrd:       4 bytes
- *   quantizerParamsLen:     4 bytes
- *   quantizerParams:        quantizerParamsLen bytes
- *
- * [Centroids Section]
- *   nlist x dimension x 4 bytes (float32)
- *
- * [Inverted Lists Section]
- *   For each centroid i (0..nlist-1):
- *     listSize_i:           4 bytes
- *     docIds_i:             listSize_i x 4 bytes (int32)
- *     encodedVectors_i:     listSize_i x encodedBytesPerVector bytes
- *
- * [Inverted List Offsets]
- *   nlist x 8 bytes (long offset to start of each inverted list)
- *
- * [Footer]
- *   offsetToOffsets:        8 bytes (position of the offsets section)
- * </pre>
- *
- * <p>Header fields, centroid float32 values, list sizes/doc IDs, offsets, and footer metadata are written in
- * big-endian order (Java {@link DataOutputStream} default). {@code encodedVectors} payload bytes are emitted
- * verbatim by the selected quantizer and therefore use quantizer-defined encoding semantics; the
- * {@link FlatQuantizer} currently stores float32 payloads in little-endian order.</p>
- */
+/// Creates an IVF_FLAT (Inverted File with flat vectors) index for immutable segments.
+///
+/// The creator buffers all vectors in memory during [#add(float[])] calls, then
+/// trains k-means centroids, assigns vectors to their nearest centroids, and serializes
+/// the complete index to a single `.ivfflat.index` file during [#seal()].
+///
+/// ## Thread safety
+///
+/// This class is NOT thread-safe. It is designed for single-threaded segment creation.
+///
+/// ## File format (version 1)
+///
+/// ```
+/// [Header]
+///   magic:                  4 bytes (0x49564646 = "IVFF")
+///   version:                4 bytes (1)
+///   dimension:              4 bytes
+///   numVectors:             4 bytes
+///   nlist:                  4 bytes
+///   distanceFunctionOrd:    4 bytes
+///   quantizerTypeOrd:       4 bytes
+///   quantizerParamsLen:     4 bytes
+///   quantizerParams:        quantizerParamsLen bytes
+///
+/// [Centroids Section]
+///   nlist x dimension x 4 bytes (float32)
+///
+/// [Inverted Lists Section]
+///   For each centroid i (0..nlist-1):
+///     listSize_i:           4 bytes
+///     docIds_i:             listSize_i x 4 bytes (int32)
+///     encodedVectors_i:     listSize_i x encodedBytesPerVector bytes
+///
+/// [Inverted List Offsets]
+///   nlist x 8 bytes (long offset to start of each inverted list)
+///
+/// [Footer]
+///   offsetToOffsets:        8 bytes (position of the offsets section)
+/// ```
+///
+/// Header fields, centroid float32 values, list sizes/doc IDs, offsets, and footer metadata are written in
+/// big-endian order (Java [DataOutputStream] default). `encodedVectors` payload bytes are emitted
+/// verbatim by the selected quantizer and therefore use quantizer-defined encoding semantics; the
+/// [FlatQuantizer] currently stores float32 payloads in little-endian order.
 public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfFlatVectorIndexCreator.class);
 
-  /** Magic bytes identifying an IVF_FLAT index file: ASCII "IVFF". */
+  /// Magic bytes identifying an IVF_FLAT index file: ASCII "IVFF".
   public static final int MAGIC = 0x49564646;
 
-  /** Current file format version (quantizer-aware encoded vectors). */
+  /// Current file format version (quantizer-aware encoded vectors).
   public static final int FORMAT_VERSION = 1;
 
-  /** Default number of Voronoi cells (centroids). */
+  /// Default number of Voronoi cells (centroids).
   public static final int DEFAULT_NLIST = 128;
 
-  /** Maximum number of k-means iterations. */
+  /// Maximum number of k-means iterations.
   static final int MAX_KMEANS_ITERATIONS = 50;
 
-  /** Convergence threshold: stop when centroid movement is below this fraction. */
+  /// Convergence threshold: stop when centroid movement is below this fraction.
   static final float CONVERGENCE_THRESHOLD = 1e-5f;
 
-  /** Default training sample size multiplier relative to nlist. */
+  /// Default training sample size multiplier relative to nlist.
   static final int DEFAULT_TRAIN_SAMPLE_MULTIPLIER = 40;
 
-  /** Minimum training sample size. */
+  /// Minimum training sample size.
   static final int DEFAULT_MIN_TRAIN_SAMPLE_SIZE = 10000;
 
   private final String _column;
@@ -116,26 +116,22 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   private final long _trainingSeed;
   private final VectorIndexConfig.VectorDistanceFunction _distanceFunction;
   private final VectorQuantizerType _quantizerType;
-  /**
-   * When {@code true}, {@link #seal()} writes to the combined-form extension
-   * ({@code .vector.ivfflat.combined.index}) instead of the legacy file extension. The V2→V3
-   * format converter recognises the combined extension and packs the bytes into {@code
-   * columns.psf} via the standard {@code copyIndexIfExists} path.
-   */
+  /// When `true`, [#seal()] writes to the combined-form extension
+  /// (`.vector.ivfflat.combined.index`) instead of the legacy file extension. The V2→V3
+  /// format converter recognises the combined extension and packs the bytes into `columns.psf` via the standard
+  /// `copyIndexIfExists` path.
   private final boolean _storeInSegmentFile;
 
-  /** All vectors collected during add(), indexed by docId (ordinal). */
+  /// All vectors collected during add(), indexed by docId (ordinal).
   private final List<float[]> _vectors = new ArrayList<>();
 
   private boolean _sealed = false;
 
-  /**
-   * Creates a new IVF_FLAT index creator.
-   *
-   * @param column     the column name
-   * @param indexDir   the segment index directory
-   * @param config     the vector index configuration
-   */
+  /// Creates a new IVF_FLAT index creator.
+  ///
+  /// @param column     the column name
+  /// @param indexDir   the segment index directory
+  /// @param config     the vector index configuration
   public IvfFlatVectorIndexCreator(String column, File indexDir, VectorIndexConfig config) {
     _column = column;
     _indexDir = indexDir;
@@ -243,9 +239,7 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   // Training
   // -----------------------------------------------------------------------
 
-  /**
-   * Collects a subsample of vectors for k-means training.
-   */
+  /// Collects a subsample of vectors for k-means training.
   float[][] collectTrainingSamples(int numVectors, int effectiveNlist) {
     int sampleSize = Math.min(_trainSampleSize, numVectors);
     if (sampleSize >= numVectors) {
@@ -273,13 +267,11 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     return samples;
   }
 
-  /**
-   * Trains centroids using k-means++ initialization followed by Lloyd's algorithm.
-   *
-   * @param samples       the training vectors
-   * @param numCentroids  the number of centroids to train
-   * @return the trained centroids
-   */
+  /// Trains centroids using k-means++ initialization followed by Lloyd's algorithm.
+  ///
+  /// @param samples       the training vectors
+  /// @param numCentroids  the number of centroids to train
+  /// @return the trained centroids
   float[][] trainKMeans(float[][] samples, int numCentroids) {
     int numSamples = samples.length;
     if (numCentroids >= numSamples) {
@@ -340,10 +332,8 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     return centroids;
   }
 
-  /**
-   * K-means++ initialization: selects initial centroids with probability proportional
-   * to the squared distance from the nearest existing centroid.
-   */
+  /// K-means++ initialization: selects initial centroids with probability proportional
+  /// to the squared distance from the nearest existing centroid.
   private float[][] kMeansPlusPlusInit(float[][] samples, int numCentroids) {
     int numSamples = samples.length;
     Random rng = new Random(_trainingSeed);
@@ -384,14 +374,12 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     return centroids;
   }
 
-  /**
-   * Computes distance used for training. Always uses L2 squared distance for k-means
-   * training regardless of the configured distance function, because k-means minimizes
-   * squared Euclidean distance by construction.
-   *
-   * <p>For COSINE distance, we normalize vectors before computing L2, which is equivalent
-   * to using angular distance for clustering.</p>
-   */
+  /// Computes distance used for training. Always uses L2 squared distance for k-means
+  /// training regardless of the configured distance function, because k-means minimizes
+  /// squared Euclidean distance by construction.
+  ///
+  /// For COSINE distance, we normalize vectors before computing L2, which is equivalent
+  /// to using angular distance for clustering.
   private float computeTrainingDistance(float[] a, float[] b) {
     // For cosine distance, use L2 on normalized vectors which groups by angular similarity
     if (_distanceFunction == VectorIndexConfig.VectorDistanceFunction.COSINE) {
@@ -404,9 +392,7 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   // Assignment
   // -----------------------------------------------------------------------
 
-  /**
-   * Assigns each vector to its nearest centroid using the configured distance function.
-   */
+  /// Assigns each vector to its nearest centroid using the configured distance function.
   private int[] assignVectors(float[][] centroids) {
     int numVectors = _vectors.size();
     int[] assignments = new int[numVectors];
@@ -416,10 +402,8 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     return assignments;
   }
 
-  /**
-   * Finds the index of the nearest centroid to the given vector using L2 distance
-   * (used during k-means training).
-   */
+  /// Finds the index of the nearest centroid to the given vector using L2 distance
+  /// (used during k-means training).
   private int findNearestCentroid(float[] vector, float[][] centroids) {
     int nearest = 0;
     float nearestDist = Float.MAX_VALUE;
@@ -433,10 +417,8 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     return nearest;
   }
 
-  /**
-   * Finds the index of the nearest centroid to the given vector using the configured
-   * distance function (used during vector assignment after training).
-   */
+  /// Finds the index of the nearest centroid to the given vector using the configured
+  /// distance function (used during vector assignment after training).
   private int findNearestCentroidForSearch(float[] vector, float[][] centroids) {
     int nearest = 0;
     float nearestDist = Float.MAX_VALUE;
@@ -454,10 +436,8 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   // Distance computation helpers (delegates to VectorFunctions)
   // -----------------------------------------------------------------------
 
-  /**
-   * Computes distance between two vectors using the configured distance function.
-   * Internally uses L2 for EUCLIDEAN/L2, cosine for COSINE, negative dot for INNER_PRODUCT/DOT_PRODUCT.
-   */
+  /// Computes distance between two vectors using the configured distance function.
+  /// Internally uses L2 for EUCLIDEAN/L2, cosine for COSINE, negative dot for INNER_PRODUCT/DOT_PRODUCT.
   private float computeDistance(float[] a, float[] b) {
     switch (_distanceFunction) {
       case EUCLIDEAN:
@@ -473,10 +453,8 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
     }
   }
 
-  /**
-   * Returns a new unit-length copy of the given vector.
-   * If the vector has zero magnitude, a zero vector of the same length is returned.
-   */
+  /// Returns a new unit-length copy of the given vector.
+  /// If the vector has zero magnitude, a zero vector of the same length is returned.
   private static float[] normalizeVector(float[] vector) {
     float norm = 0.0f;
     for (float v : vector) {
@@ -496,9 +474,7 @@ public class IvfFlatVectorIndexCreator implements VectorIndexCreator {
   // Serialization
   // -----------------------------------------------------------------------
 
-  /**
-   * Writes the complete IVF_FLAT index to disk.
-   */
+  /// Writes the complete IVF_FLAT index to disk.
   private void writeIndex(float[][] centroids, int[] assignments, List<Integer>[] invertedLists, int effectiveNlist,
       VectorQuantizer quantizer)
       throws IOException {

@@ -29,21 +29,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Kills queries that exceed scan entry or doc thresholds.
- *
- * <p>Primary strategy for proactive query killing. Checks
- * {@code numEntriesScannedInFilter} (primary signal — catches expensive filter
- * predicates / missing indexes) and {@code numDocsScanned} (secondary signal —
- * catches large aggregations).</p>
- *
- * <p>A threshold of {@link Long#MAX_VALUE} disables that metric's check.</p>
- *
- *
- * <p>Supports table-level overrides via {@link #forQuery(QueryConfig, QueryMonitorConfig)}.
- * When a table has specific thresholds in its {@link QueryConfig}, a new instance is
- * created with the resolved values. Otherwise, the same instance is returned.</p>
- */
+/// Kills queries that exceed scan entry or doc thresholds.
+///
+/// Primary strategy for proactive query killing. Checks
+/// `numEntriesScannedInFilter` (primary signal — catches expensive filter
+/// predicates / missing indexes) and `numDocsScanned` (secondary signal —
+/// catches large aggregations).
+///
+/// A threshold of [Long#MAX_VALUE] disables that metric's check.
+///
+/// Supports table-level overrides via [#forQuery(QueryConfig, QueryMonitorConfig)].
+/// When a table has specific thresholds in its [QueryConfig], a new instance is
+/// created with the resolved values. Otherwise, the same instance is returned.
 public class ScanEntriesThresholdStrategy implements QueryKillingStrategy {
   private static final String STRATEGY_NAME = "ScanEntriesThresholdStrategy";
 
@@ -102,11 +99,9 @@ public class ScanEntriesThresholdStrategy implements QueryKillingStrategy {
     return 10;
   }
 
-  /**
-   * Returns a query-specific variant with table-level threshold overrides applied.
-   * If the table's {@link QueryConfig} has non-null threshold fields, they take precedence
-   * over this strategy's thresholds. Otherwise, returns {@code this} (no allocation).
-   */
+  /// Returns a query-specific variant with table-level threshold overrides applied.
+  /// If the table's [QueryConfig] has non-null threshold fields, they take precedence
+  /// over this strategy's thresholds. Otherwise, returns `this` (no allocation).
   @Override
   public QueryKillingStrategy forQuery(@Nullable QueryConfig queryConfig,
       QueryMonitorConfig clusterConfig) {
@@ -137,15 +132,13 @@ public class ScanEntriesThresholdStrategy implements QueryKillingStrategy {
     return _maxEntriesScannedPostFilter;
   }
 
-  /**
-   * Factory that creates a {@link ScanEntriesThresholdStrategy} from
-   * {@link QueryMonitorConfig}. This is the default factory used when no custom
-   * strategy factory is configured.
-   *
-   * <p>Returns {@code null} if no scan thresholds are configured (all are
-   * {@link Long#MAX_VALUE}), which causes the manager to log a warning that
-   * scan-based killing is enabled but effectively unconfigured.</p>
-   */
+  /// Factory that creates a [ScanEntriesThresholdStrategy] from
+  /// [QueryMonitorConfig]. This is the default factory used when no custom
+  /// strategy factory is configured.
+  ///
+  /// Returns `null` if no scan thresholds are configured (all are
+  /// [Long#MAX_VALUE]), which causes the manager to log a warning that
+  /// scan-based killing is enabled but effectively unconfigured.
   public static class Factory implements QueryKillingStrategyFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(Factory.class);
 

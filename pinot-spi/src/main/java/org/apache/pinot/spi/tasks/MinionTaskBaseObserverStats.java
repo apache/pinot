@@ -30,12 +30,9 @@ import java.util.Objects;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * Wrapper class to maintain and handle all the stats emitted by the various minion task executors.
- * Currently, its being used to maintain the stats of a task execution at MinionProgressObserver.
- * Eventually the MinionProgressObserver should also accept object of MinionTaskBaseObserverStats to record progress
- *
- */
+/// Wrapper class to maintain and handle all the stats emitted by the various minion task executors.
+/// Currently, its being used to maintain the stats of a task execution at MinionProgressObserver.
+/// Eventually the MinionProgressObserver should also accept object of MinionTaskBaseObserverStats to record progress
 public class MinionTaskBaseObserverStats {
   protected String _taskId;
   protected String _currentStage;

@@ -135,12 +135,13 @@ public class QueryMonitorConfigTest {
         new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
 
     assertEquals(accountant.getQueryMonitorConfig().getPanicLevel(),
-        Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) ((double) Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO
+            * accountant.getQueryMonitorConfig().getMaxHeapSize()));
     accountant.getWatcherTask()
         .onChange(Set.of(Accounting.COMMON_PREFIX + "." + Accounting.Keys.PANIC_LEVEL_HEAP_USAGE_RATIO),
             CLUSTER_CONFIGS);
     assertEquals(accountant.getQueryMonitorConfig().getPanicLevel(),
-        EXPECTED_PANIC_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) (EXPECTED_PANIC_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize()));
   }
 
   @Test
@@ -149,12 +150,13 @@ public class QueryMonitorConfigTest {
         new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
 
     assertEquals(accountant.getQueryMonitorConfig().getCriticalLevel(),
-        Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) ((double) Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO
+            * accountant.getQueryMonitorConfig().getMaxHeapSize()));
     accountant.getWatcherTask()
         .onChange(Set.of(Accounting.COMMON_PREFIX + "." + Accounting.Keys.CRITICAL_LEVEL_HEAP_USAGE_RATIO),
             CLUSTER_CONFIGS);
     assertEquals(accountant.getQueryMonitorConfig().getCriticalLevel(),
-        EXPECTED_CRITICAL_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) (EXPECTED_CRITICAL_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize()));
   }
 
   @Test
@@ -163,12 +165,13 @@ public class QueryMonitorConfigTest {
         new PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test", InstanceType.SERVER);
 
     assertEquals(accountant.getQueryMonitorConfig().getAlarmingLevel(),
-        Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) ((double) Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO
+            * accountant.getQueryMonitorConfig().getMaxHeapSize()));
     accountant.getWatcherTask()
         .onChange(Set.of(Accounting.COMMON_PREFIX + "." + Accounting.Keys.ALARMING_LEVEL_HEAP_USAGE_RATIO),
             CLUSTER_CONFIGS);
     assertEquals(accountant.getQueryMonitorConfig().getAlarmingLevel(),
-        EXPECTED_ALARMING_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize());
+        (long) (EXPECTED_ALARMING_LEVEL * accountant.getQueryMonitorConfig().getMaxHeapSize()));
   }
 
   @Test
@@ -247,7 +250,7 @@ public class QueryMonitorConfigTest {
     assertTrue(accountant.getQueryMonitorConfig().isOomPanicPreQueryKillPauseEnabled());
   }
 
-  /// Verifies the role-specific prefix takes precedence over {@link Accounting#COMMON_PREFIX} on a server accountant,
+  /// Verifies the role-specific prefix takes precedence over [Accounting#COMMON_PREFIX] on a server accountant,
   /// and that the broker-specific prefix is ignored.
   @Test
   void testServerPrefixOverridesCommonAndIgnoresBrokerPrefix() {
@@ -266,8 +269,8 @@ public class QueryMonitorConfigTest {
         "Server-specific prefix value should override the common prefix value");
   }
 
-  /// Same as above but asserts the broker accountant picks up {@link Accounting#BROKER_PREFIX} and ignores
-  /// {@link Accounting#SERVER_PREFIX}.
+  /// Same as above but asserts the broker accountant picks up [Accounting#BROKER_PREFIX] and ignores
+  /// [Accounting#SERVER_PREFIX].
   @Test
   void testBrokerPrefixOverridesCommonAndIgnoresServerPrefix() {
     PerQueryCPUMemResourceUsageAccountant accountant =

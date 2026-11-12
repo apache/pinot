@@ -74,9 +74,7 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     _cancelled = true;
   }
 
-  /**
-   * Returns the segment ZK metadata custom map modifier.
-   */
+  /// Returns the segment ZK metadata custom map modifier.
   protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(
       PinotTaskConfig pinotTaskConfig, SegmentConversionResult segmentConversionResult);
 
@@ -132,9 +130,7 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount);
   }
 
-  /**
-   * Resolves the AuthProvider for Minion task executors. Delegates to {@link MinionTaskUtils#resolveAuthProvider}.
-   */
+  /// Resolves the AuthProvider for Minion task executors. Delegates to [MinionTaskUtils#resolveAuthProvider].
   protected static AuthProvider resolveAuthProvider(Map<String, String> taskConfigs) {
     return MinionTaskUtils.resolveAuthProvider(taskConfigs);
   }
@@ -181,9 +177,7 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     return indexDir;
   }
 
-  /**
-   * Builds a {@link PushJobSpec} from task configs. Used for both TAR and METADATA push modes.
-   */
+  /// Builds a [PushJobSpec] from task configs. Used for both TAR and METADATA push modes.
   protected PushJobSpec getPushJobSpec(Map<String, String> configs) {
     PushJobSpec pushJobSpec = new PushJobSpec();
     pushJobSpec.setPushAttempts(SEGMENT_PUSH_DEFAULT_ATTEMPTS);
@@ -199,10 +193,8 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     return pushJobSpec;
   }
 
-  /**
-   * Builds a {@link SegmentGenerationJobSpec} for segment push (TAR or METADATA). Requires
-   * {@link BatchConfigProperties#PUSH_CONTROLLER_URI} in configs for METADATA push.
-   */
+  /// Builds a [SegmentGenerationJobSpec] for segment push (TAR or METADATA). Requires
+  /// [BatchConfigProperties#PUSH_CONTROLLER_URI] in configs for METADATA push.
   protected SegmentGenerationJobSpec generateSegmentGenerationJobSpec(String tableName, Map<String, String> configs,
       PushJobSpec pushJobSpec) {
     TableSpec tableSpec = new TableSpec();
@@ -218,20 +210,25 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     return spec;
   }
 
-  /**
-   * Copies the local segment tar file to the output PinotFS. Requires
-   * {@link BatchConfigProperties#OUTPUT_SEGMENT_DIR_URI} in configs.
-   *
-   * @return the URI of the segment tar on the output filesystem
-   */
+  /// Copies the local segment tar to the output PinotFS under its own name. Fails if the target exists unless
+  /// [BatchConfigProperties#OVERWRITE_OUTPUT] is set.
+  ///
+  /// @return the URI of the segment tar on the output filesystem
   protected URI moveSegmentToOutputPinotFS(Map<String, String> configs, File localSegmentTarFile)
+      throws Exception {
+    return moveSegmentToOutputPinotFS(configs, localSegmentTarFile, localSegmentTarFile.getName(),
+        Boolean.parseBoolean(configs.get(BatchConfigProperties.OVERWRITE_OUTPUT)));
+  }
+
+  /// Copies the local segment tar to `<outputDir>/<outputFileName>`, replacing an existing file only if asked.
+  protected URI moveSegmentToOutputPinotFS(Map<String, String> configs, File localSegmentTarFile,
+      String outputFileName, boolean overwrite)
       throws Exception {
     URI outputSegmentDirURI = URI.create(configs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, outputSegmentDirURI)) {
       URI outputSegmentTarURI = URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI)
-          + URIUtils.encode(localSegmentTarFile.getName()));
-      if (!Boolean.parseBoolean(configs.get(BatchConfigProperties.OVERWRITE_OUTPUT))
-          && outputFileFS.exists(outputSegmentTarURI)) {
+          + URIUtils.encode(outputFileName));
+      if (!overwrite && outputFileFS.exists(outputSegmentTarURI)) {
         throw new RuntimeException("Output file: " + outputSegmentTarURI + " already exists. Set 'overwriteOutput' to "
             + "true to ignore this error");
       }
@@ -240,9 +237,16 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     }
   }
 
-  /**
-   * Returns HTTP parameters common to segment upload and metadata push (parallel push protection, table name, type).
-   */
+  /// Best-effort delete on the output PinotFS. Failures are logged, so cleanup never masks the push outcome.
+  protected void deleteFromOutputPinotFS(Map<String, String> configs, URI fileURI) {
+    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(configs, fileURI)) {
+      outputFileFS.delete(fileURI, true);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to delete: {} from the output PinotFS", fileURI, e);
+    }
+  }
+
+  /// Returns HTTP parameters common to segment upload and metadata push (parallel push protection, table name, type).
   protected List<NameValuePair> getSegmentPushCommonParams(String tableNameWithType) {
     List<NameValuePair> params = new ArrayList<>();
     params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
@@ -258,13 +262,11 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     return params;
   }
 
-  /**
-   * Returns HTTP headers for segment metadata push (ZK metadata custom map modifier + auth). Used when pushing
-   * metadata to the controller instead of uploading the tar via HTTP.
-   *
-   * @param segmentConversionResult the conversion result for the segment; may be null when building headers for
-   *                                 multiple segments where a single modifier does not apply
-   */
+  /// Returns HTTP headers for segment metadata push (ZK metadata custom map modifier + auth). Used when pushing
+  /// metadata to the controller instead of uploading the tar via HTTP.
+  ///
+  /// @param segmentConversionResult the conversion result for the segment; may be null when building headers for
+  ///                                 multiple segments where a single modifier does not apply
   protected List<Header> getSegmentPushMetadataHeaders(PinotTaskConfig pinotTaskConfig, AuthProvider authProvider,
       SegmentConversionResult segmentConversionResult) {
     SegmentZKMetadataCustomMapModifier modifier =
@@ -278,13 +280,11 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     return headers;
   }
 
-  /**
-   * Returns the segment push mode for upload. Default is TAR (HTTP upload). Subclasses may override to use METADATA
-   * mode (move segment to output PinotFS and send metadata to controller) when needed.
-   *
-   * @param configs task configs; may contain {@link BatchConfigProperties#PUSH_MODE}
-   * @return push type (TAR or METADATA)
-   */
+  /// Returns the segment push mode for upload. Default is TAR (HTTP upload). Subclasses may override to use METADATA
+  /// mode (move segment to output PinotFS and send metadata to controller) when needed.
+  ///
+  /// @param configs task configs; may contain [BatchConfigProperties#PUSH_MODE]
+  /// @return push type (TAR or METADATA)
   protected BatchConfigProperties.SegmentPushType getSegmentPushType(Map<String, String> configs) {
     String pushMode = configs.getOrDefault(BatchConfigProperties.PUSH_MODE,
         BatchConfigProperties.SegmentPushType.TAR.name());

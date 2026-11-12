@@ -19,9 +19,12 @@
 package org.apache.pinot.broker.routing.manager;
 
 import java.lang.reflect.Constructor;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -29,23 +32,44 @@ import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
+import org.apache.helix.model.ClusterConfig;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
+import org.apache.pinot.broker.routing.instanceselector.TableReplicaHealth;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher;
 import org.apache.pinot.broker.routing.segmentpartition.SegmentPartitionMetadataManager;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.broker.routing.segmentpruner.SegmentPruner;
 import org.apache.pinot.broker.routing.segmentselector.SegmentSelector;
+import org.apache.pinot.broker.routing.tablesampler.TableSampler;
 import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.QuerySource;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
+import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -53,17 +77,14 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.*;
 
 
 public class BrokerRoutingManagerTest {
@@ -72,6 +93,9 @@ public class BrokerRoutingManagerTest {
   private static final int SERVER_PORT = 8000;
   private static final String INSTANCE_CONFIGS_PATH = "/CONFIGS/PARTICIPANT";
   private static final String TEST_TABLE = "testTable_OFFLINE";
+  private static final List<BrokerGauge> REPLICA_HEALTH_GAUGES =
+      List.of(BrokerGauge.PERCENT_OF_REPLICAS, BrokerGauge.UNAVAILABLE_SEGMENTS,
+          BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS);
 
   private AutoCloseable _mocks;
 
@@ -100,7 +124,10 @@ public class BrokerRoutingManagerTest {
   private PropertyKey _instanceConfigsKey;
 
   @Mock
-  private Consumer<ServerInstance> _serverReenableCallback;
+  private Consumer<ServerInstance> _serverEnabledCallback;
+
+  @Mock
+  private Consumer<ServerInstance> _serverRemovedCallback;
 
   private BrokerRoutingManager _routingManager;
 
@@ -138,6 +165,96 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
+  public void testInstanceConfigIdsInternedAcrossRefreshesAndRouting()
+      throws Exception {
+    ZNRecordSerializer serializer = new ZNRecordSerializer();
+    ZNRecord assignments = new ZNRecord(TEST_TABLE);
+    assignments.setMapField("required", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    byte[] serializedAssignments = serializer.serialize(assignments);
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("required", "optional"), List.of(), instanceSelector));
+
+    for (int grpcPort : List.of(9000, 9001)) {
+      ZNRecord decodedAssignments = (ZNRecord) serializer.deserialize(serializedAssignments);
+      String requiredInstanceId = decodedAssignments.getMapField("required").keySet().iterator().next();
+      // Exercise IDs from real assignment-map decoding, including the parser's JVM interning behavior.
+      assertSame(requiredInstanceId, SERVER_INSTANCE_ID);
+      when(instanceSelector.select(any(), any(), anyLong())).thenReturn(new InstanceSelector.SelectionResult(
+          Map.of(requiredInstanceId, segmentsToQuery(List.of("required"), List.of("optional"))), List.of(), 0));
+
+      ZNRecord config = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+      config.setIntField(Helix.Instance.GRPC_PORT_KEY, grpcPort);
+      ZNRecord decodedConfig = (ZNRecord) serializer.deserialize(serializer.serialize(config));
+      // Config IDs are JSON values; unlike assignment-map keys, they are not interned by the parser.
+      assertEquals(decodedConfig.getId(), SERVER_INSTANCE_ID);
+      assertNotSame(decodedConfig.getId(), requiredInstanceId);
+      when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(),
+          anyInt())).thenReturn(List.of(decodedConfig));
+
+      _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+      Map<String, ServerInstance> enabledServers = _routingManager.getEnabledServerInstanceMap();
+      assertEquals(enabledServers.size(), 1);
+      assertSame(enabledServers.keySet().iterator().next(), requiredInstanceId);
+      ServerInstance server = enabledServers.get(requiredInstanceId);
+      assertSame(server.getInstanceId(), requiredInstanceId);
+      assertEquals(server.getHostname(), SERVER_HOST);
+      assertEquals(server.getPort(), SERVER_PORT);
+      // An equal ID on a later config refresh must still replace the server's configuration.
+      assertEquals(server.getGrpcPort(), grpcPort);
+      assertSame(_routingManager.getRoutableServerInstanceMap().get(requiredInstanceId), server);
+
+      RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest(TEST_TABLE), 0);
+      Map<ServerInstance, SegmentsToQuery> serverSegments = routingTable.getServerInstanceToSegmentsMap();
+      assertEquals(serverSegments.size(), 1);
+      assertSame(serverSegments.keySet().iterator().next(), server);
+      assertEquals(serverSegments.get(server).getSegments(), List.of("required"));
+      assertEquals(serverSegments.get(server).getOptionalSegments(), List.of("optional"));
+      assertTrue(routingTable.getUnavailableSegments().isEmpty());
+    }
+  }
+
+  @Test
+  public void testRoutingTableSkipsOptionalOnlyServersAndMetersMissingServers()
+      throws Exception {
+    String optionalOnlyInstanceId = "Server_optional_8000";
+    ServerInstance requiredServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    ServerInstance optionalOnlyServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(optionalOnlyInstanceId)));
+    _routingManager.getEnabledServerInstanceMap().put(SERVER_INSTANCE_ID, requiredServer);
+    _routingManager.getEnabledServerInstanceMap().put(optionalOnlyInstanceId, optionalOnlyServer);
+    Map<String, SegmentsToQuery> instanceToSegmentsMap = Map.of(
+        SERVER_INSTANCE_ID, segmentsToQuery(List.of("required0", "required1"), List.of("optional")),
+        optionalOnlyInstanceId, segmentsToQuery(List.of(), List.of("optionalOnly")),
+        "Server_missing_8000", segmentsToQuery(List.of("missingRequired0", "missingRequired1"), List.of()),
+        "Server_missing_optional_8000", segmentsToQuery(List.of(), List.of("missingOptional"))
+    );
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.select(any(), any(), anyLong())).thenReturn(
+        new InstanceSelector.SelectionResult(instanceToSegmentsMap, List.of(), 0));
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE,
+        selectorOf("required0", "required1", "missingRequired0", "missingRequired1", "optional", "optionalOnly",
+            "missingOptional"), List.of(), instanceSelector));
+    clearInvocations(_brokerMetrics);
+
+    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest(TEST_TABLE), 0);
+
+    Map<ServerInstance, SegmentsToQuery> serverSegments = routingTable.getServerInstanceToSegmentsMap();
+    assertEquals(serverSegments.keySet(), Set.of(requiredServer));
+    assertEquals(serverSegments.get(requiredServer).getSegments(), List.of("required0", "required1"));
+    assertEquals(serverSegments.get(requiredServer).getOptionalSegments(), List.of("optional"));
+    assertTrue(routingTable.getUnavailableSegments().isEmpty());
+    // Missing required segments are metered; missing optional segments and optional-only servers are skipped.
+    ArgumentCaptor<Long> increments = ArgumentCaptor.forClass(Long.class);
+    verify(_brokerMetrics, atLeastOnce()).addMeteredTableValue(eq(TEST_TABLE),
+        eq(BrokerMeter.SERVER_MISSING_FOR_ROUTING), increments.capture());
+    assertEquals(increments.getAllValues().stream().mapToLong(Long::longValue).sum(), 2L);
+    verifyNoMoreInteractions(_brokerMetrics);
+  }
+
+  @Test
   public void testNoErrorWhenCallbackNotSet() {
     // Don't set callback
 
@@ -166,9 +283,9 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
-  public void testServerReenableCallbackInvokedWhenExcludedServerReenabled() {
+  public void testServerEnabledCallbackInvokedWhenExcludedServerReenabled() {
     // Set up callback
-    _routingManager.setServerReenableCallback(_serverReenableCallback);
+    _routingManager.setServerEnabledCallback(_serverEnabledCallback);
 
     // First, enable the server by processing instance config change
     List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
@@ -194,29 +311,195 @@ public class BrokerRoutingManagerTest {
         anyInt(), anyInt())).thenReturn(instanceConfigs);
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
 
-    // Verify callback was invoked with correct ServerInstance
+    // Verify callback was invoked with correct ServerInstance: when the server was first enabled, and when it was
+    // enabled again
     ArgumentCaptor<ServerInstance> captor = ArgumentCaptor.forClass(ServerInstance.class);
-    verify(_serverReenableCallback).accept(captor.capture());
+    verify(_serverEnabledCallback, times(2)).accept(captor.capture());
 
     ServerInstance capturedInstance = captor.getValue();
     assertEquals(capturedInstance.getHostname(), SERVER_HOST);
     assertEquals(capturedInstance.getPort(), SERVER_PORT);
   }
 
+  /// A server that restarts without having been excluded is disabled while it shuts down and enabled again once it
+  /// is ready. It may be back at a new address, so the callback must run for it too, to refresh the channel to it.
   @Test
-  public void testServerReenableCallbackNotInvokedForNewServer() {
-    // Set up callback
-    _routingManager.setServerReenableCallback(_serverReenableCallback);
+  public void testServerEnabledCallbackInvokedWhenRestartedServerReenabled() {
+    _routingManager.setServerEnabledCallback(_serverEnabledCallback);
 
-    // Enable a new server (never excluded)
     List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
     when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
         anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(1)).accept(any());
 
+    // A change that leaves the server enabled does not call it again
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(1)).accept(any());
+
+    // Disabled while it restarts, then enabled again
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(2)).accept(any());
+  }
+
+  /// A server removed from the cluster altogether is forgotten rather than tracked forever, the removed callback lets
+  /// listeners drop what they cached for it (the single-stage transport evicts its channels), and a server added back
+  /// under the same id is enabled like any new one. Both ways out of the enabled set are covered: disabled first, and
+  /// straight from enabled to gone.
+  @Test
+  public void testRemovedServerIsForgottenAndRemovedCallbackInvoked() {
+    _routingManager.addServerEnabledCallback(_serverEnabledCallback);
+    _routingManager.addServerRemovedCallback(_serverRemovedCallback);
+    List<ZNRecord> instanceConfigs = List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    List<ZNRecord> disabledInstanceConfigs = List.of(createDisabledServerZNRecord(SERVER_INSTANCE_ID));
+
+    // Enabled, disabled, then removed: reported once, on removal
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(1)).accept(any());
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(disabledInstanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, never()).accept(any());
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    ArgumentCaptor<ServerInstance> captor = ArgumentCaptor.forClass(ServerInstance.class);
+    verify(_serverRemovedCallback).accept(captor.capture());
+    assertEquals(captor.getValue().getInstanceId(), SERVER_INSTANCE_ID);
+    assertEquals(captor.getValue().getPort(), SERVER_PORT);
+    // A refresh with it still gone does not repeat the notification
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(1)).accept(any());
+
+    // Added back under the same id: enabled again
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    verify(_serverEnabledCallback, times(2)).accept(any());
+
+    // Straight from enabled to removed
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(2)).accept(any());
+    assertFalse(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+
+    // A disabled server enabled again before it is removed is no longer tracked: its later removal comes straight
+    // from the enabled set and is reported once
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(disabledInstanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(3)).accept(any());
+  }
+
+  /// A server back under the same id at a different address has left its previous address for good. Listeners key
+  /// what they cache by address, so the removed callback gets the instance at the previous address: otherwise the
+  /// single-stage channels to it would stay cached forever. Covered while the server stays enabled and across a
+  /// disable and re-enable; a change that keeps the address calls nothing.
+  @Test
+  public void testRemovedCallbackInvokedWithPreviousAddressWhenServerMoves() {
+    _routingManager.addServerEnabledCallback(_serverEnabledCallback);
+    _routingManager.addServerRemovedCallback(_serverRemovedCallback);
+    setInstanceConfigs(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverEnabledCallback, times(1)).accept(any());
+
+    // A config change that keeps the address
+    ZNRecord tagged = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    tagged.setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), List.of("DefaultTenant_OFFLINE"));
+    setInstanceConfigs(tagged);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, never()).accept(any());
+
+    // Moves to another host while it stays enabled: not a newly enabled server, but its previous address is gone
+    ZNRecord moved = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    moved.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_HOST.name(), "otherhost");
+    setInstanceConfigs(moved);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    ArgumentCaptor<ServerInstance> captor = ArgumentCaptor.forClass(ServerInstance.class);
+    verify(_serverRemovedCallback).accept(captor.capture());
+    assertEquals(captor.getValue().getHostname(), SERVER_HOST);
+    assertEquals(captor.getValue().getPort(), SERVER_PORT);
+    assertEquals(_routingManager.getEnabledServerInstanceMap().get(SERVER_INSTANCE_ID).getHostname(), "otherhost");
+    verify(_serverEnabledCallback, times(1)).accept(any());
+
+    // Disabled, then enabled again at another port: compared with the address it had when it was disabled
+    ZNRecord disabled = createDisabledServerZNRecord(SERVER_INSTANCE_ID);
+    disabled.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_HOST.name(), "otherhost");
+    setInstanceConfigs(disabled);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(1)).accept(any());
+    ZNRecord reenabled = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    reenabled.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_HOST.name(), "otherhost");
+    reenabled.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_PORT.name(), "8001");
+    setInstanceConfigs(reenabled);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    verify(_serverRemovedCallback, times(2)).accept(captor.capture());
+    assertEquals(captor.getValue().getHostname(), "otherhost");
+    assertEquals(captor.getValue().getPort(), SERVER_PORT);
+    verify(_serverEnabledCallback, times(2)).accept(any());
+  }
+
+  private void setInstanceConfigs(ZNRecord... instanceConfigs) {
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of(instanceConfigs));
+  }
+
+  /// `setServerEnabledCallback` replaces what it set before, and only that, so callbacks registered through
+  /// `addServerEnabledCallback` (the single-stage channel eviction) are never dropped by it.
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testSetServerEnabledCallbackReplacesOnlyItsOwnCallback() {
+    Consumer<ServerInstance> setCallback1 = mock(Consumer.class);
+    Consumer<ServerInstance> setCallback2 = mock(Consumer.class);
+    _routingManager.addServerEnabledCallback(_serverEnabledCallback);
+    _routingManager.setServerEnabledCallback(setCallback1);
+    _routingManager.setServerEnabledCallback(setCallback2);
+
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
     _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
 
-    // Verify callback was NOT invoked (server was never excluded)
-    verify(_serverReenableCallback, never()).accept(any());
+    verify(_serverEnabledCallback).accept(any());
+    verify(setCallback1, never()).accept(any());
+    verify(setCallback2).accept(any());
+  }
+
+  /// Several listeners share the signal (the single-stage transport drops its channels, the multi-stage engine resets
+  /// its gRPC channel), and one failing must not stop the others or the routing update.
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testAllServerEnabledCallbacksInvokedEvenIfOneThrows() {
+    Consumer<ServerInstance> failingCallback = mock(Consumer.class);
+    doThrow(new RuntimeException("callback failure")).when(failingCallback).accept(any());
+    _routingManager.addServerEnabledCallback(failingCallback);
+    _routingManager.addServerEnabledCallback(_serverEnabledCallback);
+
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT),
+        anyInt(), anyInt())).thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    verify(failingCallback).accept(any());
+    verify(_serverEnabledCallback).accept(any());
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
   }
 
   @Test
@@ -241,20 +524,476 @@ public class BrokerRoutingManagerTest {
     assertSame(_routingManager.getTablePartitionReplicatedServersInfo(TEST_TABLE), expectedReplicatedServersInfo);
   }
 
+  @Test
+  public void testGetPrunedSegmentsIsExactlySelectedMinusSurvivors()
+      throws Exception {
+    SegmentSelector segmentSelector = selectorOf("seg1", "seg2", "seg3", "seg4");
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, segmentSelector, List.of(prunerDropping("seg1", "seg3")),
+            mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of("seg1", "seg3"));
+  }
+
+  @Test
+  public void testGetPrunedSegmentsChainsEveryPruner()
+      throws Exception {
+    SegmentPruner firstPruner = prunerDropping("seg1");
+    SegmentPruner secondPruner = prunerDropping("seg3");
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("seg1", "seg2", "seg3"), List.of(firstPruner, secondPruner),
+            mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of("seg1", "seg3"));
+
+    // The second pruner judges what the first left, so consulting only the last one would lose "seg1".
+    ArgumentCaptor<Set<String>> captor = ArgumentCaptor.captor();
+    verify(secondPruner).prune(any(), captor.capture());
+    assertEquals(captor.getValue(), Set.of("seg2", "seg3"));
+  }
+
+  /// Nothing pruned must read as "proved nothing", not as "proved every selected segment empty" -- the latter would
+  /// let a caller treat a table that fully matches the filter as a table with no matching rows.
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenNothingWasPruned()
+      throws Exception {
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("seg1", "seg2"), List.of(prunerDropping()),
+            mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of());
+  }
+
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenSelectionIsEmpty()
+      throws Exception {
+    SegmentPruner pruner = prunerDropping("seg1");
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf(), List.of(pruner), mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of());
+    // An empty selection is answered without asking anyone, so the empty result cannot have come from a pruner.
+    verify(pruner, never()).prune(any(), any());
+  }
+
+  /// A table this broker has no routing for is `null`, not an empty set: it eliminated nothing because it would have
+  /// routed nothing, which is a different claim from "the pruners ran and proved nothing".
+  @Test
+  public void testGetPrunedSegmentsIsNullForUnknownTable() {
+    assertNull(_routingManager.getPrunedSegments(brokerRequest("noSuchTable_OFFLINE")));
+  }
+
+  /// The whole point of the API: only presence in the result is a proof. A segment the selector never offered is
+  /// absent from the survivors for a reason that has nothing to do with the filter -- here the selector withheld
+  /// "seg3" -- and reporting it would let a caller skip a segment that may well hold matching rows.
+  @Test
+  public void testGetPrunedSegmentsDoesNotReportASegmentTheSelectorNeverOffered()
+      throws Exception {
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("seg1", "seg2"), List.of(prunerDropping("seg1", "seg3")),
+            mock(InstanceSelector.class)));
+
+    Set<String> prunedSegments = _routingManager.getPrunedSegments(brokerRequest(TEST_TABLE));
+
+    assertEquals(prunedSegments, Set.of("seg1"));
+    assertFalse(prunedSegments.contains("seg3"));
+  }
+
+  /// Instance selection is what makes routing depend on the request id and on which replicas are up; keeping it out
+  /// is what makes this deterministic enough to plan on.
+  @Test
+  public void testGetPrunedSegmentsNeverConsultsInstanceSelection()
+      throws Exception {
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, selectorOf("seg1", "seg2"), List.of(prunerDropping("seg1")), instanceSelector));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of("seg1"));
+    verifyNoInteractions(instanceSelector);
+  }
+
+  /// A pruner that edits the set it was handed leaves nothing to take a difference against. That has to degrade to
+  /// "proved nothing" rather than to a wrong proof.
+  @Test
+  public void testGetPrunedSegmentsIsEmptyWhenAPrunerEditsInPlace()
+      throws Exception {
+    SegmentPruner pruner = mock(SegmentPruner.class);
+    when(pruner.prune(any(), any())).thenAnswer(invocation -> {
+      Set<String> segments = invocation.getArgument(1);
+      segments.remove("seg1");
+      return segments;
+    });
+    SegmentSelector segmentSelector = mock(SegmentSelector.class);
+    when(segmentSelector.select(any())).thenReturn(new HashSet<>(Set.of("seg1", "seg2")));
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, segmentSelector, List.of(pruner), mock(InstanceSelector.class)));
+
+    assertEquals(_routingManager.getPrunedSegments(brokerRequest(TEST_TABLE)), Set.of());
+  }
+
+  private static BrokerRequest brokerRequest(String tableNameWithType) {
+    QuerySource querySource = new QuerySource();
+    querySource.setTableName(tableNameWithType);
+    BrokerRequest brokerRequest = new BrokerRequest();
+    brokerRequest.setQuerySource(querySource);
+    return brokerRequest;
+  }
+
+  private static SegmentSelector selectorOf(String... segments) {
+    SegmentSelector segmentSelector = mock(SegmentSelector.class);
+    when(segmentSelector.select(any())).thenReturn(Set.of(segments));
+    return segmentSelector;
+  }
+
+  /// Returns the segments to query on one instance, backed by mutable lists as an instance selector returns them.
+  private static SegmentsToQuery segmentsToQuery(List<String> segments, List<String> optionalSegments) {
+    return new SegmentsToQuery(new ArrayList<>(segments), new ArrayList<>(optionalSegments));
+  }
+
+  /// Mirrors [org.apache.pinot.broker.routing.segmentpruner.EmptySegmentPruner]: a fresh set when it prunes
+  /// something, the very set it was handed when it does not.
+  private static SegmentPruner prunerDropping(String... segments) {
+    Set<String> droppedSegments = Set.of(segments);
+    SegmentPruner segmentPruner = mock(SegmentPruner.class);
+    when(segmentPruner.prune(any(), any())).thenAnswer(invocation -> {
+      Set<String> candidateSegments = invocation.getArgument(1);
+      if (droppedSegments.stream().noneMatch(candidateSegments::contains)) {
+        return candidateSegments;
+      }
+      Set<String> survivingSegments = new HashSet<>(candidateSegments);
+      survivingSegments.removeAll(droppedSegments);
+      return survivingSegments;
+    });
+    return segmentPruner;
+  }
+
   private static Object createRoutingEntry(String tableNameWithType, TimeBoundaryManager timeBoundaryManager,
       SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos)
+      throws Exception {
+    return createRoutingEntry(tableNameWithType, mock(SegmentSelector.class), List.of(),
+        mock(InstanceSelector.class), timeBoundaryManager, partitionMetadataManager, samplerInfos, false);
+  }
+
+  private static Object createRoutingEntry(String tableNameWithType, TimeBoundaryManager timeBoundaryManager,
+      SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos,
+      InstanceSelector instanceSelector, boolean disabled)
+      throws Exception {
+    return createRoutingEntry(tableNameWithType, mock(SegmentSelector.class), List.of(), instanceSelector,
+        timeBoundaryManager, partitionMetadataManager, samplerInfos, disabled);
+  }
+
+  private static Object createRoutingEntry(String tableNameWithType, SegmentSelector segmentSelector,
+      List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector)
+      throws Exception {
+    return createRoutingEntry(tableNameWithType, segmentSelector, segmentPruners, instanceSelector,
+        mock(TimeBoundaryManager.class), mock(SegmentPartitionMetadataManager.class), Map.of(), false);
+  }
+
+  private static Object createRoutingEntry(String tableNameWithType, SegmentSelector segmentSelector,
+      List<SegmentPruner> segmentPruners, InstanceSelector instanceSelector, TimeBoundaryManager timeBoundaryManager,
+      SegmentPartitionMetadataManager partitionMetadataManager, Map<String, ?> samplerInfos, boolean disabled)
       throws Exception {
     Class<?> routingEntryClass = Class.forName(BaseBrokerRoutingManager.class.getName() + "$RoutingEntry");
     Constructor<?> constructor = routingEntryClass.getDeclaredConstructor(String.class, String.class, String.class,
         SegmentPreSelector.class, SegmentSelector.class, List.class, InstanceSelector.class, int.class, int.class,
         SegmentZkMetadataFetcher.class, TimeBoundaryManager.class, SegmentPartitionMetadataManager.class, Long.class,
-        Map.class, boolean.class);
+        Map.class, boolean.class, int.class);
     constructor.setAccessible(true);
+    SegmentPreSelector segmentPreSelector = onlineSegments -> onlineSegments;
     return constructor.newInstance(tableNameWithType, "/IDEALSTATES/" + tableNameWithType,
-        "/EXTERNALVIEW/" + tableNameWithType, mock(SegmentPreSelector.class), mock(SegmentSelector.class),
-        Collections.<SegmentPruner>emptyList(), mock(InstanceSelector.class), 1, 1,
+        "/EXTERNALVIEW/" + tableNameWithType, segmentPreSelector, segmentSelector, segmentPruners,
+        instanceSelector, 1, 1,
         mock(SegmentZkMetadataFetcher.class), timeBoundaryManager, partitionMetadataManager, null, samplerInfos,
-        false);
+        disabled, 0);
+  }
+
+  private static Object createSamplerInfo(InstanceSelector instanceSelector)
+      throws Exception {
+    Class<?> samplerInfoClass = Class.forName(BaseBrokerRoutingManager.class.getName() + "$SamplerInfo");
+    Constructor<?> constructor =
+        samplerInfoClass.getDeclaredConstructor(TableSampler.class, SegmentSelector.class, InstanceSelector.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(mock(TableSampler.class), mock(SegmentSelector.class), instanceSelector);
+  }
+
+  /// Registers the test server as routable, so that the exclude/include paths actually walk the routing
+  /// entries instead of short-circuiting.
+  private void enableTestServer() {
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+  }
+
+  private void verifyReplicaHealthGaugesRemoved() {
+    for (BrokerGauge gauge : REPLICA_HEALTH_GAUGES) {
+      verify(_brokerMetrics).removeTableGauge(TEST_TABLE, gauge);
+    }
+  }
+
+  private void verifyNoReplicaHealthGaugesReported() {
+    for (BrokerGauge gauge : REPLICA_HEALTH_GAUGES) {
+      verify(_brokerMetrics, never()).setValueOfTableGauge(eq(TEST_TABLE), eq(gauge), anyLong());
+    }
+  }
+
+  @Test
+  public void testRemoveRoutingRemovesReplicaHealthMetrics()
+      throws Exception {
+    // The routing owns the table's replica health gauges, so tearing it down has to stop them - otherwise
+    // they keep being exported for a table this broker no longer serves
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of()));
+
+    _routingManager.removeRouting(TEST_TABLE);
+
+    verifyReplicaHealthGaugesRemoved();
+    verify(_brokerMetrics).removeTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS);
+  }
+
+  @Test
+  public void testAssignmentChangeReportsRoutingUpdateMetrics()
+      throws Exception {
+    // Every routing update triggered by an ideal state or external view change is timed, counted and reports the
+    // number of segments the routing tracks
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    IdealState idealState = createIdealState(true);
+    idealState.getRecord().setMapField("seg0", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    idealState.getRecord().setMapField("seg1", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    idealState.getRecord().setMapField("offlineSeg", Map.of(SERVER_INSTANCE_ID, "OFFLINE"));
+    stubSegmentAssignmentChange(idealState);
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(_brokerMetrics).addTimedTableValue(eq(TEST_TABLE), eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(),
+        eq(TimeUnit.NANOSECONDS));
+    verify(_brokerMetrics).addTimedValue(eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(),
+        eq(TimeUnit.NANOSECONDS));
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_SUCCESS, 1L);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS, 2L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURE, 1L);
+  }
+
+  @Test
+  public void testFailedAssignmentChangeReportsFailureMetric()
+      throws Exception {
+    // A failed update is counted as a failure, not as an update, and is not timed, so that a table whose update
+    // keeps failing does not look like a table with many assignment changes
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    doThrow(new RuntimeException("test")).when(instanceSelector).onAssignmentChange(any(), any(), any());
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+    IdealState idealState = createIdealState(true);
+    idealState.getRecord().setMapField("seg0", Map.of(SERVER_INSTANCE_ID, "ONLINE"));
+    stubSegmentAssignmentChange(idealState);
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_FAILURE, 1L);
+    verify(_brokerMetrics, never()).addMeteredTableValue(TEST_TABLE, BrokerMeter.ROUTING_TABLE_UPDATE_SUCCESS, 1L);
+    verify(_brokerMetrics, never()).addTimedTableValue(eq(TEST_TABLE), eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME),
+        anyLong(), any());
+    verify(_brokerMetrics, never()).addTimedValue(eq(BrokerTimer.ROUTING_TABLE_UPDATE_TIME), anyLong(), any());
+  }
+
+  @Test
+  public void testInstanceChangeReportsReplicaHealthMetrics()
+      throws Exception {
+    // The gauges have to track the routing, so an instance change re-reports what the selector now measures
+    enableTestServer();
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(33, 2, 1));
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 33);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 2);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 1);
+  }
+
+  @Test
+  public void testReplicaHealthMetricsDroppedForDisabledTable()
+      throws Exception {
+    // Disabling a table drives every replica OFFLINE on purpose, so its segments look unavailable. Reporting
+    // that would fire the alert for a table nobody expects to be queryable. Drop the gauges instead, so the
+    // series disappears rather than reading as an outage.
+    enableTestServer();
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(0, 1, 1));
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, true));
+
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+
+    verifyReplicaHealthGaugesRemoved();
+    verifyNoReplicaHealthGaugesReported();
+  }
+
+  /// Stubs the ZK reads that `processSegmentAssignmentChangeInternal` makes for the test table, so that the
+  /// real assignment change path runs against the given ideal state.
+  private void stubSegmentAssignmentChange(IdealState idealState) {
+    String idealStatePath = "/IDEALSTATES/" + TEST_TABLE;
+    String externalViewPath = "/EXTERNALVIEW/" + TEST_TABLE;
+    // Any version other than the one the routing entry currently holds, so that the change is not skipped
+    Stat changedStat = new Stat();
+    changedStat.setVersion(2);
+    when(_zkDataAccessor.getStats(eq(List.of(idealStatePath)), eq(AccessOption.PERSISTENT)))
+        .thenReturn(new Stat[]{changedStat});
+    when(_zkDataAccessor.getStats(eq(List.of(externalViewPath)), eq(AccessOption.PERSISTENT)))
+        .thenReturn(new Stat[]{changedStat});
+    when(_zkDataAccessor.get(eq(idealStatePath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(idealState.getRecord());
+    when(_zkDataAccessor.get(eq(externalViewPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(new ExternalView(TEST_TABLE).getRecord());
+  }
+
+  private static IdealState createIdealState(boolean enabled) {
+    IdealState idealState = new IdealState(TEST_TABLE);
+    idealState.enable(enabled);
+    return idealState;
+  }
+
+  @Test
+  public void testBuildRoutingReportsReplicaHealthGauges()
+      throws Exception {
+    // Building the routing is the only path by which a newly served table's gauges first appear. Without a
+    // report here they would only materialize at the next unrelated cluster change, and a table that was
+    // never rebuilt would stay missing from the dashboard entirely.
+    enableTestServer();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TableNameBuilder.extractRawTableName(TEST_TABLE))
+            .build();
+    when(_propertyStore.get(eq("/CONFIGS/TABLE/" + TEST_TABLE), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfig));
+    when(_zkDataAccessor.get(eq("/IDEALSTATES/" + TEST_TABLE), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(createIdealState(true).getRecord());
+    when(_zkDataAccessor.get(eq("/EXTERNALVIEW/" + TEST_TABLE), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(new ExternalView(TEST_TABLE).getRecord());
+
+    _routingManager.buildRouting(TEST_TABLE);
+
+    assertTrue(_routingManager.routingExists(TEST_TABLE));
+    // A table with no segments has nothing to measure, so it reads as fully replicated rather than as an
+    // outage - see TableReplicaHealth
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 100);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 0);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 0);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.ROUTING_TABLE_SEGMENTS, 0);
+  }
+
+  @Test
+  public void testAssignmentChangeDropsThenRestoresGaugesAcrossDisableAndEnable()
+      throws Exception {
+    // Drives the real assignment change path rather than injecting the disabled flag, since that is the only
+    // thing that ever flips it. Both directions matter: dropping the gauges of a disabled table is only
+    // correct if enabling it brings them back, otherwise the table stays invisible for good.
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(100, 0, 0));
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+
+    // Disabling a table drives every replica OFFLINE on purpose, so reporting it would be a false alarm
+    stubSegmentAssignmentChange(createIdealState(false));
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verifyReplicaHealthGaugesRemoved();
+    verifyNoReplicaHealthGaugesReported();
+
+    clearInvocations(_brokerMetrics);
+    stubSegmentAssignmentChange(createIdealState(true));
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 100);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 0);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 0);
+  }
+
+  @Test
+  public void testSamplerInstanceSelectorNeverReportsReplicaHealth()
+      throws Exception {
+    // A sampler's selector sees only a sampled subset of the table's segments and shares the table name with
+    // the selector covering the whole table, so reporting from it would overwrite the table's real values.
+    // Only the routing entry's own selector is ever asked.
+    enableTestServer();
+    InstanceSelector samplerInstanceSelector = mock(InstanceSelector.class);
+    when(samplerInstanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(0, 5, 5));
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(100, 0, 0));
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of("sampler", createSamplerInfo(samplerInstanceSelector)),
+            instanceSelector, false));
+
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+
+    // The sampler's selector is driven by the change like any other...
+    verify(samplerInstanceSelector).onInstancesChange(any(), any());
+    // ...but is never a source of the table's gauges
+    verify(samplerInstanceSelector, never()).getReplicaHealth();
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 100);
+  }
+
+  @Test
+  public void testSelectorThatDoesNotMeasureReplicaHealthDropsTheGauges()
+      throws Exception {
+    // A custom instance selector that does not extend BaseInstanceSelector returns null replica health. Its
+    // gauges are dropped rather than left at whatever a previous selector reported, so swapping a table to
+    // such a selector ends the series instead of freezing it.
+    enableTestServer();
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.getReplicaHealth()).thenReturn(null);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+
+    // Asserted positively first, so the never() checks below cannot pass just because the reporting path
+    // was never reached at all
+    verify(instanceSelector).getReplicaHealth();
+    verifyReplicaHealthGaugesRemoved();
+    verifyNoReplicaHealthGaugesReported();
+  }
+
+  @Test
+  public void testReplicaHealthStillReportedWhenTheAssignmentChangeThrows()
+      throws Exception {
+    // RoutingEntry.onAssignmentChange updates the instance selector before the time boundary manager, so by
+    // the time this throws the replica health is already fresh but unreported. That is the window the
+    // finally block exists for. Real callers reach it through MultiStageReplicaGroupSelector, whose own
+    // onAssignmentChange recomputes the health via super and then throws from getInstancePartitions() when
+    // the instance partitions ZNode is missing.
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(0, 4, 4));
+    TimeBoundaryManager timeBoundaryManager = mock(TimeBoundaryManager.class);
+    doThrow(new RuntimeException("simulated time boundary manager failure")).when(timeBoundaryManager)
+        .onAssignmentChange(any(), any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, timeBoundaryManager, null, Map.of(), instanceSelector, false));
+    stubSegmentAssignmentChange(createIdealState(true));
+
+    _routingManager.processSegmentAssignmentChangeInternal();
+
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 0);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 4);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 4);
+  }
+
+  @Test
+  public void testReplicaHealthStillReportedWhenTheInstanceChangeThrows()
+      throws Exception {
+    // Same window on the instance change path: RoutingEntry.onInstancesChange updates the table's own
+    // selector before fanning out to the samplers', and unlike updateSamplerInfos it does not catch per
+    // sampler, so a failing sampler selector aborts the update after the health is already fresh.
+    enableTestServer();
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.getReplicaHealth()).thenReturn(new TableReplicaHealth(0, 3, 3));
+    InstanceSelector samplerInstanceSelector = mock(InstanceSelector.class);
+    doThrow(new RuntimeException("simulated instance selector failure")).when(samplerInstanceSelector)
+        .onInstancesChange(any(), any());
+    putRoutingEntry(TEST_TABLE,
+        createRoutingEntry(TEST_TABLE, null, null, Map.of("sampler", createSamplerInfo(samplerInstanceSelector)),
+            instanceSelector, false));
+
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.PERCENT_OF_REPLICAS, 0);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.SEGMENTS_AT_MIN_PERCENT_OF_REPLICAS, 3);
+    verify(_brokerMetrics).setValueOfTableGauge(TEST_TABLE, BrokerGauge.UNAVAILABLE_SEGMENTS, 3);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -291,9 +1030,74 @@ public class BrokerRoutingManagerTest {
     assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
   }
 
-  /**
-   * Creates a ZNRecord representing an enabled server instance.
-   */
+  @Test
+  public void testShuttingDownServerRemovedFromRoutingWhileAnotherServerIsExcluded()
+      throws Exception {
+    // Enable three servers, then exclude one of them (simulating FailureDetector marking it unhealthy)
+    String excludedServer = "Server_excludedhost_8000";
+    String healthyServer = "Server_healthyhost_8000";
+    ZNRecord serverConfig = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    ZNRecord excludedServerConfig = createEnabledServerZNRecord(excludedServer);
+    ZNRecord healthyServerConfig = createEnabledServerZNRecord(healthyServer);
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(serverConfig, excludedServerConfig, healthyServerConfig));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    _routingManager.excludeServerFromRouting(excludedServer);
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of(), instanceSelector, false));
+
+    // The server starts shutting down while the other server is still excluded
+    ZNRecord shuttingDownServerConfig = createEnabledServerZNRecord(SERVER_INSTANCE_ID);
+    shuttingDownServerConfig.setSimpleField(Helix.IS_SHUTDOWN_IN_PROGRESS, "true");
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(List.of(shuttingDownServerConfig, excludedServerConfig, healthyServerConfig));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    // The routing entry must stop selecting the shutting down server, and only the healthy server stays routable
+    verify(instanceSelector).onInstancesChange(Set.of(healthyServer), List.of(SERVER_INSTANCE_ID));
+    assertEquals(_routingManager.getRoutableServerInstanceMap().keySet(), Set.of(healthyServer));
+    // The excluded server stays enabled
+    assertEquals(_routingManager.getEnabledServerInstanceMap().keySet(), Set.of(excludedServer, healthyServer));
+  }
+
+  @Test
+  public void testPartitionPruningThresholdUpdates()
+      throws Exception {
+    String key = CONFIG_OF_PARTITION_PRUNING_PREPARATION_THRESHOLD;
+    _routingManager = spy(_routingManager);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, null, null, Map.of()));
+    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    ClusterConfig config = new ClusterConfig("testCluster");
+    config.getRecord().setSimpleField(key, "128");
+    handler.onClusterConfigChange(config, null);
+    handler.registerClusterConfigChangeListener(_routingManager);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), 128);
+
+    config.getRecord().setSimpleField(key, "-1");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(), -1);
+
+    config.getRecord().setSimpleField(key, "invalid");
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+
+    config.getRecord().getSimpleFields().clear();
+    handler.onClusterConfigChange(config, null);
+    assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
+        DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
+    verify(_routingManager, never()).buildRouting(TEST_TABLE);
+  }
+
+  /// Creates a ZNRecord representing a disabled server instance.
+  @SuppressWarnings("deprecation") // The routing manager still reads Helix's legacy enabled flag for compatibility.
+  private ZNRecord createDisabledServerZNRecord(String instanceId) {
+    ZNRecord record = createEnabledServerZNRecord(instanceId);
+    record.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name(), "false");
+    return record;
+  }
+
+  /// Creates a ZNRecord representing an enabled server instance.
   private ZNRecord createEnabledServerZNRecord(String instanceId) {
     ZNRecord record = new ZNRecord(instanceId);
     record.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name(), "true");

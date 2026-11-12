@@ -54,7 +54,6 @@ import org.slf4j.LoggerFactory;
 ///   - `/CONFIGS/MATERIALIZED_VIEW/RUNTIME` — high-frequency changes only update mutable
 ///       runtime state (watermarkMs, partitions map) without any SQL parsing
 ///
-///
 /// Thread-safety: all mutations go through synchronized ZK listener callbacks;
 /// reads use a [ConcurrentHashMap] and are lock-free.
 public class MaterializedViewMetadataCache {

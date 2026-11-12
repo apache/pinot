@@ -37,17 +37,13 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for {@link StreamingDispatchObserver}. Drives ServerToBroker messages directly into
- * {@link StreamObserver#onNext} on a real {@link StreamingQuerySession} and verifies the right session methods are
- * called and the session completes when expected.
- */
+/// Unit tests for [StreamingDispatchObserver]. Drives ServerToBroker messages directly into
+/// [StreamObserver#onNext] on a real [StreamingQuerySession] and verifies the right session methods are
+/// called and the session completes when expected.
 public class StreamingDispatchObserverTest {
 
-  /**
-   * Happy path: submit_ack, then 2 OpChainCompletes, then ServerDone. ackCallback fires once with the response, the
-   * session's latch drains to zero, and the stream is unregistered.
-   */
+  /// Happy path: submit_ack, then 2 OpChainCompletes, then ServerDone. ackCallback fires once with the response, the
+  /// session's latch drains to zero, and the stream is unregistered.
   @Test
   public void testHappyPath()
       throws Exception {
@@ -81,10 +77,8 @@ public class StreamingDispatchObserverTest {
     Assert.assertEquals((int) coverage.getRespondedByStage().get(1), 2);
   }
 
-  /**
-   * onError before submit_ack: ack callback receives the error (so the dispatcher's ack-await doesn't hang) and the
-   * session latch drains by the per-server remaining-expected count.
-   */
+  /// onError before submit_ack: ack callback receives the error (so the dispatcher's ack-await doesn't hang) and the
+  /// session latch drains by the per-server remaining-expected count.
   @Test
   public void testErrorBeforeAckSurfacesToCallback()
       throws Exception {
@@ -106,9 +100,7 @@ public class StreamingDispatchObserverTest {
         "expected session to complete after stream error drained latch");
   }
 
-  /**
-   * Cancel via the StreamingServerHandle interface writes a BrokerToServer.cancel onto the outbound stream.
-   */
+  /// Cancel via the StreamingServerHandle interface writes a BrokerToServer.cancel onto the outbound stream.
   @Test
   public void testCancelEmitsBrokerToServerCancel()
       throws Exception {
@@ -129,10 +121,8 @@ public class StreamingDispatchObserverTest {
     Assert.assertEquals(sent.getCancel().getRequestId(), 42L);
   }
 
-  /**
-   * STATUS_ERROR ack followed by ServerDone with no opchains: the DONE handler must drain the remaining expected count
-   * from the latch so {@link StreamingQuerySession#awaitCompletion} returns promptly, not at the query deadline.
-   */
+  /// STATUS_ERROR ack followed by ServerDone with no opchains: the DONE handler must drain the remaining expected count
+  /// from the latch so [StreamingQuerySession#awaitCompletion] returns promptly, not at the query deadline.
   @Test
   public void testDoneWithNoReportedOpChainsAfterErrorAckDrainsLatch()
       throws Exception {
@@ -163,10 +153,8 @@ public class StreamingDispatchObserverTest {
     Assert.assertEquals(session.getOutstandingCount(), 0L);
   }
 
-  /**
-   * Partial reports + DONE (not onError): server reports 1 of 3 opchains then sends DONE early. The DONE handler must
-   * drain only the remaining 2 counts, not all 3.
-   */
+  /// Partial reports + DONE (not onError): server reports 1 of 3 opchains then sends DONE early. The DONE handler must
+  /// drain only the remaining 2 counts, not all 3.
   @Test
   public void testDoneAfterPartialOpChainsReportedDrainsRemaining()
       throws Exception {
@@ -189,10 +177,8 @@ public class StreamingDispatchObserverTest {
     Assert.assertEquals(session.getOutstandingCount(), 0L);
   }
 
-  /**
-   * Partial reports + onError: the latch is drained by exactly remaining-expected, not the full per-server count
-   * (so we don't double-decrement).
-   */
+  /// Partial reports + onError: the latch is drained by exactly remaining-expected, not the full per-server count
+  /// (so we don't double-decrement).
   @Test
   public void testErrorAfterPartialReportsDrainsRemainingOnly()
       throws Exception {
@@ -214,11 +200,9 @@ public class StreamingDispatchObserverTest {
     Assert.assertEquals(session.getOutstandingCount(), 0L);
   }
 
-  /**
-   * DONE with remaining > 0 followed by onError: the onError must not double-drain the latch. The DONE handler
-   * advances _opChainsReportedForThisServer to _expectedOpChainsForThisServer, so onError computes remaining == 0
-   * and is a no-op on the latch.
-   */
+  /// DONE with remaining > 0 followed by onError: the onError must not double-drain the latch. The DONE handler
+  /// advances \_opChainsReportedForThisServer to \_expectedOpChainsForThisServer, so onError computes remaining == 0
+  /// and is a no-op on the latch.
   @Test
   public void testOnErrorAfterDoneWithRemainingDoesNotDoubleDrain()
       throws Exception {
@@ -252,9 +236,7 @@ public class StreamingDispatchObserverTest {
     Assert.assertEquals(session.getOutstandingCount(), 0L, "double-drain guard: onError after DONE must be no-op");
   }
 
-  /**
-   * onCompleted fires after a clean DONE (remaining == 0): unregisterStream is idempotent, no exception.
-   */
+  /// onCompleted fires after a clean DONE (remaining == 0): unregisterStream is idempotent, no exception.
   @Test
   public void testOnCompletedAfterCleanDoneIsNoOp()
       throws Exception {
@@ -277,11 +259,9 @@ public class StreamingDispatchObserverTest {
     Assert.assertEquals(session.getOutstandingCount(), 0L);
   }
 
-  /**
-   * A misbehaving server sending more OpChainCompletes than expected must not over-drain the session's global
-   * latch: in a multi-server query that would end awaitCompletion before the other servers' reports arrived,
-   * silently dropping their stats. Extras beyond the per-server expected count are ignored.
-   */
+  /// A misbehaving server sending more OpChainCompletes than expected must not over-drain the session's global
+  /// latch: in a multi-server query that would end awaitCompletion before the other servers' reports arrived,
+  /// silently dropping their stats. Extras beyond the per-server expected count are ignored.
   @Test
   public void testExtraOpChainCompletesDoNotOverDrainLatch()
       throws Exception {
@@ -305,13 +285,11 @@ public class StreamingDispatchObserverTest {
         "only the expected report should be recorded");
   }
 
-  /**
-   * onError must be idempotent. gRPC guarantees at most one terminal callback per stream, but
-   * {@code DispatchClient.submitWithStream} also invokes onError manually when opening the stream or sending the
-   * submit fails — and in the send-failure case a gRPC-initiated onError for the same (started) call can follow.
-   * Without the dedupe, the second invocation would drain the session latch a second time (over-draining the other
-   * servers' slots) and could deliver a second error ack into the exactly-server-count-sized ack queue.
-   */
+  /// onError must be idempotent. gRPC guarantees at most one terminal callback per stream, but
+  /// `DispatchClient.submitWithStream` also invokes onError manually when opening the stream or sending the
+  /// submit fails — and in the send-failure case a gRPC-initiated onError for the same (started) call can follow.
+  /// Without the dedupe, the second invocation would drain the session latch a second time (over-draining the other
+  /// servers' slots) and could deliver a second error ack into the exactly-server-count-sized ack queue.
   @Test
   public void testOnErrorIsIdempotent()
       throws Exception {

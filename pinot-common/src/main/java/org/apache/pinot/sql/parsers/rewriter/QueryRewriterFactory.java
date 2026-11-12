@@ -38,10 +38,11 @@ public class QueryRewriterFactory {
   //   (reference) into the group-by list, but the alias should not be applied to the reference.
   //   E.g. SELECT a + 1 AS a FROM table GROUP BY 1
   //   AggregationOptimizer should run early to optimize aggregation patterns before other rewrites.
+  //   OrderByLiteralRemover must run after OrdinalsUpdater so integer ordinals are resolved before removing literals.
   public static final List<String> DEFAULT_QUERY_REWRITERS_CLASS_NAMES =
       List.of(CompileTimeFunctionsInvoker.class.getName(), AggregationOptimizer.class.getName(),
           SelectionsRewriter.class.getName(), PredicateComparisonRewriter.class.getName(),
-          AliasApplier.class.getName(), OrdinalsUpdater.class.getName(),
+          AliasApplier.class.getName(), OrdinalsUpdater.class.getName(), OrderByLiteralRemover.class.getName(),
           NonAggregationGroupByToDistinctQueryRewriter.class.getName(), RlsFiltersRewriter.class.getName(),
           CastTypeAliasRewriter.class.getName());
 

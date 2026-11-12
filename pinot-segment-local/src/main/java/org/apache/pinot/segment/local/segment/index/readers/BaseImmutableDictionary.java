@@ -33,9 +33,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Base implementation of immutable dictionary.
- */
+/// Base implementation of immutable dictionary.
 @SuppressWarnings("rawtypes")
 public abstract class BaseImmutableDictionary implements Dictionary {
   private final ValueReader _valueReader;
@@ -57,9 +55,7 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     _numBytesPerValue = numBytesPerValue;
   }
 
-  /**
-   * For virtual dictionary.
-   */
+  /// For virtual dictionary.
   protected BaseImmutableDictionary(int length) {
     _valueReader = null;
     _length = length;
@@ -255,6 +251,10 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return _valueReader.getBigDecimal(dictId, _numBytesPerValue);
   }
 
+  protected int readUnpaddedBytes(int dictId, byte[] buffer) {
+    return _valueReader.readUnpaddedBytes(dictId, _numBytesPerValue, buffer);
+  }
+
   protected byte[] getUnpaddedBytes(int dictId, byte[] buffer) {
     return _valueReader.getUnpaddedBytes(dictId, _numBytesPerValue, buffer);
   }
@@ -263,8 +263,8 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return _valueReader.getUnpaddedString(dictId, _numBytesPerValue, buffer);
   }
 
-  protected String getPaddedString(int dictId, byte[] buffer) {
-    return _valueReader.getPaddedString(dictId, _numBytesPerValue, buffer);
+  protected int readBytes(int dictId, byte[] buffer) {
+    return _valueReader.readBytes(dictId, _numBytesPerValue, buffer);
   }
 
   protected byte[] getBytes(int dictId) {
@@ -277,18 +277,6 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   protected int getByteSize(int dictId) {
     return _valueReader.getByteSize(dictId, _numBytesPerValue);
-  }
-
-  public int get32BitsMurmur3Hash(int dictId, byte[] buffer) {
-    return _valueReader.get32BitsMurmur3Hash(dictId, _numBytesPerValue, buffer);
-  }
-
-  public long get64BitsMurmur3Hash(int dictId, byte[] buffer) {
-    return _valueReader.get64BitsMurmur3Hash(dictId, _numBytesPerValue, buffer);
-  }
-
-  public long[] get128BitsMurmur3HashValue(int dictId, byte[] buffer) {
-    return _valueReader.get128BitsMurmur3Hash(dictId, _numBytesPerValue, buffer);
   }
 
   protected byte[] getBuffer() {

@@ -30,24 +30,23 @@ import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Writer for bitmap inverted index file.
- * <pre>
- * Layout for RoaringBitmap inverted index:
- * |-------------------------------------------------------------------------|
- * |                    Start offset of 1st bitmap                           |
- * |    End offset of 1st bitmap (exclusive) / Start offset of 2nd bitmap    |
- * |                                   ...                                   |
- * | End offset of 2nd last bitmap (exclusive) / Start offset of last bitmap |
- * |                  End offset of last bitmap (exclusive)                  |
- * |-------------------------------------------------------------------------|
- * |                           Data for 1st bitmap                           |
- * |                           Data for 2nd bitmap                           |
- * |                                   ...                                   |
- * |                           Data for last bitmap                          |
- * |-------------------------------------------------------------------------|
- * </pre>
- */
+/// Writer for bitmap inverted index file.
+///
+/// ```
+/// Layout for RoaringBitmap inverted index:
+/// |-------------------------------------------------------------------------|
+/// |                    Start offset of 1st bitmap                           |
+/// |    End offset of 1st bitmap (exclusive) / Start offset of 2nd bitmap    |
+/// |                                   ...                                   |
+/// | End offset of 2nd last bitmap (exclusive) / Start offset of last bitmap |
+/// |                  End offset of last bitmap (exclusive)                  |
+/// |-------------------------------------------------------------------------|
+/// |                           Data for 1st bitmap                           |
+/// |                           Data for 2nd bitmap                           |
+/// |                                   ...                                   |
+/// |                           Data for last bitmap                          |
+/// |-------------------------------------------------------------------------|
+/// ```
 public final class BitmapInvertedIndexWriter implements Closeable {
   // 264MB - worst case serialized size of a single bitmap with Integer.MAX_VALUE rows
   private static final long MAX_INITIAL_BUFFER_SIZE = 256 << 20;
@@ -64,18 +63,16 @@ public final class BitmapInvertedIndexWriter implements Closeable {
     this(new RandomAccessFile(outputFile, "rw").getChannel(), numBitmaps, true);
   }
 
-  /**
-   * Creates a new writer that uses the given {@link FileChannel}.
-   * It will start to write on the current position of the channel assuming it is the last useful byte in the file.
-   * When this object is {@link #close() closed}, the channel is truncated to the last byte written by this writer.
-   * @param fileChannel the file channel to be used
-   * @param numBitmaps the number of bitmaps that are expected. The actual value cannot be higher than this value. Fewer
-   *                   bitmaps than the given value can be used, but in that case the representation will not be as
-   *                   expected.
-   * @param ownsChannel whether this writer owns the channel or not. If the channel is owned then it will be closed when
-   *                    this object is closed. Otherwise the owner will have to close it by itself. Even if this writer
-   *                    does not own the channel, it will be truncated when the writer is closed.
-   */
+  /// Creates a new writer that uses the given [FileChannel].
+  /// It will start to write on the current position of the channel assuming it is the last useful byte in the file.
+  /// When this object is [`closed`]\[#close()\], the channel is truncated to the last byte written by this writer.
+  /// @param fileChannel the file channel to be used
+  /// @param numBitmaps the number of bitmaps that are expected. The actual value cannot be higher than this value.
+  ///                   Fewer bitmaps than the given value can be used, but in that case the representation will not be
+  ///                   as expected.
+  /// @param ownsChannel whether this writer owns the channel or not. If the channel is owned then it will be closed
+  ///                    when this object is closed. Otherwise the owner will have to close it by itself. Even if this
+  ///                    writer does not own the channel, it will be truncated when the writer is closed.
   public BitmapInvertedIndexWriter(FileChannel fileChannel, int numBitmaps, boolean ownsChannel)
       throws IOException {
     _ownsChannel = ownsChannel;

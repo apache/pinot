@@ -112,19 +112,15 @@ public class MinionEventObservers {
     return _taskEventObservers.get(taskId);
   }
 
-  /**
-   * Gets all {@link MinionEventObserver}s
-   * @return a map of subtask ID to {@link MinionEventObserver}
-   */
+  /// Gets all [MinionEventObserver]s
+  /// @return a map of subtask ID to [MinionEventObserver]
   public Map<String, MinionEventObserver> getMinionEventObservers() {
     return _taskEventObservers;
   }
 
-  /**
-   * Gets all {@link MinionEventObserver}s with the given {@link MinionTaskState}
-   * @param taskState the {@link MinionTaskState} to match
-   * @return a map of subtask ID to {@link MinionEventObserver}
-   */
+  /// Gets all [MinionEventObserver]s with the given [MinionTaskState]
+  /// @param taskState the [MinionTaskState] to match
+  /// @return a map of subtask ID to [MinionEventObserver]
   public Map<String, MinionEventObserver> getMinionEventObserverWithGivenState(MinionTaskState taskState) {
     return _taskEventObservers.entrySet().stream()
         .filter(e -> e.getValue().getTaskState() == taskState)

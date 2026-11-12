@@ -35,18 +35,16 @@ public class ProtoBufSchemaUtils {
   private ProtoBufSchemaUtils() {
   }
 
-  /**
-   * Given an Protobuf schema, flatten/unnest the complex types based on the config, and then map from column to
-   * field type and time unit, return the equivalent Pinot schema.
-   *
-   * @param protoSchema Avro schema
-   * @param fieldTypeMap Map from column to field type
-   * @param timeUnit Time unit
-   * @param fieldsToUnnest the fields to unnest
-   * @param delimiter the delimiter to separate components in nested structure
-   *
-   * @return Pinot schema
-   */
+  /// Given an Protobuf schema, flatten/unnest the complex types based on the config, and then map from column to
+  /// field type and time unit, return the equivalent Pinot schema.
+  ///
+  /// @param protoSchema Avro schema
+  /// @param fieldTypeMap Map from column to field type
+  /// @param timeUnit Time unit
+  /// @param fieldsToUnnest the fields to unnest
+  /// @param delimiter the delimiter to separate components in nested structure
+  ///
+  /// @return Pinot schema
   public static Schema getPinotSchemaFromPinotSchemaWithComplexTypeHandling(Descriptors.Descriptor protoSchema,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit, List<String> fieldsToUnnest,
       String delimiter) {
@@ -121,9 +119,7 @@ public class ProtoBufSchemaUtils {
     }
   }
 
-  /**
-   * @return if the given avro type is a primitive type.
-   */
+  /// @return if the given avro type is a primitive type.
   public static boolean isPrimitiveType(Descriptors.FieldDescriptor.Type pinotType) {
     switch (pinotType) {
       case INT32:

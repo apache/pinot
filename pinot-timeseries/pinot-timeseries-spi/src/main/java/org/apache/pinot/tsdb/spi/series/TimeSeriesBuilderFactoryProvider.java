@@ -26,9 +26,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 
 
-/**
- * Loads all series builder providers for all configured time-series query languages.
- */
+/// Loads all series builder providers for all configured time-series query languages.
 public class TimeSeriesBuilderFactoryProvider {
   private static final Map<String, TimeSeriesBuilderFactory> FACTORY_MAP = new HashMap<>();
 

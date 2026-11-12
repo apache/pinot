@@ -27,9 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -40,47 +42,49 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code QueryContext} class encapsulates all the query related information extracted from the wiring Object.
- * <p>The query engine should work on the QueryContext instead of the wiring Object for the following benefits:
- * <ul>
- *   <li>
- *     Execution layer can be decoupled from the wiring layer, so that changes for one layer won't affect the other
- *     layer.
- *   </li>
- *   <li>
- *     It is very hard to change wiring Object because it involves protocol change, so we should make it as generic as
- *     possible to support future features. Instead, QueryContext is extracted from the wiring Object within each
- *     Broker/Server, and changing it won't cause any protocol change, so we can upgrade it along with the new feature
- *     support in query engine as needed. Also, because of this, we don't have to make QueryContext very generic, which
- *     can help save the overhead of handling generic Objects (e.g. we can pre-compute the Predicates instead of the
- *     using the generic Expressions).
- *   </li>
- *   <li>
- *     In case we need to change the wiring Object (e.g. switch from Thrift to Protobuf), we don't need to change the
- *     whole query engine.
- *   </li>
- *   <li>
- *     We can also add some helper variables or methods in the context classes which can be shared for all segments to
- *     reduce the repetitive work for each segment.
- *   </li>
- * </ul>
- */
+/// The `QueryContext` class encapsulates all the query related information extracted from the wiring Object.
+///
+/// The query engine should work on the QueryContext instead of the wiring Object for the following benefits:
+///
+/// - Execution layer can be decoupled from the wiring layer, so that changes for one layer won't affect the other
+///   layer.
+/// - It is very hard to change wiring Object because it involves protocol change, so we should make it as generic as
+///   possible to support future features. Instead, QueryContext is extracted from the wiring Object within each
+///   Broker/Server, and changing it won't cause any protocol change, so we can upgrade it along with the new feature
+///   support in query engine as needed. Also, because of this, we don't have to make QueryContext very generic, which
+///   can help save the overhead of handling generic Objects (e.g. we can pre-compute the Predicates instead of the
+///   using the generic Expressions).
+/// - In case we need to change the wiring Object (e.g. switch from Thrift to Protobuf), we don't need to change the
+///   whole query engine.
+/// - We can also add some helper variables or methods in the context classes which can be shared for all segments to
+///   reduce the repetitive work for each segment.
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class QueryContext {
+public class QueryContext implements QueryScopedCache {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryContext.class);
+
   private final String _tableName;
   private final QueryContext _subquery;
   private final List<ExpressionContext> _selectExpressions;
   private final boolean _distinct;
   private final List<String> _aliasList;
   private final FilterContext _filter;
+  @Nullable
+  private final Expression _rowFilterExpression;
+  @Nullable
+  private FilterContext _rowFilter;
+  @Nullable
+  private Map<Expression, Expression> _rowFilterExpressionOverrideMap;
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
   private final List<OrderByExpressionContext> _orderByExpressions;
@@ -90,13 +94,19 @@ public class QueryContext {
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
   private final ExplainMode _explain;
 
-  private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
+  // Values that the segments of the query share, by value type. The query context owns the map, so the values can be
+  // collected with it. A ClassValue would keep each value in its type's cache until later queries clear it.
+  private final ConcurrentHashMap<Class<?>, ConcurrentHashMap<?, ?>> _sharedValues = new ConcurrentHashMap<>();
 
   // Pre-calculate the aggregation functions and columns for the query so that it can be shared across all the segments
   private AggregationFunction[] _aggregationFunctions;
   private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
+  // Logical aggregation slots are fixed before expression rewrites to preserve the broker/server result layout.
+  private List<Pair<FunctionContext, FilterContext>> _aggregationFunctionContexts;
   private boolean _hasFilteredAggregations;
+  // Set by the instance planner after bounding all local BASE and derived grouping-set keys.
+  private boolean _groupingSetsBaseAggregationAllowed = true;
   private Set<String> _columns;
 
   // Other properties to be shared across all the segments
@@ -112,6 +122,14 @@ public class QueryContext {
   private boolean _skipStarTree;
   // Whether to skip reordering scan filters for the query
   private boolean _skipScanFilterReorder;
+  // Time spent to materialize the row-level security bitmap, summed over the segments. The segments run on several
+  // threads, so the sum is a LongAdder.
+  private final LongAdder _rowFilterTimeNs = new LongAdder();
+  // Entries scanned to materialize the row-level security bitmap, summed over the segments. Kept out of the response.
+  private final LongAdder _rowFilterNumEntriesScanned = new LongAdder();
+  // Whether an AND may push the document ids it has matched into its composite (AND/OR/NOT) children.
+  // Resolved from the query option and the server default by InstancePlanMakerImplV2#applyQueryOptions.
+  private boolean _andRestrictionPushdownEnabled;
   // Maximum number of threads used to execute the query
   private int _maxExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
   // The following properties apply to group-by queries
@@ -143,6 +161,20 @@ public class QueryContext {
   private int _effectiveSegmentGroupTrimSize;
   // Flush threshold for streaming group-by (0 = disabled)
   private int _streamingGroupByFlushThreshold;
+  // Flush threshold for streaming distinct (0 = disabled)
+  private int _streamingDistinctFlushThreshold;
+  /// Selects the streaming k-way-merge selection ORDER BY combine over sorted segments. `AUTO` is resolved to `ON`
+  /// or `OFF` by the plan maker before any plan node is built, so the plan-node gates only ever see a decided value.
+  private SortedSelectionMergeMode _sortedSelectionMergeMode = Server.DEFAULT_SORTED_SELECTION_MERGE_MODE;
+  /// Minimum fraction of sorted segments for `AUTO` to resolve to `ON`
+  private double _sortedSelectionMergeAutoMinSortedRatio =
+      Server.DEFAULT_SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO;
+  /// Output block size (rows) for the streaming selection ORDER BY combine
+  private int _sortedSelectionMergeBlockSize = Server.DEFAULT_SORTED_SELECTION_MERGE_BLOCK_SIZE;
+  // Guards the one-time warning in isSortedSelectionMergeEnabled() so that an unresolved AUTO does not log once per
+  // segment/combine call for the same query.
+  private volatile boolean _unresolvedSortedSelectionMergeModeWarned;
+
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -160,16 +192,19 @@ public class QueryContext {
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
-      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
-      @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
-      int offset, Map<String, String> queryOptions,
-      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, ExplainMode explain) {
+      @Nullable FilterContext filter, @Nullable Expression rowFilterExpression, @Nullable FilterContext rowFilter,
+      @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
+      @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
+      Map<String, String> queryOptions, @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
+      ExplainMode explain) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
     _distinct = distinct;
     _aliasList = Collections.unmodifiableList(aliasList);
     _filter = filter;
+    _rowFilterExpression = rowFilterExpression;
+    _rowFilter = rowFilter;
     _groupByExpressions = groupByExpressions;
     _havingFilter = havingFilter;
     _orderByExpressions = orderByExpressions;
@@ -190,69 +225,113 @@ public class QueryContext {
       return false;
     }
 
+    if (groupByKeys.size() == 1 && orderByKeys.size() == 1) {
+      return groupByKeys.get(0).equals(orderByKeys.get(0).getExpression());
+    }
     Set<ExpressionContext> groupByKeyIdentSet = new HashSet<>(groupByKeys);
     Set<ExpressionContext> orderByKeyIdentSet = new HashSet<>();
     orderByKeys.forEach(key -> orderByKeyIdentSet.add(key.getExpression()));
     return groupByKeyIdentSet.equals(orderByKeyIdentSet);
   }
 
-  /**
-   * Returns the table name.
-   * NOTE: on the broker side, table name might be {@code null} when subquery is available.
-   */
+  /// Returns the table name.
+  /// NOTE: on the broker side, table name might be `null` when subquery is available.
   public String getTableName() {
     return _tableName;
   }
 
-  /**
-   * Returns the subquery.
-   */
+  /// Returns the subquery.
   @Nullable
   public QueryContext getSubquery() {
     return _subquery;
   }
 
-  /**
-   * Returns a list of expressions in the SELECT clause.
-   */
+  /// Returns a list of expressions in the SELECT clause.
   public List<ExpressionContext> getSelectExpressions() {
     return _selectExpressions;
   }
 
-  /**
-   * Returns whether the query is a DISTINCT query.
-   */
+  /// Returns whether the query is a DISTINCT query.
   public boolean isDistinct() {
     return _distinct;
   }
 
-  /**
-   * Returns an unmodifiable list from the expression to its alias.
-   */
+  /// Returns an unmodifiable list from the expression to its alias.
   public List<String> getAliasList() {
     return _aliasList;
   }
 
-  /**
-   * Returns the filter in the WHERE clause, or {@code null} if there is no WHERE clause.
-   */
+  /// Returns the filter in the WHERE clause, or `null` if there is no WHERE clause.
   @Nullable
   public FilterContext getFilter() {
     return _filter;
   }
 
-  /**
-   * Returns a list of expressions in the GROUP-BY clause (aggregation keys), or {@code null} if there is no GROUP-BY
-   * clause.
-   */
+  /// Returns the row-level security (RLS) filter of the table, or `null` if the query has no RLS filter.
+  ///
+  /// The broker also ANDs this filter into the WHERE clause, so [#getFilter()] includes it. The server evaluates this
+  /// filter first, per segment, and evaluates the WHERE clause only on the documents that match it. Then no user
+  /// expression runs on a row that the RLS filter hides.
+  @Nullable
+  public FilterContext getRowFilter() {
+    return _rowFilter;
+  }
+
+  /// Returns the row-level security (RLS) filter as the broker sent it, before any optimization, or `null` if the
+  /// query has no RLS filter.
+  @Nullable
+  public Expression getRowFilterExpression() {
+    return _rowFilterExpression;
+  }
+
+  /// Replaces the row-level security filter with an equivalent one, for example the result of the query optimizer.
+  /// See [#getRowFilter()].
+  public void setRowFilter(FilterContext rowFilter) {
+    _rowFilter = rowFilter;
+  }
+
+  /// Returns the physical table overrides for the independent RLS policy. The broker already applies them to the
+  /// WHERE clause; the server must apply the same overrides to its policy copy before materializing it.
+  @Nullable
+  public Map<Expression, Expression> getRowFilterExpressionOverrideMap() {
+    return _rowFilterExpressionOverrideMap;
+  }
+
+  public void setRowFilterExpressionOverrideMap(@Nullable Map<Expression, Expression> expressionOverrideMap) {
+    _rowFilterExpressionOverrideMap = expressionOverrideMap;
+  }
+
+  /// Adds the time spent to materialize the row-level security bitmap of one segment. Thread-safe.
+  public void addRowFilterTimeNs(long rowFilterTimeNs) {
+    _rowFilterTimeNs.add(rowFilterTimeNs);
+  }
+
+  /// Returns the time spent to materialize the row-level security bitmap, summed over the segments.
+  public long getRowFilterTimeNs() {
+    return _rowFilterTimeNs.sum();
+  }
+
+  /// Adds the entries scanned to materialize the row-level security bitmap of one segment. Thread-safe.
+  public void addRowFilterNumEntriesScanned(long numEntriesScanned) {
+    _rowFilterNumEntriesScanned.add(numEntriesScanned);
+  }
+
+  /// Returns the entries scanned to materialize the row-level security bitmap, summed over the segments. The server
+  /// query log and metrics count them in `numEntriesScannedInFilter`, the response does not.
+  public long getRowFilterNumEntriesScanned() {
+    return _rowFilterNumEntriesScanned.sum();
+  }
+
+  /// Returns a list of expressions in the GROUP-BY clause (aggregation keys), or `null` if there is no GROUP-BY
+  /// clause.
   @Nullable
   public List<ExpressionContext> getGroupByExpressions() {
     return _groupByExpressions;
   }
 
-  /// Returns the grouping sets for a GROUP BY GROUPING SETS / ROLLUP / CUBE query, or {@code null} for a
+  /// Returns the grouping sets for a GROUP BY GROUPING SETS / ROLLUP / CUBE query, or `null` for a
   /// plain GROUP BY (or non-group-by) query. Each entry is the sorted list of column indexes into
-  /// {@link #getGroupByExpressions()} (the union of all grouping columns) that participate in that set; an
+  /// [#getGroupByExpressions()] (the union of all grouping columns) that participate in that set; an
   /// empty array denotes the grand-total set ().
   @Nullable
   public List<int[]> getGroupingSets() {
@@ -269,79 +348,151 @@ public class QueryContext {
   }
 
   /// Returns the number of synthetic key columns appended after the group-by (union) columns: 1 for a
-  /// grouping-set query (the {@code $groupingId} discriminator column), 0 otherwise.
+  /// grouping-set query (the `$groupingId` discriminator column), 0 otherwise.
   public int getNumExtraGroupByKeyColumns() {
     return isGroupingSets() ? 1 : 0;
   }
 
+  /// Returns whether grouping-set queries should aggregate the base grouping (union columns) once per segment
+  /// and derive the individual grouping-set records from those base groups, instead of expanding every input
+  /// row into one group per grouping set. Disabled by default (opt in with `groupingSetsBaseAggregation=true`):
+  /// the derive can be slower than expansion for expensive-to-merge intermediates (sketches). See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION].
+  ///
+  /// Even when opted in, base aggregation is disabled when:
+  /// - any aggregation function cannot merge intermediates across groups (the derive merges base groups of the
+  ///   same segment into coarser sets; e.g. SEGMENTPARTITIONEDDISTINCTCOUNT and partitioned FUNNELCOUNT keep
+  ///   per-segment-final counts and would double-count) -- see
+  ///   [AggregationFunction#canMergeIntermediatesAcrossGroups];
+  /// - a combine path other than the standard
+  ///   [org.apache.pinot.core.operator.combine.GroupByCombineOperator] would run, since only it performs the
+  ///   merge-time derive: filtered aggregations (distinct shared group-key generator), the streaming combine
+  ///   used on MSE leaf stages (`streamingGroupByFlushThreshold > 0`), and the sorted-aggregate combine
+  ///   ([#shouldSortAggregateUnderSafeTrim()]). In all these cases the segment expands per row so the emitted
+  ///   rows already carry the $groupingId discriminator.
+  /// - the instance planner cannot prove that all local base and derived groups fit within `numGroupsLimit`.
+  ///   The expansion path preserves the normal ordering and group-limit semantics in that case.
+  public boolean isGroupingSetsBaseAggregation() {
+    if (!_groupingSetsBaseAggregationAllowed || _hasFilteredAggregations || _streamingGroupByFlushThreshold > 0
+        || shouldSortAggregateUnderSafeTrim()) {
+      return false;
+    }
+    String option = _queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION);
+    if (option == null || !Boolean.parseBoolean(option)) {
+      return false;
+    }
+    if (_aggregationFunctions != null) {
+      for (AggregationFunction aggregationFunction : _aggregationFunctions) {
+        if (!aggregationFunction.canMergeIntermediatesAcrossGroups()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /// Called before building segment operators; a false value makes every local segment use per-row expansion.
+  public void setGroupingSetsBaseAggregationAllowed(boolean allowed) {
+    _groupingSetsBaseAggregationAllowed = allowed;
+  }
+
   /// Returns the total number of group-by key columns in the server result / reducer row layout: the union
-  /// group-by columns plus any synthetic key columns ({@link #getNumExtraGroupByKeyColumns()}).
+  /// group-by columns plus any synthetic key columns ([#getNumExtraGroupByKeyColumns()]).
   public int getNumGroupByKeyColumns() {
     int numGroupByExpressions = _groupByExpressions != null ? _groupByExpressions.size() : 0;
     return numGroupByExpressions + getNumExtraGroupByKeyColumns();
   }
 
-  /// Returns whether group-by key columns must be serialized/deserialized through the null-aware path (null
-  /// bitmaps). True when the user enabled null handling, or for grouping-set queries, which produce NULL keys
+  /// Returns whether group-by key columns must be compared and filtered null-aware, i.e. whether ORDER BY
+  /// comparators and HAVING predicates over group keys have to treat `null` as a distinct value rather than as the
+  /// type's default. True when the user enabled null handling, or for grouping-set queries, which produce NULL keys
   /// for rolled-up columns regardless of the user's null-handling option.
-  public boolean requiresNullAwareKeySerialization() {
+  ///
+  /// NOTE: This does not gate serialization -- [org.apache.pinot.core.common.datatable.DataTableBuilder] always
+  /// supports nulls, so a null key or intermediate result round-trips through a DataTable in either mode.
+  public boolean requiresNullAwareKeyEvaluation() {
     return isNullHandlingEnabled() || isGroupingSets();
   }
 
-  /**
-   * Returns the filter in the HAVING clause, or {@code null} if there is no HAVING clause.
-   */
+  /// Returns the filter in the HAVING clause, or `null` if there is no HAVING clause.
   @Nullable
   public FilterContext getHavingFilter() {
     return _havingFilter;
   }
 
-  /**
-   * Returns a list of order-by expressions in the ORDER-BY clause, or {@code null} if there is no ORDER-BY clause.
-   */
+  /// Returns a list of order-by expressions in the ORDER-BY clause, or `null` if there is no ORDER-BY clause.
   @Nullable
   public List<OrderByExpressionContext> getOrderByExpressions() {
     return _orderByExpressions;
   }
 
-  /**
-   * Returns the limit of the query.
-   */
+  /// Returns the limit of the query.
   public int getLimit() {
     return _limit;
   }
 
-  /**
-   * Returns the offset of the query.
-   */
+  /// Returns the offset of the query.
   public int getOffset() {
     return _offset;
   }
 
-  /**
-   * Returns the query options of the query.
-   */
+  /// Returns the query options of the query.
   public Map<String, String> getQueryOptions() {
     return _queryOptions;
   }
 
-  /**
-   * Returns the expression override hints.
-   */
+  /// Returns the expression override hints.
   public Map<ExpressionContext, ExpressionContext> getExpressionOverrideHints() {
     return _expressionOverrideHints;
   }
 
-  /**
-   * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
-   * <p>
-   * This is just an alias on top of {@link #getExplain() != ExplainMode.NONE}
-   *
-   */
+  /// Prepares derived execution state after logical expressions change, before fetch or segment planning.
+  /// Reuses compiled aggregations whose input trees did not change. The supplied set uses function identity because
+  /// expression rewrites can mutate function arguments, including their hash codes, in place.
+  public void prepareForExecution(Set<FunctionContext> changedFunctions) {
+    int numAggregations = _aggregationFunctionContexts.size();
+    if (numAggregations > 0) {
+      boolean initialPreparation = _aggregationFunctions == null;
+      if (initialPreparation) {
+        _aggregationFunctions = new AggregationFunction[numAggregations];
+        _filteredAggregationFunctions = new ArrayList<>(numAggregations);
+        _filteredAggregationsIndexMap = new HashMap<>();
+      } else {
+        // FILTER-only changes can mutate keys even when no aggregation function is recompiled.
+        _filteredAggregationsIndexMap.clear();
+      }
+      for (int i = 0; i < numAggregations; i++) {
+        Pair<FunctionContext, FilterContext> context = _aggregationFunctionContexts.get(i);
+        if (initialPreparation || changedFunctions.contains(context.getLeft())) {
+          AggregationFunction function =
+              AggregationFunctionFactory.getAggregationFunction(context.getLeft(), _nullHandlingEnabled);
+          if (initialPreparation) {
+            _filteredAggregationFunctions.add(Pair.of(function, context.getRight()));
+            _hasFilteredAggregations |= context.getRight() != null;
+          } else if (function != _aggregationFunctions[i]) {
+            _filteredAggregationFunctions.set(i, Pair.of(function, context.getRight()));
+          }
+          _aggregationFunctions[i] = function;
+        }
+        _filteredAggregationsIndexMap.put(context, i);
+      }
+    }
+    Builder.extractColumns(this);
+    if (_groupByExpressions != null) {
+      _isUnsafeTrim = isGroupingSets() || _havingFilter != null || !isSameOrderAndGroupByColumns(this);
+      _effectiveSegmentGroupTrimSize = calculateEffectiveSegmentGroupTrimSize();
+    }
+  }
+
+  /// Returns `true` if the query is an EXPLAIN query, `false` otherwise.
   public boolean isExplain() {
     return _explain != ExplainMode.NONE;
   }
 
+  /// Returns the explain mode of the query.
+  public ExplainMode getExplain() {
+    return _explain;
+  }
 
   public boolean isAccurateGroupByWithoutOrderBy() {
     return _accurateGroupByWithoutOrderBy;
@@ -351,48 +502,33 @@ public class QueryContext {
     _accurateGroupByWithoutOrderBy = enable;
   }
 
-  /**
-   * Returns the explain mode of the query.
-   */
-  public ExplainMode getExplain() {
-    return _explain;
-  }
-
-  /**
-   * Returns the aggregation functions for the query, or {@code null} if the query does not have any aggregation.
-   */
+  /// Returns the aggregation functions for the query, or `null` if the query does not have any aggregation.
   @Nullable
   public AggregationFunction[] getAggregationFunctions() {
     return _aggregationFunctions;
   }
 
-  /**
-   * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any aggregation.
-   */
+  /// Returns the filtered aggregation functions for a query, or `null` if the query does not have any
+  /// aggregation.
   @Nullable
   public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
     return _filteredAggregationFunctions;
   }
 
-  /**
-   * Returns a map from the filtered aggregation (pair of AGGREGATION FunctionContext and FILTER FilterContext) to the
-   * index of corresponding AggregationFunction in the aggregation functions array.
-   */
+  /// Returns a map from the filtered aggregation (pair of AGGREGATION FunctionContext and FILTER FilterContext) to the
+  /// index of corresponding AggregationFunction in the aggregation functions array.
   @Nullable
   public Map<Pair<FunctionContext, FilterContext>, Integer> getFilteredAggregationsIndexMap() {
     return _filteredAggregationsIndexMap;
   }
 
-  /**
-   * Returns the filtered aggregation expressions for the query.
-   */
+  /// Returns whether any aggregation in the query carries a FILTER clause, no matter whether it is referenced in the
+  /// SELECT list, the HAVING clause or the ORDER-BY clause.
   public boolean hasFilteredAggregations() {
     return _hasFilteredAggregations;
   }
 
-  /**
-   * Returns the columns (IDENTIFIER expressions) in the query.
-   */
+  /// Returns the columns (IDENTIFIER expressions) in the query.
   public Set<String> getColumns() {
     return _columns;
   }
@@ -443,6 +579,21 @@ public class QueryContext {
 
   public void setSkipScanFilterReorder(boolean skipScanFilterReorder) {
     _skipScanFilterReorder = skipScanFilterReorder;
+  }
+
+  /// Whether an AND may hand the document ids matched by its index-based children to its composite (AND/OR/NOT)
+  /// children, so that a scan-based predicate nested inside an OR is only evaluated on the documents that can still
+  /// match. See [org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode].
+  ///
+  /// Always `true` for a query with a row-level security filter, whatever the query option and the server default
+  /// say: every nested AND must restrict its composite children to the documents the RLS filter matches, so that no
+  /// user expression is evaluated on a row the RLS filter hides.
+  public boolean isAndRestrictionPushdownEnabled() {
+    return _andRestrictionPushdownEnabled || _rowFilter != null;
+  }
+
+  public void setAndRestrictionPushdownEnabled(boolean andRestrictionPushdownEnabled) {
+    _andRestrictionPushdownEnabled = andRestrictionPushdownEnabled;
   }
 
   public int getMaxExecutionThreads() {
@@ -547,6 +698,62 @@ public class QueryContext {
     _streamingGroupByFlushThreshold = streamingGroupByFlushThreshold;
   }
 
+  public int getStreamingDistinctFlushThreshold() {
+    return _streamingDistinctFlushThreshold;
+  }
+
+  public void setStreamingDistinctFlushThreshold(int streamingDistinctFlushThreshold) {
+    _streamingDistinctFlushThreshold = streamingDistinctFlushThreshold;
+  }
+
+  public SortedSelectionMergeMode getSortedSelectionMergeMode() {
+    return _sortedSelectionMergeMode;
+  }
+
+  public void setSortedSelectionMergeMode(SortedSelectionMergeMode sortedSelectionMergeMode) {
+    _sortedSelectionMergeMode = sortedSelectionMergeMode;
+  }
+
+  /// Whether the plan should use the streaming selection ORDER BY merge.
+  ///
+  /// `AUTO` is a request for a decision, not a decision, and collapsing it to "enabled" would force the merge
+  /// unconditionally while silently ignoring [#getSortedSelectionMergeAutoMinSortedRatio()] -- the half-honored
+  /// failure the single-resolution design exists to prevent. The plan maker resolves it against segment metadata
+  /// before any plan node is built (see [org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2]), so this
+  /// accessor should normally only observe `ON` or `OFF`. If it is reached with the mode still `AUTO` -- meaning
+  /// the gate was reached out of order, before resolution -- it logs a warning and falls back to `OFF` rather than
+  /// failing the query. Callers that legitimately run before resolution must read
+  /// [#getSortedSelectionMergeMode()] instead.
+  public boolean isSortedSelectionMergeEnabled() {
+    if (_sortedSelectionMergeMode == SortedSelectionMergeMode.AUTO) {
+      // This accessor is called once per segment (and again for the combine), so warn only once per query rather
+      // than flooding the log if the "should never happen" unresolved AUTO is ever actually hit.
+      if (!_unresolvedSortedSelectionMergeModeWarned) {
+        _unresolvedSortedSelectionMergeModeWarned = true;
+        LOGGER.warn("Sorted selection merge mode was read before the plan maker resolved it from AUTO; "
+            + "treating as OFF");
+      }
+      return false;
+    }
+    return _sortedSelectionMergeMode != SortedSelectionMergeMode.OFF;
+  }
+
+  public double getSortedSelectionMergeAutoMinSortedRatio() {
+    return _sortedSelectionMergeAutoMinSortedRatio;
+  }
+
+  public void setSortedSelectionMergeAutoMinSortedRatio(double sortedSelectionMergeAutoMinSortedRatio) {
+    _sortedSelectionMergeAutoMinSortedRatio = sortedSelectionMergeAutoMinSortedRatio;
+  }
+
+  public int getSortedSelectionMergeBlockSize() {
+    return _sortedSelectionMergeBlockSize;
+  }
+
+  public void setSortedSelectionMergeBlockSize(int sortedSelectionMergeBlockSize) {
+    _sortedSelectionMergeBlockSize = sortedSelectionMergeBlockSize;
+  }
+
   public boolean isNullHandlingEnabled() {
     return _nullHandlingEnabled;
   }
@@ -589,18 +796,10 @@ public class QueryContext {
     return _sortAggregateSequentialCombineNumSegmentsThreshold;
   }
 
-  /**
-   * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
-   * within the scope of a query.
-   * @param type the type of the value produced, guarantees type pollution is impossible.
-   * @param key the key used to determine if the value has already been computed.
-   * @param mapper A function to apply the first time a key is encountered to construct the value.
-   * @param <K> the key type
-   * @param <V> the value type
-   * @return the shared value
-   */
+  @Override
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
-    return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
+    return ((ConcurrentHashMap<K, V>) _sharedValues.computeIfAbsent(type, k -> new ConcurrentHashMap<>()))
+        .computeIfAbsent(key, mapper);
   }
 
   public int getEffectiveSegmentGroupTrimSize() {
@@ -608,8 +807,8 @@ public class QueryContext {
   }
 
   /// Returns the PER-grouping-set segment group-trim size for a grouping-set query, or -1 to disable
-  /// per-segment trim (no ORDER BY, or trimming disabled). Unlike the global {@link
-  /// #getEffectiveSegmentGroupTrimSize()} (which is -1 for grouping sets), the per-segment trim for grouping
+  /// per-segment trim (no ORDER BY, or trimming disabled). Unlike the global [#getEffectiveSegmentGroupTrimSize()]
+  /// (which is -1 for grouping sets), the per-segment trim for grouping
   /// sets keeps up to this many groups WITHIN each grouping set (bucketed by the discriminator), so a global
   /// top-K cannot starve low-magnitude sets such as the grand total. The broker still applies the final
   /// ORDER BY + LIMIT across all sets.
@@ -622,6 +821,32 @@ public class QueryContext {
       return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
     }
     return -1;
+  }
+
+  /// Returns the secondary per-segment base-group estimate gate. The instance planner separately requires all
+  /// local base and derived grouping-set keys to fit `numGroupsLimit`; raising this option cannot bypass that
+  /// hard bound. Defaults to `numGroupsLimit` when unset. See
+  /// [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS].
+  public int getGroupingSetsBaseAggregationMaxGroups() {
+    Integer maxGroups = QueryOptionsUtils.getGroupingSetsBaseAggregationMaxGroups(_queryOptions);
+    return maxGroups != null ? maxGroups : _numGroupsLimit;
+  }
+
+  /// Returns the effective PER-grouping-set server-side keep size for a base-aggregation grouping-set query
+  /// (`max(5 * LIMIT, groupingSetsMinServerTrimSize)`, mirroring `minServerGroupTrimSize` semantics), or -1 to
+  /// disable (no ORDER BY, or the option is unset/non-positive). When enabled, the server keeps that many groups
+  /// WITHIN each grouping set after deriving them (bucketed by the $groupingId discriminator), bounding each
+  /// server's derived output without starving low-magnitude sets. The broker still applies the final ORDER BY +
+  /// LIMIT. See [CommonConstants.Broker.Request.QueryOptionKey#GROUPING_SETS_MIN_SERVER_TRIM_SIZE].
+  public int getGroupingSetServerTrimSize() {
+    if (!isGroupingSets() || getOrderByExpressions() == null) {
+      return -1;
+    }
+    Integer minGroupTrimSize = QueryOptionsUtils.getGroupingSetsMinServerTrimSize(_queryOptions);
+    if (minGroupTrimSize == null || minGroupTrimSize <= 0) {
+      return -1;
+    }
+    return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
   }
 
   private int calculateEffectiveSegmentGroupTrimSize() {
@@ -645,9 +870,7 @@ public class QueryContext {
     return -1;
   }
 
-  /**
-   * NOTE: For debugging only.
-   */
+  /// NOTE: For debugging only.
   @Override
   public String toString() {
     return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _subquery=" + _subquery + ", _selectExpressions="
@@ -676,14 +899,12 @@ public class QueryContext {
     return _isUnsafeTrim;
   }
 
-  /**
-   * do sort aggregate when is safeTrim (order by group keys with no having clause)
-   * and limit is smaller than threshold
-   * TODO: we also want to do sort aggregate under order by group key with having case,
-   *   in this case we can check if the calculated Server trimSize is < sortAggregateLimitThreshold
-   *   if so, we do sort aggregate and trim to trimSize during combine.
-   *   This requires extracting Server trimSize calculation logic into QueryContext as pre-req
-   */
+  /// do sort aggregate when is safeTrim (order by group keys with no having clause)
+  /// and limit is smaller than threshold
+  /// TODO: we also want to do sort aggregate under order by group key with having case,
+  ///   in this case we can check if the calculated Server trimSize is < sortAggregateLimitThreshold
+  ///   if so, we do sort aggregate and trim to trimSize during combine.
+  ///   This requires extracting Server trimSize calculation logic into QueryContext as pre-req
   public boolean shouldSortAggregateUnderSafeTrim() {
     return !isUnsafeTrim() && getLimit() < getSortAggregateLimitThreshold();
   }
@@ -695,6 +916,8 @@ public class QueryContext {
     private boolean _distinct;
     private List<String> _aliasList;
     private FilterContext _filter;
+    private Expression _rowFilterExpression;
+    private FilterContext _rowFilter;
     private List<ExpressionContext> _groupByExpressions;
     private List<int[]> _groupingSets;
     private FilterContext _havingFilter;
@@ -740,13 +963,21 @@ public class QueryContext {
       return this;
     }
 
+    /// Sets the row-level security filter: the expression that the broker sent, and the filter built from it. See
+    /// [QueryContext#getRowFilter()] and [QueryContext#getRowFilterExpression()].
+    public Builder setRowFilter(@Nullable Expression rowFilterExpression, @Nullable FilterContext rowFilter) {
+      _rowFilterExpression = rowFilterExpression;
+      _rowFilter = rowFilter;
+      return this;
+    }
+
     public Builder setGroupByExpressions(List<ExpressionContext> groupByExpressions) {
       _groupByExpressions = groupByExpressions;
       return this;
     }
 
     /// Sets the grouping sets for a GROUP BY GROUPING SETS / ROLLUP / CUBE query. Each entry is the sorted
-    /// list of column indexes into {@code groupByExpressions} (the union of all grouping columns); an empty
+    /// list of column indexes into `groupByExpressions` (the union of all grouping columns); an empty
     /// array denotes the grand-total set (). Leave unset (null) for a plain GROUP BY query.
     public Builder setGroupingSets(@Nullable List<int[]> groupingSets) {
       _groupingSets = groupingSets;
@@ -783,15 +1014,6 @@ public class QueryContext {
       return this;
     }
 
-    /**
-     * @deprecated Use {@link #setExplain(ExplainMode)} instead.
-     */
-    @Deprecated
-    public Builder setExplain(boolean explain) {
-      _explain = explain ? ExplainMode.DESCRIPTION : ExplainMode.NONE;
-      return this;
-    }
-
     public Builder setExplain(ExplainMode explain) {
       _explain = explain;
       return this;
@@ -805,8 +1027,8 @@ public class QueryContext {
       }
       QueryContext queryContext =
           new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList,
-              _filter, _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
-              _expressionOverrideHints, _explain);
+              _filter, _rowFilterExpression, _rowFilter, _groupByExpressions, _havingFilter, _orderByExpressions,
+              _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
       queryContext.setServerReturnFinalResultKeyUnpartitioned(
@@ -821,20 +1043,14 @@ public class QueryContext {
       }
 
       // Pre-calculate the aggregation functions and columns for the query
-      generateAggregationFunctions(queryContext);
-      extractColumns(queryContext);
+      extractAggregationFunctionContexts(queryContext);
 
       // Pre-calculate group-by configs
       if (queryContext.getGroupByExpressions() != null) {
-        /// Grouping-set queries expand each row into multiple groups; force the unsafe-trim path so the
-        /// sort-aggregate fast path (which assumes a single flat grouping) is not taken.
-        queryContext._isUnsafeTrim = queryContext.isGroupingSets()
-            || !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
         Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
         if (sortAggregateLimitThreshold != null) {
           queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
         }
-        queryContext.setEffectiveSegmentGroupTrimSize(queryContext.calculateEffectiveSegmentGroupTrimSize());
 
         // sortAggregateSequentialCombineNumSegmentsThreshold is defaulted to hardware concurrency
         // if not specified. this allows one more parallel thread (the main thread) to do only combine
@@ -847,72 +1063,40 @@ public class QueryContext {
         }
       }
 
+      queryContext.prepareForExecution(Set.of());
       return queryContext;
     }
 
-    /**
-     * Helper method to generate the aggregation functions for the query.
-     */
-    private void generateAggregationFunctions(QueryContext queryContext) {
-      List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions = new ArrayList<>();
-      Map<Pair<FunctionContext, FilterContext>, Integer> filteredAggregationsIndexMap = new HashMap<>();
-
-      // Add aggregation functions in the SELECT clause
-      // NOTE: DO NOT deduplicate the aggregation functions in the SELECT clause because that involves protocol change.
-      List<Pair<FunctionContext, FilterContext>> filteredAggregations = new ArrayList<>();
+    /// Captures logical aggregation slots before rewriting; execution preparation must not deduplicate them again.
+    private void extractAggregationFunctionContexts(QueryContext queryContext) {
+      List<Pair<FunctionContext, FilterContext>> contexts = new ArrayList<>();
+      // SELECT duplicates are protocol-visible and must retain independent result slots.
       for (ExpressionContext selectExpression : queryContext._selectExpressions) {
-        getAggregations(selectExpression, filteredAggregations);
+        getAggregations(selectExpression, contexts);
       }
-      for (Pair<FunctionContext, FilterContext> pair : filteredAggregations) {
-        FunctionContext aggregation = pair.getLeft();
-        FilterContext filter = pair.getRight();
-        if (filter != null) {
-          queryContext._hasFilteredAggregations = true;
+      if (queryContext._havingFilter != null || queryContext._orderByExpressions != null) {
+        List<Pair<FunctionContext, FilterContext>> otherAggregations = new ArrayList<>();
+        if (queryContext._havingFilter != null) {
+          getAggregations(queryContext._havingFilter, otherAggregations);
         }
-        int functionIndex = filteredAggregationFunctions.size();
-        AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
-        filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
-        filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
-      }
-
-      // Add aggregation functions in the HAVING and ORDER-BY clause but not in the SELECT clause
-      filteredAggregations.clear();
-      if (queryContext._havingFilter != null) {
-        getAggregations(queryContext._havingFilter, filteredAggregations);
-      }
-      if (queryContext._orderByExpressions != null) {
-        for (OrderByExpressionContext orderByExpression : queryContext._orderByExpressions) {
-          getAggregations(orderByExpression.getExpression(), filteredAggregations);
+        if (queryContext._orderByExpressions != null) {
+          for (OrderByExpressionContext orderByExpression : queryContext._orderByExpressions) {
+            getAggregations(orderByExpression.getExpression(), otherAggregations);
+          }
+        }
+        if (!otherAggregations.isEmpty()) {
+          Set<Pair<FunctionContext, FilterContext>> existing = new HashSet<>(contexts);
+          for (Pair<FunctionContext, FilterContext> context : otherAggregations) {
+            if (existing.add(context)) {
+              contexts.add(context);
+            }
+          }
         }
       }
-      for (Pair<FunctionContext, FilterContext> pair : filteredAggregations) {
-        if (!filteredAggregationsIndexMap.containsKey(pair)) {
-          FunctionContext aggregation = pair.getLeft();
-          FilterContext filter = pair.getRight();
-          int functionIndex = filteredAggregationFunctions.size();
-          AggregationFunction aggregationFunction =
-              AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
-          filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
-          filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
-        }
-      }
-
-      if (!filteredAggregationFunctions.isEmpty()) {
-        int numAggregations = filteredAggregationFunctions.size();
-        AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregations];
-        for (int i = 0; i < numAggregations; i++) {
-          aggregationFunctions[i] = filteredAggregationFunctions.get(i).getLeft();
-        }
-        queryContext._aggregationFunctions = aggregationFunctions;
-        queryContext._filteredAggregationFunctions = filteredAggregationFunctions;
-        queryContext._filteredAggregationsIndexMap = filteredAggregationsIndexMap;
-      }
+      queryContext._aggregationFunctionContexts = contexts;
     }
 
-    /**
-     * Helper method to extract AGGREGATION FunctionContexts and FILTER FilterContexts from the given expression.
-     */
+    /// Helper method to extract AGGREGATION FunctionContexts and FILTER FilterContexts from the given expression.
     private static void getAggregations(ExpressionContext expression,
         List<Pair<FunctionContext, FilterContext>> filteredAggregations) {
       FunctionContext function = expression.getFunction();
@@ -942,9 +1126,7 @@ public class QueryContext {
       }
     }
 
-    /**
-     * Helper method to extract AGGREGATION FunctionContexts and FILTER FilterContexts from the given filter.
-     */
+    /// Helper method to extract AGGREGATION FunctionContexts and FILTER FilterContexts from the given filter.
     private static void getAggregations(FilterContext filter,
         List<Pair<FunctionContext, FilterContext>> filteredAggregations) {
       List<FilterContext> children = filter.getChildren();
@@ -957,10 +1139,8 @@ public class QueryContext {
       }
     }
 
-    /**
-     * Helper method to extract the columns (IDENTIFIER expressions) for the query.
-     */
-    private void extractColumns(QueryContext query) {
+    /// Helper method to extract the columns (IDENTIFIER expressions) for the query.
+    private static void extractColumns(QueryContext query) {
       Set<String> columns = new HashSet<>();
 
       for (ExpressionContext expression : query._selectExpressions) {
@@ -968,6 +1148,9 @@ public class QueryContext {
       }
       if (query._filter != null) {
         query._filter.getColumns(columns);
+      }
+      if (query._rowFilter != null) {
+        query._rowFilter.getColumns(columns);
       }
       if (query._groupByExpressions != null) {
         for (ExpressionContext expression : query._groupByExpressions) {

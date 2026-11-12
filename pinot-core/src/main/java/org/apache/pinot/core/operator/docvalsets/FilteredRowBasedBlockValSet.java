@@ -34,11 +34,9 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * A {@link BlockValSet} implementation backed by row major data with a filter column (BOOLEAN type).
- *
- * TODO: Support MV
- */
+/// A [BlockValSet] implementation backed by row major data with a filter column (BOOLEAN type).
+///
+/// TODO: Support MV
 public class FilteredRowBasedBlockValSet implements BlockValSet {
   private final DataType _dataType;
   private final DataType _storedType;

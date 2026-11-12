@@ -219,9 +219,7 @@ public class TenantRebalanceResult {
     _rebalanceTableResults = rebalanceTableResults;
   }
 
-  /**
-   * Aggregated pre-check result that provides table-level pre-check status counts and message mappings
-   */
+  /// Aggregated pre-check result that provides table-level pre-check status counts and message mappings
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class AggregatedPrecheckResult {
     private final int _tablesPassedCount;
@@ -273,9 +271,7 @@ public class TenantRebalanceResult {
     }
   }
 
-  /**
-   * Step 1: Aggregate ServerSegmentChangeInfo across all tables for each server
-   */
+  /// Step 1: Aggregate ServerSegmentChangeInfo across all tables for each server
   private static Map<String, AggregatedServerSegmentChangeInfo> aggregateServerSegmentChangeInfo(
       List<RebalanceSummaryResult> summaryResults) {
     Map<String, AggregatedServerSegmentChangeInfo> serverAggregates = new HashMap<>();
@@ -297,9 +293,7 @@ public class TenantRebalanceResult {
     return serverAggregates;
   }
 
-  /**
-   * Helper class to aggregate ServerSegmentChangeInfo across multiple tables
-   */
+  /// Helper class to aggregate ServerSegmentChangeInfo across multiple tables
   private static class AggregatedServerSegmentChangeInfo extends RebalanceSummaryResult.ServerSegmentChangeInfo {
 
     AggregatedServerSegmentChangeInfo() {
@@ -327,9 +321,7 @@ public class TenantRebalanceResult {
     }
   }
 
-  /**
-   * Aggregated ServerInfo that extends RebalanceSummaryResult.ServerInfo
-   */
+  /// Aggregated ServerInfo that extends RebalanceSummaryResult.ServerInfo
   private static class AggregatedServerInfo extends RebalanceSummaryResult.ServerInfo {
     AggregatedServerInfo(Map<String, AggregatedServerSegmentChangeInfo> serverAggregates) {
       super(0, null, null, null, null, null, null);
@@ -392,9 +384,7 @@ public class TenantRebalanceResult {
     }
   }
 
-  /**
-   * Aggregated SegmentInfo that extends RebalanceSummaryResult.SegmentInfo
-   */
+  /// Aggregated SegmentInfo that extends RebalanceSummaryResult.SegmentInfo
   private static class AggregatedSegmentInfo extends RebalanceSummaryResult.SegmentInfo {
     AggregatedSegmentInfo(List<RebalanceSummaryResult> summaryResults,
         Map<String, AggregatedServerSegmentChangeInfo> serverAggregates) {
@@ -489,9 +479,7 @@ public class TenantRebalanceResult {
     }
   }
 
-  /**
-   * Aggregates consuming segment summaries for realtime tables
-   */
+  /// Aggregates consuming segment summaries for realtime tables
   private static RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary aggregateConsumingSegmentSummary(
       List<RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary> summaries) {
     if (summaries.isEmpty()) {
@@ -568,9 +556,7 @@ public class TenantRebalanceResult {
     );
   }
 
-  /**
-   * Helper class to aggregate ConsumingSegmentSummaryPerServer across multiple tables
-   */
+  /// Helper class to aggregate ConsumingSegmentSummaryPerServer across multiple tables
   private static class AggregatedConsumingSegmentSummaryPerServer
       extends RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer {
     AggregatedConsumingSegmentSummaryPerServer() {
@@ -592,9 +578,7 @@ public class TenantRebalanceResult {
     }
   }
 
-  /**
-   * Aggregates TagInfo across multiple RebalanceSummaryResults
-   */
+  /// Aggregates TagInfo across multiple RebalanceSummaryResults
   private static List<RebalanceSummaryResult.TagInfo> createAggregatedTagsInfo(
       List<RebalanceSummaryResult> summaryResults,
       Map<String, AggregatedServerSegmentChangeInfo> serverAggregates) {
@@ -633,9 +617,7 @@ public class TenantRebalanceResult {
     return new ArrayList<>(tagAggregates.values());
   }
 
-  /**
-   * Helper class to aggregate TagInfo across multiple tables
-   */
+  /// Helper class to aggregate TagInfo across multiple tables
   private static class AggregatedTagInfo extends RebalanceSummaryResult.TagInfo {
 
     AggregatedTagInfo(String tagName) {

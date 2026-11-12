@@ -36,10 +36,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-/**
- * Tests for {@link PlanNodeMerger}, the logic that decides whether two explain plan nodes describe the same plan and
- * can be merged into one.
- */
+/// Tests for [PlanNodeMerger], the logic that decides whether two explain plan nodes describe the same plan and
+/// can be merged into one.
 public class PlanNodeMergerTest {
   private static final DataSchema SCHEMA = new DataSchema(new String[]{"col"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});

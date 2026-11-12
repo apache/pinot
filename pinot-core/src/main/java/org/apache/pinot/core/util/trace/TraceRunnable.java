@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.core.util.trace;
 
-/**
- * Wrapper class for {@link Runnable} to automatically register/un-register itself to/from a request.
- */
+/// Wrapper class for [Runnable] to automatically register/un-register itself to/from a request.
 public abstract class TraceRunnable implements Runnable {
   private final TraceContext.TraceEntry _parentTraceEntry;
 
-  /**
-   * If trace is not enabled, parent trace entry will be null.
-   */
+  /// If trace is not enabled, parent trace entry will be null.
   public TraceRunnable() {
     _parentTraceEntry = TraceContext.getTraceEntry();
   }

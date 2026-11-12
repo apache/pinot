@@ -28,12 +28,12 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/// Verifies that {@link PluginManager} exports the SPI packages from the pinot
+/// Verifies that [PluginManager] exports the SPI packages from the pinot
 /// realm into each plugin realm, so plugin JARs can implement
-/// {@link RuleSetCustomizer} without bundling or shading those classes.
+/// [RuleSetCustomizer] without bundling or shading those classes.
 ///
-/// This test lives in the {@code org.apache.pinot.spi.plugin} package (in a
-/// different Maven module) to access the package-private {@link PluginManager}
+/// This test lives in the `org.apache.pinot.spi.plugin` package (in a
+/// different Maven module) to access the package-private [PluginManager]
 /// constructor.
 public class PluginRealmExportTest {
 

@@ -45,6 +45,7 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -61,21 +62,14 @@ public class HelixSetupUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
-  /**
-   * Set up Helix cluster with the given default configs as the Helix cluster config.
-   *
-   * <ul>
-   *   <li>
-   *     If the cluster doesn't exist, a new cluster will be created with the default configs.
-   *   </li>
-   *   <li>
-   *     If the cluster already exists, it will be updated with the default configs. Default config will be set only if
-   *     the config doesn't already exist.
-   *   </li>
-   * </ul>
-   */
+  /// Set up Helix cluster with the given default configs as the Helix cluster config.
+  ///
+  /// - If the cluster doesn't exist, a new cluster will be created with the default configs.
+  /// - If the cluster already exists, it will be updated with the default configs. Default config will be set only if
+  ///   the config doesn't already exist.
   public static void setupHelixClusterWithDefaultConfigs(String zkAddress, String clusterName,
       Map<String, String> defaultConfigs) {
+    ZooKeeperSslContextSupplier.initialize();
     HelixAdmin admin = new ZKHelixAdmin.Builder().setZkAddress(zkAddress).build();
     try {
       if (admin.getClusters().contains(clusterName)) {
@@ -260,9 +254,7 @@ public class HelixSetupUtils {
     return idealState;
   }
 
-  /**
-   * If user defined properties for the lead controller have changed, update the resource.
-   */
+  /// If user defined properties for the lead controller have changed, update the resource.
   private static void enableAndUpdateLeadControllerResource(String helixClusterName, HelixAdmin helixAdmin,
       IdealState idealState, ControllerConf controllerConf) {
     boolean needsUpdating = false;

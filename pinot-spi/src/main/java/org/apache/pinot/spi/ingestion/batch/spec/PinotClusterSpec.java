@@ -21,27 +21,21 @@ package org.apache.pinot.spi.ingestion.batch.spec;
 import java.io.Serializable;
 
 
-/**
- * PinotClusterSpec defines the Pinot Cluster Access Point.
- */
+/// PinotClusterSpec defines the Pinot Cluster Access Point.
 public class PinotClusterSpec implements Serializable {
 
-  /**
-   * Controller URI is used to fetch table/schema information and data push.
-   * E.g. http://localhost:9000
-   */
+  /// Controller URI is used to fetch table/schema information and data push.
+  /// E.g. http://localhost:9000
   private String _controllerURI;
 
   public String getControllerURI() {
     return _controllerURI;
   }
 
-  /**
-   * Controller URI is used to fetch table/schema information and data push.
-   * E.g. http://localhost:9000
-   *
-   * @param controllerURI
-   */
+  /// Controller URI is used to fetch table/schema information and data push.
+  /// E.g. http://localhost:9000
+  ///
+  /// @param controllerURI
   public void setControllerURI(String controllerURI) {
     _controllerURI = controllerURI;
   }

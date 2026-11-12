@@ -21,7 +21,7 @@ package org.apache.pinot.plugin.inputformat.json.format;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 
 
-/// Parses <a href="https://www.rfc-editor.org/rfc/rfc8949.html">CBOR</a> (RFC 8949) via Jackson. Values decode
+/// Parses [CBOR](https://www.rfc-editor.org/rfc/rfc8949.html) (RFC 8949) via Jackson. Values decode
 /// to the same Java types Jackson produces for text JSON (CBOR may additionally emit `Float` and `byte[]`
 /// scalars, which Pinot handles downstream).
 ///

@@ -24,15 +24,13 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Implementation for generating segment names of the format UploadedRealtimeSegmentName:
- * {prefix}__{tableName}__{partitionId}__{creationTime}__{suffix}
- *
- * <p> Naming convention to represent uploaded segments to a realtime table see UploadedRealtimeSegmentName. The
- * semantic is similar to LLCSegmentName. This naming convention should be preferred when the data is partitioned in
- * generated segments and should be assigned based on partitionId to ensure consistency with stream partitioning for
- * upsert tables.
- */
+/// Implementation for generating segment names of the format UploadedRealtimeSegmentName:
+/// {prefix}\_\_{tableName}\_\_{partitionId}\_\_{creationTime}\_\_{suffix}
+///
+/// Naming convention to represent uploaded segments to a realtime table see UploadedRealtimeSegmentName. The
+/// semantic is similar to LLCSegmentName. This naming convention should be preferred when the data is partitioned in
+/// generated segments and should be assigned based on partitionId to ensure consistency with stream partitioning for
+/// upsert tables.
 public class UploadedRealtimeSegmentNameGenerator implements SegmentNameGenerator {
 
   private static final String DELIMITER = "__";
@@ -45,14 +43,12 @@ public class UploadedRealtimeSegmentNameGenerator implements SegmentNameGenerato
   @Nullable
   private final String _suffix;
 
-  /**
-   * Creates a UploadedRealtimeSegmentNameGenerator
-   * @param tableName
-   * @param partitionId
-   * @param creationTimeMillis
-   * @param prefix
-   * @param suffix optional field for generator, if not specified then sequenceId is used as suffix
-   */
+  /// Creates a UploadedRealtimeSegmentNameGenerator
+  /// @param tableName
+  /// @param partitionId
+  /// @param creationTimeMillis
+  /// @param prefix
+  /// @param suffix optional field for generator, if not specified then sequenceId is used as suffix
   public UploadedRealtimeSegmentNameGenerator(String tableName, int partitionId, long creationTimeMillis, String prefix,
       @Nullable String suffix) {
     Preconditions.checkArgument(

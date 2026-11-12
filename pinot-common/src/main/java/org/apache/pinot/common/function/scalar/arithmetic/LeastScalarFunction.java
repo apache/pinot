@@ -27,11 +27,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic least scalar function implementation.
- *
- * <p>Instances are immutable and thread-safe.
- */
+/// Polymorphic least scalar function implementation.
+///
+/// Instances are immutable and thread-safe.
 @ScalarFunction
 public class LeastScalarFunction extends BaseBinaryArithmeticScalarFunction {
 

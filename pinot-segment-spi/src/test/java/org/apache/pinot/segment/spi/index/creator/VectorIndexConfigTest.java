@@ -25,9 +25,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
 
-/**
- * Unit tests for {@link VectorIndexConfig#equals(Object)} and {@link VectorIndexConfig#hashCode()}.
- */
+/// Unit tests for [VectorIndexConfig#equals(Object)] and [VectorIndexConfig#hashCode()].
 public class VectorIndexConfigTest {
 
   // ---------------------------------------------------------------------------

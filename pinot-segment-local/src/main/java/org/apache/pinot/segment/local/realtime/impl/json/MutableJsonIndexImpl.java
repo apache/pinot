@@ -19,12 +19,10 @@
 package org.apache.pinot.segment.local.realtime.impl.json;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -48,6 +46,7 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.RoaringBitmapUnion;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.common.utils.regex.Pattern;
@@ -58,6 +57,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
@@ -66,9 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Json index for mutable segment.
- */
+/// Json index for mutable segment.
 public class MutableJsonIndexImpl implements MutableJsonIndex {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableJsonIndexImpl.class);
   private final JsonIndexConfig _jsonIndexConfig;
@@ -99,9 +97,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     _serverMetrics = ServerMetrics.get();
   }
 
-  /**
-   * Adds the next json value.
-   */
+  /// Adds the next json value.
   @Override
   public void add(String jsonString)
       throws IOException {
@@ -118,9 +114,27 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  /**
-   * Adds the flattened records for the next document.
-   */
+  /// Indexes an already-parsed JSON document (e.g. a Map cached on the GenericRow), flattening it directly via
+  /// {@link JsonUtils#flattenParsed(Object, String, JsonIndexConfig)} instead of re-parsing `jsonString`, the string
+  /// the document was serialized into for the forward index. A document that cannot be flattened directly is indexed
+  /// from `jsonString`, as {@link #add(String)} does.
+  public void addParsed(Object parsedValue, String jsonString)
+      throws IOException {
+    try {
+      List<Map<String, String>> flattenedRecords =
+          JsonUtils.flattenParsed(parsedValue, jsonString, _jsonIndexConfig);
+      _writeLock.lock();
+      try {
+        addFlattenedRecords(flattenedRecords);
+      } finally {
+        _writeLock.unlock();
+      }
+    } finally {
+      _nextDocId++;
+    }
+  }
+
+  /// Adds the flattened records for the next document.
   private void addFlattenedRecords(List<Map<String, String>> records) {
     int numRecords = records.size();
     Preconditions.checkState(_nextFlattenedDocId + numRecords >= 0, "Got more than %s flattened records",
@@ -135,26 +149,16 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         // Put both key and key-value into the posting list. Key is useful for checking if a key exists in the json.
         String key = entry.getKey();
         _postingListMap.computeIfAbsent(key, k -> {
-          _bytesSize += estimateLength(key);
+          _bytesSize += Utf8Utils.encodedLength(key);
           return new RoaringBitmap();
         }).add(_nextFlattenedDocId);
         String keyValue = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + entry.getValue();
         _postingListMap.computeIfAbsent(keyValue, k -> {
-          _bytesSize += estimateLength(keyValue);
+          _bytesSize += Utf8Utils.encodedLength(keyValue);
           return new RoaringBitmap();
         }).add(_nextFlattenedDocId);
       }
       _nextFlattenedDocId++;
-    }
-  }
-
-  private static int estimateLength(String value) {
-    // Utf8.encodedLength counts bytes without allocating but throws on malformed strings (e.g. unpaired surrogates).
-    // _bytesSize is only a heuristic, so fall back to getBytes (which never throws) instead of failing.
-    try {
-      return Utf8.encodedLength(value);
-    } catch (IllegalArgumentException e) {
-      return value.getBytes(StandardCharsets.UTF_8).length;
     }
   }
 
@@ -201,17 +205,48 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  /**
-   * Returns {@code true} if the given predicate type is exclusive for json_match calculation, {@code false} otherwise.
-   */
+  /// Returns `true` if the given predicate type is exclusive for json_match calculation, `false` otherwise.
   private boolean isExclusive(Predicate.Type predicateType) {
     return predicateType == Predicate.Type.IS_NULL;
   }
 
-  /** This class allows delaying of cloning posting list bitmap for as long as possible
-   * It stores either a bitmap from posting list that must be cloned before mutating (readOnly=true)
-   * or an already  cloned bitmap.
-   */
+  /// Folds many posting lists into one [LazyBitmap] through a [RoaringBitmapUnion], which unions lazily and
+  /// finalizes the bitmap once at [#get]. A single input is borrowed: it is wrapped as an immutable [LazyBitmap],
+  /// never adopted or modified.
+  private static class UnionAccumulator {
+    @Nullable
+    private RoaringBitmap _first;
+    @Nullable
+    private RoaringBitmapUnion _union;
+
+    void add(RoaringBitmap docIds) {
+      if (docIds.isEmpty()) {
+        return;
+      }
+      if (_union != null) {
+        _union.add(docIds);
+      } else if (_first == null) {
+        _first = docIds;
+      } else {
+        // The borrowed first posting list is copied into the union, never adopted
+        _union = new RoaringBitmapUnion();
+        _union.add(_first);
+        _union.add(docIds);
+        _first = null;
+      }
+    }
+
+    LazyBitmap get() {
+      if (_union != null) {
+        return LazyBitmap.createMutable(_union.take());
+      }
+      return _first != null ? LazyBitmap.createImmutable(_first) : LazyBitmap.EMPTY_BITMAP;
+    }
+  }
+
+  /// This class allows delaying of cloning posting list bitmap for as long as possible
+  /// It stores either a bitmap from posting list that must be cloned before mutating (readOnly=true)
+  /// or an already  cloned bitmap.
   private static class LazyBitmap {
     final static LazyBitmap EMPTY_BITMAP = createImmutable(new RoaringBitmap());
 
@@ -289,20 +324,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       return createMutable(RoaringBitmap.or(_value, other._value));
     }
 
-    LazyBitmap or(RoaringBitmap bitmap) {
-      if (isEmpty()) {
-        return createImmutable(bitmap);
-      }
-      if (bitmap.isEmpty()) {
-        return this;
-      }
-      if (isMutable()) {
-        _value.or(bitmap);
-        return this;
-      }
-      return createMutable(RoaringBitmap.or(_value, bitmap));
-    }
-
     LazyBitmap andNot(LazyBitmap other) {
       if (isEmpty()) {
         return EMPTY_BITMAP;
@@ -350,9 +371,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  /**
-   * Returns the matching flattened doc ids for the given filter.
-   */
+  /// Returns the matching flattened doc ids for the given filter.
   private LazyBitmap getMatchingFlattenedDocIds(FilterContext filter) {
     switch (filter.getType()) {
       case AND: {
@@ -387,11 +406,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  /**
-   * Returns the matching flattened doc ids for the given predicate.
-   * <p>Exclusive predicate is handled as the inclusive predicate, and the caller should flip the unflattened doc ids in
-   * order to get the correct exclusive predicate result.
-   */
+  /// Returns the matching flattened doc ids for the given predicate.
+  ///
+  /// Exclusive predicate is handled as the inclusive predicate, and the caller should flip the unflattened doc ids in
+  /// order to get the correct exclusive predicate result.
   private LazyBitmap getMatchingFlattenedDocIds(Predicate predicate) {
     ExpressionContext lhs = predicate.getLhs();
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
@@ -450,17 +468,17 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         StringBuilder buffer = new StringBuilder(key);
         buffer.append(JsonIndexCreator.KEY_VALUE_SEPARATOR);
         int pos = buffer.length();
-        LazyBitmap result = LazyBitmap.EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         List<String> values = ((InPredicate) predicate).getValues();
         for (String value : values) {
           buffer.setLength(pos);
           buffer.append(value);
           RoaringBitmap docIds = _postingListMap.get(buffer.toString());
           if (docIds != null) {
-            result = result.or(docIds);
+            result.add(docIds);
           }
         }
-        return result;
+        return result.get();
       }
 
       case NOT_IN: {
@@ -500,7 +518,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         }
         Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
         Matcher matcher = pattern.matcher("");
-        LazyBitmap result = LazyBitmap.EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         StringBuilder value = new StringBuilder();
         int valueStart = key.length() + 1;
         for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
@@ -508,10 +526,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
           value.setLength(0);
           value.append(keyValue, valueStart, keyValue.length());
           if (matcher.reset(value).matches()) {
-            result = result.or(entry.getValue());
+            result.add(entry.getValue());
           }
         }
-        return result;
+        return result.get();
       }
 
       case RANGE: {
@@ -533,7 +551,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
         Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
         Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
-        LazyBitmap result = LazyBitmap.EMPTY_BITMAP;
+        UnionAccumulator result = new UnionAccumulator();
         int valueStart = key.length() + 1;
         for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
           Object valueObj = rangeDataType.convert(entry.getKey().substring(valueStart));
@@ -544,10 +562,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
               upperUnbounded || (upperInclusive ? rangeDataType.compare(valueObj, upperBound) <= 0
                   : rangeDataType.compare(valueObj, upperBound) < 0);
           if (lowerCompareResult && upperCompareResult) {
-            result = result.or(entry.getValue());
+            result.add(entry.getValue());
           }
         }
-        return result;
+        return result.get();
       }
 
       default:
@@ -636,12 +654,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  /**
-   *  If key doesn't contain the array index, return <original key, null bitmap>
-   *  Elif the key, i.e. the json path provided by user doesn't match any data, return <null, empty bitmap>
-   *  Else, return the json path that is generated by replacing array index with . on the original key
-   *  and the associated flattenDocId bitmap
-   */
+  /// If key doesn't contain the array index, return <original key, null bitmap>
+  /// Elif the key, i.e. the json path provided by user doesn't match any data, return <null, empty bitmap>
+  /// Else, return the json path that is generated by replacing array index with . on the original key
+  /// and the associated flattenDocId bitmap
   private Pair<String, LazyBitmap> getKeyAndFlattenedDocIds(String key) {
     // Process the array index within the key if exists
     // E.g. "[*]"=1 -> "."='1'

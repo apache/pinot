@@ -37,10 +37,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for V5 forward index format. Inherits all write/read tests from {@link VarByteChunkV4Test}
- * and adds a compression ratio validation test for implicit-length MV encoding.
- */
+/// Tests for V5 forward index format. Inherits all write/read tests from [VarByteChunkV4Test]
+/// and adds a compression ratio validation test for implicit-length MV encoding.
 public class VarByteChunkV5Test extends VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
   private static final Random RANDOM = new Random();
 

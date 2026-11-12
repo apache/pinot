@@ -24,22 +24,20 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.spi.query.RemoteAccessStats;
 
 
-/**
- * The context for fetching buffers of a segment during query.
- */
+/// The context for fetching buffers of a segment during query.
 public class FetchContext {
   private final UUID _fetchId;
   private final String _segmentName;
   private final Map<String, List<IndexType<?, ?, ?>>> _columnToIndexList;
+  private final RemoteAccessStats _remoteAccessStats = new RemoteAccessStats();
 
-  /**
-   * Create a new FetchRequest for this segment, to fetch all buffers of the given columns
-   * @param fetchId unique fetch id
-   * @param segmentName segment name
-   * @param columns set of columns to fetch
-   */
+  /// Create a new FetchRequest for this segment, to fetch all buffers of the given columns
+  /// @param fetchId unique fetch id
+  /// @param segmentName segment name
+  /// @param columns set of columns to fetch
   public FetchContext(UUID fetchId, String segmentName, Set<String> columns) {
     _fetchId = fetchId;
     _segmentName = segmentName;
@@ -49,42 +47,41 @@ public class FetchContext {
     }
   }
 
-  /**
-   * Create a new FetchRequest for this segment, to fetch those indexes as mentioned in the column to indexes list map
-   * @param fetchId unique fetch id
-   * @param segmentName segment name
-   * @param columnToIndexList map of column names as key, and list of indexes to fetch as values
-   */
+  /// Create a new FetchRequest for this segment, to fetch those indexes as mentioned in the column to indexes list map
+  /// @param fetchId unique fetch id
+  /// @param segmentName segment name
+  /// @param columnToIndexList map of column names as key, and list of indexes to fetch as values
   public FetchContext(UUID fetchId, String segmentName, Map<String, List<IndexType<?, ?, ?>>> columnToIndexList) {
     _fetchId = fetchId;
     _segmentName = segmentName;
     _columnToIndexList = columnToIndexList;
   }
 
-  /**
-   * An id to uniquely identify the fetch request
-   * @return unique uuid
-   */
+  /// An id to uniquely identify the fetch request
+  /// @return unique uuid
   public UUID getFetchId() {
     return _fetchId;
   }
 
-  /**
-   * Segment name associated with this fetch context
-   */
+  /// Segment name associated with this fetch context
   public String getSegmentName() {
     return _segmentName;
   }
 
-  /**
-   * Map of columns to fetch as key, and the list of indexes to fetch for the column as value
-   * The list of indexes can be null, which indicates that every index for this column should be fetched
-   */
+  /// Map of columns to fetch as key, and the list of indexes to fetch for the column as value
+  /// The list of indexes can be null, which indicates that every index for this column should be fetched
   public Map<String, List<IndexType<?, ?, ?>>> getColumnToIndexList() {
     return _columnToIndexList;
   }
 
   public boolean isEmpty() {
     return _columnToIndexList.isEmpty();
+  }
+
+  /// Returns the remote accesses (local cache misses) performed to serve this fetch and the bytes they read. A segment
+  /// directory backed by a remote storage tier records them, typically when the fetched buffers are released, and the
+  /// owner of the fetch reports them to the query execution afterwards, so that they end up in the query stats.
+  public RemoteAccessStats getRemoteAccessStats() {
+    return _remoteAccessStats;
   }
 }

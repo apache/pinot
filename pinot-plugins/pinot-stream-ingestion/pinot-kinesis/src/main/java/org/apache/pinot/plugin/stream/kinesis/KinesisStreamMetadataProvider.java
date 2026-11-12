@@ -46,9 +46,7 @@ import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 
-/**
- * A {@link StreamMetadataProvider} implementation for the Kinesis stream
- */
+/// A [StreamMetadataProvider] implementation for the Kinesis stream
 public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   public static final String SHARD_ID_PREFIX = "shardId-";
   private final KinesisConnectionHandler _kinesisConnectionHandler;
@@ -115,12 +113,10 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     throw new IllegalArgumentException("Unsupported offset criteria: " + offsetCriteria);
   }
 
-  /**
-   * This call returns all active shards, taking into account the consumption status for those shards.
-   * {@link PartitionGroupMetadata} is returned for a shard if:
-   * 1. It is a branch new shard AND its parent has been consumed completely
-   * 2. It is still being actively consumed from i.e. the consuming partition has not reached the end of the shard
-   */
+  /// This call returns all active shards, taking into account the consumption status for those shards.
+  /// [PartitionGroupMetadata] is returned for a shard if:
+  /// 1. It is a branch new shard AND its parent has been consumed completely
+  /// 2. It is still being actively consumed from i.e. the consuming partition has not reached the end of the shard
   @Override
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
@@ -197,15 +193,13 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     return newPartitionGroupMetadataList;
   }
 
-  /**
-   * Refer documentation for {@link #computePartitionGroupMetadata(String, StreamConfig, List, int)}
-   * @param forceGetOffsetFromStream - the flag is not required for Kinesis stream. Kinesis implementation
-   *                                 takes care of returning non-null offsets for all old and new partitions.
-   *                                 The flag is primarily required for Kafka stream which requires refactoring
-   *                                 to avoid this flag. More details in {@link
-   *                                 StreamMetadataProvider#computePartitionGroupMetadata(
-   *                                 String, StreamConfig, List, int, boolean)}
-   */
+  /// Refer documentation for [#computePartitionGroupMetadata(String, StreamConfig, List, int)]
+  /// @param forceGetOffsetFromStream - the flag is not required for Kinesis stream. Kinesis implementation
+  ///                                 takes care of returning non-null offsets for all old and new partitions.
+  ///                                 The flag is primarily required for Kafka stream which requires refactoring
+  ///                                 to avoid this flag. More details in
+  ///                                 [StreamMetadataProvider#computePartitionGroupMetadata( String,
+  ///                                  StreamConfig, List, int, boolean)]
   @Override
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis,
@@ -214,12 +208,10 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     return computePartitionGroupMetadata(clientId, streamConfig, partitionGroupConsumptionStatuses, timeoutMillis);
   }
 
-  /**
-   * Converts a shardId string to a partitionGroupId integer by parsing the digits of the shardId
-   * e.g. "shardId-000000000001" becomes 1
-   * FIXME: Although practically the shard values follow this format, the Kinesis docs don't guarantee it.
-   *  Re-evaluate if this convention needs to be changed.
-   */
+  /// Converts a shardId string to a partitionGroupId integer by parsing the digits of the shardId
+  /// e.g. "shardId-000000000001" becomes 1
+  /// FIXME: Although practically the shard values follow this format, the Kinesis docs don't guarantee it.
+  ///  Re-evaluate if this convention needs to be changed.
   private int getPartitionGroupIdFromShardId(String shardId) {
     String shardIdNum = StringUtils.stripStart(StringUtils.removeStart(shardId, SHARD_ID_PREFIX), "0");
     return shardIdNum.isEmpty() ? 0 : Integer.parseInt(shardIdNum);

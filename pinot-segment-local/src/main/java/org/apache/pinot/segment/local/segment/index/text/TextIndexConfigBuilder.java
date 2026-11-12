@@ -101,13 +101,11 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
     return this;
   }
 
-  /**
-   * Sets whether to store text index in segment file and cleanup the directory structure.
-   *
-   * @param storeInSegmentFile true if text index should be stored in segment file and directory cleaned up,
-   *                           false to keep directory structure
-   * @return this builder
-   */
+  /// Sets whether to store text index in segment file and cleanup the directory structure.
+  ///
+  /// @param storeInSegmentFile true if text index should be stored in segment file and directory cleaned up,
+  ///                           false to keep directory structure
+  /// @return this builder
   public TextIndexConfigBuilder setStoreInSegmentFile(boolean storeInSegmentFile) {
     withStoreInSegmentFile(storeInSegmentFile);
     return this;

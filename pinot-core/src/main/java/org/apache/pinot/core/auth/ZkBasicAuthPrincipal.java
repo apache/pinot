@@ -25,9 +25,7 @@ import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 
 
-/**
- * Container object for basic auth principal
- */
+/// Container object for basic auth principal
 public class ZkBasicAuthPrincipal extends BasicAuthPrincipal {
   private final String _password;
   private final String _component;

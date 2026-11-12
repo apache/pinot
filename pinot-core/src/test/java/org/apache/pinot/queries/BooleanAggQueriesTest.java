@@ -69,11 +69,13 @@ public class BooleanAggQueriesTest extends BaseQueriesTest {
 
   private static final String BOOLEAN_COLUMN = "boolColumn";
   private static final String GROUP_BY_COLUMN = "groupByColumn";
+  private static final String MV_GROUP_BY_COLUMN = "mvGroupByColumn";
 
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder()
           .addSingleValueDimension(BOOLEAN_COLUMN, FieldSpec.DataType.BOOLEAN)
-          .addSingleValueDimension(GROUP_BY_COLUMN, FieldSpec.DataType.STRING).build();
+          .addSingleValueDimension(GROUP_BY_COLUMN, FieldSpec.DataType.STRING)
+          .addMultiValueDimension(MV_GROUP_BY_COLUMN, FieldSpec.DataType.STRING).build();
 
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
@@ -109,23 +111,26 @@ public class BooleanAggQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteDirectory(INDEX_DIR);
 
+    // The multi-value groupings are what route the aggregation through aggregateGroupByMV: rows carrying more than one
+    // tag land in several groups at once, and "mvNullAndTrue" / "mvOnlyNulls" separate skipping a null from folding it
+    // in as the column default.
     Object[][] recordContents = new Object[][]{
-        new Object[]{true, "allTrue"},
-        new Object[]{true, "allTrue"},
-        new Object[]{true, "allTrue"},
-        new Object[]{false, "allFalse"},
-        new Object[]{false, "allFalse"},
-        new Object[]{false, "allFalse"},
-        new Object[]{true, "mixedOne"},
-        new Object[]{true, "mixedOne"},
-        new Object[]{false, "mixedOne"},
-        new Object[]{false, "mixedTwo"},
-        new Object[]{true, "mixedTwo"},
-        new Object[]{false, "mixedTwo"},
-        new Object[]{null, "withNulls"},
-        new Object[]{true, "withNulls"},
-        new Object[]{false, "withNulls"},
-        new Object[]{null, "onlyNulls"},
+        new Object[]{true, "allTrue", List.of("mvAllTrue", "mvNullAndTrue")},
+        new Object[]{true, "allTrue", List.of("mvAllTrue")},
+        new Object[]{true, "allTrue", List.of("mvAllTrue")},
+        new Object[]{false, "allFalse", List.of("mvAllFalse", "mvNullAndFalse")},
+        new Object[]{false, "allFalse", List.of("mvAllFalse")},
+        new Object[]{false, "allFalse", List.of("mvAllFalse")},
+        new Object[]{true, "mixedOne", List.of("mvAllTrue")},
+        new Object[]{true, "mixedOne", List.of("mvAllTrue")},
+        new Object[]{false, "mixedOne", List.of("mvAllFalse")},
+        new Object[]{false, "mixedTwo", List.of("mvAllFalse")},
+        new Object[]{true, "mixedTwo", List.of("mvAllTrue")},
+        new Object[]{false, "mixedTwo", List.of("mvAllFalse")},
+        new Object[]{null, "withNulls", List.of("mvOnlyNulls", "mvNullAndTrue", "mvNullAndFalse")},
+        new Object[]{true, "withNulls", List.of("mvAllTrue")},
+        new Object[]{false, "withNulls", List.of("mvAllFalse")},
+        new Object[]{null, "onlyNulls", List.of("mvOnlyNulls")},
     };
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
@@ -133,6 +138,7 @@ public class BooleanAggQueriesTest extends BaseQueriesTest {
       GenericRow genericRow = new GenericRow();
       genericRow.putValue(BOOLEAN_COLUMN, record[0]);
       genericRow.putValue(GROUP_BY_COLUMN, record[1]);
+      genericRow.putValue(MV_GROUP_BY_COLUMN, record[2]);
       records.add(genericRow);
     }
 
@@ -231,6 +237,78 @@ public class BooleanAggQueriesTest extends BaseQueriesTest {
           Assert.assertEquals(aggregates.getResultForGroupId(0, key._groupId), 0);
           break;
         case "onlyNulls":
+          Assert.assertEquals(aggregates.getResultForGroupId(0, key._groupId), isNullHandlingEnabled ? null : 0);
+          break;
+        default:
+          throw new IllegalStateException("Unexpected grouping: " + key._keys[0]);
+      }
+    }
+  }
+
+  /// Grouping by a multi-value column dispatches to `aggregateGroupByMV`, where a row contributes to every group it is
+  /// tagged with. The `mvNullAndTrue` group is what distinguishes the two modes: with null handling enabled the null
+  /// row is skipped and the conjunction is over `{true}`, while with it disabled the null reads as the column default
+  /// `false` and drags the conjunction down.
+  @Test(dataProvider = "nullHandling")
+  public void testBooleanAndGroupByMultiValue(boolean isNullHandlingEnabled) {
+    // Given:
+    String query = "SELECT BOOL_AND(boolColumn) FROM testTable GROUP BY mvGroupByColumn";
+    GroupByOperator operator = getOperator(query, isNullHandlingEnabled);
+
+    // When:
+    GroupByResultsBlock result = operator.nextBlock();
+
+    // Then:
+    AggregationGroupByResult aggregates = result.getAggregationGroupByResult();
+    Iterator<GroupKeyGenerator.GroupKey> keys = aggregates.getGroupKeyIterator();
+    while (keys.hasNext()) {
+      GroupKeyGenerator.GroupKey key = keys.next();
+      switch ((String) key._keys[0]) {
+        case "mvAllTrue":
+          Assert.assertEquals(aggregates.getResultForGroupId(0, key._groupId), 1);
+          break;
+        case "mvAllFalse":
+        case "mvNullAndFalse":
+          Assert.assertEquals(aggregates.getResultForGroupId(0, key._groupId), 0);
+          break;
+        case "mvNullAndTrue":
+          Assert.assertEquals(aggregates.getResultForGroupId(0, key._groupId), isNullHandlingEnabled ? 1 : 0);
+          break;
+        case "mvOnlyNulls":
+          Assert.assertEquals(aggregates.getResultForGroupId(0, key._groupId), isNullHandlingEnabled ? null : 0);
+          break;
+        default:
+          throw new IllegalStateException("Unexpected grouping: " + key._keys[0]);
+      }
+    }
+  }
+
+  /// The multi-value counterpart for disjunction. Only `mvOnlyNulls` separates the two modes here: a null read as the
+  /// default `false` cannot change a disjunction that already contains a real value.
+  @Test(dataProvider = "nullHandling")
+  public void testBooleanOrGroupByMultiValue(boolean isNullHandlingEnabled) {
+    // Given:
+    String query = "SELECT BOOL_OR(boolColumn) FROM testTable GROUP BY mvGroupByColumn";
+    GroupByOperator operator = getOperator(query, isNullHandlingEnabled);
+
+    // When:
+    GroupByResultsBlock result = operator.nextBlock();
+
+    // Then:
+    AggregationGroupByResult aggregates = result.getAggregationGroupByResult();
+    Iterator<GroupKeyGenerator.GroupKey> keys = aggregates.getGroupKeyIterator();
+    while (keys.hasNext()) {
+      GroupKeyGenerator.GroupKey key = keys.next();
+      switch ((String) key._keys[0]) {
+        case "mvAllTrue":
+        case "mvNullAndTrue":
+          Assert.assertEquals(aggregates.getResultForGroupId(0, key._groupId), 1);
+          break;
+        case "mvAllFalse":
+        case "mvNullAndFalse":
+          Assert.assertEquals(aggregates.getResultForGroupId(0, key._groupId), 0);
+          break;
+        case "mvOnlyNulls":
           Assert.assertEquals(aggregates.getResultForGroupId(0, key._groupId), isNullHandlingEnabled ? null : 0);
           break;
         default:

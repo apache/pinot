@@ -23,11 +23,9 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 
-/**
- * This util class is a view over the left and right row joined together.
- * Currently, this is used for filtering and input of projection. So if the joined
- * tuple doesn't pass the predicate, the join result is not materialized into {@code Object[]}.
- */
+/// This util class is a view over the left and right row joined together.
+/// Currently, this is used for filtering and input of projection. So if the joined
+/// tuple doesn't pass the predicate, the join result is not materialized into `Object[]`.
 public abstract class JoinedRowView extends AbstractList<Object> implements List<Object> {
   protected final int _leftSize;
   protected final int _size;

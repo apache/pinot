@@ -23,9 +23,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.Objects;
 
 
-/**
- * These are rebalance progress stats to track how the rebalance is progressing over time
- */
+/// These are rebalance progress stats to track how the rebalance is progressing over time
 @JsonPropertyOrder({
     "status", "startTimeMs", "timeToFinishInSeconds", "completionStatusMsg",
     "rebalanceProgressStatsOverall", "rebalanceProgressStatsCurrentStep", "initialToTargetStateConvergence",
@@ -136,11 +134,9 @@ public class TableRebalanceProgressStats {
     return _rebalanceProgressStatsCurrentStep;
   }
 
-  /**
-   * Updates the overall and step progress stats based on the latest calculated step's progress stats. This should
-   * be called during the EV-IS convergence trigger to ensure the overall stats reflect the changes as they are made.
-   * @param currentStepStats latest step level stats calculated in this iteration
-   */
+  /// Updates the overall and step progress stats based on the latest calculated step's progress stats. This should
+  /// be called during the EV-IS convergence trigger to ensure the overall stats reflect the changes as they are made.
+  /// @param currentStepStats latest step level stats calculated in this iteration
   public void updateOverallAndStepStatsFromLatestStepStats(
       TableRebalanceProgressStats.RebalanceProgressStats currentStepStats) {
     // Fetch the step level and overall stats that were calculated in the last convergence check. These will be used
@@ -269,11 +265,9 @@ public class TableRebalanceProgressStats {
 
   // TODO: Clean this up once new stats are verified
 
-  /**
-   * These are rebalance stats as to how the current state is, when compared to the target state.
-   * Eg: If the current has 4 segments whose replicas (16) don't match the target state, _segmentsToRebalance
-   * is 4 and _replicasToRebalance is 16.
-   */
+  /// These are rebalance stats as to how the current state is, when compared to the target state.
+  /// Eg: If the current has 4 segments whose replicas (16) don't match the target state, \_segmentsToRebalance
+  /// is 4 and \_replicasToRebalance is 16.
   public static class RebalanceStateStats {
     public int _segmentsMissing;
     public int _segmentsToRebalance;

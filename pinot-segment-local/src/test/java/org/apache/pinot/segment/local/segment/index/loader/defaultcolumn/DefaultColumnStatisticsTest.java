@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
-import com.google.common.base.Utf8;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -92,7 +92,7 @@ public class DefaultColumnStatisticsTest {
           assertFalse(stats.isAscii());
           break;
         case STRING:
-          expectedLength = Utf8.encodedLength((String) fieldSpec.getDefaultNullValue());
+          expectedLength = Utf8Utils.encodedLength((String) fieldSpec.getDefaultNullValue());
           assertTrue(stats.isAscii()); // default "null" is ASCII
           break;
         case BYTES:
@@ -148,7 +148,7 @@ public class DefaultColumnStatisticsTest {
       int expectedLength;
       switch (storedType) {
         case STRING:
-          expectedLength = Utf8.encodedLength((String) fieldSpec.getDefaultNullValue());
+          expectedLength = Utf8Utils.encodedLength((String) fieldSpec.getDefaultNullValue());
           assertTrue(stats.isAscii()); // default "null" is ASCII
           break;
         case BYTES:

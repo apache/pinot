@@ -89,10 +89,8 @@ public class PredicateTest {
     assertEquals(children.get(1).toString(), "foo < '456'");
   }
 
-  /**
-   * Tests that the serialized predicate can be parsed and converted back to the same predicate, and returns the
-   * serialized predicate (standardized string representation of the predicate expression).
-   */
+  /// Tests that the serialized predicate can be parsed and converted back to the same predicate, and returns the
+  /// serialized predicate (standardized string representation of the predicate expression).
   private String testSerDe(String predicateExpression) {
     // Parse and convert the string predicate expression into Predicate
     Expression thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);

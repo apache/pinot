@@ -479,9 +479,7 @@ public class DictionaryIndexTypeTest {
         + "the DictionaryIndexType static instance");
   }
 
-  /**
-   * Tests to verify various combinations of inputs to test dictionary override optimization.
-   */
+  /// Tests to verify various combinations of inputs to test dictionary override optimization.
   @Test
   public void testDictionaryOverride() {
     MetricFieldSpec metric = new MetricFieldSpec("testCol", FieldSpec.DataType.DOUBLE);

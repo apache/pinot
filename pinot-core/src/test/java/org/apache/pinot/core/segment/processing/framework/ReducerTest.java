@@ -56,9 +56,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-/**
- * Tests for {@link Reducer}
- */
+/// Tests for [Reducer]
 public class ReducerTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ReducerTest");
   private static final File FILE_MANAGER_OUTPUT_DIR = new File(TEMP_DIR, "fileManagerOutput");

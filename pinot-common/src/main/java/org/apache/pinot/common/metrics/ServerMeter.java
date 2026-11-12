@@ -22,9 +22,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.metrics.PinotMeter;
 
 
-/**
- * Enumeration containing all the meters exposed by the Pinot server.
- */
+/// Enumeration containing all the meters exposed by the Pinot server.
 public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true),
   QUERIES_ON_TABLE("queries", false),
@@ -62,9 +60,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
   DEDUP_PRELOAD_FAILURE("count", false),
+  UPSERT_METADATA_REVERT_FAILURES("failures", false),
   UPSERT_KEYS_IN_WRONG_SEGMENT("rows", false),
   PARTIAL_UPSERT_OUT_OF_ORDER("rows", false),
   PARTIAL_UPSERT_KEYS_NOT_REPLACED("rows", false),
+  FULL_UPSERT_KEYS_NOT_REPLACED("rows", false),
   UPSERT_OUT_OF_ORDER("rows", false),
   DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   TOTAL_KEYS_MARKED_FOR_DELETION("rows", false),
@@ -74,6 +74,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_PRELOAD_FAILURE("count", false),
+  UPSERT_REVERT_WITH_CONSUMPTION_DURING_DOWNLOAD("segments", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
   LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),
@@ -102,6 +103,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_BUILD_WITH_CRC_MISMATCH("segments", false),
   SEGMENT_BUILD_FAILURE("segments", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
@@ -145,11 +147,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RESPONSE_SER_MEM_ALLOCATED_BYTES("bytes", false),
   TOTAL_MEM_ALLOCATED_BYTES("bytes", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
-  /**
-   * Size of the initially serialized query response in bytes.
-   * Note: This may differ from the final response actually sent to the broker if the response
-   * is later replaced (for example, when exceeding the configured max response size).
-   */
+  /// Size of the initially serialized query response in bytes.
+  /// Note: This may differ from the final response actually sent to the broker if the response
+  /// is later replaced (for example, when exceeding the configured max response size).
   QUERY_RESPONSE_SIZE("bytes", false,
       "Size of the initially serialized query response in bytes (may differ from final response sent to broker)"),
 
@@ -159,53 +159,45 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES("tables", true, "Number of failures to refresh table config and schema"),
 
+  // PageCacheWarmup related metrics
+  PAGE_CACHE_WARMUP_QUERIES("pageCacheWarmupQueries", true),
+  PAGE_CACHE_WARMUP_SERVER_ERRORS("pageCacheWarmupServerErrors", true),
+
   // Multi-stage
-  /**
-   * Number of times the max number of rows in the hash table has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different join operators and each one reaches the limit, this will be increased by 2.
-   */
+  /// Number of times the max number of rows in the hash table has been reached.
+  /// It is increased at most one by one each time per stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+  /// But if a single query has 2 different join operators and each one reaches the limit, this will be increased by 2.
   HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
-  /**
-   * Number of times group by results were trimmed.
-   * It is increased in one by each worker that reaches the limit within the stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
-   */
+  /// Number of times group by results were trimmed.
+  /// It is increased in one by each worker that reaches the limit within the stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_GROUPS_TRIMMED("times", true),
-  /**
-   * Number of times the max number of groups has been reached.
-   * It is increased in one by each worker that reaches the limit within the stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
-   */
+  /// Number of times the max number of groups has been reached.
+  /// It is increased in one by each worker that reaches the limit within the stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
-  /**
-   * Number of times the warning threshold for number of groups has been reached.
-   * It is increased in one by each worker that reaches the limit within the stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
-   */
+  /// Number of times the warning threshold for number of groups has been reached.
+  /// It is increased in one by each worker that reaches the limit within the stage.
+  /// That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
   AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
-  /**
-   * The number of blocks that have been sent to the next stage without being serialized.
-   * This is the sum of all blocks sent by all workers in the stage.
-   */
+  /// Number of times a grouping-set query's combine derived the grouping sets from BASE (union) groups, i.e. the
+  /// opt-in `groupingSetsBaseAggregation` optimization actually ran on this server (at least one segment emitted
+  /// base-layout groups). Lets users who opt in verify the optimization applied.
+  GROUPING_SETS_BASE_AGGREGATION("times", true),
+  /// The number of blocks that have been sent to the next stage without being serialized.
+  /// This is the sum of all blocks sent by all workers in the stage.
   MULTI_STAGE_IN_MEMORY_MESSAGES("messages", true),
-  /**
-   * The number of blocks that have been sent to the next stage in serialized format.
-   * This is the sum of all blocks sent by all workers in the stage.
-   */
+  /// The number of blocks that have been sent to the next stage in serialized format.
+  /// This is the sum of all blocks sent by all workers in the stage.
   MULTI_STAGE_RAW_MESSAGES("messages", true),
-  /**
-   * The number of bytes that have been sent to the next stage in serialized format.
-   * This is the sum of all bytes sent by all workers in the stage.
-   */
+  /// The number of bytes that have been sent to the next stage in serialized format.
+  /// This is the sum of all bytes sent by all workers in the stage.
   MULTI_STAGE_RAW_BYTES("bytes", true),
-  /**
-   * Number of times the max number of rows in window has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different window operators and each one reaches the limit, this will be increased by 2.
-   */
+  /// Number of times the max number of rows in window has been reached. It is increased at most one by one each time
+  /// per stage. That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+  /// But if a single query has 2 different window operators and each one reaches the limit, this will be increased by
+  /// 2.
   WINDOW_TIMES_MAX_ROWS_REACHED("times", true),
 
   /// Number of tasks started by the MSE query runner
@@ -248,9 +240,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   COMMIT_TIME_COMPACTION_BUILD_TIME_MS("milliseconds", false,
       "Additional time spent in commit-time compaction processing"),
 
-  /**
-   * Approximate heap bytes used by the mutable JSON index at the time of index close.
-   */
+  /// Approximate heap bytes used by the mutable JSON index at the time of index close.
   MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false),
   INGESTION_DELAY_TRACKING_ERRORS("errors", false,
       "Indicates the count of errors encountered while tracking ingestion delay."),
@@ -261,6 +251,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   TRANSFORMATION_ERROR_COUNT("rows", false),
   DROPPED_RECORD_COUNT("rows", false),
   CORRUPTED_RECORD_COUNT("rows", false),
+  OPEN_STRUCT_TYPE_COERCION_FAILURES("values", false,
+      "Number of OPEN_STRUCT values dropped because the value could not be coerced to the key's declared or "
+          + "already-established type"),
+  OPEN_STRUCT_TYPE_INFERENCE_FAILURES("values", false,
+      "Number of OPEN_STRUCT values stored as their serialized string form because the value's Java type maps to "
+          + "no Pinot DataType. A value that is instead dropped for failing coercion against a key's "
+          + "already-established non-STRING type is counted by openStructTypeCoercionFailures, not here"),
+  OPEN_STRUCT_IGNORED_KEY_DROPS("values", false,
+      "Number of OPEN_STRUCT map entries dropped at ingestion because the key is listed in the "
+          + "column's ignoredKeys config"),
   // Workload related metrics
   WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", true, "Number of times workload budget exceeded"),
   WORKLOAD_QUERIES("queries", false),
@@ -313,11 +313,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
     return _unit;
   }
 
-  /**
-   * Returns true if the metric is global (not attached to a particular resource)
-   *
-   * @return true if the metric is global
-   */
+  /// Returns true if the metric is global (not attached to a particular resource)
+  ///
+  /// @return true if the metric is global
   @Override
   public boolean isGlobal() {
     return _global;

@@ -23,11 +23,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Re-runs all cursor integration tests using {@code FsResponseStore} (local filesystem) instead of
- * {@code MemoryResponseStore}. This validates the single-pass {@code deleteExpiredResponses} override,
- * real PinotFS file I/O, JSON serde roundtrip, and brokerId filtering against actual metadata files.
- */
+/// Re-runs all cursor integration tests using `FsResponseStore` (local filesystem) instead of
+/// `MemoryResponseStore`. This validates the single-pass `deleteExpiredResponses` override,
+/// real PinotFS file I/O, JSON serde roundtrip, and brokerId filtering against actual metadata files.
 public class CursorFsIntegrationTest extends CursorIntegrationTest {
 
   @Override

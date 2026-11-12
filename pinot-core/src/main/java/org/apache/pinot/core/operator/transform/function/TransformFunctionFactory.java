@@ -95,9 +95,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Factory class for transformation functions.
- */
+/// Factory class for transformation functions.
 public class TransformFunctionFactory {
   private TransformFunctionFactory() {
   }
@@ -130,6 +128,12 @@ public class TransformFunctionFactory {
 
     typeToImplementation.put(TransformFunctionType.CAST, CastTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR, JsonExtractScalarTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR_FAST,
+        JsonExtractScalarTransformFunction.Fast.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR_FIRST_MATCH,
+        JsonExtractScalarTransformFunction.FirstMatch.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR_FORY,
+        JsonExtractScalarTransformFunction.Fory.class);
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_KEY, JsonExtractKeyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.TIME_CONVERT, TimeConversionTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT, DateTimeConversionTransformFunction.class);
@@ -274,12 +278,11 @@ public class TransformFunctionFactory {
     return registry;
   }
 
-  /**
-   * Initializes the factory with a set of transform function classes.
-   * <p>Should be called only once before using the factory.
-   *
-   * @param transformFunctionClasses Set of transform function classes
-   */
+  /// Initializes the factory with a set of transform function classes.
+  ///
+  /// Should be called only once before using the factory.
+  ///
+  /// @param transformFunctionClasses Set of transform function classes
   public static void init(Set<Class<TransformFunction>> transformFunctionClasses) {
     for (Class<TransformFunction> transformFunctionClass : transformFunctionClasses) {
       TransformFunction transformFunction;
@@ -298,14 +301,12 @@ public class TransformFunctionFactory {
     }
   }
 
-  /**
-   * Returns an instance of transform function for the given expression.
-   *
-   * @param expression       Transform expression
-   * @param columnContextMap Map from column name to context
-   * @param queryContext     Query context
-   * @return Transform function
-   */
+  /// Returns an instance of transform function for the given expression.
+  ///
+  /// @param expression       Transform expression
+  /// @param columnContextMap Map from column name to context
+  /// @param queryContext     Query context
+  /// @return Transform function
   public static TransformFunction get(ExpressionContext expression, Map<String, ColumnContext> columnContextMap,
       QueryContext queryContext) {
     switch (expression.getType()) {
@@ -319,8 +320,10 @@ public class TransformFunctionFactory {
               expression.getFunction().getArguments(), ArrayLiteralTransformFunction::new);
         }
 
-        // Check if the function is GenerateArray transform function
-        if (functionName.equalsIgnoreCase(GenerateArrayTransformFunction.FUNCTION_NAME)) {
+        // Check if the function is GenerateArray transform function. It generates the array once, so it takes only
+        // literals. Other arguments go through the scalar function below, which generates an array per row.
+        if (functionName.equalsIgnoreCase(GenerateArrayTransformFunction.FUNCTION_NAME) && function.getArguments()
+            .stream().allMatch(argument -> argument.getType() == ExpressionContext.Type.LITERAL)) {
           return queryContext.getOrComputeSharedValue(GenerateArrayTransformFunction.class,
               expression.getFunction().getArguments(),
               GenerateArrayTransformFunction::new);
@@ -369,7 +372,7 @@ public class TransformFunctionFactory {
         }
 
         try {
-          transformFunction.init(transformFunctionArguments, columnContextMap, queryContext.isNullHandlingEnabled());
+          transformFunction.init(transformFunctionArguments, columnContextMap, queryContext);
         } catch (Exception e) {
           throw new BadQueryRequestException("Caught exception while initializing transform function: "
               + functionName + ": " + e.getMessage(), e);
@@ -413,12 +416,10 @@ public class TransformFunctionFactory {
     return get(expression, columnContextMap, dummy);
   }
 
-  /**
-   * Converts the transform function name into its canonical form
-   *
-   * @param functionName Name of the transform function
-   * @return canonicalized transform function name
-   */
+  /// Converts the transform function name into its canonical form
+  ///
+  /// @param functionName Name of the transform function
+  /// @return canonicalized transform function name
   public static String canonicalize(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }

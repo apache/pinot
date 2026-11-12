@@ -27,17 +27,17 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.testng.annotations.Test;
 
 
-/// Negative-path tests for the fail-fast startup gates added to {@link GrpcMailboxServer} in commit
+/// Negative-path tests for the fail-fast startup gates added to [GrpcMailboxServer] in commit
 /// 1d29438dc0 ("Fail fast on invalid gRPC mailbox transport configuration"). Each test wires the
-/// corresponding bad configuration value through a {@link MailboxService}; the underlying
-/// {@code Preconditions.checkArgument} fires inside the {@code GrpcMailboxServer} constructor that
-/// {@link MailboxService#start()} invokes, so the failure surfaces during {@code start()} — which is
+/// corresponding bad configuration value through a [MailboxService]; the underlying
+/// `Preconditions.checkArgument` fires inside the `GrpcMailboxServer` constructor that
+/// [MailboxService#start()] invokes, so the failure surfaces during `start()` — which is
 /// the whole point of fail-at-startup.
 public class GrpcMailboxServerValidationTest {
 
-  /// Pins the gate {@code _inboundMessageCredit > 0} in
-  /// {@link GrpcMailboxServer}: a zero credit value makes the manual inbound flow-control prefetch a no-op
-  /// (the server never calls {@code request(...)} with a positive amount) so the stream would stall
+  /// Pins the gate `_inboundMessageCredit > 0` in
+  /// [GrpcMailboxServer]: a zero credit value makes the manual inbound flow-control prefetch a no-op
+  /// (the server never calls `request(...)` with a positive amount) so the stream would stall
   /// immediately. The startup gate ensures this misconfiguration is rejected at boot rather than producing
   /// silent hangs on the first query.
   @Test(expectedExceptions = IllegalArgumentException.class,
@@ -52,9 +52,9 @@ public class GrpcMailboxServerValidationTest {
     mailboxService.start();
   }
 
-  /// Pins the gate {@code _flowControlWindowBytes >= maxInboundMessageSize} in
-  /// {@link GrpcMailboxServer}: a window smaller than the largest possible single message produces a
-  /// pathological stream where {@code isReady()} flaps on every message because no single message can
+  /// Pins the gate `_flowControlWindowBytes >= maxInboundMessageSize` in
+  /// [GrpcMailboxServer]: a window smaller than the largest possible single message produces a
+  /// pathological stream where `isReady()` flaps on every message because no single message can
   /// ever fit in the available credit. Verifies that a 1 KiB flow-control window combined with the
   /// default 16 MiB max inbound message size is rejected at startup.
   @Test(expectedExceptions = IllegalArgumentException.class,

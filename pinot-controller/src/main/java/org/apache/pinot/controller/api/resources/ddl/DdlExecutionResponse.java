@@ -46,7 +46,7 @@ import org.apache.pinot.sql.ddl.compile.DdlOperation;
 public class DdlExecutionResponse {
   private DdlOperation _operation;
   /// Boxed Boolean so that CREATE / DROP responses can carry the dry-run flag while SHOW
-  /// TABLES and SHOW CREATE TABLE responses elide it via {@link JsonInclude.Include#NON_NULL}
+  /// TABLES and SHOW CREATE TABLE responses elide it via [JsonInclude.Include#NON_NULL]
   /// — those operations have no dry-run semantics and a serialized `"dryRun": false` on them
   /// is meaningless to the caller.
   private Boolean _dryRun;

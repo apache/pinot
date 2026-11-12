@@ -29,35 +29,33 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Focused tests for {@link ExecutionStatsAggregator#setStatsOnMergedDataTable(DataTable)} —
- * specifically the {@link MetadataKey#EARLY_TERMINATION_REASON} round-trip for DISTINCT queries.
- *
- * <p>The aggregator collapses a single-string wire-format reason into three independent booleans
- * (one per {@link EarlyTerminationReason}); the round-trip can encode only one reason back. These
- * tests pin:
- * <ul>
- *   <li>Each of the three reasons round-trips its own boolean when it is the only one set.
- *   <li>When multiple booleans are set (different per-server reasons OR-reduced), the round-trip
- *       encodes the first set flag in declaration order. The user-visible "DISTINCT is partial"
- *       signal is preserved because any one flag independently sets partial-ness on
- *       {@link BrokerResponseNative}.
- *   <li>When no DISTINCT early-termination booleans are set, the key is absent from the merged
- *       metadata (so the downstream decoder does not see a stray non-DISTINCT reason and the
- *       merged DataTable is indistinguishable from one whose inputs all completed normally).
- * </ul>
- */
+/// Focused tests for [ExecutionStatsAggregator#setStatsOnMergedDataTable(DataTable)] —
+/// specifically the [MetadataKey#EARLY_TERMINATION_REASON] round-trip for DISTINCT queries.
+///
+/// The aggregator collapses a single-string wire-format reason into three independent booleans
+/// (one per [EarlyTerminationReason]); the round-trip can encode only one reason back. These
+/// tests pin:
+///
+/// - Each of the three reasons round-trips its own boolean when it is the only one set.
+/// - When multiple booleans are set (different per-server reasons OR-reduced), the round-trip
+///      encodes the first set flag in declaration order. The user-visible "DISTINCT is partial"
+///      signal is preserved because any one flag independently sets partial-ness on
+///      [BrokerResponseNative].
+/// - When no DISTINCT early-termination booleans are set, the key is absent from the merged
+///      metadata (so the downstream decoder does not see a stray non-DISTINCT reason and the
+///      merged DataTable is indistinguishable from one whose inputs all completed normally).
 public class ExecutionStatsAggregatorTest {
 
   private static final ServerRoutingInstance SERVER =
       new ServerRoutingInstance("localhost", 8080, TableType.OFFLINE);
 
-  /** Build an empty DataTable carrying a single {@code EARLY_TERMINATION_REASON} metadata entry. */
+  /// Build an empty DataTable carrying a single `EARLY_TERMINATION_REASON` metadata entry.
   private static DataTable serverTableWithReason(EarlyTerminationReason reason) {
     DataTable dt = DataTableBuilderFactory.getEmptyDataTable();
     dt.getMetadata().put(MetadataKey.EARLY_TERMINATION_REASON.getName(), reason.name());
@@ -68,12 +66,10 @@ public class ExecutionStatsAggregatorTest {
     return DataTableBuilderFactory.getEmptyDataTable();
   }
 
-  /**
-   * Drives one aggregate-then-readback round-trip and returns the three DISTINCT booleans the
-   * downstream aggregator would flip from the merged DataTable's metadata. Mirrors the production
-   * sequence: aggregate per-server inputs → serialize onto merged DataTable → reduce path
-   * re-aggregates the merged DataTable on a fresh aggregator.
-   */
+  /// Drives one aggregate-then-readback round-trip and returns the three DISTINCT booleans the
+  /// downstream aggregator would flip from the merged DataTable's metadata. Mirrors the production
+  /// sequence: aggregate per-server inputs → serialize onto merged DataTable → reduce path
+  /// re-aggregates the merged DataTable on a fresh aggregator.
   private static boolean[] roundTrip(DataTable... inputs) {
     ExecutionStatsAggregator producer = new ExecutionStatsAggregator(false);
     for (DataTable dt : inputs) {
@@ -117,16 +113,14 @@ public class ExecutionStatsAggregatorTest {
     assertTrue(flags[2], "_maxExecutionTimeInDistinctReached must round-trip");
   }
 
-  /**
-   * Two inputs hit DIFFERENT DISTINCT early-termination reasons. The aggregator OR-reduces both
-   * into independent booleans, but the wire format is one string per DataTable. Round-trip can
-   * encode only one reason back; per the implementation contract, it picks the first set flag in
-   * declaration order — {@code DISTINCT_MAX_ROWS} when both rows-reached and execution-time are
-   * set.
-   *
-   * <p>The user-visible "DISTINCT is partial" signal is still preserved: at least one of the
-   * three flags is true post-round-trip. The exact reason granularity is best-effort.
-   */
+  /// Two inputs hit DIFFERENT DISTINCT early-termination reasons. The aggregator OR-reduces both
+  /// into independent booleans, but the wire format is one string per DataTable. Round-trip can
+  /// encode only one reason back; per the implementation contract, it picks the first set flag in
+  /// declaration order — `DISTINCT_MAX_ROWS` when both rows-reached and execution-time are
+  /// set.
+  ///
+  /// The user-visible "DISTINCT is partial" signal is still preserved: at least one of the
+  /// three flags is true post-round-trip. The exact reason granularity is best-effort.
   @Test
   public void testMultipleReasonsEncodeFirstInDeclarationOrder() {
     boolean[] flags = roundTrip(
@@ -137,13 +131,11 @@ public class ExecutionStatsAggregatorTest {
     assertFalse(flags[2], "execution-time flag is dropped — single-string wire format can only carry one reason");
   }
 
-  /**
-   * No DISTINCT early-termination on any input. The merged DataTable must NOT carry an
-   * {@code EARLY_TERMINATION_REASON} key — writing one would mislead the downstream decoder, and
-   * an empty/false value is not part of the wire-format vocabulary (the consumer's
-   * {@code EarlyTerminationReason.valueOf} would throw on "" or "false" and the
-   * {@code IllegalArgumentException} would silently mask any other reason we tried to encode).
-   */
+  /// No DISTINCT early-termination on any input. The merged DataTable must NOT carry an
+  /// `EARLY_TERMINATION_REASON` key — writing one would mislead the downstream decoder, and
+  /// an empty/false value is not part of the wire-format vocabulary (the consumer's
+  /// `EarlyTerminationReason.valueOf` would throw on "" or "false" and the
+  /// `IllegalArgumentException` would silently mask any other reason we tried to encode).
   @Test
   public void testNoReasonProducesAbsentMetadataKey() {
     ExecutionStatsAggregator producer = new ExecutionStatsAggregator(false);
@@ -161,11 +153,9 @@ public class ExecutionStatsAggregatorTest {
     assertFalse(flags[2]);
   }
 
-  /**
-   * Same DISTINCT reason reported by multiple inputs round-trips to the same single boolean. The
-   * aggregator's OR-reduce makes this a trivial case, but pinning it catches a future regression
-   * where setStatsOnMergedDataTable starts skipping the reason on repeats.
-   */
+  /// Same DISTINCT reason reported by multiple inputs round-trips to the same single boolean. The
+  /// aggregator's OR-reduce makes this a trivial case, but pinning it catches a future regression
+  /// where setStatsOnMergedDataTable starts skipping the reason on repeats.
   @Test
   public void testSameReasonFromMultipleInputsRoundTripsToOneBoolean() {
     boolean[] flags = roundTrip(
@@ -175,5 +165,52 @@ public class ExecutionStatsAggregatorTest {
     assertTrue(flags[0]);
     assertFalse(flags[1]);
     assertFalse(flags[2]);
+  }
+
+  @Test
+  public void testRemoteAccessesSumAcrossServersAndRoundTrip() {
+    DataTable table1 = emptyServerTable();
+    table1.getMetadata().put(MetadataKey.NUM_REMOTE_ACCESSES.getName(), "3");
+    table1.getMetadata().put(MetadataKey.REMOTE_ACCESS_BYTES.getName(), "300");
+    table1.getMetadata().put(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName(), "1");
+    table1.getMetadata().put(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName(), "10");
+    DataTable table2 = emptyServerTable();
+    table2.getMetadata().put(MetadataKey.NUM_REMOTE_ACCESSES.getName(), "4");
+    table2.getMetadata().put(MetadataKey.REMOTE_ACCESS_BYTES.getName(), "400");
+    table2.getMetadata().put(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName(), "2");
+    table2.getMetadata().put(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName(), "20");
+    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(false);
+    aggregator.aggregate(SERVER, table1);
+    aggregator.aggregate(SERVER, table2);
+    aggregator.aggregate(SERVER, emptyServerTable());
+    BrokerResponseNative response = new BrokerResponseNative();
+    aggregator.setStats("testTable", response, mock(BrokerMetrics.class));
+    assertEquals(response.getNumRemoteAccesses(), 7L);
+    assertEquals(response.getRemoteAccessBytes(), 700L);
+    assertEquals(response.getNumDirectRemoteAccesses(), 3L);
+    assertEquals(response.getDirectRemoteAccessBytes(), 30L);
+
+    DataTable merged = emptyServerTable();
+    aggregator.setStatsOnMergedDataTable(merged);
+    assertEquals(merged.getMetadata().get(MetadataKey.NUM_REMOTE_ACCESSES.getName()), "7");
+    assertEquals(merged.getMetadata().get(MetadataKey.REMOTE_ACCESS_BYTES.getName()), "700");
+    assertEquals(merged.getMetadata().get(MetadataKey.NUM_DIRECT_REMOTE_ACCESSES.getName()), "3");
+    assertEquals(merged.getMetadata().get(MetadataKey.DIRECT_REMOTE_ACCESS_BYTES.getName()), "30");
+  }
+
+  @Test
+  public void testApproximatedResultIsOrReducedAndRoundTrips() {
+    DataTable table = emptyServerTable();
+    table.getMetadata().put(MetadataKey.APPROXIMATED_RESULT.getName(), "true");
+    ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(false);
+    aggregator.aggregate(SERVER, emptyServerTable());
+    aggregator.aggregate(SERVER, table);
+    BrokerResponseNative response = new BrokerResponseNative();
+    aggregator.setStats("testTable", response, mock(BrokerMetrics.class));
+    assertTrue(response.isApproximatedResult());
+
+    DataTable merged = emptyServerTable();
+    aggregator.setStatsOnMergedDataTable(merged);
+    assertEquals(merged.getMetadata().get(MetadataKey.APPROXIMATED_RESULT.getName()), "true");
   }
 }

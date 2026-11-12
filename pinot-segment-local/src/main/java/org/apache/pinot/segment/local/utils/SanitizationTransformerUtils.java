@@ -25,25 +25,21 @@ import org.apache.pinot.spi.data.FieldSpec.MaxLengthExceedStrategy;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
-/**
- * Utility class for sanitization transformation logic shared between
- * {@link org.apache.pinot.segment.local.recordtransformer.SanitizationTransformer} and
- * {@link org.apache.pinot.segment.local.columntransformer.SanitizationColumnTransformer}.
- *
- * <p>The sanitization rules include:
- * <ul>
- *   <li>No {@code null} characters in string values</li>
- *   <li>String values are within the length limit</li>
- * </ul>
- *
- * <p>Uses the MaxLengthExceedStrategy in the FieldSpec to decide what to do when the value exceeds the max:
- * <ul>
- *   <li>TRIM_LENGTH: The value is trimmed to the max length</li>
- *   <li>SUBSTITUTE_DEFAULT_VALUE: The value is replaced with the default null value string</li>
- *   <li>ERROR: An exception is thrown and the record is skipped</li>
- *   <li>NO_ACTION: The value is kept as is if no NULL_CHARACTER present, else trimmed till NULL</li>
- * </ul>
- */
+/// Utility class for sanitization transformation logic shared between
+/// [org.apache.pinot.segment.local.recordtransformer.SanitizationTransformer] and
+/// [org.apache.pinot.segment.local.columntransformer.SanitizationColumnTransformer].
+///
+/// The sanitization rules include:
+///
+/// - No `null` characters in string values
+/// - String values are within the length limit
+///
+/// Uses the MaxLengthExceedStrategy in the FieldSpec to decide what to do when the value exceeds the max:
+///
+/// - TRIM_LENGTH: The value is trimmed to the max length
+/// - SUBSTITUTE_DEFAULT_VALUE: The value is replaced with the default null value string
+/// - ERROR: An exception is thrown and the record is skipped
+/// - NO_ACTION: The value is kept as is if no NULL_CHARACTER present, else trimmed till NULL
 public class SanitizationTransformerUtils {
 
   private static final String NULL_CHARACTER = "\0";
@@ -68,9 +64,7 @@ public class SanitizationTransformerUtils {
     return null;
   }
 
-  /**
-   * Configuration for a column that needs sanitization.
-   */
+  /// Configuration for a column that needs sanitization.
   public static class SanitizedColumnInfo {
     private final String _columnName;
     private final int _maxLength;
@@ -107,10 +101,8 @@ public class SanitizationTransformerUtils {
     }
   }
 
-  /**
-   * Mutable result of sanitization containing the sanitized value and whether it was modified.
-   * Reused across calls to avoid repeated object allocation.
-   */
+  /// Mutable result of sanitization containing the sanitized value and whether it was modified.
+  /// Reused across calls to avoid repeated object allocation.
   public static class SanitizationResult {
     private Object _value;
     private boolean _sanitized;
@@ -165,21 +157,17 @@ public class SanitizationTransformerUtils {
     return null;
   }
 
-  /**
-   * Sanitize a string value based on column info configuration.
-   * Updates the provided result in place.
-   */
+  /// Sanitize a string value based on column info configuration.
+  /// Updates the provided result in place.
   private static void sanitizeStringValue(SanitizedColumnInfo columnInfo, String value, SanitizationResult result) {
     sanitizeStringValue(columnInfo.getColumnName(), value, columnInfo.getMaxLength(),
         columnInfo.getMaxLengthExceedStrategy(), columnInfo.getDefaultNullValue(), result);
   }
 
-  /**
-   * Sanitize a string value based on max length and strategy.
-   * Updates the provided result in place.
-   *
-   * @throws IllegalStateException If strategy is ERROR and value exceeds max length or contains null character
-   */
+  /// Sanitize a string value based on max length and strategy.
+  /// Updates the provided result in place.
+  ///
+  /// @throws IllegalStateException If strategy is ERROR and value exceeds max length or contains null character
   private static void sanitizeStringValue(String columnName, String value, int maxLength,
       MaxLengthExceedStrategy strategy, Object defaultNullValue, SanitizationResult result) {
     String sanitizedValue = StringUtil.sanitizeStringValue(value, maxLength);
@@ -221,21 +209,17 @@ public class SanitizationTransformerUtils {
     result.set(value, false);
   }
 
-  /**
-   * Sanitize a bytes value based on column info configuration.
-   * Updates the provided result in place.
-   */
+  /// Sanitize a bytes value based on column info configuration.
+  /// Updates the provided result in place.
   private static void sanitizeBytesValue(SanitizedColumnInfo columnInfo, byte[] value, SanitizationResult result) {
     sanitizeBytesValue(columnInfo.getColumnName(), value, columnInfo.getMaxLength(),
         columnInfo.getMaxLengthExceedStrategy(), columnInfo.getDefaultNullValue(), result);
   }
 
-  /**
-   * Sanitize a bytes value based on max length and strategy.
-   * Updates the provided result in place.
-   *
-   * @throws IllegalStateException If strategy is ERROR and value exceeds max length
-   */
+  /// Sanitize a bytes value based on max length and strategy.
+  /// Updates the provided result in place.
+  ///
+  /// @throws IllegalStateException If strategy is ERROR and value exceeds max length
   private static void sanitizeBytesValue(String columnName, byte[] value, int maxLength,
       MaxLengthExceedStrategy strategy, Object defaultNullValue, SanitizationResult result) {
     if (value.length > maxLength) {

@@ -27,19 +27,17 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@code jdbc:pinot://} (HTTP) driver path through {@link java.sql.DriverManager}.
- *
- * <p>Verifies that auth credentials are correctly propagated through the JDBC driver into
- * the HTTP transport headers of {@link JsonAsyncHttpPinotClientTransport}.
- *
- * <p>Unlike the gRPC path, the HTTP connection does not send a validation query on creation,
- * so no mock server is needed. Headers are verified via reflection on the transport's
- * private {@code _headers} field.
- *
- * <p>The HTTP path (via {@link org.apache.pinot.client.utils.ConnectionUtils#getHeadersFromProperties})
- * extracts and strips the {@code headers.*} prefix, setting custom headers on the transport.
- */
+/// Tests for `jdbc:pinot://` (HTTP) driver path through [java.sql.DriverManager].
+///
+/// Verifies that auth credentials are correctly propagated through the JDBC driver into
+/// the HTTP transport headers of [JsonAsyncHttpPinotClientTransport].
+///
+/// Unlike the gRPC path, the HTTP connection does not send a validation query on creation,
+/// so no mock server is needed. Headers are verified via reflection on the transport's
+/// private `_headers` field.
+///
+/// The HTTP path (via [org.apache.pinot.client.utils.ConnectionUtils#getHeadersFromProperties])
+/// extracts and strips the `headers.*` prefix, setting custom headers on the transport.
 @Test
 public class HttpJdbcDriverAuthTest extends AbstractJdbcDriverAuthTest {
 

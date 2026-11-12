@@ -24,9 +24,7 @@ import com.fasterxml.jackson.annotation.Nulls;
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.PartitionRule.*;
 
 
-/**
- * Thresholds and parameters used in PartitionRule
- */
+/// Thresholds and parameters used in PartitionRule
 public class PartitionRuleParams {
   // Above this latency SLA we do not need any partitioning
   public Long _thresholdMaxLatencySlaPartition = DEFAULT_THRESHOLD_MAX_LATENCY_SLA_PARTITION;

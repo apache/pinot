@@ -20,13 +20,17 @@ package org.apache.pinot.segment.local.utils;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.FieldConfig.IndexType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -37,16 +41,14 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Exhaustive tests for all valid and invalid combinations of:
- * - Forward index encoding: DICTIONARY vs RAW
- * - Dictionary: enabled (default), disabled (noDictionaryColumns), or explicit (indexes.dictionary)
- * - Secondary indexes: inverted, FST, IFST, range, text, JSON, bloom filter
- * - Column data types: STRING (SV), INT (SV), INT (MV), FLOAT (SV)
- *
- * The core invariant under test: any column that uses an index requiring a dictionary
- * (inverted, FST, IFST) must have an explicit dictionary config when the forward index is raw.
- */
+/// Exhaustive tests for all valid and invalid combinations of:
+/// - Forward index encoding: DICTIONARY vs RAW
+/// - Dictionary: enabled (default), disabled (noDictionaryColumns), or explicit (indexes.dictionary)
+/// - Secondary indexes: inverted, FST, IFST, range, text, JSON, bloom filter
+/// - Column data types: STRING (SV), INT (SV), INT (MV), FLOAT (SV)
+///
+/// The core invariant under test: any column that uses an index requiring a dictionary
+/// (inverted, FST, IFST) must have an explicit dictionary config when the forward index is raw.
 public class IndexCombinationValidationTest {
 
   private static final String TABLE_NAME = "testTable";
@@ -65,14 +67,14 @@ public class IndexCombinationValidationTest {
 
   // ----- helpers -----
 
-  /** Build a FieldConfig with an explicit dictionary node in the indexes section. */
+  /// Build a FieldConfig with an explicit dictionary node in the indexes section.
   private static FieldConfig rawWithExplicitDict(String col, List<IndexType> indexes) {
     ObjectNode indexesNode = JsonUtils.newObjectNode();
     indexesNode.set("dictionary", JsonUtils.newObjectNode());
     return new FieldConfig(col, EncodingType.RAW, null, indexes, null, null, indexesNode, null, null);
   }
 
-  /** Validate and expect success. */
+  /// Validate and expect success.
   private static void assertValid(TableConfig tableConfig) {
     try {
       TableConfigUtils.validate(tableConfig, SCHEMA);
@@ -81,7 +83,7 @@ public class IndexCombinationValidationTest {
     }
   }
 
-  /** Validate and expect failure containing the given message fragment. */
+  /// Validate and expect failure containing the given message fragment.
   private static void assertInvalid(TableConfig tableConfig, String errorFragment) {
     try {
       TableConfigUtils.validate(tableConfig, SCHEMA);
@@ -132,7 +134,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testDictEncodedWithFstIndexPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.FST, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, List.of(IndexType.FST), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc)).build();
     assertValid(tc);
@@ -173,7 +175,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithFstIndexNoExplicitDictFails() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.FST, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, List.of(IndexType.FST), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -184,7 +186,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testRawWithIfstIndexNoExplicitDictFails() {
     // IFSTIndexType.validate() fires: "Cannot create IFST index on column: <col> without dictionary"
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.IFST, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, List.of(IndexType.IFST), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -268,7 +270,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithTextIndexNoDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, List.of(IndexType.TEXT), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -287,7 +289,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithJsonIndexStringColumnNoDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.JSON, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, List.of(IndexType.JSON), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -386,7 +388,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testFstIndexMvColumnFails() {
     // FST on MV column is never valid regardless of encoding
-    FieldConfig fc = new FieldConfig(INT_MV_COL, EncodingType.DICTIONARY, IndexType.FST, null, null);
+    FieldConfig fc = new FieldConfig(INT_MV_COL, EncodingType.DICTIONARY, List.of(IndexType.FST), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -410,7 +412,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testMixedColumnsAllValidPasses() {
     // strCol: raw + text (no dict required); intCol: dict + inverted; floatCol: dict + range
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, List.of(IndexType.TEXT), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setInvertedIndexColumns(List.of(INT_COL))
@@ -460,7 +462,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithLz4CodecPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.LZ4, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.LZ4, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -470,7 +472,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithSnappyCodecPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.SNAPPY, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.SNAPPY, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -480,7 +482,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithZstdCodecPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.ZSTANDARD, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.ZSTANDARD, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -491,7 +493,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testRawWithClpCodecStringColumnPasses() {
     // CLP codecs are valid for raw STRING columns
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.CLP, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.CLP, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -502,7 +504,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testRawWithClpCodecNonStringColumnFails() {
     // CLP is only valid on STRING stored type
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.CLP, null);
+    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.RAW, null, CompressionCodec.CLP, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(INT_COL))
         .setFieldConfigList(List.of(fc))
@@ -513,7 +515,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testDeltaDeltaCodecNonNumericColumnFails() {
     // DELTADELTA only valid on INT/LONG columns
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.DELTADELTA, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, CompressionCodec.DELTADELTA, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -544,7 +546,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testFstIndexNonStringColumnFails() {
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.FST, null, null);
+    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, List.of(IndexType.FST), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -553,7 +555,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testTextIndexNonStringColumnFails() {
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.TEXT, null, null);
+    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, List.of(IndexType.TEXT), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -563,7 +565,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testTextIndexStringColumnRawPasses() {
     // Text index does not require dictionary
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, List.of(IndexType.TEXT), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -573,7 +575,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testTextIndexStringColumnDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.TEXT, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, List.of(IndexType.TEXT), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -582,7 +584,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testJsonIndexStringColumnRawPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.JSON, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, List.of(IndexType.JSON), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -592,7 +594,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testJsonIndexStringColumnDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.JSON, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, List.of(IndexType.JSON), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -602,7 +604,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testJsonIndexIntColumnFails() {
     // JSON index not valid on non-STRING/non-MAP column
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.JSON, null, null);
+    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, List.of(IndexType.JSON), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -647,7 +649,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testErrorMessageNamesFstIndex() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.FST, null, null);
+    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, List.of(IndexType.FST), null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -661,5 +663,118 @@ public class IndexCombinationValidationTest {
       assertTrue(msg.contains(STR_COL), "Error should name the column");
       assertTrue(msg.contains("without dictionary"), "Error should explain the problem");
     }
+  }
+
+  // ============================================================
+  // 13. BitSliced range index (version 2) on ingestion-aggregated columns
+  //     Ingestion-time metrics aggregation forces its aggregated metric columns to be no-dictionary and does not
+  //     track their min/max during consumption. The value domain is recovered by scanning the sealed forward index
+  //     at segment build time (see MutableNoDictColumnStatistics), so the combination is supported and must pass
+  //     table-config validation.
+  // ============================================================
+
+  private static final String AGG_METRIC_COL = "m1";     // LONG metric, aggregation destination
+  private static final String AGG_SOURCE_COL = "s1";     // INT dimension, aggregation source
+  private static final String TIME_COL = "ts";           // realtime tables require a time column
+
+  /// Schema with a metric (aggregation destination), a dimension source column, and a time column.
+  private static Schema aggregationSchema() {
+    return new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(AGG_SOURCE_COL, DataType.INT)
+        .addMetric(AGG_METRIC_COL, DataType.LONG)
+        .addDateTime(TIME_COL, DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+  }
+
+  private static Map<String, String> streamConfigs() {
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.topic.name", "test");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+    return streamConfigs;
+  }
+
+  /// REALTIME table builder wired with a stream config and time column so full validation can run.
+  private static TableConfigBuilder realtimeBuilder() {
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COL)
+        .setStreamConfigs(streamConfigs());
+  }
+
+  /// IngestionConfig that aggregates `SUM(s1)` into the no-dictionary metric column `m1`.
+  private static IngestionConfig sumAggregationIngestionConfig() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(
+        List.of(new AggregationConfig(AGG_METRIC_COL, "SUM(" + AGG_SOURCE_COL + ")")));
+    return ingestionConfig;
+  }
+
+  private static void assertValid(TableConfig tableConfig, Schema schema) {
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Expected validation to pass but got: " + e.getMessage(), e);
+    }
+  }
+
+  @Test
+  public void testRangeIndexOnIngestionAggregatedColumnPasses() {
+    // aggregationConfigs (SUM into a no-dictionary metric column) + BitSliced range index on that metric column.
+    // Min/max are recovered at segment build time, so this combination is accepted.
+    TableConfig tc = realtimeBuilder()
+        .setIngestionConfig(sumAggregationIngestionConfig())
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL))
+        .setRangeIndexColumns(List.of(AGG_METRIC_COL))
+        .build();
+    assertValid(tc, aggregationSchema());
+  }
+
+  @Test
+  public void testRangeIndexOnAggregateMetricsColumnPasses() {
+    // Legacy aggregateMetrics flag (implicitly SUMs every metric) + BitSliced range index on the no-dictionary
+    // metric column. Also accepted for the same reason.
+    TableConfig tc = realtimeBuilder()
+        .setAggregateMetrics(true)
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL))
+        .setRangeIndexColumns(List.of(AGG_METRIC_COL))
+        .build();
+    assertValid(tc, aggregationSchema());
+  }
+
+  @Test
+  public void testRangeIndexV1OnIngestionAggregatedColumnPasses() {
+    // Version 1 (legacy) range index does not read min/max, so it is safe on an aggregated no-dictionary column.
+    TableConfig tc = realtimeBuilder()
+        .setIngestionConfig(sumAggregationIngestionConfig())
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL))
+        .setRangeIndexColumns(List.of(AGG_METRIC_COL))
+        .build();
+    tc.getIndexingConfig().setRangeIndexVersion(1);
+    assertValid(tc, aggregationSchema());
+  }
+
+  @Test
+  public void testRangeIndexOnNonAggregatedNoDictNumericColumnPasses() {
+    // A plain no-dictionary numeric column (not an aggregation destination) still supports the range index.
+    TableConfig tc = realtimeBuilder()
+        .setIngestionConfig(sumAggregationIngestionConfig())
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL, AGG_SOURCE_COL))
+        .setRangeIndexColumns(List.of(AGG_SOURCE_COL))
+        .build();
+    assertValid(tc, aggregationSchema());
+  }
+
+  @Test
+  public void testRangeIndexOnAggregatedColumnOfflineTablePasses() {
+    // Ingestion aggregation is inert for OFFLINE tables (min/max are computed normally), so the range index is
+    // allowed there - the validation is scoped to REALTIME to avoid over-rejecting inert offline configs.
+    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(sumAggregationIngestionConfig())
+        .setNoDictionaryColumns(List.of(AGG_METRIC_COL))
+        .setRangeIndexColumns(List.of(AGG_METRIC_COL))
+        .build();
+    assertValid(tc, aggregationSchema());
   }
 }

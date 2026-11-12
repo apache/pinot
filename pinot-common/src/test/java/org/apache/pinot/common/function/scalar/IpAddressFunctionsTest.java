@@ -27,9 +27,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for IP address functions
- */
+/// Tests for IP address functions
 public class IpAddressFunctionsTest {
 
   // ==================== Tests for isSubnetOf ====================

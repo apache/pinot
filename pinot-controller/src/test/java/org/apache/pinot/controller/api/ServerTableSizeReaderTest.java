@@ -53,7 +53,7 @@ public class ServerTableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
 
   private static final String LOOPBACK_HOST = "127.0.0.1";
-  private static final String URI_PATH = "/table/";
+  private static final String URI_PATH = "/tables/";
   private static final String TABLE_NAME = "myTable";
   private static final int TIMEOUT_MSEC = 5000;
   private static final int SERVER_COUNT = 6;
@@ -86,10 +86,11 @@ public class ServerTableSizeReaderTest {
     _tableInfo3 = createTableSizeInfo(TABLE_NAME, new ArrayList<Integer>());
     startServer(0, createHandler(200, _tableInfo1, 0));
     startServer(1, createHandler(200, _tableInfo2, 0));
-    _endpointList.set(2, endpoint(findUnusedPort()));
     startServer(3, createHandler(500, null, 0));
     startServer(4, createHandler(200, null, TIMEOUT_MSEC + 1000));
     startServer(5, createHandler(200, _tableInfo3, 0));
+    // Choose the unused port last so a mock server cannot reuse it after findUnusedPort() releases it.
+    _endpointList.set(2, endpoint(findUnusedPort()));
   }
 
   @AfterClass

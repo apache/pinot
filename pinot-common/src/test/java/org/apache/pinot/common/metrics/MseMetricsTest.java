@@ -41,10 +41,8 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Mode-aware behavior tests for {@link MseMetrics}. SERVER mode must forward to
- * {@link ServerMetrics} only; MSE mode emits {@code pinot.mse.*} only; DUAL hits both.
- */
+/// Mode-aware behavior tests for [MseMetrics]. SERVER mode must forward to
+/// [ServerMetrics] only; MSE mode emits `pinot.mse.*` only; DUAL hits both.
 public class MseMetricsTest {
 
   @BeforeClass

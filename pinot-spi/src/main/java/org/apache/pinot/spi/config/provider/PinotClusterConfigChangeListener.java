@@ -22,14 +22,10 @@ import java.util.Map;
 import java.util.Set;
 
 
-/**
- * Change listener for obtaining ZK cluster config changes. Must be registered with {@link PinotClusterConfigProvider}
- */
+/// Change listener for obtaining ZK cluster config changes. Must be registered with [PinotClusterConfigProvider]
 public interface PinotClusterConfigChangeListener {
-  /**
-   * On change callback to handle changes to the cluster configs
-   * @param changedConfigs set of configs that were changed (added/deleted/modified)
-   * @param clusterConfigs map of all the cluster configs
-   */
+  /// On change callback to handle changes to the cluster configs
+  /// @param changedConfigs set of configs that were changed (added/deleted/modified)
+  /// @param clusterConfigs map of all the cluster configs
   void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs);
 }

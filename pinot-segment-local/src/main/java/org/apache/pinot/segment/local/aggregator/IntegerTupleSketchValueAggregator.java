@@ -19,14 +19,15 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.lang.foreign.MemorySegment;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -125,13 +126,11 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
     return true;
   }
 
-  /**
-   * Returns the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given
-   * number of actual entries. Note that this assumes the worst case of the sketch in
-   * estimation mode, which requires storing theta and count.
-   * @return the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given number
-   * of entries.
-   */
+  /// Returns the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given
+  /// number of actual entries. Note that this assumes the worst case of the sketch in
+  /// estimation mode, which requires storing theta and count.
+  /// @return the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given number
+  /// of entries.
   @Override
   public int getMaxAggregatedValueByteSize() {
     if (_nominalEntries == 0) {
@@ -153,7 +152,7 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
 
   @Override
   public TupleSketch<IntegerSummary> deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(bytes);
+    return TupleSketch.heapifySketch(MemorySegment.ofArray(bytes), new IntegerSummaryDeserializer());
   }
 
   @VisibleForTesting

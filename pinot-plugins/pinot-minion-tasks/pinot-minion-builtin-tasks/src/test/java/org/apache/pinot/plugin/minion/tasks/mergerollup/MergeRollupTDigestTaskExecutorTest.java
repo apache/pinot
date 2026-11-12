@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
-import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,15 +30,18 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestCodec;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -55,21 +57,24 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
-/**
- * Tests MergeRollup task executor with PercentileTDigest aggregation on BYTES columns.
- * <p>
- * Data layout across 4 segments with 3 dimension groups:
- *   Segment 0: group1=[1..100], group2=[500..599]
- *   Segment 1: group1=[101..200], group2=[600..699], group3=[1..50]
- *   Segment 2: group1=[201..300], group3=[51..150]
- *   Segment 3: group2=[700..799], group3=[151..200]
- * <p>
- * After rollup:
- *   group1: 300 values [1..300], P50 ~ 150
- *   group2: 300 values [500..799], P50 ~ 649
- *   group3: 200 values [1..200], P50 ~ 100
- */
+
+/// Tests MergeRollup task executor with PercentileTDigest aggregation on BYTES columns.
+///
+/// Data layout across 4 segments with 3 dimension groups:
+///   Segment 0: group1=\[1..100\], group2=\[500..599\]
+///   Segment 1: group1=\[101..200\], group2=\[600..699\], group3=\[1..50\]
+///   Segment 2: group1=\[201..300\], group3=\[51..150\]
+///   Segment 3: group2=\[700..799\], group3=\[151..200\]
+///
+/// After rollup:
+///   group1: 300 values \[1..300\], P50 ~ 150
+///   group2: 300 values \[500..799\], P50 ~ 649
+///   group3: 200 values \[1..200\], P50 ~ 100
 public class MergeRollupTDigestTaskExecutorTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), "MergeRollupTDigestTaskExecutorTest");
@@ -113,10 +118,8 @@ public class MergeRollupTDigestTaskExecutorTest {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
-  /**
-   * Verifies that 3 distinct dimension groups across 4 segments are independently merged,
-   * each with correct count and quantile estimates (P0, P50, P99, P100).
-   */
+  /// Verifies that 3 distinct dimension groups across 4 segments are independently merged,
+  /// each with correct count and quantile estimates (P0, P50, P99, P100).
   @Test
   public void testMultipleDimensionGroupsIndependentMerge() throws Exception {
     List<File> segmentDirs = buildSegments(buildStandardSegmentData());
@@ -160,12 +163,10 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest3.quantile(1.0), 200, 1);         // P100 ~ 200
   }
 
-  /**
-   * Verifies cross-segment merging: the same dimension key appears in multiple segments
-   * and all values are correctly aggregated.
-   *
-   * group1 appears in segments 0, 1, 2; group2 in segments 0, 1, 3; group3 in segments 1, 2, 3.
-   */
+  /// Verifies cross-segment merging: the same dimension key appears in multiple segments
+  /// and all values are correctly aggregated.
+  ///
+  /// group1 appears in segments 0, 1, 2; group2 in segments 0, 1, 3; group3 in segments 1, 2, 3.
   @Test
   public void testCrossSegmentMerging() throws Exception {
     List<File> segmentDirs = buildSegments(buildStandardSegmentData());
@@ -194,10 +195,8 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertTrue(digest3.quantile(1.0) >= 199.0, "Max should be close to 200");
   }
 
-  /**
-   * Passes a custom compressionFactor via function parameters and verifies merge succeeds
-   * with correct results.
-   */
+  /// Passes a custom compressionFactor via function parameters and verifies merge succeeds
+  /// with correct results.
   @Test
   public void testCustomCompressionFactor() throws Exception {
     List<File> segmentDirs = buildSegments(buildStandardSegmentData());
@@ -229,10 +228,8 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest3.quantile(0.5), 100, 3);
   }
 
-  /**
-   * Uses realistic latency value ranges (1ms to 10000ms) with varying distributions per group
-   * to verify quantile accuracy on wider data ranges.
-   */
+  /// Uses realistic latency value ranges (1ms to 10000ms) with varying distributions per group
+  /// to verify quantile accuracy on wider data ranges.
   @Test
   public void testLargeValueRange() throws Exception {
     List<List<GenericRow>> segments = new ArrayList<>();
@@ -246,7 +243,7 @@ public class MergeRollupTDigestTaskExecutorTest {
     // Segment 1: group1 [501..1000], group3 spread [1..10000] step=10
     List<GenericRow> seg1 = new ArrayList<>();
     seg1.add(makeRow(GROUP_1, createTDigest(501, 1001)));
-    TDigest group3Digest = TDigest.createMergingDigest(DEFAULT_COMPRESSION);
+    TDigest group3Digest = TDigestAccumulator.forLegacyAggregation(DEFAULT_COMPRESSION);
     for (int v = 1; v <= 10000; v += 10) {
       group3Digest.add(v);
     }
@@ -277,17 +274,15 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest3.quantile(0.5), 5000, 100);
   }
 
-  /**
-   * Verifies that an empty TDigest (no values added) is handled correctly during merge.
-   * The merged result for that group should reflect only the non-empty input.
-   */
+  /// Verifies that an empty TDigest (no values added) is handled correctly during merge.
+  /// The merged result for that group should reflect only the non-empty input.
   @Test
   public void testEmptyTDigestHandling() throws Exception {
     List<List<GenericRow>> segments = new ArrayList<>();
 
     // Segment 0: group with an empty TDigest
     List<GenericRow> seg0 = new ArrayList<>();
-    TDigest emptyDigest = TDigest.createMergingDigest(DEFAULT_COMPRESSION);
+    TDigest emptyDigest = TDigestAccumulator.forLegacyAggregation(DEFAULT_COMPRESSION);
     seg0.add(makeRow(GROUP_1, emptyDigest));
     segments.add(seg0);
 
@@ -311,30 +306,28 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest1.quantile(0.5), 50, 2);
   }
 
-  /**
-   * Verifies merge works correctly with TDigests that contain exactly 1 value each.
-   */
+  /// Verifies merge works correctly with TDigests that contain exactly 1 value each.
   @Test
   public void testSingleValueTDigest() throws Exception {
     List<List<GenericRow>> segments = new ArrayList<>();
 
     // Segment 0: single value 42
     List<GenericRow> seg0 = new ArrayList<>();
-    TDigest single0 = TDigest.createMergingDigest(DEFAULT_COMPRESSION);
+    TDigest single0 = TDigestAccumulator.forLegacyAggregation(DEFAULT_COMPRESSION);
     single0.add(42);
     seg0.add(makeRow(GROUP_1, single0));
     segments.add(seg0);
 
     // Segment 1: single value 58
     List<GenericRow> seg1 = new ArrayList<>();
-    TDigest single1 = TDigest.createMergingDigest(DEFAULT_COMPRESSION);
+    TDigest single1 = TDigestAccumulator.forLegacyAggregation(DEFAULT_COMPRESSION);
     single1.add(58);
     seg1.add(makeRow(GROUP_1, single1));
     segments.add(seg1);
 
     // Segment 2: single value 100 for a different group
     List<GenericRow> seg2 = new ArrayList<>();
-    TDigest single2 = TDigest.createMergingDigest(DEFAULT_COMPRESSION);
+    TDigest single2 = TDigestAccumulator.forLegacyAggregation(DEFAULT_COMPRESSION);
     single2.add(100);
     seg2.add(makeRow(GROUP_2, single2));
     segments.add(seg2);
@@ -363,10 +356,8 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest2.quantile(0.5), 100, 0.1);
   }
 
-  /**
-   * Tests skewed distributions: one group has mostly small values, another mostly large.
-   * Verifies quantiles are correct after merge.
-   */
+  /// Tests skewed distributions: one group has mostly small values, another mostly large.
+  /// Verifies quantiles are correct after merge.
   @Test
   public void testSkewedDistributions() throws Exception {
     List<List<GenericRow>> segments = new ArrayList<>();
@@ -374,13 +365,13 @@ public class MergeRollupTDigestTaskExecutorTest {
     // Group 1 is heavily skewed low: 900 values in [1..10] and 100 values in [1000..1100]
     // Group 2 is heavily skewed high: 100 values in [1..100] and 900 values in [9000..9900]
     List<GenericRow> seg0 = new ArrayList<>();
-    TDigest digest1Low = TDigest.createMergingDigest(DEFAULT_COMPRESSION);
+    TDigest digest1Low = TDigestAccumulator.forLegacyAggregation(DEFAULT_COMPRESSION);
     for (int i = 0; i < 900; i++) {
       digest1Low.add(1 + (i % 10));  // values 1-10, repeated
     }
     seg0.add(makeRow(GROUP_1, digest1Low));
 
-    TDigest digest2Low = TDigest.createMergingDigest(DEFAULT_COMPRESSION);
+    TDigest digest2Low = TDigestAccumulator.forLegacyAggregation(DEFAULT_COMPRESSION);
     for (int i = 1; i <= 100; i++) {
       digest2Low.add(i);
     }
@@ -388,13 +379,13 @@ public class MergeRollupTDigestTaskExecutorTest {
     segments.add(seg0);
 
     List<GenericRow> seg1 = new ArrayList<>();
-    TDigest digest1High = TDigest.createMergingDigest(DEFAULT_COMPRESSION);
+    TDigest digest1High = TDigestAccumulator.forLegacyAggregation(DEFAULT_COMPRESSION);
     for (int i = 1000; i < 1100; i++) {
       digest1High.add(i);
     }
     seg1.add(makeRow(GROUP_1, digest1High));
 
-    TDigest digest2High = TDigest.createMergingDigest(DEFAULT_COMPRESSION);
+    TDigest digest2High = TDigestAccumulator.forLegacyAggregation(DEFAULT_COMPRESSION);
     for (int i = 0; i < 900; i++) {
       digest2High.add(9000 + (i % 900));
     }
@@ -429,9 +420,7 @@ public class MergeRollupTDigestTaskExecutorTest {
     Assert.assertEquals(digest2.quantile(0.0), 1, 1);
   }
 
-  /**
-   * After rollup, the total doc count must equal the number of distinct dimension keys.
-   */
+  /// After rollup, the total doc count must equal the number of distinct dimension keys.
   @Test
   public void testSegmentDocCountEqualsDistinctKeys() throws Exception {
     List<File> segmentDirs = buildSegments(buildStandardSegmentData());
@@ -444,8 +433,31 @@ public class MergeRollupTDigestTaskExecutorTest {
         "Rollup doc count should equal the number of distinct dimension keys");
   }
 
+  @Test
+  public void testCorruptedDigestFailsRollupBeforePersistingAResult() throws Exception {
+    byte[] corrupted = TDigestCodec.serializeCentroids(DEFAULT_COMPRESSION, 0.0, 10.0,
+        new double[]{0.0, 50.0, 10.0}, new double[]{1.0, 5.0, 1.0}, 3);
+    GenericRow corruptRow = new GenericRow();
+    corruptRow.putValue(DIMENSION_COL, GROUP_1);
+    corruptRow.putValue(TDIGEST_COL, corrupted);
+    List<File> segmentDirs = buildSegments(List.of(
+        List.of(makeRow(GROUP_1, createTDigest(1, 101))), List.of(corruptRow)));
+    File outputDir = new File(new File(TEMP_DIR, "workingDir_" + _workingDirCounter), "segments_output");
+
+    Exception failure = expectThrows(Exception.class, () -> runExecutor(segmentDirs, null));
+    Throwable cause = failure;
+    while (cause.getCause() != null) {
+      cause = cause.getCause();
+    }
+    assertTrue(cause instanceof IllegalArgumentException, "Rollup must fail because the digest is corrupted");
+    assertEquals(cause.getMessage(), "Cannot merge or mutate a historically corrupted TDigest; "
+        + "rebuild stored digests from source data before merging");
+    assertFalse(outputDir.exists(), "A failed rollup must not leave a synthetic percentile result");
+  }
+
   private static TDigest createTDigest(final int start, final int end) {
-    TDigest tDigest = TDigest.createMergingDigest(MergeRollupTDigestTaskExecutorTest.DEFAULT_COMPRESSION);
+    TDigest tDigest =
+        TDigestAccumulator.forLegacyAggregation(MergeRollupTDigestTaskExecutorTest.DEFAULT_COMPRESSION);
     for (int v = start; v < end; v++) {
       tDigest.add(v);
     }

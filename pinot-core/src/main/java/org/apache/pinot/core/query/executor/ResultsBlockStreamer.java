@@ -21,14 +21,10 @@ package org.apache.pinot.core.query.executor;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 
 
-/**
- * Streamer for results blocks.
- */
+/// Streamer for results blocks.
 public interface ResultsBlockStreamer {
 
-  /**
-   * Sends the results block.
-   */
+  /// Sends the results block.
   void send(BaseResultsBlock block)
       throws Exception;
 }

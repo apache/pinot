@@ -18,16 +18,18 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
-
+import java.lang.foreign.MemorySegment;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
+
 
 public class DistinctCountCPCSketchAggregatorTest {
 
@@ -42,13 +44,13 @@ public class DistinctCountCPCSketchAggregatorTest {
   public void testAggregateWithDefaultLgK() {
     CpcSketch firstSketch = new CpcSketch(10);
     CpcSketch secondSketch = new CpcSketch(20);
-    byte[] value1 = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(firstSketch);
-    byte[] value2 = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(secondSketch);
+    byte[] value1 = firstSketch.toByteArray();
+    byte[] value2 = secondSketch.toByteArray();
 
     Map<String, String> functionParameters = new HashMap<>();
     byte[] result = (byte[]) _cpcSketchAggregator.aggregate(value1, value2, functionParameters);
 
-    CpcSketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(result);
+    CpcSketch resultSketch = CpcSketch.heapify(MemorySegment.ofArray(result));
     assertNotNull(resultSketch);
     assertEquals(resultSketch.getLgK(), 12);
   }
@@ -57,15 +59,15 @@ public class DistinctCountCPCSketchAggregatorTest {
   public void testAggregateWithFunctionParameters() {
     CpcSketch firstSketch = new CpcSketch(10);
     CpcSketch secondSketch = new CpcSketch(20);
-    byte[] value1 = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(firstSketch);
-    byte[] value2 = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(secondSketch);
+    byte[] value1 = firstSketch.toByteArray();
+    byte[] value2 = secondSketch.toByteArray();
 
     Map<String, String> functionParameters = new HashMap<>();
     functionParameters.put(Constants.CPCSKETCH_LGK_KEY, "15");
 
     byte[] result = (byte[]) _cpcSketchAggregator.aggregate(value1, value2, functionParameters);
 
-    CpcSketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(result);
+    CpcSketch resultSketch = CpcSketch.heapify(MemorySegment.ofArray(result));
     assertNotNull(resultSketch);
     assertEquals(resultSketch.getLgK(), 15);
   }
@@ -77,7 +79,7 @@ public class DistinctCountCPCSketchAggregatorTest {
     for (int i = 0; i < 100; i++) {
       sketch.update(i);
     }
-    byte[] sketchBytes = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(sketch);
+    byte[] sketchBytes = sketch.toByteArray();
 
     byte[] result = (byte[]) _cpcSketchAggregator.aggregate(emptyBytes, sketchBytes, new HashMap<>());
 
@@ -92,7 +94,7 @@ public class DistinctCountCPCSketchAggregatorTest {
     for (int i = 0; i < 100; i++) {
       sketch.update(i);
     }
-    byte[] sketchBytes = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(sketch);
+    byte[] sketchBytes = sketch.toByteArray();
 
     byte[] result = (byte[]) _cpcSketchAggregator.aggregate(sketchBytes, emptyBytes, new HashMap<>());
 
@@ -108,7 +110,7 @@ public class DistinctCountCPCSketchAggregatorTest {
 
     // Both empty: should produce a valid serialized empty sketch, not byte[0],
     // so that merged segments always contain deserializable sketch bytes.
-    CpcSketch resultSketch = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(result);
+    CpcSketch resultSketch = CpcSketch.heapify(MemorySegment.ofArray(result));
     assertNotNull(resultSketch);
     assertEquals(resultSketch.getEstimate(), 0.0);
   }

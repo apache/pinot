@@ -18,27 +18,28 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class SumArrayDoubleAggregationFunction
-    extends BaseSingleInputAggregationFunction<DoubleArrayList, DoubleArrayList> {
+public class SumArrayDoubleAggregationFunction extends BaseSingleInputAggregationFunction<double[], double[]> {
+  private static final int DOUBLE_ARRAY_LIST_TYPE = 3;
 
-  public SumArrayDoubleAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "SUM_ARRAY"));
+  public SumArrayDoubleAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "SUM_ARRAY"), nullHandlingEnabled);
   }
 
   @Override
@@ -59,79 +60,91 @@ public class SumArrayDoubleAggregationFunction
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] values = blockValSetMap.get(_expression).getDoubleValuesMV();
-    if (aggregationResultHolder.getResult() == null) {
-      aggregationResultHolder.setValue(new DoubleArrayList());
-    }
-    DoubleArrayList result = aggregationResultHolder.getResult();
-    for (int i = 0; i < length; i++) {
-      double[] value = values[i];
-      aggregateMerge(value, result);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] values = blockValSet.getDoubleValuesMV();
+    // The accumulator is created inside the range, so a block with no non-null row leaves the holder untouched and
+    // extractFinalResult sees the null that means nothing was aggregated
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      double[] sums = aggregationResultHolder.getResult();
+      for (int i = from; i < to; i++) {
+        sums = add(sums, values[i]);
+      }
+      aggregationResultHolder.setValue(sums);
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      int groupKey = groupKeyArray[i];
-      setGroupByResult(groupByResultHolder, values, groupKey);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        setGroupByResult(groupByResultHolder, valuesArray[i], groupKeyArray[i]);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      int[] groupKeys = groupKeysArray[i];
-      for (int groupKey : groupKeys) {
-        setGroupByResult(groupByResultHolder, values, groupKey);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          setGroupByResult(groupByResultHolder, values, groupKey);
+        }
       }
-    }
+    });
   }
 
   private void setGroupByResult(GroupByResultHolder groupByResultHolder, double[] values, int groupKey) {
-    DoubleArrayList sumList = groupByResultHolder.getResult(groupKey);
-    if (sumList == null) {
-      sumList = new DoubleArrayList();
-      groupByResultHolder.setValueForKey(groupKey, sumList);
-    }
-    aggregateMerge(values, sumList);
-  }
-
-  private void aggregateMerge(double[] values, DoubleArrayList sumList) {
-    for (int j = sumList.size(); j < values.length; j++) {
-      sumList.add(0L);
-    }
-    for (int j = 0; j < values.length; j++) {
-      sumList.set(j, sumList.getDouble(j) + values[j]);
+    double[] sums = groupByResultHolder.getResult(groupKey);
+    double[] newSums = add(sums, values);
+    if (newSums != sums) {
+      groupByResultHolder.setValueForKey(groupKey, newSums);
     }
   }
 
+  /// Adds the values to the sums and returns the sums, which is a new array when there are none yet or the values are
+  /// longer.
+  private static double[] add(@Nullable double[] sums, double[] values) {
+    if (sums == null) {
+      return values.clone();
+    }
+    if (sums.length < values.length) {
+      sums = Arrays.copyOf(sums, values.length);
+    }
+    for (int i = 0; i < values.length; i++) {
+      sums[i] += values[i];
+    }
+    return sums;
+  }
+
+  @Nullable
   @Override
-  public DoubleArrayList extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public double[] extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public double[] extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public DoubleArrayList merge(DoubleArrayList intermediateResult1, DoubleArrayList intermediateResult2) {
-    if (intermediateResult1.size() < intermediateResult2.size()) {
-      for (int i = 0; i < intermediateResult1.size(); i++) {
-        intermediateResult2.set(i, intermediateResult1.getDouble(i) + intermediateResult2.getDouble(i));
+  public double[] merge(double[] intermediateResult1, double[] intermediateResult2) {
+    if (intermediateResult1.length < intermediateResult2.length) {
+      for (int i = 0; i < intermediateResult1.length; i++) {
+        intermediateResult2[i] += intermediateResult1[i];
       }
       return intermediateResult2;
     }
-    for (int i = 0; i < intermediateResult2.size(); i++) {
-      intermediateResult1.set(i, intermediateResult1.getDouble(i) + intermediateResult2.getDouble(i));
+    for (int i = 0; i < intermediateResult2.length; i++) {
+      intermediateResult1[i] += intermediateResult2[i];
     }
     return intermediateResult1;
   }
@@ -140,19 +153,18 @@ public class SumArrayDoubleAggregationFunction
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
     // AggregationResultsBlock#setIntermediateResult and AggregationFunctionUtils#getIntermediateResult only serialize
     // intermediate results whose stored type is INT/LONG/DOUBLE/STRING/OBJECT, so we need the OBJECT/custom ser-de path
-    // for DoubleArrayList payloads.
+    // for the sum array.
     return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(DoubleArrayList doubleArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
-        ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(doubleArrayList));
+  public SerializedResult serializeIntermediateResult(double[] sums) {
+    return new SerializedValue<>(DOUBLE_ARRAY_LIST_TYPE, sums, ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE);
   }
 
   @Override
-  public DoubleArrayList deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
+  public double[] deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DOUBLE_ARRAY_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override
@@ -160,8 +172,18 @@ public class SumArrayDoubleAggregationFunction
     return DataSchema.ColumnDataType.DOUBLE_ARRAY;
   }
 
+  @Nullable
   @Override
-  public DoubleArrayList extractFinalResult(DoubleArrayList result) {
-    return result;
+  public double[] extractFinalResult(@Nullable double[] sums) {
+    return sums;
+  }
+
+  @Override
+  public double[] mergeFinalResult(double[] finalResult1, double[] finalResult2) {
+    double[] mergedResult = Arrays.copyOf(finalResult1, Math.max(finalResult1.length, finalResult2.length));
+    for (int i = 0; i < finalResult2.length; i++) {
+      mergedResult[i] += finalResult2[i];
+    }
+    return mergedResult;
   }
 }

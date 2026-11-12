@@ -26,11 +26,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
-/**
- * Polymorphic modulo scalar function implementation.
- *
- * <p>Instances are immutable and thread-safe.
- */
+/// Polymorphic modulo scalar function implementation.
+///
+/// Instances are immutable and thread-safe.
 @ScalarFunction
 public class ModScalarFunction extends BaseBinaryArithmeticScalarFunction {
 

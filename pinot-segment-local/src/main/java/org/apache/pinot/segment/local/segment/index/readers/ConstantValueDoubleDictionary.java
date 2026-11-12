@@ -22,9 +22,7 @@ import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Dictionary of a single double value.
- */
+/// Dictionary of a single double value.
 public class ConstantValueDoubleDictionary extends BaseConstantValueDictionary {
   private final double _value;
 

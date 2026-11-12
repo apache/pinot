@@ -21,8 +21,8 @@ package org.apache.pinot.sql.parsers;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -37,6 +37,7 @@ import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
+import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
@@ -65,10 +66,13 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Join;
 import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils.SqlOptionsMode;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
+import org.apache.pinot.sql.parsers.parser.GrowingCharStream;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
@@ -97,11 +101,9 @@ public class CalciteSqlParser {
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   // TODO: Add the ability to configure the parser's maximum identifier length via configuration if needed in the future
   public static final int CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH = 1024;
-  /// The grouping-set discriminator is encoded as a 32-bit INT bitmask over the union group-by columns, so a
-  /// GROUPING SETS / ROLLUP / CUBE query may reference at most 31 distinct grouping columns.
-  public static final int MAX_GROUPING_SETS_COLUMNS = 31;
-  /// Upper bound on the number of grouping sets a single query may expand to (guards against CUBE blow-up).
-  public static final int MAX_GROUPING_SETS = 4096;
+  /// Upper bound on the number of grouping sets a single query may expand to (guards against CUBE blow-up);
+  /// shared with the multi-stage plan conversion.
+  public static final int MAX_GROUPING_SETS = GroupingSets.MAX_GROUPING_SETS;
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
@@ -121,19 +123,55 @@ public class CalciteSqlParser {
     sql = ParserUtils.sanitizeSql(sql);
 
     // extract and remove OPTIONS string
-    List<String> options = extractOptionsFromSql(sql);
-    if (!options.isEmpty()) {
-      sql = removeOptionsFromSql(sql);
+    SqlOptionsMode legacyOptionSyntaxMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
+    List<String> options = List.of();
+    // Where the suffix dropped in IGNORE mode sits in the original statement, kept only to fail a DELETE (its options
+    // configure it) without materializing the option text for the statements that discard it
+    String originalSql = sql;
+    int ignoredOptionsStart = -1;
+    int ignoredOptionsEnd = -1;
+    if (legacyOptionSyntaxMode == SqlOptionsMode.IGNORE) {
+      // IGNORE differs from the other modes: the options are never applied, so a single regex pass both detects and
+      // strips the suffix, which is anchored to the end of the statement and so matches at most once, and the common
+      // no-suffix path pays for one scan without materializing an option list
+      Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+      if (matcher.find()) {
+        ignoredOptionsStart = matcher.start(1);
+        ignoredOptionsEnd = matcher.end(1);
+        sql = sql.substring(0, matcher.start());
+      }
+    } else {
+      options = extractOptionsFromSql(sql);
+      if (!options.isEmpty()) {
+        if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
+          throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
+              + "'SET <key> = <value>;' statements instead: " + options);
+        }
+        sql = removeOptionsFromSql(sql);
+      }
     }
 
-    try (StringReader inStream = new StringReader(sql)) {
-      SqlParserImpl sqlParser = newSqlParser(inStream);
+    try {
+      SqlParserImpl sqlParser = newSqlParser(sql);
       SqlNodeList sqlNodeList = sqlParser.parseSqlStmtList();
+      sqlNodeList = (SqlNodeList) PostgreSqlCastRewriter.rewrite(sqlNodeList);
       // Extract OPTION statements from sql.
       SqlNodeAndOptions sqlNodeAndOptions = extractSqlNodeAndOptions(sqlNodeList);
+      // Dropping a DELETE option (e.g. dryRun) would change its effect
+      if (ignoredOptionsStart >= 0 && sqlNodeAndOptions.getSqlNode() instanceof SqlDelete) {
+        throw new SqlCompilationException("Legacy OPTION(...) options are ignored on this cluster, use "
+            + "'SET <key> = <value>;' statements to configure DELETE: OPTION("
+            + originalSql.substring(ignoredOptionsStart, ignoredOptionsEnd) + ")");
+      }
       // add legacy OPTIONS keyword-based options
       if (!options.isEmpty()) {
-        sqlNodeAndOptions.setExtraOptions(extractOptionsMap(options));
+        Map<String, String> optionMap = extractOptionsMap(options);
+        if (sqlNodeAndOptions.getSqlType() == PinotSqlType.DQL) {
+          // No-op unless the broker enables query option validation. DML (e.g.
+          // INSERT INTO FILE OPTION(taskName=...)) carries free-form task/FS properties, like DML SET.
+          QueryOptionsUtils.validateSqlQueryOptions(optionMap);
+        }
+        sqlNodeAndOptions.setExtraOptions(optionMap);
       }
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
@@ -147,8 +185,12 @@ public class CalciteSqlParser {
     SqlNode statementNode = null;
     Map<String, String> options = new HashMap<>();
     for (SqlNode sqlNode : sqlNodeList) {
-      if (sqlNode instanceof SqlInsertFromFile) {
-        // extract insert statement (execution statement)
+      if (sqlNode instanceof SqlExplain && ((SqlExplain) sqlNode).getExplicandum() instanceof SqlDelete) {
+        // Otherwise classified as a query, which fails later with a cast error when the DELETE is compiled
+        throw new SqlCompilationException("EXPLAIN is not supported for DELETE");
+      }
+      if (sqlNode instanceof SqlInsertFromFile || sqlNode instanceof SqlDelete) {
+        // extract DML statement (execution statement)
         if (sqlType == null) {
           sqlType = PinotSqlType.DML;
           statementNode = sqlNode;
@@ -191,6 +233,11 @@ public class CalciteSqlParser {
     if (sqlType == null) {
       throw new SqlCompilationException("SqlNode with executable statement not found!");
     }
+    if (sqlType == PinotSqlType.DQL) {
+      // No-op unless the broker enables query option validation. DML (e.g. INSERT INTO FILE) carries
+      // free-form task/FS properties via SET, and REST/JSON queryOptions never reach this path.
+      QueryOptionsUtils.validateSqlQueryOptions(options);
+    }
     return new SqlNodeAndOptions(statementNode, sqlType, QueryOptionsUtils.resolveCaseInsensitiveOptions(options));
   }
 
@@ -225,6 +272,7 @@ public class CalciteSqlParser {
       throws SqlCompilationException {
     boolean hasGroupByClause = pinotQuery.getGroupByList() != null;
     Set<Expression> groupByExprs = hasGroupByClause ? new HashSet<>(pinotQuery.getGroupByList()) : null;
+    validateHavingClause(pinotQuery, hasGroupByClause, groupByExprs);
     int aggregateExprCount = 0;
     for (Expression selectExpression : pinotQuery.getSelectList()) {
       if (isAggregateExpression(selectExpression)) {
@@ -256,10 +304,154 @@ public class CalciteSqlParser {
     // sets. Note that GROUPING() / GROUPING_ID() are not aggregation functions. (Plain non-aggregation GROUP BY
     // queries are rewritten to DISTINCT by NonAggregationGroupByToDistinctQueryRewriter, but that rewrite cannot
     // represent multiple grouping sets.)
-    if (pinotQuery.getGroupingSetMasks() != null && aggregateExprCount == 0 && !hasAggregationOutsideSelect(
+    if (pinotQuery.getGroupingSets() != null && aggregateExprCount == 0 && !hasAggregationOutsideSelect(
         pinotQuery)) {
       throw new SqlCompilationException(
           "GROUP BY GROUPING SETS / ROLLUP / CUBE requires at least one aggregation function in the query");
+    }
+    // GROUPING()/GROUPING_ID() pack one bit per argument into an INT, so a single call accepts at most 31
+    // arguments (a per-call limit — the number of grouping columns is unlimited). Reject at compile time so the
+    // user gets a clear error instead of a mid-execution failure from the shared value computation.
+    if (pinotQuery.getGroupingSets() != null) {
+      for (Expression selectExpression : pinotQuery.getSelectList()) {
+        validateGroupingFunctionArgs(selectExpression);
+      }
+      if (pinotQuery.getHavingExpression() != null) {
+        validateGroupingFunctionArgs(pinotQuery.getHavingExpression());
+      }
+      if (pinotQuery.getOrderByList() != null) {
+        for (Expression orderBy : pinotQuery.getOrderByList()) {
+          validateGroupingFunctionArgs(orderBy);
+        }
+      }
+    }
+  }
+
+  /// Rejects a HAVING clause that the single-stage engine would otherwise drop.
+  ///
+  /// HAVING is evaluated only while reducing a GROUP BY aggregation. Applied to any other shape the predicate used to
+  /// be discarded silently, so the query answered as if the clause were absent.
+  ///
+  /// A HAVING clause imposes grouping semantics: without a GROUP BY the whole table becomes a single group. Every
+  /// expression in HAVING, and in the SELECT list of a query with no GROUP BY, must therefore be an aggregation, a
+  /// literal, or functionally dependent on the GROUP BY columns -- the rule the multi-stage engine applies through
+  /// Calcite ("Expression 'x' is not being grouped").
+  ///
+  /// A GROUP BY carrying no aggregation anywhere is rejected on top of that rule. The engine has no grouping operator
+  /// for such a query: [org.apache.pinot.sql.parsers.rewriter.NonAggregationGroupByToDistinctQueryRewriter] turns it
+  /// into a DISTINCT, which has no reduce step that can evaluate a HAVING filter. Moving the predicate into WHERE
+  /// would be equivalent for a single-valued grouping column, but not for a multi-valued one -- GROUP BY builds one
+  /// group per value while WHERE keeps whole rows -- and the rewriter has no schema to tell them apart. The
+  /// multi-stage engine does support this shape.
+  private static void validateHavingClause(PinotQuery pinotQuery, boolean hasGroupByClause,
+      @Nullable Set<Expression> groupByExprs)
+      throws SqlCompilationException {
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression == null) {
+      return;
+    }
+    Set<Expression> groupedExprs = hasGroupByClause ? groupByExprs : Set.of();
+    Expression ungrouped = findUngroupedReference(havingExpression, groupedExprs);
+    if (ungrouped != null) {
+      throw new SqlCompilationException("'" + RequestUtils.prettyPrint(ungrouped) + "' in HAVING clause must "
+          + (hasGroupByClause ? "be inside an aggregate or functionally dependent on the columns used in GROUP BY "
+              + "clause." : "be inside an aggregate: with no GROUP BY clause the whole table is a single group."));
+    }
+    if (!hasGroupByClause) {
+      for (Expression selectExpression : pinotQuery.getSelectList()) {
+        Expression ungroupedSelect = findUngroupedReference(selectExpression, groupedExprs);
+        if (ungroupedSelect != null) {
+          throw new SqlCompilationException("'" + RequestUtils.prettyPrint(ungroupedSelect) + "' must be inside an "
+              + "aggregate: with a HAVING clause and no GROUP BY clause the whole table is a single group.");
+        }
+      }
+      return;
+    }
+    if (!hasAggregation(pinotQuery)) {
+      throw new SqlCompilationException("HAVING is not supported on a GROUP BY query without an aggregation in the "
+          + "single-stage query engine. Move the predicate to the WHERE clause, or use the multi-stage query engine.");
+    }
+  }
+
+  /// Returns the first identifier the engine cannot resolve once rows have been grouped: one that is neither a
+  /// grouping column nor an argument of an aggregation. Returns `null` when every reference is resolvable.
+  ///
+  /// This deliberately differs from [#expressionOutsideGroupByList], which accepts an expression as soon as it
+  /// *contains* an aggregation anywhere. That is too permissive for HAVING: `HAVING COUNT(*) > amount` contains
+  /// COUNT(*), but `amount` still has no single value per group, and the reducer fails on it at run time with a
+  /// message naming the GROUP BY clause the user did not write.
+  @Nullable
+  private static Expression findUngroupedReference(Expression expr, Set<Expression> groupByExprs) {
+    if (expr.getType() == ExpressionType.LITERAL || groupByExprs.contains(expr)) {
+      return null;
+    }
+    Function function = expr.getFunctionCall();
+    if (function == null) {
+      // An identifier that is not a grouping column.
+      return expr;
+    }
+    if (AggregationFunctionType.isAggregationFunction(function.getOperator())) {
+      // Arguments are aggregated away, so they do not have to be grouping columns.
+      return null;
+    }
+    if (function.getOperator().equalsIgnoreCase(SqlKind.FILTER.lowerName)) {
+      // A filtered aggregation, COUNT(*) FILTER (WHERE ...). The engine resolves it like any other aggregation, and
+      // its predicate is evaluated per row while aggregating, so it may reference columns that are not grouped.
+      return null;
+    }
+    List<Expression> operands = function.getOperands();
+    if (operands == null) {
+      return null;
+    }
+    // For an alias only the aliased value matters; the alias itself is not a column reference.
+    List<Expression> toCheck = function.getOperator().equals("as") ? operands.subList(0, 1) : operands;
+    for (Expression operand : toCheck) {
+      Expression ungrouped = findUngroupedReference(operand, groupByExprs);
+      if (ungrouped != null) {
+        return ungrouped;
+      }
+    }
+    return null;
+  }
+
+  /// Returns `true` if an aggregation appears anywhere the engine would compute one: the SELECT list, the HAVING
+  /// clause or the ORDER-BY list.
+  private static boolean hasAggregation(PinotQuery pinotQuery) {
+    for (Expression selectExpression : pinotQuery.getSelectList()) {
+      if (isAggregateExpression(selectExpression)) {
+        return true;
+      }
+    }
+    if (pinotQuery.getHavingExpression() != null && isAggregateExpression(pinotQuery.getHavingExpression())) {
+      return true;
+    }
+    if (pinotQuery.getOrderByList() != null) {
+      for (Expression orderByExpression : pinotQuery.getOrderByList()) {
+        if (isAggregateExpression(orderByExpression)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Recursively rejects GROUPING() / GROUPING_ID() calls with more than
+  /// [GroupingSets#MAX_GROUPING_FUNCTION_ARGS] arguments (the packed INT bit width).
+  private static void validateGroupingFunctionArgs(Expression expression) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    if (GroupingSets.isGroupingFunction(function.getOperator())
+        && function.getOperandsSize() > GroupingSets.MAX_GROUPING_FUNCTION_ARGS) {
+      throw new SqlCompilationException(
+          "GROUPING / GROUPING_ID supports at most " + GroupingSets.MAX_GROUPING_FUNCTION_ARGS + " arguments, got "
+              + function.getOperandsSize());
+    }
+    if (function.getOperands() != null) {
+      for (Expression operand : function.getOperands()) {
+        validateGroupingFunctionArgs(operand);
+      }
     }
   }
 
@@ -499,18 +691,32 @@ public class CalciteSqlParser {
   /// @throws SqlCompilationException if String is not a valid expression.
   public static Expression compileToExpression(String expression) {
     SqlNode sqlNode;
-    try (StringReader inStream = new StringReader(expression)) {
-      SqlParserImpl sqlParser = newSqlParser(inStream);
+    try {
+      SqlParserImpl sqlParser = newSqlParser(expression);
       sqlNode = sqlParser.parseSqlExpressionEof();
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing expression: " + expression, e);
     }
+    // Outside the try: the rewriter already throws SqlCompilationException, and wrapping it would drop its message.
+    sqlNode = PostgreSqlCastRewriter.rewrite(sqlNode);
     return toExpression(sqlNode);
   }
 
+  /// Compiles an expression that is already parsed, e.g. the condition of a parsed statement, into [Expression].
+  ///
+  /// The node is normalized like the String expression of [#compileToExpression(String)] (PostgreSQL `::` casts are
+  /// rewritten in place, see `PostgreSqlCastRewriter`), so both overloads compile the same SQL into the same
+  /// [Expression]. The rewrite is idempotent, so a node from [#compileToSqlNodeAndOptions] is left unchanged.
+  ///
+  /// @throws SqlCompilationException if the node is not a supported expression.
+  public static Expression compileToExpression(SqlNode sqlNode) {
+    return toExpression(PostgreSqlCastRewriter.rewrite(sqlNode));
+  }
+
   @VisibleForTesting
-  static SqlParserImpl newSqlParser(StringReader inStream) {
-    SqlParserImpl sqlParser = new SqlParserImpl(inStream);
+  static SqlParserImpl newSqlParser(String sql) {
+    // Reads long tokens, e.g. a multi-MB IdSet literal, in linear time
+    SqlParserImpl sqlParser = GrowingCharStream.newParser(sql);
     sqlParser.switchTo(SqlAbstractParserImpl.LexicalState.DQID);
     // TODO: convert to MySQL conformance once we retired most of the un-tested BABEL tokens
     sqlParser.setConformance(SqlConformanceEnum.BABEL);
@@ -577,6 +783,16 @@ public class CalciteSqlParser {
     SqlNode havingNode = selectNode.getHaving();
     if (havingNode != null) {
       pinotQuery.setHavingExpression(toExpression(havingNode));
+    }
+    // QUALIFY
+    // QUALIFY filters rows after the window functions of the SELECT list are evaluated, the way HAVING filters them
+    // after aggregation. The single-stage engine has no window functions, and PinotQuery has no field to carry the
+    // predicate, so it must be rejected rather than left unread: an unread QUALIFY is a silently wrong answer.
+    if (selectNode.getQualify() != null) {
+      throw new SqlCompilationException("QUALIFY is not supported by the single-stage query engine. Use the "
+          + "multi-stage query engine to filter on the result of a window function. If the predicate does not "
+          + "reference a window function, rewrite it as a WHERE clause (to filter on columns) or as a HAVING clause "
+          + "(to filter on aggregates of a GROUP BY query).");
     }
     // ORDER-BY
     SqlNodeList orderByNodeList = selectNode.getOrderList();
@@ -724,17 +940,17 @@ public class CalciteSqlParser {
     return selectExpr;
   }
 
-  /// Converts the GROUP BY clause into {@link PinotQuery#groupByList} and (when grouping constructs are
-  /// present) {@link PinotQuery#groupingSetMasks}.
+  /// Converts the GROUP BY clause into [PinotQuery#groupByList] and (when grouping constructs are
+  /// present) [PinotQuery#groupingSets].
   ///
   /// For a plain GROUP BY (no ROLLUP / CUBE / GROUPING SETS) this behaves exactly like
-  /// {@link #convertSelectList} and leaves {@code groupingSetMasks} unset, so non-grouping-set queries are
+  /// [#convertSelectList] and leaves `groupingSets` unset, so non-grouping-set queries are
   /// unchanged. When grouping constructs are present, the grouping elements are cross-multiplied into the
   /// canonical, de-duplicated list of grouping sets (standard SQL semantics, e.g.
-  /// {@code GROUP BY a, ROLLUP(b, c)} produces {@code {a,b,c}, {a,b}, {a}}); the ordered, de-duplicated
-  /// union of all participating columns is stored as {@code groupByList}, and each grouping set is stored
-  /// as a membership bitmask over that union — bit {@code i} set iff union column {@code i} participates,
-  /// a mask of {@code 0} being the grand-total set {@code ()}.
+  /// `GROUP BY a, ROLLUP(b, c)` produces `{a,b,c}, {a,b}, {a}`); the ordered, de-duplicated
+  /// union of all participating columns is stored as `groupByList`, and each grouping set is stored
+  /// as the sorted list of its participating union-column indexes, an empty list being the grand-total set
+  /// `()`.
   private static void setGroupByListAndGroupingSets(PinotQuery pinotQuery, SqlNodeList groupByNodeList) {
     boolean hasGroupingConstruct = false;
     for (SqlNode node : groupByNodeList) {
@@ -776,28 +992,25 @@ public class CalciteSqlParser {
         unionIndex.computeIfAbsent(expr, k -> unionIndex.size());
       }
     }
-    if (unionIndex.size() > MAX_GROUPING_SETS_COLUMNS) {
-      throw new SqlCompilationException(
-          "GROUPING SETS / ROLLUP / CUBE support at most " + MAX_GROUPING_SETS_COLUMNS
-              + " distinct grouping columns, got " + unionIndex.size());
-    }
     pinotQuery.setGroupByList(new ArrayList<>(unionIndex.keySet()));
 
-    /// Encode each grouping set as a membership bitmask over the union columns (bit i set iff union column i
-    /// participates), de-duplicating overlapping sets produced by CUBE/ROLLUP. A mask of 0 is the grand-total
-    /// set (). The union is capped at MAX_GROUPING_SETS_COLUMNS (31) above, so a 32-bit mask never overflows.
-    Set<Integer> seen = new HashSet<>();
-    List<Integer> groupingSetMasks = new ArrayList<>();
+    /// Encode each grouping set as the sorted list of its participating union-column indexes (mirroring
+    /// Calcite's per-set column bitset, so the number of grouping columns is unlimited), de-duplicating
+    /// overlapping sets produced by CUBE/ROLLUP. An empty list is the grand-total set (). A set's position in
+    /// the list is its ordinal — the value the engine carries in the synthetic $groupingId discriminator.
+    Set<List<Integer>> seen = new HashSet<>();
+    List<List<Integer>> groupingSets = new ArrayList<>();
     for (LinkedHashSet<Expression> set : combinedSets) {
-      int mask = 0;
+      List<Integer> columnIndexes = new ArrayList<>(set.size());
       for (Expression expr : set) {
-        mask |= 1 << unionIndex.get(expr);
+        columnIndexes.add(unionIndex.get(expr));
       }
-      if (seen.add(mask)) {
-        groupingSetMasks.add(mask);
+      Collections.sort(columnIndexes);
+      if (seen.add(columnIndexes)) {
+        groupingSets.add(columnIndexes);
       }
     }
-    pinotQuery.setGroupingSetMasks(groupingSetMasks);
+    pinotQuery.setGroupingSets(groupingSets);
   }
 
   private static boolean isGroupingConstruct(SqlKind kind) {
@@ -806,9 +1019,9 @@ public class CalciteSqlParser {
 
   /// Expands a single grouping element into the list of grouping sets it represents (each set is an ordered
   /// list of column expressions; the empty list is the grand-total set).
-  /// - {@code ROLLUP(l1, ..., ln)} -> the n+1 prefixes {@code {l1..ln}, {l1..ln-1}, ..., {l1}, {}}
-  /// - {@code CUBE(l1, ..., ln)} -> the power set of the n levels
-  /// - {@code GROUPING SETS(g1, ..., gm)} -> the concatenation of each operand's expansion (operands may be
+  /// - `ROLLUP(l1, ..., ln)` -> the n+1 prefixes `{l1..ln}, {l1..ln-1}, ..., {l1}, {}`
+  /// - `CUBE(l1, ..., ln)` -> the power set of the n levels
+  /// - `GROUPING SETS(g1, ..., gm)` -> the concatenation of each operand's expansion (operands may be
   ///   nested ROLLUP/CUBE/GROUPING SETS or ordinary sets)
   /// - an ordinary grouping element (a single column or a parenthesized list) -> a single set
   private static List<List<Expression>> parseGroupingElement(SqlNode node) {
@@ -869,7 +1082,7 @@ public class CalciteSqlParser {
   }
 
   /// Parses a single grouping level/set node into its column expressions. Handles a parenthesized list
-  /// (modeled by Calcite as either a {@link SqlNodeList} or a ROW call), and a bare single column. An empty
+  /// (modeled by Calcite as either a [SqlNodeList] or a ROW call), and a bare single column. An empty
   /// parenthesized list yields an empty column list (the grand-total set).
   private static List<Expression> parseLevel(SqlNode node) {
     if (node instanceof SqlNodeList) {
@@ -1093,6 +1306,17 @@ public class CalciteSqlParser {
         }
       } else {
         operands.add(toExpression(childNode));
+      }
+    }
+    if (functionKind == SqlKind.ARRAY_AGG && functionNode.getFunctionQuantifier() != null
+        && "DISTINCT".equals(functionNode.getFunctionQuantifier().toString())) {
+      Expression distinct = RequestUtils.getLiteralExpression(true);
+      int lastIndex = operands.size() - 1;
+      if ((operands.size() == 2 || operands.size() == 3) && operands.get(lastIndex).isSetLiteral()
+          && operands.get(lastIndex).getLiteral().isSetBoolValue()) {
+        operands.set(lastIndex, distinct);
+      } else if (operands.size() == 1 || operands.size() == 2) {
+        operands.add(distinct);
       }
     }
     ParserUtils.validateFunction(canonicalName, operands);

@@ -41,6 +41,7 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.factory.SharedZkClientFactory;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -49,10 +50,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class is to manage the ZK connection and operations. It will be used to fetch the segment
- * metadata from ZK and prepare for the downloading.
- */
+/// This class is to manage the ZK connection and operations. It will be used to fetch the segment
+/// metadata from ZK and prepare for the downloading.
 public class PredownloadZKClient implements AutoCloseable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PredownloadZKClient.class);
@@ -73,6 +72,7 @@ public class PredownloadZKClient implements AutoCloseable {
   }
 
   public void start() {
+    ZooKeeperSslContextSupplier.initialize();
     RealmAwareZkClient.RealmAwareZkClientConfig config = new RealmAwareZkClient.RealmAwareZkClientConfig();
     config.setConnectInitTimeout(ZK_CONNECTION_TIMEOUT_MS);
     config.setZkSerializer(new ZNRecordSerializer());
@@ -108,12 +108,10 @@ public class PredownloadZKClient implements AutoCloseable {
     return accessor.getProperty(keyBuilder.instanceConfig(_instanceName));
   }
 
-  /**
-   * Get the segments of the instance from ZK. Only fetch segments that are in ONLINE state from
-   * instance current state.
-   *
-   * @return List of segment info with table name and segment name.
-   */
+  /// Get the segments of the instance from ZK. Only fetch segments that are in ONLINE state from
+  /// instance current state.
+  ///
+  /// @return List of segment info with table name and segment name.
   public List<PredownloadSegmentInfo> getSegmentsOfInstance(HelixDataAccessor accessor) {
     List<PredownloadSegmentInfo> predownloadSegmentInfos = new ArrayList<>();
     org.apache.helix.PropertyKey.Builder keyBuilder = accessor.keyBuilder();
@@ -149,10 +147,8 @@ public class PredownloadZKClient implements AutoCloseable {
     return predownloadSegmentInfos;
   }
 
-  /**
-   * Returns URIs of ONLINE peer servers hosting the given segment.
-   * Uses ExternalView to discover peers — mirrors PeerServerSegmentFinder without requiring HelixManager.
-   */
+  /// Returns URIs of ONLINE peer servers hosting the given segment.
+  /// Uses ExternalView to discover peers — mirrors PeerServerSegmentFinder without requiring HelixManager.
   public List<URI> getPeerServerURIs(HelixDataAccessor accessor, String tableNameWithType, String segmentName,
       String downloadScheme) {
     org.apache.helix.PropertyKey.Builder keyBuilder = accessor.keyBuilder();
@@ -194,12 +190,10 @@ public class PredownloadZKClient implements AutoCloseable {
     return peerURIs;
   }
 
-  /**
-   * Update the segment deepstore metadata from ZK.
-   *
-   * @param predownloadSegmentInfoList List of segment info with table name and segment name.
-   * @param tableInfoMap               Map of table name to table info to be filled with table config.
-   */
+  /// Update the segment deepstore metadata from ZK.
+  ///
+  /// @param predownloadSegmentInfoList List of segment info with table name and segment name.
+  /// @param tableInfoMap               Map of table name to table info to be filled with table config.
   public void updateSegmentMetadata(List<PredownloadSegmentInfo> predownloadSegmentInfoList,
       Map<String, PredownloadTableInfo> tableInfoMap, InstanceDataManagerConfig instanceDataManagerConfig) {
     // fallback path comes from ZKHelixManager.class getHelixPropertyStore method

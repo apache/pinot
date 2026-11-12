@@ -301,6 +301,14 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         "UpsertCompactionTask only supports realtime tables!");
     // check upsert enabled
     Preconditions.checkState(tableConfig.isUpsertEnabled(), "Upsert must be enabled for UpsertCompactionTask");
+    // check metadataTTL is not set: UpsertCompactionTask does not compact tombstoned rows in a way that is
+    // consistent with metadataTTL-driven cleanup, so enabling them together can leave stale rows behind or
+    // resurface aged-out keys. Block the combination to avoid silent correctness issues.
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    Preconditions.checkState(upsertConfig.getMetadataTTL() <= 0,
+        "UpsertCompactionTask does not support tables with 'metadataTTL' enabled, got metadataTTL: %s",
+        upsertConfig.getMetadataTTL());
 
     // check no malformed period
     if (taskConfigs.containsKey(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY)) {
@@ -326,8 +334,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
 
     // validate validDocIdsType default logic
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    assert upsertConfig != null;
     MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
   }
 }

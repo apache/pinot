@@ -31,11 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * An implementation of StreamMessageDecoder to read log events from a stream. This is an experimental feature.
- * It allows us to encode user-specified fields of a log event using CLP. See {@link CLPLogRecordExtractor} for more
- * details. The implementation is based on {@link org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder}.
- */
+/// An implementation of StreamMessageDecoder to read log events from a stream. This is an experimental feature.
+/// It allows us to encode user-specified fields of a log event using CLP. See [CLPLogRecordExtractor] for more
+/// details. The implementation is based on [org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder].
 public class CLPLogMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String ERROR_SAMPLING_PERIOD_CONFIG_KEY = "errorSamplingPeriod";
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogMessageDecoder.class);

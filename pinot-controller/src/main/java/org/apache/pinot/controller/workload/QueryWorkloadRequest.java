@@ -23,26 +23,26 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 
-/**
- * The request contains a map of workload names to their corresponding instance costs.
- * The request also contains a flag indicating whether the request is for refreshing existing costs.
- * If the request is for refreshing existing costs, the map will contain only the workload names with non-null
- * instance costs. If the request is for deleting costs, the map will contain workload names with null instance costs.
- *
- * For example:
- * 1. To refresh costs for workload "workloadA" and "workloadB", the map will be:
- * <pre>{@code
- *  {
- *    "foo": {"cpuCostNs": 1000000, "memoryCostBytes": 1000000},
- *    "bar": {"cpuCostNs": 500000, "memoryCostBytes": 500000}
- *  }
- * }</pre>
- *
- * 2. To delete costs for workload "workloadC", the map will be:
- * <pre>{@code
- *    "baz": null
- * }</pre>
- */
+/// The request contains a map of workload names to their corresponding instance costs.
+/// The request also contains a flag indicating whether the request is for refreshing existing costs.
+/// If the request is for refreshing existing costs, the map will contain only the workload names with non-null
+/// instance costs. If the request is for deleting costs, the map will contain workload names with null instance costs.
+///
+/// For example:
+/// 1. To refresh costs for workload "workloadA" and "workloadB", the map will be:
+///
+/// ```
+/// {
+///   "foo": {"cpuCostNs": 1000000, "memoryCostBytes": 1000000},
+///   "bar": {"cpuCostNs": 500000, "memoryCostBytes": 500000}
+/// }
+/// ```
+///
+/// 2. To delete costs for workload "workloadC", the map will be:
+///
+/// ```
+/// "baz": null
+/// ```
 public class QueryWorkloadRequest {
 
   private final Map<String, InstanceCost> _workloadToCostMap;

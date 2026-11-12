@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
+import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -73,6 +74,7 @@ public class TableConfigBuilder {
   private String _timeType;
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  private String _retentionSize;
   private String _deletedSegmentsRetentionPeriod = DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD;
   private String _replacedSegmentsRetentionPeriod;
   private String _lineageEntryCleanupRetentionPeriod;
@@ -83,7 +85,7 @@ public class TableConfigBuilder {
   @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   private String _peerSegmentDownloadScheme;
-  @Deprecated
+  @Deprecated(since = "1.3.0", forRemoval = true)
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -145,6 +147,7 @@ public class TableConfigBuilder {
   private JsonNode _tierOverwrites;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
   private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
+  private PageCacheWarmupConfig _pageCacheWarmupConfig;
   private String _description;
   private List<String> _tags;
 
@@ -175,13 +178,6 @@ public class TableConfigBuilder {
     return this;
   }
 
-  @Deprecated
-  public TableConfigBuilder setLLC(boolean isLLC) {
-    Preconditions.checkState(_tableType == TableType.REALTIME);
-    Preconditions.checkArgument(isLLC, "Real-time table must use LLC");
-    return this;
-  }
-
   public TableConfigBuilder setNumReplicas(int numReplicas) {
     Preconditions.checkArgument(numReplicas > 0);
     _numReplicas = String.valueOf(numReplicas);
@@ -208,6 +204,13 @@ public class TableConfigBuilder {
     return this;
   }
 
+  /// Sets the compressed segment archive size retention limit described by
+  /// [SegmentsValidationAndRetentionConfig#getRetentionSize()].
+  public TableConfigBuilder setRetentionSize(String retentionSize) {
+    _retentionSize = retentionSize;
+    return this;
+  }
+
   public TableConfigBuilder setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
     _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
     return this;
@@ -223,9 +226,7 @@ public class TableConfigBuilder {
     return this;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
+  /// @deprecated Use `segmentIngestionType` from [IngestionConfig#getBatchIngestionConfig()]
   public TableConfigBuilder setSegmentPushType(String segmentPushType) {
     if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
       _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
@@ -235,14 +236,13 @@ public class TableConfigBuilder {
     return this;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
+  /// @deprecated Use `segmentIngestionFrequency` from [IngestionConfig#getBatchIngestionConfig()]
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
     return this;
   }
 
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public TableConfigBuilder setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
     return this;
@@ -509,6 +509,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setPageCacheWarmupConfig(PageCacheWarmupConfig pageCacheWarmupConfig) {
+    _pageCacheWarmupConfig = pageCacheWarmupConfig;
+    return this;
+  }
+
   public TableConfigBuilder setDescription(String description) {
     _description = description;
     return this;
@@ -526,6 +531,7 @@ public class TableConfigBuilder {
     validationConfig.setTimeType(_timeType);
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
+    validationConfig.setRetentionSize(_retentionSize);
     validationConfig.setDeletedSegmentsRetentionPeriod(_deletedSegmentsRetentionPeriod);
     validationConfig.setReplacedSegmentsRetentionPeriod(_replacedSegmentsRetentionPeriod);
     validationConfig.setLineageEntryCleanupRetentionPeriod(_lineageEntryCleanupRetentionPeriod);
@@ -582,7 +588,7 @@ public class TableConfigBuilder {
             _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
             _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
             _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap,
-            _tableSamplers, _isMaterializedView);
+            _tableSamplers, _isMaterializedView, _pageCacheWarmupConfig);
     tableConfig.setDescription(_description);
     tableConfig.setTags(_tags);
     return tableConfig;

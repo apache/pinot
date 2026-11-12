@@ -38,11 +38,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A segment uploader which does segment upload to a segment store (with store root dir configured as
- * _segmentStoreUriStr) using PinotFS within a configurable timeout period. The final segment location would be in the
- * URI _segmentStoreUriStr/_tableNameWithType/segmentName+random_uuid if successful.
- */
+/// A segment uploader which does segment upload to a segment store (with store root dir configured as
+/// \_segmentStoreUriStr) using PinotFS within a configurable timeout period. The final segment location would be in the
+/// URI \_segmentStoreUriStr/\_tableNameWithType/segmentName+random_uuid if successful.
 public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;

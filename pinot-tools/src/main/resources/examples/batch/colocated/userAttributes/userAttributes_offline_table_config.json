@@ -32,8 +32,7 @@
         "numReplicaGroups": 2,
         "numInstancesPerReplicaGroup": 2,
         "numPartitions": 2,
-        "numInstancesPerPartition": 1,
-        "partitionColumn": "userUUID"
+        "numInstancesPerPartition": 1
       }
     }
   },

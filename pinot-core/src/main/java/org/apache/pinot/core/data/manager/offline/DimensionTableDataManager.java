@@ -37,7 +37,6 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -49,16 +48,13 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
-
-/**
- * Dimension Table is a special type of OFFLINE table which is assigned to all servers
- * in a tenant and is used to execute a LOOKUP Transform Function. DimensionTableDataManager
- * loads the contents into a HashMap for faster access thus the size should be small
- * enough to easily fit in memory.
- *
- * DimensionTableDataManager uses Registry of Singletons pattern to store one instance per table
- * which can be accessed via {@link #getInstanceByTableName} static method.
- */
+/// Dimension Table is a special type of OFFLINE table which is assigned to all servers
+/// in a tenant and is used to execute a LOOKUP Transform Function. DimensionTableDataManager
+/// loads the contents into a HashMap for faster access thus the size should be small
+/// enough to easily fit in memory.
+///
+/// DimensionTableDataManager uses Registry of Singletons pattern to store one instance per table
+/// which can be accessed via [#getInstanceByTableName] static method.
 @ThreadSafe
 public class DimensionTableDataManager extends OfflineTableDataManager {
 
@@ -79,10 +75,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   protected DimensionTableDataManager() {
   }
 
-  /**
-   * `createInstanceByTableName` should only be used by the {@link TableDataManagerProvider} and the returned
-   * instance should be properly initialized via {@link #init} method before using.
-   */
+  /// `createInstanceByTableName` should only be used by the
+  /// [org.apache.pinot.core.data.manager.provider.TableDataManagerProvider] and the returned instance should
+  /// be properly initialized via [#init] method before using.
   public static DimensionTableDataManager createInstanceByTableName(String tableNameWithType) {
     return INSTANCES.computeIfAbsent(tableNameWithType, k -> new DimensionTableDataManager());
   }
@@ -143,8 +138,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   }
 
   @Override
-  public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
-    super.addSegment(immutableSegment, zkMetadata);
+  protected void doAddSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    super.doAddSegment(immutableSegment, zkMetadata);
     String segmentName = immutableSegment.getSegmentName();
     if (loadLookupTable()) {
       _logger.info("Successfully loaded lookup table after adding segment: {}", segmentName);
@@ -178,7 +173,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     INSTANCES.remove(_tableNameWithType);
   }
 
-
   private void closeDimensionTable(DimensionTable dimensionTable) {
     try {
       dimensionTable.close();
@@ -187,9 +181,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
   }
 
-  /**
-   * `loadLookupTable()` reads contents of the DimensionTable into _lookupTable HashMap for fast lookup.
-   */
+  /// `loadLookupTable()` reads contents of the DimensionTable into \_lookupTable HashMap for fast lookup.
   private boolean loadLookupTable() {
     DimensionTable dimensionTable =
         _disablePreload ? createMemOptimisedDimensionTable() : createFastLookupDimensionTable();
@@ -234,9 +226,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         if (numTotalDocs > 0) {
           try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-            recordReader.init(indexSegment);
+            recordReader.init(indexSegment, primaryKeyColumns);
 
-            int[] pkIndexes = recordReader.getIndexesForColumns(primaryKeyColumns);
             int[] valIndexes = recordReader.getIndexesForColumns(valueColumns);
 
             for (int i = 0; i < numTotalDocs; i++) {
@@ -245,7 +236,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
                 return null;
               }
 
-              Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
+              Object[] primaryKey = recordReader.getPrimaryKeys(i);
               Object[] values = recordReader.getRecordValues(i, valIndexes);
 
               Object[] previousValue = lookupTable.put(primaryKey, values);
@@ -312,9 +303,8 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
         try {
           int readerIdx = recordReaders.size();
           PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
-          recordReader.init(indexSegment);
+          recordReader.init(indexSegment, primaryKeyColumns);
           recordReaders.add(recordReader);
-          int[] pkIndexes = recordReader.getIndexesForColumns(primaryKeyColumns);
 
           for (int i = 0; i < numTotalDocs; i++) {
             if (_loadToken.get() != token) {
@@ -323,7 +313,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               return null;
             }
 
-            Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
+            Object[] primaryKey = recordReader.getPrimaryKeys(i);
 
             long readerIdxAndDocId = (((long) readerIdx) << 32) | (i & 0xffffffffL);
             long previousValue = lookupTable.put(primaryKey, readerIdxAndDocId);

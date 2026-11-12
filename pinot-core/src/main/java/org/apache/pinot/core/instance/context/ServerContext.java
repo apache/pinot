@@ -24,9 +24,7 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 
 
-/**
- * The <code>ServerContext</code> class is a singleton class which contains all server related context.
- */
+/// The `ServerContext` class is a singleton class which contains all server related context.
 public class ServerContext {
   private static final ServerContext INSTANCE = new ServerContext();
 

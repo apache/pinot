@@ -22,10 +22,8 @@ import java.nio.charset.StandardCharsets;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
-/**
- * Utility class to compute hash values using different hash functions.
- * This class provides consistent hash computation for KeySelector implementations.
- */
+/// Utility class to compute hash values using different hash functions.
+/// This class provides consistent hash computation for KeySelector implementations.
 public class HashFunctionSelector {
   public static final String MURMUR2 = "murmur";
   public static final String MURMUR3 = "murmur3";
@@ -40,21 +38,17 @@ public class HashFunctionSelector {
 
   public interface MvHasher {
 
-    /**
-     * Computes a hash code for multiple values based on specified key IDs using the specified hash function.
-     * This is useful for partitioning where only certain keys are relevant.
-     * @param values The array of values to hash.
-     * @param keyIds The array of key IDs indicating which values to include in the hash computation.
-     * @return The computed hash code.
-     */
+    /// Computes a hash code for multiple values based on specified key IDs using the specified hash function.
+    /// This is useful for partitioning where only certain keys are relevant.
+    /// @param values The array of values to hash.
+    /// @param keyIds The array of key IDs indicating which values to include in the hash computation.
+    /// @return The computed hash code.
     int hash(Object[] values, int[] keyIds);
   }
 
-  /**
-   * Returns a hasher function based on the specified hash function.
-   * @param hashFunction The hash function to use (e.g., "murmur", "murmur3", "cityhash", "absHashCode").
-   * @return The computed hash code.
-   */
+  /// Returns a hasher function based on the specified hash function.
+  /// @param hashFunction The hash function to use (e.g., "murmur", "murmur3", "cityhash", "absHashCode").
+  /// @return The computed hash code.
   public static SvHasher getSvHasher(String hashFunction) {
     switch (hashFunction.toLowerCase()) {
       case MURMUR2:

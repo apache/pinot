@@ -27,8 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixManager;
-import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.pinot.broker.routing.manager.MultiClusterRoutingManager;
 import org.apache.pinot.broker.routing.manager.RemoteClusterBrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -41,16 +39,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Multi-cluster broker starter that extends the base Helix broker functionality
- * to support federation across multiple Pinot clusters.
- *
- * This class handles:
- * - Connection to remote clusters via separate ZooKeeper instances
- * - Federated routing across primary and remote clusters
- * - Cross-cluster query federation
- * - Cluster change monitoring for remote clusters
- */
+/// Multi-cluster broker starter that extends the base Helix broker functionality
+/// to support federation across multiple Pinot clusters.
+///
+/// This class handles:
+/// - Connection to remote clusters via separate ZooKeeper instances
+/// - Federated routing across primary and remote clusters
+/// - Cross-cluster query federation
+/// - Cluster change monitoring for remote clusters
 @SuppressWarnings("unused")
 public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiClusterHelixBrokerStarter.class);
@@ -139,8 +135,9 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       String clusterName = entry.getKey();
       String zkServers = entry.getValue();
       try {
-        HelixManager helixManager = HelixManagerFactory.getZKHelixManager(
-            clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
+        HelixManager helixManager =
+            CompactAssignmentZkHelixManager.createSpectatorHelixManager(_brokerConf, clusterName, _instanceId,
+                zkServers);
         helixManager.connect();
         _remoteSpectatorHelixManager.put(clusterName, helixManager);
         LOGGER.info("[multi-cluster] Connected to remote cluster '{}' at ZK: {}", clusterName, zkServers);
@@ -232,6 +229,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
         RemoteClusterBrokerRoutingManager routingManager =
             new RemoteClusterBrokerRoutingManager(clusterName, _brokerMetrics, _serverRoutingStatsManager, _brokerConf);
         routingManager.init(entry.getValue());
+        _clusterConfigChangeHandler.registerClusterConfigChangeListener(routingManager);
         _remoteRoutingManagers.put(clusterName, routingManager);
       } catch (Exception e) {
         LOGGER.error("[multi-cluster] Failed to initialize routing manager for cluster '{}'", clusterName, e);

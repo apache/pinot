@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.ws.rs.NotFoundException;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -382,8 +383,8 @@ public class MinionTaskUtilsTest {
   @Test
   public void testExecutorDataCrcFallbackMatch() {
     List<Object> responses = List.of(makeResponse("seg1", "2000", "5000", "server1", makeBitmap(4)));
-    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
-        "5000", "UNSAFE", responses, new String[]{"server1"}, this);
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", 1000L,
+        5000L, "UNSAFE", responses, new String[]{"server1"}, this);
     assertNotNull(result);
     assertEquals(result.getCardinality(), 4);
   }
@@ -391,9 +392,41 @@ public class MinionTaskUtilsTest {
   @Test
   public void testExecutorDataCrcMismatchSkips() {
     List<Object> responses = List.of(makeResponse("seg1", "2000", "9999", "server1", makeBitmap(4)));
-    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", "1000",
-        "5000", "UNSAFE", responses, new String[]{"server1"}, this);
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", 1000L,
+        5000L, "UNSAFE", responses, new String[]{"server1"}, this);
     assertNull(result);
+  }
+
+  @Test
+  public void testFetchFailurePreservesNotFoundException() {
+    List<Object> responses = List.of(new NotFoundException("HTTP 404 Not Found"));
+    NotFoundException e = expectThrows(NotFoundException.class,
+        () -> getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", 1000L, "EQUAL",
+            responses, new String[]{"server1"}, this));
+    assertTrue(e.getMessage().contains("seg1"), e.getMessage());
+    assertTrue(e.getMessage().contains("localhost"), e.getMessage());
+    assertTrue(e.getCause() instanceof NotFoundException);
+  }
+
+  @Test
+  public void testFetchFailureWrapsOtherExceptions() {
+    List<Object> responses = List.of(new RuntimeException("connection reset"));
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", 1000L, "EQUAL",
+            responses, new String[]{"server1"}, this));
+    assertTrue(e.getMessage().contains("seg1"), e.getMessage());
+    assertEquals(e.getCause().getMessage(), "connection reset");
+  }
+
+  @Test
+  public void testUnsafeModeSkipsFetchFailure() {
+    List<Object> responses = List.of(
+        new NotFoundException("HTTP 404 Not Found"),
+        makeResponse("seg1", 1000L, "server2", makeBitmap(3)));
+    RoaringBitmap result = getValidDocIdFromServerMatchingCrcWithMockedReader("myTable_REALTIME", "seg1", 1000L,
+        "UNSAFE", responses, new String[]{"server1", "server2"}, this);
+    assertNotNull(result);
+    assertEquals(result.getCardinality(), 3);
   }
 
   private static RoaringBitmap makeBitmap(int numDocs) {
@@ -404,12 +437,10 @@ public class MinionTaskUtilsTest {
     return b;
   }
 
-  /**
-   * Builds a ValidDocIdsBitmapResponse for testing: same segmentCrc and GOOD status.
-   */
-  private static ValidDocIdsBitmapResponse makeResponse(String segmentName, String crc, String instanceId,
+  /// Builds a ValidDocIdsBitmapResponse for testing: same segmentCrc and GOOD status.
+  private static ValidDocIdsBitmapResponse makeResponse(String segmentName, long crc, String instanceId,
       RoaringBitmap bitmap) {
-    return new ValidDocIdsBitmapResponse(segmentName, crc, null, ValidDocIdsType.SNAPSHOT,
+    return new ValidDocIdsBitmapResponse(segmentName, Long.toString(crc), null, ValidDocIdsType.SNAPSHOT,
         RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
   }
 
@@ -419,9 +450,7 @@ public class MinionTaskUtilsTest {
         RoaringBitmapUtils.serialize(bitmap), instanceId, ServiceStatus.Status.GOOD);
   }
 
-  /**
-   * Creates an InstanceConfig so that InstanceUtils.getServerAdminEndpoint() returns a valid URL.
-   */
+  /// Creates an InstanceConfig so that InstanceUtils.getServerAdminEndpoint() returns a valid URL.
   private static InstanceConfig makeInstanceConfig(String instanceId) {
     InstanceConfig config = new InstanceConfig(instanceId);
     config.setHostName("localhost");
@@ -429,9 +458,7 @@ public class MinionTaskUtilsTest {
     return config;
   }
 
-  /**
-   * Sets up MinionContext with mock Helix so getServers() returns the given server list.
-   */
+  /// Sets up MinionContext with mock Helix so getServers() returns the given server list.
   private void setupMinionContextWithServers(String tableNameWithType, String segmentName, String[] servers) {
     ExternalView externalView = new ExternalView(tableNameWithType);
     Map<String, String> assignment = new HashMap<>();
@@ -453,20 +480,18 @@ public class MinionTaskUtilsTest {
     MinionContext.getInstance().setHelixManager(helixManager);
   }
 
-  /**
-   * Calls getValidDocIdFromServerMatchingCrc with ServerSegmentMetadataReader mocked. Each invocation of
-   * getValidDocIdsBitmapFromServer returns the next element of responseOrThrowByCallOrder; if it is an Exception,
-   * that exception is thrown (simulating fetch failure).
-   */
+  /// Calls getValidDocIdFromServerMatchingCrc with ServerSegmentMetadataReader mocked. Each invocation of
+  /// getValidDocIdsBitmapFromServer returns the next element of responseOrThrowByCallOrder; if it is an Exception,
+  /// that exception is thrown (simulating fetch failure).
   private static RoaringBitmap getValidDocIdFromServerMatchingCrcWithMockedReader(String tableName,
-      String segmentName, String expectedCrc, String consensusMode, List<Object> responseOrThrowByCallOrder,
+      String segmentName, long expectedCrc, String consensusMode, List<Object> responseOrThrowByCallOrder,
       String[] servers, MinionTaskUtilsTest testInstance) {
-    return getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc, null, consensusMode,
+    return getValidDocIdFromServerMatchingCrcWithMockedReader(tableName, segmentName, expectedCrc, -1, consensusMode,
         responseOrThrowByCallOrder, servers, testInstance);
   }
 
   private static RoaringBitmap getValidDocIdFromServerMatchingCrcWithMockedReader(String tableName,
-      String segmentName, String expectedCrc, String expectedDataCrc, String consensusMode,
+      String segmentName, long expectedCrc, long expectedDataCrc, String consensusMode,
       List<Object> responseOrThrowByCallOrder, String[] servers, MinionTaskUtilsTest testInstance) {
     testInstance.setupMinionContextWithServers(tableName, segmentName, servers);
     // Shared across all mock instances (production creates one reader per server).
@@ -495,7 +520,7 @@ public class MinionTaskUtilsTest {
   public void testSameValidDocsEqualConsensus() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(
         makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(5)),
@@ -510,7 +535,7 @@ public class MinionTaskUtilsTest {
   public void testSameValidDocsMaxValidDocs() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(
         makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(5)),
@@ -525,7 +550,7 @@ public class MinionTaskUtilsTest {
   public void testSameValidDocsNone() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(
         makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(5)),
@@ -540,7 +565,7 @@ public class MinionTaskUtilsTest {
   public void testDifferentValidDocsMaxValidDocsMax() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(
         makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(3)),
@@ -555,7 +580,7 @@ public class MinionTaskUtilsTest {
   public void testsomeServersNoValidDocsEqualConsensus() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(
         makeResponse(segmentName, expectedCrc, "server1", makeBitmap(0)),
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(0)),
@@ -569,7 +594,7 @@ public class MinionTaskUtilsTest {
   public void testsomeServersNoValidDocsMaxValidDocs() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(
         makeResponse(segmentName, expectedCrc, "server1", makeBitmap(0)),
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(0)),
@@ -584,7 +609,7 @@ public class MinionTaskUtilsTest {
   public void testSomeServersNoValidDocsNone() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(
         makeResponse(segmentName, expectedCrc, "server1", makeBitmap(0)),
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(0)),
@@ -601,7 +626,7 @@ public class MinionTaskUtilsTest {
   public void testOneServerFailsEqualConsensus() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(
         makeResponse(segmentName, expectedCrc, "server1", makeBitmap(5)),
         new RuntimeException("simulated fetch failure"),
@@ -615,7 +640,7 @@ public class MinionTaskUtilsTest {
   public void testOneServerFailsNone() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(
         new RuntimeException("simulated fetch failure"),
         makeResponse(segmentName, expectedCrc, "server2", makeBitmap(3)),
@@ -630,7 +655,7 @@ public class MinionTaskUtilsTest {
   public void testAllServersFailMostValidDocs() {
     String tableName = "myTable_REALTIME";
     String segmentName = "seg1";
-    String expectedCrc = "crc1";
+    long expectedCrc = 1000L;
     List<Object> responses = List.of(new RuntimeException("simulated"), new RuntimeException("simulated"),
         new RuntimeException("simulated"));
     expectThrows(IllegalStateException.class,

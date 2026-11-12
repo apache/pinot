@@ -24,7 +24,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.utils.ExceptionUtils;
-import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
@@ -34,9 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class contains the shared logic across all different exchange types for exchanging data across servers.
- */
+/// This class contains the shared logic across all different exchange types for exchanging data across servers.
 public abstract class BlockExchange implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BlockExchange.class);
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
@@ -46,20 +43,19 @@ public abstract class BlockExchange implements AutoCloseable {
   private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
   private final Function<List<SendingMailbox>, Integer> _statsIndexChooser;
+  private final boolean _deliversByReference;
 
   protected static final Function<List<SendingMailbox>, Integer> RANDOM_INDEX_CHOOSER =
       (mailboxes) -> ThreadLocalRandom.current().nextInt(mailboxes.size());
 
-  /**
-   * Factory method to create a BlockExchange based on the distribution type.
-   *
-   * It is important to notice that stats should only be sent to one mailbox to avoid sending the same stats multiple
-   * times.
-   * The statsIndexChooser function is used to choose the mailbox index to send stats to.
-   * In most cases the {@link #RANDOM_INDEX_CHOOSER} should be used, but in some cases, like when using spools, the
-   * mailbox index that receives the stats should be tuned.
-   * @param statsIndexChooser a function to choose the mailbox index to send stats to.
-   */
+  /// Factory method to create a BlockExchange based on the distribution type.
+  ///
+  /// It is important to notice that stats should only be sent to one mailbox to avoid sending the same stats multiple
+  /// times.
+  /// The statsIndexChooser function is used to choose the mailbox index to send stats to.
+  /// In most cases the [#RANDOM_INDEX_CHOOSER] should be used, but in some cases, like when using spools, the
+  /// mailbox index that receives the stats should be tuned.
+  /// @param statsIndexChooser a function to choose the mailbox index to send stats to.
   public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes,
       RelDistribution.Type distributionType, List<Integer> keys, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser, String hashFunction) {
@@ -91,14 +87,28 @@ public abstract class BlockExchange implements AutoCloseable {
     _sendingMailboxes = sendingMailboxes;
     _splitter = splitter;
     _statsIndexChooser = statsIndexChooser;
+    _deliversByReference = anyDeliversByReference(sendingMailboxes);
   }
 
-  /**
-   * API to send a block to the destination mailboxes.
-   * @param block the block to be transferred
-   * @return true if all the mailboxes has been early terminated.
-   * @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on timeout.
-   */
+  /// Returns whether any of the given mailboxes delivers blocks by reference. Mailboxes are fixed when the exchange
+  /// is created, and each of them gives a constant answer, so this is computed once.
+  ///
+  /// The answer therefore counts mailboxes that terminate early later on. That only makes a caller take a copy it
+  /// did not need. It never makes a caller skip a copy it did need.
+  private static boolean anyDeliversByReference(List<SendingMailbox> sendingMailboxes) {
+    for (SendingMailbox sendingMailbox : sendingMailboxes) {
+      if (sendingMailbox.deliversByReference()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// API to send a block to the destination mailboxes.
+  /// @param block the block to be transferred
+  /// @return true if all the mailboxes has been early terminated.
+  /// @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on
+  ///                                                       timeout.
   public boolean send(MseBlock.Data block) {
     boolean isEarlyTerminated = true;
     for (SendingMailbox sendingMailbox : _sendingMailboxes) {
@@ -113,12 +123,11 @@ public abstract class BlockExchange implements AutoCloseable {
     return isEarlyTerminated;
   }
 
-  /**
-   * API to send a block to the destination mailboxes.
-   * @param eosBlock the block to be transferred
-   * @return true if all the mailboxes has been early terminated.
-   * @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on timeout.
-   */
+  /// API to send a block to the destination mailboxes.
+  /// @param eosBlock the block to be transferred
+  /// @return true if all the mailboxes has been early terminated.
+  /// @throws org.apache.pinot.spi.exception.QueryException if any mailbox fails to send the block, including on
+  ///                                                       timeout.
   public boolean send(MseBlock.Eos eosBlock, List<DataBuffer> serializedStats) {
     int mailboxIdToSendMetadata;
     if (!serializedStats.isEmpty()) {
@@ -171,6 +180,12 @@ public abstract class BlockExchange implements AutoCloseable {
     }
   }
 
+  /// Sends the block to the destinations, following the distribution strategy of this exchange.
+  ///
+  /// Implementations must finish reading the block before this method returns. [BlockExchangeSendingMailbox] reports
+  /// that it does not deliver blocks by reference on that basis, so an implementation that queued a block for
+  /// another thread would break [SendingMailbox#deliversByReference()] for every exchange that decorates it, and
+  /// silently corrupt the aggregation intermediate results that [BroadcastExchange] shares between destinations.
   protected abstract void route(List<SendingMailbox> destinations, MseBlock.Data block);
 
   @Override
@@ -198,18 +213,17 @@ public abstract class BlockExchange implements AutoCloseable {
     return new BlockExchangeSendingMailbox(id);
   }
 
-  /**
-   * A mailbox that sends data blocks to a {@link BlockExchange}.
-   *
-   * BlockExchanges send data to a list of {@link SendingMailbox}es, which are responsible for sending the data
-   * to the corresponding {@link ReceivingMailbox}es. This class applies the decorator pattern to expose a BlockExchange
-   * as a SendingMailbox, open the possibility of having a BlockExchange as a destination for another BlockExchange.
-   *
-   * This is useful for example when a send operator has to send data to more than one stage. We need to broadcast the
-   * data to all the stages (the first BlockExchange). Then for each stage, we need to send the data to the
-   * corresponding workers (the inner BlockExchange). The inner BlockExchange may send data using a different
-   * distribution strategy.
-   */
+  /// A mailbox that sends data blocks to a [BlockExchange].
+  ///
+  /// BlockExchanges send data to a list of [SendingMailbox]es, which are responsible for sending the data to the
+  /// corresponding [org.apache.pinot.query.mailbox.ReceivingMailbox]es. This class applies the decorator pattern
+  /// to expose a BlockExchange as a SendingMailbox, open the possibility of having a BlockExchange as a destination for
+  /// another BlockExchange.
+  ///
+  /// This is useful for example when a send operator has to send data to more than one stage. We need to broadcast the
+  /// data to all the stages (the first BlockExchange). Then for each stage, we need to send the data to the
+  /// corresponding workers (the inner BlockExchange). The inner BlockExchange may send data using a different
+  /// distribution strategy.
   private class BlockExchangeSendingMailbox implements SendingMailbox {
     private final String _id;
     private boolean _earlyTerminated = false;
@@ -221,7 +235,19 @@ public abstract class BlockExchange implements AutoCloseable {
 
     @Override
     public boolean isLocal() {
+      // Blocks are handed to the decorated exchange whole, and splitting them is left to that exchange.
+      // TODO(#19427): the decorated exchange is currently built with BlockSplitter#NO_OP, so blocks sent
+      //       through a multi-send node are never split. See MailboxSendOperator#getBlockExchange.
       return true;
+    }
+
+    @Override
+    public boolean deliversByReference() {
+      // The decorated exchange passes blocks to its own mailboxes, so this mailbox delivers by reference only if
+      // any of those does. The question is whether a receiver keeps the block alive after route returns, not whether
+      // the decorated exchange shares one block between its own mailboxes: an inner HashExchange gives each of its
+      // mailboxes a different block, but the rows of those blocks still hold the cells of this one.
+      return _deliversByReference;
     }
 
     @Override

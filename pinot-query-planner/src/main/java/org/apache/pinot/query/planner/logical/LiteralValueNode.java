@@ -26,10 +26,8 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 
 
-/**
- * TODO: A placeholder class for literal values coming after SubPlan execution.
- * Expected to have drastic change in the future.
- */
+/// TODO: A placeholder class for literal values coming after SubPlan execution.
+/// Expected to have drastic change in the future.
 public class LiteralValueNode extends BasePlanNode {
 
   private DataTable _dataTable;

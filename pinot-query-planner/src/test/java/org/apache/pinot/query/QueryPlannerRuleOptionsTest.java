@@ -21,6 +21,7 @@ package org.apache.pinot.query;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
@@ -35,8 +36,9 @@ import static org.testng.Assert.*;
 public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
 
   private String explainQueryWithRuleDisabled(String query, String ruleToSkip) {
-    SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
-    Map<String, String> options = new HashMap<>();
+    SqlNodeAndOptions parsed = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+    SqlNode sqlNode = parsed.getSqlNode();
+    Map<String, String> options = new HashMap<>(parsed.getOptions());
     // disable rule
     options.put(CommonConstants.Broker.Request.QueryOptionKey.SKIP_PLANNER_RULES, ruleToSkip);
     SqlNodeAndOptions sqlNodeAndOptions =
@@ -91,6 +93,24 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
             + "        LogicalProject($f0=[CASE(=($0, _UTF-8'a'), 1, 0)])\n"
             + "          PinotLogicalTableScan(table=[[default, a]])\n");
     //@formatter:on
+  }
+
+  @Test
+  public void testTypeArgumentRewriteIgnoresSkipPlannerRules() {
+    // The servers require the data type argument, so naming the rule in skipPlannerRules does not turn it off.
+    String query = "EXPLAIN PLAN FOR SELECT FIRST_WITH_TIME(col1, ts), ANY_VALUE(col3) FROM a";
+    String explain =
+        explainQueryWithRuleDisabled(query, PinotAggregateTypeArgumentRewriteRule.WITHOUT_ANY_VALUE.toString());
+    assertEquals(explain, _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong()));
+    assertTrue(explain.contains("FIRSTWITHTIME($0, $1, _UTF-8'STRING')"), explain);
+    assertTrue(explain.contains("ANYVALUE($2)"), explain);
+
+    // With inferAnyValueType, the program runs the rule that also rewrites ANY_VALUE
+    query = "SET inferAnyValueType=true; " + query;
+    explain = explainQueryWithRuleDisabled(query, PinotAggregateTypeArgumentRewriteRule.INSTANCE.toString());
+    assertEquals(explain, _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong()));
+    assertTrue(explain.contains("FIRSTWITHTIME($0, $1, _UTF-8'STRING')"), explain);
+    assertTrue(explain.contains("ANYVALUE($2, _UTF-8'INT')"), explain);
   }
 
   @Test
@@ -182,9 +202,9 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
           + "  PinotLogicalExchange(distribution=[hash[0]])\n"
           + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
           + "      LogicalUnion(all=[true])\n"
-          + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+          + "        PinotLogicalExchange(distribution=[single])\n"
           + "          LogicalValues(tuples=[[]])\n"
-          + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+          + "        PinotLogicalExchange(distribution=[single])\n"
           + "          LogicalProject(col1=[$0])\n"
           + "            PinotLogicalTableScan(table=[[default, b]])\n");
     //@formatter:on
@@ -222,10 +242,13 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   }
 
   @Test
-  public void testRandFunctionNotEvaluatedInMultiStagePlanner() {
-    String query = "EXPLAIN PLAN FOR SELECT rand() FROM b";
+  public void testFunctionVolatilityDoesNotChangeLiteralEvaluationInMultiStagePlanner() {
+    String query = "EXPLAIN PLAN FOR SELECT now(), ago('PT1H'), rand(), rand(123) FROM b";
     String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
     assertTrue(explain.contains("RAND()"), "Expected RAND() to remain in logical plan");
+    assertFalse(explain.contains("NOW()"), "Expected NOW() to be evaluated into a literal");
+    assertFalse(explain.contains("AGO("), "Expected AGO('PT1H') to be evaluated into a literal");
+    assertFalse(explain.contains("RAND(123)"), "Expected RAND(123) to be evaluated into a literal");
   }
 
   @Test
@@ -317,6 +340,18 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testEnableTwoRulesSeparatedByCommaAndSpace() {
+    // The space after the comma must not stop the second rule from matching
+    String query = "EXPLAIN PLAN FOR SELECT col1 FROM a ORDER BY col1";
+    String explain = explainQueryWithRuleEnabled(query,
+        PlannerRuleNames.SORT_JOIN_TRANSPOSE + ", " + PlannerRuleNames.SORT_PROJECT_TRANSPOSE);
+    int sortIdx = explain.indexOf("LogicalSort");
+    int projectIdx = explain.indexOf("LogicalProject");
+    assertTrue(projectIdx >= 0 && sortIdx > projectIdx,
+        "With SortProjectTranspose enabled, Project must be above Sort. Plan:\n" + explain);
+  }
+
+  @Test
   public void testAggregateJoinTransposeExtendedDisabledByDefault() {
     // test aggregate function pushdown is disabled by default
     String query = "EXPLAIN PLAN FOR \n"
@@ -387,7 +422,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "    LogicalJoin(condition=[=($0, $1)], joinType=[left])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
             + "        LogicalProject(col1=[$0])\n"
@@ -413,12 +448,12 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "    LogicalJoin(condition=[=($0, $1)], joinType=[left])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
             + "        LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "            LogicalProject(col1=[$0])\n"
             + "              PinotLogicalTableScan(table=[[default, a]])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
@@ -442,7 +477,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "    LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
             + "        LogicalProject(col1=[$0])\n"
@@ -468,12 +503,12 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "    LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
             + "        LogicalSort(sort0=[$0], dir0=[ASC])\n"
             + "          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "            LogicalProject(col1=[$0])\n"
             + "              PinotLogicalTableScan(table=[[default, a]])\n"
             + "      PinotLogicalExchange(distribution=[hash[0]])\n"
@@ -626,12 +661,12 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
             + "  PinotLogicalExchange(distribution=[hash[0]])\n"
             + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
             + "      LogicalUnion(all=[true])\n"
-            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        PinotLogicalExchange(distribution=[single])\n"
             + "          PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
             + "            PinotLogicalExchange(distribution=[hash[0]])\n"
             + "              PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
             + "                PinotLogicalTableScan(table=[[default, a]])\n"
-            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        PinotLogicalExchange(distribution=[single])\n"
             + "          PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
             + "            PinotLogicalExchange(distribution=[hash[0]])\n"
             + "              PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
@@ -661,10 +696,10 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
             + "  PinotLogicalExchange(distribution=[hash[0]])\n"
             + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
             + "      LogicalUnion(all=[true])\n"
-            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        PinotLogicalExchange(distribution=[single])\n"
             + "          LogicalProject(col1=[$0])\n"
             + "            PinotLogicalTableScan(table=[[default, a]])\n"
-            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        PinotLogicalExchange(distribution=[single])\n"
             + "          LogicalProject(col1=[$0])\n"
             + "            PinotLogicalTableScan(table=[[default, b]])\n");
   }

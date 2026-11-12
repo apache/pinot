@@ -39,10 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Default implementation of {@link SegmentUploader} with support for all push modes
- * The configs for push are fetched from batchConfigMaps of tableConfig
- */
+/// Default implementation of [SegmentUploader] with support for all push modes
+/// The configs for push are fetched from batchConfigMaps of tableConfig
 public class SegmentUploaderDefault implements SegmentUploader {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentUploaderDefault.class);
@@ -101,7 +99,7 @@ public class SegmentUploaderDefault implements SegmentUploader {
     String[] filePaths = outputPinotFS.listFiles(segmentDir, true);
     for (String filePath : filePaths) {
       URI uri = URI.create(filePath);
-      if (!outputPinotFS.isDirectory(uri) && filePath.endsWith(Constants.TAR_GZ_FILE_EXT)) {
+      if (!outputPinotFS.isDirectory(uri) && Constants.isSegmentTarFile(filePath)) {
         segmentTarURIs.add(uri);
       }
     }

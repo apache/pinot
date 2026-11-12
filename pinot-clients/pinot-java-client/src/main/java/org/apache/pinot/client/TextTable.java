@@ -22,9 +22,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 
-/**
- * Utility class to format tabular data. Useful to display on console for debugging
- */
+/// Utility class to format tabular data. Useful to display on console for debugging
 public class TextTable {
   private final static char PAD_CHAR = ' ';
 

@@ -43,20 +43,18 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test that verifies a column with RAW forward index encoding plus an explicitly configured dictionary
- * returns identical query results to a baseline column that uses the default dictionary-encoded forward index.
- * Three column shapes are exercised so the predicate-evaluator selection logic is covered for each:
- * <ul>
- *   <li>{@code rawDictDim}: RAW forward + explicit dictionary, no secondary index — exercises the scan path that
- *       requires dropping the dictionary so the raw-value evaluator is used.</li>
- *   <li>{@code rawDictInvDim}: RAW forward + explicit dictionary + inverted index — exercises the inverted-index
- *       path that requires keeping the dictionary so dict IDs can be looked up.</li>
- *   <li>{@code dictDim}: regular dictionary-encoded baseline.</li>
- * </ul>
- * All three columns get identical values so query outputs must match exactly across filters, aggregations,
- * GROUP BY, DISTINCT, IN, and REGEXP_LIKE predicates.
- */
+/// Integration test that verifies a column with RAW forward index encoding plus an explicitly configured dictionary
+/// returns identical query results to a baseline column that uses the default dictionary-encoded forward index.
+/// Three column shapes are exercised so the predicate-evaluator selection logic is covered for each:
+///
+/// - `rawDictDim`: RAW forward + explicit dictionary, no secondary index — exercises the scan path that
+///      requires dropping the dictionary so the raw-value evaluator is used.
+/// - `rawDictInvDim`: RAW forward + explicit dictionary + inverted index — exercises the inverted-index
+///      path that requires keeping the dictionary so dict IDs can be looked up.
+/// - `dictDim`: regular dictionary-encoded baseline.
+///
+/// All three columns get identical values so query outputs must match exactly across filters, aggregations,
+/// GROUP BY, DISTINCT, IN, and REGEXP_LIKE predicates.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterIntegrationTest {
   private static final String TABLE_NAME = "RawForwardIndexWithDictionaryTest";
@@ -270,13 +268,11 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
             RAW_DICT_INT_DIMENSION));
   }
 
-  /**
-   * Regression test: a column with dict + inverted + RAW forward index used to crash on RANGE predicates.
-   * The planner kept the dictionary because an inverted index existed, but RANGE predicates don't use the
-   * inverted index — they fall through to the scan operator, which then called {@code applySV(rawValue)} on
-   * the dict-based range evaluator and threw {@code UnsupportedOperationException}. The fix drops the dict
-   * per-predicate-type so RANGE on RAW forward gets a raw-value evaluator.
-   */
+  /// Regression test: a column with dict + inverted + RAW forward index used to crash on RANGE predicates.
+  /// The planner kept the dictionary because an inverted index existed, but RANGE predicates don't use the
+  /// inverted index — they fall through to the scan operator, which then called `applySV(rawValue)` on
+  /// the dict-based range evaluator and threw `UnsupportedOperationException`. The fix drops the dict
+  /// per-predicate-type so RANGE on RAW forward gets a raw-value evaluator.
   @Test(dataProvider = "useBothQueryEngines")
   public void testRangeOnRawDictInvertedColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -292,11 +288,9 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         String.format("SELECT COUNT(*) FROM %s WHERE %s >= 10", getTableName(), RAW_DICT_INV_INT_DIMENSION));
   }
 
-  /**
-   * Mixed-predicate query on the same column: combines an EQ that uses the inverted index (dict path) with a
-   * RANGE that scans (raw-value path). Each predicate gets its own evaluator, so dict-drop must be decided
-   * per predicate, not per column.
-   */
+  /// Mixed-predicate query on the same column: combines an EQ that uses the inverted index (dict path) with a
+  /// RANGE that scans (raw-value path). Each predicate gets its own evaluator, so dict-drop must be decided
+  /// per predicate, not per column.
   @Test(dataProvider = "useBothQueryEngines")
   public void testMixedInvertedEqAndRangeOnSameColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -308,26 +302,24 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
             RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION));
   }
 
-  /**
-   * Comprehensive mixed-predicate matrix on the column with RAW forward + dictionary + inverted index.
-   *
-   * <p>Exercises every predicate type that takes the dict-consuming inverted-index path together with a RANGE
-   * predicate that drops the dict and scans raw values.
-   * {@code PredicateEvaluatorProvider#getDictionaryUsableForFiltering} decides per-predicate-type whether the
-   * dictionary is preserved or dropped, so each combination below routes one
-   * predicate through {@code InvertedIndexBasedFilterOperator} (with dict IDs) and another through
-   * {@code ScanBasedFilterOperator} (with raw values) on the same physical column.
-   *
-   * <p>Predicate-to-operator mapping for the int column ({@link #RAW_DICT_INV_INT_DIMENSION}) used here:
-   * <ul>
-   *   <li>{@code EQ}, {@code NOT_EQ}, {@code IN}, {@code NOT_IN} → inverted index, dict preserved</li>
-   *   <li>{@code RANGE} → scan, dict dropped, raw-value evaluator</li>
-   * </ul>
-   * Results are compared against the dictionary-encoded baseline column, which always uses the dict path.
-   * The deterministic dataset has values {@code 0..19}, each appearing 50 times in 1000 rows. Each sub-case
-   * also asserts an explicit non-zero expected count to defuse vacuous-pass risk if both sides silently
-   * returned 0 (e.g. due to a planner short-circuit on a contradictory predicate).
-   */
+  /// Comprehensive mixed-predicate matrix on the column with RAW forward + dictionary + inverted index.
+  ///
+  /// Exercises every predicate type that takes the dict-consuming inverted-index path together with a RANGE
+  /// predicate that drops the dict and scans raw values.
+  /// `PredicateEvaluatorProvider#getDictionaryUsableForFiltering` decides per-predicate-type whether the
+  /// dictionary is preserved or dropped, so each combination below routes one
+  /// predicate through `InvertedIndexBasedFilterOperator` (with dict IDs) and another through
+  /// `ScanBasedFilterOperator` (with raw values) on the same physical column.
+  ///
+  /// Predicate-to-operator mapping for the int column ([#RAW_DICT_INV_INT_DIMENSION]) used here:
+  ///
+  /// - `EQ`, `NOT_EQ`, `IN`, `NOT_IN` → inverted index, dict preserved
+  /// - `RANGE` → scan, dict dropped, raw-value evaluator
+  ///
+  /// Results are compared against the dictionary-encoded baseline column, which always uses the dict path.
+  /// The deterministic dataset has values `0..19`, each appearing 50 times in 1000 rows. Each sub-case
+  /// also asserts an explicit non-zero expected count to defuse vacuous-pass risk if both sides silently
+  /// returned 0 (e.g. due to a planner short-circuit on a contradictory predicate).
   @Test(dataProvider = "useBothQueryEngines")
   public void testAllPredicateTypesMixedWithRangeOnSameColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -376,15 +368,13 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         750);
   }
 
-  /**
-   * Mixed-predicate query on the STRING column with RAW forward + dictionary + inverted index. Validates that
-   * REGEXP_LIKE (inverted-index, dict-id evaluator) and string EQ on the same column both return correct results
-   * and can be combined in a single query.
-   *
-   * <p>Note: there is no string analogue of RANGE that drops the dict in this column shape (no raw-value evaluator
-   * is exercised here), so this is a sanity check for the inverted-index path on strings — including the
-   * REGEXP_LIKE-on-RAW-forward path that the dict-drop logic enables.
-   */
+  /// Mixed-predicate query on the STRING column with RAW forward + dictionary + inverted index. Validates that
+  /// REGEXP_LIKE (inverted-index, dict-id evaluator) and string EQ on the same column both return correct results
+  /// and can be combined in a single query.
+  ///
+  /// Note: there is no string analogue of RANGE that drops the dict in this column shape (no raw-value evaluator
+  /// is exercised here), so this is a sanity check for the inverted-index path on strings — including the
+  /// REGEXP_LIKE-on-RAW-forward path that the dict-drop logic enables.
   @Test(dataProvider = "useBothQueryEngines")
   public void testMixedRegexpAndEqOnStringRawDictInvertedColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -401,14 +391,12 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
             getTableName(), RAW_DICT_INV_DIMENSION, RAW_DICT_INV_DIMENSION));
   }
 
-  /**
-   * Cross-column mixed-predicate query: the predicates target different physical columns but each routes through
-   * a different operator within the same query plan. Validates that the planner does not entangle the per-column
-   * dict-drop decisions: the EQ on the inverted+dict+raw column takes the inverted-index path (dict preserved),
-   * while the two RANGE predicates on a raw+dict column with and without an inverted index both take the scan
-   * path (dict dropped). The dict-encoded baseline column is run as a separate query and supplies the expected
-   * value of 50 rows ({@code dim = 7} matching once per appearance).
-   */
+  /// Cross-column mixed-predicate query: the predicates target different physical columns but each routes through
+  /// a different operator within the same query plan. Validates that the planner does not entangle the per-column
+  /// dict-drop decisions: the EQ on the inverted+dict+raw column takes the inverted-index path (dict preserved),
+  /// while the two RANGE predicates on a raw+dict column with and without an inverted index both take the scan
+  /// path (dict dropped). The dict-encoded baseline column is run as a separate query and supplies the expected
+  /// value of 50 rows (`dim = 7` matching once per appearance).
   @Test(dataProvider = "useBothQueryEngines")
   public void testMixedPredicatesAcrossDifferentColumnShapesReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -421,16 +409,14 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         50);
   }
 
-  /**
-   * Column with dict + RAW forward + range index. {@code RangeIndexType#createIndexCreator} chooses the
-   * dict-id-based range index when a dictionary exists at segment build time, so the planner must keep the dict
-   * for RANGE predicates and the range-index path is used.
-   *
-   * <p>Note: this test covers the healthy case where dict and range-index were built together. The pre-existing
-   * {@link org.apache.pinot.segment.local.segment.index.readers.BitSlicedRangeIndexReader} assumes dict ↔ dict-based
-   * range; a segment built with raw-value range index that later gains a dictionary (e.g. via reload without range
-   * rebuild) is not a supported state and falls outside this fix's scope.
-   */
+  /// Column with dict + RAW forward + range index. `RangeIndexType#createIndexCreator` chooses the
+  /// dict-id-based range index when a dictionary exists at segment build time, so the planner must keep the dict
+  /// for RANGE predicates and the range-index path is used.
+  ///
+  /// Note: this test covers the healthy case where dict and range-index were built together. The pre-existing
+  /// [org.apache.pinot.segment.local.segment.index.readers.BitSlicedRangeIndexReader] assumes dict ↔ dict-based
+  /// range; a segment built with raw-value range index that later gains a dictionary (e.g. via reload without range
+  /// rebuild) is not a supported state and falls outside this fix's scope.
   @Test(dataProvider = "useBothQueryEngines")
   public void testRangeOnRawDictRangeColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -445,11 +431,9 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         String.format("SELECT COUNT(*) FROM %s WHERE %s >= 10", getTableName(), RAW_DICT_RANGE_INT_DIMENSION));
   }
 
-  /**
-   * Equality on a range-indexed column. Whether range index serves EQ depends on
-   * {@link org.apache.pinot.segment.spi.index.reader.RangeIndexReader#isExact()}; the planner reasons over that
-   * directly. Either path (range-index or scan) must produce results identical to the baseline.
-   */
+  /// Equality on a range-indexed column. Whether range index serves EQ depends on
+  /// [org.apache.pinot.segment.spi.index.reader.RangeIndexReader#isExact()]; the planner reasons over that
+  /// directly. Either path (range-index or scan) must produce results identical to the baseline.
   @Test(dataProvider = "useBothQueryEngines")
   public void testEqualityOnRawDictRangeColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -461,10 +445,8 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
     }
   }
 
-  /**
-   * Range index disabled via {@code skipIndexes}. The planner must drop the dictionary so the scan path uses the
-   * raw-value evaluator instead of the dict-based one.
-   */
+  /// Range index disabled via `skipIndexes`. The planner must drop the dictionary so the scan path uses the
+  /// raw-value evaluator instead of the dict-based one.
   @Test
   public void testRangeOnRawDictRangeColumnWithSkipRangeIndex()
       throws Exception {
@@ -518,11 +500,11 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
   }
 
   /// Multi-column GROUP BY that mixes a dict-encoded column with a RAW+dictionary column. Forces the executor onto
-  /// the {@link org.apache.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator} path.
-  /// Before the {@code ColumnContext.isDictionaryEncoded()} gate, the per-column branch there picked the dict-id
-  /// path whenever {@code ColumnContext#getDictionary() != null} and then called
-  /// {@code BlockValSet#getDictionaryIdsSV()} on the RAW forward index, which throws
-  /// {@code UnsupportedOperationException}.
+  /// the [org.apache.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator] path.
+  /// Before the `ColumnContext.isDictionaryEncoded()` gate, the per-column branch there picked the dict-id
+  /// path whenever `ColumnContext#getDictionary() != null` and then called
+  /// `BlockValSet#getDictionaryIdsSV()` on the RAW forward index, which throws
+  /// `UnsupportedOperationException`.
   @Test(dataProvider = "useBothQueryEngines")
   public void testMultiColumnGroupByWithRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -541,10 +523,10 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         "Multi-column GROUP BY rows must match between dictionary-only and raw+dictionary columns");
   }
 
-  /// Multi-column DISTINCT exercises {@link org.apache.pinot.core.query.distinct.DistinctExecutorFactory}'s
-  /// multi-column path. Before the {@code ColumnContext.isDictionaryEncoded()} gate, the factory routed to
-  /// {@code DictionaryBasedMultiColumnDistinctExecutor} whenever every column had a non-null dictionary, then
-  /// that executor called {@code BlockValSet#getDictionaryIdsSV()} — which throws on a RAW+dictionary column.
+  /// Multi-column DISTINCT exercises [org.apache.pinot.core.query.distinct.DistinctExecutorFactory]'s
+  /// multi-column path. Before the `ColumnContext.isDictionaryEncoded()` gate, the factory routed to
+  /// `DictionaryBasedMultiColumnDistinctExecutor` whenever every column had a non-null dictionary, then
+  /// that executor called `BlockValSet#getDictionaryIdsSV()` — which throws on a RAW+dictionary column.
   @Test(dataProvider = "useBothQueryEngines")
   public void testMultiColumnDistinctWithRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -562,13 +544,13 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         "Multi-column DISTINCT rows must match between dictionary-only and raw+dictionary columns");
   }
 
-  /// {@code DISTINCTCOUNT} on a RAW+dictionary column was previously crashing inside
-  /// {@link org.apache.pinot.core.query.aggregation.function.BaseDistinctAggregateAggregationFunction#svAggregate}:
-  /// the executor entered the dict-id path whenever {@code blockValSet.getDictionary() != null}, then called
-  /// {@code blockValSet.getDictionaryIdsSV()} on the RAW forward index. Now gated on
-  /// {@code BlockValSet#isDictionaryEncoded()}, the executor takes the value path instead. The {@code WHERE}
+  /// `DISTINCTCOUNT` on a RAW+dictionary column was previously crashing inside
+  /// [org.apache.pinot.core.query.aggregation.function.BaseDistinctAggregateAggregationFunction#svAggregate]:
+  /// the executor entered the dict-id path whenever `blockValSet.getDictionary() != null`, then called
+  /// `blockValSet.getDictionaryIdsSV()` on the RAW forward index. Now gated on
+  /// `BlockValSet#isDictionaryEncoded()`, the executor takes the value path instead. The `WHERE`
   /// predicate is required so the query bypasses
-  /// {@link org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator}, which would otherwise serve the
+  /// [org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator], which would otherwise serve the
   /// aggregation directly from the dictionary and hide the regression.
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctCountWithFilterOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
@@ -585,11 +567,10 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         "DISTINCTCOUNT must match between dictionary-only and raw+dictionary columns");
   }
 
-  /// {@code DISTINCTCOUNTHLL} previously crashed inside {@link
-  /// org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction#aggregate} for the same
-  /// reason as {@code DISTINCTCOUNT}; now gated on {@code BlockValSet#isDictionaryEncoded()}. The {@code WHERE}
-  /// predicate is required to bypass {@link
-  /// org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator}.
+  /// `DISTINCTCOUNTHLL` previously crashed inside
+  /// [org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction#aggregate] for the same
+  /// reason as `DISTINCTCOUNT`; now gated on `BlockValSet#isDictionaryEncoded()`. The `WHERE`
+  /// predicate is required to bypass [org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator].
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctCountHLLWithFilterOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -606,11 +587,11 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         "DISTINCTCOUNTHLL must match between dictionary-only and raw+dictionary columns");
   }
 
-  /// {@code DISTINCTCOUNTBITMAP} previously crashed inside {@link
-  /// org.apache.pinot.core.query.aggregation.function.DistinctCountBitmapAggregationFunction#aggregate}; now gated
-  /// on {@code BlockValSet#isDictionaryEncoded()}. Unlike {@code DISTINCTCOUNT} / {@code DISTINCTCOUNTHLL}, this
-  /// function is NOT in {@code AggregationPlanNode#DICTIONARY_BASED_FUNCTIONS}, so the bug surfaced even without a
-  /// {@code WHERE}.
+  /// `DISTINCTCOUNTBITMAP` previously crashed inside
+  /// [org.apache.pinot.core.query.aggregation.function.DistinctCountBitmapAggregationFunction#aggregate] ; now gated
+  /// on `BlockValSet#isDictionaryEncoded()`. Unlike `DISTINCTCOUNT` / `DISTINCTCOUNTHLL`, this
+  /// function is NOT in `AggregationPlanNode#DICTIONARY_BASED_FUNCTIONS`, so the bug surfaced even without a
+  /// `WHERE`.
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctCountBitmapOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -624,11 +605,11 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         "DISTINCTCOUNTBITMAP must match between dictionary-only and raw+dictionary columns");
   }
 
-  /// {@code SEGMENTPARTITIONEDDISTINCTCOUNT} previously crashed inside {@link
-  /// org.apache.pinot.core.query.aggregation.function.SegmentPartitionedDistinctCountAggregationFunction#aggregate}
-  /// for the same reason as the other dict-id aggregators; now gated on {@code BlockValSet#isDictionaryEncoded()}.
-  /// The {@code WHERE} predicate is required to bypass
-  /// {@link org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator}.
+  /// `SEGMENTPARTITIONEDDISTINCTCOUNT` previously crashed inside
+  /// [org.apache.pinot.core.query.aggregation.function.SegmentPartitionedDistinctCountAggregationFunction#aggregate]
+  /// for the same reason as the other dict-id aggregators; now gated on `BlockValSet#isDictionaryEncoded()`.
+  /// The `WHERE` predicate is required to bypass
+  /// [org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator].
   @Test(dataProvider = "useBothQueryEngines")
   public void testSegmentPartitionedDistinctCountWithFilterOnRawDictColumnReturnsSameResults(
       boolean useMultiStageQueryEngine)
@@ -646,10 +627,10 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         "SEGMENTPARTITIONEDDISTINCTCOUNT must match between dictionary-only and raw+dictionary columns");
   }
 
-  /// {@code MODE} previously crashed inside {@link
-  /// org.apache.pinot.core.query.aggregation.function.ModeAggregationFunction#aggregate} for the same reason; now
-  /// gated on {@code BlockValSet#isDictionaryEncoded()}. {@code MODE} is NOT in
-  /// {@code AggregationPlanNode#DICTIONARY_BASED_FUNCTIONS}, so the bug surfaced even without a {@code WHERE}.
+  /// `MODE` previously crashed inside
+  /// [org.apache.pinot.core.query.aggregation.function.ModeAggregationFunction#aggregate] for the same reason; now
+  /// gated on `BlockValSet#isDictionaryEncoded()`. `MODE` is NOT in
+  /// `AggregationPlanNode#DICTIONARY_BASED_FUNCTIONS`, so the bug surfaced even without a `WHERE`.
   @Test(dataProvider = "useBothQueryEngines")
   public void testModeOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -664,13 +645,13 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         "MODE rows must match between dictionary-only and raw+dictionary columns");
   }
 
-  /// Single-column {@code DISTINCT} with a filter exercises
-  /// {@link org.apache.pinot.core.query.distinct.DistinctExecutorFactory}'s single-column path. Without a filter
-  /// the query routes to {@link org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator} which
+  /// Single-column `DISTINCT` with a filter exercises
+  /// [org.apache.pinot.core.query.distinct.DistinctExecutorFactory]'s single-column path. Without a filter
+  /// the query routes to [org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator] which
   /// iterates the dictionary directly and never hits the bug; with a filter it goes through
-  /// {@link org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedSingleColumnDistinctExecutor}, which
-  /// previously called {@code BlockValSet#getDictionaryIdsSV()} and threw on the RAW forward index — now gated on
-  /// {@code ColumnContext#isDictionaryEncoded()}.
+  /// [org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedSingleColumnDistinctExecutor], which
+  /// previously called `BlockValSet#getDictionaryIdsSV()` and threw on the RAW forward index — now gated on
+  /// `ColumnContext#isDictionaryEncoded()`.
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctWithFilterOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -688,8 +669,8 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
   }
 
   /// Exercise the transform path: a non-identifier expression over a RAW+dictionary column. Goes through
-  /// {@link org.apache.pinot.core.operator.docvalsets.TransformBlockValSet}, whose {@code isDictionaryEncoded()}
-  /// returns whether the wrapping transform exposes its own dictionary — {@code UPPER} does not, so the executor
+  /// [org.apache.pinot.core.operator.docvalsets.TransformBlockValSet], whose `isDictionaryEncoded()`
+  /// returns whether the wrapping transform exposes its own dictionary — `UPPER` does not, so the executor
   /// must take the value path. Regression coverage for raghavyadav01's review comment on PR #18504.
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctOnTransformOfRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
@@ -747,7 +728,7 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
             + " => " + rawResult);
   }
 
-  /// Like {@link #assertScalarLongMatches} but additionally pins the expected count, so the assertion does not
+  /// Like [#assertScalarLongMatches] but additionally pins the expected count, so the assertion does not
   /// pass vacuously if both sides silently return 0 (e.g. due to a planner short-circuit on a
   /// contradictory predicate).
   private void assertScalarLongMatchesExpected(String dictQuery, String rawQuery, long expected)

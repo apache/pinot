@@ -22,9 +22,7 @@ import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Dictionary of a single long value.
- */
+/// Dictionary of a single long value.
 public class ConstantValueLongDictionary extends BaseConstantValueDictionary {
   private final long _value;
 

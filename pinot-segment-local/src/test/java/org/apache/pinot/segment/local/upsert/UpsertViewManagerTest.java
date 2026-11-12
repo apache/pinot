@@ -117,7 +117,7 @@ public class UpsertViewManagerTest {
   private static final MutableRoaringBitmap QUERYABLE_RESULT = new MutableRoaringBitmap();
 
   /// Mocks a segment whose valid-docs and queryable-docs bitmaps resolve to two different, identity-comparable
-  /// {@link MutableRoaringBitmap} instances, so tests can assert exactly which one a code path picked.
+  /// [MutableRoaringBitmap] instances, so tests can assert exactly which one a code path picked.
   private static IndexSegment mockSegmentWithDistinctBitmaps() {
     IndexSegment segment = mock(MutableSegment.class);
     ThreadSafeMutableRoaringBitmap validBitmap = mock(ThreadSafeMutableRoaringBitmap.class);

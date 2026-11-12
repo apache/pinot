@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.6.0-SNAPSHOT</version>
+    <version>1.7.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-perf</artifactId>
   <name>Pinot Perf</name>
@@ -55,12 +55,16 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-kafka-3.0</artifactId>
+      <artifactId>pinot-kafka-4.0</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-protobuf</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-json</artifactId>
     </dependency>
 
     <dependency>
@@ -114,6 +118,10 @@
       <artifactId>jmh-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.fory</groupId>
+      <artifactId>fory-json</artifactId>
+    </dependency>
+    <dependency>
       <groupId>net.sf.jopt-simple</groupId>
       <artifactId>jopt-simple</artifactId>
     </dependency>
@@ -163,20 +171,12 @@
               <name>pinot-BenchmarkFixedIntArrayOffHeapIdMap</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.BenchmarkOffHeapDictionaryMemory</mainClass>
-              <name>pinot-BenchmarkOffHeapDictionaryMemory</name>
-            </program>
-            <program>
               <mainClass>org.apache.pinot.perf.BenchmarkOfflineIndexReader</mainClass>
               <name>pinot-BenchmarkOfflineIndexReader</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.BenchmarkOrDocIdIterator</mainClass>
               <name>pinot-BenchmarkOrDocIdIterator</name>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.perf.BenchmarkQueryEngine</mainClass>
-              <name>pinot-BenchmarkQueryEngine</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.BenchmarkRealtimeConsumptionSpeed</mainClass>
@@ -195,20 +195,8 @@
               <name>pinot-DictionaryDumper</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.ForwardIndexWriterBenchmark</mainClass>
-              <name>pinot-ForwardIndexWriterBenchmark</name>
-            </program>
-            <program>
               <mainClass>org.apache.pinot.perf.BenchmarkPinotDataBitSet</mainClass>
               <name>pinot-BenchmarkPinotDataBitSet</name>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.perf.RawIndexBenchmark</mainClass>
-              <name>pinot-RawIndexBenchmark</name>
-            </program>
-            <program>
-              <mainClass>org.apache.pinot.perf.StringDictionaryPerfTest</mainClass>
-              <name>pinot-StringDictionaryPerfTest</name>
             </program>
             <program>
               <mainClass>org.apache.pinot.perf.aggregation.SumIntAggregationFunctionBenchmark</mainClass>

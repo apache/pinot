@@ -24,11 +24,9 @@ import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-/**
- * Base class for binary arithmetic scalar functions.
- *
- * <p>Instances are immutable and thread-safe.
- */
+/// Base class for binary arithmetic scalar functions.
+///
+/// Instances are immutable and thread-safe.
 public abstract class BaseBinaryArithmeticScalarFunction implements PinotScalarFunction {
 
   @Nullable
@@ -73,9 +71,7 @@ public abstract class BaseBinaryArithmeticScalarFunction implements PinotScalarF
     return defaultFunctionInfo();
   }
 
-  /**
-   * Get the binary arithmetic scalar function's {@link FunctionInfo} for the given argument type.
-   */
+  /// Get the binary arithmetic scalar function's [FunctionInfo] for the given argument type.
   protected abstract FunctionInfo functionInfoForType(ColumnDataType argumentType);
 
   protected FunctionInfo defaultFunctionInfo() {

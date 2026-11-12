@@ -27,25 +27,23 @@ import java.util.Map;
 import java.util.Set;
 
 
-/**
- * Validates {@link VectorIndexConfig} for backend-specific correctness.
- *
- * <p>This validator ensures that:
- * <ul>
- *   <li>Required common fields (vectorDimension, vectorDistanceFunction) are present and valid.</li>
- *   <li>The vectorIndexType resolves to a known {@link VectorBackendType}.</li>
- *   <li>Backend-specific properties are valid for the resolved backend type.</li>
- *   <li>Properties belonging to a different backend are rejected with a clear error message.</li>
- * </ul>
- *
- * <p>Thread-safe: this class is stateless and all methods are static.</p>
- */
+/// Validates [VectorIndexConfig] for backend-specific correctness.
+///
+/// This validator ensures that:
+///
+/// - Required common fields (vectorDimension, vectorDistanceFunction) are present and valid.
+/// - The vectorIndexType resolves to a known [VectorBackendType].
+/// - Backend-specific properties are valid for the resolved backend type.
+/// - Properties belonging to a different backend are rejected with a clear error message.
+///
+/// Thread-safe: this class is stateless and all methods are static.
 public final class VectorIndexConfigValidator {
 
   // HNSW-specific property keys
   static final Set<String> HNSW_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
       Arrays.asList("maxCon", "beamWidth", "maxDimensions", "maxBufferSizeMB",
-          "useCompoundFile", "mode", "commit", "commitIntervalMs", "commitDocs")));
+          "useCompoundFile", "mode", "commit", "commitIntervalMs", "commitDocs",
+          "refreshMinIntervalMs", "refreshWaitTimeoutMs")));
 
   // IVF_FLAT-specific property keys
   static final Set<String> IVF_FLAT_PROPERTIES = Collections.unmodifiableSet(new HashSet<>(
@@ -77,22 +75,19 @@ public final class VectorIndexConfigValidator {
   private VectorIndexConfigValidator() {
   }
 
-  /**
-   * Returns a properties map with recommended IVF_PQ defaults for the given dimension.
-   * Users can override individual values. The returned map is mutable.
-   *
-   * <p>Recommended defaults:</p>
-   * <ul>
-   *   <li>{@code nlist}: 128 (good for 10K-1M vectors)</li>
-   *   <li>{@code pqM}: dimension / 8, clamped to [1, dimension] and must divide dimension evenly</li>
-   *   <li>{@code pqNbits}: 8 (256 codewords per sub-quantizer)</li>
-   *   <li>{@code trainSampleSize}: max(nlist * 40, 10000)</li>
-   * </ul>
-   *
-   * @param dimension the vector dimension
-   * @param distanceFunction the distance function name (e.g., "EUCLIDEAN", "COSINE")
-   * @return mutable properties map with recommended defaults
-   */
+  /// Returns a properties map with recommended IVF_PQ defaults for the given dimension.
+  /// Users can override individual values. The returned map is mutable.
+  ///
+  /// Recommended defaults:
+  ///
+  /// - `nlist`: 128 (good for 10K-1M vectors)
+  /// - `pqM`: dimension / 8, clamped to \[1, dimension\] and must divide dimension evenly
+  /// - `pqNbits`: 8 (256 codewords per sub-quantizer)
+  /// - `trainSampleSize`: max(nlist \* 40, 10000)
+  ///
+  /// @param dimension the vector dimension
+  /// @param distanceFunction the distance function name (e.g., "EUCLIDEAN", "COSINE")
+  /// @return mutable properties map with recommended defaults
   public static Map<String, String> recommendedIvfPqDefaults(int dimension, String distanceFunction) {
     int nlist = DEFAULT_IVF_PQ_NLIST;
     int pqM = findBestPqM(dimension);
@@ -112,10 +107,8 @@ public final class VectorIndexConfigValidator {
     return properties;
   }
 
-  /**
-   * Finds the largest pqM <= dimension/8 that evenly divides dimension.
-   * Falls back to 1 if no better divisor exists.
-   */
+  /// Finds the largest pqM <= dimension/8 that evenly divides dimension.
+  /// Falls back to 1 if no better divisor exists.
   static int findBestPqM(int dimension) {
     int target = Math.max(1, dimension / 8);
     for (int candidate = target; candidate >= 1; candidate--) {
@@ -126,12 +119,10 @@ public final class VectorIndexConfigValidator {
     return 1;
   }
 
-  /**
-   * Validates the given {@link VectorIndexConfig} for backend-specific correctness.
-   *
-   * @param config the config to validate
-   * @throws IllegalArgumentException if validation fails
-   */
+  /// Validates the given [VectorIndexConfig] for backend-specific correctness.
+  ///
+  /// @param config the config to validate
+  /// @throws IllegalArgumentException if validation fails
   public static void validate(VectorIndexConfig config) {
     if (config.isDisabled()) {
       return;
@@ -143,14 +134,12 @@ public final class VectorIndexConfigValidator {
     validateBackendSpecificProperties(config, backendType);
   }
 
-  /**
-   * Resolves the {@link VectorBackendType} from the config. Defaults to HNSW if the
-   * vectorIndexType field is null or empty, preserving backward compatibility.
-   *
-   * @param config the config to resolve from
-   * @return the resolved backend type
-   * @throws IllegalArgumentException if the vectorIndexType is not recognized
-   */
+  /// Resolves the [VectorBackendType] from the config. Defaults to HNSW if the
+  /// vectorIndexType field is null or empty, preserving backward compatibility.
+  ///
+  /// @param config the config to resolve from
+  /// @return the resolved backend type
+  /// @throws IllegalArgumentException if the vectorIndexType is not recognized
   public static VectorBackendType resolveBackendType(VectorIndexConfig config) {
     String typeString = config.getVectorIndexType();
     if (typeString == null || typeString.isEmpty()) {
@@ -159,9 +148,7 @@ public final class VectorIndexConfigValidator {
     return VectorBackendType.fromString(typeString);
   }
 
-  /**
-   * Validates common fields shared across all backend types.
-   */
+  /// Validates common fields shared across all backend types.
   private static void validateCommonFields(VectorIndexConfig config) {
     if (config.getVectorDimension() <= 0) {
       throw new IllegalArgumentException(
@@ -173,9 +160,7 @@ public final class VectorIndexConfigValidator {
     }
   }
 
-  /**
-   * Validates the optional "quantizer" property, if present, is a valid {@link VectorQuantizerType}.
-   */
+  /// Validates the optional "quantizer" property, if present, is a valid [VectorQuantizerType].
   private static void validateQuantizerProperty(VectorIndexConfig config, VectorBackendType backendType) {
     Map<String, String> properties = config.getProperties();
     if (properties == null) {
@@ -216,10 +201,8 @@ public final class VectorIndexConfigValidator {
     }
   }
 
-  /**
-   * Validates that the properties map only contains keys valid for the resolved backend type,
-   * and that backend-specific property values are within acceptable ranges.
-   */
+  /// Validates that the properties map only contains keys valid for the resolved backend type,
+  /// and that backend-specific property values are within acceptable ranges.
   private static void validateBackendSpecificProperties(VectorIndexConfig config, VectorBackendType backendType) {
     Map<String, String> properties = config.getProperties();
     if (backendType == VectorBackendType.IVF_PQ) {
@@ -255,11 +238,9 @@ public final class VectorIndexConfigValidator {
     }
   }
 
-  /**
-   * Ensures that properties belonging to a foreign backend are not present.
-   * Note: this only rejects known foreign-backend keys; arbitrary unknown keys are allowed
-   * to support forward-compatible extensibility.
-   */
+  /// Ensures that properties belonging to a foreign backend are not present.
+  /// Note: this only rejects known foreign-backend keys; arbitrary unknown keys are allowed
+  /// to support forward-compatible extensibility.
   private static void validateNoForeignProperties(Map<String, String> properties,
       Set<String> foreignProperties, String ownType, String foreignType) {
     for (String key : properties.keySet()) {
@@ -274,19 +255,42 @@ public final class VectorIndexConfigValidator {
     }
   }
 
-  /**
-   * Validates HNSW-specific property values.
-   */
+  /// Validates HNSW-specific property values.
   private static void validateHnswProperties(Map<String, String> properties) {
     validatePositiveIntProperty(properties, "maxCon", "HNSW maxCon");
     validatePositiveIntProperty(properties, "beamWidth", "HNSW beamWidth");
     validatePositiveIntProperty(properties, "maxDimensions", "HNSW maxDimensions");
     validatePositiveDoubleProperty(properties, "maxBufferSizeMB", "HNSW maxBufferSizeMB");
+    // Rejected here rather than only in MutableVectorIndex: the constructor guard runs when a consuming segment is
+    // created on the server, which would stop ingestion for the partition instead of failing the table config.
+    validateLongProperty(properties, "refreshMinIntervalMs", "HNSW refreshMinIntervalMs", 0L);
+    validateLongProperty(properties, "refreshWaitTimeoutMs", "HNSW refreshWaitTimeoutMs", 1L);
   }
 
-  /**
-   * Validates IVF_FLAT-specific property values.
-   */
+  /// Absent means "use the default"; anything present must parse and satisfy the bound.
+  ///
+  /// Deliberately parses exactly as the consumer does -- no trimming -- so a value this accepts cannot then fail
+  /// on the server when a consuming segment is created, which would stop ingestion for the partition rather than
+  /// rejecting the table config. A key present with a null value is rejected for the same reason: `getOrDefault`
+  /// does not substitute the default for it.
+  private static void validateLongProperty(Map<String, String> properties, String key, String displayName,
+      long minInclusive) {
+    if (!properties.containsKey(key)) {
+      return;
+    }
+    String value = properties.get(key);
+    long longValue;
+    try {
+      longValue = Long.parseLong(value);
+    } catch (NumberFormatException | NullPointerException e) {
+      throw new IllegalArgumentException(displayName + " must be a valid long, got: '" + value + "'");
+    }
+    if (longValue < minInclusive) {
+      throw new IllegalArgumentException(displayName + " must be >= " + minInclusive + ", got: " + longValue);
+    }
+  }
+
+  /// Validates IVF_FLAT-specific property values.
   private static void validateIvfFlatProperties(Map<String, String> properties) {
     validatePositiveIntProperty(properties, "nlist", "IVF_FLAT nlist");
     validatePositiveIntProperty(properties, "trainSampleSize", "IVF_FLAT trainSampleSize");
@@ -303,9 +307,7 @@ public final class VectorIndexConfigValidator {
     }
   }
 
-  /**
-   * Validates IVF_ON_DISK-specific property values.
-   */
+  /// Validates IVF_ON_DISK-specific property values.
   private static void validateIvfOnDiskProperties(Map<String, String> properties) {
     validatePositiveIntProperty(properties, "nlist", "IVF_ON_DISK nlist");
     validatePositiveIntProperty(properties, "trainSampleSize", "IVF_ON_DISK trainSampleSize");
@@ -347,16 +349,12 @@ public final class VectorIndexConfigValidator {
     }
   }
 
-  /**
-   * Validates that an optional property, if present, is a positive integer.
-   */
+  /// Validates that an optional property, if present, is a positive integer.
   private static void validatePositiveIntProperty(Map<String, String> properties, String key, String displayName) {
     parsePositiveIntProperty(properties, key, displayName);
   }
 
-  /**
-   * Validates that an optional property, if present, is a positive double.
-   */
+  /// Validates that an optional property, if present, is a positive double.
   private static void validatePositiveDoubleProperty(Map<String, String> properties, String key, String displayName) {
     String value = properties.get(key);
     if (value == null) {

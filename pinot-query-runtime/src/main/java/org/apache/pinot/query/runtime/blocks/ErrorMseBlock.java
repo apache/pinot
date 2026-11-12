@@ -34,7 +34,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// A block that represents a failed execution.
-///
 public class ErrorMseBlock implements MseBlock.Eos {
   private final int _stageId;
   private final int _workerId;

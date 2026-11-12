@@ -25,9 +25,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/**
- * Partitioner which computes partition values based on the ColumnPartitionConfig from the table config
- */
+/// Partitioner which computes partition values based on the ColumnPartitionConfig from the table config
 public class TableConfigPartitioner implements Partitioner {
   private final String _column;
   private final PartitionFunction _partitionFunction;

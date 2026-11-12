@@ -23,9 +23,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
-/**
- * Partitioner which evaluates a transform function using the row to get the partition value
- */
+/// Partitioner which evaluates a transform function using the row to get the partition value
 public class TransformFunctionPartitioner implements Partitioner {
 
   private final FunctionEvaluator _functionEvaluator;

@@ -40,20 +40,16 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit tests for {@link MultiStageStatsTreeEncoder}.
- *
- * <p>The operator tree is built with mocked {@link MultiStageOperator} instances; only {@link
- * MultiStageOperator#getChildOperators()} is stubbed because that's the only method the encoder reads. Plan-node ids
- * are supplied via the {@code Function<MultiStageOperator, List<Integer>>} test entry point so we don't need to build
- * a full {@link OpChainExecutionContext}.
- */
+/// Unit tests for [MultiStageStatsTreeEncoder].
+///
+/// The operator tree is built with mocked [MultiStageOperator] instances; only [MultiStageOperator#getChildOperators()]
+/// is stubbed because that's the only method the encoder reads. Plan-node ids
+/// are supplied via the `Function<MultiStageOperator, List<Integer>>` test entry point so we don't need to build
+/// a full [OpChainExecutionContext].
 public class MultiStageStatsTreeEncoderTest {
 
-  /**
-   * Linear chain: MailboxReceive -> Sort -> MailboxSend (root). Verifies inorder ordering between operator tree and
-   * flat stats list, and that stat map bytes round-trip.
-   */
+  /// Linear chain: MailboxReceive -> Sort -> MailboxSend (root). Verifies inorder ordering between operator tree and
+  /// flat stats list, and that stat map bytes round-trip.
   @Test
   public void testLinearChainEncode()
       throws IOException {
@@ -108,10 +104,8 @@ public class MultiStageStatsTreeEncoderTest {
     Assert.assertEquals(deserializedReceiveStat, receiveStat);
   }
 
-  /**
-   * N-ary set op (3 inputs). Verifies the encoder records all children regardless of arity, in left-to-right order,
-   * and that the flat stats list is consumed in inorder (leftmost-leaf-first).
-   */
+  /// N-ary set op (3 inputs). Verifies the encoder records all children regardless of arity, in left-to-right order,
+  /// and that the flat stats list is consumed in inorder (leftmost-leaf-first).
   @Test
   public void testNaryEncode()
       throws IOException {
@@ -161,9 +155,7 @@ public class MultiStageStatsTreeEncoderTest {
     Assert.assertEquals(roundTripped, receiveStatMid);
   }
 
-  /**
-   * One-to-many planNodeIds for a leaf operator: a single operator records multiple plan-node ids.
-   */
+  /// One-to-many planNodeIds for a leaf operator: a single operator records multiple plan-node ids.
   @Test
   public void testLeafPlanNodeFanOut()
       throws IOException {
@@ -183,9 +175,7 @@ public class MultiStageStatsTreeEncoderTest {
     Assert.assertEquals(tree.getCurrentStage().getPlanNodeIdsList(), List.of(10, 11, 12, 13));
   }
 
-  /**
-   * Tree-vs-flat-list size mismatch: encoder must throw rather than emit a malformed tree.
-   */
+  /// Tree-vs-flat-list size mismatch: encoder must throw rather than emit a malformed tree.
   @Test(expectedExceptions = IllegalStateException.class)
   public void testTreeFlatListMismatchThrows()
       throws IOException {
@@ -201,14 +191,12 @@ public class MultiStageStatsTreeEncoderTest {
     MultiStageStatsTreeEncoder.encode(root, stats, op -> List.of());
   }
 
-  /**
-   * Pipeline-breaker graft: a leaf opchain's live operator tree is {@code MAILBOX_SEND -> LEAF} (the pipeline breaker
-   * ran as a pre-stage sub-execution and is NOT a live child of the {@code LeafOperator}), but its folded flat stats
-   * are {@code [MAILBOX_RECEIVE, PIPELINE_BREAKER, LEAF, MAILBOX_SEND]}. Passing the pipeline-breaker root operator
-   * must graft it as the {@code LEAF}'s child so the encoded tree is
-   * {@code MAILBOX_SEND -> LEAF -> PIPELINE_BREAKER -> MAILBOX_RECEIVE} (matching the legacy mailbox shape), using the
-   * pipeline breaker's real operator arities.
-   */
+  /// Pipeline-breaker graft: a leaf opchain's live operator tree is `MAILBOX_SEND -> LEAF` (the pipeline breaker
+  /// ran as a pre-stage sub-execution and is NOT a live child of the `LeafOperator`), but its folded flat stats
+  /// are `[MAILBOX_RECEIVE, PIPELINE_BREAKER, LEAF, MAILBOX_SEND]`. Passing the pipeline-breaker root operator
+  /// must graft it as the `LEAF`'s child so the encoded tree is
+  /// `MAILBOX_SEND -> LEAF -> PIPELINE_BREAKER -> MAILBOX_RECEIVE` (matching the legacy mailbox shape), using the
+  /// pipeline breaker's real operator arities.
   @Test
   public void testPipelineBreakerGraft()
       throws IOException {
@@ -259,12 +247,10 @@ public class MultiStageStatsTreeEncoderTest {
     Assert.assertEquals(deserialize(receiveNode.getStatMap(), BaseMailboxReceiveOperator.StatKey.class), receiveStat);
   }
 
-  /**
-   * Multiple build sides: the live pipeline breaker has TWO {@code MAILBOX_RECEIVE} children, but the fold collapses
-   * same-stage receives ({@code PipelineBreakerOperator.calculateUpstreamStats} -> {@code mergeUpstream}), so the
-   * leaf's folded flat stats keep only ONE receive entry. The graft must trim to the kept receive (1), not the live
-   * count (2); otherwise {@code treeSize(5) != flatSize(4)} throws and the whole leaf stage's stats are dropped.
-   */
+  /// Multiple build sides: the live pipeline breaker has TWO `MAILBOX_RECEIVE` children, but the fold collapses
+  /// same-stage receives (`PipelineBreakerOperator.calculateUpstreamStats` -> `mergeUpstream`), so the
+  /// leaf's folded flat stats keep only ONE receive entry. The graft must trim to the kept receive (1), not the live
+  /// count (2); otherwise `treeSize(5) != flatSize(4)` throws and the whole leaf stage's stats are dropped.
   @Test
   public void testPipelineBreakerGraftTrimsCollapsedReceives()
       throws IOException {
@@ -295,12 +281,10 @@ public class MultiStageStatsTreeEncoderTest {
     Assert.assertEquals(pbNode.getChildren(0).getOperatorTypeId(), MultiStageOperator.Type.MAILBOX_RECEIVE.getId());
   }
 
-  /**
-   * When the stage did not fold the pipeline breaker (e.g. {@code skip.pipeline.breaker.stats=true}), the leaf's flat
-   * stats are just {@code [LEAF, MAILBOX_SEND]} — no breaker prefix. Passing a non-null {@code pipelineBreakerRoot}
-   * anyway (i.e. the caller failed to gate on {@code isKeepPipelineBreakerStats()}) must fail loudly rather than
-   * silently mis-encode. This is why {@code QueryServer} nulls the stashed root when the fold is off.
-   */
+  /// When the stage did not fold the pipeline breaker (e.g. `skip.pipeline.breaker.stats=true`), the leaf's flat
+  /// stats are just `[LEAF, MAILBOX_SEND]` — no breaker prefix. Passing a non-null `pipelineBreakerRoot`
+  /// anyway (i.e. the caller failed to gate on `isKeepPipelineBreakerStats()`) must fail loudly rather than
+  /// silently mis-encode. This is why `QueryServer` nulls the stashed root when the fold is off.
   @Test
   public void testPipelineBreakerGraftThrowsWhenStageDidNotFold() {
     MultiStageOperator pbRoot =
@@ -329,7 +313,7 @@ public class MultiStageStatsTreeEncoderTest {
     return op;
   }
 
-  /** As {@link #mockOperator} but also stubs {@link MultiStageOperator#getOperatorType()} (read by the graft logic). */
+  /// As [#mockOperator] but also stubs [MultiStageOperator#getOperatorType()] (read by the graft logic).
   private static MultiStageOperator mockOperator(MultiStageOperator.Type type, MultiStageOperator... children) {
     MultiStageOperator op = mockOperator(children);
     Mockito.when(op.getOperatorType()).thenReturn(type);

@@ -23,23 +23,19 @@ import javax.net.ssl.SSLContext;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 
 
-/**
- * Pluggable provider for configuring AsyncHttpClient SSL/TLS.
- *
- * A custom provider can be supplied using the system property
- * {@code pinot.client.sslContextProvider} (fully qualified class name)
- * or via the Java service loader (META-INF/services).
- */
+/// Pluggable provider for configuring AsyncHttpClient SSL/TLS.
+///
+/// A custom provider can be supplied using the system property
+/// `pinot.client.sslContextProvider` (fully qualified class name)
+/// or via the Java service loader (META-INF/services).
 public interface SslContextProvider {
 
-  /**
-   * Configure the AsyncHttpClient builder with SSL/TLS settings.
-   *
-   * @param builder the client config builder to update
-   * @param sslContext optional SSL context to use
-   * @param tlsProtocols configured TLS protocol list
-   * @return the same builder for chaining
-   */
+  /// Configure the AsyncHttpClient builder with SSL/TLS settings.
+  ///
+  /// @param builder the client config builder to update
+  /// @param sslContext optional SSL context to use
+  /// @param tlsProtocols configured TLS protocol list
+  /// @return the same builder for chaining
   DefaultAsyncHttpClientConfig.Builder configure(DefaultAsyncHttpClientConfig.Builder builder,
       @Nullable SSLContext sslContext, TlsProtocols tlsProtocols);
 }

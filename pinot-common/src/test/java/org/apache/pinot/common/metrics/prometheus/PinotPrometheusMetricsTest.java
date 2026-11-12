@@ -19,7 +19,6 @@
 package org.apache.pinot.common.metrics.prometheus;
 
 import com.google.common.base.Objects;
-import com.google.common.io.Resources;
 import io.prometheus.jmx.JmxCollector;
 import io.prometheus.jmx.JmxCollector.Mode;
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
@@ -30,8 +29,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -107,18 +104,16 @@ public abstract class PinotPrometheusMetricsTest {
     _httpServer.close();
   }
 
-  /**
-   * Pinot currently uses the JMX->Prom exporter to export metrics to Prometheus. Normally, this runs as an agent in the
-   * JVM. In this case however, we've got tests using four different config files (server.yml, broker.yml,
-   * controller.yml and minion.yml). Loading the same agent in the same JVM multiple times isn't allowed, we are copying
-   * the agent's code to some degree and starting up the HTTP servers manually. For impl, see:
-   * <a href="https://github.com/prometheus/jmx_exporter/blob/main/jmx_prometheus_javaagent/src/main/java/io/
-   * prometheus/jmx/JavaAgent.java">...</a>
-   *
-   * Updated for JMX Exporter 1.5.0 which uses new prometheus-metrics library instead of the legacy client.
-   *
-   * @return the corresponding HTTP server on a random unoccupied port
-   */
+  /// Pinot currently uses the JMX->Prom exporter to export metrics to Prometheus. Normally, this runs as an agent in
+  /// the JVM. In this case however, we've got tests using four different config files (server.yml, broker.yml,
+  /// controller.yml and minion.yml). Loading the same agent in the same JVM multiple times isn't allowed, we are
+  /// copying the agent's code to some degree and starting up the HTTP servers manually. For impl, see:
+  /// <a href="https://github.com/prometheus/jmx_exporter/blob/main/jmx_prometheus_javaagent/src/main/java/io/
+  /// prometheus/jmx/JavaAgent.java">...</a>
+  ///
+  /// Updated for JMX Exporter 1.5.0 which uses new prometheus-metrics library instead of the legacy client.
+  ///
+  /// @return the corresponding HTTP server on a random unoccupied port
   protected HTTPServer startExporter() {
     String args = String.format("%s:%s", 0, getConfigFile());
     try {
@@ -296,15 +291,6 @@ public abstract class PinotPrometheusMetricsTest {
     }
   }
 
-  private String loadResourceAsString(String resourceFileName) {
-    URL url = Resources.getResource(resourceFileName);
-    try {
-      return Resources.toString(url, StandardCharsets.UTF_8);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   public static class ExportedLabels {
 
     public static final List<String> TABLENAME = List.of(TABLE, ExportedLabelValues.TABLENAME);
@@ -389,12 +375,10 @@ public abstract class PinotPrometheusMetricsTest {
       _labels = labels;
     }
 
-    /**
-     * Create an instance of {@link PromMetric} from an exported Prometheus metric
-     *
-     * @param exportedMetric the exported Prom metric (name + labels)
-     * @return the corresponding {@link PromMetric}
-     */
+    /// Create an instance of [PromMetric] from an exported Prometheus metric
+    ///
+    /// @param exportedMetric the exported Prom metric (name + labels)
+    /// @return the corresponding [PromMetric]
     public static PromMetric fromExportedMetric(String exportedMetric) {
       int spaceIndex = exportedMetric.indexOf(' ');
       String metricWithoutVal = exportedMetric.substring(0, spaceIndex);
@@ -410,23 +394,19 @@ public abstract class PinotPrometheusMetricsTest {
       }
     }
 
-    /**
-     * Creates an instance of {@link PromMetric} with a name and an empty label list
-     *
-     * @param metricName the metric name
-     * @return the corresponding PromMetric
-     */
+    /// Creates an instance of [PromMetric] with a name and an empty label list
+    ///
+    /// @param metricName the metric name
+    /// @return the corresponding PromMetric
     public static PromMetric withName(String metricName) {
       return new PromMetric(metricName, new LinkedHashMap<>());
     }
 
-    /**
-     * Creates an instance of {@link PromMetric} with a name and an label list
-     *
-     * @param metricName the metric name
-     * @param labels     the labels
-     * @return the corresponding PromMetric
-     */
+    /// Creates an instance of [PromMetric] with a name and an label list
+    ///
+    /// @param metricName the metric name
+    /// @param labels     the labels
+    /// @return the corresponding PromMetric
     public static PromMetric withNameAndLabels(String metricName, List<String> labels) {
       Map<String, String> labelMap = new LinkedHashMap<>();
       for (int i = 0; i < labels.size(); i += 2) {

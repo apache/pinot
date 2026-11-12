@@ -27,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
+import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.queries.BaseQueriesTest;
@@ -61,19 +62,19 @@ import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/**
- * End-to-end benchmark for the min/max segment pruning of selection {@code ORDER BY <col> LIMIT n} queries with a
- * filter (issue apache/pinot#18685).
- * <p>The table is range-partitioned on a sorted, nullable {@code TS_COL}: segment {@code i} covers the contiguous range
- * {@code [i * numRows, (i + 1) * numRows)}. Each invocation runs the segment pruners (the default chain, which respects
- * {@link org.apache.pinot.core.query.pruner.SegmentPruner#isApplicableTo}) and then executes the surviving segments via
- * the single-stage engine.
- * <p>The comparison is self-contained (no need to diff against a base commit): the optimization is gated off when null
- * handling is active, so running the same filtered query <b>with</b> {@code enableNullHandling=true} reproduces the
- * pre-fix behavior (the filtered order-by is not limit-pruned and every matching segment is engaged), while running it
- * <b>without</b> null handling exercises the fix (only the top segment(s) survive). The {@code NO_FILTER} query is a
- * reference point that is limit-pruned regardless.
- */
+/// End-to-end benchmark for the min/max segment pruning of selection `ORDER BY <col> LIMIT n` queries with a
+/// filter (issue apache/pinot#18685).
+///
+/// The table is range-partitioned on a sorted, nullable `TS_COL`: segment `i` covers the contiguous range
+/// `[i * numRows, (i + 1) * numRows)`. Each invocation runs the segment pruners (the default chain, which
+/// respects [org.apache.pinot.core.query.pruner.SegmentPruner#isApplicableTo]) and then executes the surviving
+/// segments via the single-stage engine.
+///
+/// The comparison is self-contained (no need to diff against a base commit): the optimization is gated off when null
+/// handling is active, so running the same filtered query **with** `enableNullHandling=true` reproduces the
+/// pre-fix behavior (the filtered order-by is not limit-pruned and every matching segment is engaged), while running it
+/// **without** null handling exercises the fix (only the top segment(s) survive). The `NO_FILTER` query is a
+/// reference point that is limit-pruned regardless.
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)
@@ -98,13 +99,13 @@ public class BenchmarkSelectionOrderByFilterPruning extends BaseQueriesTest {
       .addSingleValueDimension(VAL_COL, FieldSpec.DataType.INT)
       .build();
 
-  /** Which query shape to run; see {@link #buildQuery}. */
+  /// Which query shape to run; see [#buildQuery].
   public enum Mode {
-    /** Filtered order-by, optimization eligible (limit-pruned to the segments the LIMIT needs). */
+    /// Filtered order-by, optimization eligible (limit-pruned to the segments the LIMIT needs).
     FILTER,
-    /** Same filtered query but with null handling on, which gates the optimization off (pre-fix behavior). */
+    /// Same filtered query but with null handling on, which gates the optimization off (pre-fix behavior).
     FILTER_NULL_HANDLING,
-    /** No filter: limit-pruned regardless of the fix (reference point). */
+    /// No filter: limit-pruned regardless of the fix (reference point).
     NO_FILTER
   }
 
@@ -189,7 +190,7 @@ public class BenchmarkSelectionOrderByFilterPruning extends BaseQueriesTest {
     // Prune first (this is what the fix affects), then execute the surviving segments through the single-stage engine.
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(_query);
     queryContext.setSchema(SCHEMA);
-    _selectedSegments = _segmentPrunerService.prune(_allSegments, queryContext);
+    _selectedSegments = _segmentPrunerService.prune(_allSegments, queryContext, new SegmentPrunerStatistics());
     return getBrokerResponse(_query);
   }
 

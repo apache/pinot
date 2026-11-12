@@ -37,9 +37,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 
 
 public class DefaultFetchPlanner implements FetchPlanner {
-  /**
-   * Get BloomFilter for columns present in EQ and IN predicates.
-   */
+  /// Get BloomFilter for columns present in EQ and IN predicates.
   @Override
   public FetchContext planFetchForPruning(IndexSegment indexSegment, QueryContext queryContext) {
     // Extract columns in EQ/IN predicates.
@@ -84,9 +82,7 @@ public class DefaultFetchPlanner implements FetchPlanner {
     }
   }
 
-  /**
-   * Fetch all kinds of index for columns accessed by the query.
-   */
+  /// Fetch all kinds of index for columns accessed by the query.
   @Override
   public FetchContext planFetchForProcessing(IndexSegment indexSegment, QueryContext queryContext) {
     return new FetchContext(UUID.randomUUID(), indexSegment.getSegmentName(), getColumns(indexSegment, queryContext));

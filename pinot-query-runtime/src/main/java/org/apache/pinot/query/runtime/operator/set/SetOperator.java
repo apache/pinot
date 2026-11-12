@@ -25,9 +25,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-/**
- * Set operator, which supports UNION (ALL), INTERSECT (ALL) and EXCEPT / MINUS (ALL).
- */
+/// Set operator, which supports UNION (ALL), INTERSECT (ALL) and EXCEPT / MINUS (ALL).
 public abstract class SetOperator extends MultiStageOperator {
 
   protected final List<MultiStageOperator> _inputOperators;
@@ -73,13 +71,9 @@ public abstract class SetOperator extends MultiStageOperator {
         return true;
       }
     },
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;

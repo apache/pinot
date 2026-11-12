@@ -34,19 +34,16 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * The {@code MergeEqualInFilterOptimizer} merges EQ and IN predicates on the same column joined by OR, and performs the
- * following optimizations:
- * <ul>
- *   <li>Merge multiple EQ and IN predicates into one IN predicate (or one EQ predicate if possible)</li>
- *   <li>De-duplicates the values in the IN predicate</li>
- *   <li>Converts single value IN predicate to EQ predicate</li>
- *   <li>Pulls up the merged predicate in the absence of other predicates</li>
- * </ul>
- *
- * NOTE: This optimizer follows the {@link FlattenAndOrFilterOptimizer}, so all the AND/OR filters are already
- *       flattened.
- */
+/// The `MergeEqualInFilterOptimizer` merges EQ and IN predicates on the same column joined by OR, and performs
+/// the following optimizations:
+///
+/// - Merge multiple EQ and IN predicates into one IN predicate (or one EQ predicate if possible)
+/// - De-duplicates the values in the IN predicate
+/// - Converts single value IN predicate to EQ predicate
+/// - Pulls up the merged predicate in the absence of other predicates
+///
+/// NOTE: This optimizer follows the [FlattenAndOrFilterOptimizer], so all the AND/OR filters are already
+///       flattened.
 public class MergeEqInFilterOptimizer implements FilterOptimizer {
 
   @Override
@@ -164,10 +161,8 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
     }
   }
 
-  /**
-   * Helper method to get the values from the IN predicate. Returns a map from string representation of the value to the
-   * value.
-   */
+  /// Helper method to get the values from the IN predicate. Returns a map from string representation of the value
+  /// to the value.
   private Map<String, Expression> getInValues(List<Expression> operands) {
     int numOperands = operands.size();
     Map<String, Expression> values = Maps.newHashMapWithExpectedSize(numOperands - 1);
@@ -181,9 +176,7 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
     return values;
   }
 
-  /**
-   * Helper method to construct a EQ or IN predicate filter Expression from the given lhs and values.
-   */
+  /// Helper method to construct a EQ or IN predicate filter Expression from the given lhs and values.
   private static Expression getFilterExpression(Expression lhs, Collection<Expression> values) {
     int numValues = values.size();
     if (numValues == 1) {

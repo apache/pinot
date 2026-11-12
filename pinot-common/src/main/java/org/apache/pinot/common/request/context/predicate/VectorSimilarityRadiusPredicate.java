@@ -23,31 +23,27 @@ import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Predicate for vector similarity radius/threshold search.
- * Returns all documents whose vector distance from the query vector is within the specified threshold.
- *
- * <p>Unlike {@link VectorSimilarityPredicate} which returns a fixed number of top-K results,
- * this predicate returns all documents that satisfy the distance threshold constraint.</p>
- *
- * <p>An internal safety limit caps the maximum number of candidates retrieved from the ANN index
- * before exact distance filtering is applied.</p>
- *
- * <p>Example SQL:</p>
- * <pre>
- *   WHERE VECTOR_SIMILARITY_RADIUS(embedding, ARRAY[1.0, 2.0, 3.0], 0.5)
- * </pre>
- *
- * <p>NOTE: Currently, we only support vector similarity search on float array columns.</p>
- */
+/// Predicate for vector similarity radius/threshold search.
+/// Returns all documents whose vector distance from the query vector is within the specified threshold.
+///
+/// Unlike {@link VectorSimilarityPredicate} which returns a fixed number of top-K results,
+/// this predicate returns all documents that satisfy the distance threshold constraint.
+///
+/// An internal safety limit caps the maximum number of candidates retrieved from the ANN index
+/// before exact distance filtering is applied.
+///
+/// Example SQL:
+/// <pre>
+///   WHERE VECTOR_SIMILARITY_RADIUS(embedding, ARRAY[1.0, 2.0, 3.0], 0.5)
+/// </pre>
+///
+/// NOTE: Currently, we only support vector similarity search on float array columns.
 public class VectorSimilarityRadiusPredicate extends BasePredicate {
   public static final float DEFAULT_THRESHOLD = 0.5f;
-  /**
-   * Default internal candidate limit for index-assisted radius search. This is used as a cap
-   * when retrieving ANN candidates before exact distance filtering. The effective limit is
-   * {@code Math.min(DEFAULT_INTERNAL_LIMIT, numDocs)} so it adapts to small segments.
-   * For large segments, consider increasing this via a query option if results appear truncated.
-   */
+  /// Default internal candidate limit for index-assisted radius search. This is used as a cap
+  /// when retrieving ANN candidates before exact distance filtering. The effective limit is
+  /// {@code Math.min(DEFAULT_INTERNAL_LIMIT, numDocs)} so it adapts to small segments.
+  /// For large segments, consider increasing this via a query option if results appear truncated.
   public static final int DEFAULT_INTERNAL_LIMIT = 100_000;
 
   private final float[] _value;

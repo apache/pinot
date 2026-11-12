@@ -35,10 +35,8 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
-/**
- * Yammer-backed implementation of {@link MetricsInspector}. Uses Yammer's {@link MetricsRegistryListener} to capture
- * metric registrations and provides timer-sum / metered-count readings via Yammer's {@link MetricProcessor}.
- */
+/// Yammer-backed implementation of [MetricsInspector]. Uses Yammer's [MetricsRegistryListener] to capture
+/// metric registrations and provides timer-sum / metered-count readings via Yammer's [MetricProcessor].
 public class YammerMetricsInspector extends MetricsInspector {
   private final Map<MetricName, Metric> _metricMap = new HashMap<>();
   private volatile MetricName _lastMetric;

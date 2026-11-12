@@ -49,16 +49,15 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>FilteredGroupByOperator</code> class provides the operator for group-by query on a single segment when
- * there are 1 or more filter expressions on aggregations.
- */
+/// The `FilteredGroupByOperator` class provides the operator for group-by query on a single segment when
+/// there are 1 or more filter expressions on aggregations.
 @SuppressWarnings("rawtypes")
 public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilteredGroupByOperator.class);
@@ -143,12 +142,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
 
       // Perform aggregation group-by on all the blocks
+      AggregationFunctionColumnPair[] starTreeFunctionColumnPairs = aggregationInfo.getStarTreeFunctionColumnPairs();
       DefaultGroupByExecutor groupByExecutor;
 
-      if (aggregationInfo.isUseStarTree()) {
+      if (starTreeFunctionColumnPairs != null) {
         groupByExecutor =
             new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                groupKeyGenerator);
+                starTreeFunctionColumnPairs, groupKeyGenerator);
       } else {
         groupByExecutor =
             new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,

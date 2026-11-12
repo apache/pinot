@@ -41,11 +41,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Round-trip test: creates a small HNSW index via {@link HnswVectorIndexCreator} with
- * {@code storeInSegmentFile=true}, verifies the combined file is produced, mmaps it, opens a
- * {@link Directory} via {@link HnswVectorIndexBufferReader}, and runs a {@link KnnFloatVectorQuery}.
- */
+/// Round-trip test: creates a small HNSW index via [HnswVectorIndexCreator] with
+/// `storeInSegmentFile=true`, verifies the combined file is produced, mmaps it, opens a
+/// [Directory] via [HnswVectorIndexBufferReader], and runs a [KnnFloatVectorQuery].
 public class HnswVectorIndexCombinedTest {
 
   private static final String COLUMN = "vec";
@@ -142,12 +140,10 @@ public class HnswVectorIndexCombinedTest {
     }
   }
 
-  /**
-   * A truncated/corrupt combined file (whose header advertises more data than is present) must fail
-   * fast instead of spinning forever in the {@code transferTo} extraction loop. Dropping the final
-   * byte leaves the header/metadata intact but makes the last packed file one byte short, so
-   * {@code transferTo} hits EOF with bytes still outstanding.
-   */
+  /// A truncated/corrupt combined file (whose header advertises more data than is present) must fail
+  /// fast instead of spinning forever in the `transferTo` extraction loop. Dropping the final
+  /// byte leaves the header/metadata intact but makes the last packed file one byte short, so
+  /// `transferTo` hits EOF with bytes still outstanding.
   @Test
   public void testExtractThrowsOnTruncatedCombinedFile()
       throws Exception {
@@ -194,9 +190,9 @@ public class HnswVectorIndexCombinedTest {
   }
 
   /// Regression for the consolidated-HNSW docId-mapping byte order. The mapping is packed verbatim
-  /// from the little-endian file-backed sidecar, but the enclosing {@code columns.psf} buffer is
-  /// big-endian. {@code extractDocIdMappingBuffer} must hand back a LITTLE_ENDIAN view so
-  /// {@code DocIdTranslator} reads the Lucene→Pinot doc ids unswapped.
+  /// from the little-endian file-backed sidecar, but the enclosing `columns.psf` buffer is
+  /// big-endian. `extractDocIdMappingBuffer` must hand back a LITTLE_ENDIAN view so
+  /// `DocIdTranslator` reads the Lucene→Pinot doc ids unswapped.
   @Test
   public void testExtractDocIdMappingBufferIsLittleEndian()
       throws Exception {

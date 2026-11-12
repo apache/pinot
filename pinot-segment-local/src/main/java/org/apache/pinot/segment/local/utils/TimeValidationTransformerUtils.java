@@ -33,21 +33,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class for time value validation logic shared between
- * {@link org.apache.pinot.segment.local.recordtransformer.TimeValidationTransformer} and
- * {@link org.apache.pinot.segment.local.columntransformer.TimeValidationColumnTransformer}.
- */
+/// Utility class for time value validation logic shared between
+/// [org.apache.pinot.segment.local.recordtransformer.TimeValidationTransformer] and
+/// [org.apache.pinot.segment.local.columntransformer.TimeValidationColumnTransformer].
 public class TimeValidationTransformerUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeValidationTransformerUtils.class);
 
   private TimeValidationTransformerUtils() {
   }
 
-  /**
-   * Configuration for time validation, holding all state needed to validate time values.
-   * Similar to {@link SanitizationTransformerUtils.SanitizedColumnInfo}.
-   */
+  /// Configuration for time validation, holding all state needed to validate time values.
+  /// Similar to [SanitizationTransformerUtils.SanitizedColumnInfo].
   public static class TimeValidationConfig {
     private final DateTimeFormatSpec _timeFormatSpec;
     private final boolean _continueOnError;
@@ -73,14 +69,12 @@ public class TimeValidationTransformerUtils {
     }
   }
 
-  /**
-   * Create a TimeValidationConfig from table config and schema. Returns null when time validation
-   * is disabled (acts as the isNoOp signal).
-   *
-   * @param tableConfig The table configuration
-   * @param schema The schema
-   * @return TimeValidationConfig if time validation is enabled, null otherwise
-   */
+  /// Create a TimeValidationConfig from table config and schema. Returns null when time validation
+  /// is disabled (acts as the isNoOp signal).
+  ///
+  /// @param tableConfig The table configuration
+  /// @param schema The schema
+  /// @return TimeValidationConfig if time validation is enabled, null otherwise
   @Nullable
   public static TimeValidationConfig getConfig(TableConfig tableConfig, Schema schema) {
     String timeColumnName = tableConfig.getValidationConfig() != null
@@ -102,14 +96,12 @@ public class TimeValidationTransformerUtils {
     return new TimeValidationConfig(timeFormatSpec, continueOnError, throttledLogger);
   }
 
-  /**
-   * Transform (validate) a time value. Returns the value unchanged if valid, null if invalid.
-   * Handles error logging/throwing based on the config's continueOnError setting.
-   *
-   * @param config The time validation configuration
-   * @param value The time value to validate
-   * @return The original value if valid, null if invalid or null input
-   */
+  /// Transform (validate) a time value. Returns the value unchanged if valid, null if invalid.
+  /// Handles error logging/throwing based on the config's continueOnError setting.
+  ///
+  /// @param config The time validation configuration
+  /// @param value The time value to validate
+  /// @return The original value if valid, null if invalid or null input
   @Nullable
   public static Object transformTimeValue(TimeValidationConfig config, @Nullable Object value) {
     if (value == null) {

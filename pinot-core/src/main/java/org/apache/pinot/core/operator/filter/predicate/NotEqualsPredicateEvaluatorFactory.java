@@ -27,35 +27,30 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/**
- * Factory for NEQ predicate evaluators.
- */
+/// Factory for NEQ predicate evaluators.
 public class NotEqualsPredicateEvaluatorFactory {
   private NotEqualsPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based NEQ predicate evaluator.
-   *
-   * @param notEqPredicate NOT_EQ predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
-   * @return Dictionary based NOT_EQ predicate evaluator
-   */
+  /// Create a new instance of dictionary based NEQ predicate evaluator.
+  ///
+  /// @param notEqPredicate NOT_EQ predicate to evaluate
+  /// @param dictionary Dictionary for the column
+  /// @param dataType Data type for the column
+  /// @return Dictionary based NOT_EQ predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NotEqPredicate notEqPredicate,
       Dictionary dictionary, DataType dataType) {
     return new DictionaryBasedNeqPredicateEvaluator(notEqPredicate, dictionary, dataType);
   }
 
-  /**
-   * Create a new instance of raw value based NEQ predicate evaluator.
-   *
-   * @param notEqPredicate NOT_EQ predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based NOT_EQ predicate evaluator
-   */
+  /// Create a new instance of raw value based NEQ predicate evaluator.
+  ///
+  /// @param notEqPredicate NOT_EQ predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based NOT_EQ predicate evaluator
   public static NeqRawPredicateEvaluator newRawValueBasedEvaluator(NotEqPredicate notEqPredicate, DataType dataType) {
     String value = notEqPredicate.getValue();
     switch (dataType) {
@@ -78,6 +73,11 @@ public class NotEqualsPredicateEvaluatorFactory {
         return new StringRawValueBasedNeqPredicateEvaluator(notEqPredicate, value);
       case BYTES:
         return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate, BytesUtils.toBytes(value));
+      // UUID is a logical type stored as 16 raw bytes, so -- like TIMESTAMP over LONG above -- convert the literal to
+      // its stored form and reuse the stored-type evaluator. getDataType() then correctly reports the type applySV
+      // consumes (BYTES), per the PredicateEvaluator contract.
+      case UUID:
+        return new BytesRawValueBasedNeqPredicateEvaluator(notEqPredicate, UuidUtils.toBytes(value));
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }

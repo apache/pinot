@@ -22,10 +22,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 
-/**
- * Response object for the GET /minions/status endpoint.
- * Provides status information for all minion instances including their task counts and drain state.
- */
+/// Response object for the GET /minions/status endpoint.
+/// Provides status information for all minion instances including their task counts and drain state.
 public class MinionStatusResponse {
   private int _currentMinionCount;
   private List<MinionStatus> _minionStatus;
@@ -56,9 +54,7 @@ public class MinionStatusResponse {
     _minionStatus = minionStatus;
   }
 
-  /**
-   * Status information for a single minion instance.
-   */
+  /// Status information for a single minion instance.
   public static class MinionStatus {
     private String _instanceId;
     private String _host;

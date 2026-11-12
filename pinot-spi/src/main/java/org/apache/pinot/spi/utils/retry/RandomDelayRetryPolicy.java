@@ -22,9 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Random;
 
 
-/**
- * Delay policy with random delay between attempts.
- */
+/// Delay policy with random delay between attempts.
 public class RandomDelayRetryPolicy extends BaseRetryPolicy {
   private final static Random RANDOM = new Random(System.currentTimeMillis());
   private final long _minDelayMs;

@@ -22,42 +22,31 @@ import java.io.Serializable;
 import java.util.Map;
 
 
-/**
- * PinotFSSpec defines how to initialize a PinotFS for given scheme.
- *
- */
+/// PinotFSSpec defines how to initialize a PinotFS for given scheme.
 public class PinotFSSpec implements Serializable {
 
-  /**
-   * Scheme used to identify a PinotFS.
-   * E.g. local, hdfs, dbfs, etc
-   */
+  /// Scheme used to identify a PinotFS.
+  /// E.g. local, hdfs, dbfs, etc
   private String _scheme;
 
-  /**
-   * Class name used to create the PinotFS instance.
-   * E.g.
-   *    org.apache.pinot.spi.filesystem.LocalPinotFS is used for local filesystem
-   *    org.apache.pinot.plugin.filesystem.AzurePinotFS is used for Azure Data Lake
-   *    org.apache.pinot.plugin.filesystem.HadoopPinotFS is used for HDFS
-   */
+  /// Class name used to create the PinotFS instance.
+  /// E.g.
+  ///    org.apache.pinot.spi.filesystem.LocalPinotFS is used for local filesystem
+  ///    org.apache.pinot.plugin.filesystem.AzurePinotFS is used for Azure Data Lake
+  ///    org.apache.pinot.plugin.filesystem.HadoopPinotFS is used for HDFS
   private String _className;
 
-  /**
-   * Configs used to init the PinotFS instances.
-   */
+  /// Configs used to init the PinotFS instances.
   private Map<String, String> _configs;
 
   public String getScheme() {
     return _scheme;
   }
 
-  /**
-   * Scheme used to identify a Pinot FileSystem. It should match the scheme in the file uri for access.
-   * E.g. local, hdfs, dbfs, etc
-   *
-   * @param scheme
-   */
+  /// Scheme used to identify a Pinot FileSystem. It should match the scheme in the file uri for access.
+  /// E.g. local, hdfs, dbfs, etc
+  ///
+  /// @param scheme
   public void setScheme(String scheme) {
     _scheme = scheme;
   }
@@ -66,15 +55,13 @@ public class PinotFSSpec implements Serializable {
     return _className;
   }
 
-  /**
-   * Class name used to create the PinotFS instance.
-   * E.g.
-   *    org.apache.pinot.spi.filesystem.LocalPinotFS is used for local filesystem
-   *    org.apache.pinot.plugin.filesystem.AzurePinotFS is used for Azure Data Lake
-   *    org.apache.pinot.plugin.filesystem.HadoopPinotFS is used for HDFS
-   *
-   * @param className
-   */
+  /// Class name used to create the PinotFS instance.
+  /// E.g.
+  ///    org.apache.pinot.spi.filesystem.LocalPinotFS is used for local filesystem
+  ///    org.apache.pinot.plugin.filesystem.AzurePinotFS is used for Azure Data Lake
+  ///    org.apache.pinot.plugin.filesystem.HadoopPinotFS is used for HDFS
+  ///
+  /// @param className
   public void setClassName(String className) {
     _className = className;
   }

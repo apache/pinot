@@ -29,23 +29,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class for segment operation throttlers, contains the common logic for the semaphore and handling the pre and
- * post query serving values. The semaphore cannot be null and must contain >= 0 total permits. A value of 0 acts as
- * a kill switch that blocks all {@link #acquire()} callers until permits are restored via
- * {@link #updatePermits(int, int)} or {@link #startServingQueries()}; negative values are rejected as
- * misconfiguration.
- */
+/// Base class for segment operation throttlers, contains the common logic for the semaphore and handling the pre and
+/// post query serving values. The semaphore cannot be null and must contain >= 0 total permits. A value of 0 acts as
+/// a kill switch that blocks all [#acquire()] callers until permits are restored via
+/// [#updatePermits(int, int)] or [#startServingQueries()]; negative values are rejected as
+/// misconfiguration.
 public class SegmentOperationsThrottler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOperationsThrottler.class);
   protected ServerMetrics _serverMetrics;
   protected AdjustableSemaphore _semaphore;
-  /**
-   * _maxConcurrency and _maxConcurrencyBeforeServingQueries must be >= 0. To effectively disable throttling, set
-   * to a very high value. To halt all operations (kill switch), set to 0; blocked acquirers park until permits are
-   * restored.
-   */
+  /// \_maxConcurrency and \_maxConcurrencyBeforeServingQueries must be >= 0. To effectively disable throttling, set
+  /// to a very high value. To halt all operations (kill switch), set to 0; blocked acquirers park until permits are
+  /// restored.
   protected int _maxConcurrency;
   protected int _maxConcurrencyBeforeServingQueries;
   protected boolean _isServingQueries;
@@ -56,39 +52,33 @@ public class SegmentOperationsThrottler {
   @Nullable
   private final ServerGauge _countGauge;
 
-  /**
-   * Base segment operations throttler constructor
-   * @param maxConcurrency configured concurrency
-   * @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
-   * @param isServingQueries whether the server is ready to serve queries or not
-   */
+  /// Base segment operations throttler constructor
+  /// @param maxConcurrency configured concurrency
+  /// @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
+  /// @param isServingQueries whether the server is ready to serve queries or not
   @VisibleForTesting
   public SegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
       boolean isServingQueries) {
     this(maxConcurrency, maxConcurrencyBeforeServingQueries, isServingQueries, null, null, "");
   }
 
-  /**
-   * Base segment operations throttler constructor
-   * @param maxConcurrency configured concurrency
-   * @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
-   * @param isServingQueries whether the server is ready to serve queries or not
-   * @param throttlerName name of the throttler to be used in logging
-   */
+  /// Base segment operations throttler constructor
+  /// @param maxConcurrency configured concurrency
+  /// @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
+  /// @param isServingQueries whether the server is ready to serve queries or not
+  /// @param throttlerName name of the throttler to be used in logging
   public SegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
       boolean isServingQueries, String throttlerName) {
     this(maxConcurrency, maxConcurrencyBeforeServingQueries, isServingQueries, null, null, throttlerName);
   }
 
-  /**
-   * Base segment operations throttler constructor with gauge parameters
-   * @param maxConcurrency configured concurrency
-   * @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
-   * @param isServingQueries whether the server is ready to serve queries or not
-   * @param thresholdGauge gauge for tracking the throttle threshold metric, or null to skip
-   * @param countGauge gauge for tracking the count metric, or null to skip
-   * @param throttlerName name of the throttler to be used in logging
-   */
+  /// Base segment operations throttler constructor with gauge parameters
+  /// @param maxConcurrency configured concurrency
+  /// @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
+  /// @param isServingQueries whether the server is ready to serve queries or not
+  /// @param thresholdGauge gauge for tracking the throttle threshold metric, or null to skip
+  /// @param countGauge gauge for tracking the count metric, or null to skip
+  /// @param throttlerName name of the throttler to be used in logging
   public SegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
       boolean isServingQueries, @Nullable ServerGauge thresholdGauge, @Nullable ServerGauge countGauge,
       String throttlerName) {
@@ -124,33 +114,27 @@ public class SegmentOperationsThrottler {
         _throttlerName, totalPermits(), availablePermits());
   }
 
-  /**
-   * Updates the throttle threshold metric
-   * @param value value to update the metric to
-   */
+  /// Updates the throttle threshold metric
+  /// @param value value to update the metric to
   public void updateThresholdMetric(int value) {
     if (_thresholdGauge != null) {
       _serverMetrics.setValueOfGlobalGauge(_thresholdGauge, value);
     }
   }
 
-  /**
-   * Updates the throttle count metric
-   * @param value value to update the metric to
-   */
+  /// Updates the throttle count metric
+  /// @param value value to update the metric to
   public void updateCountMetric(int value) {
     if (_countGauge != null) {
       _serverMetrics.setValueOfGlobalGauge(_countGauge, value);
     }
   }
 
-  /**
-   * The ServerMetrics may be created after these throttle objects are created. In that case, the initialization that
-   * happens in the constructor may have occurred on the NOOP metrics. This should be called after the server metrics
-   * are created and registered to ensure the correct metrics object is used and the metrics are updated correctly
-   *
-   * This is called in the same thread as the constructor so there is no need to make _serverMetrics volatile here
-   */
+  /// The ServerMetrics may be created after these throttle objects are created. In that case, the initialization that
+  /// happens in the constructor may have occurred on the NOOP metrics. This should be called after the server metrics
+  /// are created and registered to ensure the correct metrics object is used and the metrics are updated correctly
+  ///
+  /// This is called in the same thread as the constructor so there is no need to make \_serverMetrics volatile here
   public void initializeMetrics() {
     _serverMetrics = ServerMetrics.get();
     updateThresholdMetric(_semaphore.getTotalPermits());
@@ -170,13 +154,11 @@ public class SegmentOperationsThrottler {
         availablePermits());
   }
 
-  /**
-   * Updates the throttler permits based on new configuration values.
-   * This is called by the parent SegmentOperationsThrottlerSet when config changes are detected.
-   *
-   * @param maxConcurrency new max concurrency value
-   * @param maxConcurrencyBeforeServingQueries new max concurrency before serving queries value
-   */
+  /// Updates the throttler permits based on new configuration values.
+  /// This is called by the parent SegmentOperationsThrottlerSet when config changes are detected.
+  ///
+  /// @param maxConcurrency new max concurrency value
+  /// @param maxConcurrencyBeforeServingQueries new max concurrency before serving queries value
   public synchronized void updatePermits(int maxConcurrency, int maxConcurrencyBeforeServingQueries) {
     Preconditions.checkArgument(maxConcurrency >= 0, "Max concurrency must be >= 0, but found: " + maxConcurrency);
     Preconditions.checkArgument(maxConcurrencyBeforeServingQueries >= 0,
@@ -197,16 +179,14 @@ public class SegmentOperationsThrottler {
     LOGGER.info("Throttler {}: Updated total permits: {}", _throttlerName, totalPermits());
   }
 
-  /**
-   * Partial variant of {@link #updatePermits(int, int)}: a {@code null} argument leaves the corresponding value
-   * unchanged. Resolving the current value and writing the new permits happen atomically under this throttler's
-   * lock, so a partial update cannot interleave with another concurrent permit change. This allows a single
-   * changed config to be applied without resetting the other (unchanged) config.
-   *
-   * @param maxConcurrency new max concurrency value, or {@code null} to keep the current value
-   * @param maxConcurrencyBeforeServingQueries new max concurrency before serving queries value, or {@code null} to
-   *     keep the current value
-   */
+  /// Partial variant of [#updatePermits(int, int)]: a `null` argument leaves the corresponding value
+  /// unchanged. Resolving the current value and writing the new permits happen atomically under this throttler's
+  /// lock, so a partial update cannot interleave with another concurrent permit change. This allows a single
+  /// changed config to be applied without resetting the other (unchanged) config.
+  ///
+  /// @param maxConcurrency new max concurrency value, or `null` to keep the current value
+  /// @param maxConcurrencyBeforeServingQueries new max concurrency before serving queries value, or `null` to
+  ///     keep the current value
   public synchronized void updatePermits(@Nullable Integer maxConcurrency,
       @Nullable Integer maxConcurrencyBeforeServingQueries) {
     updatePermits(maxConcurrency == null ? _maxConcurrency : maxConcurrency,
@@ -214,50 +194,40 @@ public class SegmentOperationsThrottler {
             : maxConcurrencyBeforeServingQueries);
   }
 
-  /**
-   * Block trying to acquire the semaphore to perform the segment operation steps unless interrupted.
-   * <p>
-   * {@link #release()} should be called after the segment operation completes. It is the responsibility of the caller
-   * to ensure that {@link #release()} is called exactly once for each call to this method.
-   *
-   * @throws InterruptedException if the current thread is interrupted
-   */
+  /// Block trying to acquire the semaphore to perform the segment operation steps unless interrupted.
+  ///
+  /// [#release()] should be called after the segment operation completes. It is the responsibility of the caller
+  /// to ensure that [#release()] is called exactly once for each call to this method.
+  ///
+  /// @throws InterruptedException if the current thread is interrupted
   public void acquire()
       throws InterruptedException {
     _semaphore.acquire();
     updateCountMetric(_numSegmentsAcquiredSemaphore.incrementAndGet());
   }
 
-  /**
-   * Should be called after the segment operation completes. It is the responsibility of the caller to
-   * ensure that this method is called exactly once for each call to {@link #acquire()}.
-   */
+  /// Should be called after the segment operation completes. It is the responsibility of the caller to
+  /// ensure that this method is called exactly once for each call to [#acquire()].
   public void release() {
     _semaphore.release();
     updateCountMetric(_numSegmentsAcquiredSemaphore.decrementAndGet());
   }
 
-  /**
-   * Get the estimated number of threads waiting for the semaphore
-   * @return the estimated queue length
-   */
+  /// Get the estimated number of threads waiting for the semaphore
+  /// @return the estimated queue length
   public int getQueueLength() {
     return _semaphore.getQueueLength();
   }
 
-  /**
-   * Get the number of available permits
-   * @return number of available permits
-   */
+  /// Get the number of available permits
+  /// @return number of available permits
   @VisibleForTesting
   public int availablePermits() {
     return _semaphore.availablePermits();
   }
 
-  /**
-   * Get the total number of permits
-   * @return total number of permits
-   */
+  /// Get the total number of permits
+  /// @return total number of permits
   @VisibleForTesting
   public int totalPermits() {
     return _semaphore.getTotalPermits();

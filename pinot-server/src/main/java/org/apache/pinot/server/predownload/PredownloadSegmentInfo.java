@@ -127,7 +127,7 @@ public class PredownloadSegmentInfo {
           .setInstanceId(indexLoadingConfig.getInstanceId())
           .setTableDataDir(indexLoadingConfig.getTableDataDir())
           .setSegmentName(_segmentName)
-          .setSegmentCrc(String.valueOf(_crc))
+          .setSegmentCrc(_crc)
           .setSegmentTier(indexLoadingConfig.getSegmentTier())
           .setInstanceTierConfigs(indexLoadingConfig.getInstanceTierConfigs())
           .build();

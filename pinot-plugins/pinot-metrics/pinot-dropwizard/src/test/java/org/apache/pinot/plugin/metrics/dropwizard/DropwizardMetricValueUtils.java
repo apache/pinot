@@ -26,10 +26,8 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.metrics.PinotMetric;
 
 
-/**
- * Dropwizard-specific test utility for reading gauge values directly from the Dropwizard metrics registry. Mirrors the
- * Yammer-side {@code YammerMetricValueUtils}.
- */
+/// Dropwizard-specific test utility for reading gauge values directly from the Dropwizard metrics registry. Mirrors the
+/// Yammer-side `YammerMetricValueUtils`.
 public class DropwizardMetricValueUtils {
   private DropwizardMetricValueUtils() {
   }

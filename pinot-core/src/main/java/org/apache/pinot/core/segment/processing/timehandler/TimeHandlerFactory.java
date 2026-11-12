@@ -25,9 +25,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Factory for TimeHandler.
- */
+/// Factory for TimeHandler.
 public class TimeHandlerFactory {
   private TimeHandlerFactory() {
   }

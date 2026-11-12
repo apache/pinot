@@ -25,9 +25,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
 
 
-/**
- * Holds the pre-check result for each pre-check performed as part of RebalancePreChecker
- */
+/// Holds the pre-check result for each pre-check performed as part of RebalancePreChecker
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class RebalancePreCheckerResult {
@@ -37,11 +35,9 @@ public class RebalancePreCheckerResult {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final String _message;
 
-  /**
-   * Constructor for RebalancePreCheckerResult
-   * @param preCheckStatus server related summary information
-   * @param message segment related summary information
-   */
+  /// Constructor for RebalancePreCheckerResult
+  /// @param preCheckStatus server related summary information
+  /// @param message segment related summary information
   @JsonCreator
   public RebalancePreCheckerResult(@JsonProperty("preCheckStatus") PreCheckStatus preCheckStatus,
       @JsonProperty("message") @Nullable String message) {

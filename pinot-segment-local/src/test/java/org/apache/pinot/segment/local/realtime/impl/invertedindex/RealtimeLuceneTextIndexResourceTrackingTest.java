@@ -263,9 +263,7 @@ public class RealtimeLuceneTextIndexResourceTrackingTest {
     }
   }
 
-  /**
-   * A ThreadAccountant implementation that tracks calls for testing purposes.
-   */
+  /// A ThreadAccountant implementation that tracks calls for testing purposes.
   private static class TrackingAccountant implements ThreadAccountant {
     private final AtomicInteger _setupTaskCount = new AtomicInteger(0);
     private final AtomicInteger _sampleUsageCount = new AtomicInteger(0);

@@ -24,22 +24,20 @@ import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
-import org.apache.pinot.core.operator.DocIdOrderedOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 
 
-/**
- * The operator used when selecting with order-by on a way that the segment layout can be used to prune results.
- *
- * This requires that the first order-by expression is on a column that is sorted in the segment and:
- * 1. The order-by is ASC
- * 2. The order-by is DESC and the input operators support descending iteration (e.g. full scan)
- *
- * @see LinearSelectionOrderByOperator
- */
+/// The operator used when selecting with order-by on a way that the segment layout can be used to prune results.
+///
+/// The planner guarantees the sorted prefix is compatible with the input order. A literal-only prefix accepts any
+/// input order. When the prefix contains a column, it must be sorted in the segment and:
+/// 1. The order-by is ASC
+/// 2. The order-by is DESC and the input operators support descending iteration (e.g. full scan)
+///
+/// @see LinearSelectionOrderByOperator
 public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOrderByOperator {
 
   private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_LINEAR";
@@ -49,22 +47,11 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
   public SelectionPartiallyOrderedByLinearOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
-    boolean firstColIsAsc = queryContext.getOrderByExpressions().stream()
-        .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
-        .findFirst()
-        .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
-        .isAsc();
-    DocIdOrderedOperator.DocIdOrder docIdOrder = DocIdOrderedOperator.DocIdOrder.fromAsc(firstColIsAsc);
-    if (!projectOperator.isCompatibleWith(docIdOrder)) {
-      throw new IllegalStateException(EXPLAIN_NAME + " requires the input operator to be compatible with order: "
-          + docIdOrder + ", but found: " + projectOperator.toExplainString());
-    }
   }
 
   @Override
   protected List<Object[]> fetch(Supplier<ListBuilder> listBuilderSupplier) {
-    int numExpressions = _expressions.size();
-    BlockValSet[] blockValSets = new BlockValSet[numExpressions];
+    BlockValSet[] blockValSets = new BlockValSet[_numOrderByExpressions];
     ListBuilder listBuilder = listBuilderSupplier.get();
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {

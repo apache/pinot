@@ -32,18 +32,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Data Server layer state model to take over how to operate on:
- * 1. Add a new segment
- * 2. Refresh an existed now serving segment.
- * 3. Delete an existed segment.
- */
+/// Data Server layer state model to take over how to operate on:
+/// 1. Add a new segment
+/// 2. Refresh an existed now serving segment.
+/// 3. Delete an existed segment.
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
 
   protected final String _instanceId;
   protected final InstanceDataManager _instanceDataManager;
-  /** Provides custom thread pools for executing Helix state transition messages. If this is null, all state
-   * transition message will be executed using the default shared thread pool by Helix */
+  /// Provides custom thread pools for executing Helix state transition messages. If this is null, all state
+  /// transition message will be executed using the default shared thread pool by Helix
   @Nullable
   protected final StateTransitionThreadPoolManager _stateTransitionThreadPoolManager;
 
@@ -151,10 +149,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       }
     }
 
-    /**
-     * Should be invoked after segment is offloaded and deleted so that it can safely release the resources from table
-     * data manager.
-     */
+    /// Should be invoked after segment is offloaded and deleted so that it can safely release the resources from table
+    /// data manager.
     private void onConsumingToDropped(String realtimeTableName, String segmentName) {
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
       if (tableDataManager == null) {
@@ -255,18 +251,16 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     }
   }
 
-  /**
-   * Get thread pool to handle the given state transition message.
-   * If this method returns null, the threadpool returned from
-   * {@link StateModelFactory#getExecutorService(String resourceName, String fromState, String toState)} will be used;
-   * If this method returns null the threadpool returned from
-   * {@link StateModelFactory#getExecutorService(String resourceName)} will be used.
-   * If that method return null too, then the default shared threadpool will be used.
-   * This method may be called only once for each category of messages,
-   * it will NOT be called during each state transition.
-   * @param messageInfo contains information used to categorize messages to use different threadpools
-   * @return An object contains the MessageIdentifierBase and the assigned threadpool for the input message
-   */
+  /// Get thread pool to handle the given state transition message.
+  /// If this method returns null, the threadpool returned from
+  /// [StateModelFactory#getExecutorService(String resourceName, String fromState, String toState)] will be used;
+  /// If this method returns null the threadpool returned from
+  /// [StateModelFactory#getExecutorService(String resourceName)] will be used.
+  /// If that method return null too, then the default shared threadpool will be used.
+  /// This method may be called only once for each category of messages,
+  /// it will NOT be called during each state transition.
+  /// @param messageInfo contains information used to categorize messages to use different threadpools
+  /// @return An object contains the MessageIdentifierBase and the assigned threadpool for the input message
   @Override
   @Nullable
   public CustomizedExecutorService getExecutorService(Message.MessageInfo messageInfo) {

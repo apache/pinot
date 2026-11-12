@@ -156,9 +156,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     LOGGER.info("Initialized BrokerGrpcServer on port: {}", portToUse);
   }
 
-  /**
-   * Registers buffer metrics for the given allocator.
-   */
+  /// Registers buffer metrics for the given allocator.
   private void registerBufferMetrics(PooledByteBufAllocator bufAllocator, BrokerMetrics brokerMetrics) {
     PooledByteBufAllocatorMetric metric = bufAllocator.metric();
     brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.GRPC_NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
@@ -230,10 +228,11 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(query, requestJsonNode);
     } catch (Exception e) {
+      QueryErrorCode errorCode = QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING);
       BrokerResponse brokerResponse;
       Broker.BrokerResponse errorBlock;
       try {
-        brokerResponse = new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+        brokerResponse = new BrokerResponseNative(errorCode, e.getMessage());
         errorBlock = Broker.BrokerResponse.newBuilder().setPayload(ByteString.copyFrom(
             brokerResponse.toJsonString().getBytes())).build();
       } catch (IOException ex) {

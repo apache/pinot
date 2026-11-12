@@ -19,35 +19,77 @@
 package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.Futures;
-import java.net.InetSocketAddress;
+import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
+import io.netty.channel.ChannelPromise;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.util.ReferenceCountUtil;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
-import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
+import org.apache.thrift.TDeserializer;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.core.transport.QueryServerTestUtils.startAndGetPort;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -117,29 +159,60 @@ public class QueryRoutingTest {
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes, int port) {
-    InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(),
-        mockQueryScheduler(responseDelayMs, responseBytes), mock(AccessControl.class),
-        ThreadAccountantUtils.getNoOpAccountant());
-    return new QueryServer(port, null, handler);
+    return getQueryServer(responseDelayMs, PinotByteBuffer.wrap(responseBytes), port);
   }
 
-  /**
-   * Starts the query server and returns the actual bound port. Uses port 0 to let the OS assign a free port,
-   * avoiding TOCTOU race conditions. {@link QueryServer#start()} blocks on {@code bind().sync()}, so the
-   * server is ready to accept connections when this method returns.
-   */
-  private int startAndGetPort(QueryServer server) {
-    server.start();
-    return ((InetSocketAddress) server.getChannel().localAddress()).getPort();
-  }
-
-  private QueryScheduler mockQueryScheduler(int responseDelayMs, byte[] responseBytes) {
-    QueryScheduler queryScheduler = mock(QueryScheduler.class);
-    when(queryScheduler.submit(any())).thenAnswer(invocation -> {
-      Thread.sleep(responseDelayMs);
-      return Futures.immediateFuture(responseBytes);
+  private QueryServer getQueryServer(int responseDelayMs, DataBuffer response, int port) {
+    return QueryServerTestUtils.newQueryServer(port, queryRequest -> {
+      Uninterruptibles.sleepUninterruptibly(responseDelayMs, TimeUnit.MILLISECONDS);
+      return Futures.immediateFuture(response);
     });
-    return queryScheduler;
+  }
+
+  private QueryRouter newIsolatedQueryRouter() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    ServerRoutingStatsManager statsManager =
+        new ServerRoutingStatsManager(new PinotConfiguration(properties), mock(BrokerMetrics.class));
+    statsManager.init();
+    return new QueryRouter("testBroker", null, null, statsManager, ThreadAccountantUtils.getNoOpAccountant());
+  }
+
+  private QueryRouter newIsolatedQueryRouter(int unansweredQueriesThreshold, long unansweredQueryGraceMs) {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    ServerRoutingStatsManager statsManager =
+        new ServerRoutingStatsManager(new PinotConfiguration(properties), mock(BrokerMetrics.class));
+    statsManager.init();
+    return new QueryRouter("testBroker", null, null, statsManager, ThreadAccountantUtils.getNoOpAccountant(),
+        unansweredQueriesThreshold, unansweredQueryGraceMs);
+  }
+
+  private AsyncQueryResponse submitRealtimeQuery(QueryRouter queryRouter, long requestId, long timeoutMs)
+      throws Exception {
+    AsyncQueryResponse asyncQueryResponse =
+        queryRouter.submitQuery(requestId, "testTable", null, null, BROKER_REQUEST, _routingTable, timeoutMs);
+    asyncQueryResponse.getFinalResponses();
+    return asyncQueryResponse;
+  }
+
+  private static void waitForUnansweredQueries(QueryRouter queryRouter, ServerRoutingInstance instance, int expected) {
+    TestUtils.waitForCondition(aVoid -> queryRouter.getUnansweredQueries(instance) == expected, 10L, 5_000L,
+        "Expected " + expected + " unanswered queries counted against " + instance);
+  }
+
+  /// A server that answers nothing until the test completes the current gate, and then answers every request it has
+  /// queued; the gate can be swapped to hold the next requests again. The scheduler returns the gate itself, so the
+  /// server's event loop is never blocked and keeps reading requests (and noticing closed connections).
+  private QueryServer getGatedQueryServer(AtomicReference<SettableFuture<DataBuffer>> gate) {
+    return QueryServerTestUtils.newQueryServer(queryRequest -> gate.get());
+  }
+
+  private static byte[] responseBytesForRequest(long requestId)
+      throws Exception {
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    return dataTable.toBytes();
   }
 
   @Test
@@ -201,6 +274,51 @@ public class QueryRoutingTest {
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
   }
 
+  /// The server sends a response that is split into many pages. The broker must receive the same table.
+  @Test
+  public void testPagedResponse()
+      throws Exception {
+    long requestId = 123;
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"bytes"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BYTES});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    int numRows = 200;
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      dataTableBuilder.startRow();
+      byte[] value = new byte[10_000];
+      Arrays.fill(value, (byte) rowId);
+      dataTableBuilder.setColumn(0, new ByteArray(value));
+      dataTableBuilder.finishRow();
+    }
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    DataBuffer response = dataTable.toDataBuffer();
+    List<ByteBuffer> responseBuffers = new ArrayList<>();
+    response.appendAsByteBuffers(responseBuffers);
+    assertTrue(responseBuffers.size() > 100, "Expected the response in many pages: " + responseBuffers.size());
+
+    _queryServer = getQueryServer(0, response, 0);
+    initializeTestFixtures(startAndGetPort(_queryServer));
+
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 600_000L);
+    Map<ServerRoutingInstance, ServerResponse> responses = asyncQueryResponse.getFinalResponses();
+    assertEquals(responses.size(), 1);
+    ServerResponse serverResponse = responses.get(_offlineServerRoutingInstance);
+    assertNotNull(serverResponse);
+    assertEquals(serverResponse.getResponseSize(), response.size());
+    DataTable receivedDataTable = serverResponse.getDataTable();
+    assertNotNull(receivedDataTable);
+    assertEquals(receivedDataTable.getNumberOfRows(), numRows);
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      byte[] expected = new byte[10_000];
+      Arrays.fill(expected, (byte) rowId);
+      assertEquals(receivedDataTable.getBytes(rowId, 0).getBytes(), expected);
+    }
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+  }
+
   @Test
   public void testInvalidResponse()
       throws Exception {
@@ -224,6 +342,12 @@ public class QueryRoutingTest {
     assertEquals(serverResponse.getDeserializationTimeMs(), 0);
     // Query should time out
     assertTrue(System.currentTimeMillis() - startTimeMs >= 1000);
+    // A request left unanswered until the deadline produces a timeout and nothing else: the send succeeded and the
+    // channel was never torn down, so no failed server is reported. This is why the broker's failure detector cannot
+    // rely on getFailedServer() alone -- see FailureDetector#notifyServerNotResponded.
+    assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.TIMED_OUT);
+    assertNull(asyncQueryResponse.getException());
+    assertNull(asyncQueryResponse.getFailedServer());
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
@@ -555,6 +679,809 @@ public class QueryRoutingTest {
         _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance1.getInstanceId()).intValue(), 0);
     assertEquals(
         _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance2.getInstanceId()).intValue(), 0);
+  }
+
+  @Test
+  public void testSkipUnavailableServerChannelInactive()
+      throws Exception {
+    long requestId = 123;
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"column1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    builder.startRow();
+    builder.setColumn(0, "value1");
+    builder.finishRow();
+    DataTable dataTableSuccess = builder.build();
+    dataTableSuccess.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    byte[] successResponseBytes = dataTableSuccess.toBytes();
+
+    // The healthy server responds after a delay; the second server has a warm channel established during submitQuery
+    // and its channel then goes inactive mid-flight (Path 2) before it can respond.
+    long healthyDelayMs = 1000L;
+    long timeoutMs = 10_000L;
+    _queryServer = getQueryServer((int) healthyDelayMs, successResponseBytes, 0);
+    int healthyPort = startAndGetPort(_queryServer);
+    // Long delay so this server never actually responds during the test
+    QueryServer unavailableServer = getQueryServer(60_000, successResponseBytes, 0);
+    int unavailablePort = startAndGetPort(unavailableServer);
+    // Isolated broker
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+
+    try {
+      ServerInstance healthyInstance = new ServerInstance("localhost", healthyPort);
+      ServerInstance unavailableInstance = new ServerInstance("localhost", unavailablePort);
+      ServerRoutingInstance healthyRoutingInstance =
+          healthyInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      ServerRoutingInstance unavailableRoutingInstance =
+          unavailableInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      Map<ServerInstance, SegmentsToQuery> routingTable =
+          Map.of(healthyInstance, new SegmentsToQuery(List.of(), List.of()),
+              unavailableInstance, new SegmentsToQuery(List.of(), List.of()));
+
+      BrokerRequest brokerRequest =
+          CalciteSqlCompiler.compileToBrokerRequest("SET skipUnavailableServers=true; SELECT * FROM testTable");
+      long startTime = System.currentTimeMillis();
+      AsyncQueryResponse asyncQueryResponse =
+          queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, timeoutMs);
+      // Confirm the request was actually dispatched to the unavailable server (its channel went live) so this is a
+      // genuine Path 2 (channel dies AFTER dispatch), not a send-time failure. The server is up, so the write succeeds
+      // within milliseconds.
+      ServerResponse unavailableDispatch = asyncQueryResponse.getCurrentResponses().get(unavailableRoutingInstance);
+      TestUtils.waitForCondition(aVoid -> unavailableDispatch.getRequestSentDelayMs() >= 0, 10L, 5000L,
+          "Request was not dispatched to the unavailable server");
+      // Drive the mid-flight channel-inactive event through the real broker inbound handler
+      new DataTableHandler(queryRouter, ThreadAccountantUtils.getNoOpAccountant(), unavailableRoutingInstance)
+          .channelInactive(mock(ChannelHandlerContext.class));
+
+      Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+      long elapsed = System.currentTimeMillis() - startTime;
+
+      assertEquals(response.size(), 2);
+      ServerResponse healthyResponse = response.get(healthyRoutingInstance);
+      ServerResponse unavailableResponse = response.get(unavailableRoutingInstance);
+      // The healthy server returned data; the unavailable server did not.
+      assertNotNull(healthyResponse.getDataTable());
+      assertNull(unavailableResponse.getDataTable());
+      // No BROKER_REQUEST_SEND (425): the query degraded to partial results instead of failing.
+      assertNull(asyncQueryResponse.getException());
+      assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.COMPLETED);
+      // The down server is still recorded so the failure detector can quarantine it from routing.
+      assertEquals(asyncQueryResponse.getFailedServer(), unavailableRoutingInstance);
+      // We waited for the healthy server (the latch was not force-drained) and returned well before the timeout.
+      // If the bug were present, markQueryFailed would force-drain the latch and return almost immediately.
+      assertTrue(elapsed >= healthyDelayMs, "Expected to wait for the healthy server, elapsed=" + elapsed);
+      assertTrue(elapsed < timeoutMs, "Expected to return before timeout, elapsed=" + elapsed);
+    } finally {
+      unavailableServer.shutDown();
+      queryRouter.shutDown();
+    }
+  }
+
+  /// Control for [#testSkipUnavailableServerChannelInactive]: the same channel-inactive-mid-flight scenario but
+  /// WITHOUT `skipUnavailableServers` must still fail the whole query
+  @Test
+  public void testChannelInactiveWithoutSkipFailsQuery()
+      throws Exception {
+    long requestId = 123;
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"column1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    builder.startRow();
+    builder.setColumn(0, "value1");
+    builder.finishRow();
+    DataTable dataTableSuccess = builder.build();
+    dataTableSuccess.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    byte[] successResponseBytes = dataTableSuccess.toBytes();
+
+    long timeoutMs = 10_000L;
+    // Healthy server delay is set well above the deterministic fail-fast path
+    long healthyDelayMs = 4000L;
+    _queryServer = getQueryServer((int) healthyDelayMs, successResponseBytes, 0);
+    int healthyPort = startAndGetPort(_queryServer);
+    // Long delay so this server never actually responds during the test
+    QueryServer unavailableServer = getQueryServer(60_000, successResponseBytes, 0);
+    int unavailablePort = startAndGetPort(unavailableServer);
+    // Isolated broker
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+
+    try {
+      ServerInstance healthyInstance = new ServerInstance("localhost", healthyPort);
+      ServerInstance unavailableInstance = new ServerInstance("localhost", unavailablePort);
+      ServerRoutingInstance unavailableRoutingInstance =
+          unavailableInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      Map<ServerInstance, SegmentsToQuery> routingTable =
+          Map.of(healthyInstance, new SegmentsToQuery(List.of(), List.of()),
+              unavailableInstance, new SegmentsToQuery(List.of(), List.of()));
+
+      // No skipUnavailableServers option set.
+      long startTime = System.currentTimeMillis();
+      AsyncQueryResponse asyncQueryResponse =
+          queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, routingTable, null, null, timeoutMs);
+      // Confirm the request was actually dispatched to the unavailable server (its channel went live) so this is a
+      // genuine Path 2 (channel dies AFTER dispatch), not a send-time failure.
+      ServerResponse unavailableDispatch = asyncQueryResponse.getCurrentResponses().get(unavailableRoutingInstance);
+      TestUtils.waitForCondition(aVoid -> unavailableDispatch.getRequestSentDelayMs() >= 0, 10L, 5000L,
+          "Request was not dispatched to the unavailable server");
+      // Drive the mid-flight channel-inactive event through the real broker inbound handler, deterministically (see the
+      // rationale in testSkipUnavailableServerChannelInactive).
+      new DataTableHandler(queryRouter, ThreadAccountantUtils.getNoOpAccountant(), unavailableRoutingInstance)
+          .channelInactive(mock(ChannelHandlerContext.class));
+
+      Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+      long elapsed = System.currentTimeMillis() - startTime;
+
+      assertEquals(response.size(), 2);
+      // Without the flag the query fails: the exception is set (becomes a 425 downstream) and status is FAILED.
+      assertNotNull(asyncQueryResponse.getException());
+      assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.FAILED);
+      assertEquals(asyncQueryResponse.getFailedServer(), unavailableRoutingInstance);
+      // The latch is force-drained, so the query fails fast — it returns before the healthy server's delay elapses
+      // rather than waiting it out (and well before the timeout).
+      assertTrue(elapsed < healthyDelayMs, "Expected to fail fast before the healthy server responded, elapsed="
+          + elapsed);
+    } finally {
+      unavailableServer.shutDown();
+      queryRouter.shutDown();
+    }
+  }
+
+  /// Readmission of a restarted server: every cached channel to it, one per table type, is closed and forgotten,
+  /// and the next query reconnects instead of writing into the channels of the previous process.
+  @Test
+  public void testEvictChannelsDropsBothTableTypesAndNextQueryReconnects()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    byte[] responseBytes = dataTable.toBytes();
+    _queryServer = getQueryServer(0, responseBytes);
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try {
+      // Nothing cached yet
+      assertEquals(queryRouter.evictChannels(_serverInstance), 0);
+
+      // A hybrid query opens one channel per table type
+      AsyncQueryResponse asyncQueryResponse =
+          queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, BROKER_REQUEST, _routingTable,
+              10_000L);
+      Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+      assertEquals(response.size(), 2);
+      assertNotNull(response.get(_offlineServerRoutingInstance).getDataTable());
+      assertNotNull(response.get(_realtimeServerRoutingInstance).getDataTable());
+      assertTrue(queryRouter.hasChannel(_serverInstance));
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 2, 10L, 5_000L,
+          "Expected one channel per table type on the server");
+
+      assertEquals(queryRouter.evictChannels(_serverInstance), 2);
+      assertEquals(queryRouter.evictChannels(_serverInstance), 0, "Nothing left to evict");
+      assertFalse(queryRouter.hasChannel(_serverInstance), "No channel left for the transport to vouch for");
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 0, 10L, 5_000L,
+          "Evicted channels were not closed");
+
+      // The next query reconnects and succeeds
+      asyncQueryResponse =
+          queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, BROKER_REQUEST, _routingTable,
+              10_000L);
+      response = asyncQueryResponse.getFinalResponses();
+      assertEquals(response.size(), 2);
+      assertNotNull(response.get(_offlineServerRoutingInstance).getDataTable());
+      assertNotNull(response.get(_realtimeServerRoutingInstance).getDataTable());
+      assertNull(asyncQueryResponse.getException());
+      assertTrue(queryRouter.hasChannel(_serverInstance));
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 2, 10L, 5_000L,
+          "Expected fresh channels on the server");
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
+  /// A server toggled off and on again, not restarted, answers the query in flight on its old channel, while the next
+  /// query goes to a fresh connection; the old channel is closed once the query on it is past its deadline. A channel
+  /// that carries nothing is evicted, which costs the next query a reconnect.
+  @Test
+  public void testEnabledServerRetiresChannelThatCarriesQueries()
+      throws Exception {
+    long heldRequestId = 201;
+    long heldTimeoutMs = 2_000L;
+    SettableFuture<DataBuffer> heldAnswer = SettableFuture.create();
+    _queryServer = QueryServerTestUtils.newQueryServer(
+        queryRequest -> queryRequest.getRequestId() == heldRequestId ? heldAnswer
+            : Futures.immediateFuture(answerTo(queryRequest.getRequestId())));
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter router = newIsolatedQueryRouter();
+    try {
+      // Nothing left on the channel once its query is answered: evicted
+      AsyncQueryResponse answered =
+          router.submitQuery(202L, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+      assertNotNull(answered.getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+      Channel idleChannel = router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
+      assertEquals(router.evictChannelsOfEnabledServer(_serverInstance), 1);
+      TestUtils.waitForCondition(aVoid -> !idleChannel.isActive(), 10L, 5_000L, "Evicted channel was not closed");
+
+      // A query the server is still working on keeps its channel open across the enable
+      AsyncQueryResponse held =
+          router.submitQuery(heldRequestId, "testTable", BROKER_REQUEST, _routingTable, null, null, heldTimeoutMs);
+      Channel retiredChannel =
+          router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
+      assertNotSame(retiredChannel, idleChannel);
+      assertEquals(router.evictChannelsOfEnabledServer(_serverInstance), 0);
+      assertTrue(retiredChannel.isActive());
+
+      // The next query goes to a fresh connection
+      AsyncQueryResponse next =
+          router.submitQuery(203L, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+      assertNotNull(next.getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+      Channel freshChannel =
+          router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
+      assertNotSame(freshChannel, retiredChannel);
+      assertTrue(retiredChannel.isActive());
+      assertEquals(held.getStatus(), QueryResponse.Status.IN_PROGRESS);
+
+      // The held query is answered on the old channel, which is closed once that query is past its deadline
+      heldAnswer.set(answerTo(heldRequestId));
+      assertNotNull(held.getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+      assertEquals(held.getStatus(), QueryResponse.Status.COMPLETED);
+      TestUtils.waitForCondition(aVoid -> !retiredChannel.isActive(), 10L,
+          heldTimeoutMs + ServerChannels.RETIRED_CHANNEL_CLOSE_GRACE_MS + 5_000L, "Retired channel was not closed");
+      assertTrue(freshChannel.isActive());
+    } finally {
+      router.shutDown();
+    }
+  }
+
+  private static DataBuffer answerTo(long requestId) {
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    try {
+      return PinotByteBuffer.wrap(dataTable.toBytes());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /// A query rejected because the channel's outbound queue is full fails, or skips the server, without reporting the
+  /// server: that is backpressure, which a healthy server draining a large request causes too.
+  @Test(dataProvider = "skipUnavailable")
+  public void testUnwritableRejectionDoesNotReportServer(boolean skip)
+      throws Exception {
+    initializeTestFixtures(12345);
+    QueryRouter router = newIsolatedQueryRouter();
+    try {
+      Channel unwritableChannel = mock(Channel.class);
+      when(unwritableChannel.isActive()).thenReturn(true);
+      when(unwritableChannel.isWritable()).thenReturn(false);
+      router.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance).setChannel(unwritableChannel);
+      BrokerRequest request = CalciteSqlCompiler.compileToBrokerRequest(
+          "SET skipUnavailableServers=" + skip + "; SELECT * FROM testTable");
+
+      AsyncQueryResponse response = router.submitQuery(301L, "testTable", request, _routingTable, null, null, 10_000L);
+      response.getFinalResponses();
+      assertEquals(response.getStatus(), skip ? QueryResponse.Status.COMPLETED : QueryResponse.Status.FAILED);
+      assertNull(response.getFailedServer());
+      verify(unwritableChannel, never()).writeAndFlush(any());
+    } finally {
+      router.shutDown();
+    }
+  }
+
+  @DataProvider
+  public Object[][] skipUnavailable() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  /// Hold the old inactive event until the replacement query is registered, first before and then after pinning.
+  @SuppressWarnings("unchecked")
+  @Test(dataProvider = "skipUnavailable")
+  public void testDelayedRetiredChannelInactiveDoesNotFailReplacement(boolean skip)
+      throws Exception {
+    _queryServer = QueryServerTestUtils.newQueryServer(queryRequest -> SettableFuture.create());
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter router = newIsolatedQueryRouter();
+    ExecutorService sender = Executors.newSingleThreadExecutor();
+    ServerChannels.ServerChannel replacement = null;
+    boolean locked = false;
+    try {
+      BrokerRequest request = CalciteSqlCompiler.compileToBrokerRequest(
+          "SET skipUnavailableServers=" + skip + "; SELECT * FROM testTable");
+      Field channelsField = QueryRouter.class.getDeclaredField("_serverChannels");
+      channelsField.setAccessible(true);
+      ServerChannels channels = (ServerChannels) channelsField.get(router);
+      Field responsesField = QueryRouter.class.getDeclaredField("_asyncQueryResponseMap");
+      responsesField.setAccessible(true);
+      Map<Long, AsyncQueryResponse> responses =
+          (ConcurrentHashMap<Long, AsyncQueryResponse>) responsesField.get(router);
+      AsyncQueryResponse old = router.submitQuery(101L, "testTable", request, _routingTable, null, null, 10_000L);
+      Channel oldChannel = channels.getOrCreateServerChannel(_offlineServerRoutingInstance)._channel;
+      DataTableHandler oldHandler = oldChannel.pipeline().get(DataTableHandler.class);
+      AtomicReference<ChannelHandlerContext> delayedInactive = new AtomicReference<>();
+      CountDownLatch inactiveArrived = new CountDownLatch(1);
+      oldChannel.eventLoop().submit(() -> oldChannel.pipeline().addBefore(
+          oldChannel.pipeline().context(oldHandler).name(), "delayInactive", new ChannelInboundHandlerAdapter() {
+            @Override
+            public void channelInactive(ChannelHandlerContext ctx) {
+              delayedInactive.set(ctx);
+              inactiveArrived.countDown();
+            }
+          })).sync();
+      assertEquals(router.evictChannels(_serverInstance), 1);
+      assertTrue(inactiveArrived.await(5L, TimeUnit.SECONDS));
+      replacement = channels.getOrCreateServerChannel(_offlineServerRoutingInstance);
+      replacement._channelLock.lock();
+      locked = true;
+      Future<AsyncQueryResponse> submitted = sender.submit(
+          () -> router.submitQuery(102L, "testTable", request, _routingTable, null, null, 10_000L));
+      TestUtils.waitForCondition(aVoid -> responses.containsKey(102L), 10L, 5_000L, "New query was not registered");
+      AsyncQueryResponse fresh = responses.get(102L);
+      // This is the real old handler and context captured by eviction, rather than an invented server-down event.
+      oldHandler.channelInactive(delayedInactive.get());
+      assertEquals(fresh.getStatus(), QueryResponse.Status.IN_PROGRESS);
+      assertNull(fresh.getFailedServer(), "A broker close must ignore a query that has not selected its channel yet");
+      assertNull(fresh.getException());
+      replacement._channelLock.unlock();
+      locked = false;
+      assertSame(submitted.get(5L, TimeUnit.SECONDS), fresh);
+      assertNotSame(replacement._channel, oldChannel);
+      oldHandler.channelInactive(delayedInactive.get());
+      assertEquals(fresh.getStatus(), QueryResponse.Status.IN_PROGRESS);
+      assertNull(fresh.getFailedServer());
+      assertNull(fresh.getException());
+      old.getFinalResponses();
+      assertEquals(old.getStatus(), skip ? QueryResponse.Status.COMPLETED : QueryResponse.Status.FAILED);
+      assertNull(old.getFailedServer(), "A broker-initiated close must not blame the server");
+      DataTable data = DataTableBuilderFactory.getEmptyDataTable();
+      data.getMetadata().put(MetadataKey.REQUEST_ID.getName(), "102");
+      router.receiveDataTable(_offlineServerRoutingInstance, data, 0, 0);
+      assertNotNull(fresh.getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+      assertEquals(fresh.getStatus(), QueryResponse.Status.COMPLETED);
+      AsyncQueryResponse genuine = router.submitQuery(103L, "testTable", request, _routingTable, null, null, 10_000L);
+      ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
+      when(ctx.channel()).thenReturn(replacement._channel);
+      replacement._channel.pipeline().get(DataTableHandler.class).channelInactive(ctx);
+      genuine.getFinalResponses();
+      assertEquals(genuine.getStatus(), skip ? QueryResponse.Status.COMPLETED : QueryResponse.Status.FAILED);
+      assertEquals(genuine.getFailedServer(), _offlineServerRoutingInstance);
+    } finally {
+      if (locked) {
+        replacement._channelLock.unlock();
+      }
+      sender.shutdownNow();
+      router.shutDown();
+    }
+  }
+
+  /// The retry probe used to look at the OFFLINE channel only. On a realtime-only cluster it therefore had no
+  /// channel to check, answered UNKNOWN, and the failure detector readmitted the server onto whatever channel was
+  /// cached.
+  @Test
+  public void testRetryProbeCoversRealtimeOnlyChannel()
+      throws Exception {
+    long requestId = 123;
+    _queryServer = getQueryServer(0, responseBytesForRequest(requestId));
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try {
+      assertFalse(queryRouter.hasChannel(_serverInstance), "No query sent yet");
+
+      AsyncQueryResponse asyncQueryResponse =
+          queryRouter.submitQuery(requestId, "testTable", null, null, BROKER_REQUEST, _routingTable, 10_000L);
+      assertNotNull(asyncQueryResponse.getFinalResponses().get(_realtimeServerRoutingInstance).getDataTable());
+      assertTrue(queryRouter.hasChannel(_serverInstance), "The REALTIME channel carries queries");
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 1, 10L, 5_000L,
+          "Expected the REALTIME channel on the server");
+      SocketChannel healthyChannel = _queryServer.getConnectedChannels().iterator().next();
+
+      // A healthy channel passes the probe and is kept, not replaced
+      assertTrue(queryRouter.connect(_serverInstance));
+      assertEquals(_queryServer.getConnectedChannelCount(), 1);
+      assertSame(_queryServer.getConnectedChannels().iterator().next(), healthyChannel);
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
+  /// A dead channel that still reports active answers nothing. Each unanswered query is judged a grace period after
+  /// its timeout; at the threshold the server is reported, and the channel is replaced by the next query to it
+  /// (so recovery does not depend on a failure detector being configured) or by the detector's probe. Timeouts
+  /// themselves never fail the query or blame the server on the spot.
+  @Test
+  public void testUnansweredQueriesReportServerAndReplaceChannel()
+      throws Exception {
+    long requestId = 123;
+    // Never completed: the server answers nothing for the whole test
+    AtomicReference<SettableFuture<DataBuffer>> gate = new AtomicReference<>(SettableFuture.create());
+    _queryServer = getGatedQueryServer(gate);
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    int threshold = 3;
+    long timeoutMs = 300L;
+    long graceMs = 200L;
+    QueryRouter queryRouter = newIsolatedQueryRouter(threshold, graceMs);
+    List<ServerRoutingInstance> reported = new CopyOnWriteArrayList<>();
+    queryRouter.setUnansweredServerReporter(reported::add);
+    try {
+      for (int i = 1; i <= threshold; i++) {
+        AsyncQueryResponse asyncQueryResponse = submitRealtimeQuery(queryRouter, requestId, timeoutMs);
+        assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.TIMED_OUT);
+        assertNull(asyncQueryResponse.getFailedServer(), "A timeout blames nobody on the spot");
+        assertNull(asyncQueryResponse.getException(), "A timeout is not a send failure");
+        // Judged a grace period later; the count resets once the threshold is reached
+        waitForUnansweredQueries(queryRouter, _realtimeServerRoutingInstance, i < threshold ? i : 0);
+      }
+      TestUtils.waitForCondition(aVoid -> reported.equals(List.of(_realtimeServerRoutingInstance)), 10L, 5_000L,
+          "The server was not reported after " + threshold + " unanswered queries");
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 1, 10L, 5_000L,
+          "Expected the REALTIME channel on the server");
+      SocketChannel suspectChannel = _queryServer.getConnectedChannels().iterator().next();
+
+      // The next query is written to a fresh connection and the suspect channel is closed, without the server being
+      // reported again for the close
+      AsyncQueryResponse asyncQueryResponse = submitRealtimeQuery(queryRouter, requestId, timeoutMs);
+      assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.TIMED_OUT);
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 1
+          && _queryServer.getConnectedChannels().iterator().next() != suspectChannel, 10L, 5_000L,
+          "The suspect channel was not replaced by the next query");
+      assertEquals(reported.size(), 1);
+      assertTrue(queryRouter.hasChannel(_serverInstance));
+
+      // The probe keeps the fresh channel ...
+      SocketChannel freshChannel = _queryServer.getConnectedChannels().iterator().next();
+      assertTrue(queryRouter.connect(_serverInstance));
+      assertEquals(_queryServer.getConnectedChannelCount(), 1);
+      assertSame(_queryServer.getConnectedChannels().iterator().next(), freshChannel);
+
+      // ... and replaces it once it is suspect in turn, which is the path the failure detector takes after a report
+      // (the first unanswered query above already counted once against the fresh channel)
+      for (int i = 2; i <= threshold; i++) {
+        submitRealtimeQuery(queryRouter, requestId, timeoutMs);
+      }
+      TestUtils.waitForCondition(aVoid -> reported.size() == 2, 10L, 5_000L, "The server was not reported again");
+      assertTrue(queryRouter.connect(_serverInstance));
+      TestUtils.waitForCondition(aVoid -> _queryServer.getConnectedChannelCount() == 1
+          && _queryServer.getConnectedChannels().iterator().next() != freshChannel, 10L, 5_000L,
+          "The suspect channel was not replaced by the probe");
+    } finally {
+      gate.get().set(PinotByteBuffer.wrap(new byte[0]));
+      queryRouter.shutDown();
+    }
+  }
+
+  /// Any response from the server within the grace period, even a late one for a query that already timed out,
+  /// clears the query: a slow server that still answers is never mistaken for a dead channel, and a broker that was
+  /// late reading the responses does not blame the servers.
+  @Test
+  public void testLateResponseClearsUnansweredQuery()
+      throws Exception {
+    long requestId = 123;
+    AtomicReference<SettableFuture<DataBuffer>> gate = new AtomicReference<>(SettableFuture.create());
+    _queryServer = getGatedQueryServer(gate);
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    int threshold = 2;
+    long timeoutMs = 300L;
+    long graceMs = 1_000L;
+    QueryRouter queryRouter = newIsolatedQueryRouter(threshold, graceMs);
+    List<ServerRoutingInstance> reported = new CopyOnWriteArrayList<>();
+    queryRouter.setUnansweredServerReporter(reported::add);
+    try {
+      AsyncQueryResponse asyncQueryResponse = submitRealtimeQuery(queryRouter, requestId, timeoutMs);
+      assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.TIMED_OUT);
+      // The server answers the first query late, inside the grace period: useless to the query, proof of life for
+      // the channel
+      gate.getAndSet(SettableFuture.create()).set(PinotByteBuffer.wrap(responseBytesForRequest(requestId)));
+      Thread.sleep(graceMs + 500L);
+      assertEquals(queryRouter.getUnansweredQueries(_realtimeServerRoutingInstance), 0,
+          "A query answered within the grace period must not count");
+
+      // Two queries the server never answers do count, and reach the threshold
+      submitRealtimeQuery(queryRouter, requestId, timeoutMs);
+      waitForUnansweredQueries(queryRouter, _realtimeServerRoutingInstance, 1);
+      assertTrue(reported.isEmpty());
+      submitRealtimeQuery(queryRouter, requestId, timeoutMs);
+      TestUtils.waitForCondition(aVoid -> reported.equals(List.of(_realtimeServerRoutingInstance)), 10L, 5_000L,
+          "The server was not reported");
+    } finally {
+      gate.get().set(PinotByteBuffer.wrap(new byte[0]));
+      queryRouter.shutDown();
+    }
+  }
+
+  /// A response frame counts as an answer from the server as soon as it arrives, before it is decoded: one that fails
+  /// to deserialize, a heap OOM included, still proves the server alive, so it must not count towards the unanswered
+  /// queries that get a channel replaced.
+  @Test
+  public void testUndecodableResponseStillCountsAsAnswer() {
+    QueryRouter queryRouter = mock(QueryRouter.class);
+    ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE);
+    EmbeddedChannel channel = new EmbeddedChannel(
+        new DataTableHandler(queryRouter, ThreadAccountantUtils.getNoOpAccountant(), routingInstance));
+    try {
+      channel.writeInbound(Unpooled.wrappedBuffer(new byte[]{1, 2, 3}));
+      verify(queryRouter).recordResponse(routingInstance);
+      verify(queryRouter, never()).receiveDataTable(any(), any(), anyInt(), anyInt());
+    } finally {
+      channel.finishAndReleaseAll();
+    }
+  }
+
+  @Test
+  public void testChannelActiveInactiveEmitPerServerTaggedMeters() {
+    PinotMetricUtils.init(new PinotConfiguration());
+    // register() is a compareAndSet against NOOP with no deregister, so another test class may already have registered
+    // a real instance. Either way, read from whatever DataTableHandler will read via BrokerMetrics.get().
+    BrokerMetrics.register(new BrokerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    BrokerMetrics brokerMetrics = BrokerMetrics.get();
+    PinotMetricsRegistry registry = brokerMetrics.getMetricsRegistry();
+
+    ServerInstance serverInstance = new ServerInstance("localhost", 12345);
+    ServerRoutingInstance routingInstance =
+        serverInstance.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+    String shortName = routingInstance.getShortName();
+    DataTableHandler handler =
+        new DataTableHandler(_queryRouter, ThreadAccountantUtils.getNoOpAccountant(), routingInstance);
+
+    long activeBefore = taggedMeterCount(registry, BrokerMeter.NETTY_CONNECTION_CHANNEL_ACTIVE, shortName);
+    handler.channelActive(mock(ChannelHandlerContext.class));
+    assertEquals(taggedMeterCount(registry, BrokerMeter.NETTY_CONNECTION_CHANNEL_ACTIVE, shortName), activeBefore + 1);
+
+    // channelInactive also calls markServerUnavailable, but no query is in flight on _queryRouter so that is a no-op.
+    long inactiveBefore = taggedMeterCount(registry, BrokerMeter.NETTY_CONNECTION_CHANNEL_INACTIVE, shortName);
+    handler.channelInactive(mock(ChannelHandlerContext.class));
+    assertEquals(taggedMeterCount(registry, BrokerMeter.NETTY_CONNECTION_CHANNEL_INACTIVE, shortName),
+        inactiveBefore + 1);
+  }
+
+  private static long taggedMeterCount(PinotMetricsRegistry registry, BrokerMeter meter, String tag) {
+    String fullName = CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX + meter.getMeterName() + "." + tag;
+    return PinotMetricUtils.makePinotMeter(registry,
+        PinotMetricUtils.makePinotMetricName(BrokerMetrics.class, fullName), meter.getUnit(), TimeUnit.SECONDS).count();
+  }
+
+  /// A server that answers queries answers a ping over the channel they use. Before any query there is no channel to
+  /// ping over, and the ping must not open one either: that would make a server that only serves multi-stage queries
+  /// look queried over this path.
+  @Test
+  public void testPingIsAnsweredByLiveServer()
+      throws Exception {
+    long requestId = 123;
+    _queryServer = getQueryServer(0, dataTableBytesWithRequestId(requestId));
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try {
+      assertFalse(queryRouter.ping(_serverInstance, 5_000L));
+      assertFalse(queryRouter.hasChannel(_serverInstance));
+
+      assertNotNull(queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 5_000L)
+          .getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+      assertTrue(queryRouter.ping(_serverInstance, 5_000L));
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
+  /// The property that keeps busy servers in routing: the ping is answered from the server's network thread, so it
+  /// comes back at once even while a query to that server is stuck.
+  @Test
+  public void testPingIsAnsweredPromptlyWhileTheQueryEngineIsStuck() {
+    _queryServer = QueryServerTestUtils.newQueryServer(queryRequest -> SettableFuture.create());
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try {
+      AsyncQueryResponse stuckQuery =
+          queryRouter.submitQuery(123, "testTable", BROKER_REQUEST, _routingTable, null, null, 60_000L);
+
+      long startTimeMs = System.currentTimeMillis();
+      assertTrue(queryRouter.ping(_serverInstance, 5_000L));
+      assertTrue(System.currentTimeMillis() - startTimeMs < 2_000L,
+          "A server whose query engine is stuck must still answer a ping promptly");
+      // The status stays IN_PROGRESS until the query is waited on, even after the server answers it, so check for an
+      // answer directly.
+      assertEquals(stuckQuery.getNumServersResponded(), 0, "The stuck query must still be unanswered");
+      assertEquals(stuckQuery.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
+  /// A frozen JVM or a vanished node: the kernel (or nothing at all) completes the TCP handshake, but nothing ever
+  /// reads the request. Modeled by a listening socket that is never accepted from. The unanswered ping must also close
+  /// the channel, or every later attempt would write into the same possibly half-open connection.
+  @Test
+  public void testPingGoesUnansweredByFrozenServer()
+      throws Exception {
+    long timeoutMs = 1_000L;
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try (ServerSocket frozenServer = new ServerSocket(0)) {
+      initializeTestFixtures(frozenServer.getLocalPort());
+      // Opens the channel, and is never answered.
+      AsyncQueryResponse query =
+          queryRouter.submitQuery(123, "testTable", BROKER_REQUEST, _routingTable, null, null, 60_000L);
+
+      long startTimeMs = System.currentTimeMillis();
+      assertFalse(queryRouter.ping(_serverInstance, timeoutMs));
+      long elapsedMs = System.currentTimeMillis() - startTimeMs;
+      assertTrue(elapsedMs >= timeoutMs && elapsedMs < timeoutMs + 2_000L,
+          "A ping to a frozen server must fail after the ping timeout, not sooner or much later; took " + elapsedMs);
+      // Closing the channel also ends the query waiting on it, instead of leaving it to its own timeout.
+      TestUtils.waitForCondition(aVoid -> query.getStatus() != QueryResponse.Status.IN_PROGRESS, 5_000L,
+          "The query on the closed channel did not end");
+
+      // Only now pick up the connection: past the query and the ping, the broker must have closed its end.
+      frozenServer.setSoTimeout(5_000);
+      try (Socket connection = frozenServer.accept()) {
+        connection.setSoTimeout(5_000);
+        InputStream inputStream = connection.getInputStream();
+        while (inputStream.read() != -1) {
+          // Skip the requests.
+        }
+      } catch (SocketTimeoutException e) {
+        fail("The channel to a server that left a ping unanswered must be closed");
+      }
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
+  /// Every channel queries use has to answer. A server whose OFFLINE channel answers while its REALTIME channel stays
+  /// silent -- left half-open, say, when the server came back under a new address -- fails the ping, as REALTIME
+  /// queries would time out. Only the silent channel is closed: the one that answered still carries queries.
+  @Test
+  public void testPingFailsWhenAnyChannelIsSilent()
+      throws Exception {
+    long requestId = 123;
+    _queryServer = getQueryServer(0, dataTableBytesWithRequestId(requestId));
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    EmbeddedChannel silentChannel = new EmbeddedChannel();
+    try {
+      assertNotNull(queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, _routingTable, null, null, 5_000L)
+          .getFinalResponses().get(_offlineServerRoutingInstance).getDataTable());
+      ServerChannels serverChannels = queryRouter.getServerChannels();
+      ServerChannels.ServerChannel realtimeChannel =
+          serverChannels.getOrCreateServerChannel(_realtimeServerRoutingInstance);
+      realtimeChannel._openedByQuery = true;
+      realtimeChannel.setChannel(silentChannel);
+
+      assertFalse(queryRouter.ping(_serverInstance, 1_000L));
+      assertFalse(silentChannel.isOpen(), "The silent channel must be closed");
+      // A close runs on the channel's event loop, so give a wrong one time to land.
+      assertFalse(serverChannels.getOrCreateServerChannel(_offlineServerRoutingInstance)._channel.closeFuture()
+          .await(500, TimeUnit.MILLISECONDS), "The channel that answered must stay open");
+    } finally {
+      silentChannel.finishAndReleaseAll();
+      queryRouter.shutDown();
+    }
+  }
+
+  /// Each table type has its own channel to a server. A server queried only for REALTIME tables -- as in the incident
+  /// this guards -- has no OFFLINE channel, and must still be found and pinged over the channel queries use.
+  @Test
+  public void testRealtimeOnlyServerIsFoundAndPinged()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    _queryServer = getQueryServer(0, dataTable.toBytes());
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    assertFalse(_queryRouter.hasChannel(_serverInstance));
+
+    _queryRouter.submitQuery(requestId, "testTable", null, null, BROKER_REQUEST, _routingTable, 5_000L)
+        .getFinalResponses();
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+
+    assertTrue(_queryRouter.hasChannel(_serverInstance),
+        "A REALTIME channel must count, or a REALTIME-only server is never checked");
+    assertTrue(_queryRouter.ping(_serverInstance, 5_000L));
+  }
+
+  /// A channel that fails at once must not end the wait for another one that is still due to answer, and get that one
+  /// closed as if it were silent -- along with the queries in flight on it.
+  @Test
+  public void testChannelFailingAtOnceDoesNotCloseAnotherStillDueToAnswer()
+      throws Exception {
+    _queryServer = new QueryServer(0, null, new SlowPingHandler(300L));
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    // Fails every write at once, as a connection that was just reset does.
+    EmbeddedChannel failingChannel = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+      @Override
+      public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+        ReferenceCountUtil.release(msg);
+        promise.setFailure(new IOException("Connection reset"));
+      }
+    });
+    try {
+      // Opens the OFFLINE channel, and stays in flight: the server never answers queries.
+      AsyncQueryResponse query =
+          queryRouter.submitQuery(123, "testTable", BROKER_REQUEST, _routingTable, null, null, 60_000L);
+      ServerChannels.ServerChannel realtimeChannel =
+          queryRouter.getServerChannels().getOrCreateServerChannel(_realtimeServerRoutingInstance);
+      realtimeChannel._openedByQuery = true;
+      realtimeChannel.setChannel(failingChannel);
+
+      assertFalse(queryRouter.ping(_serverInstance, 5_000L));
+      // A close runs on the channel's event loop, so give a wrong one time to land.
+      assertFalse(queryRouter.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance)._channel
+          .closeFuture().await(500, TimeUnit.MILLISECONDS), "The channel that answered late must stay open");
+      assertEquals(query.getStatus(), QueryResponse.Status.IN_PROGRESS);
+    } finally {
+      failingChannel.finishAndReleaseAll();
+      queryRouter.shutDown();
+    }
+  }
+
+  /// A ping that stays silent closes the connection it went out on, not whichever connection its channel holds by
+  /// then. Here the ping's connection drops while the ping waits, and a query reconnects and sends over a fresh
+  /// connection before the ping is done: the fresh connection, and the query on it, must survive.
+  @Test
+  public void testFailedPingClosesOnlyItsOwnConnection()
+      throws Exception {
+    // Nothing listens on this port: every connection below is planted.
+    initializeTestFixtures(12345);
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    ServerChannels.ServerChannel offlineChannel =
+        queryRouter.getServerChannels().getOrCreateServerChannel(_offlineServerRoutingInstance);
+    offlineChannel._openedByQuery = true;
+    EmbeddedChannel freshConnection = new EmbeddedChannel(
+        new DataTableHandler(queryRouter, ThreadAccountantUtils.getNoOpAccountant(), _offlineServerRoutingInstance));
+    List<AsyncQueryResponse> queriesOnFreshConnection = new ArrayList<>();
+    EmbeddedChannel pingConnection = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+      @Override
+      public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+        ReferenceCountUtil.release(msg);
+        promise.setSuccess();
+        // The connection drops, and its inactive callback runs to the end, failing the ping that waits on it. (Run here
+        // directly: Netty would defer the callback of a channel closed in the middle of its own write.)
+        ctx.channel().close();
+        queryRouter.markServerUnavailable(_offlineServerRoutingInstance, new IOException("Connection dropped"));
+        // Before the ping gets to its cleanup, a query reconnects and sends over a fresh connection. This runs on the
+        // thread that holds the channel lock for the ping, so the query gets the lock too.
+        offlineChannel.setChannel(freshConnection);
+        queriesOnFreshConnection.add(
+            queryRouter.submitQuery(123, "testTable", BROKER_REQUEST, _routingTable, null, null, 60_000L));
+      }
+    });
+    offlineChannel.setChannel(pingConnection);
+    try {
+      assertFalse(queryRouter.ping(_serverInstance, 5_000L));
+      assertTrue(freshConnection.isOpen(), "The ping must not close the connection that replaced its own");
+      assertEquals(queriesOnFreshConnection.size(), 1);
+      assertEquals(queriesOnFreshConnection.get(0).getStatus(), QueryResponse.Status.IN_PROGRESS);
+    } finally {
+      pingConnection.finishAndReleaseAll();
+      freshConnection.finishAndReleaseAll();
+      queryRouter.shutDown();
+    }
+  }
+
+  /// Answers pings after a delay, and queries never.
+  @ChannelHandler.Sharable
+  private static class SlowPingHandler extends SimpleChannelInboundHandler<ByteBuf> {
+    private final long _delayMs;
+
+    SlowPingHandler(long delayMs) {
+      _delayMs = delayMs;
+    }
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg)
+        throws Exception {
+      byte[] requestBytes = new byte[msg.readableBytes()];
+      msg.readBytes(requestBytes);
+      InstanceRequest instanceRequest = new InstanceRequest();
+      new TDeserializer(new TCompactProtocol.Factory()).deserialize(instanceRequest, requestBytes);
+      if (instanceRequest.isPing()) {
+        byte[] responseBytes = dataTableBytesWithRequestId(instanceRequest.getRequestId());
+        ctx.executor().schedule(() -> ctx.writeAndFlush(Unpooled.wrappedBuffer(responseBytes)), _delayMs,
+            TimeUnit.MILLISECONDS);
+      }
+    }
+  }
+
+  private static byte[] dataTableBytesWithRequestId(long requestId)
+      throws IOException {
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    return dataTable.toBytes();
   }
 
   private void waitForStatsUpdate(long taskCount) {

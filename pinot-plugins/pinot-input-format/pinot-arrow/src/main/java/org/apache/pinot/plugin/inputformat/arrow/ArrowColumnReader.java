@@ -65,27 +65,23 @@ public class ArrowColumnReader implements ColumnReader {
   private final boolean _isSingleValue;
   private final boolean _extractRawTimeValues;
 
-  /**
-   * Construct an ArrowColumnReader for the given vector, surfacing converted (non-raw) temporal
-   * values — equivalent to {@link #ArrowColumnReader(String, FieldVector, boolean)} with
-   * {@code extractRawTimeValues = false}.
-   *
-   * @param columnName Pinot column name
-   * @param vector Arrow field vector backing this column
-   */
+  /// Construct an ArrowColumnReader for the given vector, surfacing converted (non-raw) temporal
+  /// values — equivalent to [#ArrowColumnReader(String, FieldVector, boolean)] with
+  /// `extractRawTimeValues = false`.
+  ///
+  /// @param columnName Pinot column name
+  /// @param vector Arrow field vector backing this column
   public ArrowColumnReader(String columnName, FieldVector vector) {
     this(columnName, vector, false);
   }
 
-  /**
-   * Construct an ArrowColumnReader for the given vector.
-   *
-   * @param columnName Pinot column name
-   * @param vector Arrow field vector backing this column
-   * @param extractRawTimeValues when {@code true}, temporal columns surface their raw epoch values
-   *        via the generic {@link #getValue(int)} path rather than canonical JDK temporal types,
-   *        mirroring {@code ArrowRecordExtractorConfig.EXTRACT_RAW_TIME_VALUES} on the row-major path
-   */
+  /// Construct an ArrowColumnReader for the given vector.
+  ///
+  /// @param columnName Pinot column name
+  /// @param vector Arrow field vector backing this column
+  /// @param extractRawTimeValues when `true`, temporal columns surface their raw epoch values
+  ///        via the generic [#getValue(int)] path rather than canonical JDK temporal types,
+  ///        mirroring `ArrowRecordExtractorConfig.EXTRACT_RAW_TIME_VALUES` on the row-major path
   public ArrowColumnReader(String columnName, FieldVector vector, boolean extractRawTimeValues) {
     _columnName = columnName;
     _vector = vector;
@@ -366,12 +362,10 @@ public class ArrowColumnReader implements ColumnReader {
     return out;
   }
 
-  /**
-   * Scan element-level validity for the list slice {@code [start, start + length)} of
-   * {@code elements}, returning a BitSet whose set bits mark null elements, or {@code null} when no
-   * element is null (the common case, so callers skip the per-element check). The returned index
-   * space is element-local: bit {@code i} corresponds to element {@code start + i}.
-   */
+  /// Scan element-level validity for the list slice `[start, start + length)` of
+  /// `elements`, returning a BitSet whose set bits mark null elements, or `null` when no
+  /// element is null (the common case, so callers skip the per-element check). The returned index
+  /// space is element-local: bit `i` corresponds to element `start + i`.
   @Nullable
   private static BitSet elementNulls(FieldVector elements, int start, int length) {
     BitSet nulls = null;
@@ -386,7 +380,7 @@ public class ArrowColumnReader implements ColumnReader {
     return nulls;
   }
 
-  /** True when element {@code i} is not null, given the {@link #elementNulls} BitSet (possibly null). */
+  /// True when element `i` is not null, given the [#elementNulls] BitSet (possibly null).
   private static boolean notNull(@Nullable BitSet nulls, int i) {
     return nulls == null || !nulls.get(i);
   }
@@ -411,10 +405,8 @@ public class ArrowColumnReader implements ColumnReader {
             + expectedType);
   }
 
-  /**
-   * The underlying vector is owned by {@link ArrowColumnReaderFactory}; closing this reader does
-   * not release the vector's memory.
-   */
+  /// The underlying vector is owned by [ArrowColumnReaderFactory]; closing this reader does
+  /// not release the vector's memory.
   @Override
   public void close() {
     // No-op: factory owns the vector lifecycle.

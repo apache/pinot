@@ -32,19 +32,15 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.zookeeper.data.Stat;
 
 
-/**
- * Helper methods to fetch/persist ZNRecord for minion task metadata
- */
+/// Helper methods to fetch/persist ZNRecord for minion task metadata
 public final class MinionTaskMetadataUtils {
 
   private MinionTaskMetadataUtils() {
   }
 
-  /**
-   * Fetches the minion task metadata ZNRecord for the given minion task and tableName. Fetch from the new path
-   * MINION_TASK_METADATA/${tableNameWthType}/{taskType} if it exists; otherwise, fetch from the old path
-   * MINION_TASK_METADATA/${taskType}/${tableNameWthType}.
-   */
+  /// Fetches the minion task metadata ZNRecord for the given minion task and tableName. Fetch from the new path
+  /// MINION_TASK_METADATA/${tableNameWthType}/{taskType} if it exists; otherwise, fetch from the old path
+  /// MINION_TASK_METADATA/${taskType}/${tableNameWthType}.
   @Nullable
   public static ZNRecord fetchTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       String tableNameWithType) {
@@ -67,12 +63,10 @@ public final class MinionTaskMetadataUtils {
     return znRecord;
   }
 
-  /**
-   * Gets the last update time (in ms) of all minion task metadata.
-   * @param propertyStore the property store where all minion task metadata is stored.
-   * @return a map storing the last update time (in ms) of all minion task metadata: (tableNameWithType -> taskType
-   *         -> last update time in ms)
-   */
+  /// Gets the last update time (in ms) of all minion task metadata.
+  /// @param propertyStore the property store where all minion task metadata is stored.
+  /// @return a map storing the last update time (in ms) of all minion task metadata: (tableNameWithType -> taskType
+  ///         -> last update time in ms)
   public static Map<String, Map<String, Long>> getAllTaskMetadataLastUpdateTimeMs(
       HelixPropertyStore<ZNRecord> propertyStore) {
     Map<String, Map<String, Long>> tableTaskLastUpdateTimeMsMap = new HashMap<>();
@@ -128,11 +122,9 @@ public final class MinionTaskMetadataUtils {
         });
   }
 
-  /**
-   * Deletes the minion task metadata ZNRecord for the given minion task and tableName, from both the new path
-   * MINION_TASK_METADATA/${tableNameWthType}/${taskType} and the old path
-   * MINION_TASK_METADATA/${taskType}/${tableNameWthType}.
-   */
+  /// Deletes the minion task metadata ZNRecord for the given minion task and tableName, from both the new path
+  /// MINION_TASK_METADATA/${tableNameWthType}/${taskType} and the old path
+  /// MINION_TASK_METADATA/${taskType}/${tableNameWthType}.
   public static void deleteTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       String tableNameWithType) {
     String newPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(tableNameWithType, taskType);
@@ -145,11 +137,9 @@ public final class MinionTaskMetadataUtils {
     }
   }
 
-  /**
-   * Deletes the minion task metadata ZNRecord for the given tableName, from both the new path
-   * MINION_TASK_METADATA/${tableNameWthType} and the old path
-   * MINION_TASK_METADATA/<any task type>/${tableNameWthType}
-   */
+  /// Deletes the minion task metadata ZNRecord for the given tableName, from both the new path
+  /// MINION_TASK_METADATA/${tableNameWthType} and the old path
+  /// MINION_TASK_METADATA/<any task type>/${tableNameWthType}
   public static void deleteTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
     // delete the minion task metadata ZNRecord MINION_TASK_METADATA/${tableNameWthType}
     String path = ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata(tableNameWithType);
@@ -179,15 +169,13 @@ public final class MinionTaskMetadataUtils {
     }
   }
 
-  /**
-   * Generic method for persisting {@link BaseTaskMetadata} to MINION_TASK_METADATA. The metadata will
-   * be saved in the ZNode under the new path /MINION_TASK_METADATA/${tableNameWithType}/${taskType} if
-   * it exists or the old path does not exist; otherwise, it will be saved in the ZNode under the old path
-   * /MINION_TASK_METADATA/${taskType}/${tableNameWithType}.
-   *
-   * Will fail if expectedVersion does not match.
-   * Set expectedVersion -1 to override version check.
-   */
+  /// Generic method for persisting [BaseTaskMetadata] to MINION_TASK_METADATA. The metadata will
+  /// be saved in the ZNode under the new path /MINION_TASK_METADATA/${tableNameWithType}/${taskType} if
+  /// it exists or the old path does not exist; otherwise, it will be saved in the ZNode under the old path
+  /// /MINION_TASK_METADATA/${taskType}/${tableNameWithType}.
+  ///
+  /// Will fail if expectedVersion does not match.
+  /// Set expectedVersion -1 to override version check.
   public static void persistTaskMetadata(HelixPropertyStore<ZNRecord> propertyStore, String taskType,
       BaseTaskMetadata taskMetadata, int expectedVersion) {
     String newPath =

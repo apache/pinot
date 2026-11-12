@@ -19,56 +19,88 @@
 package org.apache.pinot.integration.tests.realtime.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
+import com.google.common.util.concurrent.Uninterruptibles;
+import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.FailureInjectionUtils;
-import org.apache.zookeeper.data.Stat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
 
 
 public class FailureInjectingPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   private final Map<String, String> _failureConfig;
-  private long _maxSegmentCompletionTimeoutMs = 300000L;
-  private static final Logger LOGGER = LoggerFactory.getLogger(FailureInjectingPinotLLCRealtimeSegmentManager.class);
+  private final Set<String> _forceExpiredSegments = ConcurrentHashMap.newKeySet();
+  // Non-null while table config reads are blocked, see blockTableConfigReads()
+  private volatile CountDownLatch _tableConfigReadLatch;
 
   public FailureInjectingPinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(helixResourceManager, controllerConf, controllerMetrics);
-    _failureConfig = new HashMap<>();
+    _failureConfig = new ConcurrentHashMap<>();
   }
 
+  /// Treats force-expired segments as exceeding the max segment completion time regardless of how recently their
+  /// segment ZK metadata was updated. This makes them immediately eligible for repair while keeping their in-flight
+  /// commit attempts rejected, without shortening the completion time for any other segment.
   @Override
   protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
       long currentTimeMs) {
-    Stat stat = new Stat();
-    getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-    if (currentTimeMs > stat.getMtime() + _maxSegmentCompletionTimeoutMs) {
-      LOGGER.info("Segment: {} exceeds the max completion time: {}ms, metadata update time: {}, current time: {}",
-          segmentName, _maxSegmentCompletionTimeoutMs, stat.getMtime(), currentTimeMs);
-      return true;
-    } else {
-      return false;
+    return _forceExpiredSegments.contains(segmentName)
+        || super.isExceededMaxSegmentCompletionTime(realtimeTableName, segmentName, currentTimeMs);
+  }
+
+  public void forceExpireSegments(Collection<String> segmentNames) {
+    _forceExpiredSegments.addAll(segmentNames);
+  }
+
+  public void clearForceExpiredSegments() {
+    _forceExpiredSegments.clear();
+  }
+
+  /// Makes table config reads wait until [#unblockTableConfigReads()] is called, like reads that queue behind a burst
+  /// of other requests on the controller's ZooKeeper session.
+  public void blockTableConfigReads() {
+    _tableConfigReadLatch = new CountDownLatch(1);
+  }
+
+  public void unblockTableConfigReads() {
+    CountDownLatch latch = _tableConfigReadLatch;
+    if (latch != null) {
+      _tableConfigReadLatch = null;
+      latch.countDown();
     }
   }
 
-  public void setMaxSegmentCompletionTimeoutMs(long maxSegmentCompletionTimeoutMs) {
-    _maxSegmentCompletionTimeoutMs = maxSegmentCompletionTimeoutMs;
+  @Override
+  public TableConfig getTableConfig(String realtimeTableName) {
+    CountDownLatch latch = _tableConfigReadLatch;
+    if (latch != null) {
+      // Wait longer than the server's request timeout, but not forever in case a test does not unblock the reads
+      Uninterruptibles.awaitUninterruptibly(latch, 1, TimeUnit.MINUTES);
+    }
+    return super.getTableConfig(realtimeTableName);
   }
 
   @VisibleForTesting
   public void enableTestFault(String faultType) {
-    _failureConfig.put(faultType, "true");
+    if (faultType != null) {
+      _failureConfig.put(faultType, "true");
+    }
   }
 
   @VisibleForTesting
   public void disableTestFault(String faultType) {
-    _failureConfig.remove(faultType);
+    if (faultType != null) {
+      _failureConfig.remove(faultType);
+    }
   }
 
   @Override

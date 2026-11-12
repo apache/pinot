@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -63,7 +64,7 @@ public class PluginManager {
   private static final String PINOUT_PLUGIN_PROPERTIES_FILE_NAME = "pinot-plugin.properties";
 
   // For backward compatibility, this map holds a mapping from old plugins class name to its new class name.
-  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>() {
+  private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new ConcurrentHashMap<>() {
     {
       // MessageDecoder
       put("org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder",
@@ -97,14 +98,15 @@ public class PluginManager {
       put("org.apache.pinot.filesystem.LocalPinotFS", "org.apache.pinot.spi.filesystem.LocalPinotFS");
 
       // StreamConsumerFactory
-      // Old-style class names mapped to current plugin packages
-      // Rename the usage of kafka 2 to kafka 3
+      // Map every historical factory directly to the sole Kafka implementation; aliases are not chained.
       put("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
       put("org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
       put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
-          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+          "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
+      put("org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory",
+          "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
     }
   };
 
@@ -134,6 +136,9 @@ public class PluginManager {
 
   private final ClassWorld _classWorld;
   private final Map<Plugin, PluginClassLoader> _registry;
+  private final Map<String, String> _backwardCompatiblePluginNames = new ConcurrentHashMap<>(Map.of(
+      "pinot-kafka-2.0", "pinot-kafka-4.0",
+      "pinot-kafka-3.0", "pinot-kafka-4.0"));
 
   private String _pluginsDirectories;
   private String _pluginsInclude;
@@ -141,7 +146,7 @@ public class PluginManager {
 
   PluginManager() {
     // For the shaded plugins
-    _registry = new HashMap<>();
+    _registry = new ConcurrentHashMap<>();
     _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(List.of()));
 
     // for the new pinot plugins
@@ -205,14 +210,12 @@ public class PluginManager {
     }
   }
 
-  /**
-   * This method will take a semi-colon delimited string of directories and a semi-colon delimited string of plugin
-   * names. It will traverse the directories in order and produce a <String, File> map of plugins to be loaded.
-   * If a plugin is found in multiple directories, only the first copy of it will be picked up.
-   * @param pluginsDirectories
-   * @param pluginsInclude
-   * @return A hash map with key = plugin name, value = file object
-   */
+  /// This method will take a semi-colon delimited string of directories and a semi-colon delimited string of plugin
+  /// names. It will traverse the directories in order and produce a <String, File> map of plugins to be loaded.
+  /// If a plugin is found in multiple directories, only the first copy of it will be picked up.
+  /// @param pluginsDirectories
+  /// @param pluginsInclude
+  /// @return A hash map with key = plugin name, value = file object
   @VisibleForTesting
   public HashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude)
       throws IllegalArgumentException {
@@ -220,6 +223,12 @@ public class PluginManager {
     LOGGER.info("Plugin directories: {}, parsed directories to load: '{}'", pluginsDirectories, directories);
 
     HashMap<String, File> finalPluginsToLoad = new HashMap<>();
+    List<String> pluginsToLoad = null;
+    if (!StringUtils.isEmpty(pluginsInclude)) {
+      pluginsToLoad = Arrays.stream(pluginsInclude.split(";"))
+          .map(this::getBackwardCompatiblePluginName).collect(Collectors.toList());
+      LOGGER.info("Potential plugins to load: [{}]", Arrays.toString(pluginsToLoad.toArray()));
+    }
 
     for (String pluginsDirectory : directories) {
       if (!new File(pluginsDirectory).exists()) {
@@ -228,11 +237,7 @@ public class PluginManager {
 
       Collection<File> jarFiles =
           FileUtils.listFiles(new File(pluginsDirectory), new String[]{JAR_FILE_EXTENSION}, true);
-      List<String> pluginsToLoad = null;
-      if (!StringUtils.isEmpty(pluginsInclude)) {
-        pluginsToLoad = Arrays.asList(pluginsInclude.split(";"));
-        LOGGER.info("Potential plugins to load: [{}]", Arrays.toString(pluginsToLoad.toArray()));
-      } else {
+      if (pluginsToLoad == null) {
         LOGGER.info("Please use system property '{}' to customize plugins to load. Loading all plugins: {}",
             PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(jarFiles.toArray()));
       }
@@ -261,11 +266,9 @@ public class PluginManager {
   private void initRecordReaderClassMap() {
   }
 
-  /**
-   * Loads jars recursively
-   * @param pluginName
-   * @param directory the directory of one plugin
-   */
+  /// Loads jars recursively
+  /// @param pluginName
+  /// @param directory the directory of one plugin
   public void load(String pluginName, File directory) {
     Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
     if (Files.isRegularFile(pluginPropertiesPath)) {
@@ -359,14 +362,15 @@ public class PluginManager {
     return new PluginClassLoader(urls, this.getClass().getClassLoader());
   }
 
-  /**
-   * Loads a class. The class name can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
-   * @param className
-   * @return
-   * @throws ClassNotFoundException
-   */
+  /// Loads a class. The class name can be in any of the following formats
+  ///
+  /// - com.x.y.foo
+  ///   loads the class in the default class path
+  /// - pluginName:com.x.y.foo
+  ///   loads the class in plugin specific classloader
+  ///   @param className
+  ///   @return
+  ///   @throws ClassNotFoundException
   public Class<?> loadClass(String className)
       throws ClassNotFoundException {
     String pluginName = DEFAULT_PLUGIN_NAME;
@@ -379,24 +383,23 @@ public class PluginManager {
     return loadClass(pluginName, realClassName);
   }
 
-  /**
-   * Loads a class using the plugin specific class loader
-   * @param pluginName
-   * @param className
-   * @return
-   * @throws ClassNotFoundException
-   */
+  /// Loads a class using the plugin specific class loader
+  /// @param pluginName
+  /// @param className
+  /// @return
+  /// @throws ClassNotFoundException
   public Class<?> loadClass(String pluginName, String className)
       throws ClassNotFoundException {
     // Backward compatible check.
     String name = loadClassWithBackwardCompatibleCheck(className);
 
-    Plugin plugin = new Plugin(pluginName);
+    String currentPluginName = getBackwardCompatiblePluginName(pluginName);
+    Plugin plugin = new Plugin(currentPluginName);
     if (_registry.containsKey(plugin)) {
       return _registry.get(plugin).loadClass(name, true);
     } else {
       try {
-        return _classWorld.getRealm(pluginName).loadClass(className);
+        return _classWorld.getRealm(currentPluginName).loadClass(name);
       } catch (NoSuchRealmException e) {
         throw new RuntimeException(e);
       }
@@ -404,28 +407,30 @@ public class PluginManager {
   }
 
   public static String loadClassWithBackwardCompatibleCheck(String className) {
-    return PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.getOrDefault(className, className);
+    return className == null ? null : PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP.getOrDefault(className, className);
   }
 
-  /**
-   * Create an instance of the className. The className can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
-   * @param className
-   * @return
-   */
+  /// Create an instance of the className. The className can be in any of the following formats
+  ///
+  /// - com.x.y.foo
+  ///   loads the class in the default class path
+  /// - pluginName:com.x.y.foo
+  ///   loads the class in plugin specific classloader
+  ///   @param className
+  ///   @return
   public <T> T createInstance(String className)
       throws Exception {
     return createInstance(className, new Class[]{}, new Object[]{});
   }
 
-  /**
-   * Create an instance of the className. The className can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
-   * @param className
-   * @return
-   */
+  /// Create an instance of the className. The className can be in any of the following formats
+  ///
+  /// - com.x.y.foo
+  ///   loads the class in the default class path
+  /// - pluginName:com.x.y.foo
+  ///   loads the class in plugin specific classloader
+  ///   @param className
+  ///   @return
   public <T> T createInstance(String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     String pluginName = DEFAULT_PLUGIN_NAME;
@@ -438,39 +443,35 @@ public class PluginManager {
     return createInstance(pluginName, realClassName, argTypes, argValues);
   }
 
-  /**
-   * Creates an instance of className using classloader specific to the plugin
-   * @param pluginName
-   * @param className
-   * @param <T>
-   * @return
-   * @throws Exception
-   */
+  /// Creates an instance of className using classloader specific to the plugin
+  /// @param pluginName
+  /// @param className
+  /// @param <T>
+  /// @return
+  /// @throws Exception
   public <T> T createInstance(String pluginName, String className)
       throws Exception {
     return createInstance(pluginName, className, new Class[]{}, new Object[]{});
   }
 
-  /**
-   *
-   * @param pluginName
-   * @param className
-   * @param argTypes
-   * @param argValues
-   * @param <T>
-   * @return
-   */
+  /// @param pluginName
+  /// @param className
+  /// @param argTypes
+  /// @param argValues
+  /// @param <T>
+  /// @return
   public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     Class<T> loadedClass;
     String name = loadClassWithBackwardCompatibleCheck(className);
 
-    Plugin plugin = new Plugin(pluginName);
+    String currentPluginName = getBackwardCompatiblePluginName(pluginName);
+    Plugin plugin = new Plugin(currentPluginName);
     if (_registry.containsKey(plugin)) {
       PluginClassLoader pluginClassLoader = _registry.get(plugin);
       loadedClass = (Class<T>) pluginClassLoader.loadClass(name, true);
     } else {
-      loadedClass = (Class<T>) Class.forName(name, true, _classWorld.getRealm(pluginName));
+      loadedClass = (Class<T>) Class.forName(name, true, _classWorld.getRealm(currentPluginName));
     }
     Constructor<?> constructor;
     constructor = loadedClass.getConstructor(argTypes);
@@ -531,6 +532,35 @@ public class PluginManager {
     }
     if (recordReaderConfigClass != null) {
       INPUT_FORMAT_TO_RECORD_READER_CONFIG_CLASS_NAME_MAP.put(inputFormat.toLowerCase(), recordReaderConfigClass);
+    }
+  }
+
+  private String getBackwardCompatiblePluginName(String pluginName) {
+    return _backwardCompatiblePluginNames.getOrDefault(pluginName, pluginName);
+  }
+
+  /// Registers a direct alias for a renamed plugin, including `plugins.include` and plugin-qualified class names.
+  /// Call during bootstrap, before creating plugin instances. If eager initialization already skipped the replacement
+  /// because only the old name was included, loads that replacement now. Repeated registration is harmless.
+  public synchronized void registerBackwardCompatiblePluginName(String oldPluginName, String newPluginName) {
+    String previousName = _backwardCompatiblePluginNames.put(oldPluginName, newPluginName);
+    if (newPluginName.equals(previousName)) {
+      return;
+    }
+    loadReplacementPluginIfNeeded(oldPluginName, newPluginName);
+  }
+
+  private void loadReplacementPluginIfNeeded(String oldPluginName, String newPluginName) {
+    if (StringUtils.isEmpty(_pluginsDirectories) || StringUtils.isEmpty(_pluginsInclude)
+        || !Arrays.asList(_pluginsInclude.split(";")).contains(oldPluginName)) {
+      return;
+    }
+    if (_registry.containsKey(new Plugin(newPluginName)) || _classWorld.getClassRealm(newPluginName) != null) {
+      return;
+    }
+    File pluginDirectory = getPluginsToLoad(_pluginsDirectories, oldPluginName).get(newPluginName);
+    if (pluginDirectory != null) {
+      load(newPluginName, pluginDirectory);
     }
   }
 

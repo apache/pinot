@@ -23,9 +23,7 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Mutable null value vector (for CONSUMING segment).
- */
+/// Mutable null value vector (for CONSUMING segment).
 public class MutableNullValueVector implements NullValueVectorReader {
   private final ThreadSafeMutableRoaringBitmap _nullBitmap;
 

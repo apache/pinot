@@ -33,12 +33,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This class loads FST index from PinotDataBuffer and creates a FST reader which
- * is used in finding matching results for regexp queries. Since FST index currently
- * stores dict ids as values this class only implements getDictIds method.
- *
- */
+/// This class loads FST index from PinotDataBuffer and creates a FST reader which
+/// is used in finding matching results for regexp queries. Since FST index currently
+/// stores dict ids as values this class only implements getDictIds method.
 public class LuceneFSTIndexReader implements TextIndexReader {
   public static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexReader.class);
 

@@ -24,12 +24,10 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 
 
-/**
- * Implementation of {@link StreamConsumerFactory} for a fake stream
- * Data source is /resources/data/fakestream_avro_data.tar.gz
- * Avro schema is /resources/data/fakestream/fake_stream_avro_schema.avsc
- * Pinot schema is /resources/data/fakestream/fake_stream_pinot_schema.avsc
- */
+/// Implementation of [StreamConsumerFactory] for a fake stream
+/// Data source is /resources/data/fakestream_avro_data.tar.gz
+/// Avro schema is /resources/data/fakestream/fake_stream_avro_schema.avsc
+/// Pinot schema is /resources/data/fakestream/fake_stream_pinot_schema.avsc
 public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
   @Override

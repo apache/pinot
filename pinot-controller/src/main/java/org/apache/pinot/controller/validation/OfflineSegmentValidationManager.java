@@ -47,10 +47,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
- * that the offline push delay isn't too high.
- */
+/// Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
+/// that the offline push delay isn't too high.
 public class OfflineSegmentValidationManager extends ControllerPeriodicTask<OfflineSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentValidationManager.class);
 
@@ -107,13 +105,11 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Offl
     }
   }
 
-  /**
-   * Updates the resource utilization metric for the given table.
-   * Sets the RESOURCE_UTILIZATION_LIMIT_EXCEEDED gauge to 1 if resource utilization is above limits (FAIL),
-   * or to 0 if within limits (PASS). The metric is not updated when the result is UNDETERMINED.
-   *
-   * @param tableNameWithType the table name with type for which to update the metric
-   */
+  /// Updates the resource utilization metric for the given table.
+  /// Sets the RESOURCE_UTILIZATION_LIMIT_EXCEEDED gauge to 1 if resource utilization is above limits (FAIL),
+  /// or to 0 if within limits (PASS). The metric is not updated when the result is UNDETERMINED.
+  ///
+  /// @param tableNameWithType the table name with type for which to update the metric
   private void updateResourceUtilizationMetric(String tableNameWithType) {
     UtilizationChecker.CheckResult result =
         _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
@@ -213,17 +209,16 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Offl
     }
   }
 
-  /**
-   * Computes the number of missing segments based on the given existing segment intervals and the expected frequency
-   * of the intervals.
-   * <p>We count the interval as missing if there are at least two intervals between the start of the previous interval
-   * and current interval. For long intervals (span over multiple intervals), count its start time as the start time of
-   * the last interval it covers.
-   *
-   * @param segmentIntervals List of existing segment intervals
-   * @param frequency Expected interval frequency
-   * @return Number of missing segments
-   */
+  /// Computes the number of missing segments based on the given existing segment intervals and the expected frequency
+  /// of the intervals.
+  ///
+  /// We count the interval as missing if there are at least two intervals between the start of the previous interval
+  /// and current interval. For long intervals (span over multiple intervals), count its start time as the start time of
+  /// the last interval it covers.
+  ///
+  /// @param segmentIntervals List of existing segment intervals
+  /// @param frequency Expected interval frequency
+  /// @return Number of missing segments
   @VisibleForTesting
   static int computeNumMissingSegments(List<Interval> segmentIntervals, Duration frequency) {
     int numSegments = segmentIntervals.size();

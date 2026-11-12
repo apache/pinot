@@ -57,9 +57,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -173,6 +171,31 @@ public class MutableColumnStatisticsTest implements PinotBuffersAfterClassCheckR
       assertTrue(stats.isFixedLength());
       assertFalse(stats.isAscii());
       assertTrue(stats.isSorted());
+      // A single distinct value is sorted by construction, so the forward index is never read
+      verify(forwardIndex, never()).getDictId(anyInt());
+    }
+  }
+
+  // ======== isSorted caching ========
+
+  @Test
+  public void testIsSortedScansOnce()
+      throws Exception {
+    try (MutableDictionary dictionary = createMutableDictionary(DataType.INT, "onHeap")) {
+      int dictId0 = dictionary.index(10);
+      int dictId1 = dictionary.index(20);
+      int dictId2 = dictionary.index(30);
+
+      int numDocs = 3;
+      MutableForwardIndex forwardIndex = mockSvForwardIndex(dictId0, dictId1, dictId2);
+      DataSourceMetadata metadata = mockMetadata(DataType.INT, true, numDocs);
+
+      MutableColumnStatistics stats =
+          new MutableColumnStatistics(mockDataSource(metadata, forwardIndex, dictionary), null, false);
+
+      assertTrue(stats.isSorted());
+      assertTrue(stats.isSorted());
+      verify(forwardIndex, times(numDocs)).getDictId(anyInt());
     }
   }
 

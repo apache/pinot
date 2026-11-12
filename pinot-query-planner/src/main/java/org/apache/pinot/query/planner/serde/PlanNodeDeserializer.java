@@ -54,6 +54,9 @@ public class PlanNodeDeserializer {
   private PlanNodeDeserializer() {
   }
 
+  // ENRICHEDJOINNODE is a deprecated node case retained for backward-compatible deserialization of plans from
+  // older-version brokers.
+  @SuppressWarnings({"deprecation", "removal"})
   public static PlanNode process(Plan.PlanNode protoNode) {
     switch (protoNode.getNodeCase()) {
       case AGGREGATENODE:
@@ -91,11 +94,15 @@ public class PlanNodeDeserializer {
 
   private static AggregateNode deserializeAggregateNode(Plan.PlanNode protoNode) {
     Plan.AggregateNode protoAggregateNode = protoNode.getAggregateNode();
+    List<List<Integer>> groupingSets = new ArrayList<>(protoAggregateNode.getGroupingSetsCount());
+    for (Plan.GroupingSet protoGroupingSet : protoAggregateNode.getGroupingSetsList()) {
+      groupingSets.add(protoGroupingSet.getGroupKeyIndexesList());
+    }
     return new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertFunctionCalls(protoAggregateNode.getAggCallsList()),
         protoAggregateNode.getFilterArgsList(), protoAggregateNode.getGroupKeysList(),
         convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult(),
-        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit());
+        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit(), groupingSets);
   }
 
   private static FilterNode deserializeFilterNode(Plan.PlanNode protoNode) {
@@ -114,6 +121,7 @@ public class PlanNodeDeserializer {
             protoJoinNode.getMatchCondition()) : null);
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   private static EnrichedJoinNode deserializeEnrichedJoinNode(Plan.PlanNode protoNode) {
     Plan.EnrichedJoinNode protoEnrichedJoinNode = protoNode.getEnrichedJoinNode();
     // reconstruct filterProjectRex

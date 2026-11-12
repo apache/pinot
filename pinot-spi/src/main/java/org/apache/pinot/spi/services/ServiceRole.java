@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.spi.services;
 
-/**
- * ServiceRole defines a role that Pinot Service could start/stop.
- */
+/// ServiceRole defines a role that Pinot Service could start/stop.
 public enum ServiceRole {
   CONTROLLER, BROKER, SERVER, MINION,
 }

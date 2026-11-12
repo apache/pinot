@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
@@ -28,19 +28,14 @@ public class PercentileMVAggregationFunctionTest extends AbstractAggregationFunc
 
   @Test
   public void testAggregationMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1;2;3;4;5"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"6;7;8;9;10"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2;3;4;5"})
+        .andOnSecondInstance(new Object[]{"6;7;8;9;10"})
         // All values: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 - p50 should be 6
         .whenQuery("select percentile(mv, 50) from testTable")
         .thenResultIs("DOUBLE", "6.0");
@@ -48,48 +43,39 @@ public class PercentileMVAggregationFunctionTest extends AbstractAggregationFunc
 
   @Test
   public void testAggregationMVGroupBySV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("mv", DataType.INT)
+        .addSingleValueDimension("sv", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("mv", FieldSpec.DataType.INT)
-                .addSingleValueDimension("sv", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            new Object[]{"1;2;3;4;5", "k1"},
-            new Object[]{"10;20;30", "k2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"6;7;8;9;10", "k1"},
-            new Object[]{"40;50", "k2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2;3;4;5", "k1"}, new Object[]{"10;20;30", "k2"})
+        .andOnSecondInstance(new Object[]{"6;7;8;9;10", "k1"}, new Object[]{"40;50", "k2"})
         .whenQuery("select sv, percentile(mv, 50) from testTable group by sv order by sv")
-        .thenResultIs("STRING | DOUBLE",
+        .thenResultIs(
+            "STRING | DOUBLE",
             "k1 | 6.0",   // values: 1-10, p50 = 6
-            "k2 | 30.0"); // values: 10, 20, 30, 40, 50, p50 = 30
+            "k2 | 30.0"  // values: 10, 20, 30, 40, 50, p50 = 30
+        );
   }
 
   @Test
   public void testAggregationMVGroupByMV() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addMultiValueDimension("nums", DataType.INT)
+        .addMultiValueDimension("tags", DataType.STRING)
+        .build();
     FluentQueryTest.withBaseDir(_baseDir)
-        .givenTable(
-            new Schema.SchemaBuilder()
-                .setSchemaName("testTable")
-                .setEnableColumnBasedNullHandling(true)
-                .addMultiValueDimension("nums", FieldSpec.DataType.INT)
-                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .build(), SINGLE_FIELD_TABLE_CONFIG)
-        .onFirstInstance(
-            // Column order is alphabetical: nums, tags
-            new Object[]{"1;2;3", "tag1;tag2"}
-        )
-        .andOnSecondInstance(
-            new Object[]{"4;5;6", "tag1;tag2"}
-        )
+        .givenTable(schema, SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(new Object[]{"1;2;3", "tag1;tag2"})  // Column order is alphabetical: nums, tags
+        .andOnSecondInstance(new Object[]{"4;5;6", "tag1;tag2"})
         .whenQuery("select tags, percentile(nums, 50) from testTable group by tags order by tags")
-        .thenResultIs("STRING | DOUBLE",
+        .thenResultIs(
+            "STRING | DOUBLE",
             "tag1 | 4.0",   // nums: 1, 2, 3, 4, 5, 6, p50 = 4
-            "tag2 | 4.0");  // nums: 1, 2, 3, 4, 5, 6, p50 = 4
+            "tag2 | 4.0"    // nums: 1, 2, 3, 4, 5, 6, p50 = 4
+        );
   }
 }

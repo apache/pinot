@@ -93,9 +93,7 @@ public class MailboxSendNode extends BasePlanNode {
     return _receiverStages.intersects(other._receiverStages);
   }
 
-  /**
-   * Returns the receiver stage ids, sorted in ascending order.
-   */
+  /// Returns the receiver stage ids, sorted in ascending order.
   public Iterable<Integer> getReceiverStageIds() {
     return () -> new Iterator<>() {
       int _next = _receiverStages.nextSetBit(0);
@@ -114,9 +112,7 @@ public class MailboxSendNode extends BasePlanNode {
     };
   }
 
-  /**
-   * returns true if this node sends to multiple receivers
-   */
+  /// returns true if this node sends to multiple receivers
   public boolean isMultiSend() {
     return _receiverStages.cardinality() > 1;
   }

@@ -42,9 +42,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class for command to stream Avro data into Kafka.
- */
+/// Class for command to stream Avro data into Kafka.
 @CommandLine.Command(name = "StreamAvroIntoKafka", mixinStandardHelpOptions = true)
 public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamAvroIntoKafkaCommand.class);

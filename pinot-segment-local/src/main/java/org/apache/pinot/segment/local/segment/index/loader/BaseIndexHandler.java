@@ -36,13 +36,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base class for all of the {@link IndexHandler} classes. This class provides a mechanism to rebuild the forward
- * index if the forward index does not exist and is required to rebuild the index of interest. It also handles cleaning
- * up the forward index if temporarily built once all handlers have completed via overriding the
- * postUpdateIndicesCleanup() method. For {@link IndexHandler} classes which do not utilize the forward index or do not
- * need this behavior, the postUpdateIndicesCleanup() method can be overridden to be a no-op.
- */
+/// Base class for all of the [IndexHandler] classes. This class provides a mechanism to rebuild the forward
+/// index if the forward index does not exist and is required to rebuild the index of interest. It also handles cleaning
+/// up the forward index if temporarily built once all handlers have completed via overriding the
+/// postUpdateIndicesCleanup() method. For [IndexHandler] classes which do not utilize the forward index or do not
+/// need this behavior, the postUpdateIndicesCleanup() method can be overridden to be a no-op.
 public abstract class BaseIndexHandler implements IndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseIndexHandler.class);
   protected final Set<String> _tmpForwardIndexColumns;

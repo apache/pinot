@@ -1,4 +1,38 @@
 rules:
+# OPEN_STRUCT observability. These MUST precede the generic gauge/meter rules below: the column segment
+# would otherwise be consumed by the "tableNameWithType + partitionId" rule and exported as partition="<column>",
+# and the column-level meters by the "rawTableName" rule as table="<table>.<column>".
+# Per-key gauge. The key is a raw user-supplied JSON key, so it is captured last with a greedy ([^"]+) — it may
+# contain '$', '.', '-' or spaces, all of which are legal in a Prometheus label value. The closing quote is
+# excluded because the trailing "? is optional and a greedy (.+) would otherwise swallow it. The column name
+# cannot contain '.' or '$', so ([^.$"]+) splits the two unambiguously. The sparse column renders as key="__sparse__".
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"ServerMetrics\", name=\"?pinot\\.server\\.(openStructLastSegmentKeyDocCount)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([^.$\"]+)\\$([^\"]+)\"?><>(\\w+)"
+  name: "pinot_server_$1_$8"
+  cache: true
+  labels:
+    database: "$3"
+    table: "$2$4"
+    tableType: "$5"
+    column: "$6"
+    key: "$7"
+# Column-level OPEN_STRUCT gauges.
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"ServerMetrics\", name=\"?pinot\\.server\\.(openStructLastSegmentDenseKeyCount|openStructLastSegmentSparseKeyCount|openStructLastSegmentKeyCount|openStructLastSegmentDocCount)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([^.\"]+)\"?><>(\\w+)"
+  name: "pinot_server_$1_$7"
+  cache: true
+  labels:
+    database: "$3"
+    table: "$2$4"
+    tableType: "$5"
+    column: "$6"
+# Column-level OPEN_STRUCT meters. Meter names put the metric name last, unlike gauges.
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"ServerMetrics\", name=\"?pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([^.]+)\\.(openStructTypeCoercionFailures|openStructTypeInferenceFailures)\"?><>(\\w+)"
+  name: "pinot_server_$6_$7"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+    tableType: "$4"
+    column: "$5"
 # Gauges that accept tableNameWithType
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
   name: "pinot_$1_$2_$7"

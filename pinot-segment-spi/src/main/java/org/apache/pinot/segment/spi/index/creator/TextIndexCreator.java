@@ -22,26 +22,18 @@ import java.io.IOException;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
-/**
- * Index creator for text indexes.
- *
- * In order to create FST indexes, {@link FSTIndexCreator} must be used.
- */
+/// Index creator for text indexes.
+///
+/// In order to create FST indexes, [FSTIndexCreator] must be used.
 public interface TextIndexCreator extends IndexCreator {
 
-  /**
-   * Adds the next document.
-   */
+  /// Adds the next document.
   void add(String document);
 
-  /**
-   * Adds a set of documents to the index
-   */
+  /// Adds a set of documents to the index
   void add(String[] document, int length);
 
-  /**
-   * Seals the index and flushes it to disk.
-   */
+  /// Seals the index and flushes it to disk.
   void seal()
       throws IOException;
 }

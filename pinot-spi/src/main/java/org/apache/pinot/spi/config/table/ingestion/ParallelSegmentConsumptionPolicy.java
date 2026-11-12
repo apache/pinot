@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.spi.config.table.ingestion;
 
-/**
- * Policy to determine the behaviour of parallel consumption for Realtime Ingestion.
- */
+/// Policy to determine the behaviour of parallel consumption for Realtime Ingestion.
 public enum ParallelSegmentConsumptionPolicy {
   ALLOW_ALWAYS(true, true),
   ALLOW_DURING_BUILD_ONLY(true, false),

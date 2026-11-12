@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -25,12 +26,15 @@ import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -124,13 +128,11 @@ public class BrokerReduceServiceTest {
     brokerReduceService.shutDown();
   }
 
-  /**
-   * Pins the safety net: when `brokerRequest != serverBrokerRequest` (i.e. a path that rewrote
-   * the server-side query), no gapfill is requested, AND no MV-rewrite marker is present, the
-   * reducer MUST throw `BadQueryRequestException("Nested query is not supported without
-   * gapfill")`.  This is the guardrail that prevents any future federated / JOIN / nested-query
-   * rewrite path from silently degrading to a meaningless reduce.
-   */
+  /// Pins the safety net: when `brokerRequest != serverBrokerRequest` (i.e. a path that rewrote
+  /// the server-side query), no gapfill is requested, AND no MV-rewrite marker is present, the
+  /// reducer MUST throw `BadQueryRequestException("Nested query is not supported without
+  /// gapfill")`.  This is the guardrail that prevents any future federated / JOIN / nested-query
+  /// rewrite path from silently degrading to a meaningless reduce.
   @Test
   public void testNestedQueryRejectedWhenNoMaterializedViewMarker()
       throws IOException {
@@ -160,15 +162,13 @@ public class BrokerReduceServiceTest {
     }
   }
 
-  /**
-   * Pins the MV-rewrite opt-out: when the server-side query carries the broker-internal
-   * `MATERIALIZED_VIEW_REWRITE=true` marker, the reducer skips the "Nested query is not
-   * supported without gapfill" safety net and proceeds to reduce normally.
-   *
-   * <p>The marker is broker-internal — `BaseSingleStageBrokerRequestHandler.handleRequest` strips
-   * any user-supplied copy of this option at request entry, so the only way a server query can
-   * carry it is if the broker itself stamped it during a committed FULL_REWRITE.
-   */
+  /// Pins the MV-rewrite opt-out: when the server-side query carries the broker-internal
+  /// `MATERIALIZED_VIEW_REWRITE=true` marker, the reducer skips the "Nested query is not
+  /// supported without gapfill" safety net and proceeds to reduce normally.
+  ///
+  /// The marker is broker-internal — `BaseSingleStageBrokerRequestHandler.handleRequest` strips
+  /// any user-supplied copy of this option at request entry, so the only way a server query can
+  /// carry it is if the broker itself stamped it during a committed FULL_REWRITE.
   @Test
   public void testMaterializedViewMarkerOptsOutOfNestedQueryGuard()
       throws IOException {
@@ -203,6 +203,54 @@ public class BrokerReduceServiceTest {
     } finally {
       service.shutDown();
     }
+  }
+
+  /// Each server holds one distinct value, which is exact on its own. Merging them on the broker crosses a threshold of
+  /// one, and only that threshold, so the response reports an approximate result for it alone.
+  @Test
+  public void testApproximatedResultFromBrokerMerge()
+      throws IOException {
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    for (int threshold : new int[]{1, 10}) {
+      String params = "threshold=" + threshold;
+      BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+          "SELECT DISTINCTCOUNTSMARTHLL(col1, '" + params + "') FROM testTable");
+      DistinctCountSmartHLLAggregationFunction function = new DistinctCountSmartHLLAggregationFunction(
+          List.of(ExpressionContext.forIdentifier("col1"), ExpressionContext.forLiteral(Literal.stringValue(params))),
+          false);
+      Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+      for (int i = 0; i < 2; i++) {
+        DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(
+            new DataSchema(new String[]{"distinctcountsmarthll(col1)"}, new ColumnDataType[]{ColumnDataType.OBJECT}));
+        dataTableBuilder.startRow();
+        dataTableBuilder.setColumn(0, function.serializeIntermediateResult(new IntOpenHashSet(new int[]{i})));
+        dataTableBuilder.finishRow();
+        dataTableMap.put(new ServerRoutingInstance("localhost", i, TableType.OFFLINE), dataTableBuilder.build());
+      }
+
+      BrokerResponseNative response = reduce(brokerReduceService, brokerRequest, dataTableMap, 10_000L);
+      assertEquals(response.getExceptions().size(), 0, response.getExceptions().toString());
+      assertEquals(response.isApproximatedResult(), threshold == 1, params);
+    }
+    brokerReduceService.shutDown();
+  }
+
+  /// A server that extracted final results itself reports an approximate result in its metadata.
+  @Test
+  public void testApproximatedResultReportedByServer() {
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT COUNT(*) FROM testTable");
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(
+        new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG}));
+    DataTable dataTable = dataTableBuilder.build().toMetadataOnlyDataTable();
+    dataTable.getMetadata().put(DataTable.MetadataKey.APPROXIMATED_RESULT.getName(), "true");
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    dataTableMap.put(new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE), dataTable);
+
+    assertTrue(reduce(brokerReduceService, brokerRequest, dataTableMap, 10_000L).isApproximatedResult());
+    brokerReduceService.shutDown();
   }
 
   private BrokerResponseNative reduce(BrokerReduceService brokerReduceService, BrokerRequest brokerRequest,

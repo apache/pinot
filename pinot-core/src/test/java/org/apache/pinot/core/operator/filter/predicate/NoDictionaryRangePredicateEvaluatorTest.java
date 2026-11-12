@@ -19,17 +19,17 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Unit test for no-dictionary based range predicate evaluators.
- */
+/// Unit test for no-dictionary based range predicate evaluators.
 public class NoDictionaryRangePredicateEvaluatorTest {
   private static final ExpressionContext COLUMN_EXPRESSION = ExpressionContext.forIdentifier("column");
 
@@ -389,6 +389,73 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     for (int i = 0x00; i < 0x30; i++) {
       byte[] value = Integer.toString(i).getBytes();
       Assert.assertTrue(predicateEvaluator.applySV(value));
+    }
+  }
+
+  @Test
+  public void testUuidPredicateEvaluator() {
+    // Spread the probes across the full unsigned byte range of the first octet. 0x80..0xff are negative as signed
+    // bytes, so a signed comparison would order them below the bounds and this test would fail.
+    String[] uuidStrings = new String[]{
+        "00000000-0000-4000-8000-000000000000", "20000000-0000-4000-8000-000000000000",
+        "40000000-0000-4000-8000-000000000000", "60000000-0000-4000-8000-000000000000",
+        "80000000-0000-4000-8000-000000000000", "a0000000-0000-4000-8000-000000000000",
+        "c0000000-0000-4000-8000-000000000000", "e0000000-0000-4000-8000-000000000000",
+        "ffffffff-ffff-4fff-bfff-ffffffffffff"
+    };
+    String lower = "40000000-0000-4000-8000-000000000000";
+    String upper = "c0000000-0000-4000-8000-000000000000";
+    byte[] lowerBytes = UuidUtils.toBytes(lower);
+    byte[] upperBytes = UuidUtils.toBytes(upper);
+
+    PredicateEvaluator predicateEvaluator = buildRangePredicate("[" + lower + "\000" + upper + "]",
+        FieldSpec.DataType.UUID);
+    for (String uuidString : uuidStrings) {
+      byte[] value = UuidUtils.toBytes(uuidString);
+      Assert.assertEquals(predicateEvaluator.applySV(value),
+          ByteArray.compare(value, lowerBytes) >= 0 && ByteArray.compare(value, upperBytes) <= 0, uuidString);
+    }
+
+    predicateEvaluator = buildRangePredicate("(" + lower + "\000" + upper + "]", FieldSpec.DataType.UUID);
+    for (String uuidString : uuidStrings) {
+      byte[] value = UuidUtils.toBytes(uuidString);
+      Assert.assertEquals(predicateEvaluator.applySV(value),
+          ByteArray.compare(value, lowerBytes) > 0 && ByteArray.compare(value, upperBytes) <= 0, uuidString);
+    }
+
+    predicateEvaluator = buildRangePredicate("(" + lower + "\000" + upper + ")", FieldSpec.DataType.UUID);
+    for (String uuidString : uuidStrings) {
+      byte[] value = UuidUtils.toBytes(uuidString);
+      Assert.assertEquals(predicateEvaluator.applySV(value),
+          ByteArray.compare(value, lowerBytes) > 0 && ByteArray.compare(value, upperBytes) < 0, uuidString);
+    }
+
+    predicateEvaluator = buildRangePredicate("(*\000" + upper + "]", FieldSpec.DataType.UUID);
+    for (String uuidString : uuidStrings) {
+      byte[] value = UuidUtils.toBytes(uuidString);
+      Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, upperBytes) <= 0, uuidString);
+    }
+
+    predicateEvaluator = buildRangePredicate("[" + lower + "\000*)", FieldSpec.DataType.UUID);
+    for (String uuidString : uuidStrings) {
+      byte[] value = UuidUtils.toBytes(uuidString);
+      Assert.assertEquals(predicateEvaluator.applySV(value), ByteArray.compare(value, lowerBytes) >= 0, uuidString);
+    }
+
+    predicateEvaluator = buildRangePredicate("(*\000*)", FieldSpec.DataType.UUID);
+    for (String uuidString : uuidStrings) {
+      Assert.assertTrue(predicateEvaluator.applySV(UuidUtils.toBytes(uuidString)), uuidString);
+    }
+
+    // Range bounds are canonical UUID strings; the ordering must match java.util.UUID's unsigned-word comparison.
+    UUID lowerUuid = UUID.fromString(lower);
+    UUID upperUuid = UUID.fromString(upper);
+    predicateEvaluator = buildRangePredicate("[" + lower + "\000" + upper + "]", FieldSpec.DataType.UUID);
+    for (int i = 0; i < 100; i++) {
+      UUID randomUuid = UUID.randomUUID();
+      boolean expected = UuidUtils.compare(UuidUtils.toBytes(randomUuid), UuidUtils.toBytes(lowerUuid)) >= 0
+          && UuidUtils.compare(UuidUtils.toBytes(randomUuid), UuidUtils.toBytes(upperUuid)) <= 0;
+      Assert.assertEquals(predicateEvaluator.applySV(UuidUtils.toBytes(randomUuid)), expected, randomUuid.toString());
     }
   }
 

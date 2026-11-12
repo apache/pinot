@@ -26,9 +26,7 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Base implementation of {@link DistinctExecutor} for single column.
- */
+/// Base implementation of [DistinctExecutor] for single column.
 public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, S, M> implements DistinctExecutor {
   protected final ExpressionContext _expression;
   protected final T _distinctTable;
@@ -82,24 +80,16 @@ public abstract class BaseSingleColumnDistinctExecutor<T extends DistinctTable, 
     }
   }
 
-  /**
-   * Reads the single-value values from the block value set.
-   */
+  /// Reads the single-value values from the block value set.
   protected abstract S getValuesSV(BlockValSet blockValSet);
 
-  /**
-   * Reads the multi-value values from the block value set.
-   */
+  /// Reads the multi-value values from the block value set.
   protected abstract M getValuesMV(BlockValSet blockValSet);
 
-  /**
-   * Processes the single-value values for the given range.
-   */
+  /// Processes the single-value values for the given range.
   protected abstract boolean processSV(S values, int from, int to);
 
-  /**
-   * Processes the multi-value values for the given range.
-   */
+  /// Processes the multi-value values for the given range.
   protected abstract boolean processMV(M values, int from, int to);
 
   @Override

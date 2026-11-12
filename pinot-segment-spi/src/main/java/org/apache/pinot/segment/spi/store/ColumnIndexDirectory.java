@@ -28,81 +28,60 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * Abstract class to map the columnar indices to their buffers
- *
- */
+/// Abstract class to map the columnar indices to their buffers
 public abstract class ColumnIndexDirectory implements Closeable {
 
   public abstract void setSegmentMetadata(SegmentMetadataImpl segmentMetadata);
 
-  /**
-   * Allocation context for tracking memory
-   * @param f file for which memory is allocatedx
-   * @param context additional context string
-   * @return formatted string for memory tracking
-   */
+  /// Allocation context for tracking memory
+  /// @param f file for which memory is allocatedx
+  /// @param context additional context string
+  /// @return formatted string for memory tracking
   protected String allocationContext(File f, String context) {
     return this.getClass().getSimpleName() + "." + f.toString() + "." + context;
   }
 
-  /**
-   * Get data buffer of a specified indexType for a column
-   * @param column column name
-   * @param type index type
-   * @return ByteBuffer like buffer for data
-   * @throws IOException
-   */
+  /// Get data buffer of a specified indexType for a column
+  /// @param column column name
+  /// @param type index type
+  /// @return ByteBuffer like buffer for data
+  /// @throws IOException
   public abstract PinotDataBuffer getBuffer(String column, IndexType<?, ?, ?> type)
       throws IOException;
 
-  /**
-   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
-   * @param column column name
-   * @param type index type
-   * @param sizeBytes sizeBytes for the buffer allocation
-   * @return ByteBuffer like buffer for data
-   * @throws IOException
-   */
+  /// Allocate a new data buffer of specified sizeBytes in the columnar index directory
+  /// @param column column name
+  /// @param type index type
+  /// @param sizeBytes sizeBytes for the buffer allocation
+  /// @return ByteBuffer like buffer for data
+  /// @throws IOException
   public abstract PinotDataBuffer newBuffer(String column, IndexType<?, ?, ?> type, long sizeBytes)
       throws IOException;
 
-  /**
-   * Check if an index exists for a column
-   * @param column column name
-   * @param type index type
-   * @return true if the index exists; false otherwise
-   */
+  /// Check if an index exists for a column
+  /// @param column column name
+  /// @param type index type
+  /// @return true if the index exists; false otherwise
   public abstract boolean hasIndexFor(String column, IndexType<?, ?, ?> type);
 
-  /**
-   * Remove the specified index
-   * @param columnName column name
-   * @param indexType index type
-   */
+  /// Remove the specified index
+  /// @param columnName column name
+  /// @param indexType index type
   public abstract void removeIndex(String columnName, IndexType<?, ?, ?> indexType);
 
-  /**
-   * Get the columns with specific index type, loaded by column index directory.
-   * @return a set of columns with such index type.
-   */
+  /// Get the columns with specific index type, loaded by column index directory.
+  /// @return a set of columns with such index type.
   public abstract Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type);
 
-  /**
-   * A hint to prefetch the buffers for columns in the context, in preparation for operating on the segment.
-   */
+  /// A hint to prefetch the buffers for columns in the context, in preparation for operating on the segment.
   public void prefetchBuffer(FetchContext fetchContext) {
   }
 
-  /**
-   * An instruction to fetch the buffers for columns in the context, in order to operate on the segment.
-   */
+  /// An instruction to fetch the buffers for columns in the context, in order to operate on the segment.
   public void acquireBuffer(FetchContext fetchContext) {
   }
 
-  /**
-   * An instruction to release the fetched buffers for columns in this context, after operating on this segment.
-   */
+  /// An instruction to release the fetched buffers for columns in this context, after operating on this segment.
   public void releaseBuffer(FetchContext fetchContext) {
   }
 }

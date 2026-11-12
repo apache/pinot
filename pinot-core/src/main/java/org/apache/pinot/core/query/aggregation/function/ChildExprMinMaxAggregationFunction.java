@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -35,5 +36,31 @@ public class ChildExprMinMaxAggregationFunction extends ChildAggregationFunction
   @Override
   public AggregationFunctionType getType() {
     return _isMax ? AggregationFunctionType.EXPRMAX : AggregationFunctionType.EXPRMIN;
+  }
+
+  /// Service registration for the ExprMin child aggregation.
+  public static final class MinProvider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.PINOTCHILDAGGEXPRMIN;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      return new ChildExprMinMaxAggregationFunction(function.getArguments(), false);
+    }
+  }
+
+  /// Service registration for the ExprMax child aggregation.
+  public static final class MaxProvider implements AggregationFunctionProvider {
+    @Override
+    public AggregationFunctionType getType() {
+      return AggregationFunctionType.PINOTCHILDAGGEXPRMAX;
+    }
+
+    @Override
+    public AggregationFunction<?, ?> create(FunctionContext function, boolean nullHandlingEnabled) {
+      return new ChildExprMinMaxAggregationFunction(function.getArguments(), true);
+    }
   }
 }

@@ -258,11 +258,9 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     }
   }
 
-  /**
-   * Migrate segment tiers on their hosting servers locally. Once table is balanced, i.e. segments are on their ideal
-   * servers, we check if any segment needs to move to a new tier on its hosting servers, i.e. doing local tier
-   * migration for the segments.
-   */
+  /// Migrate segment tiers on their hosting servers locally. Once table is balanced, i.e. segments are on their ideal
+  /// servers, we check if any segment needs to move to a new tier on its hosting servers, i.e. doing local tier
+  /// migration for the segments.
   private void migrateToTargetTier(String tableNameWithType) {
     if (!_enableLocalTierMigration) {
       LOGGER.debug("Skipping migrating segments of table: {} to new tiers on hosting servers", tableNameWithType);

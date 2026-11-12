@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.6.0-SNAPSHOT</version>
+    <version>1.7.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-kafka-4.0</artifactId>
@@ -41,15 +41,9 @@
       <artifactId>pinot-kafka-base</artifactId>
     </dependency>
 
-    <!--
-      VERSION OVERRIDE EXCEPTION: kafka-clients uses ${kafka4.version} instead of the root-managed
-      ${kafka3.version}. This module specifically targets Kafka 4.x which is a different major version
-      with breaking API changes from Kafka 3.x. The Kafka 4.x client is pure Java with no Scala dependency.
-    -->
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-clients</artifactId>
-      <version>${kafka4.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.lz4</groupId>
@@ -58,7 +52,26 @@
       </exclusions>
     </dependency>
 
+    <!-- Kafka's OAuth callback needs jose4j, which kafka-clients does not supply transitively. -->
+    <dependency>
+      <groupId>org.bitbucket.b_c</groupId>
+      <artifactId>jose4j</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
     <!-- Test dependencies -->
+    <!-- KafkaClusterTestKit's SSL setup needs client test fixtures and Bouncy Castle, absent from Kafka's POM. -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <classifier>test-fixtures</classifier>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-kafka-base</artifactId>
@@ -70,18 +83,35 @@
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Testcontainers for embedded Kafka testing with KRaft mode -->
     <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>testcontainers-kafka</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>testcontainers</artifactId>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-test-common-runtime</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>write-runtime-classpath</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <includeScope>runtime</includeScope>
+              <outputFile>${project.build.directory}/runtime-classpath.txt</outputFile>
+              <regenerateFile>true</regenerateFile>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 
   <profiles>
     <profile>

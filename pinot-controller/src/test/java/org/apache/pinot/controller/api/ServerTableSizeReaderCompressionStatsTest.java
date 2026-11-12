@@ -50,7 +50,7 @@ import static org.testng.Assert.*;
 
 /// Tests that [ServerTableSizeReader] deserializes [SegmentSizeInfo] compression-statistics fields.
 public class ServerTableSizeReaderCompressionStatsTest {
-  private static final String URI_PATH = "/table/";
+  private static final String URI_PATH = "/tables/";
   private static final int TIMEOUT_MSEC = 5000;
   private final ExecutorService _executor = Executors.newFixedThreadPool(2);
   private final PoolingHttpClientConnectionManager _connectionManager = new PoolingHttpClientConnectionManager();

@@ -24,40 +24,40 @@ import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
-/**
- * Interface class for executing the actual group-by operation.
- */
+/// Interface class for executing the actual group-by operation.
 public interface GroupByExecutor {
 
-  /**
-   * Performs the group-by aggregation on the given value block.
-   */
+  /// Performs the group-by aggregation on the given value block.
   void process(ValueBlock valueBlock);
 
-  /**
-   * Returns the result of group-by aggregation.
-   * <p>Should be called after all transform blocks has been processed.
-   *
-   * @return Result of aggregation
-   */
+  /// Returns the result of group-by aggregation.
+  ///
+  /// Should be called after all transform blocks has been processed.
+  ///
+  /// @return Result of aggregation
   AggregationGroupByResult getResult();
 
-  /**
-   * Returns the number of generated results
-   *
-   * @return Number of results
-   */
+  /// Returns the number of generated results
+  ///
+  /// @return Number of results
   int getNumGroups();
 
-  /**
-   * Trim the GroupBy result up to the threshold max(configurable_threshold * 5, minTrimSize)
-   * TODO: benchmark the performance of PQ vs. topK
-   * <p>Should be called after all transform blocks has been processed.
-   *
-   */
+  /// Trim the GroupBy result up to the threshold max(configurable_threshold \* 5, minTrimSize)
+  /// TODO: benchmark the performance of PQ vs. topK
+  ///
+  /// Should be called after all transform blocks has been processed.
   List<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer, boolean sortedOutput);
 
   GroupKeyGenerator getGroupKeyGenerator();
 
   GroupByResultHolder[] getGroupByResultHolders();
+
+  /// For a grouping-set query, whether this executor aggregated only the BASE (union) grouping so the segment
+  /// emits base groups and the combine phase derives the individual grouping-set records from them (see
+  /// [org.apache.pinot.core.util.GroupByUtils#deriveGroupingSetsFromMergedBaseTable]), rather than the
+  /// executor having expanded each row into one group per grouping set. Always `false` for non-grouping-set
+  /// queries. Resolving this on the executor keeps the base-vs-expansion decision in a single place.
+  default boolean isGroupingSetsBaseAggregation() {
+    return false;
+  }
 }

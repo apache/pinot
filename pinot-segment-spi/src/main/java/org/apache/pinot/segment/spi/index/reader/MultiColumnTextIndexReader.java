@@ -27,23 +27,38 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public interface MultiColumnTextIndexReader extends TextIndexReader {
 
-  /**
-   * Returns the matching document ids for the given search query against given column.
-   * This is the legacy method for backward compatibility.
-   */
+  /// Returns the matching document ids for the given search query against given column.
+  /// This is the legacy method for backward compatibility.
   default MutableRoaringBitmap getDocIds(String column, String searchQuery) {
     return getDocIds(searchQuery);
   }
 
-  /**
-   * Returns the matching document ids for the given search query against given column with options string.
-   * Lucene-based multi-column text index readers should implement this method.
-   * @param column The column name to search
-   * @param searchQuery The search query string
-   * @param optionsString Options string in format "key1=value1,key2=value2", can be null
-   * @return Matching document ids
-   */
+  /// Returns the matching document ids for the given search query against given column with options string.
+  /// Lucene-based multi-column text index readers should implement this method.
+  /// @param column The column name to search
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @return Matching document ids
   MutableRoaringBitmap getDocIds(String column, String searchQuery, @Nullable String optionsString);
+
+  /// Column-aware counterpart of [TextIndexReader#getNumMatchingDocs]: returns the number of documents of
+  /// `column` matching the query without materializing their ids.
+  ///
+  /// Defaults to materializing, so an implementation that cannot count more cheaply keeps its behaviour.
+  ///
+  /// @param column The column to query
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @return the number of matching documents
+  default int getNumMatchingDocs(String column, String searchQuery, @Nullable String optionsString) {
+    return getDocIds(column, searchQuery, optionsString).getCardinality();
+  }
+
+  /// A multi-column index cannot answer without a column, matching [#getDocIds(String)].
+  @Override
+  default int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
+    throw new UnsupportedOperationException("Multi-column text index requires column name to count!");
+  }
 
   default boolean isMultiColumn() {
     return true;

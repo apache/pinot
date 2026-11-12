@@ -73,9 +73,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Azure Data Lake Storage Gen2 implementation for the PinotFS interface.
- */
+/// Azure Data Lake Storage Gen2 implementation for the PinotFS interface.
 public class ADLSGen2PinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(ADLSGen2PinotFS.class);
 
@@ -248,13 +246,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         + "enableChecksum={})", accountName, fileSystemName, dfsServiceEndpointUrl, _enableChecksum);
   }
 
-  /**
-   * Returns the DataLakeFileSystemClient to the specified file system creating if it doesn't exist.
-   *
-   * @param serviceClient authenticated data lake service client to an account
-   * @param fileSystemName name of the file system (blob container)
-   * @return DataLakeFileSystemClient with the specified fileSystemName.
-   */
+  /// Returns the DataLakeFileSystemClient to the specified file system creating if it doesn't exist.
+  ///
+  /// @param serviceClient authenticated data lake service client to an account
+  /// @param fileSystemName name of the file system (blob container)
+  /// @return DataLakeFileSystemClient with the specified fileSystemName.
   @VisibleForTesting
   public DataLakeFileSystemClient getOrCreateClientWithFileSystem(DataLakeServiceClient serviceClient,
       String fileSystemName) {
@@ -273,12 +269,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Make a new directory at the given location.
-   *
-   * @param uri location to make the directory.
-   * @return true if creation succeeds else false.
-   */
+  /// Make a new directory at the given location.
+  ///
+  /// @param uri location to make the directory.
+  /// @return true if creation succeeds else false.
   @Override
   public boolean mkdir(URI uri)
       throws IOException {
@@ -301,13 +295,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Deletes a file/directory at a given location.
-   *
-   * @param segmentUri location to delete
-   * @param forceDelete to force delete non empty directory.
-   * @return true if deletion succeeds else false.
-   */
+  /// Deletes a file/directory at a given location.
+  ///
+  /// @param segmentUri location to delete
+  /// @param forceDelete to force delete non empty directory.
+  /// @return true if deletion succeeds else false.
   @Override
   public boolean delete(URI segmentUri, boolean forceDelete)
       throws IOException {
@@ -330,13 +322,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Move a file from source location to destination location.
-   *
-   * @param srcUri location to move the file from
-   * @param dstUri location to move the file to
-   * @return true if move succeeds else false.
-   */
+  /// Move a file from source location to destination location.
+  ///
+  /// @param srcUri location to move the file from
+  /// @param dstUri location to move the file to
+  /// @return true if move succeeds else false.
   @Override
   public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
@@ -351,13 +341,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Copy a file from source location to destination location.
-   *
-   * @param srcUri location to copy the file from
-   * @param dstUri location to copy the file to
-   * @return true if move succeeds else false.
-   */
+  /// Copy a file from source location to destination location.
+  ///
+  /// @param srcUri location to copy the file from
+  /// @param dstUri location to copy the file to
+  /// @return true if move succeeds else false.
   @Override
   public boolean copyDir(URI srcUri, URI dstUri)
       throws IOException {
@@ -405,12 +393,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Checks if the file exists at a given location
-   *
-   * @param fileUri location to check the existence of the file.
-   * @return true if exists else false.
-   */
+  /// Checks if the file exists at a given location
+  ///
+  /// @param fileUri location to check the existence of the file.
+  /// @return true if exists else false.
   @Override
   public boolean exists(URI fileUri)
       throws IOException {
@@ -426,12 +412,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Find the size of the file.
-   *
-   * @param fileUri location of the file to find the size of.
-   * @return size of the file
-   */
+  /// Find the size of the file.
+  ///
+  /// @param fileUri location of the file to find the size of.
+  /// @return size of the file
   @Override
   public long length(URI fileUri)
       throws IOException {
@@ -445,13 +429,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * List the names of files in a given directory.
-   *
-   * @param fileUri location to move the file from
-   * @param recursive flag to check the sub directories.
-   * @return array of all the files in the target directory.
-   */
+  /// List the names of files in a given directory.
+  ///
+  /// @param fileUri location to move the file from
+  /// @param recursive flag to check the sub directories.
+  /// @return array of all the files in the target directory.
   @Override
   public String[] listFiles(URI fileUri, boolean recursive)
       throws IOException {
@@ -535,13 +517,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
         .setIsDirectory(file.isDirectory()).build();
   }
 
-  /**
-   * Copy a file from ADL to local location.
-   *
-   * @param srcUri location of the file.
-   * @param dstFile location to move the file to.
-   * @return nothing.
-   */
+  /// Copy a file from ADL to local location.
+  ///
+  /// @param srcUri location of the file.
+  /// @param dstFile location to move the file to.
+  /// @return nothing.
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile)
       throws Exception {
@@ -582,13 +562,11 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Copy a local file to the destination location in ADL.
-   *
-   * @param srcFile location of the file locally
-   * @param dstUri location to move the file to.
-   * @return nothing.
-   */
+  /// Copy a local file to the destination location in ADL.
+  ///
+  /// @param srcFile location of the file locally
+  /// @param dstUri location to move the file to.
+  /// @return nothing.
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception {
@@ -599,12 +577,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Check if a given location is a directory.
-   *
-   * @param uri location make the check.
-   * @return true if it's a directory else false.
-   */
+  /// Check if a given location is a directory.
+  ///
+  /// @param uri location make the check.
+  /// @return true if it's a directory else false.
   @Override
   public boolean isDirectory(URI uri)
       throws IOException {
@@ -620,12 +596,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Get the last modified time of the given file location.
-   *
-   * @param uri location of the file to get the last modified time.
-   * @return the last modified time of the target file.
-   */
+  /// Get the last modified time of the given file location.
+  ///
+  /// @param uri location of the file to get the last modified time.
+  /// @return the last modified time of the target file.
   @Override
   public long lastModified(URI uri)
       throws IOException {
@@ -641,12 +615,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Touch (access) a given file.
-   *
-   * @param uri location of the file to touch the file
-   * @return true if touch succeeds else false.
-   */
+  /// Touch (access) a given file.
+  ///
+  /// @param uri location of the file to touch the file
+  /// @return true if touch succeeds else false.
   @Override
   public boolean touch(URI uri)
       throws IOException {
@@ -677,12 +649,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Open the file at a given location.
-   *
-   * @param uri location of the file to open.
-   * @return the input stream with the contents of the file.
-   */
+  /// Open the file at a given location.
+  ///
+  /// @param uri location of the file to open.
+  /// @return the input stream with the contents of the file.
   @Override
   public InputStream open(URI uri)
       throws IOException {
@@ -713,15 +683,13 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Helper function to copy input stream to destination URI.
-   *
-   * NOTE: the caller has to close the input stream.
-   *
-   * @param inputStream input stream that will be written to dstUri
-   * @param dstUri destination URI
-   * @return true if the copy succeeds
-   */
+  /// Helper function to copy input stream to destination URI.
+  ///
+  /// NOTE: the caller has to close the input stream.
+  ///
+  /// @param inputStream input stream that will be written to dstUri
+  /// @param dstUri destination URI
+  /// @return true if the copy succeeds
   private boolean copyInputStreamToDst(InputStream inputStream, URI dstUri, byte[] contentMd5)
       throws IOException {
     int bytesRead;
@@ -776,12 +744,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
-  /**
-   * Compute md5 hash from the file
-   * @param file input file
-   * @return byte array of md5 hash
-   * @throws Exception
-   */
+  /// Compute md5 hash from the file
+  /// @param file input file
+  /// @return byte array of md5 hash
+  /// @throws Exception
   private byte[] computeContentMd5(File file)
       throws Exception {
     MessageDigest messageDigest = MessageDigest.getInstance("MD5");

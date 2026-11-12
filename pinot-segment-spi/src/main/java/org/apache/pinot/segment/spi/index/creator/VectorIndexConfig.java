@@ -31,12 +31,12 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 /// Config for vector index.
 ///
 /// This is the backend-neutral configuration for all vector index types. Common fields include
-/// {@code vectorIndexType}, {@code vectorDimension}, {@code vectorDistanceFunction}, and {@code version}.
+/// `vectorIndexType`, `vectorDimension`, `vectorDistanceFunction`, and `version`.
 /// All backend-specific configuration (e.g., HNSW maxCon/beamWidth, IVF_FLAT nlist/trainSampleSize)
-/// is stored in the {@code properties} map.
+/// is stored in the `properties` map.
 ///
-/// The {@code vectorIndexType} field determines which backend is used. If absent or null, it defaults
-/// to {@code HNSW} for backward compatibility. Use {@link #resolveBackendType()} to safely resolve the
+/// The `vectorIndexType` field determines which backend is used. If absent or null, it defaults
+/// to `HNSW` for backward compatibility. Use [#resolveBackendType()] to safely resolve the
 /// backend type with this default applied.
 ///
 /// @see VectorBackendType
@@ -51,10 +51,10 @@ public class VectorIndexConfig extends IndexConfig {
   private static final VectorDistanceFunction DEFAULT_VECTOR_DISTANCE_FUNCTION =
       VectorDistanceFunction.COSINE;
 
-  /// Key in {@link #_properties} controlling whether the IVF vector index payload is consolidated
-  /// into the segment's combined index file ({@code columns.psf}) instead of living as a separate
-  /// combined file. Default {@code false} preserves the legacy combined layout. Mirrors the text
-  /// index's {@code storeInSegmentFile} flag.
+  /// Key in [#_properties] controlling whether the IVF vector index payload is consolidated
+  /// into the segment's combined index file (`columns.psf`) instead of living as a separate
+  /// combined file. Default `false` preserves the legacy combined layout. Mirrors the text
+  /// index's `storeInSegmentFile` flag.
   public static final String STORE_IN_SEGMENT_FILE = "storeInSegmentFile";
   public static final boolean DEFAULT_STORE_IN_SEGMENT_FILE = false;
 
@@ -145,21 +145,21 @@ public class VectorIndexConfig extends IndexConfig {
   }
 
   /// Whether the vector index payload is consolidated into the segment's combined index file
-  /// ({@code columns.psf}) rather than left beside it as a sidecar. Default {@code false}. Only
+  /// (`columns.psf`) rather than left beside it as a sidecar. Default `false`. Only
   /// applies to V3 segments, and covers both IVF and HNSW backends.
   ///
-  /// When {@code true} the segment build first produces a transient combined file (the IVF creator
+  /// When `true` the segment build first produces a transient combined file (the IVF creator
   /// writes the IVF `.combined.index`; for HNSW the Lucene directory is packed into
-  /// `.vector.hnsw.combined.index`); the {@code VectorIndexHandler} / V2→V3 converter then absorbs
-  /// it into {@code columns.psf} as a typed entry and deletes the sibling. The reader path is
+  /// `.vector.hnsw.combined.index`); the `VectorIndexHandler` / V2→V3 converter then absorbs
+  /// it into `columns.psf` as a typed entry and deletes the sibling. The reader path is
   /// selected by this flag — flag-on reads from
-  /// {@code segmentReader.getIndexFor(column, StandardIndexes.vector())} (the IVF reader consumes
+  /// `segmentReader.getIndexFor(column, StandardIndexes.vector())` (the IVF reader consumes
   /// the buffer directly; the HNSW reader builds a buffer-backed Lucene `Directory` over it),
   /// flag-off reads the legacy sidecar (IVF combined mmap or HNSW Lucene directory).
   ///
   /// This accessor is intentionally not a JSON property: the value is carried inside the
-  /// {@code properties} map (key {@link #STORE_IN_SEGMENT_FILE}). Marking it {@link JsonIgnore}
-  /// keeps the on-wire shape of {@code VectorIndexConfig} unchanged for callers that round-trip
+  /// `properties` map (key [#STORE_IN_SEGMENT_FILE]). Marking it [JsonIgnore]
+  /// keeps the on-wire shape of `VectorIndexConfig` unchanged for callers that round-trip
   /// the config through Jackson.
   @JsonIgnore
   public boolean isStoreInSegmentFile() {
@@ -170,8 +170,8 @@ public class VectorIndexConfig extends IndexConfig {
     return value == null ? DEFAULT_STORE_IN_SEGMENT_FILE : Boolean.parseBoolean(value);
   }
 
-  /// Resolves the {@link VectorBackendType} for this config. If {@code vectorIndexType} is null or empty,
-  /// defaults to {@link VectorBackendType#HNSW} for backward compatibility.
+  /// Resolves the [VectorBackendType] for this config. If `vectorIndexType` is null or empty,
+  /// defaults to [VectorBackendType#HNSW] for backward compatibility.
   ///
   /// @return the resolved backend type
   /// @throws IllegalArgumentException if vectorIndexType is set to an unrecognized value
@@ -211,8 +211,8 @@ public class VectorIndexConfig extends IndexConfig {
 
   /// Distance functions supported by vector indexes.
   ///
-  /// Note: {@code L2} is an alias for {@code EUCLIDEAN}. Both refer to Euclidean (L2) distance.
-  /// Existing configs using {@code EUCLIDEAN} continue to work unchanged.
+  /// Note: `L2` is an alias for `EUCLIDEAN`. Both refer to Euclidean (L2) distance.
+  /// Existing configs using `EUCLIDEAN` continue to work unchanged.
   public enum VectorDistanceFunction {
     COSINE, INNER_PRODUCT, EUCLIDEAN, DOT_PRODUCT, L2;
   }

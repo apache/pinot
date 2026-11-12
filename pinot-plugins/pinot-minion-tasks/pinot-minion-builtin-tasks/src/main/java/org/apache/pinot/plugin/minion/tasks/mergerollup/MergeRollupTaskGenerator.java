@@ -44,7 +44,6 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
-import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.MergeRollupTask;
@@ -69,59 +68,57 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A {@link PinotTaskGenerator} implementation for generating tasks of type {@link MergeRollupTask}
- *
- * Assumptions:
- *  - When the MergeRollupTask starts the first time, records older than the min(now ms, max end time ms of all ready to
- *    process segments) - bufferTimeMs have already been ingested. If not, newly ingested records older than that time
- *    may not be properly merged (Due to the latest watermarks advanced too far before records are ingested).
- *  - If it is needed, there are backfill protocols to ingest and replace records older than the latest watermarks.
- *    Those protocols can handle time alignment (according to merge levels configurations) correctly.
- *  - If it is needed, there are reconcile protocols to merge & rollup newly ingested segments that are (1) older than
- *    the latest watermarks, and (2) not time aligned according to merge levels configurations
- *    - For realtime tables, those protocols are needed if streaming records arrive late (older thant the latest
- *      watermarks)
- *    - For offline tables, those protocols are needed if there are non-time-aligned segments ingested accidentally.
- *
- *
- * Steps:
- *  - Pre-select segments:
- *    - Fetch all segments, select segments based on segment lineage (removing segmentsFrom for COMPLETED lineage
- *      entry and segmentsTo for IN_PROGRESS lineage entry)
- *    - For realtime tables, remove
- *      - in-progress segments (Segment.Realtime.Status.IN_PROGRESS), and
- *      - sealed segments with start time later than the earliest start time of all in progress segments
- *    - Remove empty segments
- *    - Sort segments based on startTime and endTime in ascending order
- *
- *  For each mergeLevel (from lowest to highest, e.g. Hourly -> Daily -> Monthly -> Yearly):
- *    - Skip scheduling if there's incomplete task for the mergeLevel
- *    - Schedule tasks for at most k time buckets, k is up to maxNumParallelBuckets (by default 1) at best effort
- *    - Repeat until k time buckets get created or we loop through all the candidate segments:
- *      - Calculate merge/roll-up bucket:
- *        - Read watermarkMs from the {@link MergeRollupTaskMetadata} ZNode found at
- *          MINION_TASK_METADATA/${tableNameWithType}/MergeRollupTask
- *          In case of cold-start, no ZNode will exist.
- *          A new ZNode will be created, with watermarkMs as the smallest time found in all segments truncated to the
- *          closest bucket start time.
- *        - The execution window for the task is calculated as,
- *          bucketStartMs = watermarkMs
- *          bucketEndMs = bucketStartMs + bucketTimeMs
- *          - bucketEndMs must be equal or older than the bufferTimeMs
- *          - bucketEndMs of higher merge level should be less or equal to the waterMarkMs of lower level
- *        - Bump up target window and watermark if needed.
- *          - If there's no unmerged segments (by checking segment zk metadata {mergeRollupTask.mergeLevel: level}) for
- *            current window, keep bumping up the watermark and target window until unmerged segments are found.
- *          - Else skip the scheduling.
- *      - Select segments for the bucket:
- *        - Skip buckets which all segments are merged
- *        - If there's no spilled over segments (segments spanning multiple time buckets), schedule buckets in parallel
- *        - Else, schedule buckets till the first one that has spilled over data (included), so the spilled over data
- *          will be merged next round
- *      - Create the tasks for the current bucket (and per partition for partitioned tables) based on
- *        maxNumRecordsPerTask
- */
+/// A [org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator] implementation for
+/// generating tasks of type [MergeRollupTask]
+///
+/// Assumptions:
+///  - When the MergeRollupTask starts the first time, records older than the min(now ms, max end time ms of all ready
+///    to process segments) - bufferTimeMs have already been ingested. If not, newly ingested records older than that
+///    time may not be properly merged (Due to the latest watermarks advanced too far before records are ingested).
+///  - If it is needed, there are backfill protocols to ingest and replace records older than the latest watermarks.
+///    Those protocols can handle time alignment (according to merge levels configurations) correctly.
+///  - If it is needed, there are reconcile protocols to merge & rollup newly ingested segments that are (1) older than
+///    the latest watermarks, and (2) not time aligned according to merge levels configurations
+///    - For realtime tables, those protocols are needed if streaming records arrive late (older thant the latest
+///      watermarks)
+///    - For offline tables, those protocols are needed if there are non-time-aligned segments ingested accidentally.
+///
+/// Steps:
+///  - Pre-select segments:
+///    - Fetch all segments, select segments based on segment lineage (removing segmentsFrom for COMPLETED lineage
+///      entry and segmentsTo for IN_PROGRESS lineage entry)
+///    - For realtime tables, remove
+///      - in-progress segments (Segment.Realtime.Status.IN_PROGRESS), and
+///      - sealed segments with start time later than the earliest start time of all in progress segments
+///    - Remove empty segments
+///    - Sort segments based on startTime and endTime in ascending order
+///
+///  For each mergeLevel (from lowest to highest, e.g. Hourly -> Daily -> Monthly -> Yearly):
+///    - Skip scheduling if there's incomplete task for the mergeLevel
+///    - Schedule tasks for at most k time buckets, k is up to maxNumParallelBuckets (by default 1) at best effort
+///    - Repeat until k time buckets get created or we loop through all the candidate segments:
+///      - Calculate merge/roll-up bucket:
+///        - Read watermarkMs from the [MergeRollupTaskMetadata] ZNode found at
+///          MINION_TASK_METADATA/${tableNameWithType}/MergeRollupTask
+///          In case of cold-start, no ZNode will exist.
+///          A new ZNode will be created, with watermarkMs as the smallest time found in all segments truncated to the
+///          closest bucket start time.
+///        - The execution window for the task is calculated as,
+///          bucketStartMs = watermarkMs
+///          bucketEndMs = bucketStartMs + bucketTimeMs
+///          - bucketEndMs must be equal or older than the bufferTimeMs
+///          - bucketEndMs of higher merge level should be less or equal to the waterMarkMs of lower level
+///        - Bump up target window and watermark if needed.
+///          - If there's no unmerged segments (by checking segment zk metadata {mergeRollupTask.mergeLevel: level}) for
+///            current window, keep bumping up the watermark and target window until unmerged segments are found.
+///          - Else skip the scheduling.
+///      - Select segments for the bucket:
+///        - Skip buckets which all segments are merged
+///        - If there's no spilled over segments (segments spanning multiple time buckets), schedule buckets in parallel
+///        - Else, schedule buckets till the first one that has spilled over data (included), so the spilled over data
+///          will be merged next round
+///      - Create the tasks for the current bucket (and per partition for partitioned tables) based on
+///        maxNumRecordsPerTask
 @TaskGenerator
 public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MergeRollupTaskGenerator.class);
@@ -622,9 +619,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             .collect(Collectors.toList());
   }
 
-  /**
-   * Validate table config for merge/rollup task
-   */
+  /// Validate table config for merge/rollup task
   @VisibleForTesting
   static boolean validate(TableConfig tableConfig, String taskType) {
     String tableNameWithType = tableConfig.getTableName();
@@ -648,11 +643,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return true;
   }
 
-  /**
-   * Get the valid bucket end time before the buffer (now - bufferMs). Consider the segment as multiple contiguous
-   * time buckets, this function will return the last bucket end time before the buffer. Return LONG.MIN_VALUE if
-   * there's no valid bucket before the buffer.
-   */
+  /// Get the valid bucket end time before the buffer (now - bufferMs). Consider the segment as multiple contiguous
+  /// time buckets, this function will return the last bucket end time before the buffer. Return LONG.MIN_VALUE if
+  /// there's no valid bucket before the buffer.
   private long getValidBucketEndTimeMsForSegment(SegmentZKMetadata segmentZKMetadata, long bucketMs, long bufferMs) {
     // Make sure the segment is ready for merge (the first bucket <= now - bufferTime)
     long currentTimeMs = System.currentTimeMillis();
@@ -670,21 +663,17 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return validBucketEndTimeMs;
   }
 
-  /**
-   * Check if the segment span multiple buckets
-   */
+  /// Check if the segment span multiple buckets
   private boolean hasSpilledOverData(SegmentZKMetadata segmentZKMetadata, long bucketMs) {
     return segmentZKMetadata.getStartTimeMs() / bucketMs < segmentZKMetadata.getEndTimeMs() / bucketMs;
   }
 
-  /**
-   * Check if the segment is merged for given and higher merge levels
-   *
-   * @param segmentZKMetadata segment zk metadata
-   * @param baseMergeLevel base merge level
-   * @param sortedMergeLevels sorted merge levels based on buffer time period
-   * @return true if the segment is merged for the base merge level or any level higher than the base merge level
-   */
+  /// Check if the segment is merged for given and higher merge levels
+  ///
+  /// @param segmentZKMetadata segment zk metadata
+  /// @param baseMergeLevel base merge level
+  /// @param sortedMergeLevels sorted merge levels based on buffer time period
+  /// @return true if the segment is merged for the base merge level or any level higher than the base merge level
   private boolean isMergedSegment(SegmentZKMetadata segmentZKMetadata, String baseMergeLevel,
       List<String> sortedMergeLevels) {
     Map<String, String> customMap = segmentZKMetadata.getCustomMap();
@@ -707,9 +696,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return false;
   }
 
-  /**
-   * Check if the bucket end time is valid
-   */
+  /// Check if the bucket end time is valid
   private boolean isValidBucketEndTime(long bucketEndMs, long bufferMs, @Nullable String lowerMergeLevel,
       MergeRollupTaskMetadata mergeRollupTaskMetadata, boolean processAll) {
     // Check that bucketEndMs <= now - bufferMs
@@ -724,10 +711,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return true;
   }
 
-  /**
-   * Get the watermark from the MergeRollupMetadata ZNode.
-   * If the znode is null, computes the watermark using the start time from segment metadata
-   */
+  /// Get the watermark from the MergeRollupMetadata ZNode.
+  /// If the znode is null, computes the watermark using the start time from segment metadata
   private long getWatermarkMs(long minStartTimeMs, long bucketMs, String mergeLevel,
       MergeRollupTaskMetadata mergeRollupTaskMetadata) {
     long watermarkMs;
@@ -743,9 +728,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return watermarkMs;
   }
 
-  /**
-   * Create pinot task configs with selected segments and configs
-   */
+  /// Create pinot task configs with selected segments and configs
   private List<PinotTaskConfig> createPinotTaskConfigs(List<SegmentZKMetadata> selectedSegments,
       TableConfig tableConfig, int maxNumRecordsPerTask, String mergeLevel, List<Integer> partition,
       Map<String, String> mergeConfigs, Map<String, String> taskConfigs) {
@@ -831,16 +814,14 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         / bucketTimeMs;
   }
 
-  /**
-   * Update the delay metrics for the given table and merge level. We create the new gauge metric if the metric is not
-   * available.
-   * @param tableNameWithType table name with type
-   * @param mergeLevel merge level
-   * @param lowerMergeLevel lower merge level
-   * @param watermarkMs current watermark value
-   * @param bufferTimeMs buffer time
-   * @param bucketTimeMs bucket time
-   */
+  /// Update the delay metrics for the given table and merge level. We create the new gauge metric if the metric is not
+  /// available.
+  /// @param tableNameWithType table name with type
+  /// @param mergeLevel merge level
+  /// @param lowerMergeLevel lower merge level
+  /// @param watermarkMs current watermark value
+  /// @param bufferTimeMs buffer time
+  /// @param bucketTimeMs bucket time
   private void createOrUpdateDelayMetrics(String tableNameWithType, String mergeLevel, String lowerMergeLevel,
       long watermarkMs, long bufferTimeMs, long bucketTimeMs) {
     ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
@@ -870,17 +851,15 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     });
   }
 
-  /**
-   * Update the number buckets to process for the given table and merge level. We create the new gauge metric if
-   * the metric is not available.
-   * @param tableNameWithType table name with type
-   * @param mergeLevel merge level
-   * @param lowerMergeLevel lower merge level
-   * @param bufferTimeMs buffer time
-   * @param bucketTimeMs bucket time
-   * @param sortedSegments sorted segment list
-   * @param sortedMergeLevels sorted merge level list
-   */
+  /// Update the number buckets to process for the given table and merge level. We create the new gauge metric if
+  /// the metric is not available.
+  /// @param tableNameWithType table name with type
+  /// @param mergeLevel merge level
+  /// @param lowerMergeLevel lower merge level
+  /// @param bufferTimeMs buffer time
+  /// @param bucketTimeMs bucket time
+  /// @param sortedSegments sorted segment list
+  /// @param sortedMergeLevels sorted merge level list
   private void createOrUpdateNumBucketsToProcessMetrics(String tableNameWithType, String mergeLevel,
       String lowerMergeLevel, long bufferTimeMs, long bucketTimeMs,
       List<SegmentZKMetadata> sortedSegments, List<String> sortedMergeLevels) {
@@ -962,11 +941,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     });
   }
 
-  /**
-   * Reset the delay metrics for the given table name.
-   *
-   * @param tableNameWithType a table name with type
-   */
+  /// Reset the delay metrics for the given table name.
+  ///
+  /// @param tableNameWithType a table name with type
   private void resetDelayMetrics(String tableNameWithType) {
     ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
     if (controllerMetrics == null) {
@@ -989,12 +966,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     }
   }
 
-  /**
-   * Reset the delay metrics for the given table name and merge level.
-   *
-   * @param tableNameWithType table name with type
-   * @param mergeLevel merge level
-   */
+  /// Reset the delay metrics for the given table name and merge level.
+  ///
+  /// @param tableNameWithType table name with type
+  /// @param mergeLevel merge level
   private void resetDelayMetrics(String tableNameWithType, String mergeLevel) {
     ControllerMetrics controllerMetrics = _clusterInfoAccessor.getControllerMetrics();
     if (controllerMetrics == null) {
@@ -1017,21 +992,19 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     }
   }
 
-  /**
-   * Clean up the metrics that no longer need to be emitted.
-   *
-   * We clean up the metrics for the following cases:
-   *   1. Table got deleted.
-   *   2. The current controller is no longer the leader for a table.
-   *   3. Merge task config got deleted.
-   *   4. Merge task config got modified and some merge levels got deleted.
-   *
-   * TODO: Current code will remove all metrics in case we invoke the ad-hoc task scheduling on a single table.
-   * We will file the follow-up PR to address this issue. We need to separate out APIs for ad-hoc scheduling and
-   * periodic scheduling. We will only enable metrics for periodic case.
-   *
-   * @param tableConfigs list of tables
-   */
+  /// Clean up the metrics that no longer need to be emitted.
+  ///
+  /// We clean up the metrics for the following cases:
+  ///   1. Table got deleted.
+  ///   2. The current controller is no longer the leader for a table.
+  ///   3. Merge task config got deleted.
+  ///   4. Merge task config got modified and some merge levels got deleted.
+  ///
+  /// TODO: Current code will remove all metrics in case we invoke the ad-hoc task scheduling on a single table.
+  /// We will file the follow-up PR to address this issue. We need to separate out APIs for ad-hoc scheduling and
+  /// periodic scheduling. We will only enable metrics for periodic case.
+  ///
+  /// @param tableConfigs list of tables
   private void cleanUpDelayMetrics(List<TableConfig> tableConfigs) {
     Map<String, TableConfig> tableConfigMap = new HashMap<>();
     for (TableConfig tableConfig : tableConfigs) {

@@ -63,11 +63,11 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     String validDocIdsTypeStr = MinionTaskUtils.getValidDocIdsType(tableConfig.getUpsertConfig(), configs,
         UpsertCompactionTask.VALID_DOC_IDS_TYPE).toString();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
-    String crcFromDeepStorageSegment = segmentMetadata.getCrc();
+    long originalSegmentCrcFromTaskGenerator = Long.parseLong(configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY));
+    long crcFromDeepStorageSegment = segmentMetadata.getCrc();
     boolean ignoreCrcMismatch = Boolean.parseBoolean(configs.getOrDefault(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
         String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
-    if (!ignoreCrcMismatch && !originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)) {
+    if (!ignoreCrcMismatch && originalSegmentCrcFromTaskGenerator != crcFromDeepStorageSegment) {
       String message = "Crc mismatched between ZK and deepstore copy of segment: " + segmentName
           + ". Expected crc from ZK: " + originalSegmentCrcFromTaskGenerator + ", crc from deepstore: "
           + crcFromDeepStorageSegment;

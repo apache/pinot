@@ -22,24 +22,20 @@ import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import javax.annotation.Nullable;
 
 
-/**
- * Window value aggregator for MAX window function over LONG types.
- * Uses primitive {@code long} operations and {@link LongArrayFIFOQueue} to avoid boxing overhead and improve cache
- * locality compared to the {@link Comparable}-based aggregator. Also avoids precision loss that occurs when converting
- * large long values to double.
- */
+/// Window value aggregator for MAX window function over LONG types.
+/// Uses primitive `long` operations and [LongArrayFIFOQueue] to avoid boxing overhead and improve cache
+/// locality compared to the [Comparable]-based aggregator. Also avoids precision loss that occurs when converting
+/// large long values to double.
 public class MaxLongWindowValueAggregator implements WindowValueAggregator<Object> {
 
   private final boolean _supportRemoval;
   private final LongArrayFIFOQueue _deque = new LongArrayFIFOQueue();
   private Long _maxValue = null;
 
-  /**
-   * @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
-   *                       only addition of values in which case this value aggregator will have O(1) space complexity;
-   *                       if {@code supportRemoval} is true, this value aggregator will have O(K) space complexity
-   *                       (where K is the max size of the window).
-   */
+  /// @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
+  ///                       only addition of values in which case this value aggregator will have O(1) space complexity;
+  ///                       if `supportRemoval` is true, this value aggregator will have O(K) space complexity
+  ///                       (where K is the max size of the window).
   public MaxLongWindowValueAggregator(boolean supportRemoval) {
     _supportRemoval = supportRemoval;
   }

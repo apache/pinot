@@ -300,15 +300,22 @@ public class SegmentDeletionManagerTest {
     TestUtils.waitForCondition((aVoid) -> dummyDir1.list().length == 1, 2000, 120000,
         "Unable to delete desired segments from dummyDir1");
 
-    // Check that empty directory has not been removed in the first run
-    TestUtils.waitForCondition((aVoid) -> dummyDir2.exists(), 2000, 120000,
-        "dummyDir2 does not exist");
+    // dummyDir2's files are all aged, so the first run deletes them (asynchronously, on the deletion
+    // manager's executor) but leaves the now-empty directory in place. Empty directories are only
+    // removed on a subsequent run. Wait until the directory is present AND empty before triggering
+    // that next run: this barrier both asserts the "directory survives the first run" behavior and,
+    // critically, guarantees the async file deletions have completed. Previously this only waited for
+    // dummyDir2.exists() (trivially true from the moment it is created), so the second run below could
+    // race ahead of the async deletions, still see files in dummyDir2, skip the empty-directory
+    // removal, and never delete the directory -- surfacing as a 120s "dummyDir2 still exists" timeout.
+    TestUtils.waitForCondition((aVoid) -> dummyDir2.exists() && dummyDir2.list().length == 0, 2000, 120000,
+        "dummyDir2 was not emptied by the first deletion run");
 
     // Check that deleted file without retention suffix is honoring cluster-wide retention period of 7 days.
     TestUtils.waitForCondition((aVoid) -> dummyDir3.list().length == 1, 2000, 120000,
         "Unable to delete desired segments from dummyDir3");
 
-    // Try to remove empty directory in the next run
+    // Try to remove the now-empty directory in the next run
     deletionManager.removeAgedDeletedSegments(leadControllerManager);
     TestUtils.waitForCondition((aVoid) -> !dummyDir2.exists(), 2000, 120000,
         "dummyDir2 still exists");

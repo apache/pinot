@@ -23,26 +23,20 @@ import java.util.Set;
 import java.util.UUID;
 
 
-/**
- * Util class for Segment Lineage
- */
+/// Util class for Segment Lineage
 public class SegmentLineageUtils {
   private SegmentLineageUtils() {
   }
 
-  /**
-   * Generate lineage entry id using UUID.
-   *
-   * @return lineage entry id
-   */
+  /// Generate lineage entry id using UUID.
+  ///
+  /// @return lineage entry id
   public static String generateLineageEntryId() {
     return UUID.randomUUID().toString();
   }
 
-  /**
-   * Use the segment lineage metadata to filters out either merged segments or original segments in place
-   * to make sure that the final segments contain no duplicate data.
-   */
+  /// Use the segment lineage metadata to filters out either merged segments or original segments in place
+  /// to make sure that the final segments contain no duplicate data.
   public static void filterSegmentsBasedOnLineageInPlace(Set<String> segments, SegmentLineage segmentLineage) {
     if (segmentLineage != null) {
       for (LineageEntry lineageEntry : segmentLineage.getLineageEntries().values()) {
@@ -55,15 +49,12 @@ public class SegmentLineageUtils {
     }
   }
 
-  /**
-   * Returns the set of segments that participate in a live lineage entry and therefore must not be deleted by
-   * external callers.
-   * <ul>
-   *   <li>{@code IN_PROGRESS} entries lock both {@code segmentsFrom} and {@code segmentsTo}.</li>
-   *   <li>{@code COMPLETED} entries lock {@code segmentsFrom}</li>
-   *   <li>{@code REVERTED} entries lock nothing.</li>
-   * </ul>
-   */
+  /// Returns the set of segments that participate in a live lineage entry and therefore must not be deleted by
+  /// external callers.
+  ///
+  /// - `IN_PROGRESS` entries lock both `segmentsFrom` and `segmentsTo`.
+  /// - `COMPLETED` entries lock `segmentsFrom`
+  /// - `REVERTED` entries lock nothing.
   public static Set<String> getDeleteBlockedSegments(SegmentLineage segmentLineage) {
     Set<String> blocked = new HashSet<>();
     for (LineageEntry lineageEntry : segmentLineage.getLineageEntries().values()) {

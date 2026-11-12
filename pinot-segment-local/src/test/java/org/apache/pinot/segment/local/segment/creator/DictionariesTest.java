@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
@@ -76,7 +77,10 @@ import org.testng.annotations.Test;
 
 public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
   private static final String AVRO_DATA = "data/test_sample_data.avro";
-  private static final File INDEX_DIR = new File(DictionariesTest.class.toString());
+  // Per-run unique dir so this test never shares an index directory with DictionaryOptimiserTest
+  // (which derived its path from the same class) when the two run concurrently in parallel forks.
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectoryPath(), DictionariesTest.class.getSimpleName() + "-" + UUID.randomUUID());
   private static final Map<String, Set<Object>> UNIQUE_ENTRIES = new HashMap<>();
 
   private static File _segmentDirectory;
@@ -447,12 +451,10 @@ public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
     Assert.assertFalse(statsCollector.isSorted());
   }
 
-  /**
-   * Test for ensuring that Strings with special characters can be handled
-   * correctly.
-   *
-   * @throws Exception
-   */
+  /// Test for ensuring that Strings with special characters can be handled
+  /// correctly.
+  ///
+  /// @throws Exception
   @Test
   public void testUTF8Characters()
       throws Exception {
@@ -478,9 +480,7 @@ public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
     FileUtils.deleteQuietly(indexDir);
   }
 
-  /**
-   * Tests SegmentDictionaryCreator for case when there is only one string and it is empty.
-   */
+  /// Tests SegmentDictionaryCreator for case when there is only one string and it is empty.
   @Test
   public void testSingleEmptyString()
       throws Exception {
@@ -497,13 +497,11 @@ public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
     FileUtils.deleteQuietly(indexDir);
   }
 
-  /**
-   * Helper method to build stats collector for a given column.
-   *
-   * @param column Column name
-   * @param dataType Data type for the column
-   * @return StatsCollector for the column
-   */
+  /// Helper method to build stats collector for a given column.
+  ///
+  /// @param column Column name
+  /// @param dataType Data type for the column
+  /// @return StatsCollector for the column
   private AbstractColumnStatisticsCollector buildStatsCollector(String column, DataType dataType) {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(column, dataType, true));

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.util.UUID;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -54,6 +55,8 @@ public class DataTypeConversionFunctionsTest {
         {10, "long", 10L},
         {10D, "float", 10F},
         {10F, "double", 10D},
+        {UUID.fromString("550e8400-e29b-41d4-a716-446655440000"), "string",
+            "550e8400-e29b-41d4-a716-446655440000"},
         {"abc1", "bytes", new byte[]{(byte) 0xab, (byte) 0xc1}},
         {new byte[]{(byte) 0xab, (byte) 0xc1}, "string", "abc1"}
     };

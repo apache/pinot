@@ -108,9 +108,7 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
     initCustomVariables();
   }
 
-  /**
-   * Can be overridden to initialize custom variables after other variables are set
-   */
+  /// Can be overridden to initialize custom variables after other variables are set
   protected void initCustomVariables() {
   }
 
@@ -119,9 +117,7 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId, this::createPartitionDedupMetadataManager);
   }
 
-  /**
-   * Create PartitionDedupMetadataManager for given partition id.
-   */
+  /// Create PartitionDedupMetadataManager for given partition id.
   protected abstract PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
 
   @Override

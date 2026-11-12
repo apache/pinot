@@ -23,13 +23,11 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * Aggregation strategy leveraging roaring bitmap algebra (unions/intersections).
- */
+/// Aggregation strategy leveraging roaring bitmap algebra (unions/intersections).
 class BitmapAggregationStrategy extends AggregationStrategy<DictIdsWrapper> {
   public BitmapAggregationStrategy(List<ExpressionContext> stepExpressions,
-      List<ExpressionContext> correlateByExpressions) {
-    super(stepExpressions, correlateByExpressions);
+      List<ExpressionContext> correlateByExpressions, boolean nullHandlingEnabled) {
+    super(stepExpressions, correlateByExpressions, nullHandlingEnabled);
   }
 
   @Override

@@ -40,9 +40,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests segment generation for empty files
- */
+/// Tests segment generation for empty files
 public class SegmentGenerationWithNoRecordsTest implements PinotBuffersAfterMethodCheckRule {
   private static final String STRING_COLUMN1 = "string_col1";
   private static final String STRING_COLUMN2 = "string_col2";

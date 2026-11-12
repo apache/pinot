@@ -67,10 +67,8 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
     LOGGER.info("WorkloadBudgetManager initialized with enforcement window: {}ms", _enforcementWindowMs);
   }
 
-  /**
-   * This budget is primarily meant to be used for queries that need to be issued in a low priority manner.
-   * This is fixed budget allocated during host startup and used across all secondary queries.
-   */
+  /// This budget is primarily meant to be used for queries that need to be issued in a low priority manner.
+  /// This is fixed budget allocated during host startup and used across all secondary queries.
   private void initSecondaryWorkloadBudget(PinotConfiguration config) {
     double secondaryCpuPercentage = config.getProperty(
         CommonConstants.Accounting.Keys.SECONDARY_WORKLOAD_CPU_PERCENTAGE,
@@ -133,10 +131,8 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
     LOGGER.info("Removed workload: {}", workload);
   }
 
-  /**
-   * Collects workload stats for CPU and memory usage.
-   * Could be overridden for custom implementations
-   */
+  /// Collects workload stats for CPU and memory usage.
+  /// Could be overridden for custom implementations
   public void collectWorkloadStats(String workload, WorkloadBudgetManager.BudgetStats stats) {
     // Default implementation does nothing.
   }
@@ -158,9 +154,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
     return budget.tryCharge(cpuUsedNs, memoryUsedBytes);
   }
 
-  /**
-   * Retrieves the initial and remaining budget for a workload.
-   */
+  /// Retrieves the initial and remaining budget for a workload.
   public BudgetStats getBudgetStats(String workload) {
     if (!_isCostCollectionEnabled) {
       return null;
@@ -169,9 +163,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
     return budget != null ? budget.getStats() : null;
   }
 
-  /**
-   * Retrieves the total remaining budget across all workloads (Thread-Safe).
-   */
+  /// Retrieves the total remaining budget across all workloads (Thread-Safe).
   public BudgetStats getRemainingBudgetAcrossAllWorkloads() {
     if (!_isCostCollectionEnabled) {
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
@@ -187,9 +179,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
     return new BudgetStats(totalCpuBudget, totalMemoryBudget, totalCpuRemaining, totalMemRemaining);
   }
 
-  /**
-   * Periodically resets budgets at the end of each enforcement window (Thread-Safe).
-   */
+  /// Periodically resets budgets at the end of each enforcement window (Thread-Safe).
   private void startBudgetResetTask() {
     LOGGER.debug("Starting budget reset task with enforcement window: {}ms", _enforcementWindowMs);
     _resetScheduler.scheduleAtFixedRate(() -> {

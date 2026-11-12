@@ -29,19 +29,17 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Tests for {@code jdbc:pinotgrpc://} driver path through {@link java.sql.DriverManager}.
- *
- * <p>Verifies that auth credentials and gRPC metadata options (blockRowSize, encoding,
- * compression) are correctly propagated through the JDBC driver into
- * {@link PinotGrpcConnection#getMetadataMap()}.
- *
- * <p>Uses the mock gRPC server from {@link AbstractJdbcDriverAuthTest} to handle
- * the validation query that the gRPC connection sends on construction.
- *
- * <p>The gRPC path extracts {@code headers.*} prefixed properties (same behavior as HTTP path),
- * providing consistent header propagation across both JDBC driver variants.
- */
+/// Tests for `jdbc:pinotgrpc://` driver path through [java.sql.DriverManager].
+///
+/// Verifies that auth credentials and gRPC metadata options (blockRowSize, encoding,
+/// compression) are correctly propagated through the JDBC driver into
+/// [PinotGrpcConnection#getMetadataMap()].
+///
+/// Uses the mock gRPC server from [AbstractJdbcDriverAuthTest] to handle
+/// the validation query that the gRPC connection sends on construction.
+///
+/// The gRPC path extracts `headers.*` prefixed properties (same behavior as HTTP path),
+/// providing consistent header propagation across both JDBC driver variants.
 @Test
 public class GrpcJdbcDriverAuthTest extends AbstractJdbcDriverAuthTest {
 

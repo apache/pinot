@@ -25,9 +25,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Realtime integration coverage for IVF_PQ configuration, which should fall back to exact scan.
- */
+/// Realtime integration coverage for IVF_PQ configuration, which should fall back to exact scan.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class IvfPqVectorRealtimeTest extends IvfPqVectorTest {
   private static final String REALTIME_TABLE_NAME = "IvfPqVectorRealtimeTest";

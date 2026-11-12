@@ -641,11 +641,22 @@ public class PinotSegmentColumnReader implements Closeable {
         return _forwardIndexReader.getString(docId1, _forwardIndexReaderContext)
             .compareTo(_forwardIndexReader.getString(docId2, _forwardIndexReaderContext));
       case BYTES:
+        // ByteArray.compare is unsigned byte-wise lexicographic; for canonical 16-byte big-endian UUIDs this is
+        // identical to UuidUtils.compare's unsigned 64-bit-word ordering, so a single comparator handles both.
         return ByteArray.compare(_forwardIndexReader.getBytes(docId1, _forwardIndexReaderContext),
             _forwardIndexReader.getBytes(docId2, _forwardIndexReaderContext));
       default:
         throw new IllegalStateException("Unsupported SV no-dictionary column type for comparison: " + _valueType);
     }
+  }
+
+  public Object getInternalValue(int docId) {
+    assert _forwardIndexReader.isSingleValue();
+    Object value = getValue(docId);
+    if (_valueType == DataType.BYTES) {
+      return new ByteArray((byte[]) value);
+    }
+    return value;
   }
 
   @Override

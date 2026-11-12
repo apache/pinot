@@ -29,9 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
-/**
- * Extension of {@link AbstractColumnStatisticsCollector} for BigDecimal column type.
- */
+/// Extension of [AbstractColumnStatisticsCollector] for BigDecimal column type.
 public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private ObjectOpenHashSet<BigDecimal> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;

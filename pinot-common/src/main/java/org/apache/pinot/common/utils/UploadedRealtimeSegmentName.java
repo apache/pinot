@@ -27,20 +27,19 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
 
-/**
- * Class to represent segment names like: {prefix}__{tableName}__{partitionId}__{creationTime}__{suffix}
- *
- * <p>This naming convention is adopted to represent a segment uploaded to a realtime table. The naming
- * convention has been kept semantically similar to {@link LLCSegmentName} but differs in following ways:
- *
- * <li> prefix to quickly identify the type/source of segment e.g. "uploaded"/"minion"
- * <li> name of the table to which the segment belongs
- * <li> partitionId which should be consistent as the stream partitioning in case of upsert realtime tables.
- * <li> creationTime creation time of segment of the format yyyyMMdd'T'HHmm'Z'
- * <li> suffix to uniquely identify segments created at the same time.
- *
- * Use {@link org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator} to generate segment names.
- */
+/// Class to represent segment names like: {prefix}\_\_{tableName}\_\_{partitionId}\_\_{creationTime}\_\_{suffix}
+///
+/// This naming convention is adopted to represent a segment uploaded to a realtime table. The naming
+/// convention has been kept semantically similar to [LLCSegmentName] but differs in following ways:
+///
+/// - prefix to quickly identify the type/source of segment e.g. "uploaded"/"minion"
+/// - name of the table to which the segment belongs
+/// - partitionId which should be consistent as the stream partitioning in case of upsert realtime tables.
+/// - creationTime creation time of segment of the format yyyyMMdd'T'HHmm'Z'
+/// - suffix to uniquely identify segments created at the same time.
+///
+///   Use [org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator] to generate segment
+///   names.
 public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeSegmentName> {
 
   private static final String SEPARATOR = "__";
@@ -69,14 +68,12 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
     }
   }
 
-  /**
-   * Constructor for UploadedRealtimeSegmentName.
-   * @param tableName
-   * @param partitionId
-   * @param msSinceEpoch
-   * @param prefix
-   * @param suffix
-   */
+  /// Constructor for UploadedRealtimeSegmentName.
+  /// @param tableName
+  /// @param partitionId
+  /// @param msSinceEpoch
+  /// @param prefix
+  /// @param suffix
   public UploadedRealtimeSegmentName(String tableName, int partitionId, long msSinceEpoch, String prefix,
       String suffix) {
     Preconditions.checkArgument(
@@ -91,12 +88,12 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
     _segmentName = Joiner.on(SEPARATOR).join(prefix, tableName, partitionId, _creationTime, suffix);
   }
 
-  /**
-   * Checks if the segment name is of the format: {prefix}__{tableName}__{partitionId}__{creationTime}__{suffix}
-   * @param segmentName
-   * @return boolean true if the segment name is of the format: {prefix}__{tableName}__{partitionId}__{creationTime}
-   * __{suffix}
-   */
+  /// Checks if the segment name is of the format:
+  /// {prefix}\_\_{tableName}\_\_{partitionId}\_\_{creationTime}\_\_{suffix}
+  /// @param segmentName
+  /// @return boolean true if the segment name is of the format:
+  /// {prefix}\_\_{tableName}\_\_{partitionId}\_\_{creationTime}
+  /// \_\_{suffix}
   public static boolean isUploadedRealtimeSegmentName(String segmentName) {
     int numSeparators = 0;
     int index = 0;
@@ -124,11 +121,9 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
     return _partitionId;
   }
 
-  /**
-   * Returns the creation time in the format yyyyMMdd'T'HHmm'Z'
-   * To be used for only human readability and not for any computation
-   * @return
-   */
+  /// Returns the creation time in the format yyyyMMdd'T'HHmm'Z'
+  /// To be used for only human readability and not for any computation
+  /// @return
   public String getCreationTime() {
     return _creationTime;
   }
@@ -145,11 +140,9 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
     return _suffix;
   }
 
-  /**
-   * Compares the string representation of the segment name.
-   * @param other the object to be compared.
-   * @return
-   */
+  /// Compares the string representation of the segment name.
+  /// @param other the object to be compared.
+  /// @return
   @Override
   public int compareTo(UploadedRealtimeSegmentName other) {
     Preconditions.checkState(_tableName.equals(other._tableName),

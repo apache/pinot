@@ -25,27 +25,19 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 
 
-/**
- * Interface for reading from the OPEN_STRUCT index. Provides per-key access to the
- * materialized sub-columns produced by the columnar storage backend.
- *
- * @param <T> Type of the ReaderContext
- */
+/// Interface for reading from the OPEN_STRUCT index. Provides per-key access to the
+/// materialized sub-columns produced by the columnar storage backend.
+///
+/// @param <T> Type of the ReaderContext
 @SuppressWarnings("rawtypes")
 public interface OpenStructIndexReader<T extends ForwardIndexReaderContext> extends ForwardIndexReader<T> {
 
-  /**
-   * Returns the keys in the map index.
-   */
+  /// Returns the keys in the map index.
   Set<String> getKeys();
 
-  /**
-   * Returns all the indexes for the given key.
-   */
+  /// Returns all the indexes for the given key.
   Map<IndexType, IndexReader> getIndexes(String key);
 
-  /**
-   * Returns the column metadata for the given key.
-   */
+  /// Returns the column metadata for the given key.
   ColumnMetadata getColumnMetadata(String key);
 }

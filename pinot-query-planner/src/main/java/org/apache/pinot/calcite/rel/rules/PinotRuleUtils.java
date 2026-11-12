@@ -19,11 +19,14 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Contexts;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
@@ -34,18 +37,27 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.logical.LogicalAsofJoin;
+import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexVisitorImpl;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.calcite.util.Util;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
 
 
 public class PinotRuleUtils {
@@ -76,6 +88,24 @@ public class PinotRuleUtils {
     }
   }
 
+  /// Appends literal arguments to the immediate project, preserving existing column references.
+  public static RelNode appendAggregateLiterals(RelNode input, List<RexNode> literals) {
+    RelNode rel = unboxRel(input);
+    if (rel instanceof Project) {
+      Project project = (Project) rel;
+      List<RexNode> projects = new ArrayList<>(project.getProjects());
+      projects.addAll(literals);
+      return LogicalProject.create(project.getInput(), project.getHints(), projects, (List<String>) null, Set.of());
+    }
+    RexBuilder rexBuilder = input.getCluster().getRexBuilder();
+    List<RexNode> projects = new ArrayList<>(input.getRowType().getFieldCount() + literals.size());
+    for (int i = 0; i < input.getRowType().getFieldCount(); i++) {
+      projects.add(rexBuilder.makeInputRef(input, i));
+    }
+    projects.addAll(literals);
+    return LogicalProject.create(input, List.of(), projects, (List<String>) null, Set.of());
+  }
+
   public static boolean isExchange(RelNode rel) {
     return unboxRel(rel) instanceof Exchange;
   }
@@ -92,18 +122,15 @@ public class PinotRuleUtils {
     return unboxRel(rel) instanceof Aggregate;
   }
 
-  /**
-   * utility logic to determine if a JOIN can be pushed down to the leaf-stage execution and leverage the
-   * segment-local info (indexing and others) to speed up the execution.
-   *
-   * <p>The logic here is that the "row-representation" of the relation must not have changed. E.g. </p>
-   * <ul>
-   *   <li>`RelNode` that are single-in, single-out are possible (Project/Filter/)</li>
-   *   <li>`Join` can be stacked on top if we only consider SEMI-JOIN</li>
-   *   <li>`Window` should be allowed but we don't have impl for Window on leaf, so not yet included.</li>
-   *   <li>`Sort` should be allowed but we need to reorder Sort and Join first, so not yet included.</li>
-   * </ul>
-   */
+  /// utility logic to determine if a JOIN can be pushed down to the leaf-stage execution and leverage the
+  /// segment-local info (indexing and others) to speed up the execution.
+  ///
+  /// The logic here is that the "row-representation" of the relation must not have changed. E.g.
+  ///
+  /// - `RelNode` that are single-in, single-out are possible (Project/Filter/)
+  /// - `Join` can be stacked on top if we only consider SEMI-JOIN
+  /// - `Window` should be allowed but we don't have impl for Window on leaf, so not yet included.
+  /// - `Sort` should be allowed but we need to reorder Sort and Join first, so not yet included.
   public static boolean canPushDynamicBroadcastToLeaf(RelNode relNode) {
     // TODO 1: optimize this part out as it is not efficient to scan the entire subtree for exchanges;
     //    we should cache the stats in the node (potentially using Trait, e.g. marking LeafTrait & IntermediateTrait)
@@ -135,6 +162,51 @@ public class PinotRuleUtils {
     return funcSqlKind == SqlKind.OTHER_FUNCTION ? function.getOperator().getName() : funcSqlKind.name();
   }
 
+  /// Returns whether `node` evaluates to the same result no matter where in the plan it sits, and can therefore be
+  /// relocated -- pushed below a join, duplicated onto another input, and so on.
+  ///
+  /// An expression must be clear of three axes of variability:
+  ///
+  /// - [SqlOperator#isDeterministic()] -- `false` for `rand()`, `UUID_V4`, `UUID_V7` and Calcite's own `RAND` /
+  ///   `RAND_INTEGER`.
+  /// - [SqlOperator#isDynamicFunction()] -- Calcite's own "fold once per query, never re-evaluate" marker, used by
+  ///   `CURRENT_TIMESTAMP` and friends.
+  /// - [PinotSqlFunction#isVolatile()] -- Pinot's equivalent marker, `true` for `FunctionVolatility.VOLATILE`
+  ///   functions such as `now()`, `ago()` and `stageId()`. These deliberately stay `isDeterministic() == true` so that
+  ///   [PinotEvaluateLiteralRule] can still fold them once at plan time, which is precisely why
+  ///   [SqlOperator#isDeterministic()] alone does not catch them.
+  ///
+  /// [PinotOperatorTable#ARRAY_TO_MV] is the one exception. It is marked non-deterministic (and so volatile) only to
+  /// stop Calcite from simplifying MV predicates such as `ARRAY_TO_MV(col) = 'a' AND ARRAY_TO_MV(col) = 'b'` to
+  /// `false`. Its value depends only on its row, so its own flags are ignored here. Its operands are still checked.
+  ///
+  /// Relocating an expression that fails this check changes how many times, and in what context, it is evaluated --
+  /// which changes query results. `FunctionVolatility.STABLE` deliberately passes: it is constant within a single
+  /// query, so moving it is safe.
+  ///
+  /// Note this is a predicate that callers must apply; it is not enforced globally. Only [PinotFilterJoinRule]
+  /// consults it today, so other rules that relocate expressions can still move volatile ones.
+  public static boolean isRelocatable(RexNode node) {
+    try {
+      node.accept(new RexVisitorImpl<Void>(true) {
+        @Override
+        public Void visitCall(RexCall call) {
+          SqlOperator operator = call.getOperator();
+          boolean isVariable = !operator.isDeterministic() || operator.isDynamicFunction()
+              || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile());
+          if (isVariable && operator != PinotOperatorTable.ARRAY_TO_MV) {
+            throw Util.FoundOne.NULL;
+          }
+          return super.visitCall(call);
+        }
+      });
+      return true;
+    } catch (Util.FoundOne e) {
+      Util.swallow(e, null);
+      return false;
+    }
+  }
+
   public static class WindowUtils {
     // Supported window functions
     // OTHER_FUNCTION supported are: BOOL_AND, BOOL_OR
@@ -157,11 +229,9 @@ public class PinotRuleUtils {
       validateWindowFrames(windowGroup);
     }
 
-    /**
-     * Replaces the reference to literal arguments in the window group with the actual literal values.
-     * NOTE: {@link Window} has a field called "constants" which contains the literal values. If the input reference is
-     * beyond the window input size, it is a reference to the constants.
-     */
+    /// Replaces the reference to literal arguments in the window group with the actual literal values.
+    /// NOTE: [Window] has a field called "constants" which contains the literal values. If the input reference is
+    /// beyond the window input size, it is a reference to the constants.
     public static Window.Group updateLiteralArgumentsInWindowGroup(Window window) {
       Window.Group oldWindowGroup = window.groups.get(0);
       RelNode input = unboxRel(window.getInput());
@@ -258,5 +328,26 @@ public class PinotRuleUtils {
       }
       return null;
     }
+  }
+
+  /// Returns `rel` with the given traits. `LogicalJoin#copy` and `LogicalAsofJoin#copy` drop the trait set they are
+  /// given, so a copy of a join loses for example its distribution. This creates them again with the traits instead.
+  public static RelNode withTraits(RelNode rel, RelTraitSet traitSet) {
+    if (rel.getTraitSet().equals(traitSet)) {
+      return rel;
+    }
+    if (rel instanceof LogicalJoin) {
+      LogicalJoin join = (LogicalJoin) rel;
+      return new LogicalJoin(join.getCluster(), traitSet, join.getHints(), join.getLeft(), join.getRight(),
+          join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
+          ImmutableList.copyOf(join.getSystemFieldList()));
+    }
+    if (rel instanceof LogicalAsofJoin) {
+      LogicalAsofJoin join = (LogicalAsofJoin) rel;
+      return new LogicalAsofJoin(join.getCluster(), traitSet, join.getHints(), join.getLeft(), join.getRight(),
+          join.getCondition(), join.getMatchCondition(), join.getJoinType(),
+          ImmutableList.copyOf(join.getSystemFieldList()));
+    }
+    return rel.copy(traitSet, rel.getInputs());
   }
 }

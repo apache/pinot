@@ -35,16 +35,12 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.commons.collections4.CollectionUtils;
 
 
-/**
- * Generates {@link PinotDistMapping} for a given source and destination RelNode.
- */
+/// Generates [PinotDistMapping] for a given source and destination RelNode.
 public class DistMappingGenerator {
   private DistMappingGenerator() {
   }
 
-  /**
-   * Source to destination mapping.
-   */
+  /// Source to destination mapping.
   public static PinotDistMapping compute(RelNode source, RelNode destination,
       @Nullable List<RelNode> leadingSiblings) {
     if (destination instanceof Project) {

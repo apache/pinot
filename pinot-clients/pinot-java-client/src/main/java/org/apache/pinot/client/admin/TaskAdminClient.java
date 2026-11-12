@@ -30,10 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Client for task administration operations.
- * Provides methods to monitor and manage Pinot tasks.
- */
+/// Client for task administration operations.
+/// Provides methods to monitor and manage Pinot tasks.
 public class TaskAdminClient extends BaseServiceAdminClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskAdminClient.class);
 
@@ -42,51 +40,43 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     super(transport, controllerAddress, headers);
   }
 
-  /**
-   * Lists all task types available in the cluster.
-   *
-   * @return Set of task type names
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists all task types available in the cluster.
+  ///
+  /// @return Set of task type names
+  /// @throws PinotAdminException If the request fails
   public Set<String> listTaskTypes()
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/tasktypes", null, _headers);
     return PinotAdminTransport.getObjectMapper().convertValue(response, Set.class);
   }
 
-  /**
-   * Gets the state (task queue state) for the given task type.
-   *
-   * @param taskType Task type name
-   * @return Task state
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets the state (task queue state) for the given task type.
+  ///
+  /// @param taskType Task type name
+  /// @return Task state
+  /// @throws PinotAdminException If the request fails
   public TaskState getTaskQueueState(String taskType)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/" + taskType + "/state", null, _headers);
     return TaskState.valueOf(response.asText());
   }
 
-  /**
-   * Lists all tasks for the given task type.
-   *
-   * @param taskType Task type name
-   * @return Set of task names
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists all tasks for the given task type.
+  ///
+  /// @param taskType Task type name
+  /// @return Set of task names
+  /// @throws PinotAdminException If the request fails
   public Set<String> getTasks(String taskType)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/" + taskType + "/tasks", null, _headers);
     return PinotAdminTransport.getObjectMapper().convertValue(response, Set.class);
   }
 
-  /**
-   * Gets the count of all tasks for the given task type.
-   *
-   * @param taskType Task type name
-   * @return Task count
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets the count of all tasks for the given task type.
+  ///
+  /// @param taskType Task type name
+  /// @return Task count
+  /// @throws PinotAdminException If the request fails
   public int getTasksCount(String taskType)
       throws PinotAdminException {
     JsonNode response =
@@ -94,14 +84,12 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.asInt();
   }
 
-  /**
-   * Lists all tasks for the given task type and table.
-   *
-   * @param taskType Task type name
-   * @param tableNameWithType Table name with type suffix
-   * @return Map of task names to task states
-   * @throws PinotAdminException If the request fails
-   */
+  /// Lists all tasks for the given task type and table.
+  ///
+  /// @param taskType Task type name
+  /// @param tableNameWithType Table name with type suffix
+  /// @return Map of task names to task states
+  /// @throws PinotAdminException If the request fails
   public Map<String, TaskState> getTaskStatesByTable(String taskType, String tableNameWithType)
       throws PinotAdminException {
     JsonNode response =
@@ -111,14 +99,12 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     });
   }
 
-  /**
-   * Gets task metadata for the given task type and table.
-   *
-   * @param taskType Task type name
-   * @param tableNameWithType Table name with type suffix
-   * @return Task metadata as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets task metadata for the given task type and table.
+  ///
+  /// @param taskType Task type name
+  /// @param tableNameWithType Table name with type suffix
+  /// @return Task metadata as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getTaskMetadataByTable(String taskType, String tableNameWithType)
       throws PinotAdminException {
     JsonNode response =
@@ -127,14 +113,12 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Deletes task metadata for the given task type and table.
-   *
-   * @param taskType Task type name
-   * @param tableNameWithType Table name with type suffix
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Deletes task metadata for the given task type and table.
+  ///
+  /// @param taskType Task type name
+  /// @param tableNameWithType Table name with type suffix
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String deleteTaskMetadataByTable(String taskType, String tableNameWithType)
       throws PinotAdminException {
     JsonNode response =
@@ -143,16 +127,14 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Fetches count of sub-tasks for each of the tasks for the given task type.
-   *
-   * @param taskType Task type name
-   * @param state Task state(s) to filter by (optional)
-   * @param tableNameWithType Table name with type to filter by (optional)
-   * @param minNumSubtasks Minimum number of subtasks to filter by (optional)
-   * @return Task counts as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Fetches count of sub-tasks for each of the tasks for the given task type.
+  ///
+  /// @param taskType Task type name
+  /// @param state Task state(s) to filter by (optional)
+  /// @param tableNameWithType Table name with type to filter by (optional)
+  /// @param minNumSubtasks Minimum number of subtasks to filter by (optional)
+  /// @return Task counts as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getTaskCounts(String taskType, @Nullable String state, @Nullable String tableNameWithType,
       @Nullable Integer minNumSubtasks)
       throws PinotAdminException {
@@ -173,14 +155,12 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Fetches debug information for all tasks for the given task type.
-   *
-   * @param taskType Task type name
-   * @param verbosity Verbosity level (0 by default)
-   * @return Task debug information as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Fetches debug information for all tasks for the given task type.
+  ///
+  /// @param taskType Task type name
+  /// @param verbosity Verbosity level (0 by default)
+  /// @return Task debug information as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getTasksDebugInfo(String taskType, int verbosity)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("verbosity", String.valueOf(verbosity));
@@ -190,15 +170,13 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Fetches debug information for all tasks for the given task type and table.
-   *
-   * @param taskType Task type name
-   * @param tableNameWithType Table name with type suffix
-   * @param verbosity Verbosity level (0 by default)
-   * @return Task debug information as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Fetches debug information for all tasks for the given task type and table.
+  ///
+  /// @param taskType Task type name
+  /// @param tableNameWithType Table name with type suffix
+  /// @param verbosity Verbosity level (0 by default)
+  /// @return Task debug information as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getTasksDebugInfo(String taskType, String tableNameWithType, int verbosity)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("verbosity", String.valueOf(verbosity));
@@ -209,15 +187,13 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Fetches task generation information for the recent runs of the given task for the given table.
-   *
-   * @param taskType Task type name
-   * @param tableNameWithType Table name with type suffix
-   * @param localOnly Whether to only lookup local cache for logs
-   * @return Task generation debug information as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Fetches task generation information for the recent runs of the given task for the given table.
+  ///
+  /// @param taskType Task type name
+  /// @param tableNameWithType Table name with type suffix
+  /// @param localOnly Whether to only lookup local cache for logs
+  /// @return Task generation debug information as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getTaskGenerationDebugInfo(String taskType, String tableNameWithType, boolean localOnly)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("localOnly", String.valueOf(localOnly));
@@ -228,15 +204,13 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Fetches debug information for the given task name.
-   *
-   * @param taskName Task name
-   * @param verbosity Verbosity level (0 by default)
-   * @param tableNameWithType Table name with type to filter by (optional)
-   * @return Task debug information as JSON string
-   * @throws PinotAdminException If the request fails
-   */
+  /// Fetches debug information for the given task name.
+  ///
+  /// @param taskName Task name
+  /// @param verbosity Verbosity level (0 by default)
+  /// @param tableNameWithType Table name with type to filter by (optional)
+  /// @return Task debug information as JSON string
+  /// @throws PinotAdminException If the request fails
   public String getTaskDebugInfo(String taskName, int verbosity, @Nullable String tableNameWithType)
       throws PinotAdminException {
     Map<String, String> queryParams = new HashMap<>();
@@ -252,13 +226,11 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Gets a map from task to task state for the given task type.
-   *
-   * @param taskType Task type name
-   * @return Map of task names to task states
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets a map from task to task state for the given task type.
+  ///
+  /// @param taskType Task type name
+  /// @return Map of task names to task states
+  /// @throws PinotAdminException If the request fails
   public Map<String, TaskState> getTaskStates(String taskType)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/" + taskType + "/taskstates", null, _headers);
@@ -266,26 +238,22 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     });
   }
 
-  /**
-   * Gets the task state for the given task.
-   *
-   * @param taskName Task name
-   * @return Task state
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets the task state for the given task.
+  ///
+  /// @param taskName Task name
+  /// @return Task state
+  /// @throws PinotAdminException If the request fails
   public TaskState getTaskState(String taskName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tasks/task/" + taskName + "/state", null, _headers);
     return TaskState.valueOf(response.asText());
   }
 
-  /**
-   * Gets the states of all sub-tasks for the given task.
-   *
-   * @param taskName Task name
-   * @return Map of sub-task names to sub-task states
-   * @throws PinotAdminException If the request fails
-   */
+  /// Gets the states of all sub-tasks for the given task.
+  ///
+  /// @param taskName Task name
+  /// @return Map of sub-task names to sub-task states
+  /// @throws PinotAdminException If the request fails
   public Map<String, String> getSubtaskStates(String taskName)
       throws PinotAdminException {
     JsonNode response =
@@ -293,9 +261,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return PinotAdminTransport.getObjectMapper().convertValue(response, Map.class);
   }
 
-  /**
-   * Stops the task queue for a given task type.
-   */
+  /// Stops the task queue for a given task type.
   public String stopTaskQueue(String taskType)
       throws PinotAdminException {
     JsonNode response =
@@ -303,9 +269,7 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Resumes the task queue for a given task type.
-   */
+  /// Resumes the task queue for a given task type.
   public String resumeTaskQueue(String taskType)
       throws PinotAdminException {
     JsonNode response =
@@ -313,12 +277,10 @@ public class TaskAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Deletes a task by name.
-   *
-   * @param taskName Task name
-   * @param forceDelete Whether to force delete an active task
-   */
+  /// Deletes a task by name.
+  ///
+  /// @param taskName Task name
+  /// @param forceDelete Whether to force delete an active task
   public String deleteTask(String taskName, boolean forceDelete)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("forceDelete", String.valueOf(forceDelete));
@@ -329,34 +291,26 @@ public class TaskAdminClient extends BaseServiceAdminClient {
 
   // Async versions of key methods
 
-  /**
-   * Lists all task types available in the cluster (async).
-   */
+  /// Lists all task types available in the cluster (async).
   public CompletableFuture<Set<String>> listTaskTypesAsync() {
     return _transport.executeGetAsync(_controllerAddress, "/tasks/tasktypes", null, _headers)
         .thenApply(response -> PinotAdminTransport.getObjectMapper()
             .convertValue(response, Set.class));
   }
 
-  /**
-   * Gets the state for the given task type (async).
-   */
+  /// Gets the state for the given task type (async).
   public CompletableFuture<TaskState> getTaskQueueStateAsync(String taskType) {
     return _transport.executeGetAsync(_controllerAddress, "/tasks/" + taskType + "/state", null, _headers)
         .thenApply(response -> TaskState.valueOf(response.asText()));
   }
 
-  /**
-   * Lists all tasks for the given task type (async).
-   */
+  /// Lists all tasks for the given task type (async).
   public CompletableFuture<Set<String>> getTasksAsync(String taskType) {
     return _transport.executeGetAsync(_controllerAddress, "/tasks/" + taskType + "/tasks", null, _headers)
         .thenApply(response -> PinotAdminTransport.getObjectMapper().convertValue(response, Set.class));
   }
 
-  /**
-   * Gets the task state for the given task (async).
-   */
+  /// Gets the task state for the given task (async).
   public CompletableFuture<TaskState> getTaskStateAsync(String taskName) {
     return _transport.executeGetAsync(_controllerAddress, "/tasks/task/" + taskName + "/state", null, _headers)
         .thenApply(response -> TaskState.valueOf(response.asText()));

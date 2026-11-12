@@ -23,23 +23,15 @@ import java.util.Map;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * Interface for StarTree.
- */
+/// Interface for StarTree.
 public interface StarTree {
 
-  /**
-   * Get the root node of the star tree.
-   */
+  /// Get the root node of the star tree.
   StarTreeNode getRoot();
 
-  /**
-   * Get a list of all dimension names. The node dimension id is the index of the dimension name in this list.
-   */
+  /// Get a list of all dimension names. The node dimension id is the index of the dimension name in this list.
   List<String> getDimensionNames();
 
-  /**
-   * Print the tree.
-   */
+  /// Print the tree.
   void printTree(Map<String, Dictionary> dictionaryMap);
 }

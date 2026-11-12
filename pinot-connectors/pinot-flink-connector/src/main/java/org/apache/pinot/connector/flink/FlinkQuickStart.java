@@ -41,11 +41,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * A quick start to populate a segment into Pinot Table using the connector. Please run the GenericQuickStart to create
- * the offline table of all Starbucks store locations in US, and then run this quick start to populate other Starbucks
- * stores in the rest of the world.
- */
+/// A quick start to populate a segment into Pinot Table using the connector. Please run the GenericQuickStart to create
+/// the offline table of all Starbucks store locations in US, and then run this quick start to populate other Starbucks
+/// stores in the rest of the world.
 public final class FlinkQuickStart {
 
   public static final RowTypeInfo TEST_TYPE_INFO =

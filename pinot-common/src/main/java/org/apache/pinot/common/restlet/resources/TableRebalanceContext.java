@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
-/**
- * Track the job configs and attempt numbers as part of the job ZK metadata to retry failed rebalance.
- */
+/// Track the job configs and attempt numbers as part of the job ZK metadata to retry failed rebalance.
 public class TableRebalanceContext {
   private static final int INITIAL_ATTEMPT_ID = 1;
   private String _jobId;
@@ -30,28 +28,24 @@ public class TableRebalanceContext {
   // Default to true for all user initiated rebalances, so that they can be retried if they fail or get stuck.
   private boolean _allowRetries = true;
 
-  /**
-   * Creates a new TableRebalanceContext for the initial attempt of a rebalance job.
-   *
-   * @param originalJobId The original job ID for the rebalance job.
-   * @param config The rebalance configuration.
-   * @param allowRetries Whether retries are allowed for this rebalance job. This isn't part of {@link RebalanceConfig}
-   *                     because user initiated rebalances should always support retries for failed and stuck jobs.
-   * @return A new TableRebalanceContext instance.
-   */
+  /// Creates a new TableRebalanceContext for the initial attempt of a rebalance job.
+  ///
+  /// @param originalJobId The original job ID for the rebalance job.
+  /// @param config The rebalance configuration.
+  /// @param allowRetries Whether retries are allowed for this rebalance job. This isn't part of [RebalanceConfig]
+  ///                     because user initiated rebalances should always support retries for failed and stuck jobs.
+  /// @return A new TableRebalanceContext instance.
   public static TableRebalanceContext forInitialAttempt(String originalJobId, RebalanceConfig config,
       boolean allowRetries) {
     return new TableRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID, allowRetries);
   }
 
-  /**
-   * Creates a new TableRebalanceContext for a retry attempt of a rebalance job.
-   *
-   * @param originalJobId The original job ID for the rebalance job.
-   * @param config The rebalance configuration.
-   * @param attemptId The attempt ID for the retry.
-   * @return A new TableRebalanceContext instance.
-   */
+  /// Creates a new TableRebalanceContext for a retry attempt of a rebalance job.
+  ///
+  /// @param originalJobId The original job ID for the rebalance job.
+  /// @param config The rebalance configuration.
+  /// @param attemptId The attempt ID for the retry.
+  /// @return A new TableRebalanceContext instance.
   public static TableRebalanceContext forRetry(String originalJobId, RebalanceConfig config, int attemptId) {
     return new TableRebalanceContext(originalJobId, config, attemptId, true);
   }

@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
@@ -50,8 +51,15 @@ public class PinotConfigUtils {
   private static final String CONTROLLER_CONFIG_VALIDATION_ERROR_MESSAGE_FORMAT =
       "Pinot Controller Config Validation Error: %s";
 
+  /// Generates the controller config from the given individual options.
+  ///
+  /// A `null` `tenantIsolation` leaves [ControllerConf#CLUSTER_TENANT_ISOLATION_ENABLE] out of the returned config so
+  /// that the value stays unresolved here. It is then decided by whoever consumes the config -- a controller starter
+  /// applying its own defaults, or the fallback in [ControllerConf#tenantIsolationEnabled]. Pass an explicit value
+  /// only when the caller genuinely wants to pin it.
   public static Map<String, Object> generateControllerConf(String zkAddress, String clusterName, String controllerHost,
-      String controllerPort, String dataDir, ControllerConf.ControllerMode controllerMode, boolean tenantIsolation)
+      String controllerPort, String dataDir, ControllerConf.ControllerMode controllerMode,
+      @Nullable Boolean tenantIsolation)
       throws SocketException, UnknownHostException {
     if (StringUtils.isEmpty(zkAddress)) {
       throw new RuntimeException("zkAddress cannot be empty.");
@@ -70,7 +78,9 @@ public class PinotConfigUtils {
     properties.put(ControllerConf.DATA_DIR, !StringUtils.isEmpty(dataDir) ? dataDir
         : TMP_DIR + String.format("Controller_%s_%s/controller/data", controllerHost, controllerPort));
     properties.put(ControllerConf.CONTROLLER_VIP_HOST, controllerHost);
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, tenantIsolation);
+    if (tenantIsolation != null) {
+      properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, tenantIsolation);
+    }
     properties.put(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_PERIOD, "6h");
     properties.put(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD, "1h");
     properties.put(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD, "1h");

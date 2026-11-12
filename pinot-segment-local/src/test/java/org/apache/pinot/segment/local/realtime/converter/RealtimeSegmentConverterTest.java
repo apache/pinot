@@ -35,7 +35,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
+import org.apache.pinot.segment.local.columntransformer.NullValueColumnTransformer;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
@@ -48,6 +50,7 @@ import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -66,6 +69,8 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -466,6 +471,92 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     }
   }
 
+  @DataProvider
+  public Object[][] mvFloatDefaults() {
+    List<Object[]> cases = new ArrayList<>();
+    for (boolean columnMajor : new boolean[]{false, true}) {
+      for (boolean raw : new boolean[]{false, true}) {
+        for (boolean finiteDefault : new boolean[]{false, true}) {
+          for (String input : List.of("omitted", "infinity", "finite")) {
+            for (int rows : new int[]{1, 257}) {
+              cases.add(new Object[]{columnMajor, raw, finiteDefault, input, rows});
+            }
+          }
+        }
+      }
+    }
+    return cases.toArray(new Object[0][]);
+  }
+
+  /// Ordinary conversion and reopen must preserve the schema default and explicit FLOAT values without any upsert.
+  @Test(dataProvider = "mvFloatDefaults")
+  public void testMvFloatDefaultsSurviveOrdinarySeal(boolean columnMajor, boolean raw, boolean finiteDefault,
+      String input, int rows)
+      throws Exception {
+    String caseName = "floatDefaults-" + columnMajor + "-" + raw + "-" + finiteDefault + "-" + input + "-" + rows;
+    File tmp = new File(TMP_DIR, caseName);
+    FileUtils.forceMkdir(tmp);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("floatDefaults")
+        .addMultiValueDimension("v", DataType.FLOAT)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    if (finiteDefault) {
+      schema.getFieldSpecFor("v").setDefaultNullValue(7.25f);
+    }
+    TableConfig table = new TableConfigBuilder(TableType.REALTIME).setTableName("floatDefaults")
+        .setTimeColumnName("ts").setColumnMajorSegmentBuilderEnabled(columnMajor)
+        .setNoDictionaryColumns(raw ? List.of("v") : List.of()).build();
+    String segmentName = "floatDefaults__0__0__123456";
+    RealtimeSegmentConfig.Builder builder = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(table.getTableName()).setSegmentName(segmentName).setStreamName(table.getTableName())
+        .setSchema(schema).setTimeColumnName("ts").setCapacity(1000).setAvgNumMultiValues(2)
+        .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmp, "stats")))
+        .setConsumerDir(new File(tmp, "consumer").getAbsolutePath());
+    if (raw) {
+      builder.setIndex(Set.of("v"), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+          .setIndex(Set.of("v"), StandardIndexes.forward(),
+              ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW));
+    }
+    MutableSegmentImpl mutable = new MutableSegmentImpl(builder.build(), null);
+    try {
+      float expected = input.equals("finite")
+          ? 3.5f
+          : input.equals("omitted") && finiteDefault ? 7.25f : Float.NEGATIVE_INFINITY;
+      GenericRow row = new GenericRow();
+      row.putValue("ts", 1793750400000L);
+      if (input.equals("omitted")) {
+        Object defaultValue =
+            new NullValueColumnTransformer(table, schema.getFieldSpecFor("v"), schema).transform(null);
+        row.putDefaultNullValue("v", defaultValue);
+      } else {
+        row.putValue("v", new Object[]{expected});
+      }
+      for (int i = 0; i < rows; i++) {
+        mutable.index(row, null);
+      }
+      GenericRow before = mutable.getRecord(rows - 1, new GenericRow());
+      assertEquals(((Number) ((Object[]) before.getValue("v"))[0]).floatValue(), expected, "mutable " + caseName);
+      File output = new File(tmp, "output");
+      RealtimeSegmentConverter converter = new RealtimeSegmentConverter(mutable, new SegmentZKPropsConfig(),
+          output.getAbsolutePath(), schema, table.getTableName(), table, segmentName, false);
+      converter.build(SegmentVersion.v3);
+      for (int reopen = 0; reopen < 2; reopen++) {
+        ImmutableSegment immutable = ImmutableSegmentLoader.load(new File(output, segmentName),
+            new IndexLoadingConfig(table, schema));
+        try {
+          GenericRow after = immutable.getRecord(rows - 1, new GenericRow());
+          float actual = ((Number) ((Object[]) after.getValue("v"))[0]).floatValue();
+          assertEquals(actual, expected, "ordinary seal/reopen " + reopen + " " + caseName);
+        } finally {
+          immutable.destroy();
+        }
+      }
+    } finally {
+      mutable.destroy();
+    }
+  }
+
   private void testSegment(List<GenericRow> rows, File indexDir,
       TableConfig tableConfig, SegmentMetadataImpl segmentMetadata)
       throws IOException, ConfigurationException {
@@ -572,7 +663,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
 
       File indexDir = new File(outputDir, segmentName);
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-      assertEquals(segmentMetadata.getCrc(), params[1]);
+      assertEquals(Long.toString(segmentMetadata.getCrc()), params[1]);
 
       assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
       assertEquals(segmentMetadata.getTotalDocs(), rows.size());
@@ -1555,6 +1646,230 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       return ByteArray.compare((byte[]) v1, (byte[]) v2);
     }
     return storedType.compare(v1, v2);
+  }
+
+  /// Ingestion-aggregated metric columns are forced to be no-dictionary and skip min/max tracking during consumption
+  /// (their values mutate in place). A BitSliced (version 2) range index on such a column previously failed to build
+  /// because the creator had no value domain. This test verifies the full seal path: after conversion, the aggregated
+  /// no-dictionary metric column has recovered min/max in its column metadata and carries a range index.
+  @Test
+  public void testRangeIndexOnIngestionAggregatedNoDictColumn()
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    List<AggregationConfig> aggregationConfigs =
+        List.of(new AggregationConfig(LONG_COLUMN4, "SUM(" + LONG_COLUMN4 + ")"));
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setIngestionConfig(ingestionConfig)
+        .setNoDictionaryColumns(List.of(LONG_COLUMN4))
+        .setRangeIndexColumns(List.of(LONG_COLUMN4))
+        .setColumnMajorSegmentBuilderEnabled(false)
+        .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .addSingleValueDimension(STRING_COLUMN1, DataType.STRING)
+        .addMetric(LONG_COLUMN4, DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = "testTable__0__0__123456";
+
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(tableNameWithType)
+        .setSegmentName(segmentName)
+        .setStreamName(tableNameWithType)
+        .setSchema(schema)
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setCapacity(1000)
+        .setIngestionAggregationConfigs(aggregationConfigs)
+        .setIndex(Set.of(LONG_COLUMN4), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+        .setIndex(Set.of(LONG_COLUMN4), StandardIndexes.forward(),
+            ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW))
+        .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
+        .setOffHeap(true)
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
+        .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath())
+        .build();
+
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfig, null);
+    try {
+      // Each row carries a distinct dimension/time value, so no rows collapse and the aggregated metric retains its
+      // per-row values 64..73 (SUM over a single-row group). The mutable segment reports null min/max for it.
+      List<GenericRow> rows = generateTestData();
+      for (GenericRow row : rows) {
+        mutableSegmentImpl.index(row, null);
+      }
+
+      File outputDir = new File(tmpDir, "outputDir");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, new SegmentZKPropsConfig(), outputDir.getAbsolutePath(),
+              schema, tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3);
+
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      ColumnMetadata metricMetadata = segmentMetadata.getColumnMetadataFor(LONG_COLUMN4);
+      assertFalse(metricMetadata.hasDictionary(), "Aggregated metric column must stay no-dictionary");
+      // Min/max are recovered by scanning the sealed forward index despite the mutable segment not tracking them.
+      assertEquals(metricMetadata.getMinValue(), 64L);
+      assertEquals(metricMetadata.getMaxValue(), 73L);
+
+      // The BitSliced range index must be present on the aggregated no-dictionary column.
+      try (SegmentLocalFSDirectory segmentDir = new SegmentLocalFSDirectory(indexDir, segmentMetadata, ReadMode.mmap);
+          SegmentDirectory.Reader segmentReader = segmentDir.createReader()) {
+        assertTrue(segmentReader.hasIndexFor(LONG_COLUMN4, StandardIndexes.range()),
+            "Range index should be built on the aggregated no-dictionary column");
+      }
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
+  }
+
+  @DataProvider
+  public static Object[][] noDictSortedAggregationKeyParams() {
+    List<Object[]> params = new ArrayList<>();
+    for (DataType dataType : new DataType[]{DataType.INT, DataType.LONG, DataType.STRING, DataType.BYTES}) {
+      for (boolean legacyAggregateMetrics : new boolean[]{false, true}) {
+        params.add(new Object[]{dataType, false, legacyAggregateMetrics});  // row-major segment builder
+        params.add(new Object[]{dataType, true, legacyAggregateMetrics});   // column-major segment builder
+      }
+    }
+    return params.toArray(new Object[0][]);
+  }
+
+  /// A sorted DIMENSION column configured as no-dictionary gets no inverted index in the consuming segment, but
+  /// ingestion aggregation forces a dictionary on it because it is part of the aggregation key. The sort step at seal
+  /// time used to take the inverted-index path because the column had a dictionary, and failed with an NPE. This
+  /// test verifies that the segment builds, the rows aggregate, and the sorted column stays sorted and raw. It covers
+  /// both the ingestion `aggregationConfigs` and the legacy `aggregateMetrics` flag (SUM on every metric).
+  @Test(dataProvider = "noDictSortedAggregationKeyParams")
+  public void testNoDictSortedColumnAsIngestionAggregationKey(DataType dataType, boolean columnMajorSegmentBuilder,
+      boolean legacyAggregateMetrics)
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "tmp_sorted_agg_" + dataType + "_" + columnMajorSegmentBuilder + "_"
+        + legacyAggregateMetrics + "_" + System.nanoTime());
+    String sortedColumn = "sorted_col";
+    List<AggregationConfig> aggregationConfigs = legacyAggregateMetrics ? List.of()
+        : List.of(new AggregationConfig(LONG_COLUMN4, "SUM(" + LONG_COLUMN4 + ")"));
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setSortedColumn(sortedColumn)
+        .setNoDictionaryColumns(List.of(sortedColumn, LONG_COLUMN4))
+        .setIngestionConfig(ingestionConfig)
+        .setAggregateMetrics(legacyAggregateMetrics)
+        .setColumnMajorSegmentBuilderEnabled(columnMajorSegmentBuilder)
+        .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .addSingleValueDimension(sortedColumn, dataType)
+        .addMetric(LONG_COLUMN4, DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = "testTable__0__0__123456";
+
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder(tableConfig, schema)
+        .setTableNameWithType(tableNameWithType)
+        .setSegmentName(segmentName)
+        .setStreamName(tableNameWithType)
+        .setSchema(schema)
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setCapacity(1000)
+        .setIngestionAggregationConfigs(aggregationConfigs)
+        .setAggregateMetrics(legacyAggregateMetrics)
+        .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
+        .setOffHeap(true)
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
+        .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath())
+        .build();
+
+    MutableSegmentImpl mutableSegment = new MutableSegmentImpl(realtimeSegmentConfig, null);
+    try {
+      // Key i has (i % 3) + 1 distinct time values, so the sort buckets have unequal sizes (1, 2 or 3 docs). Each
+      // (key, time) pair is inserted twice, keys in reverse sorted order, so that rows aggregate and the conversion
+      // must reorder them. For one key, the docIds follow the time order, so a stable sort keeps the times ascending.
+      // Row (i, t) carries metric value i + 1, so the aggregated value for each (key i, time) pair is 2 * (i + 1).
+      int numKeys = 10;
+      int maxTimesPerKey = 3;
+      long baseTime = 1697814309L;
+      int expectedNumDocs = 0;
+      for (int i = 0; i < numKeys; i++) {
+        expectedNumDocs += numTimes(i, maxTimesPerKey);
+      }
+      for (int round = 0; round < 2; round++) {
+        for (int t = 0; t < maxTimesPerKey; t++) {
+          for (int i = numKeys - 1; i >= 0; i--) {
+            if (t < numTimes(i, maxTimesPerKey)) {
+              GenericRow row = new GenericRow();
+              row.putValue(sortedColumn, sortedValue(dataType, i, numKeys));
+              row.putValue(LONG_COLUMN4, (long) (i + 1));
+              row.putValue(DATE_TIME_COLUMN, baseTime + t);
+              mutableSegment.index(row, null);
+            }
+          }
+        }
+      }
+      assertEquals(mutableSegment.getNumDocsIndexed(), expectedNumDocs);
+
+      File outputDir = new File(tmpDir, "outputDir");
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegment, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3);
+
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      assertEquals(segmentMetadata.getTotalDocs(), expectedNumDocs);
+      ColumnMetadata sortedColMeta = segmentMetadata.getColumnMetadataFor(sortedColumn);
+      assertTrue(sortedColMeta.isSorted(), "Sorted column must have isSorted=true");
+      assertFalse(sortedColMeta.hasDictionary(), "Sorted column must stay no-dictionary in the immutable segment");
+
+      SegmentLocalFSDirectory segmentDir = new SegmentLocalFSDirectory(indexDir, segmentMetadata, ReadMode.mmap);
+      SegmentDirectory.Reader segmentReader = segmentDir.createReader();
+      Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+      for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+        indexContainerMap.put(entry.getKey(),
+            new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
+      }
+      ImmutableSegmentImpl immutableSegment =
+          new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null);
+      try {
+        DataType storedType = dataType.getStoredType();
+        int docId = 0;
+        for (int i = 0; i < numKeys; i++) {
+          for (int t = 0; t < numTimes(i, maxTimesPerKey); t++, docId++) {
+            assertEquals(compareValues(storedType, immutableSegment.getValue(docId, sortedColumn),
+                sortedValue(dataType, i, numKeys)), 0, "Unexpected sorted column value at docId=" + docId);
+            assertEquals(immutableSegment.getValue(docId, DATE_TIME_COLUMN), baseTime + t,
+                "Unexpected time value at docId=" + docId);
+            assertEquals(immutableSegment.getValue(docId, LONG_COLUMN4), 2L * (i + 1),
+                "Unexpected aggregated metric value at docId=" + docId);
+          }
+        }
+      } finally {
+        immutableSegment.destroy();
+      }
+    } finally {
+      mutableSegment.destroy();
+    }
+  }
+
+  private static int numTimes(int key, int maxTimesPerKey) {
+    return key % maxTimesPerKey + 1;
   }
 
   private List<GenericRow> generateTestData() {

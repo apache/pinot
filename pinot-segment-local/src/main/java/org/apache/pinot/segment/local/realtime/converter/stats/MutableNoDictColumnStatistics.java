@@ -45,7 +45,26 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   protected final boolean _isSortedColumn;
   protected final MutableForwardIndex _forwardIndex;
 
+  @Nullable
+  private final Comparable<?> _minValue;
+  @Nullable
+  private final Comparable<?> _maxValue;
+
+  // Lazily computed because it may require a full scan of the forward index, and it is queried multiple times per
+  // column during segment creation. Left unsynchronized: an instance describes a single column and is reached only
+  // through the per-column stats map, so it is confined to whichever thread creates that column. Even if that ever
+  // changes, the segment no longer accepts documents by the time stats are collected, so a race can only recompute
+  // the same value.
+  private Boolean _sorted;
+
   public MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn) {
+    this(dataSource, sortedDocIds, isSortedColumn, true);
+  }
+
+  /// @param recoverMinMax whether to scan for min/max missing from the metadata. Subclasses that compute their own
+  ///                      bounds over a subset of docs pass false to skip the scan.
+  protected MutableNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn,
+      boolean recoverMinMax) {
     _dataSourceMetadata = dataSource.getDataSourceMetadata();
     _fieldSpec = _dataSourceMetadata.getFieldSpec();
     Preconditions.checkState(_dataSourceMetadata.getNumDocs() > 0,
@@ -55,6 +74,55 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     _forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
     Preconditions.checkState(_forwardIndex != null, "Failed to find forward index for column: %s",
         _fieldSpec.getName());
+
+    // Ingestion-aggregated metric columns mutate in place during consumption, so the mutable segment does not track
+    // min/max for them. Recover the bounds for single-value INT/LONG columns, the only types whose BitSliced range
+    // index needs them, and record sortedness in the same scan. Other types keep null bounds (unchanged behavior).
+    Comparable<?> minValue = (Comparable<?>) _dataSourceMetadata.getMinValue();
+    Comparable<?> maxValue = (Comparable<?>) _dataSourceMetadata.getMaxValue();
+    if (recoverMinMax && (minValue == null || maxValue == null) && isSingleValue()) {
+      int numDocs = _dataSourceMetadata.getNumDocs();
+      switch (getStoredType()) {
+        case INT: {
+          int min = _forwardIndex.getInt(docId(0));
+          int max = min;
+          int prev = min;
+          boolean sorted = true;
+          for (int i = 1; i < numDocs; i++) {
+            int curr = _forwardIndex.getInt(docId(i));
+            min = Math.min(min, curr);
+            max = Math.max(max, curr);
+            sorted &= curr >= prev;
+            prev = curr;
+          }
+          minValue = min;
+          maxValue = max;
+          _sorted = _isSortedColumn || sorted;
+          break;
+        }
+        case LONG: {
+          long min = _forwardIndex.getLong(docId(0));
+          long max = min;
+          long prev = min;
+          boolean sorted = true;
+          for (int i = 1; i < numDocs; i++) {
+            long curr = _forwardIndex.getLong(docId(i));
+            min = Math.min(min, curr);
+            max = Math.max(max, curr);
+            sorted &= curr >= prev;
+            prev = curr;
+          }
+          minValue = min;
+          maxValue = max;
+          _sorted = _isSortedColumn || sorted;
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    _minValue = minValue;
+    _maxValue = maxValue;
   }
 
   @Override
@@ -69,12 +137,16 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
 
   @Override
   public Comparable<?> getMinValue() {
-    return (Comparable<?>) _dataSourceMetadata.getMinValue();
+    return _minValue;
   }
 
   @Override
   public Comparable<?> getMaxValue() {
-    return (Comparable<?>) _dataSourceMetadata.getMaxValue();
+    return _maxValue;
+  }
+
+  private int docId(int index) {
+    return _sortedDocIds != null ? _sortedDocIds[index] : index;
   }
 
   @Nullable
@@ -105,6 +177,13 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
 
   @Override
   public boolean isSorted() {
+    if (_sorted == null) {
+      _sorted = computeSorted();
+    }
+    return _sorted;
+  }
+
+  private boolean computeSorted() {
     // Sorted column is guaranteed to be sorted by construction — no scan needed
     if (_isSortedColumn) {
       return true;
@@ -115,9 +194,18 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
       return false;
     }
 
+    // A single distinct value is always sorted — no scan needed. Min and max are tracked per raw value during
+    // ingestion, but are left null when aggregated metrics are enabled, so fall back to the scan when unavailable.
+    Comparable<?> minValue = getMinValue();
+    if (minValue != null && minValue.equals(getMaxValue())) {
+      return true;
+    }
+
     int numDocs = _dataSourceMetadata.getNumDocs();
 
-    // Verify that values are non-decreasing when iterated in the given order
+    // Verify that values are non-decreasing when iterated in the given order. The BYTES path uses
+    // ByteArray.compare (unsigned byte-wise lexicographic), which is identical to UuidUtils.compare's unsigned
+    // 64-bit-word ordering on canonical 16-byte big-endian UUIDs, so a single comparator handles both.
     DataType storedType = getStoredType();
     if (_sortedDocIds != null) {
       switch (storedType) {

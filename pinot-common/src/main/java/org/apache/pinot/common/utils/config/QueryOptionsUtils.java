@@ -21,30 +21,88 @@ package org.apache.pinot.common.utils.config;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.AndRestrictionPushdownMode;
+import org.apache.pinot.spi.utils.CommonConstants.Server.SortedSelectionMergeMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-/**
- * Utils to parse query options.
- */
+/// Utils to parse query options.
 public class QueryOptionsUtils {
   private QueryOptionsUtils() {
   }
 
+  /// How SQL-supplied query option keys are validated, see
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE].
+  public enum SqlQueryOptionValidationMode {
+    /// Unknown keys are preserved as-is and nothing is logged. Default, and the only mode that
+    /// leaves the parsed options identical to what Pinot produced before validation existed.
+    NONE,
+    /// Unknown keys are preserved, but logged once per distinct key with a typo suggestion.
+    WARN,
+    /// Unknown keys fail the query with a typo suggestion.
+    REJECT
+  }
+
+  /// How query options embedded in the SQL text are handled, as opposed to options passed through the request
+  /// payload. Shared by the brokers' legacy `OPTION(...)` syntax policy
+  /// ([CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE]) and the per-request
+  /// [QueryOptionKey#SQL_OPTIONS_MODE].
+  public enum SqlOptionsMode {
+    /// The options are applied. Default.
+    ALLOW,
+    /// The options are dropped, except that a DELETE statement carrying any fails, since its options configure it.
+    IGNORE,
+    /// The statement fails.
+    REJECT
+  }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryOptionsUtils.class);
+
   private static final Map<String, String> CONFIG_RESOLVER;
   private static final RuntimeException CLASS_LOAD_ERROR;
+
+  /// Lower-case keys accepted in SQL `SET`/`OPTION(...)` that are not declared on [QueryOptionKey].
+  private static final Set<String> ADDITIONAL_SQL_OPTION_KEYS =
+      Set.of(CommonConstants.Broker.Request.TRACE.toLowerCase(), CommonConstants.DATABASE.toLowerCase());
+
+  /// Row-level-security options are injected by the broker after parsing and must never be settable
+  /// from user SQL, not even through [#registerSqlQueryOptionKey]. Matched as a lower-case prefix so
+  /// case tricks (`RLSFilters-t`) cannot bypass the guard.
+  private static final String RLS_FILTERS_PREFIX = CommonConstants.RLS_FILTERS.toLowerCase();
+
+  /// Lower-case option keys registered by plugins via [#registerSqlQueryOptionKey].
+  private static final Set<String> REGISTERED_SQL_OPTION_KEYS = ConcurrentHashMap.newKeySet();
+
+  /// Distinct unknown keys already logged in [SqlQueryOptionValidationMode#WARN], so that a
+  /// high-QPS client sending one misspelled option cannot flood the broker log.
+  private static final Set<String> WARNED_SQL_OPTION_KEYS = ConcurrentHashMap.newKeySet();
+  private static final int MAX_WARNED_SQL_OPTION_KEYS = 1000;
+
+  /// Longest key for which a "did you mean" suggestion is computed, to bound the Levenshtein cost.
+  private static final int MAX_SUGGESTION_KEY_LENGTH = 64;
+
+  private static volatile SqlQueryOptionValidationMode _sqlQueryOptionValidationMode =
+      SqlQueryOptionValidationMode.NONE;
+  private static volatile SqlOptionsMode _legacyOptionSyntaxMode = SqlOptionsMode.ALLOW;
 
   static {
     // this is a bit hacky, but lots of the code depends directly on usage of
@@ -77,6 +135,9 @@ public class QueryOptionsUtils {
         : new RuntimeException("Failure to build case insensitive mapping.", classLoadError);
   }
 
+  /// Resolves known option keys case-insensitively to their canonical names. Unknown keys are
+  /// preserved unchanged, including their key case. Used for every option source: SQL, REST/JSON
+  /// `queryOptions` and broker-injected options, none of which reject unknown keys here.
   public static Map<String, String> resolveCaseInsensitiveOptions(Map<String, String> queryOptions) {
     if (CLASS_LOAD_ERROR != null) {
       throw CLASS_LOAD_ERROR;
@@ -93,6 +154,144 @@ public class QueryOptionsUtils {
     }
 
     return resolved;
+  }
+
+  public static SqlQueryOptionValidationMode getSqlQueryOptionValidationMode() {
+    return _sqlQueryOptionValidationMode;
+  }
+
+  /// Sets the validation mode applied to SQL-supplied query option keys, see
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_VALIDATION_MODE].
+  public static void setSqlQueryOptionValidationMode(SqlQueryOptionValidationMode mode) {
+    _sqlQueryOptionValidationMode = mode;
+  }
+
+  public static SqlOptionsMode getLegacyOptionSyntaxMode() {
+    return _legacyOptionSyntaxMode;
+  }
+
+  /// Sets how the legacy `OPTION(...)` query option suffix is handled, see
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_QUERY_OPTION_LEGACY_SYNTAX_MODE].
+  public static void setLegacyOptionSyntaxMode(SqlOptionsMode mode) {
+    _legacyOptionSyntaxMode = mode;
+  }
+
+  /// Returns the per-request [QueryOptionKey#SQL_OPTIONS_MODE], `ALLOW` when absent. Fails with
+  /// [QueryErrorCode#QUERY_VALIDATION] when the value is not a [SqlOptionsMode].
+  public static SqlOptionsMode getSqlOptionsMode(Map<String, String> queryOptions) {
+    String mode = queryOptions.get(QueryOptionKey.SQL_OPTIONS_MODE);
+    if (mode == null) {
+      return SqlOptionsMode.ALLOW;
+    }
+    try {
+      return SqlOptionsMode.valueOf(mode.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Invalid value '" + mode + "' for query option '"
+          + QueryOptionKey.SQL_OPTIONS_MODE + "', must be one of " + Arrays.toString(SqlOptionsMode.values()));
+    }
+  }
+
+  /// Registers an option key that [#validateSqlQueryOptions] accepts in addition to the keys
+  /// declared on [QueryOptionKey]. Meant for plugins that read custom options off the
+  /// `BrokerRequest`; call it from plugin init. Case-insensitive, thread safe and idempotent.
+  public static void registerSqlQueryOptionKey(String key) {
+    REGISTERED_SQL_OPTION_KEYS.add(key.toLowerCase());
+  }
+
+  /// Validates SQL-supplied `SET` / `OPTION(...)` option keys according to the configured
+  /// [SqlQueryOptionValidationMode]. Only meant for DQL: DML statements carry free-form task and
+  /// filesystem properties, and REST/JSON `queryOptions` are free-form for backward compatibility,
+  /// so neither is validated in any mode. Options the broker injects after parsing are never routed
+  /// here either.
+  ///
+  /// Does not modify or copy the map; in the default `NONE` mode it returns immediately, so the
+  /// parsed options stay exactly what the parser produced.
+  ///
+  /// @throws IllegalArgumentException in `REJECT` mode if an unsupported option key is present
+  public static void validateSqlQueryOptions(Map<String, String> queryOptions) {
+    SqlQueryOptionValidationMode mode = _sqlQueryOptionValidationMode;
+    if (mode == SqlQueryOptionValidationMode.NONE || queryOptions.isEmpty()) {
+      return;
+    }
+    if (CLASS_LOAD_ERROR != null) {
+      throw CLASS_LOAD_ERROR;
+    }
+    for (String key : queryOptions.keySet()) {
+      String lowerKey = key.toLowerCase();
+      if (CONFIG_RESOLVER.containsKey(lowerKey) || ADDITIONAL_SQL_OPTION_KEYS.contains(lowerKey)
+          || (REGISTERED_SQL_OPTION_KEYS.contains(lowerKey) && !lowerKey.startsWith(RLS_FILTERS_PREFIX))) {
+        continue;
+      }
+      if (mode == SqlQueryOptionValidationMode.REJECT) {
+        throw new IllegalArgumentException(buildUnsupportedOptionMessage(key));
+      }
+      // ponytail: bounded set, never evicted, so a key seen once is never logged again. Swap for a
+      // rate limiter if the set of distinct unknown keys ever needs to be unbounded.
+      if (WARNED_SQL_OPTION_KEYS.size() < MAX_WARNED_SQL_OPTION_KEYS && WARNED_SQL_OPTION_KEYS.add(lowerKey)) {
+        LOGGER.warn("{} (logged once per distinct key)", buildUnsupportedOptionMessage(key));
+      }
+    }
+  }
+
+  private static String buildUnsupportedOptionMessage(String key) {
+    String suggestion = findClosestCanonicalOption(key);
+    if (suggestion != null) {
+      return "Unsupported query option '" + key + "'. Did you mean '" + suggestion + "'?";
+    }
+    return "Unsupported query option '" + key + "'";
+  }
+
+  /// Only called on the unknown-key path, never while parsing a valid query.
+  @Nullable
+  private static String findClosestCanonicalOption(String key) {
+    if (key.length() > MAX_SUGGESTION_KEY_LENGTH) {
+      return null;
+    }
+    String lower = key.toLowerCase();
+    String best = null;
+    int bestDist = Integer.MAX_VALUE;
+    // CONFIG_RESOLVER is keyed by the lower-case name and valued by the canonical name.
+    for (Map.Entry<String, String> entry : CONFIG_RESOLVER.entrySet()) {
+      int dist = levenshteinDistance(lower, entry.getKey());
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = entry.getValue();
+      }
+    }
+    if (best == null) {
+      return null;
+    }
+    // Suggest only when reasonably close (pure case variants are not unknown in the first place).
+    int threshold = Math.max(2, best.length() / 4);
+    return bestDist <= threshold ? best : null;
+  }
+
+  private static int levenshteinDistance(String a, String b) {
+    int n = a.length();
+    int m = b.length();
+    if (n == 0) {
+      return m;
+    }
+    if (m == 0) {
+      return n;
+    }
+    int[] prev = new int[m + 1];
+    int[] curr = new int[m + 1];
+    for (int j = 0; j <= m; j++) {
+      prev[j] = j;
+    }
+    for (int i = 1; i <= n; i++) {
+      curr[0] = i;
+      char ca = a.charAt(i - 1);
+      for (int j = 1; j <= m; j++) {
+        int cost = ca == b.charAt(j - 1) ? 0 : 1;
+        curr[j] = Math.min(Math.min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+      }
+      int[] tmp = prev;
+      prev = curr;
+      curr = tmp;
+    }
+    return prev[m];
   }
 
   @Nullable
@@ -145,8 +344,43 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
   }
 
+  /// Per-query override of [AndRestrictionPushdownMode], or `null` when the query does not set one, in which case
+  /// the server default applies.
+  @Nullable
+  public static AndRestrictionPushdownMode getAndRestrictionPushdownMode(Map<String, String> queryOptions) {
+    String mode = queryOptions.get(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE);
+    return mode != null ? parseAndRestrictionPushdownMode(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, mode) : null;
+  }
+
+  /// Parses an [AndRestrictionPushdownMode], naming the offending key and the legal values on failure. The option
+  /// reads like a toggle, so `true`/`false` is a likely mistake and the message has to say so.
+  public static AndRestrictionPushdownMode parseAndRestrictionPushdownMode(String key, String value) {
+    try {
+      return AndRestrictionPushdownMode.valueOf(value.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid value for %s: '%s'. Expected one of: %s (this option is a mode, not a boolean toggle)",
+              key, value, Arrays.toString(AndRestrictionPushdownMode.values())));
+    }
+  }
+
   public static boolean isSkipUpsert(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
+  }
+
+  /// Query-level IN-pruning threshold override. Negative means always prune.
+  @Nullable
+  public static Integer getInPredicatePruningThreshold(Map<String, String> queryOptions) {
+    return uncheckedParseInt(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD,
+        queryOptions.get(QueryOptionKey.IN_PREDICATE_PRUNING_THRESHOLD));
+  }
+
+  /// Query-level override for the minimum candidate segments needed to prepare the partition-pruning predicate.
+  /// A negative value disables preparation.
+  @Nullable
+  public static Integer getPartitionPruningPreparationThreshold(@Nullable Map<String, String> queryOptions) {
+    return queryOptions != null ? uncheckedParseInt(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD,
+        queryOptions.get(QueryOptionKey.PARTITION_PRUNING_PREPARATION_THRESHOLD)) : null;
   }
 
   /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
@@ -159,6 +393,11 @@ public class QueryOptionsUtils {
     }
     String value = queryOptions.get(QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE);
     return value == null || Boolean.parseBoolean(value);
+  }
+
+  /// Returns whether ANY_VALUE(expr) is rewritten to take the data type of `expr`. Defaults to `false`.
+  public static boolean isInferAnyValueType(@Nullable Map<String, String> queryOptions) {
+    return queryOptions != null && Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_ANY_VALUE_TYPE));
   }
 
   public static boolean isSkipUpsertView(Map<String, String> queryOptions) {
@@ -186,21 +425,17 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
   }
 
-  /**
-   * When true, use index-based distinct operators when applicable:
-   * {@link org.apache.pinot.core.operator.query.JsonIndexDistinctOperator} for JSON columns and
-   * {@link org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator} for dictionary + inverted index columns.
-   * Set via query option useIndexBasedDistinctOperator=true.
-   */
+  /// When true, use index-based distinct operators when applicable:
+  /// [org.apache.pinot.core.operator.query.JsonIndexDistinctOperator] for JSON columns and
+  /// [org.apache.pinot.core.operator.query.InvertedIndexDistinctOperator] for dictionary + inverted index
+  /// columns. Set via query option useIndexBasedDistinctOperator=true.
   public static boolean isUseIndexBasedDistinctOperator(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_INDEX_BASED_DISTINCT_OPERATOR));
   }
 
-  /**
-   * Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
-   * The inverted index path is chosen when dictionaryCardinality * costRatio <= filteredDocCount.
-   * A cost ratio of 0 forces the inverted index path for any non-empty filter result.
-   */
+  /// Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
+  /// The inverted index path is chosen when dictionaryCardinality \* costRatio <= filteredDocCount.
+  /// A cost ratio of 0 forces the inverted index path for any non-empty filter result.
   @Nullable
   public static Double getInvertedIndexDistinctCostRatio(Map<String, String> queryOptions) {
     return checkedParseDoubleNonNegative(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO,
@@ -243,12 +478,12 @@ public class QueryOptionsUtils {
         throw new RuntimeException("Invalid format for " + QueryOptionKey.SKIP_INDEXES
             + ". Example of valid format: SET skipIndexes='col1=inverted,range&col2=inverted'");
       }
-      String columnName = conf[0];
+      String columnName = conf[0].trim();
       String[] indexTypes = StringUtils.split(conf[1], ',');
 
       for (String indexType : indexTypes) {
         skipIndexes.computeIfAbsent(columnName, k -> new HashSet<>())
-            .add(FieldConfig.IndexType.valueOf(indexType.toUpperCase()));
+            .add(FieldConfig.IndexType.valueOf(indexType.trim().toUpperCase(Locale.ROOT)));
       }
     }
 
@@ -257,26 +492,31 @@ public class QueryOptionsUtils {
 
   public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
     // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
-    String skipPlannerRulesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
-    if (skipPlannerRulesStr == null) {
-      return Set.of();
-    }
-
-    String[] skippedRules = StringUtils.split(skipPlannerRulesStr, ',');
-
-    return new HashSet<>(List.of(skippedRules));
+    return parsePlannerRules(queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES));
   }
 
   public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
     // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
-    String usePlannerRulesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
-    if (usePlannerRulesStr == null) {
+    return parsePlannerRules(queryOptions.get(QueryOptionKey.USE_PLANNER_RULES));
+  }
+
+  /// Parses a comma-separated list of planner rule names. Each name is trimmed, and empty names are dropped.
+  private static Set<String> parsePlannerRules(@Nullable String plannerRules) {
+    if (plannerRules == null) {
       return Set.of();
     }
+    return Arrays.stream(StringUtils.split(plannerRules, ','))
+        .map(String::trim)
+        .filter(ruleName -> !ruleName.isEmpty())
+        .collect(Collectors.toSet());
+  }
 
-    String[] useRules = StringUtils.split(usePlannerRulesStr, ',');
-
-    return new HashSet<>(List.of(useRules));
+  /// Returns the per-query override of the approximate-function rewrite, or `null` if the query does not set one, in
+  /// which case the table config and then the cluster/broker default decide.
+  @Nullable
+  public static Boolean isUseApproximateFunction(Map<String, String> queryOptions) {
+    return checkedParseBooleanNullable(QueryOptionKey.USE_APPROXIMATE_FUNCTION,
+        queryOptions.get(QueryOptionKey.USE_APPROXIMATE_FUNCTION));
   }
 
   @Nullable
@@ -351,6 +591,22 @@ public class QueryOptionsUtils {
     return uncheckedParseInt(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, minServerGroupTrimSizeString);
   }
 
+  /// Maximum estimated base-group count for which grouping-set base aggregation is used; `null` lets the
+  /// caller fall back to its default (`numGroupsLimit`). Must be a positive integer when set.
+  @Nullable
+  public static Integer getGroupingSetsBaseAggregationMaxGroups(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS);
+    return checkedParseIntPositive(QueryOptionKey.GROUPING_SETS_BASE_AGGREGATION_MAX_GROUPS, value);
+  }
+
+  @Nullable
+  public static Integer getGroupingSetsMinServerTrimSize(Map<String, String> queryOptions) {
+    String groupingSetsMinServerTrimSizeString =
+        queryOptions.get(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE);
+    // NOTE: Non-positive value means turning off the per-set server trim for grouping-set base aggregation
+    return uncheckedParseInt(QueryOptionKey.GROUPING_SETS_MIN_SERVER_TRIM_SIZE, groupingSetsMinServerTrimSizeString);
+  }
+
   @Nullable
   public static Integer getMinBrokerGroupTrimSize(Map<String, String> queryOptions) {
     String minBrokerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE);
@@ -389,6 +645,42 @@ public class QueryOptionsUtils {
   public static Integer getStreamingGroupByFlushThreshold(Map<String, String> queryOptions) {
     String value = queryOptions.get(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD);
     return checkedParseIntNonNegative(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD, value);
+  }
+
+  @Nullable
+  public static Integer getStreamingDistinctFlushThreshold(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD);
+    return checkedParseIntNonNegative(QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD, value);
+  }
+
+  /// Returns the streaming selection ORDER BY merge mode, or null if not set. Accepts the enum constant names in
+  /// any case (`on` / `off` / `auto`).
+  @Nullable
+  public static SortedSelectionMergeMode getSortedSelectionMergeMode(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_MODE);
+    if (value == null) {
+      return null;
+    }
+    try {
+      return SortedSelectionMergeMode.valueOf(value.trim().toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("%s must be one of %s, got: %s", QueryOptionKey.SORTED_SELECTION_MERGE_MODE,
+              Arrays.toString(SortedSelectionMergeMode.values()), value));
+    }
+  }
+
+  /// Returns the minimum sorted-segment fraction for [SortedSelectionMergeMode#AUTO], or null if not set.
+  @Nullable
+  public static Double getSortedSelectionMergeAutoMinSortedRatio(Map<String, String> queryOptions) {
+    return checkedParseRatio(QueryOptionKey.SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO,
+        queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_AUTO_MIN_SORTED_RATIO));
+  }
+
+  @Nullable
+  public static Integer getSortedSelectionMergeBlockSize(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.SORTED_SELECTION_MERGE_BLOCK_SIZE);
+    return checkedParseIntPositive(QueryOptionKey.SORTED_SELECTION_MERGE_BLOCK_SIZE, value);
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
@@ -550,10 +842,8 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  /**
-   * Reads the {@code streamStats} query option that opts a single query into the {@code SubmitWithStream}
-   * dispatch path. See {@link QueryOptionKey#STREAM_STATS}.
-   */
+  /// Reads the `streamStats` query option that opts a single query into the `SubmitWithStream`
+  /// dispatch path. See [QueryOptionKey#STREAM_STATS].
   public static boolean isStreamStats(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.STREAM_STATS);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
@@ -678,6 +968,29 @@ public class QueryOptionsUtils {
     return value;
   }
 
+  /// Parses a fraction in the closed range [0, 1].
+  @Nullable
+  private static Double checkedParseRatio(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    double value;
+    try {
+      value = Double.parseDouble(optionValue.trim());
+    } catch (NumberFormatException nfe) {
+      throw ratioParseException(optionName, optionValue);
+    }
+    if (!Double.isFinite(value) || value < 0 || value > 1) {
+      throw ratioParseException(optionName, optionValue);
+    }
+    return value;
+  }
+
+  private static IllegalArgumentException ratioParseException(String optionName, String optionValue) {
+    return new IllegalArgumentException(
+        String.format("%s must be a number between 0 and 1, got: %s", optionName, optionValue));
+  }
+
   @Nullable
   private static Long checkedParseLongPositive(String optionName, @Nullable String optionValue) {
     return checkedParseLong(optionName, optionValue, 1);
@@ -731,18 +1044,14 @@ public class QueryOptionsUtils {
 
   // --- Vector search query option accessors ---
 
-  /**
-   * Returns the configured nprobe value for IVF_FLAT vector search, or {@code null} if not set.
-   */
+  /// Returns the configured nprobe value for IVF_FLAT vector search, or `null` if not set.
   @Nullable
   public static Integer getVectorNprobe(Map<String, String> queryOptions) {
     String nprobe = queryOptions.get(QueryOptionKey.VECTOR_NPROBE);
     return checkedParseIntPositive(QueryOptionKey.VECTOR_NPROBE, nprobe);
   }
 
-  /**
-   * Returns whether exact rerank is enabled for vector search. Defaults to {@code false}.
-   */
+  /// Returns whether exact rerank is enabled for vector search. Defaults to `false`.
   public static boolean isVectorExactRerank(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.VECTOR_EXACT_RERANK));
   }
@@ -753,18 +1062,14 @@ public class QueryOptionsUtils {
     return exactRerank != null ? Boolean.parseBoolean(exactRerank) : null;
   }
 
-  /**
-   * Returns the maximum number of ANN candidates for vector search, or {@code null} if not set.
-   */
+  /// Returns the maximum number of ANN candidates for vector search, or `null` if not set.
   @Nullable
   public static Integer getVectorMaxCandidates(Map<String, String> queryOptions) {
     String maxCandidates = queryOptions.get(QueryOptionKey.VECTOR_MAX_CANDIDATES);
     return checkedParseIntPositive(QueryOptionKey.VECTOR_MAX_CANDIDATES, maxCandidates);
   }
 
-  /**
-   * Returns the distance threshold for vector radius/threshold search, or {@code null} if not set.
-   */
+  /// Returns the distance threshold for vector radius/threshold search, or `null` if not set.
   @Nullable
   public static Float getVectorDistanceThreshold(Map<String, String> queryOptions) {
     String threshold = queryOptions.get(QueryOptionKey.VECTOR_DISTANCE_THRESHOLD);
@@ -786,27 +1091,21 @@ public class QueryOptionsUtils {
     }
   }
 
-  /**
-   * Returns the configured efSearch value for HNSW vector search, or {@code null} if not set.
-   */
+  /// Returns the configured efSearch value for HNSW vector search, or `null` if not set.
   @Nullable
   public static Integer getVectorEfSearch(Map<String, String> queryOptions) {
     String efSearch = queryOptions.get(QueryOptionKey.VECTOR_EF_SEARCH);
     return checkedParseIntPositive(QueryOptionKey.VECTOR_EF_SEARCH, efSearch);
   }
 
-  /**
-   * Returns whether HNSW should use relative-distance competitive checks, or {@code null} if not set.
-   */
+  /// Returns whether HNSW should use relative-distance competitive checks, or `null` if not set.
   @Nullable
   public static Boolean getVectorUseRelativeDistance(Map<String, String> queryOptions) {
     return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE,
         queryOptions.get(QueryOptionKey.VECTOR_USE_RELATIVE_DISTANCE));
   }
 
-  /**
-   * Returns whether HNSW should use a bounded collector queue, or {@code null} if not set.
-   */
+  /// Returns whether HNSW should use a bounded collector queue, or `null` if not set.
   @Nullable
   public static Boolean getVectorUseBoundedQueue(Map<String, String> queryOptions) {
     return checkedParseBooleanNullable(QueryOptionKey.VECTOR_USE_BOUNDED_QUEUE,
@@ -839,5 +1138,13 @@ public class QueryOptionsUtils {
       }
     }
     return i;
+  }
+
+  /// Returns the [QueryOptionKey#SEALED_IN_LIST_THRESHOLD] option, or `defaultValue` when the option is not set.
+  public static int getSealedInListThreshold(Map<String, String> options, int defaultValue) {
+    String threshold = options.get(QueryOptionKey.SEALED_IN_LIST_THRESHOLD);
+    Integer value =
+        uncheckedParseInt(QueryOptionKey.SEALED_IN_LIST_THRESHOLD, threshold != null ? threshold.trim() : null);
+    return value != null ? value : defaultValue;
   }
 }

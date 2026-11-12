@@ -127,7 +127,7 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
     String trimDisabledPlan = "Execution Plan\n"
         + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[1])\n"
         + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], "
-        + "isSortOnReceiver=[true])\n"
+        + "isSortOnReceiver=[false])\n"
         + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], fetch=[1])\n"
         + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
@@ -188,7 +188,7 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[1])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], fetch=[1])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, 1 "
             + "DESC]], limit=[1])\n"
@@ -224,7 +224,7 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[1])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], fetch=[1])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, 1 "
             + "DESC]], limit=[1])\n"
@@ -258,7 +258,7 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], offset=[0], fetch=[3])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[3])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, "
             + "1]], limit=[3])\n"
@@ -293,7 +293,7 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], offset=[0], fetch=[3])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[3])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, "
             + "1]], limit=[3])\n"
@@ -328,7 +328,7 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], offset=[1], fetch=[3])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[4])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, "
             + "1]], limit=[4])\n"
@@ -366,11 +366,9 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
     assertFullPageOfGroups(aggregated, 2);
   }
 
-  /**
-   * Asserts the result is a full page of 5 distinct, in-domain (i, j) groups. The rows are not ordered (we query
-   * without ORDER BY for deterministic trimming), so we validate the page size and group validity rather than exact
-   * values. When {@code expectedCount >= 0}, also asserts each group's COUNT(*).
-   */
+  /// Asserts the result is a full page of 5 distinct, in-domain (i, j) groups. The rows are not ordered (we query
+  /// without ORDER BY for deterministic trimming), so we validate the page size and group validity rather than exact
+  /// values. When `expectedCount >= 0`, also asserts each group's COUNT(\*).
   private static void assertFullPageOfGroups(JsonNode mainNode, int expectedCount) {
     JsonNode resultTable = mainNode.get(RESULT_TABLE);
     Assert.assertNotNull(resultTable, toResultStr(mainNode));
@@ -472,7 +470,7 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
             + "LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[DESC], dir1=[DESC], dir2=[DESC], offset=[0],"
             + " fetch=[3])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC, 1 DESC, 2 DESC]], "
-            + "isSortOnSender=[false], isSortOnReceiver=[true])\n"
+            + "isSortOnSender=[false], isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[DESC], dir1=[DESC], dir2=[DESC], "
             + "fetch=[3])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0 "
@@ -513,7 +511,7 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$3], dir0=[DESC], offset=[0], fetch=[3])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[3 DESC]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$3], dir0=[DESC], fetch=[3])\n"
             + "      LogicalProject(i=[$0], j=[$1], cnt=[$2], EXPR$3=[*(*($0, $1), $2)])\n"
             + "        PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])\n"
@@ -551,7 +549,7 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[5])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[0, "
             + "1]], limit=[5])\n"

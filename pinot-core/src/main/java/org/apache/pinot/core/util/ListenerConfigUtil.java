@@ -56,10 +56,8 @@ import org.glassfish.jersey.server.ResourceConfig;
 import static org.apache.pinot.spi.utils.CommonConstants.HTTPS_PROTOCOL;
 
 
-/**
- * Utility class that generates Http {@link ListenerConfig} instances
- * based on the properties provided by a property namespace in {@link PinotConfiguration}.
- */
+/// Utility class that generates Http [ListenerConfig] instances
+/// based on the properties provided by a property namespace in [PinotConfiguration].
 public final class ListenerConfigUtil {
   private static final String DEFAULT_HOST = "0.0.0.0";
   private static final String DOT_ACCESS_PROTOCOLS = ".access.protocols";
@@ -74,25 +72,26 @@ public final class ListenerConfigUtil {
   public static final Set<String> SUPPORTED_PROTOCOLS =
       new HashSet<>(Arrays.asList(CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL));
 
-  /**
-   * Generates {@link ListenerConfig} instances based on the combination
-   * of properties such as *.port and *.access.protocols.
-   *
-   * @param config property holders for controller configuration
-   * @param namespace property namespace to extract from
-   *
-   * @return List of {@link ListenerConfig} for which http listeners
-   * should be created.
-   */
+  /// Generates [ListenerConfig] instances based on the combination
+  /// of properties such as \*.port and \*.access.protocols.
+  ///
+  /// @param config property holders for controller configuration
+  /// @param namespace property namespace to extract from
+  ///
+  /// @return List of [ListenerConfig] for which http listeners
+  /// should be created.
   public static List<ListenerConfig> buildListenerConfigs(PinotConfiguration config, String namespace,
       TlsConfig tlsDefaults) {
     if (StringUtils.isBlank(config.getProperty(namespace + DOT_ACCESS_PROTOCOLS))) {
       return new ArrayList<>();
     }
 
+    // Trim each protocol and skip empty ones. Cluster configs are applied with setProperty(), which keeps the raw
+    // value, so a value like "http, https" is not split or trimmed by the config.
     String[] protocols = config.getProperty(namespace + DOT_ACCESS_PROTOCOLS).split(",");
 
-    return Arrays.stream(protocols).map(protocol -> buildListenerConfig(config, namespace, protocol, tlsDefaults))
+    return Arrays.stream(protocols).map(String::trim).filter(protocol -> !protocol.isEmpty())
+        .map(protocol -> buildListenerConfig(config, namespace, protocol, tlsDefaults))
         .collect(Collectors.toList());
   }
 
@@ -277,12 +276,10 @@ public final class ListenerConfigUtil {
     httpServer.addListener(listener);
   }
 
-  /**
-   * Finds the last listener that has HTTPS protocol, and returns its port. If not found any TLS, return defaultValue
-   * @param configs the config to search
-   * @param defaultValue the default value if the TLS listener is not found
-   * @return the port number of last entry that has secure protocol. If not found then defaultValue
-   */
+  /// Finds the last listener that has HTTPS protocol, and returns its port. If not found any TLS, return defaultValue
+  /// @param configs the config to search
+  /// @param defaultValue the default value if the TLS listener is not found
+  /// @return the port number of last entry that has secure protocol. If not found then defaultValue
   public static int findLastTlsPort(List<ListenerConfig> configs, int defaultValue) {
     return configs.stream()
         .filter(config -> config.getProtocol().equalsIgnoreCase(HTTPS_PROTOCOL))

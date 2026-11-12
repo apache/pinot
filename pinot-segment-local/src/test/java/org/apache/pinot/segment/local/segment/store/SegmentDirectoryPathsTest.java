@@ -98,12 +98,10 @@ public class SegmentDirectoryPathsTest {
     }
   }
 
-  /**
-   * When only the combined-form IVF file exists on disk (segment built with
-   * {@code storeInSegmentFile=true} whose absorb has not yet run), the lookup must still find it.
-   * Without this the reader factory silently returns null on a flag rollback and ANN queries
-   * degrade to brute-force scan.
-   */
+  /// When only the combined-form IVF file exists on disk (segment built with
+  /// `storeInSegmentFile=true` whose absorb has not yet run), the lookup must still find it.
+  /// Without this the reader factory silently returns null on a flag rollback and ANN queries
+  /// degrade to brute-force scan.
   @Test
   public void testFindVectorIndexFileFindsCombinedFormWhenLegacyAbsent()
       throws Exception {
@@ -132,11 +130,9 @@ public class SegmentDirectoryPathsTest {
     }
   }
 
-  /**
-   * When only the HNSW combined-form file exists (segment built with {@code storeInSegmentFile=true}
-   * whose absorb step has not yet run), {@code findVectorIndexIndexFile} must still find it so that
-   * the reader factory can open the index without treating a missing file as "no index".
-   */
+  /// When only the HNSW combined-form file exists (segment built with `storeInSegmentFile=true`
+  /// whose absorb step has not yet run), `findVectorIndexIndexFile` must still find it so that
+  /// the reader factory can open the index without treating a missing file as "no index".
   @Test
   public void testFindVectorIndexFileFindsCombinedHnswWhenLegacyDirAbsent()
       throws Exception {
@@ -164,11 +160,9 @@ public class SegmentDirectoryPathsTest {
     }
   }
 
-  /**
-   * When both legacy and combined-form IVF files exist (mixed state from a crashed toggle), the
-   * legacy file is returned — preserves the prior behaviour for unchanged segments and lets the
-   * reader factory keep using the well-tested legacy path.
-   */
+  /// When both legacy and combined-form IVF files exist (mixed state from a crashed toggle), the
+  /// legacy file is returned — preserves the prior behaviour for unchanged segments and lets the
+  /// reader factory keep using the well-tested legacy path.
   @Test
   public void testFindVectorIndexFilePrefersLegacyWhenBothExist()
       throws Exception {

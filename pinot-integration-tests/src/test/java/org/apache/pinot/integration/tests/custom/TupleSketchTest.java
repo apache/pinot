@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.List;
@@ -28,9 +29,9 @@ import org.apache.avro.generic.GenericData;
 import org.apache.datasketches.tuple.TupleIntersection;
 import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
@@ -65,10 +66,26 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
     TupleSketch<IntegerSummary> deserializedSketch =
-        ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(rawSketchBytes);
+        TupleSketch.heapifySketch(MemorySegment.ofArray(rawSketchBytes), new IntegerSummaryDeserializer());
 
     assertTrue(distinctCount > 0);
     assertEquals(Double.valueOf(deserializedSketch.getEstimate()).longValue(), distinctCount);
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(2).asLong() > 0);
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(3).asLong() > 0);
+
+    String parameterizedQuery =
+        String.format(
+            "SELECT DISTINCT_COUNT_TUPLE_SKETCH(%s, 'nominalEntries=16384;accumulatorThreshold=10'), "
+                + "DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(%s, 'nominalEntries=16384;accumulatorThreshold=10'), "
+                + "SUM_VALUES_INTEGER_SUM_TUPLE_SKETCH(%s, 'nominalEntries=16384;accumulatorThreshold=10'), "
+                + "AVG_VALUE_INTEGER_SUM_TUPLE_SKETCH(%s, 'nominalEntries=16384;accumulatorThreshold=10') FROM %s",
+            MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES,
+            getTableName());
+    jsonNode = postQuery(parameterizedQuery);
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong() > 0);
+    byte[] sketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
+    assertTrue(TupleSketch.heapifySketch(MemorySegment.ofArray(sketchBytes), new IntegerSummaryDeserializer())
+        .getEstimate() > 0);
     assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(2).asLong() > 0);
     assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(3).asLong() > 0);
   }
@@ -150,9 +167,11 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
       String sketch1 = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
       String sketch2 = jsonNode.get("resultTable").get("rows").get(0).get(2).asText();
       TupleSketch<IntegerSummary> deserializedSketch1 =
-          ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(Base64.getDecoder().decode(sketch1));
+          TupleSketch.heapifySketch(MemorySegment.ofArray(Base64.getDecoder().decode(sketch1)),
+              new IntegerSummaryDeserializer());
       TupleSketch<IntegerSummary> deserializedSketch2 =
-          ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(Base64.getDecoder().decode(sketch2));
+          TupleSketch.heapifySketch(MemorySegment.ofArray(Base64.getDecoder().decode(sketch2)),
+              new IntegerSummaryDeserializer());
       TupleIntersection<IntegerSummary> intersection = new TupleIntersection<>(new IntegerSummarySetOperations(
           IntegerSummary.Mode.Sum, IntegerSummary.Mode.Sum));
       intersection.intersect(deserializedSketch1);
@@ -190,7 +209,7 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
     TupleSketch<IntegerSummary> deserializedSketch =
-        ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(rawSketchBytes);
+        TupleSketch.heapifySketch(MemorySegment.ofArray(rawSketchBytes), new IntegerSummaryDeserializer());
 
     assertTrue(distinctCount > 0);
     assertEquals(Double.valueOf(deserializedSketch.getEstimate()).longValue(), distinctCount);
@@ -225,7 +244,7 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
     TupleSketch<IntegerSummary> deserializedSketch =
-        ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(rawSketchBytes);
+        TupleSketch.heapifySketch(MemorySegment.ofArray(rawSketchBytes), new IntegerSummaryDeserializer());
     assertTrue(distinctCount > 0);
     assertEquals(Double.valueOf(deserializedSketch.getEstimate()).longValue(), distinctCount);
     assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(2).asLong() > 0);
@@ -233,7 +252,8 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
 
     distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(4).asLong();
     rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(5).asText());
-    deserializedSketch = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(rawSketchBytes);
+    deserializedSketch = TupleSketch.heapifySketch(MemorySegment.ofArray(rawSketchBytes),
+        new IntegerSummaryDeserializer());
     assertTrue(distinctCount > 0);
     assertEquals(Double.valueOf(deserializedSketch.getEstimate()).longValue(), distinctCount);
     assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(6).asLong() > 0);
@@ -304,6 +324,6 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
   private byte[] getRandomRawValue() {
     IntegerTupleSketch is = new IntegerTupleSketch(4, IntegerSummary.Mode.Sum);
     is.update(RANDOM.nextInt(100), RANDOM.nextInt(100));
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
+    return is.compact().toByteArray();
   }
 }

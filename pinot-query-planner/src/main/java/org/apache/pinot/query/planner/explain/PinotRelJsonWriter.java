@@ -29,9 +29,7 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
-/**
- * Extends {@link RelJsonWriter} to add the type of the relational algebra node.
- */
+/// Extends [RelJsonWriter] to add the type of the relational algebra node.
 public class PinotRelJsonWriter extends RelJsonWriter {
 
   public PinotRelJsonWriter() {
@@ -53,9 +51,7 @@ public class PinotRelJsonWriter extends RelJsonWriter {
   static class PinotRelJson extends RelJson {
     private final RelJson _relJson;
 
-    /**
-     * Creates a PinotRelJson.
-     */
+    /// Creates a PinotRelJson.
     public PinotRelJson(RelJson relJson) {
       super(null);
       _relJson = relJson;

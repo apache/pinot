@@ -22,67 +22,53 @@ import java.util.Iterator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
-/**
- * Interface for generating group keys.
- * It extends AutoCloseable for thread-local maps to be cleared
- */
+/// Interface for generating group keys.
+/// It extends AutoCloseable for thread-local maps to be cleared
 public interface GroupKeyGenerator extends AutoCloseable {
   char DELIMITER = '\0';
   int INVALID_ID = -1;
 
-  /**
-   * Get the global upper bound of the group key. All group keys generated or will be generated should be less than this
-   * value. This interface can be called before generating group keys to determine the type and size of the value result
-   * holder.
-   *
-   * @return global upper bound of the group key.
-   */
+  /// Get the global upper bound of the group key. All group keys generated or will be generated should be less than
+  /// this value. This interface can be called before generating group keys to determine the type and size of the value
+  /// result holder.
+  ///
+  /// @return global upper bound of the group key.
   int getGlobalGroupKeyUpperBound();
 
-  /**
-   * Generates group keys on the given value block and returns the result to the given buffer.
-   * <p>This method is for situation where all the group-by columns are single-valued.
-   *
-   * @param valueBlock Value block
-   * @param groupKeys  Buffer to return the results
-   */
+  /// Generates group keys on the given value block and returns the result to the given buffer.
+  ///
+  /// This method is for situation where all the group-by columns are single-valued.
+  ///
+  /// @param valueBlock Value block
+  /// @param groupKeys  Buffer to return the results
   void generateKeysForBlock(ValueBlock valueBlock, int[] groupKeys);
 
-  /**
-   * Generate group keys on the given value block and returns the result to the given buffer.
-   * <p>This method is for situation where at least one group-by columns are multi-valued.
-   *
-   * @param valueBlock Value block
-   * @param groupKeys  Buffer to return the results
-   */
+  /// Generate group keys on the given value block and returns the result to the given buffer.
+  ///
+  /// This method is for situation where at least one group-by columns are multi-valued.
+  ///
+  /// @param valueBlock Value block
+  /// @param groupKeys  Buffer to return the results
   void generateKeysForBlock(ValueBlock valueBlock, int[][] groupKeys);
 
-  /**
-   * Get the current upper bound of the group key. All group keys already generated should be less than this value. This
-   * interface can be called after generating some group keys and before processing them to determine whether to expand
-   * the size of the value result holder.
-   *
-   * @return current upper bound of the group key.
-   */
+  /// Get the current upper bound of the group key. All group keys already generated should be less than this value.
+  /// This interface can be called after generating some group keys and before processing them to determine whether to
+  /// expand the size of the value result holder.
+  ///
+  /// @return current upper bound of the group key.
   int getCurrentGroupKeyUpperBound();
 
-  /**
-   * Returns an iterator of {@link GroupKey}. Use this interface to iterate through all the group keys.
-   */
+  /// Returns an iterator of [GroupKey]. Use this interface to iterate through all the group keys.
   Iterator<GroupKey> getGroupKeys();
 
-  /**
-   * Return current number of unique keys
-   */
+  /// Return current number of unique keys
   int getNumKeys();
 
   @Override
   default void close() {
   }
 
-  /**
-   * This class encapsulates the integer group id and the group keys.
-   */
+  /// This class encapsulates the integer group id and the group keys.
   class GroupKey {
     public int _groupId;
     public Object[] _keys;

@@ -43,9 +43,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Tests the Pinot inbuilt transform functions
- */
+/// Tests the Pinot inbuilt transform functions
 public class DateTimeFunctionsTest {
   private static final ZoneOffset WEIRD_ZONE = ZoneOffset.ofHoursMinutes(7, 9);
   private static final DateTimeZone WEIRD_DATE_TIME_ZONE = DateTimeZone.forID(WEIRD_ZONE.getId());

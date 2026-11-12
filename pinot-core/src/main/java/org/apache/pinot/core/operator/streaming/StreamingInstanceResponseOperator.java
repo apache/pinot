@@ -39,12 +39,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Like {@link InstanceResponseOperator}, but instead of sending all the data to the broker at once, it streams the data
- * to a given {@link ResultsBlockStreamer}.
- *
- * This is used in multi-stage to stream data to the receiving mailboxes.
- */
+/// Like [InstanceResponseOperator], but instead of sending all the data to the broker at once, it streams the
+/// data to a given [ResultsBlockStreamer].
+///
+/// This is used in multi-stage to stream data to the receiving mailboxes.
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
   private static final String EXPLAIN_NAME = "STREAMING_INSTANCE_RESPONSE";
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingInstanceResponseOperator.class);

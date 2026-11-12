@@ -35,10 +35,8 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
-/**
- * Comprehensive tests for DataTypeColumnTransformer.
- * Tests data type conversions, isNoOp optimization, and error handling.
- */
+/// Comprehensive tests for DataTypeColumnTransformer.
+/// Tests data type conversions, isNoOp optimization, and error handling.
 public class DataTypeColumnTransformerTest {
   private static final String COLUMN_NAME = "testColumn";
 

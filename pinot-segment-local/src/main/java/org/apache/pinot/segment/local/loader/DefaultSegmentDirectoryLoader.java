@@ -31,31 +31,31 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Default implementation of {@link SegmentDirectoryLoader}
- */
+/// Default implementation of [SegmentDirectoryLoader]
 @SegmentLoader(name = "default")
 public class DefaultSegmentDirectoryLoader implements SegmentDirectoryLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultSegmentDirectoryLoader.class);
 
-  /**
-   * Creates and loads the {@link SegmentLocalFSDirectory} which is the default implementation of
-   * {@link SegmentDirectory}.
-   *
-   * <p>The {@link SegmentDirectoryLoaderContext} is forwarded into the {@link SegmentLocalFSDirectory}
-   * so downstream consumers (e.g. {@code SingleFileIndexDirectory#createRemoteBuffers}) can use it to
-   * propagate the table's task configuration into remote/empty index buffers.
-   *
-   * @param indexDir segment index directory
-   * @param segmentLoaderContext context for instantiation of the SegmentDirectory
-   * @return instance of {@link SegmentLocalFSDirectory}
-   */
+  /// Creates and loads the [SegmentLocalFSDirectory] which is the default implementation of
+  /// [SegmentDirectory].
+  ///
+  /// The [SegmentDirectoryLoaderContext] is forwarded into the [SegmentLocalFSDirectory]
+  /// so downstream consumers (e.g. `SingleFileIndexDirectory#createRemoteBuffers`) can use it to
+  /// propagate the table's task configuration into remote/empty index buffers.
+  ///
+  /// @param indexDir segment index directory
+  /// @param segmentLoaderContext context for instantiation of the SegmentDirectory
+  /// @return instance of [SegmentLocalFSDirectory]
   @Override
   public SegmentDirectory load(URI indexDir, SegmentDirectoryLoaderContext segmentLoaderContext)
       throws Exception {
     File directory = new File(indexDir);
     if (!directory.exists()) {
       return new SegmentLocalFSDirectory(directory);
+    }
+    if (segmentLoaderContext.isMappedMetadataEnabled()) {
+      return new SegmentLocalFSDirectory(directory, SegmentMetadataImpl.loadEagerSnapshot(directory),
+          segmentLoaderContext.getReadMode(), segmentLoaderContext);
     }
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(directory);
     return new SegmentLocalFSDirectory(directory, metadata, segmentLoaderContext.getReadMode(),

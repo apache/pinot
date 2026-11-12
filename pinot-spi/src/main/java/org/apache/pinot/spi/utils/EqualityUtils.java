@@ -27,12 +27,10 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 
-/**
- * Various utilities in implementing {@link Object#equals(Object)} and {@link Object#hashCode()}.
- *
- * For primitive float and double, {@code isEqual()} is not the same as Java == operator, {@code isEqual(NaN, NaN)}
- * returns true instead of false.
- */
+/// Various utilities in implementing [Object#equals(Object)] and [Object#hashCode()].
+///
+/// For primitive float and double, `isEqual()` is not the same as Java == operator, `isEqual(NaN, NaN)`
+/// returns true instead of false.
 public class EqualityUtils {
   private EqualityUtils() {
   }
@@ -45,18 +43,14 @@ public class EqualityUtils {
     return left == right;
   }
 
-  /**
-   * Compare both arguments for equality, and consider {@code Float.NaN} to be equal to {@code Float.NaN} (unlike the
-   * Java == operator).
-   */
+  /// Compare both arguments for equality, and consider `Float.NaN` to be equal to `Float.NaN` (unlike the
+  /// Java == operator).
   public static boolean isEqual(float left, float right) {
     return Float.floatToIntBits(left) == Float.floatToIntBits(right);
   }
 
-  /**
-   * Compare both arguments for equality, and consider {@code Double.NaN} to be equal to {@code Double.NaN} (unlike the
-   * Java == operator).
-   */
+  /// Compare both arguments for equality, and consider `Double.NaN` to be equal to `Double.NaN` (unlike the
+  /// Java == operator).
   public static boolean isEqual(double left, double right) {
     return Double.doubleToLongBits(left) == Double.doubleToLongBits(right);
   }
@@ -171,9 +165,7 @@ public class EqualityUtils {
     return left == right;
   }
 
-  /**
-   * Given an object, return the hashcode of it. For {@code null}, return 0 instead.
-   */
+  /// Given an object, return the hashcode of it. For `null`, return 0 instead.
   public static int hashCodeOf(@Nullable Object o) {
     if (o != null) {
       return o.hashCode();

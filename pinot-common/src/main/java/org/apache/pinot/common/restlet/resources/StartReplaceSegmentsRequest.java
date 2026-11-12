@@ -26,14 +26,12 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 
-/**
- * Request object for startReplaceSegments API.
- *
- * 1. segmentsFrom : original segments. This field can be empty in case the user tries to upload the original segments
- *    and wants to achieve the atomic update of multiple segments.
- * 2. segmentsTo : merged segments.
- * 3. customMap : custom map.
- */
+/// Request object for startReplaceSegments API.
+///
+/// 1. segmentsFrom : original segments. This field can be empty in case the user tries to upload the original segments
+///    and wants to achieve the atomic update of multiple segments.
+/// 2. segmentsTo : merged segments.
+/// 3. customMap : custom map.
 public class StartReplaceSegmentsRequest {
   private final List<String> _segmentsFrom;
   private final List<String> _segmentsTo;

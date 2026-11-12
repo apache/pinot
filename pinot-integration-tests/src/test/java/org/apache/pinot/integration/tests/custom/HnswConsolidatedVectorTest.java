@@ -40,17 +40,15 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * End-to-end integration test for HNSW with {@code storeInSegmentFile=true}.
- *
- * <p>Sibling of {@link IvfFlatConsolidatedVectorTest} for the HNSW backend. The first server load
- * packs the offline-built Lucene HNSW directory into a combined file and absorbs it into {@code
- * columns.psf}; subsequent queries read the typed entry directly via the buffer-backed
- * {@code HnswVectorIndexReader} (including the little-endian docId mapping consumed by
- * {@code DocIdTranslator}). The single test method asserts that a {@code vectorSimilarity} query
- * returns sensible top-K ANN candidates — i.e. the consolidated HNSW read path executes and the
- * Lucene-to-Pinot doc id translation is not byte-swapped.</p>
- */
+/// End-to-end integration test for HNSW with `storeInSegmentFile=true`.
+///
+/// Sibling of [IvfFlatConsolidatedVectorTest] for the HNSW backend. The first server load
+/// packs the offline-built Lucene HNSW directory into a combined file and absorbs it into `columns.psf` ; subsequent
+/// queries read the typed entry directly via the buffer-backed
+/// `HnswVectorIndexReader` (including the little-endian docId mapping consumed by
+/// `DocIdTranslator`). The single test method asserts that a `vectorSimilarity` query
+/// returns sensible top-K ANN candidates — i.e. the consolidated HNSW read path executes and the
+/// Lucene-to-Pinot doc id translation is not byte-swapped.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class HnswConsolidatedVectorTest extends CustomDataQueryClusterIntegrationTest {
 
@@ -125,14 +123,12 @@ public class HnswConsolidatedVectorTest extends CustomDataQueryClusterIntegratio
     }
   }
 
-  /**
-   * End-to-end: writes a segment with {@code storeInSegmentFile=true}, loads it onto a server,
-   * and runs an ANN query. Passes iff (a) the server can load the segment without error (proves
-   * the consolidated HNSW reader path resolves the typed entry from {@code columns.psf} and
-   * rebuilds the Lucene directory + docId mapping from the packed buffer), and (b) the query
-   * returns rows ordered by L2 distance ascending (proves the Lucene-to-Pinot doc id translation
-   * is read little-endian rather than byte-swapped by the big-endian columns.psf view).
-   */
+  /// End-to-end: writes a segment with `storeInSegmentFile=true`, loads it onto a server,
+  /// and runs an ANN query. Passes iff (a) the server can load the segment without error (proves
+  /// the consolidated HNSW reader path resolves the typed entry from `columns.psf` and
+  /// rebuilds the Lucene directory + docId mapping from the packed buffer), and (b) the query
+  /// returns rows ordered by L2 distance ascending (proves the Lucene-to-Pinot doc id translation
+  /// is read little-endian rather than byte-swapped by the big-endian columns.psf view).
   @Test(dataProvider = "useBothQueryEngines")
   public void testConsolidatedHnswVectorSimilarity(boolean useMultiStageQueryEngine)
       throws Exception {

@@ -24,12 +24,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 
 
-/**
- * This class gives list of the details from each server if there exists any segments that need to be reloaded
- *
- * It has details of reload flag which returns true if reload is needed on table and additional details of the
- * respective servers.
- */
+/// This class gives list of the details from each server if there exists any segments that need to be reloaded
+///
+/// It has details of reload flag which returns true if reload is needed on table and additional details of the
+/// respective servers.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableSegmentsReloadCheckResponse {
   @JsonProperty("needReload")

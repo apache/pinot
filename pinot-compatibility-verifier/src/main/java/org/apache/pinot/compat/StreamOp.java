@@ -62,16 +62,14 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * PRODUCE
- *   Produce events onto the stream, and verify that the number of rows in the tables increased
- *   by the number of rows produced. Also, verify the segment state for all replicas of the tables
- *
- * TODO: Consider using a file-based stream, where "pushing" events is simply adding new files to
- *       a folder named after the "stream". The implementation for the consumer would need to watch
- *       for new files and read them out. There could be one sub-folder per partition. This approach
- *       can save us handling kafka errors, etc.
- */
+/// PRODUCE
+///   Produce events onto the stream, and verify that the number of rows in the tables increased
+///   by the number of rows produced. Also, verify the segment state for all replicas of the tables
+///
+/// TODO: Consider using a file-based stream, where "pushing" events is simply adding new files to
+///       a folder named after the "stream". The implementation for the consumer would need to watch
+///       for new files and read them out. There could be one sub-folder per partition. This approach
+///       can save us handling kafka errors, etc.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StreamOp extends BaseOp {
   public enum Op {

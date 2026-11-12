@@ -31,35 +31,30 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/**
- * Factory for EQ predicate evaluators.
- */
+/// Factory for EQ predicate evaluators.
 public class EqualsPredicateEvaluatorFactory {
   private EqualsPredicateEvaluatorFactory() {
   }
 
-  /**
-   * Create a new instance of dictionary based EQ predicate evaluator.
-   *
-   * @param eqPredicate EQ predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @param dataType Data type for the column
-   * @return Dictionary based EQ predicate evaluator
-   */
+  /// Create a new instance of dictionary based EQ predicate evaluator.
+  ///
+  /// @param eqPredicate EQ predicate to evaluate
+  /// @param dictionary Dictionary for the column
+  /// @param dataType Data type for the column
+  /// @return Dictionary based EQ predicate evaluator
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(EqPredicate eqPredicate,
       Dictionary dictionary, DataType dataType) {
     return new DictionaryBasedEqPredicateEvaluator(eqPredicate, dictionary, dataType);
   }
 
-  /**
-   * Create a new instance of raw value based EQ predicate evaluator.
-   *
-   * @param eqPredicate EQ predicate to evaluate
-   * @param dataType Data type for the column
-   * @return Raw value based EQ predicate evaluator
-   */
+  /// Create a new instance of raw value based EQ predicate evaluator.
+  ///
+  /// @param eqPredicate EQ predicate to evaluate
+  /// @param dataType Data type for the column
+  /// @return Raw value based EQ predicate evaluator
   public static EqRawPredicateEvaluator newRawValueBasedEvaluator(EqPredicate eqPredicate, DataType dataType) {
     String value = eqPredicate.getValue();
     switch (dataType) {
@@ -82,6 +77,11 @@ public class EqualsPredicateEvaluatorFactory {
         return new StringRawValueBasedEqPredicateEvaluator(eqPredicate, value);
       case BYTES:
         return new BytesRawValueBasedEqPredicateEvaluator(eqPredicate, BytesUtils.toBytes(value));
+      // UUID is a logical type stored as 16 raw bytes, so -- like TIMESTAMP over LONG above -- convert the literal to
+      // its stored form and reuse the stored-type evaluator. getDataType() then correctly reports the type applySV
+      // consumes (BYTES), per the PredicateEvaluator contract.
+      case UUID:
+        return new BytesRawValueBasedEqPredicateEvaluator(eqPredicate, UuidUtils.toBytes(value));
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType);
     }

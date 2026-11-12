@@ -130,17 +130,17 @@ public class UpsertConfig extends BaseJsonConfig {
   @Nullable
   private Map<String, String> _metadataManagerConfigs;
 
-  /// @deprecated use {@link #_snapshot} instead. This is kept here for backward compatibility.
+  /// @deprecated use [#_snapshot] instead. This is kept here for backward compatibility.
   @Deprecated
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
 
-  /// @deprecated use {@link #_preload} instead. This is kept here for backward compatibility.
+  /// @deprecated use [#_preload] instead. This is kept here for backward compatibility.
   @Deprecated
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
 
-  /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
+  /// @deprecated use [org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)] instead.
   @Deprecated
   @JsonPropertyDescription("Whether to pause partial upsert table's partition consumption during commit")
   private boolean _allowPartialUpsertConsumptionDuringCommit;
@@ -352,7 +352,8 @@ public class UpsertConfig extends BaseJsonConfig {
     _metadataManagerConfigs = metadataManagerConfigs;
   }
 
-  @Deprecated
+  /// @deprecated Use `upsertConfig.snapshot` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isEnableSnapshot() {
     return _enableSnapshot;
   }
@@ -365,7 +366,8 @@ public class UpsertConfig extends BaseJsonConfig {
     }
   }
 
-  @Deprecated
+  /// @deprecated Use `upsertConfig.preload` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isEnablePreload() {
     return _enablePreload;
   }
@@ -378,7 +380,8 @@ public class UpsertConfig extends BaseJsonConfig {
     }
   }
 
-  @Deprecated
+  /// @deprecated Use `ingestionConfig.streamIngestionConfig.parallelSegmentConsumptionPolicy` instead.
+  @Deprecated(since = "1.4.0", forRemoval = true)
   public boolean isAllowPartialUpsertConsumptionDuringCommit() {
     return _allowPartialUpsertConsumptionDuringCommit;
   }

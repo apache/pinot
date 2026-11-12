@@ -314,20 +314,18 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     testCountStar(getNumDocs(additionalSegmentName));
   }
 
-  /**
-   * Extracts a list of segments from a given lineage response based on a provided key.
-   *
-   * This method searches for the specified key within the lineage response and extracts the
-   * segment list enclosed in square brackets following the key. The list is returned as a substring.
-   *
-   * Example keys are "segmentsTo" and "segmentsFrom".
-   *
-   * @param key The key to search for within the lineage response. It is expected to be a JSON
-   *            key that maps to an array of segments, formatted as "key":[...].
-   * @param lineageResponse The JSON-formatted lineage response containing the key and segments.
-   * @return A substring containing the list of segments associated with the provided key. If the
-   *         key is not found, or if there are no segments, an empty string is returned.
-   */
+  /// Extracts a list of segments from a given lineage response based on a provided key.
+  ///
+  /// This method searches for the specified key within the lineage response and extracts the
+  /// segment list enclosed in square brackets following the key. The list is returned as a substring.
+  ///
+  /// Example keys are "segmentsTo" and "segmentsFrom".
+  ///
+  /// @param key The key to search for within the lineage response. It is expected to be a JSON
+  ///            key that maps to an array of segments, formatted as "key":\[...\].
+  /// @param lineageResponse The JSON-formatted lineage response containing the key and segments.
+  /// @return A substring containing the list of segments associated with the provided key. If the
+  ///         key is not found, or if there are no segments, an empty string is returned.
   private static String extractSegmentsFromLineageKey(String key, String lineageResponse) {
     String segmentKey = "\"" + key + "\":[";
     int startIndex = lineageResponse.indexOf(segmentKey);

@@ -36,9 +36,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests the MultiplePinotSegmentRecordReader to check that the records being merged correctly
- */
+/// Tests the MultiplePinotSegmentRecordReader to check that the records being merged correctly
 public class MultiplePinotSegmentRecordReaderTest {
   private static final int NUM_ROWS = 10000;
   private static final int NUM_SEGMENTS = 5;

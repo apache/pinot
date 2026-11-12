@@ -31,11 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Multi-column metadata as read from metadata.properties file.
- * Note: only settings that multi-column text index uses are parsed & stored, ignoring everything else.
- * That is to prevent storing useless data in properties file and potentially triggering unnecessary index rebuild.
- */
+/// Multi-column metadata as read from metadata.properties file.
+/// Note: only settings that multi-column text index uses are parsed & stored, ignoring everything else.
+/// That is to prevent storing useless data in properties file and potentially triggering unnecessary index rebuild.
 public class MultiColumnTextMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiColumnTextMetadata.class);
   public static final int VERSION_1 = 1;

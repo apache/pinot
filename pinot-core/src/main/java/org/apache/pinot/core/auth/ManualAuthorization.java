@@ -25,11 +25,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Annotation to be used on top of REST endpoints. Methods annotated with this annotation don't perform default
- * authorization via AuthenticationFilter. This is useful when performing authorization manually via calls to
- * {@code AuthenticationFiler.validatePermissions()}
- */
+/// Annotation to be used on top of REST endpoints. Methods annotated with this annotation don't perform default
+/// authorization via AuthenticationFilter. This is useful when performing authorization manually via calls to
+/// `AuthenticationFiler.validatePermissions()`
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface ManualAuthorization {

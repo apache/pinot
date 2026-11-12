@@ -32,27 +32,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Manages distributed locks for minion task generation using ZooKeeper ephemeral nodes that automatically disappear
- * when the controller session ends or when the lock is explicitly released. This approach provides automatic cleanup
- * and is suitable for long-running task generation.
- * Locks are at the table level, to ensure that only one type of task can be generated per table at any given time.
- * This is to prevent task types which shouldn't run in parallel from being generated at the same time.
- * <p>
- * ZK EPHEMERAL Lock Node:
- *   <ul>
- *     <li>Every lock is created at the table level with the name: {tableName}-Lock, under the base path
- *     MINION_TASK_METADATA within the PROPERTYSTORE.
- *     <li>If the propertyStore::create() call returns true, that means the lock node was successfully created and the
- *     lock belongs to the current controller, otherwise it was not. If the lock node already exists, this will return
- *     false. No clean-up of the lock node is needed if the propertyStore::create() call returns false.
- *     <li>The locks are EPHEMERAL in nature, meaning that once the session with ZK is lost, the lock is automatically
- *     cleaned up. Scenarios when the ZK session can be lost: a) controller shutdown, b) controller crash, c) ZK session
- *     expiry (e.g. long GC pauses can cause this). This property helps ensure that the lock is released under
- *     controller failure.
- *   </ul>
- * <p>
- */
+/// Manages distributed locks for minion task generation using ZooKeeper ephemeral nodes that automatically disappear
+/// when the controller session ends or when the lock is explicitly released. This approach provides automatic cleanup
+/// and is suitable for long-running task generation.
+/// Locks are at the table level, to ensure that only one type of task can be generated per table at any given time.
+/// This is to prevent task types which shouldn't run in parallel from being generated at the same time.
+///
+/// ZK EPHEMERAL Lock Node:
+///
+/// - Every lock is created at the table level with the name: {tableName}-Lock, under the base path
+///   MINION_TASK_METADATA within the PROPERTYSTORE.
+/// - If the propertyStore::create() call returns true, that means the lock node was successfully created and the
+///   lock belongs to the current controller, otherwise it was not. If the lock node already exists, this will return
+///   false. No clean-up of the lock node is needed if the propertyStore::create() call returns false.
+/// - The locks are EPHEMERAL in nature, meaning that once the session with ZK is lost, the lock is automatically
+///   cleaned up. Scenarios when the ZK session can be lost: a) controller shutdown, b) controller crash, c) ZK
+///   session expiry (e.g. long GC pauses can cause this). This property helps ensure that the lock is released under
+///   controller failure.
 public class DistributedTaskLockManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(DistributedTaskLockManager.class);
 
@@ -74,15 +70,13 @@ public class DistributedTaskLockManager {
     _controllerMetrics = ControllerMetrics.get();
   }
 
-  /**
-   * Attempts to acquire a distributed lock at the table level for task generation using session-based locking.
-   * The lock is at the table level instead of the task level to ensure that only a single task can be generated for
-   * a given table at any time. Certain tasks depend on other tasks not being generated at the same time
-   * The lock is held until explicitly released or the controller session ends.
-   *
-   * @param tableNameWithType the table name with type
-   * @return TaskLock object if successful, null if lock could not be acquired
-   */
+  /// Attempts to acquire a distributed lock at the table level for task generation using session-based locking.
+  /// The lock is at the table level instead of the task level to ensure that only a single task can be generated for
+  /// a given table at any time. Certain tasks depend on other tasks not being generated at the same time
+  /// The lock is held until explicitly released or the controller session ends.
+  ///
+  /// @param tableNameWithType the table name with type
+  /// @return TaskLock object if successful, null if lock could not be acquired
   @Nullable
   public TaskLock acquireLock(String tableNameWithType) {
     LOGGER.info("Attempting to acquire task generation lock for table: {} by controller: {}", tableNameWithType,
@@ -114,12 +108,10 @@ public class DistributedTaskLockManager {
     return ZKMetadataProvider.constructPropertyStorePathForMinionTaskGenerationLock(tableNameForPath);
   }
 
-  /**
-   * Releases a previously acquired session-based lock and marks task generation as completed.
-   *
-   * @param lock the lock to release
-   * @return true if successfully released, false otherwise
-   */
+  /// Releases a previously acquired session-based lock and marks task generation as completed.
+  ///
+  /// @param lock the lock to release
+  /// @return true if successfully released, false otherwise
   public boolean releaseLock(TaskLock lock) {
     if (lock == null) {
       return true;
@@ -149,10 +141,8 @@ public class DistributedTaskLockManager {
     return status;
   }
 
-  /**
-   * Attempts to remove a lock node with retries and exponential backoff.
-   * Only retries if the lock exists and the remove operation returns false.
-   */
+  /// Attempts to remove a lock node with retries and exponential backoff.
+  /// Only retries if the lock exists and the remove operation returns false.
   private boolean removeWithRetries(String lockNode, String tableNameWithType) {
     for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -211,9 +201,7 @@ public class DistributedTaskLockManager {
     return false;
   }
 
-  /**
-   * Force release the lock without checking if any tasks are in progress
-   */
+  /// Force release the lock without checking if any tasks are in progress
   public void forceReleaseLock(String tableNameWithType) {
     LOGGER.info("Trying to force release the lock for table: {}", tableNameWithType);
     String lockPath = getLockPath(tableNameWithType);
@@ -234,12 +222,10 @@ public class DistributedTaskLockManager {
     }
   }
 
-  /**
-   * Checks if any task generation is currently in progress for the given table.
-   *
-   * @param tableNameWithType the table name with type
-   * @return true if task generation is in progress, false otherwise
-   */
+  /// Checks if any task generation is currently in progress for the given table.
+  ///
+  /// @param tableNameWithType the table name with type
+  /// @return true if task generation is in progress, false otherwise
   @VisibleForTesting
   boolean isTaskGenerationInProgress(String tableNameWithType) {
     String lockPath = getLockPath(tableNameWithType);
@@ -272,9 +258,7 @@ public class DistributedTaskLockManager {
     }
   }
 
-  /**
-   * Attempts to acquire a lock using ephemeral nodes.
-   */
+  /// Attempts to acquire a lock using ephemeral nodes.
   @VisibleForTesting
   TaskLock tryAcquireSessionBasedLock(String tableNameWithType) {
     String lockPath = getLockPath(tableNameWithType);
@@ -306,11 +290,9 @@ public class DistributedTaskLockManager {
     return null;
   }
 
-  /**
-   * Represents a session-based distributed lock for task generation.
-   * The lock is automatically released when the controller session ends.
-   * The state node is periodically cleaned up
-   */
+  /// Represents a session-based distributed lock for task generation.
+  /// The lock is automatically released when the controller session ends.
+  /// The state node is periodically cleaned up
   public static class TaskLock {
     private final String _tableNameWithType;
     private final String _owner;

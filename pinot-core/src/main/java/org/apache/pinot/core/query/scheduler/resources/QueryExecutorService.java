@@ -32,11 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Executor service adaptor that supports limited interface for running queries.
- * Derived implementations should provide implementation of {@code execute(Runnable r)} method
- * from {@code Executor} interface.
- */
+/// Executor service adaptor that supports limited interface for running queries.
+/// Derived implementations should provide implementation of `execute(Runnable r)` method
+/// from `Executor` interface.
 public abstract class QueryExecutorService implements ExecutorService {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryExecutorService.class);
 

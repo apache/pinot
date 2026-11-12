@@ -53,10 +53,8 @@ public class ConsistentDataPushUtils {
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0);
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
 
-  /**
-   * Fetch the list of segments to be replaced, then invoke startReplaceSegments API and returns a map of controller
-   * URI to lineage entry IDs.
-   */
+  /// Fetch the list of segments to be replaced, then invoke startReplaceSegments API and returns a map of controller
+  /// URI to lineage entry IDs.
   public static Map<URI, String> preUpload(SegmentGenerationJobSpec spec, List<String> segmentsTo)
       throws Exception {
     String rawTableName = spec.getTableSpec().getTableName();
@@ -67,10 +65,8 @@ public class ConsistentDataPushUtils {
     return startReplaceSegments(spec, uriToExistingOfflineSegments, segmentsTo);
   }
 
-  /**
-   * uriToLineageEntryIdMap is non-empty if and only if consistent data push is enabled.
-   * If uriToLineageEntryIdMap is non-empty, end the consistent data push protocol for each controller.
-   */
+  /// uriToLineageEntryIdMap is non-empty if and only if consistent data push is enabled.
+  /// If uriToLineageEntryIdMap is non-empty, end the consistent data push protocol for each controller.
   public static void postUpload(SegmentGenerationJobSpec spec, Map<URI, String> uriToLineageEntryIdMap)
       throws Exception {
     String rawTableName = spec.getTableSpec().getTableName();
@@ -80,9 +76,7 @@ public class ConsistentDataPushUtils {
     }
   }
 
-  /**
-   * Builds a map of controller URI to startReplaceSegments URI for each Pinot cluster in the spec.
-   */
+  /// Builds a map of controller URI to startReplaceSegments URI for each Pinot cluster in the spec.
   public static Map<URI, URI> getStartReplaceSegmentUris(SegmentGenerationJobSpec spec, String rawTableName) {
     Map<URI, URI> baseUriToStartReplaceSegmentUriMap = new HashMap<>();
     for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
@@ -99,10 +93,8 @@ public class ConsistentDataPushUtils {
     return baseUriToStartReplaceSegmentUriMap;
   }
 
-  /**
-   * Starts consistent data push protocol for each Pinot cluster in the spec.
-   * Returns a map of controller URI to segment lineage entry ID.
-   */
+  /// Starts consistent data push protocol for each Pinot cluster in the spec.
+  /// Returns a map of controller URI to segment lineage entry ID.
   public static Map<URI, String> startReplaceSegments(SegmentGenerationJobSpec spec,
       Map<URI, List<String>> uriToSegmentsFrom, List<String> segmentsTo)
       throws Exception {
@@ -157,9 +149,7 @@ public class ConsistentDataPushUtils {
     return uriToLineageEntryIdMap;
   }
 
-  /**
-   * Ends consistent data push protocol for each Pinot cluster in the spec.
-   */
+  /// Ends consistent data push protocol for each Pinot cluster in the spec.
   public static void endReplaceSegments(SegmentGenerationJobSpec spec, Map<URI, String> uriToLineageEntryIdMap)
       throws Exception {
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
@@ -196,11 +186,9 @@ public class ConsistentDataPushUtils {
     }
   }
 
-  /**
-   * Revert segment lineage entry when exception gets caught. This revert request is called at best effort.
-   * If the revert call fails at this point, the next startReplaceSegment call will do the cleanup
-   * by marking the previous entry to "REVERTED" and cleaning up the leftover segments.
-   */
+  /// Revert segment lineage entry when exception gets caught. This revert request is called at best effort.
+  /// If the revert call fails at this point, the next startReplaceSegment call will do the cleanup
+  /// by marking the previous entry to "REVERTED" and cleaning up the leftover segments.
   public static void handleUploadException(SegmentGenerationJobSpec spec, Map<URI, String> uriToLineageEntryIdMap,
       Exception exception) {
     if (uriToLineageEntryIdMap != null) {
@@ -241,9 +229,7 @@ public class ConsistentDataPushUtils {
     return consistentDataPushEnabled;
   }
 
-  /**
-   * Returns a map of controller URI to a list of existing OFFLINE segments.
-   */
+  /// Returns a map of controller URI to a list of existing OFFLINE segments.
   public static Map<URI, List<String>> getSegmentsToReplace(SegmentGenerationJobSpec spec, String rawTableName)
       throws Exception {
     Map<URI, List<String>> uriToOfflineSegments = new HashMap<>();
@@ -270,9 +256,7 @@ public class ConsistentDataPushUtils {
     return uriToOfflineSegments;
   }
 
-  /**
-   * Append current timestamp to existing configured segment name postfix, if configured, to make segment name unique.
-   */
+  /// Append current timestamp to existing configured segment name postfix, if configured, to make segment name unique.
   public static void configureSegmentPostfix(SegmentGenerationJobSpec spec) {
     SegmentNameGeneratorSpec segmentNameGeneratorSpec = spec.getSegmentNameGeneratorSpec();
     if (segmentNameGeneratorSpec == null) {

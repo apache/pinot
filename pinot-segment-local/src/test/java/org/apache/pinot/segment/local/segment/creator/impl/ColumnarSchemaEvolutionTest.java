@@ -22,16 +22,13 @@ import java.io.File;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for schema evolution and new column handling.
- *
- * <p>This test class validates:
- * <ul>
- *   <li>Adding new columns with default values during columnar building</li>
- *   <li>Schema evolution compatibility between row-major and columnar approaches</li>
- *   <li>Default value handling for single-value and multi-value columns</li>
- * </ul>
- */
+/// Tests for schema evolution and new column handling.
+///
+/// This test class validates:
+///
+/// - Adding new columns with default values during columnar building
+/// - Schema evolution compatibility between row-major and columnar approaches
+/// - Default value handling for single-value and multi-value columns
 public class ColumnarSchemaEvolutionTest extends ColumnarSegmentBuildingTestBase {
 
   @Test

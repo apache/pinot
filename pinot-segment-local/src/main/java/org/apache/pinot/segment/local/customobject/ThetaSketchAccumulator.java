@@ -24,15 +24,13 @@ import org.apache.datasketches.theta.ThetaSketch;
 import org.apache.datasketches.theta.ThetaUnion;
 
 
-/**
- * Intermediate state used by {@code DistinctCountThetaSketchAggregationFunction} which gives
- * the end user more control over how sketches are merged for performance.
- * In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
- * processing beyond the minimum Theta value.
- * The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
- * that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
- * set to the minimum immediately, further gains can be realised.
- */
+/// Intermediate state used by `DistinctCountThetaSketchAggregationFunction` which gives
+/// the end user more control over how sketches are merged for performance.
+/// In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
+/// processing beyond the minimum Theta value.
+/// The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
+/// that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
+/// set to the minimum immediately, further gains can be realised.
 public class ThetaSketchAccumulator extends CustomObjectAccumulator<ThetaSketch> {
   private ThetaSetOperationBuilder _setOperationBuilder = new ThetaSetOperationBuilder();
   private ThetaUnion _union;
@@ -54,24 +52,12 @@ public class ThetaSketchAccumulator extends CustomObjectAccumulator<ThetaSketch>
   }
 
   @Override
-  public ThetaSketch getResult() {
-    return unionAll();
-  }
-
-  private ThetaSketch unionAll() {
+  protected void flush() {
+    if (_accumulator == null || _accumulator.isEmpty()) {
+      return;
+    }
     if (_union == null) {
       _union = _setOperationBuilder.buildUnion();
-    }
-    // Return the default update "gadget" sketch as a compact sketch
-    if (isEmpty()) {
-      return _union.getResult(false, null);
-    }
-    // Corner-case: the parameters are not strictly respected when there is a single sketch.
-    // This single sketch might have been the result of a previously accumulated union and
-    // would already have the parameters set.  The sketch is returned as-is without adjusting
-    // nominal entries which requires an additional union operation.
-    if (getNumInputs() == 1) {
-      return _accumulator.get(0);
     }
 
     // Performance optimization: ensure that the minimum Theta is used for "early stop".
@@ -88,7 +74,25 @@ public class ThetaSketchAccumulator extends CustomObjectAccumulator<ThetaSketch>
       _union.union(accumulatedSketch);
     }
     _accumulator.clear();
+  }
 
+  @Override
+  public ThetaSketch getResult() {
+    if (_union == null) {
+      _union = _setOperationBuilder.buildUnion();
+    }
+    // Return the default update "gadget" sketch as a compact sketch
+    if (isEmpty()) {
+      return _union.getResult(false, null);
+    }
+    // Corner-case: the parameters are not strictly respected when there is a single sketch.
+    // This single sketch might have been the result of a previously accumulated union and
+    // would already have the parameters set.  The sketch is returned as-is without adjusting
+    // nominal entries which requires an additional union operation.
+    if (getNumInputs() == 1 && _accumulator != null && _accumulator.size() == 1) {
+      return _accumulator.get(0);
+    }
+    flush();
     return _union.getResult(false, null);
   }
 }

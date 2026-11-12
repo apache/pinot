@@ -55,10 +55,7 @@ public class AvroSink implements AutoCloseable {
     GENERIC_DATA.addLogicalTypeConversion(new Conversions.BigDecimalConversion());
     // Decimal with scale and precision. Deserialized as BigDecimal, serialized as bytes.
     GENERIC_DATA.addLogicalTypeConversion(new Conversions.DecimalConversion());
-    // TODO: Other interesting standard conversions we may want to add. First we need to make sure that we support
-    //  the corresponding data types in Pinot (ie can we read UUIDs or Instant?).
-    // UUID is deserialized as java.util.UUID, serialized as string.
-    //GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
+    // UUID rows use canonical strings, the logical type's raw Avro representation, so no writer conversion is needed.
     // Instant is deserialized as java.time.Instant, serialized as long (epoch millis).
     //GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
   }
@@ -92,6 +89,9 @@ public class AvroSink implements AutoCloseable {
         case STRING:
         case JSON:
           addType(value, Schema.create(Schema.Type.STRING), nullSchema);
+          break;
+        case UUID:
+          addType(value, LogicalTypes.uuid().addToSchema(Schema.create(Schema.Type.STRING)), nullSchema);
           break;
         case BIG_DECIMAL:
           Schema bigDecimal = LogicalTypes.bigDecimal().addToSchema(SchemaBuilder.builder().bytesType());
@@ -170,9 +170,7 @@ public class AvroSink implements AutoCloseable {
     }
   }
 
-  /**
-   * Converts a Pinot schema to an Avro schema
-   */
+  /// Converts a Pinot schema to an Avro schema
   private static Schema convertPinotSchemaToAvroSchema(org.apache.pinot.spi.data.Schema pinotSchema) {
     SchemaBuilder.FieldAssembler<Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 

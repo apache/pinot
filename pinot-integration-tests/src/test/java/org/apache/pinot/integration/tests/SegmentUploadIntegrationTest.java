@@ -50,11 +50,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Test for advanced push types.
- * Currently only tests METADATA push type.
- * todo: add test for URI push
- */
+/// Test for advanced push types.
+/// Currently only tests METADATA push type.
+/// todo: add test for URI push
 public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   private static String _tableNameSuffix;
 
@@ -274,10 +272,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  /**
-   * Runs both SegmentMetadataPushJobRunner and SegmentTarPushJobRunner while enabling consistent data push.
-   * Checks that segments are properly loaded and segment lineage entry were also in expected states.
-   */
+  /// Runs both SegmentMetadataPushJobRunner and SegmentTarPushJobRunner while enabling consistent data push.
+  /// Checks that segments are properly loaded and segment lineage entry were also in expected states.
   @Test
   public void testUploadAndQueryWithConsistentPush()
       throws Exception {

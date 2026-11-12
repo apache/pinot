@@ -71,11 +71,16 @@ public class ExecutionStatsAggregator {
   private long _numSegmentsPrunedInvalid = 0L;
   private long _numSegmentsPrunedByLimit = 0L;
   private long _numSegmentsPrunedByValue = 0L;
+  private long _numRemoteAccesses = 0L;
+  private long _remoteAccessBytes = 0L;
+  private long _numDirectRemoteAccesses = 0L;
+  private long _directRemoteAccessBytes = 0L;
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
+  private boolean _approximatedResult = false;
   private boolean _maxRowsInDistinctReached = false;
   private boolean _maxRowsWithoutChangeInDistinctReached = false;
   private boolean _maxExecutionTimeInDistinctReached = false;
@@ -217,6 +222,12 @@ public class ExecutionStatsAggregator {
         l -> _numSegmentsPrunedByLimit += l);
     withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE,
         l -> _numSegmentsPrunedByValue += l);
+    withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_REMOTE_ACCESSES, l -> _numRemoteAccesses += l);
+    withNotNullLongMetadata(metadata, DataTable.MetadataKey.REMOTE_ACCESS_BYTES, l -> _remoteAccessBytes += l);
+    withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_DIRECT_REMOTE_ACCESSES,
+        l -> _numDirectRemoteAccesses += l);
+    withNotNullLongMetadata(metadata, DataTable.MetadataKey.DIRECT_REMOTE_ACCESS_BYTES,
+        l -> _directRemoteAccessBytes += l);
 
     String explainPlanNumEmptyFilterSegments =
         metadata.get(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName());
@@ -240,6 +251,7 @@ public class ExecutionStatsAggregator {
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
     _numGroupsWarningLimitReached |=
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName()));
+    _approximatedResult |= Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.APPROXIMATED_RESULT.getName()));
     String distinctEarlyTermination =
         metadata.get(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName());
     if (distinctEarlyTermination != null) {
@@ -286,6 +298,7 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setGroupsTrimmed(_groupsTrimmed);
     brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
     brokerResponseNative.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
+    brokerResponseNative.setApproximatedResult(_approximatedResult);
     brokerResponseNative.setMaxRowsInDistinctReached(_maxRowsInDistinctReached);
     brokerResponseNative.setMaxRowsWithoutChangeInDistinctReached(_maxRowsWithoutChangeInDistinctReached);
     brokerResponseNative.setMaxExecutionTimeInDistinctReached(_maxExecutionTimeInDistinctReached);
@@ -303,6 +316,10 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setNumSegmentsPrunedInvalid(_numSegmentsPrunedInvalid);
     brokerResponseNative.setNumSegmentsPrunedByLimit(_numSegmentsPrunedByLimit);
     brokerResponseNative.setNumSegmentsPrunedByValue(_numSegmentsPrunedByValue);
+    brokerResponseNative.setNumRemoteAccesses(_numRemoteAccesses);
+    brokerResponseNative.setRemoteAccessBytes(_remoteAccessBytes);
+    brokerResponseNative.setNumDirectRemoteAccesses(_numDirectRemoteAccesses);
+    brokerResponseNative.setDirectRemoteAccessBytes(_directRemoteAccessBytes);
     brokerResponseNative.setExplainPlanNumEmptyFilterSegments(_explainPlanNumEmptyFilterSegments);
     brokerResponseNative.setExplainPlanNumMatchAllFilterSegments(_explainPlanNumMatchAllFilterSegments);
     if (_numConsumingSegmentsQueried > 0) {
@@ -349,40 +366,37 @@ public class ExecutionStatsAggregator {
     }
   }
 
-  /**
-   * Writes the accumulated execution stats onto the given DataTable's metadata (and exception map),
-   * so a merged-only DataTable can be re-injected into the regular reduce path with the same
-   * downstream totals as a direct reduce of the original inputs would have produced.
-   *
-   * <p>Unlike {@link #setStats(String, BrokerResponseNative, BrokerMetrics)}, this method does NOT
-   * bump broker meters or timers. The merge-only path is expected to run off the request-serving
-   * path; meter increments fire when the result is eventually re-reduced.
-   *
-   * <p>Limitations of the round-trip via DataTable metadata:
-   * <ul>
-   *   <li>CPU and memory stats round-trip as a single combined value per key
-   *       ({@link DataTable.MetadataKey#THREAD_CPU_TIME_NS}, etc.) because the wire format has no
-   *       per-tableType keys. In the standard reduce path the aggregator attributes each server's
-   *       value to offline vs realtime based on {@code routingInstance.getTableType()} and surfaces
-   *       them as separate fields on {@link BrokerResponseNative}; on a re-reduce of the merged
-   *       DataTable the whole combined value lands in one bucket — whichever tableType the caller
-   *       assigned to the synthetic server response. So the per-tableType split visible on
-   *       BrokerResponse is lost across the round-trip, even though the total is preserved.
-   *   <li>Per-server exceptions are written via {@link DataTable#addException(int, String)} which
-   *       backs a {@code Map<Integer, String>} keyed by error code; if two inputs reported the
-   *       same error code the merged DataTable carries last-write-wins for the message.
-   *   <li>Per-server trace info is JSON-encoded into a single
-   *       {@link DataTable.MetadataKey#TRACE_INFO} entry; the downstream aggregator reads it back
-   *       as one trace blob attributed to the synthetic server.
-   *   <li>DISTINCT early-termination reasons round-trip as a single enum name
-   *       ({@link DataTable.MetadataKey#EARLY_TERMINATION_REASON}) because the wire format is one
-   *       string per DataTable. The aggregator OR-reduces multiple per-server reasons into three
-   *       independent booleans; on re-injection we encode only the first set flag in declaration
-   *       order. The user-visible "DISTINCT is partial" signal is preserved (each of the three
-   *       flags independently sets partial-ness on {@link BrokerResponseNative}); the exact reason
-   *       granularity is best-effort when multiple flags are true.
-   * </ul>
-   */
+  /// Writes the accumulated execution stats onto the given DataTable's metadata (and exception map),
+  /// so a merged-only DataTable can be re-injected into the regular reduce path with the same
+  /// downstream totals as a direct reduce of the original inputs would have produced.
+  ///
+  /// Unlike [#setStats(String, BrokerResponseNative, BrokerMetrics)], this method does NOT
+  /// bump broker meters or timers. The merge-only path is expected to run off the request-serving
+  /// path; meter increments fire when the result is eventually re-reduced.
+  ///
+  /// Limitations of the round-trip via DataTable metadata:
+  ///
+  /// - CPU and memory stats round-trip as a single combined value per key
+  ///      ([DataTable.MetadataKey#THREAD_CPU_TIME_NS], etc.) because the wire format has no
+  ///      per-tableType keys. In the standard reduce path the aggregator attributes each server's
+  ///      value to offline vs realtime based on `routingInstance.getTableType()` and surfaces
+  ///      them as separate fields on [BrokerResponseNative]; on a re-reduce of the merged
+  ///      DataTable the whole combined value lands in one bucket — whichever tableType the caller
+  ///      assigned to the synthetic server response. So the per-tableType split visible on
+  ///      BrokerResponse is lost across the round-trip, even though the total is preserved.
+  /// - Per-server exceptions are written via [DataTable#addException(int, String)] which
+  ///      backs a `Map<Integer, String>` keyed by error code; if two inputs reported the
+  ///      same error code the merged DataTable carries last-write-wins for the message.
+  /// - Per-server trace info is JSON-encoded into a single
+  ///      [DataTable.MetadataKey#TRACE_INFO] entry; the downstream aggregator reads it back
+  ///      as one trace blob attributed to the synthetic server.
+  /// - DISTINCT early-termination reasons round-trip as a single enum name
+  ///      ([DataTable.MetadataKey#EARLY_TERMINATION_REASON]) because the wire format is one
+  ///      string per DataTable. The aggregator OR-reduces multiple per-server reasons into three
+  ///      independent booleans; on re-injection we encode only the first set flag in declaration
+  ///      order. The user-visible "DISTINCT is partial" signal is preserved (each of the three
+  ///      flags independently sets partial-ness on [BrokerResponseNative]); the exact reason
+  ///      granularity is best-effort when multiple flags are true.
   public void setStatsOnMergedDataTable(DataTable dataTable) {
     Map<String, String> metadata = dataTable.getMetadata();
 
@@ -403,6 +417,10 @@ public class ExecutionStatsAggregator {
     putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID, _numSegmentsPrunedInvalid);
     putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, _numSegmentsPrunedByLimit);
     putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE, _numSegmentsPrunedByValue);
+    putLong(metadata, DataTable.MetadataKey.NUM_REMOTE_ACCESSES, _numRemoteAccesses);
+    putLong(metadata, DataTable.MetadataKey.REMOTE_ACCESS_BYTES, _remoteAccessBytes);
+    putLong(metadata, DataTable.MetadataKey.NUM_DIRECT_REMOTE_ACCESSES, _numDirectRemoteAccesses);
+    putLong(metadata, DataTable.MetadataKey.DIRECT_REMOTE_ACCESS_BYTES, _directRemoteAccessBytes);
     putLong(metadata, DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS,
         _explainPlanNumEmptyFilterSegments);
     putLong(metadata, DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS,
@@ -436,6 +454,9 @@ public class ExecutionStatsAggregator {
     }
     if (_numGroupsWarningLimitReached) {
       metadata.put(DataTable.MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName(), "true");
+    }
+    if (_approximatedResult) {
+      metadata.put(DataTable.MetadataKey.APPROXIMATED_RESULT.getName(), "true");
     }
 
     // EARLY_TERMINATION_REASON: 1-string wire format ↔ 3-boolean accumulator. aggregate() OR-reduces

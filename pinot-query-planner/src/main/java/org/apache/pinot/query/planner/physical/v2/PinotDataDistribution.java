@@ -29,40 +29,27 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.physical.v2.mapping.PinotDistMapping;
 
 
-/**
- * Describes how the data will be distributed across a distributed set of output streams for a given Plan Node.
- * They integer based keys, such as those in {@link HashDistributionDesc} are based on the output Row Type of the
- * corresponding plan node.
- */
+/// Describes how the data will be distributed across a distributed set of output streams for a given Plan Node.
+/// They integer based keys, such as those in [HashDistributionDesc] are based on the output Row Type of the
+/// corresponding plan node.
 public class PinotDataDistribution {
-  /**
-   * Denotes the type of distribution: broadcast, singleton, etc.
-   */
+  /// Denotes the type of distribution: broadcast, singleton, etc.
   private final RelDistribution.Type _type;
-  /**
-   * In the format: "index@instanceId".
-   * <p>
-   *   <b>TODO:</b> An alternative is to store workers separately. One reason workers are needed is because
-   *     Exchange is often required because the workers for RelNode with multiple inputs may be different.
-   *     If we store workers separately, then we can just store the number of streams here. But that means then that
-   *     we have to handle Exchanges for scenarios where workers are different in sender/receiver separately from
-   *     Exchanges added due to the other reason.
-   * </p>
-   */
+  /// In the format: "index@instanceId".
+  ///
+  ///   **TODO:** An alternative is to store workers separately. One reason workers are needed is because
+  ///     Exchange is often required because the workers for RelNode with multiple inputs may be different.
+  ///     If we store workers separately, then we can just store the number of streams here. But that means then that
+  ///     we have to handle Exchanges for scenarios where workers are different in sender/receiver separately from
+  ///     Exchanges added due to the other reason.
   private final List<String> _workers;
-  /**
-   * Precomputed hashCode of workers to allow quick comparisons. In large deployments, it is common to have 30-100+
-   * servers, and if the plan is big enough, comparison of workers can become a bottleneck.
-   */
+  /// Precomputed hashCode of workers to allow quick comparisons. In large deployments, it is common to have 30-100+
+  /// servers, and if the plan is big enough, comparison of workers can become a bottleneck.
   private final long _workerHash;
-  /**
-   * The set of hash distribution descriptors. This is a set, because a given stream can be partitioned by multiple
-   * different sets of keys.
-   */
+  /// The set of hash distribution descriptors. This is a set, because a given stream can be partitioned by multiple
+  /// different sets of keys.
   private final Set<HashDistributionDesc> _hashDistributionDesc;
-  /**
-   * Denotes the ordering of data in each output stream of data.
-   */
+  /// Denotes the ordering of data in each output stream of data.
   private final RelCollation _collation;
 
   public PinotDataDistribution(RelDistribution.Type type, List<String> workers, long workerHash,
@@ -105,11 +92,9 @@ public class PinotDataDistribution {
     return _collation;
   }
 
-  /**
-   * Given a distribution constraint, return whether this physical distribution meets the constraint or not.
-   * E.g. say the distribution constraint is Broadcast. That means each stream in the output of this Plan Node should
-   * contain all the records. This method will return true if that is already the case.
-   */
+  /// Given a distribution constraint, return whether this physical distribution meets the constraint or not.
+  /// E.g. say the distribution constraint is Broadcast. That means each stream in the output of this Plan Node should
+  /// contain all the records. This method will return true if that is already the case.
   public boolean satisfies(@Nullable RelDistribution distributionConstraint) {
     if (distributionConstraint == null || _workers.size() == 1) {
       return true;
@@ -133,9 +118,7 @@ public class PinotDataDistribution {
     }
   }
 
-  /**
-   * Returns a Hash Distribution Desc
-   */
+  /// Returns a Hash Distribution Desc
   @Nullable
   public HashDistributionDesc satisfiesHashDistributionDesc(List<Integer> keys) {
     Preconditions.checkNotNull(_hashDistributionDesc, "null hashDistributionDesc in satisfies");
@@ -154,9 +137,7 @@ public class PinotDataDistribution {
     return _collation.satisfies(relCollation);
   }
 
-  /**
-   * Applies a mapping to this distribution. This will DROP the collation however.
-   */
+  /// Applies a mapping to this distribution. This will DROP the collation however.
   public PinotDataDistribution apply(@Nullable PinotDistMapping mapping) {
     return apply(mapping, true);
   }

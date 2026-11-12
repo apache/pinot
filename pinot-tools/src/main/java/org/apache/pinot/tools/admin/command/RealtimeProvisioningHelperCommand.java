@@ -40,10 +40,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Given a set of input params, output a table of num hosts to num hours and the memory required per host
- *
- */
+/// Given a set of input params, output a table of num hosts to num hours and the memory required per host
 @CommandLine.Command(name = "RealtimeProvisioningHelper", mixinStandardHelpOptions = true)
 public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand implements Command {
 
@@ -323,12 +320,10 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     System.out.println(note.toString());
   }
 
-  /**
-   * Displays the output values as a grid of numHoursToConsume vs numHostsToProvision
-   * @param outputValues
-   * @param numHosts
-   * @param numHours
-   */
+  /// Displays the output values as a grid of numHoursToConsume vs numHostsToProvision
+  /// @param outputValues
+  /// @param numHosts
+  /// @param numHours
   private void displayResults(String[][] outputValues, int[] numHosts, int[] numHours) {
     System.out.println();
     System.out.print("numHosts --> ");

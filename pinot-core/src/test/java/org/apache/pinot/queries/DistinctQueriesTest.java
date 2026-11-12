@@ -61,9 +61,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for DISTINCT queries.
- */
+/// Queries test for DISTINCT queries.
 public class DistinctQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DistinctQueryTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -179,12 +177,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  /**
-   * Helper method to generate records based on the given base value.
-   *
-   * All columns will have the same value but different data types (BYTES values are encoded STRING values).
-   * For the {i}th unique record, the value will be {baseValue + i}.
-   */
+  /// Helper method to generate records based on the given base value.
+  ///
+  /// All columns will have the same value but different data types (BYTES values are encoded STRING values).
+  /// For the {i}th unique record, the value will be {baseValue + i}.
   private List<GenericRow> generateRecords(int baseValue) {
     List<GenericRow> uniqueRecords = new ArrayList<>(NUM_UNIQUE_RECORDS_PER_SEGMENT);
     for (int i = 0; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
@@ -685,25 +681,23 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /**
-   * Test DISTINCT query within a single segment.
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   * </ul>
-   */
+  /// Test DISTINCT query within a single segment.
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
   private void testDistinctInnerSegmentHelper(String[] queries) {
     assertEquals(queries.length, 13);
 
@@ -1058,25 +1052,23 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /**
-   * Test DISTINCT query within a single segment.
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   * </ul>
-   */
+  /// Test DISTINCT query within a single segment.
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
   @Test
   public void testDistinctInnerSegment() {
     //@formatter:off
@@ -1103,25 +1095,23 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     //@formatter:on
   }
 
-  /**
-   * Test Non-Aggregation GroupBy query rewrite to Distinct query within a single segment.
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   * </ul>
-   */
+  /// Test Non-Aggregation GroupBy query rewrite to Distinct query within a single segment.
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
   @Test
   public void testNonAggGroupByRewriteToDistinctInnerSegment() {
     //@formatter:off
@@ -1160,9 +1150,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     //@formatter:on
   }
 
-  /**
-   * Helper method to get the DistinctTable result for one single segment for the given query.
-   */
+  /// Helper method to get the DistinctTable result for one single segment for the given query.
   private DistinctTable getDistinctTableInnerSegment(String query) {
     BaseOperator<DistinctResultsBlock> distinctOperator = getOperator(query);
     DistinctTable distinctTable = distinctOperator.nextBlock().getDistinctTable();
@@ -1170,30 +1158,26 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     return distinctTable;
   }
 
-  /**
-   * Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>
-   *     Selecting some columns with filter that does not match any record in one segment but matches some records in
-   *     the other segment
-   *   </li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   *   TODO: Support alias and add a test for that
-   * </ul>
-   */
+  /// Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting some columns with filter that does not match any record in one segment but matches some records in
+  ///   the other segment
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
+  ///   TODO: Support alias and add a test for that
   private void testDistinctInterSegmentHelper(String[] queries) {
     assertEquals(queries.length, 14);
 
@@ -1576,30 +1560,26 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     }
   }
 
-  /**
-   * Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>
-   *     Selecting some columns with filter that does not match any record in one segment but matches some records in
-   *     the other segment
-   *   </li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   *   TODO: Support alias and add a test for that
-   * </ul>
-   */
+  /// Test DISTINCT query across multiple segments and servers (2 servers, each with 2 segments).
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting some columns with filter that does not match any record in one segment but matches some records in
+  ///   the other segment
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
+  ///   TODO: Support alias and add a test for that
   @Test
   public void testDistinctInterSegment() {
     //@formatter:off
@@ -1627,31 +1607,27 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     //@formatter:on
   }
 
-  /**
-   * Test Non-Aggregation GroupBy query rewrite to Distinct query across multiple segments and servers (2 servers,
-   * each with 2 segments).
-   * <p>The following query types are tested:
-   * <ul>
-   *   <li>Selecting all dictionary-encoded SV columns</li>
-   *   <li>Selecting all dictionary-encoded MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some MV columns</li>
-   *   <li>Selecting some columns with filter</li>
-   *   <li>Selecting some columns order by MV column</li>
-   *   <li>Selecting some columns order by raw BYTES column</li>
-   *   <li>Selecting some columns transform, filter, order-by and limit</li>
-   *   <li>Selecting some columns with filter that does not match any record</li>
-   *   <li>
-   *     Selecting some columns with filter that does not match any record in one segment but matches some records in
-   *     the other segment
-   *   </li>
-   *   <li>Selecting all dictionary-encoded raw MV columns</li>
-   *   <li>Selecting some SV columns (including raw) and some raw MV columns</li>
-   *   <li>Selecting some columns with filter with raw MV</li>
-   *   <li>Selecting some columns order by raw MV column</li>
-   *   <li>Selecting some columns with filter that does not match any record with raw MV</li>
-   *   TODO: Support alias and add a test for that
-   * </ul>
-   */
+  /// Test Non-Aggregation GroupBy query rewrite to Distinct query across multiple segments and servers (2 servers,
+  /// each with 2 segments).
+  ///
+  /// The following query types are tested:
+  ///
+  /// - Selecting all dictionary-encoded SV columns
+  /// - Selecting all dictionary-encoded MV columns
+  /// - Selecting some SV columns (including raw) and some MV columns
+  /// - Selecting some columns with filter
+  /// - Selecting some columns order by MV column
+  /// - Selecting some columns order by raw BYTES column
+  /// - Selecting some columns transform, filter, order-by and limit
+  /// - Selecting some columns with filter that does not match any record
+  /// - Selecting some columns with filter that does not match any record in one segment but matches some records in
+  ///   the other segment
+  /// - Selecting all dictionary-encoded raw MV columns
+  /// - Selecting some SV columns (including raw) and some raw MV columns
+  /// - Selecting some columns with filter with raw MV
+  /// - Selecting some columns order by raw MV column
+  /// - Selecting some columns with filter that does not match any record with raw MV
+  ///   TODO: Support alias and add a test for that
   @Test
   public void testNonAggGroupByRewriteToDistinctInterSegment() {
     //@formatter:off

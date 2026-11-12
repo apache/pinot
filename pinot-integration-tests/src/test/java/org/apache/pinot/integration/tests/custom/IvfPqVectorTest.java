@@ -40,9 +40,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for the IVF_PQ vector backend with query-option and fallback coverage.
- */
+/// Integration test for the IVF_PQ vector backend with query-option and fallback coverage.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class IvfPqVectorTest extends CustomDataQueryClusterIntegrationTest {
 

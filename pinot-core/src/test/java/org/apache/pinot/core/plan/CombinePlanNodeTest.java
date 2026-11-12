@@ -50,9 +50,7 @@ public class CombinePlanNodeTest {
   private final QueryContext _queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
   private final ExecutorService _executorService = Executors.newFixedThreadPool(10);
 
-  /**
-   * Tests that the tasks are executed as expected in parallel mode.
-   */
+  /// Tests that the tasks are executed as expected in parallel mode.
   @Test
   public void testParallelExecution() {
     AtomicInteger count = new AtomicInteger(0);
@@ -105,11 +103,9 @@ public class CombinePlanNodeTest {
     fail();
   }
 
-  /**
-   * Tests that query termination is checked while building the combine operator, so a terminated query stops before
-   * running the plan nodes. With a small number of plan nodes the combine operator is built sequentially on the
-   * calling thread (numTasks == 1), so it observes the QueryThreadContext set up on this thread.
-   */
+  /// Tests that query termination is checked while building the combine operator, so a terminated query stops before
+  /// running the plan nodes. With a small number of plan nodes the combine operator is built sequentially on the
+  /// calling thread (numTasks == 1), so it observes the QueryThreadContext set up on this thread.
   @Test
   public void testTerminationCheckedDuringPlanning() {
     try (QueryThreadContext threadContext = QueryThreadContext.openForSseTest()) {
@@ -135,10 +131,8 @@ public class CombinePlanNodeTest {
     }
   }
 
-  /**
-   * Tests that a QueryException thrown while building a plan node in parallel mode is surfaced as-is with its error
-   * code preserved, instead of being wrapped in a generic RuntimeException.
-   */
+  /// Tests that a QueryException thrown while building a plan node in parallel mode is surfaced as-is with its error
+  /// code preserved, instead of being wrapped in a generic RuntimeException.
   @Test
   public void testQueryExceptionPreservedInParallel() {
     List<PlanNode> planNodes = new ArrayList<>();

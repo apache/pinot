@@ -69,9 +69,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for ST_UNION queries.
- */
+/// Queries test for ST_UNION queries.
 @SuppressWarnings("rawtypes")
 public class StUnionQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "StUnionQueriesTest");

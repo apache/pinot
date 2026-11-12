@@ -33,13 +33,11 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
 
-/**
- * The {@code MergeRangeFilterOptimizer} merges multiple RANGE predicates on the same column joined by AND by taking
- * their intersection. It also pulls up the merged predicate in the absence of other predicates.
- *
- * NOTE: This optimizer follows the {@link FlattenAndOrFilterOptimizer}, so all the AND/OR filters are already
- *       flattened.
- */
+/// The `MergeRangeFilterOptimizer` merges multiple RANGE predicates on the same column joined by AND by taking
+/// their intersection. It also pulls up the merged predicate in the absence of other predicates.
+///
+/// NOTE: This optimizer follows the [FlattenAndOrFilterOptimizer], so all the AND/OR filters are already
+///       flattened.
 public class MergeRangeFilterOptimizer implements FilterOptimizer {
 
   @Override
@@ -118,9 +116,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
     }
   }
 
-  /**
-   * Helper method to create a Range from the given filter kind, operands and data type.
-   */
+  /// Helper method to create a Range from the given filter kind, operands and data type.
   private static Range getRange(FilterKind filterKind, List<Expression> operands, DataType dataType) {
     switch (filterKind) {
       case GREATER_THAN:
@@ -141,17 +137,13 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
     }
   }
 
-  /**
-   * Helper method to create a Comparable from the given literal expression and data type.
-   */
+  /// Helper method to create a Comparable from the given literal expression and data type.
   @SuppressWarnings("rawtypes")
   private static Comparable getComparable(Expression literalExpression, DataType dataType) {
     return dataType.convertInternal(RequestUtils.getLiteralString(literalExpression));
   }
 
-  /**
-   * Helper method to construct a RANGE predicate filter Expression from the given column and range.
-   */
+  /// Helper method to construct a RANGE predicate filter Expression from the given column and range.
   private static Expression getRangeFilterExpression(String column, Range range) {
     return RequestUtils.getFunctionExpression(FilterKind.RANGE.name(), RequestUtils.getIdentifierExpression(column),
         RequestUtils.getLiteralExpression(range.getRangeString()));

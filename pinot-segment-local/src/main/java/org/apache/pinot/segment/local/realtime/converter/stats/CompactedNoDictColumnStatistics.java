@@ -19,13 +19,13 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -47,7 +47,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
 
   public CompactedNoDictColumnStatistics(DataSource dataSource, @Nullable int[] sortedDocIds, boolean isSortedColumn,
       RoaringBitmap validDocIds) {
-    super(dataSource, sortedDocIds, isSortedColumn);
+    super(dataSource, sortedDocIds, isSortedColumn, false);
     Preconditions.checkState(!validDocIds.isEmpty(), "Use EmptyColumnStatistics for empty column: %s",
         _fieldSpec.getName());
     _totalDocs = validDocIds.getCardinality();
@@ -74,13 +74,32 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
     int maxRowLength = 0;
 
     if (isSingleValue) {
-      if (_sortedDocIds != null) {
+      totalEntries = _totalDocs;
+
+      // Min and max are tracked per raw value during ingestion, so equal bounds identify a constant column without
+      // any scan. They are left null when aggregated metrics are enabled, in which case the scan below still runs.
+      // The bounds span the whole segment, so this is sufficient but not necessary: a column that is constant only
+      // among the valid documents is still scanned.
+      Comparable segmentMinValue = _dataSourceMetadata.getMinValue();
+      if (segmentMinValue != null && segmentMinValue.equals(_dataSourceMetadata.getMaxValue())) {
+        // Every document holds the same value, so every stat collected below collapses to that one value
+        minValue = segmentMinValue;
+        maxValue = segmentMinValue;
+        if (isVariableWidth) {
+          int length = getElementLength(segmentMinValue, storedType);
+          minElementLength = length;
+          maxElementLength = length;
+          if (isAscii) {
+            isAscii = length == ((String) segmentMinValue).length();
+          }
+        }
+        isSorted = true;
+      } else if (_sortedDocIds != null) {
         // Iterate in sorted doc order, filtered to valid docs, to track sortedness inline
         for (int docId : _sortedDocIds) {
           if (!validDocIds.contains(docId)) {
             continue;
           }
-          totalEntries++;
           Comparable value = readValue(docId, storedType);
           if (minValue == null || value.compareTo(minValue) < 0) {
             minValue = value;
@@ -107,7 +126,6 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
         IntIterator iterator = validDocIds.getIntIterator();
         while (iterator.hasNext()) {
           int docId = iterator.next();
-          totalEntries++;
           Comparable value = readValue(docId, storedType);
           if (minValue == null || value.compareTo(minValue) < 0) {
             minValue = value;
@@ -241,7 +259,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
               if (maxString == null || value.compareTo(maxString) > 0) {
                 maxString = value;
               }
-              int length = Utf8.encodedLength(value);
+              int length = Utf8Utils.encodedLength(value);
               minElementLength = Math.min(minElementLength, length);
               maxElementLength = Math.max(maxElementLength, length);
               if (isAscii) {
@@ -388,7 +406,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
       case BIG_DECIMAL:
         return BigDecimalUtils.byteSize((BigDecimal) value);
       case STRING:
-        return Utf8.encodedLength((String) value);
+        return Utf8Utils.encodedLength((String) value);
       case BYTES:
         return ((ByteArray) value).length();
       default:

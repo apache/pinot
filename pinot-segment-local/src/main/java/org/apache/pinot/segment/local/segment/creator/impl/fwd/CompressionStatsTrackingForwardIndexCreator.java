@@ -34,7 +34,8 @@ public interface CompressionStatsTrackingForwardIndexCreator extends ForwardInde
   @Override
   long getRawForwardIndexUncompressedValueSizeInBytes();
 
-  /// Returns the raw forward-index chunk-compression type, or null when tracking is disabled.
+  /// Returns the raw forward-index chunk-compression type, or null when tracking is disabled or the
+  /// raw format cannot be represented by one legacy [ChunkCompressionType].
   @Override
   @Nullable
   ChunkCompressionType getRawForwardIndexChunkCompressionType();

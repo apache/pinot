@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -40,13 +41,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
@@ -67,12 +69,14 @@ import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.QueryFingerprintUtils;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -101,9 +105,13 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
@@ -112,14 +120,12 @@ import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
 
 
-/**
- * This class serves as the broker entry-point for handling incoming multi-stage query requests and dispatching them
- * to servers.
- */
+/// This class serves as the broker entry-point for handling incoming multi-stage query requests and dispatching them
+/// to servers.
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
   /// Disabled by default, but can be enabled with
-  ///```xml
+  /// ```xml
   ///  <MarkerFilter marker="MSE_STATS_MARKER" onMatch="ACCEPT" onMismatch="NEUTRAL"/>
   ///  ...
   ///  <Loggers>
@@ -129,10 +135,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///      </AppenderRef>
   ///    </Logger>
   ///  </Loggers>
-  ///```
+  /// ```
   private static final Marker MSE_STATS_MARKER = MarkerFactory.getMarker("MSE_STATS_MARKER");
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
+  // Extra column of the EXPLAIN response with the IdSet subqueries as a JSON array. EXPLAIN does not run them: the plan
+  // uses the empty IdSet in their place.
+  private static final String EXPLAIN_ID_SET_SUBQUERIES_FIELD = "ID_SET_SUBQUERIES_NOT_RUN";
 
   private final WorkerManager _workerManager;
   private final WorkerManager _multiClusterWorkerManager;
@@ -145,10 +154,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final ExecutorService _queryCompileExecutor;
   private final Set<String> _defaultDisabledPlannerRules;
   protected final long _extraPassiveTimeoutMs;
-  protected final boolean _enableQueryFingerprinting;
   private final boolean _streamStatsDefault;
   @Nullable
   protected final String _defaultStreamingGroupByFlushThreshold;
+  @Nullable
+  protected final String _defaultStreamingDistinctFlushThreshold;
 
   protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
   protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
@@ -210,11 +220,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long streamStatsDrainMs = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_STREAM_STATS_DRAIN_MS,
         CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS);
+    boolean enableProtoSegmentList = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST,
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_PROTO_SEGMENT_LIST);
+    int dispatchMaxInboundMessageSizeBytes = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_MAX_INBOUND_MESSAGE_SIZE_BYTES);
     _mailboxService = new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig);
     _queryDispatcher =
         new QueryDispatcher(_mailboxService, failureDetector, tlsConfig, isQueryCancellationEnabled(), cancelTimeout,
             dispatchKeepAliveTimeMs, dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls, _streamStatsDefault,
-            streamStatsDrainMs);
+            streamStatsDrainMs, enableProtoSegmentList, dispatchMaxInboundMessageSizeBytes);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -227,13 +242,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Executors.newFixedThreadPool(
             Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
             new NamedThreadFactory("multi-stage-query-compile-executor")));
-    _defaultDisabledPlannerRules =
-        _config.containsKey(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES) ? Set.copyOf(
-            _config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()))
-            : CommonConstants.Broker.DEFAULT_DISABLED_RULES;
-    _enableQueryFingerprinting = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
-        CommonConstants.Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
+    _defaultDisabledPlannerRules = getDefaultDisabledPlannerRules(_config);
     int streamingGroupByFlushThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD,
         CommonConstants.Broker.DEFAULT_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD);
@@ -241,6 +250,23 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     // null indicates "feature disabled", which matches the broker-config-unset case.
     _defaultStreamingGroupByFlushThreshold =
         streamingGroupByFlushThreshold > 0 ? Integer.toString(streamingGroupByFlushThreshold) : null;
+    int streamingDistinctFlushThreshold = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD,
+        CommonConstants.Broker.DEFAULT_MSE_STREAMING_DISTINCT_FLUSH_THRESHOLD);
+    _defaultStreamingDistinctFlushThreshold =
+        streamingDistinctFlushThreshold > 0 ? Integer.toString(streamingDistinctFlushThreshold) : null;
+  }
+
+  /// Returns the planner rules disabled by default: the comma-separated list in
+  /// [CommonConstants.Broker#CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES], or
+  /// [CommonConstants.Broker#DEFAULT_DISABLED_RULES] when the config is not set. An empty value disables no rules.
+  @VisibleForTesting
+  static Set<String> getDefaultDisabledPlannerRules(PinotConfiguration config) {
+    if (!config.containsKey(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES)) {
+      return CommonConstants.Broker.DEFAULT_DISABLED_RULES;
+    }
+    return Set.copyOf(
+        config.getCommaSeparatedList(CommonConstants.Broker.CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES, List.of()));
   }
 
   @Override
@@ -249,12 +275,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     warmupCompile();
   }
 
-  /**
-   * Best-effort warmup of the Calcite compile pipeline at broker startup. Running a trivial compile
-   * early ensures that JVM class-loading and Calcite initialization costs are paid before real
-   * queries arrive, so that the first MSE queries do not fail due to tight per-query timeout
-   * constraints.
-   */
+  /// Best-effort warmup of the Calcite compile pipeline at broker startup. Running a trivial compile
+  /// early ensures that JVM class-loading and Calcite initialization costs are paid before real
+  /// queries arrive, so that the first MSE queries do not fail due to tight per-query timeout
+  /// constraints.
   private void warmupCompile() {
     // TODO: extend warmup to exercise the full query execution path (planning + dispatch + execution),
     //       not just compilation, to amortize all cold-start costs before serving traffic.
@@ -267,7 +291,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       try (var compiled = exec.submit(() -> warmupEnv.compile("SELECT 1")).get(5, TimeUnit.SECONDS)) {
         // result discarded; compile call is for JVM warmup only
       } finally {
-        exec.shutdownNow();
+        // Do not interrupt a warmup that takes longer than the wait. Planning stops on an interrupt, and then the first
+        // queries pay the rest of the warmup cost.
+        exec.shutdown();
       }
       LOGGER.info("MSE startup warmup completed in {}ms", System.currentTimeMillis() - startMs);
     } catch (Exception e) {
@@ -394,20 +420,22 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponse handleRequestThrowing(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws QueryException, WebApplicationException {
-    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
-
+    QueryFingerprint queryFingerprint = null;
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
       try {
-        QueryFingerprint queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+        queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
         if (queryFingerprint != null) {
           queryHash = queryFingerprint.getQueryHash();
           requestContext.setQueryFingerprint(queryFingerprint);
         }
       } catch (Exception e) {
-        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId, query, e.getMessage());
+        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId,
+            _queryLogger.redactQuery(query), e.getMessage());
       }
     }
+
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query, queryFingerprint);
 
     String cid = extractClientRequestId(sqlNodeAndOptions);
     if (cid == null) {
@@ -421,6 +449,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long activeDeadlineMs = startTimeMs + timeoutMs;
     long passiveDeadlineMs = activeDeadlineMs + getExtraPassiveTimeoutMs(options);
 
+    // Runs before the query context opens, because each subquery opens its own. As in the single-stage engine, they
+    // run before the query is checked for access and quota, and each is checked like any other query.
+    List<String> idSetSubqueries =
+        rewriteIdSetSubqueries(requestId, query, sqlNodeAndOptions, requesterIdentity, httpHeaders, activeDeadlineMs);
+    if (!idSetSubqueries.isEmpty()) {
+      // Keeps the time of the subqueries out of the compilation time of the query
+      queryTimer = new Timer(queryTimer.getRemainingTimeMs(), TimeUnit.MILLISECONDS);
+    }
+
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
             activeDeadlineMs, passiveDeadlineMs, _brokerId, _brokerId, queryHash);
@@ -432,18 +469,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
             httpHeaders, queryTimer)) {
       validatePhysicalTablesWithMultiClusterRouting(compiledQuery.getTableNames(), compiledQuery.getOptions());
-      AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
-      checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery, rlsFiltersApplied);
+      boolean rlsFiltersApplied = checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery);
 
       // Apply broker-default query options before branching to EXPLAIN/execute so both paths see the same options.
       applyBrokerDefaultQueryOptions(compiledQuery.getOptions());
       prepareCompiledQueryForPlanning(compiledQuery, requestId, requestContext, httpHeaders);
 
       if (sqlNodeAndOptions.getSqlNode().getKind() == SqlKind.EXPLAIN) {
-        return explain(compiledQuery, requestId, requestContext, queryTimer);
+        return explain(compiledQuery, requestId, requestContext, queryTimer, idSetSubqueries);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied.get(), queryWasLogged, workloadName);
+            rlsFiltersApplied, queryWasLogged, workloadName);
       }
     }
   }
@@ -454,13 +490,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private QueryEnvironment.CompiledQuery compileQuery(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       RequestContext requestContext, HttpHeaders httpHeaders, Timer queryTimer) {
     // Add queryHash to query options so it gets passed to multi-stage workers
-    if (_enableQueryFingerprinting) {
-      QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
-      if (queryFingerprint != null) {
-        sqlNodeAndOptions.getOptions().put(
-            CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
-            queryFingerprint.getQueryHash());
-      }
+    QueryFingerprint queryFingerprint = requestContext.getQueryFingerprint();
+    if (queryFingerprint != null) {
+      sqlNodeAndOptions.getOptions().put(CommonConstants.Broker.Request.QueryOptionKey.QUERY_HASH,
+          queryFingerprint.getQueryHash());
     }
 
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
@@ -483,8 +516,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private void checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
-      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery, AtomicBoolean rlsFiltersApplied) {
+  private boolean checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
+      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery) {
     Set<String> tables = compiledQuery.getTableNames();
     if (tables != null && !tables.isEmpty()) {
       TableAuthorizationResult tableAuthorizationResult =
@@ -492,21 +525,30 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
       }
-      if (_enableRowColumnLevelAuth) {
-        AccessControl accessControl = _accessControlFactory.create();
-        for (String tableName : tables) {
-          accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
-              .ifPresent(rowFilters -> {
-                rlsFiltersApplied.set(true);
-                String combinedFilters =
-                    rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
-                String key = RlsUtils.buildRlsFilterKey(tableName);
-                compiledQuery.getOptions().put(key, combinedFilters);
-                _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
-              });
-        }
-      }
+      return _enableRowColumnLevelAuth && applyRlsFilters(requesterIdentity, tables, compiledQuery.getOptions());
     }
+    return false;
+  }
+
+  /// Returns `true` if an RLS filter was added for at least one table.
+  @VisibleForTesting
+  boolean applyRlsFilters(@Nullable RequesterIdentity requesterIdentity, Set<String> tables,
+      Map<String, String> queryOptions) {
+    AccessControl accessControl = _accessControlFactory.create();
+    boolean applied = false;
+    for (String tableName : tables) {
+      List<String> rowFilters = accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
+          .orElse(null);
+      if (rowFilters == null || rowFilters.isEmpty()) {
+        continue;
+      }
+      String combinedFilters =
+          rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+      queryOptions.put(RlsUtils.buildRlsFilterKey(tableName), combinedFilters);
+      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
+      applied = true;
+    }
+    return applied;
   }
 
   private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
@@ -558,11 +600,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int sortExchangeCopyThreshold = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD,
         CommonConstants.Broker.DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD);
+    int sealedInListThreshold = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_SEALED_IN_LIST_THRESHOLD,
+        CommonConstants.Broker.DEFAULT_SEALED_IN_LIST_THRESHOLD);
     boolean defaultUnnestColumnPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_UNNEST_COLUMN_PRUNING,
         CommonConstants.Broker.DEFAULT_UNNEST_COLUMN_PRUNING);
     WorkerManager workerManager = QueryOptionsUtils.isMultiClusterRoutingEnabled(queryOptions, false)
         ? _multiClusterWorkerManager : _workerManager;
+    // Unlike the single-stage engine there is no table-level layer here, because a multi-stage query can span tables.
+    // Precedence is therefore query option > cluster config > broker conf.
+    ApproximateFunctionOverrideProvider.Settings approximateFunctionSettings =
+        _approximateFunctionOverrideProvider.getSettings();
+    boolean useApproximateFunction =
+        approximateFunctionSettings.isEnabled(QueryOptionsUtils.isUseApproximateFunction(queryOptions), null);
     return QueryEnvironment.configBuilder()
         .requestId(requestId)
         .database(database)
@@ -575,6 +626,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultUnnestColumnPruning(defaultUnnestColumnPruning)
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
+        .useApproximateFunction(useApproximateFunction)
+        .approximateFunctionDistinctCountParams(approximateFunctionSettings._distinctCountParams)
+        .approximateFunctionPercentileParams(approximateFunctionSettings._percentileParams)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
         .defaultUseLiteMode(defaultUseLiteMode)
@@ -587,36 +641,45 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultHashFunction(defaultHashFunction)
         .defaultDisabledPlannerRules(_defaultDisabledPlannerRules)
         .defaultSortExchangeCopyLimit(sortExchangeCopyThreshold)
+        .defaultSealedInListThreshold(sealedInListThreshold)
         .build();
   }
 
-  /**
-   * Applies broker-level defaults for MSE query options. Per-query overrides (i.e. {@code SET option = value} in the
-   * SQL text) always win because we use {@link Map#putIfAbsent} — a user can set the option to {@code 0} to opt out of
-   * a streaming default that the cluster has enabled.
-   */
+  /// Applies broker-level defaults for MSE query options. Per-query overrides (i.e. `SET option = value` in the
+  /// SQL text) always win because we use [Map#putIfAbsent] — a user can set the option to `0` to opt out of
+  /// a streaming default that the cluster has enabled.
   @VisibleForTesting
   void applyBrokerDefaultQueryOptions(Map<String, String> queryOptions) {
     if (_defaultStreamingGroupByFlushThreshold != null) {
       queryOptions.putIfAbsent(CommonConstants.Broker.Request.QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD,
           _defaultStreamingGroupByFlushThreshold);
     }
+    if (_defaultStreamingDistinctFlushThreshold != null) {
+      queryOptions.putIfAbsent(CommonConstants.Broker.Request.QueryOptionKey.STREAMING_DISTINCT_FLUSH_THRESHOLD,
+          _defaultStreamingDistinctFlushThreshold);
+    }
   }
 
-  /**
-   * Extension hook for preparing a compiled query's planner-visible options after compilation, authorization and
-   * broker defaults, but before planning/explain. Subclasses can use the validated table set from
-   * {@link QueryEnvironment.CompiledQuery#getTableNames()} without re-parsing SQL.
-   */
+  /// Extension hook for preparing a compiled query's planner-visible options after compilation, authorization and
+  /// broker defaults, but before planning/explain. Subclasses can use the validated table set from
+  /// [QueryEnvironment.CompiledQuery#getTableNames()] without re-parsing SQL.
   protected void prepareCompiledQueryForPlanning(QueryEnvironment.CompiledQuery compiledQuery, long requestId,
       RequestContext requestContext, HttpHeaders httpHeaders) {
   }
 
-  /**
-   * Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
-   * multi-stage query throttler before dispatch. Subclasses can override to accurately
-   * estimate the real per-server work.
-   */
+  /// Extension hook for preparing a stage right before the broker sends it to its workers, to run the query or to
+  /// explain it on the servers. To run the query, the broker calls it for every stage, including stage 0 (the broker
+  /// reduce). To explain the query on the servers, it calls it only for the leaf stages that have segments.
+  ///
+  /// Subclasses can add entries to the custom properties of the stage
+  /// ([DispatchablePlanFragment#getCustomProperties()]), which its workers get in their stage metadata. They must not
+  /// replace the existing entries, such as the table name and the time boundary that servers use for leaf stages.
+  protected void prepareStageForDispatch(DispatchablePlanFragment stage, Map<String, String> queryOptions) {
+  }
+
+  /// Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
+  /// multi-stage query throttler before dispatch. Subclasses can override to accurately
+  /// estimate the real per-server work.
   protected int getEstimatedNumQueryThreads(DispatchableSubPlan dispatchableSubPlan) {
     return dispatchableSubPlan.getEstimatedNumQueryThreads();
   }
@@ -631,13 +694,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return extraPassiveTimeoutMsFromQueryOption != null ? extraPassiveTimeoutMsFromQueryOption : _extraPassiveTimeoutMs;
   }
 
-  /**
-   * Explains the query and returns the broker response.
-   *
-   * Throws using the same conventions as handleRequestThrowing.
-   */
+  /// Explains the query and returns the broker response.
+  ///
+  /// Throws using the same conventions as handleRequestThrowing.
+  ///
+  /// @param idSetSubqueries the IdSet subqueries that did not run, see [IdSetSubqueryRewriter]
   private BrokerResponse explain(QueryEnvironment.CompiledQuery query, long requestId, RequestContext requestContext,
-      Timer timer)
+      Timer timer, List<String> idSetSubqueries)
       throws WebApplicationException, QueryException {
     Map<String, String> queryOptions = query.getOptions();
 
@@ -652,7 +715,156 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         () -> query.explain(requestId, fragmentToPlanNode), timer);
     String plan = queryPlanResult.getExplainPlan();
     Map<String, String> extraFields = queryPlanResult.getExtraFields();
+    if (!idSetSubqueries.isEmpty()) {
+      ArrayNode subqueries = JsonNodeFactory.instance.arrayNode();
+      idSetSubqueries.forEach(subqueries::add);
+      extraFields = new LinkedHashMap<>(extraFields);
+      extraFields.put(EXPLAIN_ID_SET_SUBQUERIES_FIELD, subqueries.toString());
+    }
     return constructMultistageExplainPlan(query.getTextQuery(), plan, extraFields);
+  }
+
+  /// Runs the IdSet subqueries of the query, or not to explain it, and replaces them with their IdSets. See
+  /// [IdSetSubqueryRewriter]. Returns the subqueries that were replaced.
+  private List<String> rewriteIdSetSubqueries(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
+      @Nullable RequesterIdentity requesterIdentity, @Nullable HttpHeaders httpHeaders, long deadlineMs) {
+    SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
+    boolean explain = sqlNode.getKind() == SqlKind.EXPLAIN;
+    SqlNode queryNode = explain ? ((SqlExplain) sqlNode).getExplicandum() : sqlNode;
+    Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+    return IdSetSubqueryRewriter.rewrite(query, queryNode, explain, new IdSetSubqueryRewriter.SubqueryRunner() {
+      @Override
+      public boolean validates(String subquery) {
+        return validatesOnItsOwn(requestId, subquery, queryOptions, httpHeaders, deadlineMs);
+      }
+
+      @Nullable
+      @Override
+      public String run(String subquery) {
+        return runIdSetSubquery(requestId, subquery, queryOptions, requesterIdentity, httpHeaders, deadlineMs);
+      }
+    });
+  }
+
+  /// Returns whether the subquery validates on its own, i.e. whether it does not refer to the query it is in.
+  /// Validation does not optimize the subquery, so it is quick enough to run without a timeout.
+  ///
+  /// Any failure, e.g. from an invalid option the subquery inherits, means no: the subquery then stays in the query,
+  /// and compiling the query reports the problem.
+  private boolean validatesOnItsOwn(long requestId, String subquery, Map<String, String> queryOptions,
+      @Nullable HttpHeaders httpHeaders, long deadlineMs) {
+    getTimeLeftMs(subquery, deadlineMs);
+    try {
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(subquery);
+      RequestUtils.setOptions(sqlNodeAndOptions, queryOptions);
+      QueryEnvironment queryEnv = new QueryEnvironment(
+          getQueryEnvConf(httpHeaders, sqlNodeAndOptions.getOptions(), requestId), _multiClusterRoutingContext);
+      queryEnv.validate(sqlNodeAndOptions);
+      return true;
+    } catch (RuntimeException e) {
+      return false;
+    }
+  }
+
+  /// Runs an IdSet subquery as a query of its own, and returns the serialized IdSet it returns, or `null` if it returns
+  /// no rows or NULL.
+  ///
+  /// The subquery inherits the options of the query, which the options set in the subquery override, and the time left
+  /// until the deadline of the query. It runs like any other query: it is checked for access and quota, and it can be
+  /// cancelled. As it inherits the client query id, cancelling the query by that id cancels the subquery, which fails
+  /// the query.
+  @Nullable
+  private String runIdSetSubquery(long requestId, String subquery, Map<String, String> queryOptions,
+      @Nullable RequesterIdentity requesterIdentity, @Nullable HttpHeaders httpHeaders, long deadlineMs) {
+    SqlNodeAndOptions sqlNodeAndOptions;
+    try {
+      sqlNodeAndOptions = RequestUtils.parseQuery(subquery);
+    } catch (Exception e) {
+      throw new QueryException(QueryErrorCode.fromThrowable(e, QueryErrorCode.SQL_PARSING),
+          "Failed to parse subquery: " + subquery + ": " + e.getMessage(), e);
+    }
+    if (sqlNodeAndOptions.getSqlType() != PinotSqlType.DQL
+        || !sqlNodeAndOptions.getSqlNode().getKind().belongsTo(SqlKind.QUERY)) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException("Subquery is not a query: " + subquery);
+    }
+    RequestUtils.setOptions(sqlNodeAndOptions, queryOptions);
+    Map<String, String> options = sqlNodeAndOptions.getOptions();
+    long timeLeftMs = getTimeLeftMs(subquery, deadlineMs);
+    Long timeoutMs = QueryOptionsUtils.getTimeoutMs(options);
+    options.put(QueryOptionKey.TIMEOUT_MS,
+        Long.toString(timeoutMs != null ? Math.min(timeoutMs, timeLeftMs) : timeLeftMs));
+    // The rows of the subquery are its result
+    options.remove(QueryOptionKey.DROP_RESULTS);
+
+    // Like BaseBrokerRequestHandler.handleRequest, except for the first access check and the application quota, which
+    // the query passed
+    long subqueryRequestId = _requestIdGenerator.get();
+    RequestContext requestContext = new DefaultRequestContext();
+    requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+    requestContext.setBrokerId(_brokerId);
+    requestContext.setRequestId(subqueryRequestId);
+    requestContext.setQuery(subquery);
+    setTrackedHeadersInRequestContext(requestContext, httpHeaders, _trackedHeaders);
+    LOGGER.info("Request {} runs a subquery as request {}", requestId, subqueryRequestId);
+    BrokerResponse response = handleRequest(subqueryRequestId, subquery, sqlNodeAndOptions,
+        JsonNodeFactory.instance.objectNode().put(CommonConstants.Broker.Request.SQL, subquery), requesterIdentity,
+        requestContext, httpHeaders, _accessControlFactory.create());
+    response.setBrokerId(_brokerId);
+    response.setRequestId(Long.toString(subqueryRequestId));
+    onQueryCompletion(requestContext, response);
+
+    if (!response.getExceptions().isEmpty()) {
+      QueryProcessingException exception = response.getExceptions().get(0);
+      throw new QueryException(QueryErrorCode.fromErrorCode(exception.getErrorCode()),
+          "Subquery failed: " + subquery + ": " + exception.getMessage());
+    }
+    // An IdSet built from part of the rows would make the query miss rows without an error
+    if (response.isPartialResult()) {
+      List<String> reasons = getPartialResultReasons(response);
+      throw QueryErrorCode.QUERY_EXECUTION.asException(
+          "Subquery returned a partial result" + (reasons.isEmpty() ? "" : " " + reasons) + ": " + subquery);
+    }
+    ResultTable resultTable = response.getResultTable();
+    DataSchema dataSchema = resultTable != null ? resultTable.getDataSchema() : null;
+    if (dataSchema == null || dataSchema.size() != 1 || dataSchema.getColumnDataType(0) != ColumnDataType.STRING) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(
+          "Subquery must return one STRING column, the serialized IdSet, got: " + dataSchema + " for: " + subquery);
+    }
+    List<Object[]> rows = resultTable.getRows();
+    if (rows.size() > 1) {
+      throw QueryErrorCode.QUERY_EXECUTION.asException(
+          "Subquery must return at most one row, got: " + rows.size() + " for: " + subquery);
+    }
+    return rows.isEmpty() ? null : (String) rows.get(0)[0];
+  }
+
+  /// Returns the known reasons why the response holds a partial result, for the error message.
+  private static List<String> getPartialResultReasons(BrokerResponse response) {
+    List<String> reasons = new ArrayList<>();
+    if (response.isNumGroupsLimitReached()) {
+      reasons.add("numGroupsLimitReached");
+    }
+    if (response.isMaxRowsInJoinReached()) {
+      reasons.add("maxRowsInJoinReached");
+    }
+    if (response.isMaxRowsInWindowReached()) {
+      reasons.add("maxRowsInWindowReached");
+    }
+    if (response.isMseLiteLeafStageLimitReached()) {
+      reasons.add("mseLiteLeafStageLimitReached");
+    }
+    if (response instanceof BrokerResponseNativeV2) {
+      reasons.addAll(((BrokerResponseNativeV2) response).getEarlyTerminationReasons());
+    }
+    return reasons;
+  }
+
+  private static long getTimeLeftMs(String subquery, long deadlineMs) {
+    long timeLeftMs = deadlineMs - System.currentTimeMillis();
+    if (timeLeftMs <= 0) {
+      throw QueryErrorCode.BROKER_TIMEOUT.asException("Timed out before running subquery: " + subquery);
+    }
+    return timeLeftMs;
   }
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
@@ -702,8 +914,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate QPS quota
     if (hasExceededQPSQuota(query.getDatabase(), tableNames, requestContext)) {
-      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
+      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId,
+          _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
       return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
+    }
+
+    for (DispatchablePlanFragment stage : dispatchableSubPlan.getQueryStageMap().values()) {
+      prepareStageForDispatch(stage, query.getOptions());
     }
 
     // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
@@ -715,14 +932,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // these requests.
       if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, timer.getRemainingTimeMs(),
           TimeUnit.MILLISECONDS)) {
-        LOGGER.warn("Timed out waiting to execute request {}: {}", requestId, query);
+        LOGGER.warn("Timed out waiting to execute request {}: {}", requestId,
+            _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
         requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
         return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
       }
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
           _queryThrottler.currentQueryServerThreads());
     } catch (InterruptedException e) {
-      LOGGER.warn("Interrupt received while waiting to execute request {}: {}", requestId, query);
+      LOGGER.warn("Interrupt received while waiting to execute request {}: {}", requestId,
+          _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
       requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
       return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
     }
@@ -746,7 +965,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         } catch (Throwable t) {
           QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
           String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
-          LOGGER.error("Caught exception reducing all-leaf-empty request {}: {}, {}", requestId, query,
+          LOGGER.error("Caught exception reducing all-leaf-empty request {}: {}, {}", requestId,
+              _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()),
               consolidatedMessage);
           requestContext.setErrorCode(queryErrorCode);
           return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
@@ -768,7 +988,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         } catch (Throwable t) {
           QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
           String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
-          LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
+          LOGGER.error("Caught exception executing request {}: {}, {}", requestId,
+              _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()),
+              consolidatedMessage);
           requestContext.setErrorCode(queryErrorCode);
           return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
         } finally {
@@ -788,7 +1010,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           for (String table : tableNames) {
             _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
           }
-          LOGGER.warn("Timed out executing request {}: {}", requestId, query);
+          LOGGER.warn("Timed out executing request {}: {}", requestId,
+              _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
         }
         requestContext.setErrorCode(errorCode);
       } else {
@@ -870,6 +1093,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         if (brokerResponse.isGroupsTrimmed()) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
         }
+        if (brokerResponse.isApproximatedResult()) {
+          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_APPROXIMATED_RESULT, 1);
+        }
         if (brokerResponse.isMseLiteLeafStageLimitReached()) {
           _brokerMetrics.addMeteredTableValue(table,
               BrokerMeter.BROKER_RESPONSES_WITH_MSE_LITE_LEAF_STAGE_LIMIT_REACHED, 1);
@@ -877,6 +1103,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
 
       brokerResponse.setTimeUsedMs(totalTimeMs);
+      // Surface any generic response metadata registered during query handling (e.g. a
+      // degraded-engine note) into the response. Entries are registered via
+      // QueryThreadContext#addResponseBrokerMetadata; the core engine attaches no semantics to them.
+      // The sink is broker-local for now, so this only picks up entries registered on the broker.
+      QueryThreadContext queryThreadContext = QueryThreadContext.getIfAvailable();
+      if (queryThreadContext != null) {
+        queryThreadContext.getExecutionContext().getResponseMetadata().forEach(brokerResponse::putResponseMetadata);
+      }
       augmentStatistics(requestContext, brokerResponse);
       if (QueryOptionsUtils.shouldDropResults(query.getOptions())) {
         brokerResponse.setResultTable(null);
@@ -890,6 +1124,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
               QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null, workloadName),
           queryWasLogged);
+      if (rlsFiltersApplied) {
+        RlsResponseUtils.hideTableLayoutStats(brokerResponse);
+      }
 
       return brokerResponse;
     } finally {
@@ -907,13 +1144,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
   }
 
-  /**
-   * Calls the given callable in a separate thread and enforces a timeout on it.
-   *
-   * The only exception that can be thrown by this method is a QueryException. All other exceptions are caught and
-   * wrapped in a QueryException. Specifically, {@link TimeoutException} is caught and wrapped in a QueryException with
-   * the error code {@link QueryErrorCode#BROKER_TIMEOUT} and other exceptions are treated as internal errors.
-   */
+  /// Calls the given callable in a separate thread and enforces a timeout on it.
+  ///
+  /// The only exception that can be thrown by this method is a QueryException. All other exceptions are caught and
+  /// wrapped in a QueryException. Specifically, [TimeoutException] is caught and wrapped in a QueryException with
+  /// the error code [QueryErrorCode#BROKER_TIMEOUT] and other exceptions are treated as internal errors.
   private <E> E callAsync(long requestId, String query, Callable<E> queryPlannerResultCallable, Timer timer)
       throws QueryException {
     Future<E> queryPlanResultFuture = _queryCompileExecutor.submit(queryPlannerResultCallable);
@@ -921,17 +1156,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return queryPlanResultFuture.get(timer.getRemainingTimeMs(), TimeUnit.MILLISECONDS);
     } catch (TimeoutException e) {
       String errorMsg = "Timed out while planning query";
-      LOGGER.warn(errorMsg + " {}", query, e);
+      LOGGER.warn(errorMsg + " {}", _queryLogger.redactQuery(query), e);
       queryPlanResultFuture.cancel(true);
       throw QueryErrorCode.BROKER_TIMEOUT.asException(errorMsg);
     } catch (InterruptedException e) {
-      LOGGER.warn("Interrupt received while planning query {}: {}", requestId, query);
+      LOGGER.warn("Interrupt received while planning query {}: {}", requestId, _queryLogger.redactQuery(query));
       throw QueryErrorCode.INTERNAL.asException("Interrupted while planning query");
     } catch (ExecutionException e) {
       if (e.getCause() instanceof QueryException) {
         throw (QueryException) e.getCause();
       } else {
-        LOGGER.warn("Error while planning query {}: {}", query, e.getCause());
+        LOGGER.warn("Error while planning query {}: {}", _queryLogger.redactQuery(query), e.getCause());
         throw QueryErrorCode.INTERNAL.asException("Error while planning query", e.getCause());
       }
     }
@@ -940,6 +1175,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,
       RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
     List<PlanNode> stagePlans;
+    prepareStageForDispatch(fragment, queryOptions);
     try {
       stagePlans = _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
     } catch (Exception e) {
@@ -948,6 +1184,23 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     return stagePlans;
+  }
+
+  @VisibleForTesting
+  static void mergeStageStats(BrokerResponseNativeV2 brokerResponse,
+      List<MultiStageQueryStats.StageStats.Closed> queryStats) {
+    for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
+      if (stageStats != null) { // for example pipeline breaker may not have stats
+        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+        if (!stageStats.isEmpty()) {
+          // The stage root's allocation covers all the operators of its op chain. It is read by name because stage
+          // roots have different stat key types. Leaf threads and pipeline breakers are added in
+          // MultiStageOperator.Type#mergeInto.
+          brokerResponse.addTotalMemAllocatedBytes(
+              stageStats.getLastOperatorStats().getUnsafe("ALLOCATED_MEMORY_BYTES", 0L));
+        }
+      }
+    }
   }
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
@@ -960,11 +1213,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(queryStageMap, queryStats,
           stageStatsTrees);
       brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
-      for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
-        if (stageStats != null) { // for example pipeline breaker may not have stats
-          stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
-        }
-      }
+      mergeStageStats(brokerResponse, queryStats);
       // Broker-pruned segments are computed during routing in WorkerManager, not reported by servers.
       // Inject the count directly since it doesn't flow through the LeafOperator stat pipeline.
       long numSegmentsPrunedByBroker = dispatchableSubPlan.getNumSegmentsPrunedByBroker();
@@ -1026,29 +1275,39 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return _queryDispatcher.cancel(queryId);
   }
 
-  /**
-   * Returns the string representation of the Set of Strings with a limit on the number of elements.
-   * @param setOfStrings Set of strings
-   * @param limit Limit on the number of elements
-   * @return String representation of the set of the form [a,b,c...].
-   */
+  /// Returns the string representation of the Set of Strings with a limit on the number of elements.
+  /// @param setOfStrings Set of strings
+  /// @param limit Limit on the number of elements
+  /// @return String representation of the set of the form \[a,b,c...\].
   private static String toSizeLimitedString(Set<String> setOfStrings, int limit) {
     return setOfStrings.stream().limit(limit)
         .collect(Collectors.joining(", ", "[", setOfStrings.size() > limit ? "...]" : "]"));
   }
 
-  /**
-   * Check if a server that was previously detected as unhealthy is now healthy.
-   */
+  /// Check if a server that was previously detected as unhealthy is now healthy.
   public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
-    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
-    if (serverInstance == null) {
-      LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return FailureDetector.ServerState.UNHEALTHY;
+    ServerInstance serverInstance = getEnabledServerInstance(instanceId);
+    if (serverInstance != null) {
+      return _queryDispatcher.checkConnectivityToInstance(serverInstance);
     }
+    // Queries are also dispatched to workers that no routing manager knows, for example workers that a custom worker
+    // manager picks. Check them at the address that a query was last dispatched to.
+    return _queryDispatcher.checkConnectivityToInstance(instanceId);
+  }
 
-    return _queryDispatcher.checkConnectivityToInstance(serverInstance);
+  /// Returns the enabled server with the given instance id: a server of this cluster, or with multi-cluster routing, a
+  /// server of a remote cluster.
+  @Nullable
+  private ServerInstance getEnabledServerInstance(String instanceId) {
+    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    if (serverInstance == null && _multiClusterRoutingContext != null) {
+      RoutingManager multiClusterRoutingManager = _multiClusterRoutingContext.getMultiClusterRoutingManager();
+      if (multiClusterRoutingManager != null) {
+        serverInstance = multiClusterRoutingManager.getEnabledServerInstanceMap().get(instanceId);
+      }
+    }
+    return serverInstance;
   }
 
   public static boolean isYellowError(QueryException e) {

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -31,7 +32,6 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
@@ -43,12 +43,10 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Lucene text index reader supporting near realtime search. An instance of this
- * is created per consuming segment by {@link MutableSegmentImpl}.
- * Internally it uses {@link LuceneTextIndexCreator} for adding documents to the lucene index
- * as and when they are indexed by the consuming segment.
- */
+/// Lucene text index reader supporting near realtime search. An instance of this
+/// is created per consuming segment by [org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl].
+/// Internally it uses [LuceneTextIndexCreator] for adding documents to the lucene index
+/// as and when they are indexed by the consuming segment.
 public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndex.class);
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
@@ -64,14 +62,12 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private final RealtimeLuceneRefreshListener _refreshListener;
   private final RealtimeLuceneIndexRefreshManager.SearcherManagerHolder _searcherManagerHolder;
 
-  /**
-   * Created by {@link MutableSegmentImpl}
-   * for each column on which text index has been enabled
-   * @param column column name
-   * @param segmentIndexDir realtime segment consumer dir
-   * @param segmentName realtime segment name
-   * @param config the table index config
-   */
+  /// Created by [org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl]
+  /// for each column on which text index has been enabled
+  /// @param column column name
+  /// @param segmentIndexDir realtime segment consumer dir
+  /// @param segmentName realtime segment name
+  /// @param config the table index config
   public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName, TextIndexConfig config) {
     _column = column;
     _segmentName = segmentName;
@@ -111,17 +107,13 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     }
   }
 
-  /**
-   * Adds a new document.
-   */
+  /// Adds a new document.
   @Override
   public void add(String document) {
     _indexCreator.add(document);
   }
 
-  /**
-   * Adds a new document, made up of multiple values.
-   */
+  /// Adds a new document, made up of multiple values.
   @Override
   public void add(String[] documents) {
     _indexCreator.add(documents, documents.length);
@@ -174,9 +166,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     }
   }
 
-  /**
-   * Executes Lucene search with options. Extracted to a separate method for clarity.
-   */
+  /// Executes Lucene search with options. Extracted to a separate method for clarity.
   private MutableRoaringBitmap executeSearchWithOptions(String actualQuery,
       LuceneTextIndexUtils.LuceneTextIndexOptions options, RealtimeLuceneDocIdCollector docIDCollector)
       throws Exception {
@@ -218,9 +208,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     }
   }
 
-  /**
-   * Executes Lucene search without options.
-   */
+  /// Executes Lucene search without options.
   private MutableRoaringBitmap executeSearchWithoutOptions(String searchQuery,
       RealtimeLuceneDocIdCollector docIDCollector) throws Exception {
     IndexSearcher indexSearcher = null;
@@ -270,7 +258,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       while (luceneDocIDIterator.hasNext()) {
         int luceneDocId = luceneDocIDIterator.next();
         Document document = indexSearcher.doc(luceneDocId);
-        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
         actualDocIDs.add(pinotDocId);
       }
     } catch (Exception e) {
@@ -352,8 +340,27 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   public SearcherManager getSearcherManager() {
     return _searcherManager;
   }
+
   @Override
   public int getSearchableDocCount() {
-    return _refreshListener.getLastRefreshNumDocs();
+    // The refresh listener records a lower bound that can miss documents added during a refresh.
+    SearcherManager searcherManager = _searcherManager;
+    IndexSearcher indexSearcher = null;
+    try {
+      indexSearcher = searcherManager.acquire();
+      // This is a doc-id fence, so deleted document slots must remain within its bounds.
+      return indexSearcher.getIndexReader().maxDoc();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to get searchable document count for realtime text index for segment "
+          + _segmentName + " for column " + _column, e);
+    } finally {
+      if (indexSearcher != null) {
+        try {
+          searcherManager.release(indexSearcher);
+        } catch (IOException e) {
+          LOGGER.error("Failed while releasing searcher manager for column {}", _column, e);
+        }
+      }
+    }
   }
 }

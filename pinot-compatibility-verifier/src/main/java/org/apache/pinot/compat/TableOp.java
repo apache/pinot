@@ -32,17 +32,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * TableOp creates, or deletes a table, or updates the table config.
- * CREATE
- *   verifies table exists, after it is created.
- * DELETE
- *   verifies that the table does not exist, after the operation.
- * UPDATE_CONFIG
- *   Updates the table config
- * UPDATE_SCHEMA
- *   Updates the schema and executes a reload on the table. Awaits reload status
- */
+/// TableOp creates, or deletes a table, or updates the table config.
+/// CREATE
+///   verifies table exists, after it is created.
+/// DELETE
+///   verifies that the table does not exist, after the operation.
+/// UPDATE_CONFIG
+///   Updates the table config
+/// UPDATE_SCHEMA
+///   Updates the schema and executes a reload on the table. Awaits reload status
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableOp extends BaseOp {
   public enum Op {

@@ -34,11 +34,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Dispatches physical plan conversion to the active {@link OpChainConverter}. The active instance is resolved from
- * {@link ServiceLoader} when the JVM loads this class and whenever {@link #setActiveConverterIdOverride} runs (intended
- * to be rare, e.g. on config change).
- */
+/// Dispatches physical plan conversion to the active [OpChainConverter]. The active instance is resolved from
+/// [ServiceLoader] when the JVM loads this class and whenever [#setActiveConverterIdOverride] runs
+/// (intended to be rare, e.g. on config change).
 public final class OpChainConverterDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainConverterDispatcher.class);
 
@@ -58,11 +56,9 @@ public final class OpChainConverterDispatcher {
     });
   }
 
-  /**
-   * Re-resolves converters from {@link ServiceLoader} and sets the active one to the given
-   * {@link OpChainConverter#converterId()} (case-insensitive), or to the highest-{@link OpChainConverter#priority()}
-   * implementation when {@code null}.
-   */
+  /// Re-resolves converters from [ServiceLoader] and sets the active one to the given
+  /// [OpChainConverter#converterId()] (case-insensitive), or to the highest-[OpChainConverter#priority()]
+  /// implementation when `null`.
   public static void setActiveConverterIdOverride(@Nullable String converterId) {
     _active = resolveActiveConverter(converterId);
     if (converterId != null) {

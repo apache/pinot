@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,7 +49,9 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.upsert.DocIdsSnapshot;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager.SnapshotPass;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -62,6 +65,8 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -73,11 +78,12 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.*;
 
 
 public class TablesResourceTest extends BaseResourceTest {
@@ -91,12 +97,12 @@ public class TablesResourceTest extends BaseResourceTest {
     String responseBody = response.readEntity(String.class);
     TablesList tablesList = JsonUtils.stringToObject(responseBody, TablesList.class);
 
-    Assert.assertNotNull(tablesList);
+    assertNotNull(tablesList);
     List<String> tables = tablesList.getTables();
-    Assert.assertNotNull(tables);
-    Assert.assertEquals(tables.size(), 2);
-    Assert.assertEquals(tables.get(0), REALTIME_TABLE_NAME);
-    Assert.assertEquals(tables.get(1), OFFLINE_TABLE_NAME);
+    assertNotNull(tables);
+    assertEquals(tables.size(), 2);
+    assertEquals(tables.get(0), REALTIME_TABLE_NAME);
+    assertEquals(tables.get(1), OFFLINE_TABLE_NAME);
 
     String secondTable = "secondTable_REALTIME";
     addTable(secondTable);
@@ -104,13 +110,13 @@ public class TablesResourceTest extends BaseResourceTest {
     responseBody = response.readEntity(String.class);
     tablesList = JsonUtils.stringToObject(responseBody, TablesList.class);
 
-    Assert.assertNotNull(tablesList);
+    assertNotNull(tablesList);
     tables = tablesList.getTables();
-    Assert.assertNotNull(tables);
-    Assert.assertEquals(tables.size(), 3);
-    Assert.assertTrue(tables.contains(REALTIME_TABLE_NAME));
-    Assert.assertTrue(tables.contains(secondTable));
-    Assert.assertTrue(tables.contains(OFFLINE_TABLE_NAME));
+    assertNotNull(tables);
+    assertEquals(tables.size(), 3);
+    assertTrue(tables.contains(REALTIME_TABLE_NAME));
+    assertTrue(tables.contains(secondTable));
+    assertTrue(tables.contains(OFFLINE_TABLE_NAME));
   }
 
   @Test
@@ -120,25 +126,25 @@ public class TablesResourceTest extends BaseResourceTest {
     IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
 
     TableSegments tableSegments = _webTarget.path(segmentsPath).request().get(TableSegments.class);
-    Assert.assertNotNull(tableSegments);
+    assertNotNull(tableSegments);
     List<String> segmentNames = tableSegments.getSegments();
-    Assert.assertNotNull(segmentNames);
-    Assert.assertEquals(segmentNames.size(), 1);
-    Assert.assertEquals(segmentNames.get(0), _realtimeIndexSegments.get(0).getSegmentName());
+    assertNotNull(segmentNames);
+    assertEquals(segmentNames.size(), 1);
+    assertEquals(segmentNames.get(0), _realtimeIndexSegments.get(0).getSegmentName());
 
     IndexSegment secondSegment = setUpSegment(REALTIME_TABLE_NAME, null, "0", _realtimeIndexSegments);
     tableSegments = _webTarget.path(segmentsPath).request().get(TableSegments.class);
-    Assert.assertNotNull(tableSegments);
+    assertNotNull(tableSegments);
     segmentNames = tableSegments.getSegments();
-    Assert.assertNotNull(segmentNames);
-    Assert.assertEquals(segmentNames.size(), 2);
-    Assert.assertTrue(segmentNames.contains(defaultSegment.getSegmentName()));
-    Assert.assertTrue(segmentNames.contains(secondSegment.getSegmentName()));
+    assertNotNull(segmentNames);
+    assertEquals(segmentNames.size(), 2);
+    assertTrue(segmentNames.contains(defaultSegment.getSegmentName()));
+    assertTrue(segmentNames.contains(secondSegment.getSegmentName()));
 
     // No such table
     Response response = _webTarget.path("/tables/noSuchTable/segments").request().get(Response.class);
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertNotNull(response);
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
@@ -149,8 +155,8 @@ public class TablesResourceTest extends BaseResourceTest {
     JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(tableIndexesPath).request().get(String.class));
     TableIndexMetadataResponse tableIndexMetadataResponse =
         JsonUtils.jsonNodeToObject(jsonResponse, TableIndexMetadataResponse.class);
-    Assert.assertNotNull(tableIndexMetadataResponse);
-    Assert.assertEquals(tableIndexMetadataResponse.getTotalOnlineSegments(), _offlineIndexSegments.size());
+    assertNotNull(tableIndexMetadataResponse);
+    assertEquals(tableIndexMetadataResponse.getTotalOnlineSegments(), _offlineIndexSegments.size());
 
     Map<String, Map<String, Integer>> columnToIndexCountMap = new HashMap<>();
     for (ImmutableSegment segment : _offlineIndexSegments) {
@@ -164,12 +170,12 @@ public class TablesResourceTest extends BaseResourceTest {
       });
     }
 
-    Assert.assertEquals(tableIndexMetadataResponse.getColumnToIndexesCount(), columnToIndexCountMap);
+    assertEquals(tableIndexMetadataResponse.getColumnToIndexesCount(), columnToIndexCountMap);
 
     // No such table
     Response response = _webTarget.path("/tables/noSuchTable/indexes").request().get(Response.class);
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertNotNull(response);
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
@@ -182,11 +188,11 @@ public class TablesResourceTest extends BaseResourceTest {
       JsonNode jsonResponse =
           JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath).request().get(String.class));
       TableMetadataInfo metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
-      Assert.assertNotNull(metadataInfo);
-      Assert.assertEquals(metadataInfo.getTableName(), tableNameWithType);
-      Assert.assertEquals(metadataInfo.getColumnLengthMap().size(), 0);
-      Assert.assertEquals(metadataInfo.getColumnCardinalityMap().size(), 0);
-      Assert.assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 0);
+      assertNotNull(metadataInfo);
+      assertEquals(metadataInfo.getTableName(), tableNameWithType);
+      assertEquals(metadataInfo.getColumnLengthMap().size(), 0);
+      assertEquals(metadataInfo.getColumnCardinalityMap().size(), 0);
+      assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 0);
 
       jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
           .queryParam("columns", "column1")
@@ -194,19 +200,17 @@ public class TablesResourceTest extends BaseResourceTest {
           .request()
           .get(String.class));
       metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
-      Assert.assertEquals(metadataInfo.getColumnLengthMap().size(), 2);
-      Assert.assertEquals(metadataInfo.getColumnCardinalityMap().size(), 2);
-      Assert.assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 2);
-      Assert.assertTrue(
-          metadataInfo.getColumnIndexSizeMap().get("column1").containsKey(StandardIndexes.dictionary().getId()));
-      Assert.assertTrue(
-          metadataInfo.getColumnIndexSizeMap().get("column2").containsKey(StandardIndexes.forward().getId()));
+      assertEquals(metadataInfo.getColumnLengthMap().size(), 2);
+      assertEquals(metadataInfo.getColumnCardinalityMap().size(), 2);
+      assertEquals(metadataInfo.getColumnIndexSizeMap().size(), 2);
+      assertTrue(metadataInfo.getColumnIndexSizeMap().get("column1").containsKey(StandardIndexes.dictionary().getId()));
+      assertTrue(metadataInfo.getColumnIndexSizeMap().get("column2").containsKey(StandardIndexes.forward().getId()));
     }
 
     // No such table
     Response response = _webTarget.path("/tables/noSuchTable/metadata").request().get(Response.class);
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertNotNull(response);
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
@@ -225,7 +229,7 @@ public class TablesResourceTest extends BaseResourceTest {
     try {
       String response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/metadata").request().get(String.class);
       TableMetadataInfo metadataInfo = JsonUtils.stringToObject(response, TableMetadataInfo.class);
-      Assert.assertEquals(metadataInfo.getNumSegments(), 2L);
+      assertEquals(metadataInfo.getNumSegments(), 2L);
     } finally {
       _tableDataManagerMap.put(REALTIME_TABLE_NAME, original);
     }
@@ -241,49 +245,49 @@ public class TablesResourceTest extends BaseResourceTest {
     JsonNode jsonResponse =
         JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
     SegmentMetadata segmentMetadata = defaultSegment.getSegmentMetadata();
-    Assert.assertEquals(jsonResponse.get("segmentName").asText(), segmentMetadata.getName());
-    Assert.assertEquals(jsonResponse.get("crc").asText(), segmentMetadata.getCrc());
-    Assert.assertEquals(jsonResponse.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
-    Assert.assertTrue(jsonResponse.has("startTimeReadable"));
-    Assert.assertTrue(jsonResponse.has("endTimeReadable"));
-    Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
-    Assert.assertEquals(jsonResponse.get("columns").size(), 0);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 0);
+    assertEquals(jsonResponse.get("segmentName").asText(), segmentMetadata.getName());
+    assertEquals(jsonResponse.get("crc").asLong(), segmentMetadata.getCrc());
+    assertEquals(jsonResponse.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
+    assertTrue(jsonResponse.has("startTimeReadable"));
+    assertTrue(jsonResponse.has("endTimeReadable"));
+    assertTrue(jsonResponse.has("creationTimeReadable"));
+    assertEquals(jsonResponse.get("columns").size(), 0);
+    assertEquals(jsonResponse.get("indexes").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath)
         .queryParam("columns", "column1")
         .queryParam("columns", "column2")
         .request()
         .get(String.class));
-    Assert.assertEquals(jsonResponse.get("columns").size(), 2);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 2);
-    Assert.assertNotNull(jsonResponse.get("columns").get(0).get("indexSizeMap"));
-    Assert.assertEquals(jsonResponse.get("columns").get(0).get("indexSizeMap").get("forward_index").asText(), "400008");
-    Assert.assertEquals(jsonResponse.get("columns").get(0).get("indexSizeMap").get("dictionary").asText(), "206384");
-    Assert.assertNotNull(jsonResponse.get("columns").get(1).get("indexSizeMap"));
-    Assert.assertEquals(jsonResponse.get("columns").get(1).get("indexSizeMap").get("forward_index").asText(), "400008");
-    Assert.assertEquals(jsonResponse.get("columns").get(1).get("indexSizeMap").get("dictionary").asText(), "168976");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("h3-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("fst-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("text-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column2").get("h3-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column2").get("fst-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column2").get("text-index").asText(), "NO");
+    assertEquals(jsonResponse.get("columns").size(), 2);
+    assertEquals(jsonResponse.get("indexes").size(), 2);
+    assertNotNull(jsonResponse.get("columns").get(0).get("indexSizeMap"));
+    assertEquals(jsonResponse.get("columns").get(0).get("indexSizeMap").get("forward_index").asText(), "400008");
+    assertEquals(jsonResponse.get("columns").get(0).get("indexSizeMap").get("dictionary").asText(), "206384");
+    assertNotNull(jsonResponse.get("columns").get(1).get("indexSizeMap"));
+    assertEquals(jsonResponse.get("columns").get(1).get("indexSizeMap").get("forward_index").asText(), "400008");
+    assertEquals(jsonResponse.get("columns").get(1).get("indexSizeMap").get("dictionary").asText(), "168976");
+    assertEquals(jsonResponse.get("indexes").get("column1").get("h3-index").asText(), "NO");
+    assertEquals(jsonResponse.get("indexes").get("column1").get("fst-index").asText(), "NO");
+    assertEquals(jsonResponse.get("indexes").get("column1").get("text-index").asText(), "NO");
+    assertEquals(jsonResponse.get("indexes").get("column2").get("h3-index").asText(), "NO");
+    assertEquals(jsonResponse.get("indexes").get("column2").get("fst-index").asText(), "NO");
+    assertEquals(jsonResponse.get("indexes").get("column2").get("text-index").asText(), "NO");
 
     jsonResponse = JsonUtils.stringToJsonNode(
         (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
     int physicalColumnCount = defaultSegment.getPhysicalColumnNames().size();
-    Assert.assertEquals(jsonResponse.get("columns").size(), physicalColumnCount);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), physicalColumnCount);
+    assertEquals(jsonResponse.get("columns").size(), physicalColumnCount);
+    assertEquals(jsonResponse.get("indexes").size(), physicalColumnCount);
 
     Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName())
         .request()
         .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
     response =
         _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/segments/UNKNOWN_SEGMENT").request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
@@ -298,14 +302,14 @@ public class TablesResourceTest extends BaseResourceTest {
             .get(String.class));
     JsonNode jsonNode = jsonResponse.get(segmentName);
     SegmentMetadata segmentMetadata = defaultSegment.getSegmentMetadata();
-    Assert.assertEquals(jsonNode.get("segmentName").asText(), segmentMetadata.getName());
-    Assert.assertEquals(jsonNode.get("crc").asText(), segmentMetadata.getCrc());
-    Assert.assertEquals(jsonNode.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
-    Assert.assertTrue(jsonNode.has("startTimeReadable"));
-    Assert.assertTrue(jsonNode.has("endTimeReadable"));
-    Assert.assertTrue(jsonNode.has("creationTimeReadable"));
-    Assert.assertEquals(jsonNode.get("columns").size(), 0);
-    Assert.assertEquals(jsonNode.get("indexes").size(), 0);
+    assertEquals(jsonNode.get("segmentName").asText(), segmentMetadata.getName());
+    assertEquals(jsonNode.get("crc").asLong(), segmentMetadata.getCrc());
+    assertEquals(jsonNode.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
+    assertTrue(jsonNode.has("startTimeReadable"));
+    assertTrue(jsonNode.has("endTimeReadable"));
+    assertTrue(jsonNode.has("creationTimeReadable"));
+    assertEquals(jsonNode.get("columns").size(), 0);
+    assertEquals(jsonNode.get("indexes").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath)
         .queryParam("columns", "column1")
@@ -314,16 +318,16 @@ public class TablesResourceTest extends BaseResourceTest {
         .request()
         .get(String.class));
     jsonNode = jsonResponse.get(segmentName);
-    Assert.assertEquals(jsonNode.get("columns").size(), 2);
-    Assert.assertEquals(jsonNode.get("indexes").size(), 2);
-    Assert.assertNotNull(jsonNode.get("columns").get(0).get("indexSizeMap"));
-    Assert.assertNotNull(jsonNode.get("columns").get(1).get("indexSizeMap"));
-    Assert.assertEquals(jsonNode.get("indexes").get("column1").get("h3-index").asText(), "NO");
-    Assert.assertEquals(jsonNode.get("indexes").get("column1").get("fst-index").asText(), "NO");
-    Assert.assertEquals(jsonNode.get("indexes").get("column1").get("text-index").asText(), "NO");
-    Assert.assertEquals(jsonNode.get("indexes").get("column2").get("h3-index").asText(), "NO");
-    Assert.assertEquals(jsonNode.get("indexes").get("column2").get("fst-index").asText(), "NO");
-    Assert.assertEquals(jsonNode.get("indexes").get("column2").get("text-index").asText(), "NO");
+    assertEquals(jsonNode.get("columns").size(), 2);
+    assertEquals(jsonNode.get("indexes").size(), 2);
+    assertNotNull(jsonNode.get("columns").get(0).get("indexSizeMap"));
+    assertNotNull(jsonNode.get("columns").get(1).get("indexSizeMap"));
+    assertEquals(jsonNode.get("indexes").get("column1").get("h3-index").asText(), "NO");
+    assertEquals(jsonNode.get("indexes").get("column1").get("fst-index").asText(), "NO");
+    assertEquals(jsonNode.get("indexes").get("column1").get("text-index").asText(), "NO");
+    assertEquals(jsonNode.get("indexes").get("column2").get("h3-index").asText(), "NO");
+    assertEquals(jsonNode.get("indexes").get("column2").get("fst-index").asText(), "NO");
+    assertEquals(jsonNode.get("indexes").get("column2").get("text-index").asText(), "NO");
 
     jsonResponse = JsonUtils.stringToJsonNode((_webTarget.path(segmentMetadataPath)
         .queryParam("columns", "*")
@@ -332,8 +336,8 @@ public class TablesResourceTest extends BaseResourceTest {
         .get(String.class)));
     int physicalColumnCount = defaultSegment.getPhysicalColumnNames().size();
     jsonNode = jsonResponse.get(segmentName);
-    Assert.assertEquals(jsonNode.get("columns").size(), physicalColumnCount);
-    Assert.assertEquals(jsonNode.get("indexes").size(), physicalColumnCount);
+    assertEquals(jsonNode.get("columns").size(), physicalColumnCount);
+    assertEquals(jsonNode.get("indexes").size(), physicalColumnCount);
   }
 
   @Test
@@ -351,8 +355,8 @@ public class TablesResourceTest extends BaseResourceTest {
     // Check that crc info is correct
     for (ImmutableSegment immutableSegment : immutableSegments) {
       String segmentName = immutableSegment.getSegmentName();
-      String crc = immutableSegment.getSegmentMetadata().getCrc();
-      Assert.assertEquals(segmentsCrc.get(segmentName).asText(), crc);
+      long crc = immutableSegment.getSegmentMetadata().getCrc();
+      assertEquals(segmentsCrc.get(segmentName).asLong(), crc);
     }
   }
 
@@ -366,54 +370,30 @@ public class TablesResourceTest extends BaseResourceTest {
 
     // Verify non-existent table and segment download return NOT_FOUND status.
     Response response = _webTarget.path("/tables/UNKNOWN_REALTIME/segments/segmentname").request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
     response =
         _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/segments/UNKNOWN_SEGMENT").request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
   public void testDownloadValidDocIdsSnapshot()
       throws Exception {
     // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) _realtimeIndexSegments.get(0));
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME,
         (ImmutableSegmentImpl) _realtimeIndexSegments.get(0));
 
     // Verify non-existent table and segment download return NOT_FOUND status.
     Response response =
-        _webTarget.path("/tables/UNKNOWN_REALTIME/segments/segmentname/validDocIds").request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+        _webTarget.path("/segments/UNKNOWN_REALTIME/segmentname/validDocIdsBitmap").request().get(Response.class);
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
     response =
-        _webTarget.path(String.format("/tables/%s/segments/%s/validDocIds", REALTIME_TABLE_NAME, "UNKNOWN_SEGMENT"))
+        _webTarget.path(String.format("/segments/%s/%s/validDocIdsBitmap", REALTIME_TABLE_NAME, "UNKNOWN_SEGMENT"))
             .request()
             .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
-  }
-
-  @Deprecated
-  @Test
-  public void testValidDocIdMetadata()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
-
-    String validDocIdMetadataPath = "/tables/" + REALTIME_TABLE_NAME + "/validDocIdMetadata";
-    String metadataResponse = _webTarget.path(validDocIdMetadataPath)
-        .queryParam("segmentNames", segment.getSegmentName())
-        .request()
-        .get(String.class);
-    JsonNode validDocIdMetadata = JsonUtils.stringToJsonNode(metadataResponse).get(0);
-
-    Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
@@ -421,7 +401,6 @@ public class TablesResourceTest extends BaseResourceTest {
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
     // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
 
     List<String> segments = List.of(segment.getSegmentName());
@@ -433,21 +412,35 @@ public class TablesResourceTest extends BaseResourceTest {
         .post(Entity.json(tableSegments), String.class);
     JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
 
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(),
+    assertFalse(validDocIdsMetadata.has("diagnostics"));
+    assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
+    assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
+    assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
+    assertEquals(validDocIdsMetadata.get("segmentCrc").asLong(), segment.getSegmentMetadata().getCrc());
+    assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
+    assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(),
         ((ImmutableSegmentImpl) segment).getSegmentSizeBytes());
-    Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
-    Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
+    assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
+    assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
+    JsonNode snapshotPass = validDocIdsMetadata.get("snapshotPass");
+    assertEquals(snapshotPass.get("segmentsCrc").asLong(), 1234L);
+    assertEquals(snapshotPass.get("numSegments").asInt(), 2);
+    assertTrue(snapshotPass.get("consistent").asBoolean());
+    assertEquals(snapshotPass.get("finishedAtMs").asLong(), 5678L);
 
     // Verify server status information
-    Assert.assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
+    assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
     String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
-    Assert.assertNotNull(serverStatus, "Server status should not be null");
-    Assert.assertEquals(serverStatus, "NOT_STARTED", serverStatus);
+    assertNotNull(serverStatus, "Server status should not be null");
+    assertEquals(serverStatus, "NOT_STARTED", serverStatus);
+
+    // In-memory bitmaps keep changing, so they carry no snapshot pass
+    String inMemoryResponse = _webTarget.path(validDocIdsMetadataPath)
+        .queryParam("segmentNames", segment.getSegmentName())
+        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY.toString())
+        .request()
+        .post(Entity.json(tableSegments), String.class);
+    assertFalse(JsonUtils.stringToJsonNode(inMemoryResponse).get(0).has("snapshotPass"));
   }
 
   @Test
@@ -455,7 +448,6 @@ public class TablesResourceTest extends BaseResourceTest {
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
     // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
 
     List<String> segments = List.of(segment.getSegmentName());
@@ -470,21 +462,72 @@ public class TablesResourceTest extends BaseResourceTest {
         .post(Entity.json(tableSegments), String.class);
     JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
 
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT_WITH_DELETE");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(),
+    assertFalse(validDocIdsMetadata.has("diagnostics"));
+    assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
+    assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
+    assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
+    assertEquals(validDocIdsMetadata.get("segmentCrc").asLong(), segment.getSegmentMetadata().getCrc());
+    assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT_WITH_DELETE");
+    assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(),
         ((ImmutableSegmentImpl) segment).getSegmentSizeBytes());
-    Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
-    Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
+    assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
+    assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
 
     // Verify server status information
-    Assert.assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
+    assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
     String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
-    Assert.assertNotNull(serverStatus, "Server status should not be null");
-    Assert.assertEquals(serverStatus, "NOT_STARTED", serverStatus);
+    assertNotNull(serverStatus, "Server status should not be null");
+    assertEquals(serverStatus, "NOT_STARTED", serverStatus);
+  }
+
+  @DataProvider
+  public Object[][] diagnosticBitmapTypes() {
+    return new Object[][] {{null}, {"SNAPSHOT"}, {"SNAPSHOT_WITH_DELETE"}, {"IN_MEMORY"}, {"IN_MEMORY_WITH_DELETE"}};
+  }
+
+  @Test(dataProvider = "diagnosticBitmapTypes")
+  public void testValidDocIdsMetadataDiagnostics(String bitmapType)
+      throws IOException {
+    ImmutableSegmentImpl segment = (ImmutableSegmentImpl) _realtimeIndexSegments.get(0);
+    downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, segment);
+    // Upgrade both legacy fixtures to real persisted captures, without changing the live bitmaps.
+    DocIdsSnapshot.Trigger trigger = new DocIdsSnapshot.Trigger("testTable__0__2__0", "123");
+    Map<String, DocIdsSnapshot.DocIdsType> fileTypes =
+        Map.of(V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, DocIdsSnapshot.DocIdsType.VALID_DOC_IDS,
+            V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME, DocIdsSnapshot.DocIdsType.QUERYABLE_DOC_IDS);
+    for (Map.Entry<String, DocIdsSnapshot.DocIdsType> fileType : fileTypes.entrySet()) {
+      ThreadSafeMutableRoaringBitmap bitmap =
+          new ThreadSafeMutableRoaringBitmap(segment.loadDocIdsFromSnapshot(fileType.getKey()));
+      ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIds = bitmap.getBytesAndCardinality();
+      segment.persistDocIdsSnapshot(fileType.getKey(), docIds,
+          DocIdsSnapshot.metadata(docIds, fileType.getValue(), trigger));
+    }
+    long beforeRequest = System.currentTimeMillis();
+    String response = _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/validDocIdsMetadata")
+        .queryParam("validDocIdsType", bitmapType)
+        .request().post(Entity.json(new TableSegments(List.of(segment.getSegmentName()))), String.class);
+    long afterRequest = System.currentTimeMillis();
+    JsonNode metadata = JsonUtils.stringToJsonNode(response).get(0);
+    assertEquals(metadata.get("totalValidDocs").asInt(), 8);
+    String expectedType = bitmapType != null ? bitmapType : "SNAPSHOT";
+    assertEquals(metadata.get("validDocIdsType").asText(), expectedType);
+    if (expectedType.startsWith("IN_MEMORY")) {
+      assertFalse(metadata.has("diagnostics"));
+      return;
+    }
+    JsonNode diagnostics = metadata.get("diagnostics");
+    String file = expectedType.equals("SNAPSHOT") ? V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME
+        : V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME;
+    long capturedAt = segment.loadDocIdsSnapshot(file).metadata().snapshotCapturedAtMs();
+    assertEquals(diagnostics.get("snapshotCapturedAtMs").asLong(), capturedAt);
+    assertTrue(diagnostics.get("snapshotAgeMs").asLong() >= beforeRequest - capturedAt);
+    assertTrue(diagnostics.get("snapshotAgeMs").asLong() <= afterRequest - capturedAt);
+    assertEquals(diagnostics.get("snapshotConsumingSegmentName").asText(), trigger.consumingSegmentName());
+    assertEquals(diagnostics.get("snapshotConsumedUpToOffset").asText(), trigger.consumedUpToOffset());
+    assertEquals(diagnostics.get("docIdsType").asText(),
+        expectedType.equals("SNAPSHOT") ? "VALID_DOC_IDS" : "QUERYABLE_DOC_IDS");
+    assertEquals(diagnostics.get("docIdsCrc").asLong(),
+        expectedType.equals("SNAPSHOT") ? 4200314552L : 569535174L);
   }
 
   // Verify metadata file from segments.
@@ -492,12 +535,26 @@ public class TablesResourceTest extends BaseResourceTest {
       throws IOException, ConfigurationException {
     String segmentPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName();
 
+    File segmentDir = new File(_tableDataManagerMap.get(tableNameWithType).getTableDataDir(), segment.getSegmentName());
+    // The fixture loads without an instance config; create the local serving sidecar to test its tar exclusion.
+    try (SegmentMetadataImpl mappedMetadata = SegmentMetadataImpl.loadMapped(segmentDir)) {
+      assertTrue(mappedMetadata.isMapped());
+    }
+    assertTrue(new File(segmentDir, "segment_metadata.bin").isFile());
+    File temporarySidecar = new File(segmentDir, ".segment_metadata.test.tmp");
+    Files.writeString(temporarySidecar.toPath(), "in progress");
+
     // Download the segment and save to a temp local file.
-    Response response = _webTarget.path(segmentPath).request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    Response response;
+    try {
+      response = _webTarget.path(segmentPath).request().get(Response.class);
+    } finally {
+      Files.deleteIfExists(temporarySidecar.toPath());
+    }
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     File segmentFile = response.readEntity(File.class);
 
-    File tempMetadataDir = new File(FileUtils.getTempDirectory(), "segment_metadata");
+    File tempMetadataDir = new File(_tempDir, "segment_metadata");
     FileUtils.forceMkdir(tempMetadataDir);
 
     // Extract metadata.properties
@@ -508,83 +565,16 @@ public class TablesResourceTest extends BaseResourceTest {
     TarCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
         new File(tempMetadataDir, V1Constants.SEGMENT_CREATION_META));
 
+    assertThrows(IOException.class, () -> TarCompressionUtils.untarOneFile(segmentFile, "segment_metadata.bin",
+        new File(tempMetadataDir, "sidecar")));
+    assertThrows(IOException.class, () -> TarCompressionUtils.untarOneFile(segmentFile, temporarySidecar.getName(),
+        new File(tempMetadataDir, "temporary-sidecar")));
+
     // Load segment metadata
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(tempMetadataDir);
-    Assert.assertEquals(metadata.getTableName(), TableNameBuilder.extractRawTableName(tableNameWithType));
+    assertEquals(metadata.getTableName(), TableNameBuilder.extractRawTableName(tableNameWithType));
 
     FileUtils.forceDelete(tempMetadataDir);
-  }
-
-  // Verify metadata file from segments.
-  private void downLoadAndVerifyValidDocIdsSnapshot(String tableNameWithType, ImmutableSegmentImpl segment)
-      throws IOException {
-    String snapshotPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName() + "/validDocIds";
-
-    PartitionUpsertMetadataManager upsertMetadataManager = mock(PartitionUpsertMetadataManager.class);
-    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
-    ThreadSafeMutableRoaringBitmap queryableDocIds = new ThreadSafeMutableRoaringBitmap();
-    ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap();
-
-    int[] docIds = new int[]{1, 4, 6, 10, 15, 17, 18, 20};
-    for (int docId : docIds) {
-      validDocIds.add(docId);
-      queryableDocIds.add(docId + 1);
-      validDocIdsSnapshot.add(docId + 2);
-    }
-    segment.enableUpsert(upsertMetadataManager, validDocIds, queryableDocIds);
-    File validDocIdsSnapshotFile =
-        new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-    FileUtils.writeByteArrayToFile(validDocIdsSnapshotFile,
-        RoaringBitmapUtils.serialize(validDocIdsSnapshot.getMutableRoaringBitmap()));
-
-    // Create the queryableDocIds snapshot file needed for SNAPSHOT_WITH_DELETE
-    File queryableDocIdsSnapshotFile =
-        new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
-    FileUtils.writeByteArrayToFile(queryableDocIdsSnapshotFile,
-        RoaringBitmapUtils.serialize(queryableDocIds.getMutableRoaringBitmap()));
-
-    // Check no type (default should be validDocIdsSnapshot)
-    Response response = _webTarget.path(snapshotPath).request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    byte[] validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIdsSnapshot.getMutableRoaringBitmap());
-
-    // Check snapshot type
-    response = _webTarget.path(snapshotPath)
-        .queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT.toString())
-        .request()
-        .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIdsSnapshot.getMutableRoaringBitmap());
-
-    // Check onHeap type
-    response = _webTarget.path(snapshotPath)
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY)
-        .request()
-        .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIds.getMutableRoaringBitmap());
-
-    // Check onHeapWithDelete type
-    response = _webTarget.path(snapshotPath)
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())
-        .request()
-        .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        queryableDocIds.getMutableRoaringBitmap());
   }
 
   private void downLoadAndVerifyValidDocIdsSnapshotBitmap(String tableNameWithType, ImmutableSegmentImpl segment)
@@ -592,64 +582,65 @@ public class TablesResourceTest extends BaseResourceTest {
     String snapshotPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName() + "/validDocIdsBitmap";
 
     PartitionUpsertMetadataManager upsertMetadataManager = mock(PartitionUpsertMetadataManager.class);
+    when(upsertMetadataManager.getLastSnapshotPass()).thenReturn(new SnapshotPass(1234L, 2, true, 5678L));
     ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
     ThreadSafeMutableRoaringBitmap queryableDocIds = new ThreadSafeMutableRoaringBitmap();
-    ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap();
+    ThreadSafeMutableRoaringBitmap validDocIdsOnDiskBitmap = new ThreadSafeMutableRoaringBitmap();
 
     int[] docIds = new int[]{1, 4, 6, 10, 15, 17, 18, 20};
     for (int docId : docIds) {
       validDocIds.add(docId);
       queryableDocIds.add(docId + 1);
-      validDocIdsSnapshot.add(docId + 2);
+      validDocIdsOnDiskBitmap.add(docId + 2);
     }
     segment.enableUpsert(upsertMetadataManager, validDocIds, queryableDocIds);
-    File validDocIdsSnapshotFile =
+    File validDocIdsOnDiskBitmapFile =
         new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-    FileUtils.writeByteArrayToFile(validDocIdsSnapshotFile,
-        RoaringBitmapUtils.serialize(validDocIdsSnapshot.getMutableRoaringBitmap()));
+            V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+    FileUtils.writeByteArrayToFile(validDocIdsOnDiskBitmapFile,
+        RoaringBitmapUtils.serialize(validDocIdsOnDiskBitmap.getMutableRoaringBitmap()));
 
     // Create the queryableDocIds snapshot file needed for SNAPSHOT_WITH_DELETE
-    File queryableDocIdsSnapshotFile =
+    File queryableDocIdsOnDiskBitmapFile =
         new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
-            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
-    FileUtils.writeByteArrayToFile(queryableDocIdsSnapshotFile,
+            V1Constants.QUERYABLE_DOC_IDS_ON_DISK_BITMAP_FILE_NAME);
+    FileUtils.writeByteArrayToFile(queryableDocIdsOnDiskBitmapFile,
         RoaringBitmapUtils.serialize(queryableDocIds.getMutableRoaringBitmap()));
 
     // Check no type (default should be validDocIdsSnapshot)
     ValidDocIdsBitmapResponse response = _webTarget.path(snapshotPath).request().get(ValidDocIdsBitmapResponse.class);
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getSegmentCrc(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
+    assertNotNull(response);
+    assertEquals(response.getSegmentCrc(), Long.toString(segment.getSegmentMetadata().getCrc()));
+    assertEquals(response.getSegmentName(), segment.getSegmentName());
     byte[] validDocIdsSnapshotBitmap = response.getBitmap();
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIdsSnapshot.getMutableRoaringBitmap());
+    assertNotNull(validDocIdsSnapshotBitmap);
+    assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
+        validDocIdsOnDiskBitmap.getMutableRoaringBitmap());
 
     // Check snapshot type
     response = _webTarget.path(snapshotPath)
         .queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT.toString())
         .request()
         .get(ValidDocIdsBitmapResponse.class);
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getSegmentCrc(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
+    assertNotNull(response);
+    assertEquals(response.getSegmentCrc(), Long.toString(segment.getSegmentMetadata().getCrc()));
+    assertEquals(response.getSegmentName(), segment.getSegmentName());
     validDocIdsSnapshotBitmap = response.getBitmap();
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
-        validDocIdsSnapshot.getMutableRoaringBitmap());
+    assertNotNull(validDocIdsSnapshotBitmap);
+    assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
+        validDocIdsOnDiskBitmap.getMutableRoaringBitmap());
 
     // Check onHeap type
     response = _webTarget.path(snapshotPath)
         .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY.toString())
         .request()
         .get(ValidDocIdsBitmapResponse.class);
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getSegmentCrc(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
+    assertNotNull(response);
+    assertEquals(response.getSegmentCrc(), Long.toString(segment.getSegmentMetadata().getCrc()));
+    assertEquals(response.getSegmentName(), segment.getSegmentName());
     validDocIdsSnapshotBitmap = response.getBitmap();
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
+    assertNotNull(validDocIdsSnapshotBitmap);
+    assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
         validDocIds.getMutableRoaringBitmap());
 
     // Check onHeapWithDelete type
@@ -657,38 +648,13 @@ public class TablesResourceTest extends BaseResourceTest {
         .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())
         .request()
         .get(ValidDocIdsBitmapResponse.class);
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getSegmentCrc(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
+    assertNotNull(response);
+    assertEquals(response.getSegmentCrc(), Long.toString(segment.getSegmentMetadata().getCrc()));
+    assertEquals(response.getSegmentName(), segment.getSegmentName());
     validDocIdsSnapshotBitmap = response.getBitmap();
-    Assert.assertNotNull(validDocIdsSnapshotBitmap);
-    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
+    assertNotNull(validDocIdsSnapshotBitmap);
+    assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
         queryableDocIds.getMutableRoaringBitmap());
-  }
-
-  @Test
-  public void testValidDocIdsMetadataGetForSnapshotWithDelete()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
-
-    String validDocIdsMetadataPath = "/tables/" + REALTIME_TABLE_NAME + "/validDocIdMetadata";
-
-    // Test GET endpoint with SNAPSHOT_WITH_DELETE validDocIdsType
-    String response = _webTarget.path(validDocIdsMetadataPath)
-        .queryParam("segmentNames", segment.getSegmentName())
-        .queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT_WITH_DELETE.toString())
-        .request()
-        .get(String.class);
-    JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
-
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), segment.getSegmentMetadata().getCrc());
-    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT_WITH_DELETE");
   }
 
   @Test
@@ -696,7 +662,6 @@ public class TablesResourceTest extends BaseResourceTest {
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
     // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
     downLoadAndVerifyValidDocIdsSnapshotBitmap(REALTIME_TABLE_NAME, (ImmutableSegmentImpl) segment);
 
     String validDocIdsBitmapPath =
@@ -708,11 +673,11 @@ public class TablesResourceTest extends BaseResourceTest {
         .request()
         .get(ValidDocIdsBitmapResponse.class);
 
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getSegmentCrc(), _realtimeIndexSegments.get(0).getSegmentMetadata().getCrc());
-    Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
-    Assert.assertEquals(response.getValidDocIdsType(), ValidDocIdsType.SNAPSHOT_WITH_DELETE);
-    Assert.assertNotNull(response.getBitmap());
+    assertNotNull(response);
+    assertEquals(response.getSegmentCrc(), Long.toString(_realtimeIndexSegments.get(0).getSegmentMetadata().getCrc()));
+    assertEquals(response.getSegmentName(), segment.getSegmentName());
+    assertEquals(response.getValidDocIdsType(), ValidDocIdsType.SNAPSHOT_WITH_DELETE);
+    assertNotNull(response.getBitmap());
   }
 
   @Test
@@ -726,15 +691,15 @@ public class TablesResourceTest extends BaseResourceTest {
             String.format("/segments/%s/%s/upload", REALTIME_TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS))
         .request()
         .post(null);
-    Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-    Assert.assertEquals(response.readEntity(String.class), SEGMENT_DOWNLOAD_URL);
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    assertEquals(response.readEntity(String.class), SEGMENT_DOWNLOAD_URL);
 
     // Verify bad request: table type is offline
     response = _webTarget.path(
             String.format("/segments/%s/%s/upload", OFFLINE_TABLE_NAME, _offlineIndexSegments.get(0).getSegmentName()))
         .request()
         .post(null);
-    Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
 
     // Verify bad request: segment is not low level consumer segment
     response = _webTarget.path(
@@ -742,21 +707,21 @@ public class TablesResourceTest extends BaseResourceTest {
                 _realtimeIndexSegments.get(0).getSegmentName()))
         .request()
         .post(null);
-    Assert.assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
 
     // Verify non-existent segment uploading fail with NOT_FOUND status.
     response = _webTarget.path(
             String.format("/segments/%s/%s_dummy/upload", RAW_TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS))
         .request()
         .post(null);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
     // Verify fail to upload segment to segment store with internal server error.
     response =
         _webTarget.path(String.format("/segments/%s/%s/upload", RAW_TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE))
             .request()
             .post(null);
-    Assert.assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
   }
 
   @Test
@@ -770,38 +735,38 @@ public class TablesResourceTest extends BaseResourceTest {
         JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
 
     SegmentMetadata segmentMetadata = defaultSegment.getSegmentMetadata();
-    Assert.assertEquals(jsonResponse.get("segmentName").asText(), segmentMetadata.getName());
-    Assert.assertEquals(jsonResponse.get("crc").asText(), segmentMetadata.getCrc());
-    Assert.assertEquals(jsonResponse.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
-    Assert.assertTrue(jsonResponse.has("startTimeReadable"));
-    Assert.assertTrue(jsonResponse.has("endTimeReadable"));
-    Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
-    Assert.assertEquals(jsonResponse.get("columns").size(), 0);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 0);
+    assertEquals(jsonResponse.get("segmentName").asText(), segmentMetadata.getName());
+    assertEquals(jsonResponse.get("crc").asLong(), segmentMetadata.getCrc());
+    assertEquals(jsonResponse.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
+    assertTrue(jsonResponse.has("startTimeReadable"));
+    assertTrue(jsonResponse.has("endTimeReadable"));
+    assertTrue(jsonResponse.has("creationTimeReadable"));
+    assertEquals(jsonResponse.get("columns").size(), 0);
+    assertEquals(jsonResponse.get("indexes").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath)
         .queryParam("columns", "column1")
         .queryParam("columns", "column2")
         .request()
         .get(String.class));
-    Assert.assertEquals(jsonResponse.get("columns").size(), 2);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 2);
-    Assert.assertEquals(jsonResponse.get("star-tree-index").size(), 0);
+    assertEquals(jsonResponse.get("columns").size(), 2);
+    assertEquals(jsonResponse.get("indexes").size(), 2);
+    assertEquals(jsonResponse.get("star-tree-index").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(
         (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
     int physicalColumnCount = defaultSegment.getPhysicalColumnNames().size();
-    Assert.assertEquals(jsonResponse.get("columns").size(), physicalColumnCount);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), physicalColumnCount);
+    assertEquals(jsonResponse.get("columns").size(), physicalColumnCount);
+    assertEquals(jsonResponse.get("indexes").size(), physicalColumnCount);
 
     Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName())
         .request()
         .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
     response =
         _webTarget.path("/tables/" + REALTIME_TABLE_NAME + "/segments/UNKNOWN_SEGMENT").request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
@@ -812,27 +777,29 @@ public class TablesResourceTest extends BaseResourceTest {
     addTable(tableName);
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableName);
     ImmutableSegment trackedSegment = setUpSegment(tableName, null, "tracked", segments, true);
-    Assert.assertTrue(trackedSegment.getSegmentMetadata().getColumnMetadataMap().values().stream()
+    assertTrue(trackedSegment.getSegmentMetadata()
+        .getColumnMetadataMap()
+        .values()
+        .stream()
         .anyMatch(column -> column.getRawForwardIndexUncompressedValueSizeInBytes() >= 0
             || column.getDictionaryEncodedUncompressedValueSizeInBytes() >= 0));
 
     try {
       TableSegments request = new TableSegments(List.of(trackedSegment.getSegmentName()));
-      JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget
-          .path("/tables/" + tableName + "/compression-stats")
+      JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path("/tables/" + tableName + "/compression-stats")
           .queryParam("includeColumnCompressionStats", "true")
           .request()
           .post(Entity.json(request), String.class));
       ServerCompressionStatsResponse response =
           JsonUtils.jsonNodeToObject(jsonResponse, ServerCompressionStatsResponse.class);
 
-      Assert.assertNotNull(response);
-      Assert.assertEquals(response.getSegmentCompressionStats().size(), 1);
+      assertNotNull(response);
+      assertEquals(response.getSegmentCompressionStats().size(), 1);
       SegmentCompressionStatsContribution contribution = response.getSegmentCompressionStats().get(0);
-      Assert.assertFalse(contribution.isComplete());
-      Assert.assertEquals(contribution.getUncompressedValueSizeInBytes(), -1);
-      Assert.assertEquals(contribution.getForwardIndexAndDictionaryStorageSizeInBytes(), -1);
-      Assert.assertNull(contribution.getColumnCompressionStats());
+      assertFalse(contribution.isComplete());
+      assertEquals(contribution.getUncompressedValueSizeInBytes(), -1);
+      assertEquals(contribution.getForwardIndexAndDictionaryStorageSizeInBytes(), -1);
+      assertNull(contribution.getColumnCompressionStats());
     } finally {
       tableDataManager.offloadSegment(trackedSegment.getSegmentName());
       tableDataManager.shutDown();
@@ -843,15 +810,15 @@ public class TablesResourceTest extends BaseResourceTest {
   @Test
   public void testGetCompressionStatsWithMissingSegmentList()
       throws Exception {
-    JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget
-        .path("/tables/" + OFFLINE_TABLE_NAME + "/compression-stats")
-        .request()
-        .post(Entity.json("{}"), String.class));
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(
+        _webTarget.path("/tables/" + OFFLINE_TABLE_NAME + "/compression-stats")
+            .request()
+            .post(Entity.json("{}"), String.class));
     ServerCompressionStatsResponse response =
         JsonUtils.jsonNodeToObject(jsonResponse, ServerCompressionStatsResponse.class);
 
-    Assert.assertNotNull(response);
-    Assert.assertTrue(response.getSegmentCompressionStats().isEmpty());
+    assertNotNull(response);
+    assertTrue(response.getSegmentCompressionStats().isEmpty());
   }
 
   @Test
@@ -874,7 +841,7 @@ public class TablesResourceTest extends BaseResourceTest {
         .build();
 
     // Segment 1: dictionary-encoded with tracked uncompressed value bytes.
-    File tableDataDir = new File(TEMP_DIR, mixedTableName);
+    File tableDataDir = new File(_tempDir, mixedTableName);
     TableConfig dictTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(mixedTableName).build();
     dictTableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
     SegmentGeneratorConfig dictConfig = new SegmentGeneratorConfig(dictTableConfig, schema);
@@ -883,19 +850,15 @@ public class TablesResourceTest extends BaseResourceTest {
     SegmentIndexCreationDriverImpl dictDriver = new SegmentIndexCreationDriverImpl();
     dictDriver.init(dictConfig, new GenericRowRecordReader(rows));
     dictDriver.build();
-    ImmutableSegment dictSegment = ImmutableSegmentLoader.load(
-        new File(tableDataDir, dictDriver.getSegmentName()),
-        ReadMode.mmap);
+    ImmutableSegment dictSegment =
+        ImmutableSegmentLoader.load(new File(tableDataDir, dictDriver.getSegmentName()), ReadMode.mmap);
     mixedSegments.add(dictSegment);
 
     // Segment 2: raw-encoded for column1 and column2
     TableConfig rawTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(mixedTableName)
         .setNoDictionaryColumns(List.of("column1", "column2"))
-        .setFieldConfigList(List.of(
-            new FieldConfig("column1", FieldConfig.EncodingType.RAW, List.of(),
-                FieldConfig.CompressionCodec.LZ4, null),
-            new FieldConfig("column2", FieldConfig.EncodingType.RAW, List.of(),
-                FieldConfig.CompressionCodec.LZ4, null)))
+        .setFieldConfigList(List.of(new FieldConfig("column1", EncodingType.RAW, List.of(), CompressionCodec.LZ4, null),
+            new FieldConfig("column2", EncodingType.RAW, List.of(), CompressionCodec.LZ4, null)))
         .build();
     rawTableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
     SegmentGeneratorConfig rawConfig = new SegmentGeneratorConfig(rawTableConfig, schema);
@@ -904,17 +867,16 @@ public class TablesResourceTest extends BaseResourceTest {
     SegmentIndexCreationDriverImpl rawDriver = new SegmentIndexCreationDriverImpl();
     rawDriver.init(rawConfig, new GenericRowRecordReader(rows));
     rawDriver.build();
-    ImmutableSegment rawSegment = ImmutableSegmentLoader.load(
-        new File(tableDataDir, rawDriver.getSegmentName()),
-        ReadMode.mmap);
+    ImmutableSegment rawSegment =
+        ImmutableSegmentLoader.load(new File(tableDataDir, rawDriver.getSegmentName()), ReadMode.mmap);
     for (String column : List.of("column1", "column2")) {
-      Assert.assertFalse(rawSegment.getSegmentMetadata().getColumnMetadataFor(column).hasDictionary());
-      Assert.assertEquals(
+      assertFalse(rawSegment.getSegmentMetadata().getColumnMetadataFor(column).hasDictionary());
+      assertEquals(
           rawSegment.getSegmentMetadata().getColumnMetadataFor(column).getRawForwardIndexChunkCompressionType(),
           ChunkCompressionType.LZ4);
-      Assert.assertTrue(
-          rawSegment.getSegmentMetadata().getColumnMetadataFor(column)
-              .getRawForwardIndexUncompressedValueSizeInBytes() > 0);
+      assertTrue(
+          rawSegment.getSegmentMetadata().getColumnMetadataFor(column).getRawForwardIndexUncompressedValueSizeInBytes()
+              > 0);
     }
     mixedSegments.add(rawSegment);
 
@@ -930,48 +892,48 @@ public class TablesResourceTest extends BaseResourceTest {
     }
 
     try {
-      JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget
-          .path("/tables/" + mixedTableName + "/compression-stats")
-          .queryParam("columns", "column1")
-          .queryParam("columns", "column2")
-          .queryParam("includeColumnCompressionStats", "true")
-          .request()
-          .post(Entity.json(new TableSegments(List.of(dictSegment.getSegmentName(), rawSegment.getSegmentName()))),
-              String.class));
+      JsonNode jsonResponse = JsonUtils.stringToJsonNode(
+          _webTarget.path("/tables/" + mixedTableName + "/compression-stats")
+              .queryParam("columns", "column1")
+              .queryParam("columns", "column2")
+              .queryParam("includeColumnCompressionStats", "true")
+              .request()
+              .post(Entity.json(new TableSegments(List.of(dictSegment.getSegmentName(), rawSegment.getSegmentName()))),
+                  String.class));
       ServerCompressionStatsResponse compressionResponse =
           JsonUtils.jsonNodeToObject(jsonResponse, ServerCompressionStatsResponse.class);
 
-      Assert.assertNotNull(compressionResponse);
+      assertNotNull(compressionResponse);
       for (String column : List.of("column1", "column2")) {
         boolean sawDictionary = false;
         boolean sawRaw = false;
         for (SegmentCompressionStatsContribution segmentStats : compressionResponse.getSegmentCompressionStats()) {
           Map<String, ColumnCompressionStatsContribution> columnStats = segmentStats.getColumnCompressionStats();
-          Assert.assertNotNull(columnStats);
-          for (ColumnCompressionStatsContribution.EncodingContribution encoding
-              : columnStats.get(column).getEncodingBreakdown()) {
-            sawDictionary |= encoding.getEncoding() == FieldConfig.EncodingType.DICTIONARY
-                && encoding.getChunkCompressionType() == null;
-            sawRaw |= encoding.getEncoding() == FieldConfig.EncodingType.RAW
+          assertNotNull(columnStats);
+          for (ColumnCompressionStatsContribution.EncodingContribution encoding : columnStats.get(column)
+              .getEncodingBreakdown()) {
+            sawDictionary |=
+                encoding.getEncoding() == EncodingType.DICTIONARY && encoding.getChunkCompressionType() == null;
+            sawRaw |= encoding.getEncoding() == EncodingType.RAW
                 && encoding.getChunkCompressionType() == ChunkCompressionType.LZ4;
           }
         }
-        Assert.assertTrue(sawDictionary);
-        Assert.assertTrue(sawRaw);
+        assertTrue(sawDictionary);
+        assertTrue(sawRaw);
       }
 
-      JsonNode filteredResponse = JsonUtils.stringToJsonNode(_webTarget
-          .path("/tables/" + mixedTableName + "/compression-stats")
-          .queryParam("columns", "column1")
-          .queryParam("includeColumnCompressionStats", "true")
-          .request()
-          .post(Entity.json(new TableSegments(List.of(dictSegment.getSegmentName(), rawSegment.getSegmentName()))),
-              String.class));
+      JsonNode filteredResponse = JsonUtils.stringToJsonNode(
+          _webTarget.path("/tables/" + mixedTableName + "/compression-stats")
+              .queryParam("columns", "column1")
+              .queryParam("includeColumnCompressionStats", "true")
+              .request()
+              .post(Entity.json(new TableSegments(List.of(dictSegment.getSegmentName(), rawSegment.getSegmentName()))),
+                  String.class));
       ServerCompressionStatsResponse filteredInfo =
           JsonUtils.jsonNodeToObject(filteredResponse, ServerCompressionStatsResponse.class);
       for (SegmentCompressionStatsContribution segmentStats : filteredInfo.getSegmentCompressionStats()) {
-        Assert.assertNotNull(segmentStats.getColumnCompressionStats());
-        Assert.assertEquals(segmentStats.getColumnCompressionStats().keySet(), Set.of("column1"));
+        assertNotNull(segmentStats.getColumnCompressionStats());
+        assertEquals(segmentStats.getColumnCompressionStats().keySet(), Set.of("column1"));
       }
     } finally {
       for (ImmutableSegment seg : mixedSegments) {
@@ -980,6 +942,74 @@ public class TablesResourceTest extends BaseResourceTest {
       }
       _tableDataManagerMap.remove(mixedTableName);
     }
+  }
+
+  /// `GET /tables/{table}/metadata?columns=*` intersects the column sets of all segments. The first segment's
+  /// `getAllColumns()` is a view of that segment's own metadata, so intersecting in place would delete every column a
+  /// later segment lacks from the serving segment, and schema evolution makes that the normal case. Three segments
+  /// with pairwise different column sets lose a column on every iteration order if the view is narrowed in place.
+  @Test
+  public void testTableMetadataWithAllColumnsLeavesSegmentColumnsIntact()
+      throws Exception {
+    String tableName = "columnSetTable_OFFLINE";
+    List<ImmutableSegment> segments = new ArrayList<>();
+    addTable(tableName);
+    try {
+      segments.add(buildSegment(tableName, "allColumns", List.of("column1", "column2", "column3")));
+      segments.add(buildSegment(tableName, "noColumn2", List.of("column1", "column3")));
+      segments.add(buildSegment(tableName, "noColumn3", List.of("column1", "column2")));
+      Map<String, Set<String>> columnsBefore = new HashMap<>();
+      for (ImmutableSegment segment : segments) {
+        _tableDataManagerMap.get(tableName).addSegment(segment);
+        columnsBefore.put(segment.getSegmentName(), Set.copyOf(segment.getColumnNames()));
+      }
+
+      String response = _webTarget.path("/tables/" + tableName + "/metadata").queryParam("columns", "*").request()
+          .get(String.class);
+      TableMetadataInfo metadata = JsonUtils.stringToObject(response, TableMetadataInfo.class);
+
+      // The response covers the column every segment has ...
+      assertTrue(metadata.getColumnLengthMap().containsKey("column1"));
+      // ... and computing it left every segment's own column set untouched
+      for (ImmutableSegment segment : segments) {
+        String segmentName = segment.getSegmentName();
+        Set<String> expected = columnsBefore.get(segmentName);
+        assertEquals(Set.copyOf(segment.getColumnNames()), expected, segmentName);
+        assertEquals(Set.copyOf(segment.getSegmentMetadata().getAllColumns()), expected, segmentName);
+        assertEquals(Set.copyOf(segment.getSegmentMetadata().getSchema().getColumnNames()), expected, segmentName);
+      }
+    } finally {
+      for (ImmutableSegment segment : segments) {
+        segment.offload();
+        segment.destroy();
+      }
+      _tableDataManagerMap.remove(tableName);
+    }
+  }
+
+  private ImmutableSegment buildSegment(String tableNameWithType, String segmentName, List<String> columns)
+      throws Exception {
+    Schema.SchemaBuilder schemaBuilder =
+        new Schema.SchemaBuilder().setSchemaName(TableNameBuilder.extractRawTableName(tableNameWithType));
+    for (String column : columns) {
+      schemaBuilder.addSingleValueDimension(column, DataType.INT);
+    }
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      GenericRow row = new GenericRow();
+      for (String column : columns) {
+        row.putValue(column, i);
+      }
+      rows.add(row);
+    }
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableNameWithType).build(), schemaBuilder.build());
+    config.setOutDir(new File(_tempDir, tableNameWithType).getAbsolutePath());
+    config.setSegmentName(segmentName);
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+    return ImmutableSegmentLoader.load(new File(config.getOutDir(), driver.getSegmentName()), ReadMode.mmap);
   }
 
   // Override to use data with delete records

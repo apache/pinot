@@ -32,21 +32,17 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Config class for Stats collector, contains all the configs and parameters required to build
- * the stats collector.
- */
+/// Config class for Stats collector, contains all the configs and parameters required to build
+/// the stats collector.
 public class StatsCollectorConfig {
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final SegmentPartitionConfig _segmentPartitionConfig;
   private final Map<String, FieldConfig> _columnFieldConfigMap;
 
-  /**
-   * Constructor for the class.
-   * @param schema Data schema
-   * @param segmentPartitionConfig Segment partitioning config
-   */
+  /// Constructor for the class.
+  /// @param schema Data schema
+  /// @param segmentPartitionConfig Segment partitioning config
   public StatsCollectorConfig(TableConfig tableConfig, Schema schema,
       @Nullable SegmentPartitionConfig segmentPartitionConfig) {
     Preconditions.checkNotNull(tableConfig);

@@ -68,9 +68,9 @@ public interface MaterializedViewDdlHandler {
   void validateDefinedQuery(SqlNode queryNode, String definedSql, Map<String, String> properties);
 
   /// Whether the MV schema may be inferred from the `AS <query>` projection when the DDL omits an
-  /// explicit column list. Defaults to {@code true} (single-source projection inference). A handler
+  /// explicit column list. Defaults to `true` (single-source projection inference). A handler
   /// whose `definedSQL` may be multi-source — where projection inference is not supported — returns
-  /// {@code false}, so the compiler requires an explicit column list.
+  /// `false`, so the compiler requires an explicit column list.
   ///
   /// @param properties the MV's `PROPERTIES (...)` map
   default boolean supportsSchemaInference(Map<String, String> properties) {
@@ -84,9 +84,9 @@ public interface MaterializedViewDdlHandler {
   ///
   /// @param properties the MV's `PROPERTIES (...)` map
   /// @param definedSql the verbatim `AS <query>` text
-  /// @param schedule   the Quartz cron derived from `REFRESH EVERY`, or {@code null} when absent
+  /// @param schedule   the Quartz cron derived from `REFRESH EVERY`, or `null` when absent
   /// @param builder    the table-config builder to populate (already has name + isMaterializedView)
-  /// @return the minion task type stamped onto the builder (e.g. {@code MaterializedViewTask})
+  /// @return the minion task type stamped onto the builder (e.g. `MaterializedViewTask`)
   String applyTaskConfig(Map<String, String> properties, String definedSql, @Nullable String schedule,
       TableConfigBuilder builder);
 

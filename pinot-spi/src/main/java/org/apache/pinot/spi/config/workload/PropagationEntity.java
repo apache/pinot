@@ -25,14 +25,11 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
-/**
- * Represents a propagation entity with resource allocation constraints.
- * <p>
- * A PropagationEntity defines resource limits (CPU and memory) for a specific entity
- * (such as a table or tenant) within a workload propagation scheme. It can also contain
- * nested sub-allocations for more granular resource management.
- * </p>
- */
+/// Represents a propagation entity with resource allocation constraints.
+///
+/// A PropagationEntity defines resource limits (CPU and memory) for a specific entity
+/// (such as a table or tenant) within a workload propagation scheme. It can also contain
+/// nested sub-allocations for more granular resource management.
 public class PropagationEntity extends BaseJsonConfig {
   @JsonPropertyDescription("Describes the unique identifier for the propagation entity (table, tenant, etc.)")
   private String _entity;
@@ -44,11 +41,9 @@ public class PropagationEntity extends BaseJsonConfig {
       + "if not specified, inherited from parent")
   private Long _memoryCostBytes;
 
-  /**
-   * List of finer grained resource allocation within the entity.
-   * For example, in a TablePropagationScheme, for realtime tables, the overrides could be "CONSUMING" and "COMPLETED"
-   * to allow for two different resource allocations. Each having its own CPU and memory costs.
-   */
+  /// List of finer grained resource allocation within the entity.
+  /// For example, in a TablePropagationScheme, for realtime tables, the overrides could be "CONSUMING" and "COMPLETED"
+  /// to allow for two different resource allocations. Each having its own CPU and memory costs.
   @JsonPropertyDescription("List of overrides for finer grained resource allocation within the entity")
   private List<PropagationEntityOverrides> _overrides;
 

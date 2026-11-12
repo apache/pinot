@@ -44,16 +44,14 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration tests for commit-time compaction feature in upsert tables.
- *
- * These tests validate that commit-time compaction correctly handles:
- * - Multi-value dictionary columns
- * - Mixed column configurations (dictionary vs no-dictionary)
- * - Inverted indexes
- * - Raw index writers
- * - Different data types
- */
+/// Integration tests for commit-time compaction feature in upsert tables.
+///
+/// These tests validate that commit-time compaction correctly handles:
+/// - Multi-value dictionary columns
+/// - Mixed column configurations (dictionary vs no-dictionary)
+/// - Inverted indexes
+/// - Raw index writers
+/// - Different data types
 public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationTest {
   private static final String INPUT_DATA_SMALL_TAR_FILE = "gameScores_csv.tar.gz";
   private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";
@@ -893,9 +891,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         .getResultSet(0).getLong(0, 0);
   }
 
-  /**
-   * Validates compaction efficiency metrics
-   */
+  /// Validates compaction efficiency metrics
   protected void validateCompactionEfficiency(long physicalCountCompacted, long physicalCountNormal,
       int minExpectedRemovedRecords, double maxCompressionRatio) {
     double compressionRatio = (double) physicalCountCompacted / physicalCountNormal;

@@ -28,27 +28,17 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Bit-compressed dictionary-encoded forward index reader for multi-value columns. The values returned are dictionary
- * ids.
- * <p>Storage Layout:
- * <ul>
- *   <li>
- *     There will be three sections: CHUNK OFFSET, BITMAP and RAW DATA.
- *   </li>
- *   <li>
- *     CHUNK OFFSET contains the start offset of each chunk.
- *   </li>
- *   <li>
- *     BITMAP contains sequence of bits. The number of bits equals to the total number of values. The number of set bits
- *     equals to the number of rows. A bit is set if it is the start of a new row.
- *   </li>
- *   <li>
- *     RAW DATA contains the bit compressed values. We divide RAW DATA into chunks, where each chunk has the same number
- *     of rows.
- *   </li>
- * </ul>
- */
+/// Bit-compressed dictionary-encoded forward index reader for multi-value columns. The values returned are dictionary
+/// ids.
+///
+/// Storage Layout:
+///
+/// - There will be three sections: CHUNK OFFSET, BITMAP and RAW DATA.
+/// - CHUNK OFFSET contains the start offset of each chunk.
+/// - BITMAP contains sequence of bits. The number of bits equals to the total number of values. The number of set
+///   bits equals to the number of rows. A bit is set if it is the start of a new row.
+/// - RAW DATA contains the bit compressed values. We divide RAW DATA into chunks, where each chunk has the same
+///   number of rows.
 public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<FixedBitMVForwardIndexReader.Context> {
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
@@ -209,6 +199,11 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     } else {
       endIndex = _bitmapReader.getNextSetBitOffset(startIndex + 1);
     }
+    // Record the position like getDictIdMV() does. Without it, every call for a sequential scan takes the bitmap
+    // scan from the context position (or the chunk start) instead of the O(1) next-doc path, which makes counting
+    // the values of a whole segment quadratic in the number of docs per chunk.
+    context._docId = docId;
+    context._endOffset = endIndex;
     return endIndex - startIndex;
   }
 

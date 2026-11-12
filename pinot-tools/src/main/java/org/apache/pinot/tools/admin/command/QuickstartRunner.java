@@ -23,9 +23,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.IntFunction;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -84,7 +87,10 @@ public class QuickstartRunner {
 
   private final List<Integer> _controllerPorts = new ArrayList<>();
   private final List<Integer> _brokerPorts = new ArrayList<>();
-  private boolean _isStopped = false;
+  private final List<QuickstartServerProcess> _serverProcesses = new CopyOnWriteArrayList<>();
+  private boolean _forkServers;
+  private boolean _stopRequested;
+  private boolean _isStopped;
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides)
@@ -200,6 +206,13 @@ public class QuickstartRunner {
     }
   }
 
+  /// Starts servers in separate JVMs, isolating server-local static state such as dimension-table managers.
+  /// Configure this before calling [#startAll].
+  public QuickstartRunner setForkServers(boolean forkServers) {
+    _forkServers = forkServers;
+    return this;
+  }
+
   private void startServers()
       throws Exception {
     for (int i = 0; i < _numServers; i++) {
@@ -220,7 +233,18 @@ public class QuickstartRunner {
       } else {
         serverStarter.setConfigOverrides(_configOverrides);
       }
-      if (!serverStarter.execute()) {
+      if (_forkServers) {
+        QuickstartServerProcess process;
+        synchronized (_serverProcesses) {
+          if (_stopRequested) {
+            throw new IllegalStateException("Quickstart stopped while starting server " + i);
+          }
+          process = QuickstartServerProcess.launch(serverStarter.getServerConf(),
+              new File(_tempDir, "server-process-" + i));
+          _serverProcesses.add(process);
+        }
+        process.awaitReady();
+      } else if (!serverStarter.execute()) {
         throw new RuntimeException("Failed to start Server");
       }
     }
@@ -246,32 +270,67 @@ public class QuickstartRunner {
 
   public void startAll()
       throws Exception {
-    registerDefaultPinotFS();
-    if (_zkExternalAddress == null) {
-      startZookeeper();
+    try {
+      registerDefaultPinotFS();
+      if (_zkExternalAddress == null) {
+        startZookeeper();
+      }
+      startControllers();
+      startBrokers();
+      startServers();
+      startMinions();
+    } catch (Exception e) {
+      try {
+        stopServerProcesses();
+      } catch (Exception cleanupException) {
+        e.addSuppressed(cleanupException);
+      }
+      throw e;
     }
-    startControllers();
-    startBrokers();
-    startServers();
-    startMinions();
   }
 
-  public void stop()
+  public synchronized void stop()
       throws Exception {
     if (_isStopped) {
       return;
     }
+    synchronized (_serverProcesses) {
+      _stopRequested = true;
+    }
+    stopServerProcesses();
 
     // TODO: Stop Minion
     StopProcessCommand stopper = new StopProcessCommand(false);
     if (_zkExternalAddress == null) {
-      stopper.stopController().stopBroker().stopServer().stopZookeeper();
+      stopper.stopController().stopBroker().stopZookeeper();
+      if (!_forkServers) {
+        stopper.stopServer();
+      }
     }
     stopper.execute();
     if (_deleteExistingData) {
       clean();
     }
     _isStopped = true;
+  }
+
+  private void stopServerProcesses()
+      throws Exception {
+    Exception failure = null;
+    for (QuickstartServerProcess process : _serverProcesses) {
+      try {
+        process.stop();
+      } catch (Exception e) {
+        if (failure == null) {
+          failure = e;
+        } else {
+          failure.addSuppressed(e);
+        }
+      }
+    }
+    if (failure != null) {
+      throw failure;
+    }
   }
 
   public void createServerTenantWith(int numOffline, int numRealtime, String tenantName)
@@ -285,6 +344,16 @@ public class QuickstartRunner {
       throws Exception {
     new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0)).setName(tenantName)
         .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
+  }
+
+  /// @return names of the tables [#bootstrapTable()] creates, so that callers can tell which sample queries can
+  /// actually be answered.
+  public Set<String> getBootstrappedTableNames() {
+    Set<String> tableNames = new HashSet<>();
+    for (QuickstartTableRequest request : _tableRequests) {
+      tableNames.add(request.getTableName());
+    }
+    return tableNames;
   }
 
   public void bootstrapTable()

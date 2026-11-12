@@ -34,10 +34,8 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
-/**
- * Hybrid cluster integration test that uploads 8 months of data as offline and 6 months of data as realtime (with a
- * two month overlap).
- */
+/// Hybrid cluster integration test that uploads 8 months of data as offline and 6 months of data as realtime (with a
+/// two month overlap).
 public class BaseHybridClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;
@@ -159,11 +157,9 @@ public class BaseHybridClusterIntegrationTest extends BaseClusterIntegrationTest
     cleanupHybridCluster();
   }
 
-  /**
-   * Can be overridden to preserve segments.
-   *
-   * @throws Exception
-   */
+  /// Can be overridden to preserve segments.
+  ///
+  /// @throws Exception
   protected void cleanupHybridCluster()
       throws Exception {
     FileUtils.deleteDirectory(_tempDir);

@@ -21,9 +21,12 @@ package org.apache.pinot.common.utils.helix;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -32,6 +35,9 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.HelixProperty;
+import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -41,10 +47,10 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.common.workload.WorkloadChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -68,17 +74,88 @@ public class HelixHelper {
       RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
-  private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
   private static final IdealStateGroupCommit IDEAL_STATE_GROUP_COMMIT = new IdealStateGroupCommit();
 
   private static final String ONLINE = "ONLINE";
   private static final String OFFLINE = "OFFLINE";
+  private static final Random RANDOM = new Random();
 
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
+  /// Creates a ZooKeeper-backed manager with Pinot's TLS bootstrap policy applied before construction.
+  /// Callers retain responsibility for the manager's connect/disconnect lifecycle.
+  public static HelixManager createZkHelixManager(String clusterName, String instanceName, InstanceType instanceType,
+      String zkAddress) {
+    ZooKeeperSslContextSupplier.initialize();
+    return HelixManagerFactory.getZKHelixManager(clusterName, instanceName, instanceType, zkAddress);
+  }
+
+  /// Returns a deep copy of the IdealState with the same content as cloning it through a serialization round trip of
+  /// its ZNRecord: id, simple fields, map fields, list fields and raw payload, with the same container types and
+  /// iteration order. Like the round trip, the ZK stat fields (e.g. version) are not copied. Unlike the round trip, the
+  /// serializer's write policies (list field bound, size limit) are not applied; they still apply when the IdealState
+  /// is written.
+  ///
+  /// Copying the fields directly avoids serializing (and compressing) the whole ZNRecord and parsing it back, which
+  /// takes seconds for an IdealState with hundreds of thousands of segments and widens the window for version
+  /// conflicts when updating it.
   public static IdealState cloneIdealState(IdealState idealState) {
-    return new IdealState(
-        (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
+    ZNRecord record = idealState.getRecord();
+    IdealState copy = new IdealState(record.getId());
+    ZNRecord copyRecord = copy.getRecord();
+    copyRecord.setSimpleFields(new TreeMap<>(record.getSimpleFields()));
+    TreeMap<String, Map<String, String>> mapFields = new TreeMap<>(record.getMapFields());
+    mapFields.replaceAll((key, value) -> value != null ? new LinkedHashMap<>(value) : null);
+    copyRecord.setMapFields(mapFields);
+    TreeMap<String, List<String>> listFields = new TreeMap<>(record.getListFields());
+    listFields.replaceAll((key, value) -> value != null ? new ArrayList<>(value) : null);
+    copyRecord.setListFields(listFields);
+    byte[] rawPayload = record.getRawPayload();
+    if (rawPayload != null) {
+      copyRecord.setRawPayload(rawPayload.clone());
+    }
+    return copy;
+  }
+
+  /// Returns whether the given record came from the compact parser of [CompactZNRecordSerializer], that is, its map
+  /// fields are an [ImmutableSortedArrayMap]. A record from
+  /// [ZNRecordSerializer][org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer] returns false, including
+  /// the records that the compact serializer delegates to it (plain znodes and the fallback).
+  public static boolean isCompact(ZNRecord record) {
+    return record.getMapFields() instanceof ImmutableSortedArrayMap;
+  }
+
+  /// Returns an [IdealState] for the given record. When the record [is compact][#isCompact], the ideal state takes
+  /// over the maps of the record instead of copying them (see `adoptRecord`), so the caller must own the record and
+  /// must not use it afterwards. Otherwise this is `new IdealState(record)`.
+  public static IdealState toIdealState(ZNRecord record) {
+    return isCompact(record) ? adoptRecord(record, new IdealState(record.getId())) : new IdealState(record);
+  }
+
+  /// Returns an [ExternalView] for the given record. Same contract as [#toIdealState].
+  public static ExternalView toExternalView(ZNRecord record) {
+    return isCompact(record) ? adoptRecord(record, new ExternalView(record.getId())) : new ExternalView(record);
+  }
+
+  /// Makes the empty record of the given property hold the content of the source record, as
+  /// `ZNRecord(ZNRecord, String)` (called by `HelixProperty(ZNRecord)`) does, but by reference instead of by copy:
+  /// the simple, list and map fields and the raw payload are shared. The scalar fields that the copy constructor
+  /// copies (version, creation time, modified time, ephemeral owner) are copied, and the property [HelixProperty.Stat]
+  /// is set from them, as `HelixProperty(ZNRecord)` does. Like the copy constructor, the delta list is not copied.
+  /// Returns the given property.
+  private static <T extends HelixProperty> T adoptRecord(ZNRecord source, T property) {
+    ZNRecord target = property.getRecord();
+    target.setSimpleFields(source.getSimpleFields());
+    target.setListFields(source.getListFields());
+    target.setMapFields(source.getMapFields());
+    target.setRawPayload(source.getRawPayload());
+    target.setVersion(source.getVersion());
+    target.setCreationTime(source.getCreationTime());
+    target.setModifiedTime(source.getModifiedTime());
+    target.setEphemeralOwner(source.getEphemeralOwner());
+    property.setStat(new HelixProperty.Stat(source.getVersion(), source.getCreationTime(), source.getModifiedTime(),
+        source.getEphemeralOwner()));
+    return property;
   }
 
   public static IdealState updateIdealState(HelixManager helixManager, String resourceName,
@@ -97,9 +174,7 @@ public class HelixHelper {
     return IDEAL_STATE_GROUP_COMMIT.commit(helixManager, resourceName, updater, retryPolicy, noChangeOk);
   }
 
-  /**
-   * Exception to be thrown by updater function to exit from retry in {@link HelixHelper::updatedIdealState}
-   */
+  /// Exception to be thrown by updater function to exit from retry in [HelixHelper::updatedIdealState]
   public static class PermanentUpdaterException extends RuntimeException {
 
     public PermanentUpdaterException(String message) {
@@ -111,10 +186,8 @@ public class HelixHelper {
     }
   }
 
-  /**
-   * Updates broker resource ideal state for the given broker with the given broker tags. Optional {@code tablesAdded}
-   * and {@code tablesRemoved} can be provided to track the tables added/removed during the update.
-   */
+  /// Updates broker resource ideal state for the given broker with the given broker tags. Optional `tablesAdded`
+  /// and `tablesRemoved` can be provided to track the tables added/removed during the update.
   public static void updateBrokerResource(HelixManager helixManager, String brokerId, List<String> brokerTags,
       @Nullable List<String> tablesAdded, @Nullable List<String> tablesRemoved) {
     Preconditions.checkArgument(InstanceTypeUtils.isBroker(brokerId), "Invalid broker id: %s", brokerId);
@@ -156,14 +229,12 @@ public class HelixHelper {
     });
   }
 
-  /**
-   * Updates broker resource ideal state for the given broker with the given broker tags. Optional {@code tablesAdded}
-   * and {@code tablesRemoved} can be provided to track the tables added/removed during the update.
-   *
-   * <p>This accepts a {@link org.apache.pinot.common.workload.WorkloadChangeListener} to notify
-   * when broker resource changes, enabling workload propagation. This is expected to be only called
-   * from pinot-controller, where the listener is registered.</p>
-   */
+  /// Updates broker resource ideal state for the given broker with the given broker tags. Optional `tablesAdded`
+  /// and `tablesRemoved` can be provided to track the tables added/removed during the update.
+  ///
+  /// This accepts a [org.apache.pinot.common.workload.WorkloadChangeListener] to notify
+  /// when broker resource changes, enabling workload propagation. This is expected to be only called
+  /// from pinot-controller, where the listener is registered.
   public static void updateBrokerResource(HelixManager helixManager, String brokerId, List<String> brokerTags,
       @Nullable List<String> tablesAdded, @Nullable List<String> tablesRemoved,
       @Nullable WorkloadChangeListener listener) {
@@ -185,23 +256,19 @@ public class HelixHelper {
     }
   }
 
-  /**
-   * Returns all instances for the given cluster.
-   *
-   * @param helixAdmin The HelixAdmin object used to interact with the Helix cluster
-   * @param clusterName Name of the cluster for which to get all the instances for.
-   * @return Returns a List of strings containing the instance names for the given cluster.
-   */
+  /// Returns all instances for the given cluster.
+  ///
+  /// @param helixAdmin The HelixAdmin object used to interact with the Helix cluster
+  /// @param clusterName Name of the cluster for which to get all the instances for.
+  /// @return Returns a List of strings containing the instance names for the given cluster.
   public static List<String> getAllInstances(HelixAdmin helixAdmin, String clusterName) {
     return helixAdmin.getInstancesInCluster(clusterName);
   }
 
-  /**
-   * Returns all instances for the given resource.
-   *
-   * @param idealState IdealState of the resource for which to return the instances of.
-   * @return Returns a Set of strings containing the instance names for the given cluster.
-   */
+  /// Returns all instances for the given resource.
+  ///
+  /// @param idealState IdealState of the resource for which to return the instances of.
+  /// @return Returns a Set of strings containing the instance names for the given cluster.
   public static Set<String> getAllInstancesForResource(IdealState idealState) {
     final Set<String> instances = new HashSet<String>();
 
@@ -213,14 +280,12 @@ public class HelixHelper {
     return instances;
   }
 
-  /**
-   * Toggle the state of the instance between OFFLINE and ONLINE.
-   *
-   * @param instanceName Name of the instance for which to toggle the state.
-   * @param clusterName Name of the cluster to which the instance belongs.
-   * @param admin HelixAdmin to access the cluster.
-   * @param enable Set enable to true for ONLINE and FALSE for OFFLINE.
-   */
+  /// Toggle the state of the instance between OFFLINE and ONLINE.
+  ///
+  /// @param instanceName Name of the instance for which to toggle the state.
+  /// @param clusterName Name of the cluster to which the instance belongs.
+  /// @param admin HelixAdmin to access the cluster.
+  /// @param enable Set enable to true for ONLINE and FALSE for OFFLINE.
   public static void setInstanceState(String instanceName, String clusterName, HelixAdmin admin, boolean enable) {
     admin.enableInstance(clusterName, instanceName, enable);
   }
@@ -299,12 +364,10 @@ public class HelixHelper {
     return admin.getResourceIdealState(clusterName, BROKER_RESOURCE);
   }
 
-  /**
-   * Remove a resource (offline/realtime table) from the Broker's ideal state.
-   *
-   * @param helixManager The HelixManager object for accessing helix cluster.
-   * @param resourceTag Name of the resource that needs to be removed from Broker ideal state.
-   */
+  /// Remove a resource (offline/realtime table) from the Broker's ideal state.
+  ///
+  /// @param helixManager The HelixManager object for accessing helix cluster.
+  /// @param resourceTag Name of the resource that needs to be removed from Broker ideal state.
   public static void removeResourceFromBrokerIdealState(HelixManager helixManager, final String resourceTag) {
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
       @Override
@@ -324,12 +387,10 @@ public class HelixHelper {
         DEFAULT_RETRY_POLICY);
   }
 
-  /**
-   * Returns the set of online instances from external view.
-   *
-   * @param resourceExternalView External view for the resource.
-   * @return Set&lt;String&gt; of online instances in the external view for the resource.
-   */
+  /// Returns the set of online instances from external view.
+  ///
+  /// @param resourceExternalView External view for the resource.
+  /// @return Set&lt;String&gt; of online instances in the external view for the resource.
   public static Set<String> getOnlineInstanceFromExternalView(ExternalView resourceExternalView) {
     Set<String> instanceSet = new HashSet<String>();
     if (resourceExternalView != null) {
@@ -345,12 +406,10 @@ public class HelixHelper {
     return instanceSet;
   }
 
-  /**
-   * Get a set of offline instance from the external view of the resource.
-   *
-   * @param resourceExternalView External view of the resource
-   * @return Set of string instance names of the offline instances in the external view.
-   */
+  /// Get a set of offline instance from the external view of the resource.
+  ///
+  /// @param resourceExternalView External view of the resource
+  /// @return Set of string instance names of the offline instances in the external view.
   public static Set<String> getOfflineInstanceFromExternalView(ExternalView resourceExternalView) {
     Set<String> instanceSet = new HashSet<String>();
     if (resourceExternalView != null) {
@@ -366,13 +425,11 @@ public class HelixHelper {
     return instanceSet;
   }
 
-  /**
-   * Remove the segment from the cluster.
-   *
-   * @param helixManager The HelixManager object to access the helix cluster.
-   * @param tableName Name of the table to which the new segment is to be added.
-   * @param segmentName Name of the new segment to be added
-   */
+  /// Remove the segment from the cluster.
+  ///
+  /// @param helixManager The HelixManager object to access the helix cluster.
+  /// @param tableName Name of the table to which the new segment is to be added.
+  /// @param segmentName Name of the new segment to be added
   public static void removeSegmentFromIdealState(HelixManager helixManager, String tableName,
       final String segmentName) {
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
@@ -413,48 +470,38 @@ public class HelixHelper {
     updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
   }
 
-  /**
-   * Returns the config for all the instances in the cluster.
-   */
+  /// Returns the config for all the instances in the cluster.
   public static List<InstanceConfig> getInstanceConfigs(HelixManager helixManager) {
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
     return helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs(), true);
   }
 
-  /**
-   * Returns the instances in the cluster with the given tag.
-   */
+  /// Returns the instances in the cluster with the given tag.
   public static List<String> getInstancesWithTag(HelixManager helixManager, String tag) {
     return getInstancesWithTag(getInstanceConfigs(helixManager), tag);
   }
 
-  /**
-   *  Returns the instances in the cluster without any tag.
-   */
+  /// Returns the instances in the cluster without any tag.
   public static List<String> getInstancesWithoutTag(HelixManager helixManager, String defaultTag) {
     return getInstancesWithoutTag(getInstanceConfigs(helixManager), defaultTag);
   }
 
-  /**
-   * Returns the instances in the cluster with the given tag.
-   *
-   * TODO: refactor code to use this method over {@link #getInstancesWithTag(HelixManager, String)} if applicable to
-   * reuse instance configs in order to reduce ZK accesses
-   */
+  /// Returns the instances in the cluster with the given tag.
+  ///
+  /// TODO: refactor code to use this method over [#getInstancesWithTag(HelixManager, String)] if applicable to
+  /// reuse instance configs in order to reduce ZK accesses
   public static List<String> getInstancesWithTag(List<InstanceConfig> instanceConfigs, String tag) {
     List<InstanceConfig> instancesWithTag = getInstancesConfigsWithTag(instanceConfigs, tag);
     return instancesWithTag.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
   }
 
-  /**
-   * Retrieves the list of instance names for instances that do not have a specific tag associated with them.
-   * This method filters through the provided list of {@link InstanceConfig} objects and identifies those
-   * that are associated with the provided {@code defaultTag}, which indicates the absence of a specific tag.
-   *
-   * @param instanceConfigs the list of {@link InstanceConfig} objects to be checked for instances without tags.
-   * @param defaultTag the default tag that represents instances without an associated tag.
-   * @return a list of instance names for instances that do not have a specific tag.
-   */
+  /// Retrieves the list of instance names for instances that do not have a specific tag associated with them.
+  /// This method filters through the provided list of [InstanceConfig] objects and identifies those
+  /// that are associated with the provided `defaultTag`, which indicates the absence of a specific tag.
+  ///
+  /// @param instanceConfigs the list of [InstanceConfig] objects to be checked for instances without tags.
+  /// @param defaultTag the default tag that represents instances without an associated tag.
+  /// @return a list of instance names for instances that do not have a specific tag.
   public static List<String> getInstancesWithoutTag(List<InstanceConfig> instanceConfigs, String defaultTag) {
     List<InstanceConfig> instancesWithoutTag = getInstancesConfigsWithoutTag(instanceConfigs, defaultTag);
     return instancesWithoutTag.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
@@ -471,17 +518,15 @@ public class HelixHelper {
   }
 
 
-  /**
-   * Retrieves a list of {@link InstanceConfig} objects that either do not have any tags
-   * or are associated with the provided tag, which represents the absence of a specific tag.
-   * This method iterates through the provided list of {@link InstanceConfig} objects, checks
-   * whether their tag list is empty or if they contain the specified tag, and collects those
-   * instances that match the criteria.
-   *
-   * @param instanceConfigs the list of {@link InstanceConfig} objects to be checked.
-   * @param defaultTag the tag used to identify instances that are either untagged or have the specified tag.
-   * @return a list of {@link InstanceConfig} objects that are untagged or have the specified tag.
-   */
+  /// Retrieves a list of [InstanceConfig] objects that either do not have any tags
+  /// or are associated with the provided tag, which represents the absence of a specific tag.
+  /// This method iterates through the provided list of [InstanceConfig] objects, checks
+  /// whether their tag list is empty or if they contain the specified tag, and collects those
+  /// instances that match the criteria.
+  ///
+  /// @param instanceConfigs the list of [InstanceConfig] objects to be checked.
+  /// @param defaultTag the tag used to identify instances that are either untagged or have the specified tag.
+  /// @return a list of [InstanceConfig] objects that are untagged or have the specified tag.
   public static List<InstanceConfig> getInstancesConfigsWithoutTag(
       List<InstanceConfig> instanceConfigs, String defaultTag) {
     List<InstanceConfig> instancesWithoutTag = new ArrayList<>();
@@ -494,19 +539,15 @@ public class HelixHelper {
     return instancesWithoutTag;
   }
 
-  /**
-   * Returns the enabled instances in the cluster with the given tag.
-   */
+  /// Returns the enabled instances in the cluster with the given tag.
   public static List<String> getEnabledInstancesWithTag(HelixManager helixManager, String tag) {
     return getEnabledInstancesWithTag(getInstanceConfigs(helixManager), tag);
   }
 
-  /**
-   * Returns the enabled instances in the cluster with the given tag.
-   *
-   * TODO: refactor code to use this method over {@link #getEnabledInstancesWithTag(HelixManager, String)} if applicable
-   * to reuse instance configs in order to reduce ZK accesses
-   */
+  /// Returns the enabled instances in the cluster with the given tag.
+  ///
+  /// TODO: refactor code to use this method over [#getEnabledInstancesWithTag(HelixManager, String)] if
+  /// applicable to reuse instance configs in order to reduce ZK accesses
   public static List<String> getEnabledInstancesWithTag(List<InstanceConfig> instanceConfigs, String tag) {
     List<String> enabledInstancesWithTag = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
@@ -517,27 +558,21 @@ public class HelixHelper {
     return enabledInstancesWithTag;
   }
 
-  /**
-   * Returns the server instances in the cluster for the given tenant.
-   */
+  /// Returns the server instances in the cluster for the given tenant.
   public static Set<String> getServerInstancesForTenant(HelixManager helixManager, String tenant) {
     return getServerInstancesForTenant(getInstanceConfigs(helixManager), tenant);
   }
 
-  /**
-   * Returns the server instances in the cluster for the given tenant.
-   *
-   * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
-   */
+  /// Returns the server instances in the cluster for the given tenant.
+  ///
+  /// TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
   public static Set<String> getServerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
     return getServerInstancesForTenantWithType(instanceConfigs, tenant, null);
   }
 
-  /**
-   * Returns the server instances in the cluster for the given tenant name and tenant type.
-   *
-   * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
-   */
+  /// Returns the server instances in the cluster for the given tenant name and tenant type.
+  ///
+  /// TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
   public static Set<String> getServerInstancesForTenantWithType(List<InstanceConfig> instanceConfigs, String tenant,
       TableType tableType) {
     Set<String> serverInstancesWithType = new HashSet<>();
@@ -552,11 +587,9 @@ public class HelixHelper {
     return serverInstancesWithType;
   }
 
-  /**
-   * Returns the broker instances in the cluster for the given tenant.
-   *
-   * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
-   */
+  /// Returns the broker instances in the cluster for the given tenant.
+  ///
+  /// TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
   public static Set<String> getBrokerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
     return new HashSet<>(getInstancesWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
   }
@@ -590,18 +623,14 @@ public class HelixHelper {
     return tablesForBrokerTags;
   }
 
-  /**
-   * Returns the instance config for a specific instance.
-   */
+  /// Returns the instance config for a specific instance.
   public static InstanceConfig getInstanceConfig(HelixManager helixManager, String instanceId) {
     HelixAdmin admin = helixManager.getClusterManagmentTool();
     String clusterName = helixManager.getClusterName();
     return admin.getInstanceConfig(clusterName, instanceId);
   }
 
-  /**
-   * Updates instance config to the Helix property store.
-   */
+  /// Updates instance config to the Helix property store.
   public static void updateInstanceConfig(HelixManager helixManager, InstanceConfig instanceConfig) {
     // NOTE: Use HelixDataAccessor.setProperty() instead of HelixAdmin.setInstanceConfig() because the latter explicitly
     // forbids instance host/port modification
@@ -611,10 +640,8 @@ public class HelixHelper {
             instanceConfig), "Failed to update instance config for instance: " + instanceConfig.getId());
   }
 
-  /**
-   * Updates hostname and port in the instance config, returns {@code true} if the value is updated, {@code false}
-   * otherwise.
-   */
+  /// Updates hostname and port in the instance config, returns `true` if the value is updated, `false`
+  /// otherwise.
   public static boolean updateHostnamePort(InstanceConfig instanceConfig, String hostname, int port) {
     boolean updated = false;
     String existingHostname = instanceConfig.getHostName();
@@ -633,33 +660,28 @@ public class HelixHelper {
     return updated;
   }
 
-  /**
-   * Updates a tlsPort value into Pinot instance config so it can be retrieved later
-   * @param instanceConfig the instance config to update
-   * @param tlsPort the tlsPort number
-   * @return true if updated
-   */
+  /// Updates a tlsPort value into Pinot instance config so it can be retrieved later
+  /// @param instanceConfig the instance config to update
+  /// @param tlsPort the tlsPort number
+  /// @return true if updated
   public static boolean updateTlsPort(InstanceConfig instanceConfig, int tlsPort) {
     ExtraInstanceConfig pinotInstanceConfig = new ExtraInstanceConfig(instanceConfig);
     pinotInstanceConfig.setTlsPort(String.valueOf(tlsPort));
     return true;
   }
 
-  /**
-   * Return the grpcPort for a given Pinot instance config
-   * @param instanceConfig the instance config to fetch
-   * @return the grpc port, -1 if not found
-   */
+  /// Return the grpcPort for a given Pinot instance config
+  /// @param instanceConfig the instance config to fetch
+  /// @return the grpc port, -1 if not found
   public static String getGrpcPort(InstanceConfig instanceConfig) {
     return instanceConfig.getRecord().getStringField(CommonConstants.Helix.Instance.GRPC_PORT_KEY, "-1");
   }
 
-  /**
-   * Adds default tags to the instance config if no tag exists, returns {@code true} if the default tags are added,
-   * {@code false} otherwise.
-   * <p>The {@code defaultTagsSupplier} is a function which is only invoked when the instance does not have any tag.
-   * E.g. () -> List.of("DefaultTenant_BROKER").
-   */
+  /// Adds default tags to the instance config if no tag exists, returns `true` if the default tags are added,
+  /// `false` otherwise.
+  ///
+  /// The `defaultTagsSupplier` is a function which is only invoked when the instance does not have any tag.
+  /// E.g. () -> List.of("DefaultTenant_BROKER").
   public static boolean addDefaultTags(InstanceConfig instanceConfig, Supplier<List<String>> defaultTagsSupplier) {
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags.isEmpty()) {
@@ -675,11 +697,9 @@ public class HelixHelper {
     return false;
   }
 
-  /**
-   * Removes the disabled partitions from the instance config. Sometimes a partition can be accidentally disabled, and
-   * not re-enabled for some reason. When an instance is restarted, we should remove these disabled partitions so that
-   * they can be processed.
-   */
+  /// Removes the disabled partitions from the instance config. Sometimes a partition can be accidentally disabled, and
+  /// not re-enabled for some reason. When an instance is restarted, we should remove these disabled partitions so that
+  /// they can be processed.
   public static boolean removeDisabledPartitions(InstanceConfig instanceConfig) {
     ZNRecord record = instanceConfig.getRecord();
     String disabledPartitionsKey = InstanceConfig.InstanceConfigProperty.HELIX_DISABLED_PARTITION.name();
@@ -706,5 +726,55 @@ public class HelixHelper {
       return true;
     }
     return false;
+  }
+
+  /// Gets a random live controller's base URL by discovering controller instances from Helix.
+  /// This distributes load across all available controllers instead of always hitting the lead controller.
+  /// Shared by callers that need to reach any controller for a read-only request (e.g. query workload budget
+  /// fetch and page-cache warmup query fetch).
+  ///
+  /// @param helixManager the Helix manager to use for discovery
+  /// @return a controller base URL (scheme://host:port), or {@code null} if none is available
+  @Nullable
+  public static String getControllerUrl(HelixManager helixManager) {
+    try {
+      HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+      Builder keyBuilder = helixDataAccessor.keyBuilder();
+
+      // Get all live instances first (this is a single ZK call)
+      List<String> liveInstances = helixDataAccessor.getChildNames(keyBuilder.liveInstances());
+      if (liveInstances == null || liveInstances.isEmpty()) {
+        LOGGER.warn("No live instances found in Helix");
+        return null;
+      }
+
+      // Filter for live controller instances only
+      List<String> liveControllerInstances = new ArrayList<>();
+      for (String instanceName : liveInstances) {
+        if (InstanceTypeUtils.isController(instanceName)) {
+          liveControllerInstances.add(instanceName);
+        }
+      }
+
+      if (liveControllerInstances.isEmpty()) {
+        LOGGER.warn("No live controller instances found in Helix");
+        return null;
+      }
+
+      String selectedInstance = liveControllerInstances.get(RANDOM.nextInt(liveControllerInstances.size()));
+      ExtraInstanceConfig extraInstanceConfig = new ExtraInstanceConfig(
+          helixDataAccessor.getProperty(keyBuilder.instanceConfig(selectedInstance)));
+      String baseUrl = extraInstanceConfig.getComponentUrl();
+      if (baseUrl == null) {
+        LOGGER.warn("Unable to extract the base URL from controller instance config: {}", selectedInstance);
+        return null;
+      }
+      LOGGER.info("Dynamically discovered controller URL from Helix (randomly selected from {} controllers): {}",
+          liveControllerInstances.size(), baseUrl);
+      return baseUrl;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to dynamically discover controller URL from Helix", e);
+      return null;
+    }
   }
 }

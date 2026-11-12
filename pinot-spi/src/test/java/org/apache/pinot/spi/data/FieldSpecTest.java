@@ -24,6 +24,8 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -40,9 +42,7 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
-/**
- * Tests for {@link FieldSpec}.
- */
+/// Tests for [FieldSpec].
 public class FieldSpecTest {
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
@@ -50,9 +50,7 @@ public class FieldSpecTest {
   private static final String UUID_VALUE = "550e8400-e29b-41d4-a716-446655440000";
   private static final String LARGER_UUID_VALUE = "550e8400-e29b-41d4-a716-446655440001";
 
-  /**
-   * Test all {@link FieldSpec.DataType}.
-   */
+  /// Test all [FieldSpec.DataType].
   @Test
   public void testDataType() {
     Assert.assertEquals(INT.getStoredType(), INT);
@@ -76,9 +74,7 @@ public class FieldSpecTest {
     Assert.assertEquals(UUID.size(), UuidUtils.UUID_NUM_BYTES);
   }
 
-  /**
-   * Test all {@link FieldSpec.FieldType} with different {@link FieldSpec.DataType}.
-   */
+  /// Test all [FieldSpec.FieldType] with different [FieldSpec.DataType].
   @Test
   public void testFieldSpec() {
     // Single-value boolean type dimension field with default null value.
@@ -264,9 +260,7 @@ public class FieldSpecTest {
     Assert.assertEquals(TIMESTAMP.compare(1000L, 1000L), 0);
   }
 
-  /**
-   * Test {@link TimeFieldSpec} constructors.
-   */
+  /// Test [TimeFieldSpec] constructors.
   @Test
   public void testTimeFieldSpecConstructor() {
     String incomingName = "incoming";
@@ -287,9 +281,7 @@ public class FieldSpecTest {
     Assert.assertEquals(timeFieldSpec1, timeFieldSpec2);
   }
 
-  /**
-   * Test {@link DateTimeFieldSpec} constructors.
-   */
+  /// Test [DateTimeFieldSpec] constructors.
   @Test
   public void testDateTimeFieldSpecConstructor() {
     String name = "Date";
@@ -360,9 +352,7 @@ public class FieldSpecTest {
     return entries.toArray(new Object[entries.size()][]);
   }
 
-  /**
-   * Test different order of fields in serialized JSON string to deserialize {@link FieldSpec}.
-   */
+  /// Test different order of fields in serialized JSON string to deserialize [FieldSpec].
   @Test
   public void testOrderOfFields()
       throws Exception {
@@ -404,9 +394,7 @@ public class FieldSpecTest {
     Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec2, ERROR_MESSAGE);
   }
 
-  /**
-   * Test {@link FieldSpec} serialize deserialize.
-   */
+  /// Test [FieldSpec] serialize deserialize.
   @Test
   public void testSerializeDeserialize()
       throws Exception {
@@ -460,9 +448,7 @@ public class FieldSpecTest {
     Assert.assertEquals(first, second, ERROR_MESSAGE);
   }
 
-  /**
-   * Helper function to generate JSON string with random order of fields passed in.
-   */
+  /// Helper function to generate JSON string with random order of fields passed in.
   private String getRandomOrderJsonString(String[] fields) {
     int length = fields.length;
     List<Integer> indices = new LinkedList<>();
@@ -525,11 +511,9 @@ public class FieldSpecTest {
   }
 
 
-  /**
-   * Test to ensure only expected fields are serialized and @JsonIgnore methods are excluded.
-   * This test verifies that getEffectiveMaxLength and getEffectiveMaxLengthExceedStrategy
-   * (which are annotated with @JsonIgnore) do not appear in the JSON output.
-   */
+  /// Test to ensure only expected fields are serialized and @JsonIgnore methods are excluded.
+  /// This test verifies that getEffectiveMaxLength and getEffectiveMaxLengthExceedStrategy
+  /// (which are annotated with @JsonIgnore) do not appear in the JSON output.
   @Test
   public void testJsonSerializationExcludesIgnoredFields() throws Exception {
     // Test DimensionFieldSpec with some null and some non-null values
@@ -871,5 +855,45 @@ public class FieldSpecTest {
     newSpec.setMetadata(Map.of("2", "person"));
 
     assertThat(newSpec.isBackwardCompatibleWith(oldSpec)).isTrue();
+  }
+
+  @Test
+  public void testComplexFieldSpecEqualsAndHashCode() {
+    Map<String, FieldSpec> children = new LinkedHashMap<>();
+    children.put("a", new DimensionFieldSpec("a", INT, true));
+    children.put("b", new DimensionFieldSpec("b", STRING, true));
+    ComplexFieldSpec first = new ComplexFieldSpec("nested", MAP, true, children);
+    Map<String, FieldSpec> reversed = new LinkedHashMap<>();
+    reversed.put("b", new DimensionFieldSpec("b", STRING, true));
+    reversed.put("a", new DimensionFieldSpec("a", INT, true));
+    ComplexFieldSpec second = new ComplexFieldSpec("nested", MAP, true, reversed);
+    assertThat(first).isEqualTo(first).isEqualTo(second).isNotEqualTo(null)
+        .isNotEqualTo(new DimensionFieldSpec("nested", STRING, true));
+    assertThat(second).isEqualTo(first);
+    assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    assertThat(new HashSet<>(List.of(first))).contains(second);
+
+    second.setDescription("different parent");
+    assertThat(first).isNotEqualTo(second);
+    second.setDescription(null);
+    second.getChildFieldSpecs().remove("b");
+    assertThat(first).isNotEqualTo(second);
+    second.getChildFieldSpecs().put("b", new DimensionFieldSpec("b", LONG, true));
+    assertThat(first).isNotEqualTo(second);
+  }
+
+  @Test
+  public void testComplexFieldSpecEqualityIncludesNestedChildren() {
+    DimensionFieldSpec firstLeaf = new DimensionFieldSpec("value", INT, true, -1);
+    DimensionFieldSpec secondLeaf = new DimensionFieldSpec("value", INT, true, -1);
+    ComplexFieldSpec first = new ComplexFieldSpec("root", MAP, true,
+        Map.of("nested", new ComplexFieldSpec("nested", MAP, true, Map.of("value", firstLeaf))));
+    ComplexFieldSpec second = new ComplexFieldSpec("root", MAP, true,
+        Map.of("nested", new ComplexFieldSpec("nested", MAP, true, Map.of("value", secondLeaf))));
+    assertThat(first).isEqualTo(second);
+    assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    secondLeaf.setDefaultNullValue(-2);
+    assertThat(first).isNotEqualTo(second);
+    assertThat(first.hashCode()).isNotEqualTo(second.hashCode());
   }
 }

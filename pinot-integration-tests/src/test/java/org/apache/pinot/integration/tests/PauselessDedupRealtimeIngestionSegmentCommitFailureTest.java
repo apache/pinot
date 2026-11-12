@@ -22,27 +22,23 @@ import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.BeforeClass;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY;
 import static org.testng.Assert.assertNotNull;
 
 
+/// Runs the shared server-failure recovery scenarios with deduplication and two replicas.
 public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
     extends PauselessRealtimeIngestionSegmentCommitFailureTest {
-
   private static final int NUM_PARTITIONS = 2;
+
   private final double _randomDouble = new Random().nextDouble();
 
   @Override
@@ -95,46 +91,20 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
     }
   }
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+  @Override
+  protected int getNumServersForTest() {
+    return 2;
+  }
 
-    // Start the Pinot cluster
-    startZk();
-    // Start a customized controller with more frequent realtime segment validation
-    startController();
-    startBroker();
-    startServers(2);
+  @Override
+  protected TableConfig createTestTableConfig(File sampleAvroFile) {
+    TableConfig tableConfig = super.createDedupTableConfig(sampleAvroFile, getPartitionColumn(), NUM_PARTITIONS);
+    assertNotNull(tableConfig.getDedupConfig());
+    return tableConfig;
+  }
 
-    // load data in kafka
-    List<File> avroFiles = unpackAvroData(_tempDir);
-    startKafka();
-    pushAvroIntoKafka(avroFiles);
-
-    setMaxSegmentCompletionTimeMillis();
-    // create schema for non-pauseless table
-    Schema schema = createSchema();
-    schema.setSchemaName(getNonPauselessTableName());
-    addSchema(schema);
-
-    // add non-pauseless table
-    TableConfig tableConfig2 = createDedupTableConfig(avroFiles.get(0));
-    tableConfig2.setTableName(TableNameBuilder.REALTIME.tableNameWithType(getNonPauselessTableName()));
-    tableConfig2.getValidationConfig().setRetentionTimeUnit("DAYS");
-    tableConfig2.getValidationConfig().setRetentionTimeValue("100000");
-    addTableConfig(tableConfig2);
-    waitForAllDocsLoaded(tableConfig2.getTableName(), 600_000L);
-
-    // create schema for pauseless table
-    schema.setSchemaName(getPauselessTableName());
-    addSchema(schema);
-
-    // add pauseless table
-    TableConfig tableConfig = createDedupTableConfig(avroFiles.get(0));
-    tableConfig.setTableName(TableNameBuilder.REALTIME.tableNameWithType(getPauselessTableName()));
-    tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
-    tableConfig.getValidationConfig().setRetentionTimeValue("100000");
+  @Override
+  protected void configurePauselessTable(TableConfig tableConfig) {
     assertNotNull(tableConfig.getIngestionConfig());
     StreamIngestionConfig streamIngestionConfig = tableConfig.getIngestionConfig().getStreamIngestionConfig();
     assertNotNull(streamIngestionConfig);
@@ -146,19 +116,10 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
       streamIngestionConfig.setDisasterRecoveryMode(DisasterRecoveryMode.ALWAYS);
     }
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
-
-    addTableConfig(tableConfig);
-    String realtimeTableName = tableConfig.getTableName();
-    TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) > 0, 600_000L,
-        "Segments still not in error state");
   }
 
-  protected TableConfig createDedupTableConfig(File sampleAvroFile) {
-    TableConfig tableConfig = super.createDedupTableConfig(sampleAvroFile, getPartitionColumn(), NUM_PARTITIONS);
-    assertNotNull(tableConfig.getDedupConfig());
-    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
-      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
-    }
-    return tableConfig;
+  @Override
+  protected boolean hasExpectedErrorSegments(String realtimeTableName, int expectedMaxFailures) {
+    return getNumErrorSegmentsInEV(realtimeTableName) > 0;
   }
 }

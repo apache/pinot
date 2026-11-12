@@ -76,13 +76,12 @@ import org.slf4j.LoggerFactory;
 ///   - **Append** – If no STALE partitions exist and the watermark can advance (next
 ///       window is outside the buffer period), generate a normal `APPEND` task.
 ///
-///
 /// Dirty marking (STALE detection) is handled externally by
 /// `MaterializedViewConsistencyManager`, which reacts to base table segment changes
 /// (add, replace, delete) and proactively marks affected partitions in
 /// [MaterializedViewRuntimeMetadata].
 ///
-/// <h3>Partition model (TIME-WINDOWED ONLY in PR 1)</h3>
+/// ## Partition model (TIME-WINDOWED ONLY in PR 1)
 ///
 /// All selection logic assumes time-windowed partitions of fixed width `bucketTimePeriod`:
 /// the watermark is `long ms`, APPEND windows are `[watermarkMs, watermarkMs+bucketMs)`, and

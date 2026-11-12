@@ -114,26 +114,20 @@ public interface DataBuffer extends Closeable {
 
   void putDouble(long offset, double value);
 
-  /**
-   * Given an array of bytes, copies the content of this object into the array of bytes.
-   * The first byte to be copied is the one that could be read with {@code this.getByte(offset)}
-   */
+  /// Given an array of bytes, copies the content of this object into the array of bytes.
+  /// The first byte to be copied is the one that could be read with `this.getByte(offset)`
   void copyTo(long offset, byte[] buffer, int destOffset, int size);
 
-  /**
-   * Given an array of bytes, copies the content of this object into the array of bytes.
-   * The first byte to be copied is the one that could be read with {@code this.getByte(offset)}
-   */
+  /// Given an array of bytes, copies the content of this object into the array of bytes.
+  /// The first byte to be copied is the one that could be read with `this.getByte(offset)`
   default void copyTo(long offset, byte[] buffer) {
     copyTo(offset, buffer, 0, buffer.length);
   }
 
-  /**
-   * Note: It is the responsibility of the caller to make sure arguments are checked before the methods are called.
-   * While some rudimentary checks are performed on the input, the checks are best effort and when performance is an
-   * overriding priority, as when methods of this class are optimized by the runtime compiler, some or all checks
-   * (if any) may be elided. Hence, the caller must not rely on the checks and corresponding exceptions!
-   */
+  /// Note: It is the responsibility of the caller to make sure arguments are checked before the methods are called.
+  /// While some rudimentary checks are performed on the input, the checks are best effort and when performance is an
+  /// overriding priority, as when methods of this class are optimized by the runtime compiler, some or all checks
+  /// (if any) may be elided. Hence, the caller must not rely on the checks and corresponding exceptions!
   void copyTo(long offset, DataBuffer buffer, long destOffset, long size);
 
   default void copyTo(long offset, ByteBuffer buffer, int destOffset, int size) {
@@ -141,9 +135,7 @@ public interface DataBuffer extends Closeable {
     copyTo(offset, wrap, destOffset, size);
   }
 
-  /**
-   * Given an array of bytes, writes the content in the specified position.
-   */
+  /// Given an array of bytes, writes the content in the specified position.
   void readFrom(long offset, byte[] buffer, int srcOffset, int size);
 
   default void readFrom(long offset, byte[] buffer) {
@@ -159,16 +151,12 @@ public interface DataBuffer extends Closeable {
 
   ByteOrder order();
 
-  /**
-   * Creates a view of the range [start, end) of this buffer with the given byte order. Calling {@link #flush()} or
-   * {@link #close()} has no effect on view.
-   */
+  /// Creates a view of the range \[start, end) of this buffer with the given byte order. Calling [#flush()] or
+  /// [#close()] has no effect on view.
   DataBuffer view(long start, long end, ByteOrder byteOrder);
 
-  /**
-   * Creates a view of the range [start, end) of this buffer with the current byte order. Calling {@link #flush()} or
-   * {@link #close()} has no effect on view.
-   */
+  /// Creates a view of the range \[start, end) of this buffer with the current byte order. Calling [#flush()] or
+  /// [#close()] has no effect on view.
   default DataBuffer view(long start, long end) {
     return view(start, end, order());
   }
@@ -187,34 +175,27 @@ public interface DataBuffer extends Closeable {
     return new DataBufferPinotInputStream(this, offset, offset + length);
   }
 
-  /**
-   * Reads the range [offset, offset + length) as a RoaringBitmap.
-   * <p>
-   * Implementations should do their best to do not allocate memory and instead return a view of the underlying data.
-   */
+  /// Reads the range \[offset, offset + length) as a RoaringBitmap.
+  ///
+  /// Implementations should do their best to do not allocate memory and instead return a view of the underlying data.
   ImmutableRoaringBitmap viewAsRoaringBitmap(long offset, int length);
 
-  /**
-   * Returns a ByteBuffer whose content is the same as the range [offset, offset + size) of this buffer.
-   * <p>
-   * Implementations should do their best to do not allocate memory and instead return a view of the underlying data.
-   * Callers cannot assume they have the ownership of the returned ByteBuffer, and therefore should not call
-   * {@link CleanerUtil#cleanQuietly(ByteBuffer)} using the returned object.
-   */
+  /// Returns a ByteBuffer whose content is the same as the range \[offset, offset + size) of this buffer.
+  ///
+  /// Implementations should do their best to do not allocate memory and instead return a view of the underlying data.
+  /// Callers cannot assume they have the ownership of the returned ByteBuffer, and therefore should not call
+  /// [CleanerUtil#cleanQuietly(ByteBuffer)] using the returned object.
   ByteBuffer copyOrView(long offset, int size, ByteOrder byteOrder);
 
   void appendAsByteBuffers(List<ByteBuffer> appendTo);
 
-  /**
-   *
-   * Returns a ByteBuffer whose content is the same as the range [offset, offset + size) of this buffer.
-   * <p>
-   * Implementations should do their best to do not allocate memory and instead return a view of the underlying data.
-   * Callers cannot assume they have the ownership of the returned ByteBuffer, and therefore should not call
-   * {@link CleanerUtil#cleanQuietly(ByteBuffer)} using the returned object.
-   * <p>
-   * The returned ByteBuffer will have the same byte order as this buffer.
-   */
+  /// Returns a ByteBuffer whose content is the same as the range \[offset, offset + size) of this buffer.
+  ///
+  /// Implementations should do their best to do not allocate memory and instead return a view of the underlying data.
+  /// Callers cannot assume they have the ownership of the returned ByteBuffer, and therefore should not call
+  /// [CleanerUtil#cleanQuietly(ByteBuffer)] using the returned object.
+  ///
+  /// The returned ByteBuffer will have the same byte order as this buffer.
   default ByteBuffer copyOrView(long offset, int size) {
     return copyOrView(offset, size, order());
   }

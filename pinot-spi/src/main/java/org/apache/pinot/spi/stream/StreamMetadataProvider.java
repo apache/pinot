@@ -30,49 +30,39 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-/**
- * Interface for provider of stream metadata such as partition count, partition offsets
- */
+/// Interface for provider of stream metadata such as partition count, partition offsets
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface StreamMetadataProvider extends Closeable {
 
-  /**
-   * Fetches the number of partitions for a topic given the stream configs
-   * @param timeoutMillis Fetch timeout
-   * @return number of partitions
-   */
+  /// Fetches the number of partitions for a topic given the stream configs
+  /// @param timeoutMillis Fetch timeout
+  /// @return number of partitions
   int fetchPartitionCount(long timeoutMillis);
 
-  /**
-   * Fetches the partition ids for a topic given the stream configs.
-   */
+  /// Fetches the partition ids for a topic given the stream configs.
   default Set<Integer> fetchPartitionIds(long timeoutMillis) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Fetches the latest offset for a set of given partition Ids.
-   * Implementations may not be thread-safe. Callers that need concurrent access
-   * should use a thread-safe wrapper.
-   *
-   * @param partitionIds partition Ids of the stream
-   * @param timeoutMillis fetch timeout
-   * @return latest {@link StreamPartitionMsgOffset} for each partition Id.
-   */
+  /// Fetches the latest offset for a set of given partition Ids.
+  /// Implementations may not be thread-safe. Callers that need concurrent access
+  /// should use a thread-safe wrapper.
+  ///
+  /// @param partitionIds partition Ids of the stream
+  /// @param timeoutMillis fetch timeout
+  /// @return latest [StreamPartitionMsgOffset] for each partition Id.
   default Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds,
       long timeoutMillis) {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Fetches the offset for a given partition and offset criteria
-   * @param offsetCriteria offset criteria to fetch{@link StreamPartitionMsgOffset}.
-   *                       Depends on the semantics of the stream e.g. smallest, largest for Kafka
-   * @param timeoutMillis fetch timeout
-   * @return {@link StreamPartitionMsgOffset} based on the offset criteria provided
-   * @throws TimeoutException if timed out trying to connect and fetch from stream
-   */
+  /// Fetches the offset for a given partition and offset criteria
+  /// @param offsetCriteria offset criteria to fetch[StreamPartitionMsgOffset].
+  ///                       Depends on the semantics of the stream e.g. smallest, largest for Kafka
+  /// @param timeoutMillis fetch timeout
+  /// @return [StreamPartitionMsgOffset] based on the offset criteria provided
+  /// @throws TimeoutException if timed out trying to connect and fetch from stream
   StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis)
       throws TimeoutException;
 
@@ -122,24 +112,18 @@ public interface StreamMetadataProvider extends Closeable {
     return null;
   }
 
-  /**
-   * Fetches the list of available topics/streams
-   *
-   * @return List of topics
-   */
+  /// Fetches the list of available topics/streams
+  ///
+  /// @return List of topics
   default List<TopicMetadata> getTopics() {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @return true if the stream supports computing ingestion lag by subtracting the last consumed offset from the
-   * latest offset.
-   */
+  /// @return true if the stream supports computing ingestion lag by subtracting the last consumed offset from the
+  /// latest offset.
   boolean supportsOffsetLag();
 
-  /**
-   * Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.
-   */
+  /// Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.
   interface TopicMetadata {
     String getName();
   }

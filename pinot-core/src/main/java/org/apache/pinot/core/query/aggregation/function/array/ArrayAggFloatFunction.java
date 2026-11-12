@@ -23,12 +23,14 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
 public class ArrayAggFloatFunction extends BaseArrayAggFloatFunction<FloatArrayList> {
+  private static final int FLOAT_ARRAY_LIST_TYPE = 44;
+
   public ArrayAggFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -71,9 +73,8 @@ public class ArrayAggFloatFunction extends BaseArrayAggFloatFunction<FloatArrayL
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(FloatArrayList floatArrayList) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatArrayList.getValue(),
-        ObjectSerDeUtils.FLOAT_ARRAY_LIST_SER_DE.serialize(floatArrayList));
+  public SerializedResult serializeIntermediateResult(FloatArrayList floatArrayList) {
+    return new SerializedValue<>(FLOAT_ARRAY_LIST_TYPE, floatArrayList, ObjectSerDeUtils.FLOAT_ARRAY_LIST_SER_DE);
   }
 
   @Override

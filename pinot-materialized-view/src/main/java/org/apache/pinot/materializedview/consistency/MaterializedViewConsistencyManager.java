@@ -79,7 +79,7 @@ import org.slf4j.LoggerFactory;
 /// Thread-safety: all public methods are thread-safe. The internal flush and the periodic sweep
 /// both run on the same single-threaded scheduler, so ZK writes are serialized per base table.
 ///
-/// <h3>Partition model (TIME-WINDOWED ONLY in PR 1)</h3>
+/// ## Partition model (TIME-WINDOWED ONLY in PR 1)
 ///
 /// This implementation assumes a single MV partition shape: time-windowed partitions of
 /// uniform width `bucketTimePeriod`, keyed by `bucketStartMs`. Range-based notifications

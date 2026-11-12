@@ -68,9 +68,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
-/**
- * Tests for {@link MergeRollupTaskGenerator}
- */
+/// Tests for [MergeRollupTaskGenerator]
 public class MergeRollupTaskGeneratorTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
@@ -372,9 +370,7 @@ public class MergeRollupTaskGeneratorTest {
     });
   }
 
-  /**
-   * Tests for some config checks
-   */
+  /// Tests for some config checks
   @Test
   public void testGenerateTasksCheckConfigs() {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
@@ -419,9 +415,7 @@ public class MergeRollupTaskGeneratorTest {
     assertTrue(pinotTaskConfigs.isEmpty());
   }
 
-  /**
-   * Test pre-filter of task generation
-   */
+  /// Test pre-filter of task generation
   @Test
   public void testFilterSegmentsforRealtimeTable() {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
@@ -507,9 +501,7 @@ public class MergeRollupTaskGeneratorTest {
     });
   }
 
-  /**
-   * Test empty table
-   */
+  /// Test empty table
   @Test
   public void testEmptyTable() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -534,9 +526,7 @@ public class MergeRollupTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
-  /**
-   * Test empty segment
-   */
+  /// Test empty segment
   @Test
   public void testEmptySegment() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -566,9 +556,7 @@ public class MergeRollupTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
-  /**
-   * Test buffer time
-   */
+  /// Test buffer time
   @Test
   public void testBufferTime() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -595,9 +583,7 @@ public class MergeRollupTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
-  /**
-   * Test max number records per task
-   */
+  /// Test max number records per task
   @Test
   public void testMaxNumRecordsPerTask() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -650,9 +636,7 @@ public class MergeRollupTaskGeneratorTest {
     checkPinotTaskConfig(pinotTaskConfigs.get(1).getConfigs(), segmentName3, DAILY, "concat", "1d", null, "1000000");
   }
 
-  /**
-   * Test num parallel buckets
-   */
+  /// Test num parallel buckets
   @Test
   public void testNumParallelBuckets() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -771,9 +755,7 @@ public class MergeRollupTaskGeneratorTest {
     checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName7, MONTHLY, "concat", "30d", null, "1000000");
   }
 
-  /**
-   * Test partitioned table
-   */
+  /// Test partitioned table
   @Test
   public void testPartitionedTable() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -870,9 +852,7 @@ public class MergeRollupTaskGeneratorTest {
     assertTrue(isPartitionedSegmentsGroup1Seen && isPartitionedSegmentsGroup2Seen && isPartitionedSegmentsGroup3Seen);
   }
 
-  /**
-   * Test update watermark
-   */
+  /// Test update watermark
   @Test
   public void testUpdateWatermark() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -933,9 +913,7 @@ public class MergeRollupTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
-  /**
-   * Tests for incomplete task
-   */
+  /// Tests for incomplete task
   @Test
   public void testIncompleteTask() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -1016,9 +994,7 @@ public class MergeRollupTaskGeneratorTest {
     checkPinotTaskConfig(pinotTaskConfigs.get(0).getConfigs(), segmentName2, DAILY, "concat", "1d", null, "1000000");
   }
 
-  /**
-   * Tests for multilevel selection
-   */
+  /// Tests for multilevel selection
   @Test
   public void testSegmentSelectionMultiLevels() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -1199,11 +1175,9 @@ public class MergeRollupTaskGeneratorTest {
     assertEquals(pinotTaskConfigs.size(), 0);
   }
 
-  /**
-   * Tests that retentionExpiryBufferPeriod config causes segments near retention to be filtered out from task
-   * generation. With 30d retention and 5d buffer, effective retention is 25d — segments older than that should be
-   * excluded.
-   */
+  /// Tests that retentionExpiryBufferPeriod config causes segments near retention to be filtered out from task
+  /// generation. With 30d retention and 5d buffer, effective retention is 25d — segments older than that should be
+  /// excluded.
   @Test
   public void testRetentionExpiryBufferFiltersSegments() {
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();

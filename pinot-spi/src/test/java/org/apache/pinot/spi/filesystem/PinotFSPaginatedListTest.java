@@ -35,9 +35,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Tests for the 4-arg listFilesWithMetadata: default method guard clause and NoClosePinotFS delegation.
- */
+/// Tests for the 4-arg listFilesWithMetadata: default method guard clause and NoClosePinotFS delegation.
 public class PinotFSPaginatedListTest {
 
   private static final URI TEST_URI = URI.create("s3://bucket/data/");

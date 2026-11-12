@@ -25,9 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
-/**
- * Client for logical table administration operations.
- */
+/// Client for logical table administration operations.
 public class LogicalTableAdminClient extends BaseServiceAdminClient {
 
   public LogicalTableAdminClient(PinotAdminTransport transport, String controllerAddress,
@@ -84,17 +82,13 @@ public class LogicalTableAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Gets a logical table configuration.
-   */
+  /// Gets a logical table configuration.
   public LogicalTableConfig getLogicalTableConfig(String logicalTableName)
       throws PinotAdminException {
     return getLogicalTableConfig(logicalTableName, null);
   }
 
-  /**
-   * Gets a logical table configuration with optional extra headers.
-   */
+  /// Gets a logical table configuration with optional extra headers.
   public LogicalTableConfig getLogicalTableConfig(String logicalTableName, @Nullable Map<String, String> headers)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/logicalTables/" + logicalTableName, null,

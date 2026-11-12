@@ -23,9 +23,7 @@ import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
-/**
- * Predicate for IN.
- */
+/// Predicate for IN.
 public class InPredicate extends BaseInPredicate {
 
   public InPredicate(ExpressionContext lhs, List<String> values) {

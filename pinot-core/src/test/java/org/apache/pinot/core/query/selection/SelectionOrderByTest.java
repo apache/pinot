@@ -59,7 +59,7 @@ import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 
 
-/** query-based tests for selection-orderby */
+/// query-based tests for selection-orderby
 public class SelectionOrderByTest {
 
   @Test

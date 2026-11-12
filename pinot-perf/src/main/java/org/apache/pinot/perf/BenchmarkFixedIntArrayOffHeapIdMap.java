@@ -33,7 +33,6 @@ import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
@@ -66,11 +65,6 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
     }
   }
 
-  @TearDown
-  public void tearDown()
-      throws Exception {
-  }
-
   // Start with mid size, with overflow
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
@@ -81,59 +75,6 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
 
     IdMap<FixedIntArray> idMap =
         new FixedIntArrayOffHeapIdMap(CARDINALITY / 10, 1000, NUM_COLUMNS, memoryManager, "perfTestWithCache");
-
-    for (FixedIntArray value : _values) {
-      idMap.put(value);
-    }
-
-    memoryManager.close();
-    return idMap;
-  }
-
-  // Start with max size, no cache
-  @BenchmarkMode(Mode.SampleTime)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public IdMap<FixedIntArray> benchmarkOffHeapWithReSizeWithoutCache()
-      throws IOException {
-    PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("perfTest");
-
-    IdMap<FixedIntArray> idMap =
-        new FixedIntArrayOffHeapIdMap(CARDINALITY / 10, 0, NUM_COLUMNS, memoryManager, "perfTestWithCache");
-
-    for (FixedIntArray value : _values) {
-      idMap.put(value);
-    }
-
-    memoryManager.close();
-    return idMap;
-  }
-
-  @BenchmarkMode(Mode.SampleTime)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public IdMap<FixedIntArray> benchmarkOffHeapPreSizeWithCache()
-      throws IOException {
-    PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("perfTest");
-
-    IdMap<FixedIntArray> idMap =
-        new FixedIntArrayOffHeapIdMap(CARDINALITY, 1000, NUM_COLUMNS, memoryManager, "perfTestWithCache");
-
-    for (FixedIntArray value : _values) {
-      idMap.put(value);
-    }
-
-    memoryManager.close();
-    return idMap;
-  }
-
-  // Start with max size, no cache
-  @BenchmarkMode(Mode.SampleTime)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public IdMap<FixedIntArray> benchmarkOffHeapPreSizeWithoutCache()
-      throws IOException {
-    PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("perfTest");
-
-    IdMap<FixedIntArray> idMap =
-        new FixedIntArrayOffHeapIdMap(CARDINALITY, 0, NUM_COLUMNS, memoryManager, "perfTestWithCache");
 
     for (FixedIntArray value : _values) {
       idMap.put(value);

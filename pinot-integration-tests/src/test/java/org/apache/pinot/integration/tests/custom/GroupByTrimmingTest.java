@@ -143,7 +143,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$3], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[3 DESC]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$3], dir0=[DESC], fetch=[5])\n" // <-- actual sort & limit
             + "      LogicalProject(i=[$0], j=[$1], EXPR$2=[$2], EXPR$3=[*($0, $1)])\n"
             // <-- order by value is computed here, so trimming in upstream stages is not possible
@@ -186,7 +186,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$1], dir0=[DESC], fetch=[5])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[1 DESC]],"
             + " limit=[5])\n"
@@ -237,7 +237,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$2], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[2 DESC]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$2], dir0=[DESC], fetch=[5])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[2 DESC]],"
             + " limit=[5])\n"
@@ -275,13 +275,13 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
             + "98,\t998,\t4\n"
             + "97,\t997,\t4\n"
             + "96,\t996,\t4\n"
-            + "95,\t995,\t4");
+            + "95,\t995,\t4", result.getExecutionStats().toString());
 
     assertEquals(toExplainStr(postQuery(options + "SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true),
         "Execution Plan\n"
             + "LogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$1], dir0=[DESC], fetch=[5])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[1 DESC]],"
             + " limit=[5])\n"
@@ -326,7 +326,7 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
         "Execution Plan\n"
             + "LogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], "
-            + "isSortOnReceiver=[true])\n"
+            + "isSortOnReceiver=[false])\n"
             + "    LogicalSort(sort0=[$1], dir0=[DESC], fetch=[5])\n"
             + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[1 DESC]],"
             + " limit=[5])\n" // receives 50-row-big blocks, trimming kicks in only if limit is lower

@@ -24,7 +24,7 @@ import java.util.List;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 
 
-public class TPCHQuickStart extends MultistageEngineQuickStart {
+public class TPCHQuickStart extends Quickstart {
   private static final String QUICKSTART_IDENTIFIER = "TPCH";
   private static final String[] TPCH_DIRECTORIES = new String[]{
       "examples/batch/tpch/customer",

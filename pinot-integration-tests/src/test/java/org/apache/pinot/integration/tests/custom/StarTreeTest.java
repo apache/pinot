@@ -45,17 +45,10 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for Star-Tree based indexes.
- * <ul>
- *   <li>
- *     Set up the Pinot cluster and create a table with star tree indexes
- *   </li>
- *   <li>
- *     Send queries with and without star-tree and assert that results match
- *   </li>
- * </ul>
- */
+/// Integration test for Star-Tree based indexes.
+///
+/// - Set up the Pinot cluster and create a table with star tree indexes
+/// - Send queries with and without star-tree and assert that results match
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class StarTreeTest extends CustomDataQueryClusterIntegrationTest {
   public static final String FILTER_STARTREE_INDEX = "FILTER_STARTREE_INDEX";
@@ -159,10 +152,8 @@ public class StarTreeTest extends CustomDataQueryClusterIntegrationTest {
     return tableConfig;
   }
 
-  /**
-   * Initialize query generators after segments have been built and uploaded.
-   * This is called lazily before the first test that needs them.
-   */
+  /// Initialize query generators after segments have been built and uploaded.
+  /// This is called lazily before the first test that needs them.
   private void ensureQueryGeneratorsInitialized()
       throws Exception {
     if (_starTree1QueryGenerator == null || _starTree2QueryGenerator == null) {

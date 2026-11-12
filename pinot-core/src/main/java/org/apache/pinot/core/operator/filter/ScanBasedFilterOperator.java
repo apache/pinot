@@ -91,10 +91,8 @@ public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
     attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
   }
 
-  /**
-   * Returns the metadata of the data source associated with the scan filter.
-   * TODO: Replace this with a priority method for all filter operators
-   */
+  /// Returns the metadata of the data source associated with the scan filter.
+  /// TODO: Replace this with a priority method for all filter operators
   public DataSourceMetadata getDataSourceMetadata() {
     return _dataSource.getDataSourceMetadata();
   }

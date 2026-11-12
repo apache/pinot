@@ -27,9 +27,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@link ScalarQuantizer} SQ8 and SQ4 implementations.
- */
+/// Tests for [ScalarQuantizer] SQ8 and SQ4 implementations.
 public class ScalarQuantizerTest {
 
   private static final int DIMENSION = 128;

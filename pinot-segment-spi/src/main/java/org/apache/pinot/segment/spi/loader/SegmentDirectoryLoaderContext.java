@@ -24,9 +24,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
-/**
- * Context for {@link SegmentDirectoryLoader}
- */
+/// Context for [SegmentDirectoryLoader]
 public class SegmentDirectoryLoaderContext {
   private final ReadMode _readMode;
   private final TableConfig _tableConfig;
@@ -34,14 +32,16 @@ public class SegmentDirectoryLoaderContext {
   private final String _instanceId;
   private final String _tableDataDir;
   private final String _segmentName;
-  private final String _segmentCrc;
+  private final long _segmentCrc;
   private final String _segmentTier;
   private final Map<String, Map<String, String>> _instanceTierConfigs;
   private final Map<String, String> _segmentCustomConfigs;
+  private final boolean _mappedMetadataEnabled;
 
   private SegmentDirectoryLoaderContext(ReadMode readMode, TableConfig tableConfig, Schema schema, String instanceId,
-      String tableDataDir, String segmentName, String segmentCrc, String segmentTier,
-      Map<String, Map<String, String>> instanceTierConfigs, Map<String, String> segmentCustomConfigs) {
+      String tableDataDir, String segmentName, long segmentCrc, String segmentTier,
+      Map<String, Map<String, String>> instanceTierConfigs, Map<String, String> segmentCustomConfigs,
+      boolean mappedMetadataEnabled) {
     _readMode = readMode;
     _tableConfig = tableConfig;
     _schema = schema;
@@ -52,6 +52,7 @@ public class SegmentDirectoryLoaderContext {
     _segmentTier = segmentTier;
     _instanceTierConfigs = instanceTierConfigs;
     _segmentCustomConfigs = segmentCustomConfigs;
+    _mappedMetadataEnabled = mappedMetadataEnabled;
   }
 
   public ReadMode getReadMode() {
@@ -78,7 +79,8 @@ public class SegmentDirectoryLoaderContext {
     return _segmentName;
   }
 
-  public String getSegmentCrc() {
+  /// Returns the CRC of the segment being loaded, or `Long.MIN_VALUE` when the caller did not supply one.
+  public long getSegmentCrc() {
     return _segmentCrc;
   }
 
@@ -94,6 +96,16 @@ public class SegmentDirectoryLoaderContext {
     return _segmentCustomConfigs;
   }
 
+  public boolean isMappedMetadataEnabled() {
+    return _mappedMetadataEnabled;
+  }
+
+  /// Requests a guarded eager snapshot for a local directory that may become the mapped serving view.
+  public SegmentDirectoryLoaderContext withMappedMetadataEnabled() {
+    return new SegmentDirectoryLoaderContext(_readMode, _tableConfig, _schema, _instanceId, _tableDataDir, _segmentName,
+        _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs, true);
+  }
+
   public static class Builder {
     private ReadMode _readMode = ReadMode.DEFAULT_MODE;
     private TableConfig _tableConfig;
@@ -101,7 +113,7 @@ public class SegmentDirectoryLoaderContext {
     private String _instanceId;
     private String _tableDataDir;
     private String _segmentName;
-    private String _segmentCrc;
+    private long _segmentCrc = Long.MIN_VALUE;
     private String _segmentTier;
     private Map<String, Map<String, String>> _instanceTierConfigs;
     private Map<String, String> _segmentCustomConfigs;
@@ -136,7 +148,7 @@ public class SegmentDirectoryLoaderContext {
       return this;
     }
 
-    public Builder setSegmentCrc(String segmentCrc) {
+    public Builder setSegmentCrc(long segmentCrc) {
       _segmentCrc = segmentCrc;
       return this;
     }
@@ -158,7 +170,7 @@ public class SegmentDirectoryLoaderContext {
 
     public SegmentDirectoryLoaderContext build() {
       return new SegmentDirectoryLoaderContext(_readMode, _tableConfig, _schema, _instanceId, _tableDataDir,
-          _segmentName, _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs);
+          _segmentName, _segmentCrc, _segmentTier, _instanceTierConfigs, _segmentCustomConfigs, false);
     }
   }
 }

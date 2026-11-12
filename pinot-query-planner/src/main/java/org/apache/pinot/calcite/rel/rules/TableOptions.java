@@ -22,9 +22,7 @@ import javax.annotation.Nullable;
 import org.immutables.value.Value;
 
 
-/**
- * An internal interface used to generate the table options hint.
- */
+/// An internal interface used to generate the table options hint.
 @Value.Immutable
 public interface TableOptions {
   String getPartitionKey();
@@ -35,4 +33,9 @@ public interface TableOptions {
 
   @Nullable
   Integer getPartitionParallelism();
+
+  /// Whether the table is replicated across all workers. This is never inferred; it is only ever populated from an
+  /// explicitly supplied table options hint.
+  @Nullable
+  Boolean isReplicated();
 }

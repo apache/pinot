@@ -23,17 +23,15 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
-/**
- * Deprecated factory shim that preserves the historical entry points under
- * {@code org.apache.pinot.segment.local.function}. Delegates entirely to
- * {@link org.apache.pinot.common.evaluator.FunctionEvaluatorFactory}.
- *
- * <p>This class is stateless and thread-safe.
- *
- * <p>TODO: Delete this shim after Pinot 1.6.0 is released.
- *
- * @deprecated Use {@link org.apache.pinot.common.evaluator.FunctionEvaluatorFactory} instead.
- */
+/// Deprecated factory shim that preserves the historical entry points under
+/// `org.apache.pinot.segment.local.function`. Delegates entirely to
+/// [org.apache.pinot.common.evaluator.FunctionEvaluatorFactory].
+///
+/// This class is stateless and thread-safe.
+///
+/// TODO: Delete this shim after Pinot 1.6.0 is released.
+///
+/// @deprecated Use [org.apache.pinot.common.evaluator.FunctionEvaluatorFactory] instead.
 @Deprecated
 public class FunctionEvaluatorFactory {
   private FunctionEvaluatorFactory() {

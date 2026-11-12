@@ -42,23 +42,21 @@ import org.apache.pinot.segment.spi.memory.DataBufferPinotInputStream;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
-/**
- * On-disk codec for IVF_PQ segment indexes.
- *
- * <p>This class centralizes the stable file format so creator and reader evolve together.</p>
- */
+/// On-disk codec for IVF_PQ segment indexes.
+///
+/// This class centralizes the stable file format so creator and reader evolve together.
 public final class IvfPqIndexFormat {
-  /** Magic bytes identifying an IVF_PQ index file: ASCII "IVPQ". */
+  /// Magic bytes identifying an IVF_PQ index file: ASCII "IVPQ".
   public static final int MAGIC = 0x49565051;
   private static final byte[] MAGIC_BYTES = new byte[]{'I', 'V', 'P', 'Q'};
 
-  /** Legacy big-endian format version. */
+  /// Legacy big-endian format version.
   private static final int LEGACY_BIG_ENDIAN_FORMAT_VERSION = 1;
 
-  /** Current file format version. Version 2 writes numeric fields in little-endian order. */
+  /// Current file format version. Version 2 writes numeric fields in little-endian order.
   public static final int FORMAT_VERSION = 2;
 
-  /** On-disk file extension for the IVF_PQ index. */
+  /// On-disk file extension for the IVF_PQ index.
   public static final String INDEX_FILE_EXTENSION = V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
 
   private IvfPqIndexFormat() {
@@ -100,12 +98,10 @@ public final class IvfPqIndexFormat {
     }
   }
 
-  /**
-   * Reads an IVF_PQ index from a {@link PinotDataBuffer}. Used by the buffer-based reader factory
-   * (combined mmap today; column-buffer in tiered/storeInSegment scenarios).
-   *
-   * <p>The caller retains ownership of {@code buffer}; this method does not close it.</p>
-   */
+  /// Reads an IVF_PQ index from a [PinotDataBuffer]. Used by the buffer-based reader factory
+  /// (combined mmap today; column-buffer in tiered/storeInSegment scenarios).
+  ///
+  /// The caller retains ownership of `buffer`; this method does not close it.
   public static IndexData read(PinotDataBuffer buffer)
       throws IOException {
     try (DataBufferPinotInputStream pinotIn = new DataBufferPinotInputStream(buffer)) {
@@ -310,9 +306,7 @@ public final class IvfPqIndexFormat {
     return bytes;
   }
 
-  /**
-   * Maps a distance function to a stable on-disk ID that is independent of enum ordinal order.
-   */
+  /// Maps a distance function to a stable on-disk ID that is independent of enum ordinal order.
   public static int distanceFunctionToStableId(VectorIndexConfig.VectorDistanceFunction distanceFunction) {
     switch (distanceFunction) {
       case EUCLIDEAN:
@@ -330,9 +324,7 @@ public final class IvfPqIndexFormat {
     }
   }
 
-  /**
-   * Maps a stable on-disk ID back to the corresponding distance function.
-   */
+  /// Maps a stable on-disk ID back to the corresponding distance function.
   public static VectorIndexConfig.VectorDistanceFunction stableIdToDistanceFunction(int id) {
     switch (id) {
       case 0:
@@ -350,9 +342,7 @@ public final class IvfPqIndexFormat {
     }
   }
 
-  /**
-   * Immutable in-memory representation of one IVF_PQ index file.
-   */
+  /// Immutable in-memory representation of one IVF_PQ index file.
   public static final class IndexData {
     private final int _dimension;
     private final int _numVectors;

@@ -27,21 +27,21 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
-/**
- * The MAP_VALUE transform function takes 3 arguments:
- * <ul>
- *   <li>KeyColumn: dictionary-encoded multi-value column where the values are sorted inside each multi-value entry</li>
- *   <li>KeyValue: a literal (number or string)</li>
- *   <li>ValueColumn: dictionary-encoded multi-value column</li>
- * </ul>
- * For each docId, the multi-value entry for ValueColumn has the same number of values as the multi-value entry for
- * KeyColumn to store the key-value pairs.
- * <p>E.g. map {"k1": 9, "k2": 5} will be stored as: ["k1", "k2"] in KeyColumn and [9, 5] in ValueColumn.
- * <p>Except for the filter clause, in order to make MAP_VALUE transform function work, the keyValue provided must exist
- * in the keyColumn.
- * <p>To ensure that, the query can have a filter on the keyColumn.
- * <p>E.g. {@code SELECT mapValue(key, 'myKey', value) FROM myTable WHERE key = 'myKey'}
- */
+/// The MAP_VALUE transform function takes 3 arguments:
+/// - KeyColumn: dictionary-encoded multi-value column where the values are sorted inside each multi-value entry
+/// - KeyValue: a literal (number or string)
+/// - ValueColumn: dictionary-encoded multi-value column
+/// For each docId, the multi-value entry for ValueColumn has the same number of values as the multi-value entry for
+/// KeyColumn to store the key-value pairs.
+///
+/// E.g. map {"k1": 9, "k2": 5} will be stored as: \["k1", "k2"\] in KeyColumn and \[9, 5\] in ValueColumn.
+///
+/// Except for the filter clause, in order to make MAP_VALUE transform function work, the keyValue provided must exist
+/// in the keyColumn.
+///
+/// To ensure that, the query can have a filter on the keyColumn.
+///
+/// E.g. `SELECT mapValue(key, 'myKey', value) FROM myTable WHERE key = 'myKey'`
 public class MapValueTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "mapValue";
 

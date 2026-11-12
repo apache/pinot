@@ -25,10 +25,8 @@ import java.util.Map;
 import org.apache.pinot.spi.audit.AuditUserIdentity;
 
 
-/**
- * Data class representing an audit event for Pinot Controller API requests.
- * Contains all required fields as specified in the Phase 1 audit logging specification.
- */
+/// Data class representing an audit event for Pinot Controller API requests.
+/// Contains all required fields as specified in the Phase 1 audit logging specification.
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonAutoDetect(getterVisibility = JsonAutoDetect.Visibility.NONE, isGetterVisibility = JsonAutoDetect.Visibility.NONE)
 public class AuditEvent {
@@ -153,10 +151,8 @@ public class AuditEvent {
     return this;
   }
 
-  /**
-   * Strongly-typed data class representing the request payload portion of an audit event.
-   * Contains captured request data such as query parameters, headers, and body content.
-   */
+  /// Strongly-typed data class representing the request payload portion of an audit event.
+  /// Contains captured request data such as query parameters, headers, and body content.
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class AuditRequestPayload {
 

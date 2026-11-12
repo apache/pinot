@@ -27,18 +27,15 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.slf4j.Logger;
 
 
-/**
- * Rate-limited exception logger that prevents log flooding while maintaining visibility into errors.
- *
- * <p><b>Key Features:</b>
- * <ul>
- * <li>Class-based fingerprinting: Each exception class gets its own rate limiter</li>
- * <li>Suppression tracking: Reports count of dropped logs when rate limit is lifted</li>
- * <li>Zero Dependencies: Uses a lightweight in-house Token Bucket implementation</li>
- * </ul>
- *
- * <p><b>Note:</b> This class is designed for single-threaded access per instance.
- */
+/// Rate-limited exception logger that prevents log flooding while maintaining visibility into errors.
+///
+/// **Key Features:**
+///
+/// - Class-based fingerprinting: Each exception class gets its own rate limiter
+/// - Suppression tracking: Reports count of dropped logs when rate limit is lifted
+/// - Zero Dependencies: Uses a lightweight in-house Token Bucket implementation
+///
+/// **Note:** This class is designed for single-threaded access per instance.
 @NotThreadSafe
 public class ThrottledLogger {
   private final Logger _delegate;

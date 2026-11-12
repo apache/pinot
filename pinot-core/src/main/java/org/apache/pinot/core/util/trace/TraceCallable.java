@@ -21,15 +21,11 @@ package org.apache.pinot.core.util.trace;
 import java.util.concurrent.Callable;
 
 
-/**
- * Wrapper class for {@link Callable} to automatically register/un-register itself to/from a request.
- */
+/// Wrapper class for [Callable] to automatically register/un-register itself to/from a request.
 public abstract class TraceCallable<V> implements Callable<V> {
   private final TraceContext.TraceEntry _parentTraceEntry;
 
-  /**
-   * If trace is not enabled, parent trace entry will be null.
-   */
+  /// If trace is not enabled, parent trace entry will be null.
   public TraceCallable() {
     _parentTraceEntry = TraceContext.getTraceEntry();
   }

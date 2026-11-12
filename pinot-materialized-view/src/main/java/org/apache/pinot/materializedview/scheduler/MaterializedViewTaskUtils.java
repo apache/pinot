@@ -46,7 +46,7 @@ public final class MaterializedViewTaskUtils {
   private MaterializedViewTaskUtils() {
   }
 
-  /// Reads a positive-integer cluster-config override and falls back to {@code defaultValue}
+  /// Reads a positive-integer cluster-config override and falls back to `defaultValue`
   /// when the key is unset, malformed, or non-positive. Use for caps that must be reloadable
   /// at runtime without a controller / minion restart — callers MUST invoke this on every
   /// consumer-site call rather than caching the result.
@@ -74,7 +74,7 @@ public final class MaterializedViewTaskUtils {
     }
   }
 
-  /// Same as {@link #readPositiveIntClusterConfigOrDefault} for `long` values (e.g. millis).
+  /// Same as [#readPositiveIntClusterConfigOrDefault] for `long` values (e.g. millis).
   public static long readPositiveLongClusterConfigOrDefault(
       @Nullable Function<String, String> clusterConfigLookup, String configKey, long defaultValue) {
     if (clusterConfigLookup == null) {

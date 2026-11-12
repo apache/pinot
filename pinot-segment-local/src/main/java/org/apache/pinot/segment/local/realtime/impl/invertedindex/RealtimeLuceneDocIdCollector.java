@@ -29,13 +29,11 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * DocID collector for Lucene search query. We have optimized
- * the lucene search on offline segments by maintaining
- * a pre-built luceneDocId -> pinotDocId mapping. Since that solution
- * is not directly applicable to realtime, we will separate the collector
- * for the time-being. Once we have optimized the realtime, we can
- */
+/// DocID collector for Lucene search query. We have optimized
+/// the lucene search on offline segments by maintaining
+/// a pre-built luceneDocId -> pinotDocId mapping. Since that solution
+/// is not directly applicable to realtime, we will separate the collector
+/// for the time-being. Once we have optimized the realtime, we can
 public class RealtimeLuceneDocIdCollector implements Collector {
   private volatile boolean _shouldCancel;
   private final MutableRoaringBitmap _docIds;

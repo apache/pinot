@@ -24,11 +24,9 @@ import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Geometry;
 
 
-/**
- * Function that checks the containment of the two geo-spatial objects. It returns true if and only if no points of the
- * second geometry lie in the exterior of the first geometry, and at least one point of the interior of the first
- * geometry lies in the interior of the second geometry.
- */
+/// Function that checks the containment of the two geo-spatial objects. It returns true if and only if no points of the
+/// second geometry lie in the exterior of the first geometry, and at least one point of the interior of the first
+/// geometry lies in the interior of the second geometry.
 public class StContainsFunction extends BaseBinaryGeoTransformFunction {
   public static final String FUNCTION_NAME = "ST_Contains";
 

@@ -38,13 +38,10 @@ import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
-/**
- * A {@code TablePropagationScheme} resolves instances based on table names in a propagation entity
- *
- * Currently, this requires InstancePartitions to be set up for servers, and an ExternalView for brokers.
- * TODO: Add support for resolving instances based for Balanced Instance Assignment strategy.
- *
- */
+/// A `TablePropagationScheme` resolves instances based on table names in a propagation entity
+///
+/// Currently, this requires InstancePartitions to be set up for servers, and an ExternalView for brokers.
+/// TODO: Add support for resolving instances based for Balanced Instance Assignment strategy.
 public class TablePropagationScheme implements PropagationScheme {
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
@@ -53,22 +50,19 @@ public class TablePropagationScheme implements PropagationScheme {
     _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
-  /**
-   * Resolves instances based on table names in the propagation entity and node type.
-   *
-   * <p>
-   * For BROKER nodes, all brokers serving the given table are returned.
-   * For SERVER nodes, all servers serving the given table are returned. If the table is
-   * REALTIME and overrides are provided, only the servers for the specified partition types
-   * (CONSUMING or COMPLETED) are returned.
-   * </p>
-   *
-   * Example:
-   * <pre>
-   *   ["Broker_instance_1", "Broker_instance_2"]
-   *   ["Server_instance_1", "Server_instance_2", "Server_instance_3"]
-   * </pre>
-   */
+  /// Resolves instances based on table names in the propagation entity and node type.
+  ///
+  /// For BROKER nodes, all brokers serving the given table are returned.
+  /// For SERVER nodes, all servers serving the given table are returned. If the table is
+  /// REALTIME and overrides are provided, only the servers for the specified partition types
+  /// (CONSUMING or COMPLETED) are returned.
+  ///
+  /// Example:
+  ///
+  /// ```
+  /// ["Broker_instance_1", "Broker_instance_2"]
+  /// ["Server_instance_1", "Server_instance_2", "Server_instance_3"]
+  /// ```
   @Override
   public Set<String> resolveInstances(PropagationEntity entity, NodeConfig.Type nodeType,
                                       @Nullable PropagationEntityOverrides override) {
@@ -97,13 +91,11 @@ public class TablePropagationScheme implements PropagationScheme {
     return false;
   }
 
-  /**
-   * Resolves the set of broker instances responsible for serving the given table name.
-   * Uses IdealState instead of ExternalView to ensure brokers that are temporarily offline
-   * (e.g., during restart) still receive workload configuration updates.
-   *
-   * Returns the first non-empty set of instances since the brokers are shared across all table types.
-   */
+  /// Resolves the set of broker instances responsible for serving the given table name.
+  /// Uses IdealState instead of ExternalView to ensure brokers that are temporarily offline
+  /// (e.g., during restart) still receive workload configuration updates.
+  ///
+  /// Returns the first non-empty set of instances since the brokers are shared across all table types.
   private Set<String> getBrokerInstances(String tableName) {
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
     // Using IdealState to include offline brokers (e.g. during rolling restart)
@@ -155,10 +147,8 @@ public class TablePropagationScheme implements PropagationScheme {
     return instances;
   }
 
-  /**
-   * Returns REALTIME instances for the given tableWithType.
-   * If {@code type} is null, returns the union of CONSUMING and COMPLETED.
-   */
+  /// Returns REALTIME instances for the given tableWithType.
+  /// If `type` is null, returns the union of CONSUMING and COMPLETED.
   private Set<String> getRealtimeInstances(String tableWithType, @Nullable OverrideEntityType type) {
     String consumingKey =
         InstancePartitionsUtils.getInstancePartitionsName(tableWithType, InstancePartitionsType.CONSUMING);
@@ -186,17 +176,13 @@ public class TablePropagationScheme implements PropagationScheme {
     return union;
   }
 
-  /**
-   * Expands a raw table name into type-qualified names.
-   *
-   * <p>
-   * If the input lacks a type suffix, both {@code OFFLINE} and {@code REALTIME} variants are
-   * returned. Otherwise, the name is returned as-is.
-   * </p>
-   *
-   * @param tableName The raw or type-qualified table name.
-   * @return A list of table names with type.
-   */
+  /// Expands a raw table name into type-qualified names.
+  ///
+  /// If the input lacks a type suffix, both `OFFLINE` and `REALTIME` variants are
+  /// returned. Otherwise, the name is returned as-is.
+  ///
+  /// @param tableName The raw or type-qualified table name.
+  /// @return A list of table names with type.
   private static List<String> expandToTablesWithType(String tableName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {

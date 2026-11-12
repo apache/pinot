@@ -34,9 +34,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-/**
- * Integration tests for {@link PinotLLCRealtimeSegmentManager}.
- */
+/// Integration tests for [PinotLLCRealtimeSegmentManager].
 public class PinotLLCRealtimeSegmentManagerIntegrationTest extends BaseClusterIntegrationTest {
 
   @Override

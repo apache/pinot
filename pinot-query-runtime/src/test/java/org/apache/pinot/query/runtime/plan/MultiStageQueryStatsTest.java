@@ -41,10 +41,8 @@ import org.testng.annotations.Test;
 
 public class MultiStageQueryStatsTest {
 
-  /**
-   * A test that verifies calling {@link MultiStageQueryStats#mergeUpstream(MultiStageQueryStats)} is similar to call
-   * {@link MultiStageQueryStats#serialize()} and then {@link MultiStageQueryStats#mergeUpstream(List)}.
-   */
+  /// A test that verifies calling [MultiStageQueryStats#mergeUpstream(MultiStageQueryStats)] is similar to call
+  /// [MultiStageQueryStats#serialize()] and then [MultiStageQueryStats#mergeUpstream(List)].
   @Test(dataProvider = "stats")
   public void testMergeEquivalence(MultiStageQueryStats stats)
       throws IOException {
@@ -61,12 +59,10 @@ public class MultiStageQueryStatsTest {
     Assert.assertEquals(mergingHeap, rootStats, "Merging objects should be equal to merging serialized buffers");
   }
 
-  /**
-   * The legacy binary stat format encodes the operator type id as a single unsigned byte, so serializing a
-   * plugin-defined operator type (id >= {@link OperatorTypeDescriptor#PLUGIN_ID_FLOOR}) must fail loudly instead of
-   * truncating the id and letting the receiver silently decode the wrong built-in type. Plugin operator stats can
-   * only travel via stream-mode stats reporting, whose proto carries the id as an int32.
-   */
+  /// The legacy binary stat format encodes the operator type id as a single unsigned byte, so serializing a
+  /// plugin-defined operator type (id >= [OperatorTypeDescriptor#PLUGIN_ID_FLOOR]) must fail loudly instead of
+  /// truncating the id and letting the receiver silently decode the wrong built-in type. Plugin operator stats can
+  /// only travel via stream-mode stats reporting, whose proto carries the id as an int32.
   @Test
   public void testSerializePluginOperatorIdFailsLoudly() {
     OperatorTypeDescriptor pluginType = new OperatorTypeDescriptor() {

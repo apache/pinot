@@ -23,9 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * This is the index used to create range indexes
- */
+/// This is the index used to create range indexes
 public interface CombinedInvertedIndexCreator
     extends DictionaryBasedInvertedIndexCreator, RawValueBasedInvertedIndexCreator {
 
@@ -105,10 +103,8 @@ public interface CombinedInvertedIndexCreator
     }
   }
 
-  /**
-   * Primitive type additions for columnar processing optimization.
-   * These methods avoid boxing overhead when iterating over columnar data.
-   */
+  /// Primitive type additions for columnar processing optimization.
+  /// These methods avoid boxing overhead when iterating over columnar data.
 
   @Override
   default void addInt(int value, int dictId) {

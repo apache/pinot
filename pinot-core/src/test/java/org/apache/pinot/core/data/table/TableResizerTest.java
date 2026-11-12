@@ -40,9 +40,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests the functionality of {@link @TableResizer}
- */
+/// Tests the functionality of [@TableResizer]
 public class TableResizerTest {
   private static final String QUERY_PREFIX =
       "SELECT SUM(m1), MAX(m2), DISTINCTCOUNT(m3), AVG(m4) FROM testTable GROUP BY d1, d2, d3 ORDER BY ";
@@ -248,9 +246,7 @@ public class TableResizerTest {
     assertTrue(recordsMap.containsKey(_keys.get(0)));
   }
 
-  /**
-   * Tests the sort function for ordered resizer
-   */
+  /// Tests the sort function for ordered resizer
   @Test
   public void testSortTopRecords() {
     // d1 asc
@@ -330,9 +326,7 @@ public class TableResizerTest {
     assertEquals(sortedRecords.get(2), _records.get(3));
   }
 
-  /**
-   * Tests in-segment trim from 15 records to 10 records
-   */
+  /// Tests in-segment trim from 15 records to 10 records
   @Test
   public void testInSegmentTrim() {
     TableResizer tableResizer =

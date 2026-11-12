@@ -114,7 +114,15 @@ export default defineConfig(({ mode }) => {
         transformMixedEsModules: true,
         // Ensure CommonJS modules are properly handled
         include: [/node_modules/],
-        defaultIsModuleExports: true,
+        // Use 'auto' (the plugin default) so the default import honors a CJS
+        // module's `__esModule`/`exports.default` marker. Forcing `true` here
+        // made `import X from 'cjs-pkg'` resolve to the entire module.exports
+        // object for Babel-compiled packages like `react-diff-viewer` (which
+        // sets `__esModule` and `exports.default = DiffViewer`). Rendering that
+        // object as a component crashed the /tables status diff viewer with
+        // React error #130 ("Element type is invalid ... got: object"). 'auto'
+        // matches the esbuild interop used by optimizeDeps in dev.
+        defaultIsModuleExports: 'auto',
       },
     },
 

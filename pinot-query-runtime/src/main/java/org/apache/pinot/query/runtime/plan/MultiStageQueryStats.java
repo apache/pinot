@@ -48,40 +48,36 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The stats of a given query.
- * <p>
- * For the same query, multiple instances of this class may exist. Each of them will have a partial view of the stats.
- * Specifically, while the query is being executed, each operator will return its own partial view of the stats when
- * EOS block is sent.
- * <p>
- * Simple operations with a single upstream, like filters or transforms, would just add their own information to the
- * stats. More complex operations, like joins or receiving mailboxes, will merge the stats from all their upstreams and
- * add their own stats.
- * <p>
- * The complete stats for the query are obtained in the execution root (usually the broker) by merging the partial
- * views.
- * <p>
- * In order to reduce allocation, this class is mutable. Some operators may create their own stats, but most of them
- * will receive a stats object from the upstream operator and modify it by adding their own stats and sometimes merging
- * them with other upstream stats.
- */
+/// The stats of a given query.
+///
+/// For the same query, multiple instances of this class may exist. Each of them will have a partial view of the stats.
+/// Specifically, while the query is being executed, each operator will return its own partial view of the stats when
+/// EOS block is sent.
+///
+/// Simple operations with a single upstream, like filters or transforms, would just add their own information to the
+/// stats. More complex operations, like joins or receiving mailboxes, will merge the stats from all their upstreams and
+/// add their own stats.
+///
+/// The complete stats for the query are obtained in the execution root (usually the broker) by merging the partial
+/// views.
+///
+/// In order to reduce allocation, this class is mutable. Some operators may create their own stats, but most of them
+/// will receive a stats object from the upstream operator and modify it by adding their own stats and sometimes merging
+/// them with other upstream stats.
 public class MultiStageQueryStats {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageQueryStats.class);
   private final int _currentStageId;
   private final StageStats.Open _currentStats;
-  /**
-   * Known stats for stages whose id is higher than the current one.
-   * <p>
-   * A stage may not know all the stats whose id is higher than the current one, so this list may contain null values.
-   * It may also grow in size when different merge methods are called.
-   * <p>
-   * For example the stats of the left hand side of a join may know stats of stages 3 and 4 and the right side may know
-   * stats of stages 5. When merging the stats of the join, the stats of stages 5 will be added to this list.
-   *
-   * @see #mergeUpstream(List)
-   * @see #mergeUpstream(MultiStageQueryStats)
-   */
+  /// Known stats for stages whose id is higher than the current one.
+  ///
+  /// A stage may not know all the stats whose id is higher than the current one, so this list may contain null values.
+  /// It may also grow in size when different merge methods are called.
+  ///
+  /// For example the stats of the left hand side of a join may know stats of stages 3 and 4 and the right side may know
+  /// stats of stages 5. When merging the stats of the join, the stats of stages 5 will be added to this list.
+  ///
+  /// @see #mergeUpstream(List)
+  /// @see #mergeUpstream(MultiStageQueryStats)
   private final ArrayList<StageStats.Closed> _closedStats;
 
   private MultiStageQueryStats(int stageId) {
@@ -115,12 +111,10 @@ public class MultiStageQueryStats {
     return _currentStageId;
   }
 
-  /**
-   * Serialize the current stats in a way it is compatible with {@link #mergeUpstream(List)}.
-   * <p>
-   * The serialized stats are returned in a list where the index is the stage id. Stages downstream or not related to
-   * the current one will be null.
-   */
+  /// Serialize the current stats in a way it is compatible with [#mergeUpstream(List)].
+  ///
+  /// The serialized stats are returned in a list where the index is the stage id. Stages downstream or not related to
+  /// the current one will be null.
   public List<DataBuffer> serialize()
       throws IOException {
 
@@ -158,18 +152,14 @@ public class MultiStageQueryStats {
     return _currentStats;
   }
 
-  /**
-   * Returns the higher stage id known by this object.
-   */
+  /// Returns the higher stage id known by this object.
   public int getMaxStageId() {
     return _currentStageId + _closedStats.size();
   }
 
-  /**
-   * Get the stats of a stage whose id is higher than the current one.
-   * <p>
-   * This method returns null in case the stage id is unknown by this stage or no stats are stored for it.
-   */
+  /// Get the stats of a stage whose id is higher than the current one.
+  ///
+  /// This method returns null in case the stage id is unknown by this stage or no stats are stored for it.
   @Nullable
   public StageStats.Closed getUpstreamStageStats(int stageId) {
     if (stageId <= _currentStageId) {
@@ -184,12 +174,10 @@ public class MultiStageQueryStats {
     return _closedStats.get(index);
   }
 
-  /**
-   * Merge stats from another MultiStageQueryStats on the same stage into the receiver object.
-   *
-   * It is important to call this method in the correct order to preserve the in-order traversal of the operator tree,
-   * which is required to be able to reconstruct the stats when the result is sent to the user.
-   */
+  /// Merge stats from another MultiStageQueryStats on the same stage into the receiver object.
+  ///
+  /// It is important to call this method in the correct order to preserve the in-order traversal of the operator tree,
+  /// which is required to be able to reconstruct the stats when the result is sent to the user.
   public void mergeSameStage(MultiStageQueryStats otherStats) {
     Preconditions.checkArgument(_currentStageId == otherStats._currentStageId,
         "Cannot merge stats from different stages (%s and %s)", _currentStageId, otherStats._currentStageId);
@@ -205,15 +193,13 @@ public class MultiStageQueryStats {
     }
   }
 
-  /**
-   * Merge stats from an upstream stage into this one.
-   *
-   * This is similar to wrap the stats in a MultiStageQueryStats object and call
-   * {@link #mergeUpstream(MultiStageQueryStats)} but it is easier to call and slightly more efficient.
-   *
-   * @param stageId the stage id of the upstream stage
-   * @param closedStats the stats to merge
-   */
+  /// Merge stats from an upstream stage into this one.
+  ///
+  /// This is similar to wrap the stats in a MultiStageQueryStats object and call
+  /// [#mergeUpstream(MultiStageQueryStats)] but it is easier to call and slightly more efficient.
+  ///
+  /// @param stageId the stage id of the upstream stage
+  /// @param closedStats the stats to merge
   public void mergeUpstream(int stageId, StageStats.Closed closedStats) {
     Preconditions.checkArgument(_currentStageId <= stageId,
         "Cannot merge stats from early stage %s into stats of later stage %s",
@@ -233,27 +219,23 @@ public class MultiStageQueryStats {
     }
   }
 
-  /**
-   * Merge upstream stats from another MultiStageQueryStats object into this one.
-   *
-   * This method is equivalent to calling {@link #mergeUpstream(MultiStageQueryStats, boolean)} with bubbleUp set to
-   * false.
-   */
+  /// Merge upstream stats from another MultiStageQueryStats object into this one.
+  ///
+  /// This method is equivalent to calling [#mergeUpstream(MultiStageQueryStats, boolean)] with bubbleUp set to
+  /// false.
   public void mergeUpstream(MultiStageQueryStats otherStats) {
     mergeUpstream(otherStats, false);
   }
 
-  /**
-   * Merge upstream stats from another MultiStageQueryStats object into this one.
-   * <p>
-   * Only the stages whose id is higher than the current one are merged. The reason to do so is that upstream stats
-   * should be already closed while current stage may need some extra tuning.
-   * <p>
-   * For example set operations may need to merge the stats from all its upstreams before concatenating stats of the
-   * current stage.
-   *
-   * @param bubbleUp true if and only if runtime exceptions should be thrown when merging stats.
-   */
+  /// Merge upstream stats from another MultiStageQueryStats object into this one.
+  ///
+  /// Only the stages whose id is higher than the current one are merged. The reason to do so is that upstream stats
+  /// should be already closed while current stage may need some extra tuning.
+  ///
+  /// For example set operations may need to merge the stats from all its upstreams before concatenating stats of the
+  /// current stage.
+  ///
+  /// @param bubbleUp true if and only if runtime exceptions should be thrown when merging stats.
   public void mergeUpstream(MultiStageQueryStats otherStats, boolean bubbleUp) {
     Preconditions.checkArgument(_currentStageId <= otherStats._currentStageId,
         "Cannot merge stats from early stage %s into stats of later stage %s",
@@ -296,19 +278,15 @@ public class MultiStageQueryStats {
     }
   }
 
-  /**
-   * Merge upstream stats from a list of DataBuffer objects into this one.
-   *
-   * This method is equivalent to calling {@link #mergeUpstream(List, boolean)} with bubbleUp set to false.
-   */
+  /// Merge upstream stats from a list of DataBuffer objects into this one.
+  ///
+  /// This method is equivalent to calling [#mergeUpstream(List, boolean)] with bubbleUp set to false.
   public void mergeUpstream(List<DataBuffer> otherStats) {
     mergeUpstream(otherStats, false);
   }
 
-  /**
-   * Merge upstream stats from a list of DataBuffer objects into this one.
-   * @param bubbleUp true if and only if runtime exceptions should be thrown when merging stats.
-   */
+  /// Merge upstream stats from a list of DataBuffer objects into this one.
+  /// @param bubbleUp true if and only if runtime exceptions should be thrown when merging stats.
   public void mergeUpstream(List<DataBuffer> otherStats, boolean bubbleUp) {
     for (int i = 0; i <= _currentStageId && i < otherStats.size(); i++) {
       if (otherStats.get(i) != null) {
@@ -389,33 +367,27 @@ public class MultiStageQueryStats {
     return Objects.hash(_currentStageId, _currentStats, _closedStats);
   }
 
-  /**
-   * {@code StageStats} tracks execution statistics for a single stage.
-   * <p>
-   * Instances of this class may not have the complete stat information for the stage. Specifically, while the query
-   * is being executed, each OpChain will contain its own partial view of the stats.
-   * The final stats for the stage are obtained in the execution root (usually the broker) by
-   * {@link Closed#merge(StageStats) merging} the partial views from all OpChains.
-   */
+  /// `StageStats` tracks execution statistics for a single stage.
+  ///
+  /// Instances of this class may not have the complete stat information for the stage. Specifically, while the query
+  /// is being executed, each OpChain will contain its own partial view of the stats.
+  /// The final stats for the stage are obtained in the execution root (usually the broker) by
+  /// [`merging`]\[Closed#merge(StageStats)\] the partial views from all OpChains.
   public abstract static class StageStats {
 
-    /**
-     * The types of the operators in the stage.
-     * <p>
-     * The operator index used here is the index of the operator in the operator tree, in the order of the inorder
-     * traversal. That means that the first value is the leftmost leaf, and the last value is the root.
-     * <p>
-     * This list contains no null values.
-     */
+    /// The types of the operators in the stage.
+    ///
+    /// The operator index used here is the index of the operator in the operator tree, in the order of the inorder
+    /// traversal. That means that the first value is the leftmost leaf, and the last value is the root.
+    ///
+    /// This list contains no null values.
     protected final List<OperatorTypeDescriptor> _operatorTypes;
-    /**
-     * The stats associated with the given operator index.
-     * <p>
-     * The operator index used here is the index of the operator in the operator tree, in the order of the inorder
-     * traversal. That means that the first value is the leftmost leaf, and the last value is the root.
-     * <p>
-     * This list contains no null values.
-     */
+    /// The stats associated with the given operator index.
+    ///
+    /// The operator index used here is the index of the operator in the operator tree, in the order of the inorder
+    /// traversal. That means that the first value is the leftmost leaf, and the last value is the root.
+    ///
+    /// This list contains no null values.
     protected final List<StatMap<?>> _operatorStats;
 
     private StageStats() {
@@ -449,20 +421,19 @@ public class MultiStageQueryStats {
       return copy;
     }
 
-    /**
-     * Return the stats associated with the given operator index.
-     * <p>
-     * The operator index used here is the index of the operator in the operator tree, in the order of the inorder
-     * traversal.
-     * That means that the first value is the leftmost leaf, and the last value is the root.
-     * <p>
-     * It is the operator responsibility to store here its own stats and that must be done just before the end of stream
-     * block is sent. This means that calling this method before the stats is added will throw an index out of bounds.
-     *
-     * @param operatorIdx The operator index in inorder traversal of the operator tree.
-     * @return The value of the stat or null if no stat is registered.
-     * @throws IndexOutOfBoundsException if there is no stats for the given operator index.
-     */
+    /// Return the stats associated with the given operator index.
+    ///
+    /// The operator index used here is the index of the operator in the operator tree, in the order of the inorder
+    /// traversal.
+    /// That means that the first value is the leftmost leaf, and the last value is the root.
+    ///
+    /// It is the operator responsibility to store here its own stats and that must be done just before the end of
+    /// stream block is sent. This means that calling this method before the stats is added will throw an index out of
+    /// bounds.
+    ///
+    /// @param operatorIdx The operator index in inorder traversal of the operator tree.
+    /// @return The value of the stat or null if no stat is registered.
+    /// @throws IndexOutOfBoundsException if there is no stats for the given operator index.
     public StatMap<?> getOperatorStats(int operatorIdx) {
       return _operatorStats.get(operatorIdx);
     }
@@ -507,11 +478,9 @@ public class MultiStageQueryStats {
       return json;
     }
 
-    /**
-     * Serialize the stats to the given output.
-     * <p>
-     * Stats can be then deserialized as {@link Closed} with {@link Closed#deserialize(DataInput)}.
-     */
+    /// Serialize the stats to the given output.
+    ///
+    /// Stats can be then deserialized as [Closed] with [Closed#deserialize(DataInput)].
     public void serialize(DataOutput output)
         throws IOException {
       // TODO: we can serialize with short or variable size
@@ -555,12 +524,10 @@ public class MultiStageQueryStats {
       return asJson().toString();
     }
 
-    /**
-     * Closed stats represent the stats of upstream stages.
-     * <p>
-     * These stats can be serialized or deserialized and merged with other stats of the same stage, but operators must
-     * never add entries for itself in upstream stats.
-     */
+    /// Closed stats represent the stats of upstream stages.
+    ///
+    /// These stats can be serialized or deserialized and merged with other stats of the same stage, but operators must
+    /// never add entries for itself in upstream stats.
     public static class Closed extends StageStats {
       public Closed(List<OperatorTypeDescriptor> operatorTypes, List<StatMap<?>> operatorStats) {
         super(operatorTypes, operatorStats);
@@ -570,12 +537,10 @@ public class MultiStageQueryStats {
         return new Closed(new ArrayList<>(other._operatorTypes), other.copyOperatorStats());
       }
 
-      /**
-       * Merges the stats from another StageStats object into this one.
-       * <p>
-       * This object is modified in place while the other object is not modified.
-       * Both stats must belong to the same stage.
-       */
+      /// Merges the stats from another StageStats object into this one.
+      ///
+      /// This object is modified in place while the other object is not modified.
+      /// Both stats must belong to the same stage.
       // We need to deal with unchecked because Java type system is not expressive enough to handle this at static time
       // But we know we are merging the same stat types because they were created for the same operation.
       // There is also a dynamic check in the StatMap.merge() method.
@@ -620,10 +585,8 @@ public class MultiStageQueryStats {
         }
       }
 
-      /**
-       * Same as {@link #merge(StageStats)} but reads the stats from a DataInput, so it should be slightly faster given
-       * it doesn't need to create new objects.
-       */
+      /// Same as [#merge(StageStats)] but reads the stats from a DataInput, so it should be slightly faster given
+      /// it doesn't need to create new objects.
       public static Closed deserialize(DataInput input)
           throws IOException {
         return deserialize(input, input.readInt());
@@ -662,12 +625,10 @@ public class MultiStageQueryStats {
       }
     }
 
-    /**
-     * Open stats represent the stats of the current stage.
-     * <p>
-     * These stats can be modified by the operator that is currently executing. Specifically they can add stats for
-     * the current operator or merge with other open stats from the same stage.
-     */
+    /// Open stats represent the stats of the current stage.
+    ///
+    /// These stats can be modified by the operator that is currently executing. Specifically they can add stats for
+    /// the current operator or merge with other open stats from the same stage.
     public static class Open extends StageStats {
       private Open() {
         super();
@@ -700,9 +661,7 @@ public class MultiStageQueryStats {
         return copy;
       }
 
-      /**
-       * Adds the given stats at the end of this object.
-       */
+      /// Adds the given stats at the end of this object.
       public void concat(StageStats.Open other) {
         _operatorTypes.addAll(other._operatorTypes);
         _operatorStats.addAll(other._operatorStats);
@@ -726,11 +685,9 @@ public class MultiStageQueryStats {
       return this;
     }
 
-    /**
-     * Adds a new operator to the stats.
-     * @param consumer a function that will be called with a new and empty open stats object and returns the closed stat
-     *                 to be added. The received object can be freely modified and close.
-     */
+    /// Adds a new operator to the stats.
+    /// @param consumer a function that will be called with a new and empty open stats object and returns the closed
+    ///                 stat to be added. The received object can be freely modified and close.
     public Builder addLast(Function<StageStats.Open, StageStats.Closed> consumer) {
       StageStats.Open open = new StageStats.Open();
       _stats._closedStats.add(consumer.apply(open));

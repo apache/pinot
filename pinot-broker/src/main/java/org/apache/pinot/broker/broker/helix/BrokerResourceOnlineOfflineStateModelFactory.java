@@ -41,12 +41,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
 
-/**
- * Broker Resource layer state model to take over how to operate on:
- * Adding an external view to routing table.
- *
- *
- */
+/// Broker Resource layer state model to take over how to operate on:
+/// Adding an external view to routing table.
 public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceOnlineOfflineStateModelFactory.class);
 

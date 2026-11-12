@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.queries;
 
-import com.tdunning.math.stats.TDigest;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -38,21 +38,13 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 
 
-/**
- * Tests for PERCENTILE_TDIGEST and PERCENTILE_TDIGEST_MV aggregation functions.
- *
- * <ul>
- *   <li>
- *     Generates a segment with a double multi-valued column, a TDigest column, a custom compression TDigest column
- *     and a group-by column
- *   </li>
- *   <li>Runs aggregation and group-by queries on the generated segment</li>
- *   <li>
- *     Compares the results for PERCENTILE_TDIGEST_MV on double multi-valued column, PERCENTILE_TDIGEST on TDigest
- *     column with results for PERCENTILE_MV on double multi-valued column
- *   </li>
- * </ul>
- */
+/// Tests for PERCENTILE_TDIGEST and PERCENTILE_TDIGEST_MV aggregation functions.
+///
+/// - Generates a segment with a double multi-valued column, a TDigest column, a custom compression TDigest column
+///   and a group-by column
+/// - Runs aggregation and group-by queries on the generated segment
+/// - Compares the results for PERCENTILE_TDIGEST_MV on double multi-valued column, PERCENTILE_TDIGEST on TDigest
+///   column with results for PERCENTILE_MV on double multi-valued column
 public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest {
   private static final int MAX_NUM_MULTI_VALUES = 10;
   private long _numValues;
@@ -68,8 +60,10 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
       int numMultiValues = RANDOM.nextInt(MAX_NUM_MULTI_VALUES) + 1;
       _numValues += numMultiValues;
       Double[] values = new Double[numMultiValues];
-      TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
-      TDigest tDigestCustom = TDigest.createMergingDigest(CUSTOM_COMPRESSION);
+      TDigest tDigest =
+          TDigestAccumulator.forLegacyAggregation(
+              PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest tDigestCustom = TDigestAccumulator.forLegacyAggregation(CUSTOM_COMPRESSION);
       for (int j = 0; j < numMultiValues; j++) {
         double value = RANDOM.nextDouble() * VALUE_RANGE;
         values[j] = value;
@@ -78,13 +72,11 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
       }
       row.putValue(DOUBLE_COLUMN, values);
 
-      ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
-      tDigest.asBytes(byteBuffer);
-      row.putValue(TDIGEST_COLUMN, byteBuffer.array());
+      byte[] digestBytes = tDigest.serialize();
+      row.putValue(TDIGEST_COLUMN, digestBytes);
 
-      ByteBuffer byteBufferCustom = ByteBuffer.allocate(tDigestCustom.byteSize());
-      tDigestCustom.asBytes(byteBufferCustom);
-      row.putValue(TDIGEST_CUSTOM_COMPRESSION_COLUMN, byteBufferCustom.array());
+      byte[] customDigestBytes = tDigestCustom.serialize();
+      row.putValue(TDIGEST_CUSTOM_COMPRESSION_COLUMN, customDigestBytes);
 
       String group = GROUPS[RANDOM.nextInt(GROUPS.length)];
       row.putValue(GROUP_BY_COLUMN, group);

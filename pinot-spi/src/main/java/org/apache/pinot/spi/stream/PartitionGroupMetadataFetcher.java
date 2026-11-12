@@ -28,10 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Fetches the {@link StreamMetadata} for all streams of a table,
- * using the {@link StreamMetadataProvider}
- */
+/// Fetches the [StreamMetadata] for all streams of a table,
+/// using the [StreamMetadataProvider]
 public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
   private static final int METADATA_FETCH_TIMEOUT_MS = 15000;
@@ -57,9 +55,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     return Collections.unmodifiableList(_streamMetadataList);
   }
 
-  /**
-   * @deprecated after 1.5.0 release. Use {@link #getStreamMetadataList()} instead.
-   */
+  /// @deprecated after 1.5.0 release. Use [#getStreamMetadataList()] instead.
   @Deprecated
   public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
     return _streamMetadataList.stream()
@@ -71,11 +67,9 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     return _exception;
   }
 
-  /**
-   * Callable to fetch the {@link StreamMetadata} list from the streams.
-   * The stream requires the list of {@link PartitionGroupConsumptionStatus} to compute the new
-   * {@link PartitionGroupMetadata}
-   */
+  /// Callable to fetch the [StreamMetadata] list from the streams.
+  /// The stream requires the list of [PartitionGroupConsumptionStatus] to compute the new
+  /// [PartitionGroupMetadata]
   @Override
   public Boolean call()
       throws Exception {

@@ -33,29 +33,27 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.BinaryWorkloadResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This scheduler is designed to deal with two types of workloads
- * 1. Primary Workloads -> regular queries from the application
- * 2. Secondary Workloads -> adhoc queries fired from tools, testing, etc
- *
- *
- * Primary Workload Queries
- * Primary workloads queries are executed with priority and submitted to the Runner threads as and when they arrive.
- * The resources used by a primary workload query is not capped.
- *
- * Secondary Workload Queries
- *   - Secondary workload queries are identified using a query option -> "SET isSecondaryWorkload=true"
- *   - Secondary workload queries are contained as follows:
- *       - Restrictions on number of runner threads available to process secondary queries
- *       - Restrictions on total number of worker threads available to process a single secondary query
- *       - Restrictions on total number of worker threads available to process all in-progress secondary queries
- */
+/// This scheduler is designed to deal with two types of workloads
+/// 1. Primary Workloads -> regular queries from the application
+/// 2. Secondary Workloads -> adhoc queries fired from tools, testing, etc
+///
+/// Primary Workload Queries
+/// Primary workloads queries are executed with priority and submitted to the Runner threads as and when they arrive.
+/// The resources used by a primary workload query is not capped.
+///
+/// Secondary Workload Queries
+///   - Secondary workload queries are identified using a query option -> "SET isSecondaryWorkload=true"
+///   - Secondary workload queries are contained as follows:
+///       - Restrictions on number of runner threads available to process secondary queries
+///       - Restrictions on total number of worker threads available to process a single secondary query
+///       - Restrictions on total number of worker threads available to process all in-progress secondary queries
 public class BinaryWorkloadScheduler extends QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BinaryWorkloadScheduler.class);
 
@@ -87,15 +85,15 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
   }
 
   @Override
-  public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+  public ListenableFuture<DataBuffer> submitResponse(ServerQueryRequest queryRequest) {
     if (!_isRunning) {
-      return shuttingDown(queryRequest);
+      return shuttingDownResponse(queryRequest);
     }
 
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (!QueryOptionsUtils.isSecondaryWorkload(queryRequest.getQueryContext().getQueryOptions())) {
       QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, null);
-      ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, executorService);
+      ListenableFutureTask<DataBuffer> queryTask = createResponseFutureTask(queryRequest, executorService);
       _resourceManager.getQueryRunners().submit(queryTask);
       return queryTask;
     }
@@ -109,13 +107,13 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
     } catch (OutOfCapacityException e) {
       LOGGER.error("Out of capacity for query {} table {}, message: {}", queryRequest.getRequestId(),
           queryRequest.getTableNameWithType(), e.getMessage());
-      return outOfCapacity(queryRequest);
+      return outOfCapacityResponse(queryRequest);
     } catch (Exception e) {
       // We should not throw any other exception other than OutOfCapacityException. Signal that there's an issue with
       // the scheduler if any other exception is thrown.
       LOGGER.error("Internal error for query {} table {}, message {}", queryRequest.getRequestId(),
           queryRequest.getTableNameWithType(), e.getMessage());
-      return shuttingDown(queryRequest);
+      return shuttingDownResponse(queryRequest);
     }
     return schedQueryContext.getResultFuture();
   }
@@ -154,7 +152,7 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
             ServerQueryRequest queryRequest = request.getQueryRequest();
             SchedulerGroup schedulerGroup = request.getSchedulerGroup();
             QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, schedulerGroup);
-            ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, executorService);
+            ListenableFutureTask<DataBuffer> queryFutureTask = createResponseFutureTask(queryRequest, executorService);
             queryFutureTask.addListener(new Runnable() {
               @Override
               public void run() {
@@ -212,7 +210,7 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
   synchronized private void failAllPendingQueries() {
     List<SchedulerQueryContext> pending = _secondaryQueryQ.drain();
     for (SchedulerQueryContext queryContext : pending) {
-      ListenableFuture<byte[]> serverShuttingDown = shuttingDown(queryContext.getQueryRequest());
+      ListenableFuture<DataBuffer> serverShuttingDown = shuttingDownResponse(queryContext.getQueryRequest());
       queryContext.setResultFuture(serverShuttingDown);
     }
   }

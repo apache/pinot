@@ -194,12 +194,10 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
     }
   }
 
-  /**
-   * Main method for the class.
-   *
-   * @param args arguments for the perf benchmark runner.
-   * @throws Exception
-   */
+  /// Main method for the class.
+  ///
+  /// @param args arguments for the perf benchmark runner.
+  /// @throws Exception
   public static void main(String[] args)
       throws Exception {
     PerfBenchmarkRunner perfBenchmarkRunner = new PerfBenchmarkRunner();

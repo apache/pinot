@@ -32,16 +32,13 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for core ColumnReader interface and implementations.
- *
- * <p>This test class validates:
- * <ul>
- *   <li>PinotSegmentColumnReaderFactory functionality</li>
- *   <li>DefaultValueColumnReader for new columns</li>
- *   <li>ColumnReader interface contract</li>
- * </ul>
- */
+/// Tests for core ColumnReader interface and implementations.
+///
+/// This test class validates:
+///
+/// - PinotSegmentColumnReaderFactory functionality
+/// - DefaultValueColumnReader for new columns
+/// - ColumnReader interface contract
 public class ColumnReaderInterfaceTest extends ColumnarSegmentBuildingTestBase {
 
   @Test

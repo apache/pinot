@@ -38,13 +38,11 @@ import org.apache.lucene.search.knn.MultiLeafKnnCollector;
 import org.apache.lucene.util.hnsw.BlockingFloatHeap;
 
 
-/**
- * Shared Lucene HNSW query helpers for Pinot's immutable and mutable HNSW readers.
- *
- * <p>This utility keeps query-time runtime controls behaviorally aligned across the two readers by
- * centralizing the custom {@link KnnFloatVectorQuery} implementation and collector semantics in a
- * single place.</p>
- */
+/// Shared Lucene HNSW query helpers for Pinot's immutable and mutable HNSW readers.
+///
+/// This utility keeps query-time runtime controls behaviorally aligned across the two readers by
+/// centralizing the custom [KnnFloatVectorQuery] implementation and collector semantics in a
+/// single place.
 public final class LuceneHnswRuntimeControlUtils {
   private LuceneHnswRuntimeControlUtils() {
   }

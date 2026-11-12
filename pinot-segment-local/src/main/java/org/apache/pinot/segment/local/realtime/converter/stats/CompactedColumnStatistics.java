@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.math.BigDecimal;
@@ -31,6 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.Utf8Utils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -67,41 +67,50 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
 
     // Single pass over valid documents to collect used dict IDs and entry counts.
     // For SV columns, sort order is tracked inline: when sortedDocIds is provided, iterate in that order; when null,
-    // iterate via the bitmap.
+    // iterate via the bitmap. A single-value dictionary is sorted by construction, so the scan is skipped entirely.
     // isSorted is initialized to false for sorted columns to skip the per-doc dictionary compare entirely.
     // MV columns are never sorted, so we always iterate via the bitmap regardless of sortedDocIds.
     IntOpenHashSet usedDictIds = new IntOpenHashSet();
     boolean isSorted = !_isSortedColumn;
-    int prevDictId = -1;
-    int maxRowLength = 0;
     int totalEntries = 0;
     int maxMultiValues = 0;
+    int maxRowLength = 0;
 
     if (isSingleValue) {
-      if (_sortedDocIds != null) {
+      totalEntries = _totalDocs;
+      if (dictionary.length() == 1) {
+        // Every document maps to the only dict id, so scanning the forward index cannot discover anything: the used
+        // dict ids are exactly {0}, and an SV column contributes one entry per valid document
+        usedDictIds.add(0);
+        isSorted = true;
+      } else if (_sortedDocIds != null) {
+        int prevDictId = -1;
         for (int docId : _sortedDocIds) {
           if (!validDocIds.contains(docId)) {
             continue;
           }
           int dictId = forwardIndex.getDictId(docId);
-          totalEntries++;
-          usedDictIds.add(dictId);
-          if (isSorted) {
-            if (prevDictId != -1 && dictionary.compare(prevDictId, dictId) > 0) {
+          // Repeating the previous dict id needs no work: it is already in the set, and a value compared against
+          // itself can never break the sort order
+          if (dictId != prevDictId) {
+            usedDictIds.add(dictId);
+            if (isSorted && prevDictId != -1 && dictionary.compare(prevDictId, dictId) > 0) {
               isSorted = false;
             }
             prevDictId = dictId;
           }
         }
       } else {
+        int prevDictId = -1;
         org.roaringbitmap.IntIterator iterator = validDocIds.getIntIterator();
         while (iterator.hasNext()) {
           int docId = iterator.next();
           int dictId = forwardIndex.getDictId(docId);
-          totalEntries++;
-          usedDictIds.add(dictId);
-          if (isSorted) {
-            if (prevDictId != -1 && dictionary.compare(prevDictId, dictId) > 0) {
+          // Repeating the previous dict id needs no work: it is already in the set, and a value compared against
+          // itself can never break the sort order
+          if (dictId != prevDictId) {
+            usedDictIds.add(dictId);
+            if (isSorted && prevDictId != -1 && dictionary.compare(prevDictId, dictId) > 0) {
               isSorted = false;
             }
             prevDictId = dictId;
@@ -228,7 +237,7 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
           maxValue = values[_cardinality - 1];
           isAscii = true;
           for (String value : values) {
-            int length = Utf8.encodedLength(value);
+            int length = Utf8Utils.encodedLength(value);
             minElementLength = Math.min(minElementLength, length);
             maxElementLength = Math.max(maxElementLength, length);
             if (isAscii) {

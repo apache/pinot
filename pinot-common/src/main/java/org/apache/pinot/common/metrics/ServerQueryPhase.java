@@ -21,10 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Enumeration containing all the query phases executed by the server.
- *
- */
+/// Enumeration containing all the query phases executed by the server.
 public enum ServerQueryPhase implements AbstractMetrics.QueryPhase {
   REQUEST_DESERIALIZATION,
   TOTAL_QUERY_TIME,

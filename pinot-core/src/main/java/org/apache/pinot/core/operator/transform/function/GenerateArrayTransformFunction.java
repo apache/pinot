@@ -24,7 +24,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.scalar.ArrayFunctions;
+import org.apache.pinot.common.function.scalar.array.GenerateArrayScalarFunction;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.LiteralContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -66,95 +70,51 @@ public class GenerateArrayTransformFunction implements TransformFunction {
       Preconditions.checkState(literalContext.getType() == ExpressionContext.Type.LITERAL,
           "GenerateArrayTransformFunction only takes literals as arguments, found: %s", literalContext);
     }
-    // Get the type of the first member in the literalContext and generate an array
-    _dataType = literalContexts.get(0).getLiteral().getType();
-
-    switch (_dataType) {
+    // Generate the widest of the argument types, as the multi-stage engine does. A leaf stage projection is evaluated
+    // here, and its result must have the type the multi-stage planner inferred.
+    ColumnDataType[] argumentTypes = new ColumnDataType[literalContexts.size()];
+    for (int i = 0; i < argumentTypes.length; i++) {
+      argumentTypes[i] = ColumnDataType.fromDataTypeSV(literalContexts.get(i).getLiteral().getType());
+    }
+    ColumnDataType elementType = GenerateArrayScalarFunction.getElementType(argumentTypes);
+    Preconditions.checkState(elementType != null, "Illegal argument types for GenerateArrayTransformFunction: %s",
+        literalContexts);
+    _dataType = elementType.toDataType();
+    LiteralContext start = literalContexts.get(0).getLiteral();
+    LiteralContext end = literalContexts.get(1).getLiteral();
+    LiteralContext inc = literalContexts.size() == 3 ? literalContexts.get(2).getLiteral() : null;
+    int[] intArray = null;
+    long[] longArray = null;
+    float[] floatArray = null;
+    double[] doubleArray = null;
+    switch (elementType) {
       case INT:
-        int startInt = literalContexts.get(0).getLiteral().getIntValue();
-        int endInt = literalContexts.get(1).getLiteral().getIntValue();
-        int incInt;
-        if (literalContexts.size() == 3) {
-          incInt = literalContexts.get(2).getLiteral().getIntValue();
-        } else {
-          incInt = 1;
-        }
-        Preconditions.checkState((endInt > startInt && incInt > 0) || (startInt > endInt
-            && incInt < 0), "Incorrect Step value.");
-        int size = (endInt - startInt) / incInt + 1;
-        _intArrayLiteral = new int[size];
-        for (int i = 0, value = startInt; i < size; i++, value += incInt) {
-          _intArrayLiteral[i] = value;
-        }
-        _longArrayLiteral = null;
-        _floatArrayLiteral = null;
-        _doubleArrayLiteral = null;
+        intArray = inc != null
+            ? ArrayFunctions.generateIntArray(start.getIntValue(), end.getIntValue(), inc.getIntValue())
+            : ArrayFunctions.generateIntArray(start.getIntValue(), end.getIntValue());
         break;
       case LONG:
-        long startLong = Long.parseLong(literalContexts.get(0).getLiteral().getStringValue());
-        long endLong = Long.parseLong(literalContexts.get(1).getLiteral().getStringValue());
-        long incLong;
-        if (literalContexts.size() == 3) {
-          incLong = Long.parseLong(literalContexts.get(2).getLiteral().getStringValue());
-        } else {
-          incLong = 1L;
-        }
-        Preconditions.checkState((endLong > startLong && incLong > 0) || (startLong > endLong
-            && incLong < 0), "Incorrect Step value.");
-        size = (int) ((endLong - startLong) / incLong + 1);
-        _longArrayLiteral = new long[size];
-        for (int i = 0; i < size; i++, startLong += incLong) {
-          _longArrayLiteral[i] = startLong;
-        }
-        _intArrayLiteral = null;
-        _floatArrayLiteral = null;
-        _doubleArrayLiteral = null;
+        longArray = inc != null
+            ? ArrayFunctions.generateLongArray(start.getLongValue(), end.getLongValue(), inc.getLongValue())
+            : ArrayFunctions.generateLongArray(start.getLongValue(), end.getLongValue());
         break;
       case FLOAT:
-        float startFloat = Float.parseFloat(literalContexts.get(0).getLiteral().getStringValue());
-        float endFloat = Float.parseFloat(literalContexts.get(1).getLiteral().getStringValue());
-        float incFloat;
-        if (literalContexts.size() == 3) {
-          incFloat = Float.parseFloat(literalContexts.get(2).getLiteral().getStringValue());
-        } else {
-          incFloat = 1;
-        }
-        Preconditions.checkState((endFloat > startFloat && incFloat > 0) || (startFloat > endFloat
-            && incFloat < 0), "Incorrect Step value.");
-        size = (int) ((endFloat - startFloat) / incFloat + 1);
-        _floatArrayLiteral = new float[size];
-        for (int i = 0; i < size; i++, startFloat += incFloat) {
-          _floatArrayLiteral[i] = startFloat;
-        }
-        _intArrayLiteral = null;
-        _longArrayLiteral = null;
-        _doubleArrayLiteral = null;
+        floatArray = inc != null
+            ? ArrayFunctions.generateFloatArray(start.getFloatValue(), end.getFloatValue(), inc.getFloatValue())
+            : ArrayFunctions.generateFloatArray(start.getFloatValue(), end.getFloatValue());
         break;
       case DOUBLE:
-        double startDouble = Double.parseDouble(literalContexts.get(0).getLiteral().getStringValue());
-        double endDouble = Double.parseDouble(literalContexts.get(1).getLiteral().getStringValue());
-        double incDouble;
-        if (literalContexts.size() == 3) {
-          incDouble = Double.parseDouble(literalContexts.get(2).getLiteral().getStringValue());
-        } else {
-          incDouble = 1.0;
-        }
-        Preconditions.checkState((endDouble > startDouble && incDouble > 0) || (startDouble > endDouble
-            && incDouble < 0), "Incorrect Step value.");
-        size = (int) ((endDouble - startDouble) / incDouble + 1);
-        _doubleArrayLiteral = new double[size];
-        for (int i = 0; i < size; i++, startDouble += incDouble) {
-          _doubleArrayLiteral[i] = startDouble;
-        }
-        _intArrayLiteral = null;
-        _longArrayLiteral = null;
-        _floatArrayLiteral = null;
+        doubleArray = inc != null
+            ? ArrayFunctions.generateDoubleArray(start.getDoubleValue(), end.getDoubleValue(), inc.getDoubleValue())
+            : ArrayFunctions.generateDoubleArray(start.getDoubleValue(), end.getDoubleValue());
         break;
       default:
-        throw new IllegalStateException(
-            "Illegal data type for GenerateArrayTransformFunction: " + _dataType + ", literal contexts: "
-                + Arrays.toString(literalContexts.toArray()));
+        throw new IllegalStateException("Unexpected element type for GenerateArrayTransformFunction: " + elementType);
     }
+    _intArrayLiteral = intArray;
+    _longArrayLiteral = longArray;
+    _floatArrayLiteral = floatArray;
+    _doubleArrayLiteral = doubleArray;
   }
 
   public int[] getIntArrayLiteral() {

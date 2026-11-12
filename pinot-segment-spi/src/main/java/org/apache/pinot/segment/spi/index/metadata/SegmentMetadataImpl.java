@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -29,17 +30,23 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.AbstractSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -59,8 +66,10 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.ColumnNameInterner;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.joda.time.DateTimeZone;
@@ -70,12 +79,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentMetadataImpl implements SegmentMetadata {
+public class SegmentMetadataImpl implements SegmentMetadata, Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
   private final File _indexDir;
   private final TreeMap<String, ColumnMetadata> _columnMetadataMap;
   private final Schema _schema;
+  @Nullable
+  private MappedSegmentMetadataStore _mappedStore;
+  @Nullable
+  private AtomicReferenceArray<MappedColumnMetadata> _mappedColumnMetadata;
+  private boolean _mappedStoreClosed;
+  // These overlays are mutated only during segment load, before metadata is published to query threads.
+  private final Map<String, ColumnMetadata> _virtualColumnMetadata = new HashMap<>();
+  private final Set<String> _removedColumns = new HashSet<>();
+  @Nullable
+  private Set<String> _physicalColumnNames;
+  @Nullable
+  private volatile NavigableSet<String> _mappedAllColumns;
   private String _segmentName;
   private int _totalDocs;
   private SegmentVersion _segmentVersion;
@@ -104,9 +125,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private MultiColumnTextMetadata _multiColumnTextMetadata;
 
-  /**
-   * For segments that can only provide the inputstream to the metadata
-   */
+  /// For segments that can only provide the inputstream to the metadata
   public SegmentMetadataImpl(InputStream metadataPropertiesInputStream, InputStream creationMetaInputStream)
       throws IOException, ConfigurationException {
     _indexDir = null;
@@ -121,20 +140,28 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     loadCreationMeta(creationMetaInputStream);
   }
 
-  /**
-   * For segments on disk.
-   * <p>Index directory passed in should be top level segment directory.
-   * <p>If segment metadata file exists in multiple segment version, load the one in highest segment version.
-   */
+  /// For segments on disk.
+  ///
+  /// Index directory passed in should be top level segment directory.
+  ///
+  /// If segment metadata file exists in multiple segment version, load the one in highest segment version.
   public SegmentMetadataImpl(File indexDir)
+      throws IOException, ConfigurationException {
+    this(indexDir, SegmentMetadataUtils.getPropertiesConfiguration(indexDir));
+  }
+
+  SegmentMetadataImpl(File indexDir, PropertiesConfiguration segmentMetadataPropertiesConfiguration)
+      throws IOException, ConfigurationException {
+    this(indexDir, segmentMetadataPropertiesConfiguration, null, null);
+  }
+
+  SegmentMetadataImpl(File indexDir, PropertiesConfiguration segmentMetadataPropertiesConfiguration,
+      @Nullable PropertiesConfiguration indexMapConfiguration, @Nullable IndexService indexService)
       throws IOException, ConfigurationException {
     _indexDir = indexDir;
     _columnMetadataMap = new TreeMap<>();
     _schema = new Schema();
-
-    PropertiesConfiguration segmentMetadataPropertiesConfiguration =
-        SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
-    init(segmentMetadataPropertiesConfiguration);
+    init(segmentMetadataPropertiesConfiguration, indexMapConfiguration, indexService);
     setTimeInfo(segmentMetadataPropertiesConfiguration);
 
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
@@ -143,9 +170,162 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  /**
-   * For REALTIME consuming segments.
-   */
+  /// Captures the canonical metadata bytes and their parsed eager view for a final local serving load. The snapshot
+  /// is short-lived and is reused for sidecar generation only while the source fingerprints still match.
+  public static EagerSnapshot loadEagerSnapshot(File indexDir)
+      throws IOException, ConfigurationException {
+    return MappedSegmentMetadataStore.captureEagerSnapshot(indexDir);
+  }
+
+  /// A transient eager view and the exact source bytes from which it was parsed.
+  public static final class EagerSnapshot {
+    final SegmentMetadataImpl _metadata;
+    @Nullable
+    final PropertiesConfiguration _configuration;
+    final long _propertiesLength;
+    final int _propertiesCrc;
+    final long _indexMapLength;
+    final int _indexMapCrc;
+    final IndexService _indexService;
+    final boolean _reusable;
+
+    EagerSnapshot(SegmentMetadataImpl metadata, @Nullable PropertiesConfiguration configuration, long propertiesLength,
+        int propertiesCrc, long indexMapLength, int indexMapCrc, IndexService indexService, boolean reusable) {
+      _metadata = metadata;
+      _configuration = configuration;
+      _propertiesLength = propertiesLength;
+      _propertiesCrc = propertiesCrc;
+      _indexMapLength = indexMapLength;
+      _indexMapCrc = indexMapCrc;
+      _indexService = indexService;
+      _reusable = reusable;
+    }
+
+    public SegmentMetadataImpl getMetadata() {
+      return _metadata;
+    }
+  }
+
+  private SegmentMetadataImpl(SegmentMetadataImpl mapped) {
+    // A subclass may report a different index directory than the one its mapping reads.
+    _indexDir = mapped.getIndexDir();
+    _columnMetadataMap = new TreeMap<>();
+    _schema = new Schema();
+    _segmentName = mapped._segmentName;
+    _totalDocs = mapped._totalDocs;
+    _segmentVersion = mapped._segmentVersion;
+    _creatorName = mapped._creatorName;
+    _crc = mapped._crc;
+    _dataCrc = mapped._dataCrc;
+    _creationTime = mapped._creationTime;
+    _zkCreationTime = mapped._zkCreationTime;
+    _zkPushTime = mapped._zkPushTime;
+    _timeColumn = mapped._timeColumn;
+    _timeUnit = mapped._timeUnit;
+    _timeGranularity = mapped._timeGranularity;
+    _segmentStartTime = mapped._segmentStartTime;
+    _segmentEndTime = mapped._segmentEndTime;
+    _timeInterval = mapped._timeInterval;
+    _starTreeV2MetadataList = mapped._starTreeV2MetadataList != null
+        ? new ArrayList<>(mapped._starTreeV2MetadataList) : null;
+    _customMap.putAll(mapped._customMap);
+    _startOffset = mapped._startOffset;
+    _endOffset = mapped._endOffset;
+    _rawTableName = mapped._rawTableName;
+    _multiColumnTextMetadata = mapped._multiColumnTextMetadata;
+  }
+
+  /// Opens the versioned, file-backed metadata for a sealed segment. A legacy segment is converted locally on first
+  /// open; subsequent opens read the binary file and do not build retained per-column metadata objects.
+  public static SegmentMetadataImpl loadMapped(File indexDir)
+      throws IOException, ConfigurationException {
+    return loadMapped(indexDir, ReadMode.mmap);
+  }
+
+  /// Uses a direct buffer for `heap` mode and a file mapping for `mmap` mode.
+  public static SegmentMetadataImpl loadMapped(File indexDir, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    return loadMapped(indexDir, readMode, null);
+  }
+
+  /// Uses a matching eager snapshot when a sidecar rebuild is needed, otherwise reads canonical metadata afresh.
+  public static SegmentMetadataImpl loadMapped(File indexDir, ReadMode readMode, @Nullable EagerSnapshot eagerSnapshot)
+      throws IOException, ConfigurationException {
+    return new SegmentMetadataImpl(indexDir, readMode, eagerSnapshot);
+  }
+
+  /// Identifies the local mapped metadata sidecar and its incomplete temporary files.
+  public static boolean isMappedMetadataSidecarFileName(String fileName) {
+    return MappedSegmentMetadataStore.isSidecarFileName(fileName);
+  }
+
+  /// Identifies an incomplete mapped metadata sidecar, which should not be copied during segment reload.
+  public static boolean isMappedMetadataTemporaryFileName(String fileName) {
+    return MappedSegmentMetadataStore.isTempFileName(fileName);
+  }
+
+  /// Mapped constructor for segment directory implementations that subclass [SegmentMetadataImpl] to carry their own
+  /// metadata, for example one that stages a segment's metadata files locally while its index files live elsewhere.
+  /// It reads `indexDir` exactly as [#loadMapped(File, ReadMode, EagerSnapshot)] does, so the caller owns the mapping
+  /// and must [#close()] it. A subclass may override [#getIndexDir()]; [#detachedCopy()] keeps what it reports, but
+  /// returns a plain [SegmentMetadataImpl].
+  protected SegmentMetadataImpl(File indexDir, ReadMode readMode, @Nullable EagerSnapshot eagerSnapshot)
+      throws IOException, ConfigurationException {
+    _indexDir = indexDir;
+    _columnMetadataMap = null;
+    _schema = null;
+    MappedSegmentMetadataStore store = MappedSegmentMetadataStore.open(indexDir, readMode, eagerSnapshot);
+    try {
+      PropertiesConfiguration segmentConfig = store.segmentConfiguration();
+      initSegmentFields(segmentConfig);
+      setTimeInfo(segmentConfig);
+      File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
+      if (creationMetaFile != null) {
+        loadCreationMeta(creationMetaFile);
+      }
+      _mappedStore = store;
+      _mappedColumnMetadata = new AtomicReferenceArray<>(store.size());
+      _physicalColumnNames = new AbstractSet<>() {
+        @Override
+        public int size() {
+          return store.size() - _removedColumns.size();
+        }
+
+        @Override
+        public boolean contains(Object o) {
+          return o instanceof String && store.ordinal((String) o) >= 0 && !_removedColumns.contains(o);
+        }
+
+        @Override
+        public Iterator<String> iterator() {
+          return new Iterator<>() {
+            private int _index;
+
+            @Override
+            public boolean hasNext() {
+              while (_index < store.size() && _removedColumns.contains(store.name(_index))) {
+                _index++;
+              }
+              return _index < store.size();
+            }
+
+            @Override
+            public String next() {
+              if (!hasNext()) {
+                throw new NoSuchElementException();
+              }
+              return store.name(_index++);
+            }
+          };
+        }
+      };
+    } catch (IOException | ConfigurationException | RuntimeException e) {
+      store.close();
+      throw e;
+    }
+  }
+
+  /// For REALTIME consuming segments.
   public SegmentMetadataImpl(String rawTableName, String segmentName, Schema schema, long creationTime) {
     _indexDir = null;
     _columnMetadataMap = null;
@@ -156,17 +336,15 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _zkCreationTime = creationTime;
   }
 
-  /**
-   * Helper method to set time related information:
-   * <ul>
-   *   <li> Time column Name. </li>
-   *   <li> Tine Unit. </li>
-   *   <li> Time Interval. </li>
-   *   <li> Start and End time. </li>
-   * </ul>
-   */
+  /// Helper method to set time related information:
+  ///
+  /// - Time column Name.
+  /// - Tine Unit.
+  /// - Time Interval.
+  /// - Start and End time.
   private void setTimeInfo(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
-    _timeColumn = segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
+    String timeColumn = segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
+    _timeColumn = ColumnNameInterner.intern(timeColumn);
     if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_START_TIME)
         && segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_END_TIME)
         && segmentMetadataPropertiesConfiguration.containsKey(Segment.TIME_UNIT)) {
@@ -216,16 +394,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private void init(PropertiesConfiguration segmentMetadata)
       throws ConfigurationException {
-    _segmentName = segmentMetadata.getString(Segment.SEGMENT_NAME);
-    _totalDocs = segmentMetadata.getInt(Segment.SEGMENT_TOTAL_DOCS);
-    _segmentVersion = segmentMetadata.getEnum(Segment.SEGMENT_VERSION, SegmentVersion.class, SegmentVersion.v1);
-    _creatorName = segmentMetadata.getString(Segment.SEGMENT_CREATOR_VERSION, null);
+    init(segmentMetadata, null, null);
+  }
 
-    // Set the table name (for backward compatibility)
-    String tableName = segmentMetadata.getString(Segment.TABLE_NAME);
-    if (tableName != null) {
-      _rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    }
+  private void init(PropertiesConfiguration segmentMetadata, @Nullable PropertiesConfiguration indexMapConfiguration,
+      @Nullable IndexService snapshotIndexService)
+      throws ConfigurationException {
+    initSegmentFields(segmentMetadata);
 
     // NOTE: here we only add physical columns as virtual columns should not be loaded from metadata file
     // NOTE: getList() will always return an non-null List with trimmed strings:
@@ -249,13 +424,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
 
       // Load index metadata
-      // Support V3 (e.g. SingleFileIndexDirectory only). Skip for empty segments — there is no payload to size up,
-      // and [EmptyColumnMetadata] does not support `addIndexSize`.
-      if (_segmentVersion == SegmentVersion.v3) {
+      // Index sizes are available only from a local v3 index_map; stream-loaded metadata has no index directory.
+      if (_segmentVersion == SegmentVersion.v3 && _indexDir != null) {
         File indexMapFile = new File(_indexDir, "v3" + File.separator + V1Constants.INDEX_MAP_FILE_NAME);
-        if (indexMapFile.exists()) {
-          IndexService indexService = IndexService.getInstance();
-          PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(indexMapFile);
+        PropertiesConfiguration mapConfig = indexMapConfiguration;
+        IndexService indexService = snapshotIndexService;
+        if (indexService == null && indexMapFile.exists()) {
+          indexService = IndexService.getInstance();
+          mapConfig = CommonsConfigurationUtils.fromFile(indexMapFile);
+        }
+        if (mapConfig != null) {
           for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
             try {
               String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
@@ -276,6 +454,19 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _columnMetadataMap.put(column, columnMetadata);
         _schema.addField(columnMetadata.getFieldSpec());
       }
+    }
+  }
+
+  private void initSegmentFields(PropertiesConfiguration segmentMetadata) {
+    _segmentName = segmentMetadata.getString(Segment.SEGMENT_NAME);
+    _totalDocs = segmentMetadata.getInt(Segment.SEGMENT_TOTAL_DOCS);
+    _segmentVersion = segmentMetadata.getEnum(Segment.SEGMENT_VERSION, SegmentVersion.class, SegmentVersion.v1);
+    _creatorName = segmentMetadata.getString(Segment.SEGMENT_CREATOR_VERSION, null);
+
+    // Set the table name (for backward compatibility)
+    String tableName = segmentMetadata.getString(Segment.TABLE_NAME);
+    if (tableName != null) {
+      _rawTableName = TableNameBuilder.extractRawTableName(tableName);
     }
 
     // Build star-tree v2 metadata
@@ -315,12 +506,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  /**
-   * Helper method to add the physical columns from source list to destination set.
-   */
+  /// Helper method to add the physical columns from source list to destination set.
+  ///
+  /// Column names are interned: the same names recur in every segment of a table and each one is retained by the
+  /// column metadata map key, the FieldSpec, the segment Schema and the loader's per-column maps.
+  /// [ColumnNameInterner] holds these shared names weakly so unused names can be reclaimed.
   private static void addPhysicalColumns(List<Object> src, Set<String> dest) {
     for (Object o : src) {
-      String column = o.toString();
+      String column = ColumnNameInterner.intern(o.toString());
       if (!column.isEmpty() && !BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS.contains(column)) {
         // NOTE:
         //   Exclude built in virtual columns. In regular case they shouldn't exist in the metadata file, but we perform
@@ -374,13 +567,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public String getCrc() {
-    return String.valueOf(_crc);
+  public long getCrc() {
+    return _crc;
   }
 
   @Override
-  public String getDataCrc() {
-    return String.valueOf(_dataCrc);
+  public long getDataCrc() {
+    return _dataCrc;
   }
 
   @Override
@@ -390,7 +583,19 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public Schema getSchema() {
-    return _schema;
+    if (_mappedStore == null) {
+      return _schema;
+    }
+    // A Schema has several maps and lists per segment. Construct it only for callers that need it, without retaining
+    // another copy of the column directory for the lifetime of a wide segment.
+    Schema schema = new Schema();
+    for (String column : getPhysicalColumnNames()) {
+      schema.addField(_mappedStore.fieldSpec(_mappedStore.ordinal(column)));
+    }
+    for (ColumnMetadata metadata : _virtualColumnMetadata.values()) {
+      schema.addField(metadata.getFieldSpec());
+    }
+    return schema;
   }
 
   @Override
@@ -414,39 +619,31 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _creationTime;
   }
 
-  /**
-   * Returns the ZooKeeper creation time for upsert consistency.
-   * For REALTIME tables, this is set by the controller when the consuming segment is created, ensuring consistent
-   * creation time across replicas. For segments loaded from disk, this returns {@code Long.MIN_VALUE} until
-   * {@link #setZkCreationTime(long)} is explicitly called (e.g. from ZK metadata during segment loading).
-   * @return ZK creation time in milliseconds, or {@code Long.MIN_VALUE} if not explicitly set
-   */
+  /// Returns the ZooKeeper creation time for upsert consistency.
+  /// For REALTIME tables, this is set by the controller when the consuming segment is created, ensuring consistent
+  /// creation time across replicas. For segments loaded from disk, this returns `Long.MIN_VALUE` until
+  /// [#setZkCreationTime(long)] is explicitly called (e.g. from ZK metadata during segment loading).
+  /// @return ZK creation time in milliseconds, or `Long.MIN_VALUE` if not explicitly set
   public long getZkCreationTime() {
     return _zkCreationTime;
   }
 
-  /**
-   * Sets the ZooKeeper creation time for upsert consistency.
-   * @param zkCreationTime ZK creation time in milliseconds
-   */
+  /// Sets the ZooKeeper creation time for upsert consistency.
+  /// @param zkCreationTime ZK creation time in milliseconds
   public void setZkCreationTime(long zkCreationTime) {
     _zkCreationTime = zkCreationTime;
   }
 
-  /**
-   * Returns the ZooKeeper push time for upsert consistency.
-   * This refers to the time set by controller while pushing the segment. It is used to ensure consistent
-   * push time across replicas for upsert operations.
-   * @return ZK push time in milliseconds, or Long.MIN_VALUE if not set
-   */
+  /// Returns the ZooKeeper push time for upsert consistency.
+  /// This refers to the time set by controller while pushing the segment. It is used to ensure consistent
+  /// push time across replicas for upsert operations.
+  /// @return ZK push time in milliseconds, or Long.MIN_VALUE if not set
   public long getZkPushTime() {
     return _zkPushTime;
   }
 
-  /**
-   * Sets the ZooKeeper push time for upsert consistency.
-   * @param zkPushTime ZK push time in milliseconds
-   */
+  /// Sets the ZooKeeper push time for upsert consistency.
+  /// @param zkPushTime ZK push time in milliseconds
   public void setZkPushTime(long zkPushTime) {
     _zkPushTime = zkPushTime;
   }
@@ -495,21 +692,135 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public TreeMap<String, ColumnMetadata> getColumnMetadataMap() {
-    return _columnMetadataMap;
+    if (_mappedStore == null) {
+      return _columnMetadataMap;
+    }
+    // Compatibility API for metadata/admin callers. The serving path uses column names and direct lookup instead.
+    TreeMap<String, ColumnMetadata> result = new TreeMap<>();
+    for (String column : getPhysicalColumnNames()) {
+      result.put(column, getColumnMetadataFor(column));
+    }
+    result.putAll(_virtualColumnMetadata);
+    return result;
+  }
+
+  /// Returns the physical column names without materializing a metadata map or Schema on mapped segments.
+  public Set<String> getPhysicalColumnNames() {
+    return _mappedStore != null ? _physicalColumnNames : _schema.getPhysicalColumnNames();
+  }
+
+  @Override
+  public NavigableSet<String> getAllColumns() {
+    if (_mappedStore == null) {
+      return getSchema().getColumnNames();
+    }
+    NavigableSet<String> columns = _mappedAllColumns;
+    if (columns == null) {
+      NavigableSet<String> allColumns = new TreeSet<>(getPhysicalColumnNames());
+      allColumns.addAll(_virtualColumnMetadata.keySet());
+      columns = Collections.unmodifiableNavigableSet(allColumns);
+      _mappedAllColumns = columns;
+    }
+    return columns;
+  }
+
+  /// Indicates whether the immutable segment is reading its metadata from the binary mapping.
+  public boolean isMapped() {
+    return _mappedStore != null;
+  }
+
+  /// Returns metadata that remains readable after the mapped segment is released. Eager metadata already owns its
+  /// column data; a mapped segment needs an eager copy with its serving-time column overlays and ZK timestamps.
+  public SegmentMetadataImpl detachedCopy() {
+    if (_mappedStore == null) {
+      return this;
+    }
+    SegmentMetadataImpl copy = new SegmentMetadataImpl(this);
+    for (String column : getPhysicalColumnNames()) {
+      ColumnMetadata mappedColumn = getColumnMetadataFor(column);
+      ColumnMetadata detachedColumn = _totalDocs > 0 ? ColumnMetadataImpl.detachedCopyOf(mappedColumn)
+          : new EmptyColumnMetadata(mappedColumn.getFieldSpec(), mappedColumn.getPartitionFunction(),
+              mappedColumn.getPartitions());
+      copy._columnMetadataMap.put(column, detachedColumn);
+      copy._schema.addField(detachedColumn.getFieldSpec());
+    }
+    for (Map.Entry<String, ColumnMetadata> entry : _virtualColumnMetadata.entrySet()) {
+      copy._columnMetadataMap.put(entry.getKey(), entry.getValue());
+      copy._schema.addField(entry.getValue().getFieldSpec());
+    }
+    return copy;
+  }
+
+  @Nullable
+  @Override
+  public ColumnMetadata getColumnMetadataFor(String column) {
+    if (_mappedStore == null) {
+      TreeMap<String, ColumnMetadata> columnMetadataMap = getColumnMetadataMap();
+      return columnMetadataMap != null ? columnMetadataMap.get(column) : null;
+    }
+    ColumnMetadata virtual = _virtualColumnMetadata.get(column);
+    if (virtual != null) {
+      return virtual;
+    }
+    if (_removedColumns.contains(column)) {
+      return null;
+    }
+    int ordinal = _mappedStore.ordinal(column);
+    if (ordinal < 0) {
+      return null;
+    }
+    MappedColumnMetadata metadata = _mappedColumnMetadata.get(ordinal);
+    if (metadata == null) {
+      metadata = new MappedColumnMetadata(_mappedStore, ordinal);
+      if (!_mappedColumnMetadata.compareAndSet(ordinal, null, metadata)) {
+        metadata = _mappedColumnMetadata.get(ordinal);
+      }
+    }
+    return metadata;
+  }
+
+  /// Adds a virtual column generated during serving load without changing the on-disk physical-column directory.
+  public void addVirtualColumnMetadata(String column, ColumnMetadata metadata) {
+    if (_mappedStore == null) {
+      _columnMetadataMap.put(column, metadata);
+    } else {
+      _virtualColumnMetadata.put(column, metadata);
+      _mappedAllColumns = null;
+    }
+  }
+
+  /// Releases the metadata mapping. Managed serving directories close after readers retire; other callers must
+  /// keep the mapping open while it is in use. The mapped store synchronizes buffer-backed reads with close.
+  public synchronized void close()
+      throws IOException {
+    if (_mappedStore != null && !_mappedStoreClosed) {
+      _mappedStore.close();
+      _mappedStoreClosed = true;
+    }
   }
 
   @Override
   public void removeColumn(String column) {
     Preconditions.checkState(!column.equals(_timeColumn), "Cannot remove time column: %s", _timeColumn);
-    _columnMetadataMap.remove(column);
-    _schema.removeField(column);
+    if (_mappedStore == null) {
+      _columnMetadataMap.remove(column);
+      _schema.removeField(column);
+    } else {
+      if (_mappedStore.ordinal(column) >= 0) {
+        _removedColumns.add(column);
+      } else {
+        _virtualColumnMetadata.remove(column);
+      }
+      _mappedAllColumns = null;
+    }
   }
 
   @Override
   public JsonNode toJson(@Nullable Set<String> columnFilter) {
     ObjectNode segmentMetadata = JsonUtils.newObjectNode();
     segmentMetadata.put("segmentName", _segmentName);
-    segmentMetadata.put("schemaName", _schema != null ? _schema.getSchemaName() : null);
+    Schema schema = getSchema();
+    segmentMetadata.put("schemaName", schema != null ? schema.getSchemaName() : null);
     segmentMetadata.put("crc", _crc);
     if (_dataCrc != Long.MIN_VALUE) {
       segmentMetadata.put("dataCrc", _dataCrc);
@@ -548,9 +859,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     segmentMetadata.put("startOffset", _startOffset);
     segmentMetadata.put("endOffset", _endOffset);
 
-    if (_columnMetadataMap != null) {
+    TreeMap<String, ColumnMetadata> columns = getColumnMetadataMap();
+    if (columns != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();
-      for (Map.Entry<String, ColumnMetadata> entry : _columnMetadataMap.entrySet()) {
+      for (Map.Entry<String, ColumnMetadata> entry : columns.entrySet()) {
         if (columnFilter == null || columnFilter.contains(entry.getKey())) {
           columnsMetadata.add(JsonUtils.objectToJsonNode(entry.getValue()));
         }

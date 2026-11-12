@@ -29,18 +29,16 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
-/**
- * Registry of all known MSE {@link OperatorTypeDescriptor}s. Built-in types ({@link MultiStageOperator.Type} enum
- * entries) are always present. Plugin-defined types are discovered at class-loading time via {@link ServiceLoader}:
- * any jar that ships a
- * {@code META-INF/services/org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor} file will have its
- * descriptors automatically registered without configuration. Discovery covers both the context classpath and the
- * {@link PluginManager} plugin classloaders, so descriptors packaged in isolated plugin jars are found too — like
- * {@code PinotRuleSet} does for {@code RuleSetCustomizer}. The registry is first used well after plugins are loaded
- * (decoding/encoding stream-mode stats), so the plugin classloader snapshot is complete by then.
- *
- * <p>Thread-safe: the registry map is built once in a static initializer and never mutated afterward.
- */
+/// Registry of all known MSE [OperatorTypeDescriptor]s. Built-in types ([MultiStageOperator.Type] enum
+/// entries) are always present. Plugin-defined types are discovered at class-loading time via [ServiceLoader]:
+/// any jar that ships a
+/// `META-INF/services/org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor` file will have its
+/// descriptors automatically registered without configuration. Discovery covers both the context classpath and the
+/// [PluginManager] plugin classloaders, so descriptors packaged in isolated plugin jars are found too — like
+/// `PinotRuleSet` does for `RuleSetCustomizer`. The registry is first used well after plugins are loaded
+/// (decoding/encoding stream-mode stats), so the plugin classloader snapshot is complete by then.
+///
+/// Thread-safe: the registry map is built once in a static initializer and never mutated afterward.
 public final class OperatorTypeRegistry {
 
   private static final Map<Integer, OperatorTypeDescriptor> ID_TO_DESCRIPTOR;
@@ -86,17 +84,15 @@ public final class OperatorTypeRegistry {
   private OperatorTypeRegistry() {
   }
 
-  /**
-   * Returns the descriptor registered for the given id, or {@code null} if no descriptor has that id.
-   * Built-in types (ids 0–15) are always present. Plugin types are available if their jar was on the classpath at
-   * startup.
-   */
+  /// Returns the descriptor registered for the given id, or `null` if no descriptor has that id.
+  /// Built-in types (ids 0–15) are always present. Plugin types are available if their jar was on the classpath at
+  /// startup.
   @Nullable
   public static OperatorTypeDescriptor fromId(int id) {
     return ID_TO_DESCRIPTOR.get(id);
   }
 
-  /** Returns the total number of registered descriptors (built-ins + plugins). */
+  /// Returns the total number of registered descriptors (built-ins + plugins).
   @VisibleForTesting
   static int size() {
     return ID_TO_DESCRIPTOR.size();

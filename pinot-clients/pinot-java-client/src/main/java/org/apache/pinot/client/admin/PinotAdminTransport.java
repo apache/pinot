@@ -44,21 +44,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * HTTP transport for Pinot admin operations.
- * Handles communication with Pinot controller REST APIs.
- */
+/// HTTP transport for Pinot admin operations.
+/// Handles communication with Pinot controller REST APIs.
 public class PinotAdminTransport implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdminTransport.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   public static final String ADMIN_TRANSPORT_REQUEST_TIMEOUT_MS = "pinot.admin.request.timeout.ms";
   public static final String ADMIN_TRANSPORT_SCHEME = "pinot.admin.scheme";
 
-  /**
-   * Gets the ObjectMapper instance for JSON serialization/deserialization.
-   *
-   * @return ObjectMapper instance
-   */
+  /// Gets the ObjectMapper instance for JSON serialization/deserialization.
+  ///
+  /// @return ObjectMapper instance
   public static ObjectMapper getObjectMapper() {
     return OBJECT_MAPPER;
   }
@@ -107,30 +103,24 @@ public class PinotAdminTransport implements AutoCloseable {
     LOGGER.info("Initialized Pinot admin transport with scheme: {}, timeout: {}ms", scheme, _requestTimeoutMs);
   }
 
-  /**
-   * Returns the scheme (http/https) used by this transport.
-   */
+  /// Returns the scheme (http/https) used by this transport.
   public String getScheme() {
     return _scheme;
   }
 
-  /**
-   * Returns the SSL context used by this transport, or {@code null} if SSL is not configured.
-   */
+  /// Returns the SSL context used by this transport, or `null` if SSL is not configured.
   SSLContext getSslContext() {
     return _sslContext;
   }
 
-  /**
-   * Executes a GET request to the specified path.
-   *
-   * @param controllerAddress Controller address
-   * @param path Request path
-   * @param queryParams Query parameters
-   * @param headers Additional headers
-   * @return Response JSON node
-   * @throws PinotAdminException If the request fails
-   */
+  /// Executes a GET request to the specified path.
+  ///
+  /// @param controllerAddress Controller address
+  /// @param path Request path
+  /// @param queryParams Query parameters
+  /// @param headers Additional headers
+  /// @return Response JSON node
+  /// @throws PinotAdminException If the request fails
   public JsonNode executeGet(String controllerAddress, String path, Map<String, String> queryParams,
       Map<String, String> headers)
       throws PinotAdminException {
@@ -149,16 +139,14 @@ public class PinotAdminTransport implements AutoCloseable {
     }
   }
 
-  /**
-   * Executes a GET request to the specified path and returns the raw bytes.
-   *
-   * @param controllerAddress Controller address
-   * @param path Request path
-   * @param queryParams Query parameters
-   * @param headers Additional headers
-   * @return Response body as bytes
-   * @throws PinotAdminException If the request fails
-   */
+  /// Executes a GET request to the specified path and returns the raw bytes.
+  ///
+  /// @param controllerAddress Controller address
+  /// @param path Request path
+  /// @param queryParams Query parameters
+  /// @param headers Additional headers
+  /// @return Response body as bytes
+  /// @throws PinotAdminException If the request fails
   public byte[] executeGetBinary(String controllerAddress, String path, Map<String, String> queryParams,
       Map<String, String> headers)
       throws PinotAdminException {
@@ -178,15 +166,13 @@ public class PinotAdminTransport implements AutoCloseable {
     }
   }
 
-  /**
-   * Executes an async GET request to the specified path.
-   *
-   * @param controllerAddress Controller address
-   * @param path Request path
-   * @param queryParams Query parameters
-   * @param headers Additional headers
-   * @return CompletableFuture with response JSON node
-   */
+  /// Executes an async GET request to the specified path.
+  ///
+  /// @param controllerAddress Controller address
+  /// @param path Request path
+  /// @param queryParams Query parameters
+  /// @param headers Additional headers
+  /// @return CompletableFuture with response JSON node
   public CompletableFuture<JsonNode> executeGetAsync(String controllerAddress, String path,
       Map<String, String> queryParams, Map<String, String> headers) {
     return executeRequestAsync(controllerAddress, path, "GET", null, queryParams, headers).thenCompose(response -> {
@@ -204,17 +190,15 @@ public class PinotAdminTransport implements AutoCloseable {
     });
   }
 
-  /**
-   * Executes a POST request to the specified path.
-   *
-   * @param controllerAddress Controller address
-   * @param path Request path
-   * @param body Request body
-   * @param queryParams Query parameters
-   * @param headers Additional headers
-   * @return Response JSON node
-   * @throws PinotAdminException If the request fails
-   */
+  /// Executes a POST request to the specified path.
+  ///
+  /// @param controllerAddress Controller address
+  /// @param path Request path
+  /// @param body Request body
+  /// @param queryParams Query parameters
+  /// @param headers Additional headers
+  /// @return Response JSON node
+  /// @throws PinotAdminException If the request fails
   public JsonNode executePost(String controllerAddress, String path, Object body,
       Map<String, String> queryParams, Map<String, String> headers)
       throws PinotAdminException {
@@ -233,16 +217,14 @@ public class PinotAdminTransport implements AutoCloseable {
     }
   }
 
-  /**
-   * Executes an async POST request to the specified path.
-   *
-   * @param controllerAddress Controller address
-   * @param path Request path
-   * @param body Request body
-   * @param queryParams Query parameters
-   * @param headers Additional headers
-   * @return CompletableFuture with response JSON node
-   */
+  /// Executes an async POST request to the specified path.
+  ///
+  /// @param controllerAddress Controller address
+  /// @param path Request path
+  /// @param body Request body
+  /// @param queryParams Query parameters
+  /// @param headers Additional headers
+  /// @return CompletableFuture with response JSON node
   public CompletableFuture<JsonNode> executePostAsync(String controllerAddress, String path, Object body,
       Map<String, String> queryParams, Map<String, String> headers) {
     return executeRequestAsync(controllerAddress, path, "POST", body, queryParams, headers).thenCompose(response -> {
@@ -260,17 +242,15 @@ public class PinotAdminTransport implements AutoCloseable {
     });
   }
 
-  /**
-   * Executes a PUT request to the specified path.
-   *
-   * @param controllerAddress Controller address
-   * @param path Request path
-   * @param body Request body
-   * @param queryParams Query parameters
-   * @param headers Additional headers
-   * @return Response JSON node
-   * @throws PinotAdminException If the request fails
-   */
+  /// Executes a PUT request to the specified path.
+  ///
+  /// @param controllerAddress Controller address
+  /// @param path Request path
+  /// @param body Request body
+  /// @param queryParams Query parameters
+  /// @param headers Additional headers
+  /// @return Response JSON node
+  /// @throws PinotAdminException If the request fails
   public JsonNode executePut(String controllerAddress, String path, Object body,
       Map<String, String> queryParams, Map<String, String> headers)
       throws PinotAdminException {
@@ -289,16 +269,14 @@ public class PinotAdminTransport implements AutoCloseable {
     }
   }
 
-  /**
-   * Executes an async PUT request to the specified path.
-   *
-   * @param controllerAddress Controller address
-   * @param path Request path
-   * @param body Request body
-   * @param queryParams Query parameters
-   * @param headers Additional headers
-   * @return CompletableFuture with response JSON node
-   */
+  /// Executes an async PUT request to the specified path.
+  ///
+  /// @param controllerAddress Controller address
+  /// @param path Request path
+  /// @param body Request body
+  /// @param queryParams Query parameters
+  /// @param headers Additional headers
+  /// @return CompletableFuture with response JSON node
   public CompletableFuture<JsonNode> executePutAsync(String controllerAddress, String path, Object body,
       Map<String, String> queryParams, Map<String, String> headers) {
     return executeRequestAsync(controllerAddress, path, "PUT", body, queryParams, headers).thenCompose(response -> {
@@ -316,16 +294,14 @@ public class PinotAdminTransport implements AutoCloseable {
     });
   }
 
-  /**
-   * Executes a DELETE request to the specified path.
-   *
-   * @param controllerAddress Controller address
-   * @param path Request path
-   * @param queryParams Query parameters
-   * @param headers Additional headers
-   * @return Response JSON node
-   * @throws PinotAdminException If the request fails
-   */
+  /// Executes a DELETE request to the specified path.
+  ///
+  /// @param controllerAddress Controller address
+  /// @param path Request path
+  /// @param queryParams Query parameters
+  /// @param headers Additional headers
+  /// @return Response JSON node
+  /// @throws PinotAdminException If the request fails
   public JsonNode executeDelete(String controllerAddress, String path, Map<String, String> queryParams,
       Map<String, String> headers)
       throws PinotAdminException {
@@ -344,15 +320,13 @@ public class PinotAdminTransport implements AutoCloseable {
     }
   }
 
-  /**
-   * Executes an async DELETE request to the specified path.
-   *
-   * @param controllerAddress Controller address
-   * @param path Request path
-   * @param queryParams Query parameters
-   * @param headers Additional headers
-   * @return CompletableFuture with response JSON node
-   */
+  /// Executes an async DELETE request to the specified path.
+  ///
+  /// @param controllerAddress Controller address
+  /// @param path Request path
+  /// @param queryParams Query parameters
+  /// @param headers Additional headers
+  /// @return CompletableFuture with response JSON node
   public CompletableFuture<JsonNode> executeDeleteAsync(String controllerAddress, String path,
       Map<String, String> queryParams, Map<String, String> headers) {
     return executeRequestAsync(controllerAddress, path, "DELETE", null, queryParams, headers).thenCompose(response -> {
@@ -426,15 +400,13 @@ public class PinotAdminTransport implements AutoCloseable {
     }
   }
 
-  /**
-   * Parses a JSON array field into a List of Strings.
-   * Handles both actual JSON arrays and comma-separated strings for backward compatibility.
-   *
-   * @param response JSON response node
-   * @param fieldName Name of the field containing the array
-   * @return List of strings from the array field
-   * @throws PinotAdminException If the field is missing, null, or not in expected format
-   */
+  /// Parses a JSON array field into a List of Strings.
+  /// Handles both actual JSON arrays and comma-separated strings for backward compatibility.
+  ///
+  /// @param response JSON response node
+  /// @param fieldName Name of the field containing the array
+  /// @return List of strings from the array field
+  /// @throws PinotAdminException If the field is missing, null, or not in expected format
   public List<String> parseStringArray(JsonNode response, String fieldName)
       throws PinotAdminException {
     JsonNode arrayNode = response.get(fieldName);
@@ -485,14 +457,12 @@ public class PinotAdminTransport implements AutoCloseable {
     throw new PinotAdminException("Expected a JSON array or string but got: " + arrayNode.getNodeType());
   }
 
-  /**
-   * Safely parses a JSON array field into a List of Strings for async operations.
-   * Returns empty list on error instead of throwing exception.
-   *
-   * @param response JSON response node
-   * @param fieldName Name of the field containing the array
-   * @return List of strings from the array field, or empty list if parsing fails
-   */
+  /// Safely parses a JSON array field into a List of Strings for async operations.
+  /// Returns empty list on error instead of throwing exception.
+  ///
+  /// @param response JSON response node
+  /// @param fieldName Name of the field containing the array
+  /// @return List of strings from the array field, or empty list if parsing fails
   public List<String> parseStringArraySafe(JsonNode response, String fieldName) {
     try {
       return parseStringArray(response, fieldName);
@@ -582,11 +552,9 @@ public class PinotAdminTransport implements AutoCloseable {
     }
   }
 
-  /**
-   * Gets the HTTP client statistics.
-   *
-   * @return Client statistics
-   */
+  /// Gets the HTTP client statistics.
+  ///
+  /// @return Client statistics
   public ClientStats getClientMetrics() {
     return _httpClient.getClientStats();
   }

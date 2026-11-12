@@ -21,9 +21,7 @@ package org.apache.pinot.client;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * TLS Protocols enabled for AsyncHttpClient
- */
+/// TLS Protocols enabled for AsyncHttpClient
 public class TlsProtocols {
   private final List<String> _enabledProtocols;
 

@@ -38,70 +38,64 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * This mutable forward index implements a composite index for string-typed columns with dynamic encoding options:
- * <ol>
- *   <li>Pure CLP dictionary encoding when the dictionary cardinality is below a configurable threshold.</li>
- *   <li>CLP dictionary encoding combined with a raw string forward index when the dictionary cardinality exceeds
- *   the threshold.</li>
- * </ol>
- * <p>
- * Initially, CLP encoding transforms a high-cardinality log message string into three data columns:
- * <ul>
- *   <li>Logtype (very low cardinality) - essentially an inferred format string of the log</li>
- *   <li>Dictionary variables (medium cardinality) - variables with both alphabets and numbers</li>
- *   <li>Encoded variables (high cardinality) - pure fixed point and floating point numbers</li>
- * </ul>
- * The logtype and dictionary variables are dictionary-encoded, while the encoded variables are stored as longs.
- * Notably, both {@code encodedVarIds} and {@code encodedVars} are multi-valued, but they are stored using a
- * flattened single-value mutable forward index, along with a separate forward index to capture the end offsets
- * for each multi-valued document. This approach is necessary because the maximum number of values per document
- * is unknown during ingestion, unlike the existing multi-value forward index, which requires this information
- * upfront. During the conversion from mutable to immutable forward index, the two single-value mutable indices
- * are merged into a single immutable multi-valued forward index, as the max length is known at conversion time.
- * <p>
- * During ingestion, if the cardinality of either the {@code logtypeId} or {@code dictVarID} exceeds a predefined
- * threshold, the ingestion mode switches to a raw bytes forward index for subsequent documents. Maintaining very
- * large dictionaries is inefficient in Pinot due to memory and I/O constraints (memory-mapped). Switching to a
- * raw bytes forward index helps avoid these issues. During reads, if the requested {@code docId} is in the raw
- * forward index, the raw bytes are returned. Otherwise, the log type, dictionary variables, and encoded variables
- * are decoded using the CLP decoder to return the original log message's bytes.
- *
- * <p><b>Note on Write and Read Operations:</b> Writes are strictly sequential, while reads can be performed
- * randomly. The supported append operations are:</p>
- * <ul>
- *   <li>{@link #setString(int docId, String value)} - Encodes the log message using CLP and invokes
- *   {@link #appendEncodedMessage(EncodedMessage clpEncodedMessage)}.</li>
- *   <li>{@link #appendEncodedMessage(EncodedMessage clpEncodedMessage)}</li>
- * </ul>
- *
- * <p><b>Limitations:</b> The current CLP mutable forward index does not achieve the same compression ratio as the
- * original standalone CLP implementation, primarily due to design differences between Pinot and CLP. While Pinot
- * is optimized for fast random access, CLP is designed for single-pass streaming compression and search. As a result,
- * Pinot sacrifices some compression efficiency for these primary reasons:
- * <ul>
- *   <li>Pinot implementation uses block compression compared to CLP’s standalone streaming compression, which achieves
- *   much better compression ratio at the cost of random access performance.</li>
- *   <li>Pinot implementation uses uncompressed dictionaries for random lookups of log types and dictionary variables,
- *   whereas CLP employs compressed dictionaries suited only for single-pass streaming queries.</li>
- *   <li>Pinot stores additional offsets and length metadata for log types, dictionary variables, and encoded
- *   variables:</li>
- *   <ul>
- *      <li>Streaming forward indices used by CLP's standalone implementation, do not need to store document start or
- *      end markers because the boundary of one document naturally aligns with the next.</li>
- *      <li>CLP avoids storing the number of {@code dictVars} and {@code encodedVars}, as this information is already
- *      embedded in the log type and available during decoding. Pinot, however, needs to store this metadata,
- *      which can sometimes take up more space than the data itself when compressed.</li>
- *   </ul>
- * </ul>
- * Additionally, CLP standalone binaries can perform search without decompressing the data into plain text. The most
- * common query type on log data is partial matching. Frequently, searches can be completed by scanning only the logtype
- * dictionaries for partial matches. Searches can also be executed on {@code logtypeId} and {@code dictVarId} directly
- * by first performing lookup on the dictionaries to get a subset of dictionary ids to filter, whereas in Pinot,
- * each dictionary id must be first converted back to strings, followed by a brute-force search on the corresponding
- * string value. For these reasons, direct searching on CLP columns in Pinot is not yet implemented but may be
- * included in future updates.</p>
- */
+/// This mutable forward index implements a composite index for string-typed columns with dynamic encoding options:
+///
+/// 1. Pure CLP dictionary encoding when the dictionary cardinality is below a configurable threshold.
+/// 2. CLP dictionary encoding combined with a raw string forward index when the dictionary cardinality exceeds
+///    the threshold.
+///
+/// Initially, CLP encoding transforms a high-cardinality log message string into three data columns:
+///
+/// - Logtype (very low cardinality) - essentially an inferred format string of the log
+/// - Dictionary variables (medium cardinality) - variables with both alphabets and numbers
+/// - Encoded variables (high cardinality) - pure fixed point and floating point numbers
+///
+/// The logtype and dictionary variables are dictionary-encoded, while the encoded variables are stored as longs.
+/// Notably, both `encodedVarIds` and `encodedVars` are multi-valued, but they are stored using a
+/// flattened single-value mutable forward index, along with a separate forward index to capture the end offsets
+/// for each multi-valued document. This approach is necessary because the maximum number of values per document
+/// is unknown during ingestion, unlike the existing multi-value forward index, which requires this information
+/// upfront. During the conversion from mutable to immutable forward index, the two single-value mutable indices
+/// are merged into a single immutable multi-valued forward index, as the max length is known at conversion time.
+///
+/// During ingestion, if the cardinality of either the `logtypeId` or `dictVarID` exceeds a predefined
+/// threshold, the ingestion mode switches to a raw bytes forward index for subsequent documents. Maintaining very
+/// large dictionaries is inefficient in Pinot due to memory and I/O constraints (memory-mapped). Switching to a
+/// raw bytes forward index helps avoid these issues. During reads, if the requested `docId` is in the raw
+/// forward index, the raw bytes are returned. Otherwise, the log type, dictionary variables, and encoded variables
+/// are decoded using the CLP decoder to return the original log message's bytes.
+///
+/// **Note on Write and Read Operations:** Writes are strictly sequential, while reads can be performed
+/// randomly. The supported append operations are:
+///
+/// - [#setString(int docId, String value)] - Encodes the log message using CLP and invokes
+///   [#appendEncodedMessage(EncodedMessage clpEncodedMessage)].
+/// - [#appendEncodedMessage(EncodedMessage clpEncodedMessage)]
+///
+/// **Limitations:** The current CLP mutable forward index does not achieve the same compression ratio as the
+/// original standalone CLP implementation, primarily due to design differences between Pinot and CLP. While Pinot
+/// is optimized for fast random access, CLP is designed for single-pass streaming compression and search. As a result,
+/// Pinot sacrifices some compression efficiency for these primary reasons:
+///
+/// - Pinot implementation uses block compression compared to CLP’s standalone streaming compression, which achieves
+///   much better compression ratio at the cost of random access performance.
+/// - Pinot implementation uses uncompressed dictionaries for random lookups of log types and dictionary variables,
+///   whereas CLP employs compressed dictionaries suited only for single-pass streaming queries.
+/// - Pinot stores additional offsets and length metadata for log types, dictionary variables, and encoded
+///   variables:
+///   - Streaming forward indices used by CLP's standalone implementation, do not need to store document start or
+///     end markers because the boundary of one document naturally aligns with the next.
+///   - CLP avoids storing the number of `dictVars` and `encodedVars`, as this information is already
+///     embedded in the log type and available during decoding. Pinot, however, needs to store this metadata,
+///     which can sometimes take up more space than the data itself when compressed.
+///
+/// Additionally, CLP standalone binaries can perform search without decompressing the data into plain text. The most
+/// common query type on log data is partial matching. Frequently, searches can be completed by scanning only the
+/// logtype dictionaries for partial matches. Searches can also be executed on `logtypeId` and `dictVarId`
+/// directly by first performing lookup on the dictionaries to get a subset of dictionary ids to filter, whereas in
+/// Pinot, each dictionary id must be first converted back to strings, followed by a brute-force search on the
+/// corresponding string value. For these reasons, direct searching on CLP columns in Pinot is not yet implemented but
+/// may be included in future updates.
 public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   protected static final Logger LOGGER = LoggerFactory.getLogger(CLPMutableForwardIndexV2.class);
   public final String _columnName;
@@ -204,16 +198,14 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
     _encodedVarOffset.setInt(0, 0);
   }
 
-  /**
-   * Sets a string value in the forward index.
-   * <p>
-   * This method appends the given string value to the forward index. The provided `docId` is ignored as this mutable
-   * forward index only supports sequential writes (append operations) rather than random access based on document IDs.
-   * Only reads can be random.
-   *
-   * @param docId The document ID (ignored in this implementation).
-   * @param value The string value to append to the forward index.
-   */
+  /// Sets a string value in the forward index.
+  ///
+  /// This method appends the given string value to the forward index. The provided `docId` is ignored as this mutable
+  /// forward index only supports sequential writes (append operations) rather than random access based on document IDs.
+  /// Only reads can be random.
+  ///
+  /// @param docId The document ID (ignored in this implementation).
+  /// @param value The string value to append to the forward index.
   @Override
   public void setString(int docId, String value) {
     // docId is intentionally ignored because this forward index only supports sequential writes (append only)
@@ -228,15 +220,13 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
     }
   }
 
-  /**
-   * Appends an encoded message to the forward index.
-   * <p>
-   * This method processes the provided {@link EncodedMessage} by first flattening the dictionary variables to ensure
-   * efficient data access through the lower-level clp-ffi API. The method handles potential null values within the
-   * encoded message by replacing them with empty arrays, as Pinot does not accept null values.
-   *
-   * @param clpEncodedMessage The {@link EncodedMessage} to append.
-   */
+  /// Appends an encoded message to the forward index.
+  ///
+  /// This method processes the provided [EncodedMessage] by first flattening the dictionary variables to ensure
+  /// efficient data access through the lower-level clp-ffi API. The method handles potential null values within the
+  /// encoded message by replacing them with empty arrays, as Pinot does not accept null values.
+  ///
+  /// @param clpEncodedMessage The [EncodedMessage] to append.
   public void appendEncodedMessage(EncodedMessage clpEncodedMessage) {
     byte[] rawMessageBytes = clpEncodedMessage.getMessage();
     if (_isClpEncoded || _forceEnableClpEncoding) {
@@ -308,22 +298,18 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
     return _isClpEncoded ? _nextEncodedVarId : 0;
   }
 
-  /**
-   * Forces the use of CLP dictionary encoding, overriding any automatic encoding decisions.
-   *
-   * <p><b>Note:</b> This method is exclusive to {@code forceRawEncoding}; enabling CLP dictionary
-   * encoding will disable any forced raw encoding. Only one of these methods can be active at a time.</p>
-   */
+  /// Forces the use of CLP dictionary encoding, overriding any automatic encoding decisions.
+  ///
+  /// **Note:** This method is exclusive to `forceRawEncoding`; enabling CLP dictionary
+  /// encoding will disable any forced raw encoding. Only one of these methods can be active at a time.
   public void forceClpEncoding() {
     _forceEnableClpEncoding = true;
   }
 
-  /**
-   * Forces the use of raw encoding, overriding any automatic encoding decisions.
-   *
-   * <p><b>Note:</b> This method is exclusive to {@code forceClpEncoding}; enabling raw encoding will
-   * disable clp encoding. Only one of these methods can be active at a time.</p>
-   */
+  /// Forces the use of raw encoding, overriding any automatic encoding decisions.
+  ///
+  /// **Note:** This method is exclusive to `forceClpEncoding`; enabling raw encoding will
+  /// disable clp encoding. Only one of these methods can be active at a time.
   public void forceRawEncoding() {
     _isClpEncoded = false;
     _bytesRawFwdIndexDocIdStartOffset = 0;
@@ -400,15 +386,13 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
     return _encodedVar;
   }
 
-  /**
-   * Returns whether the mutable forward index is currently using CLP encoding.
-   *
-   * <p>Note that this reflects the current state, and the use of CLP encoding may change dynamically as new documents
-   * are ingested. CLP encoding can be enabled or disabled based on factors such as cardinality
-   * thresholds or forced encoding settings.</p>
-   *
-   * @return {@code true} if the forward index is currently using CLP encoding; {@code false} otherwise.
-   */
+  /// Returns whether the mutable forward index is currently using CLP encoding.
+  ///
+  /// Note that this reflects the current state, and the use of CLP encoding may change dynamically as new documents
+  /// are ingested. CLP encoding can be enabled or disabled based on factors such as cardinality
+  /// thresholds or forced encoding settings.
+  ///
+  /// @return `true` if the forward index is currently using CLP encoding; `false` otherwise.
   public boolean isClpEncoded() {
     return _isClpEncoded;
   }
@@ -441,9 +425,7 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
     return _maxNumEncodedVarPerDoc;
   }
 
-  /**
-   * Compatibility method for generating statistic objects to be used by CLPForwardIndexCreatorV1 only.
-   */
+  /// Compatibility method for generating statistic objects to be used by CLPForwardIndexCreatorV1 only.
   public CLPStatsProvider.CLPStats getCLPStats() {
     if (!isClpEncoded()) {
       throw new UnsupportedOperationException(

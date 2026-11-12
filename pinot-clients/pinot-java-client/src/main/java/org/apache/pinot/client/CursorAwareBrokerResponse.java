@@ -21,10 +21,8 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import javax.annotation.Nullable;
 
-/**
- * Extended BrokerResponse with cursor-specific fields for cursor pagination queries.
- * This class adds cursor metadata fields while maintaining full compatibility with BrokerResponse.
- */
+/// Extended BrokerResponse with cursor-specific fields for cursor pagination queries.
+/// This class adds cursor metadata fields while maintaining full compatibility with BrokerResponse.
 public class CursorAwareBrokerResponse extends BrokerResponse {
   // Cursor-specific fields from Pinot documentation
   private final Long _offset;
@@ -38,9 +36,7 @@ public class CursorAwareBrokerResponse extends BrokerResponse {
   private Long _bytesWritten;
   private final Long _cursorFetchTimeMs;
 
-  /**
-   * Creates a CursorAwareBrokerResponse by parsing cursor-specific fields from the JSON response.
-   */
+  /// Creates a CursorAwareBrokerResponse by parsing cursor-specific fields from the JSON response.
   public static CursorAwareBrokerResponse fromJson(JsonNode brokerResponse) {
     return new CursorAwareBrokerResponse(brokerResponse);
   }

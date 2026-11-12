@@ -21,10 +21,8 @@ package org.apache.pinot.sql.parsers.rewriter;
 import org.apache.pinot.common.request.PinotQuery;
 
 
-/**
- * QueryRewriter is the interface to rewrite PinotQuery.
- * Rewrite is recommended to be in-place.
- */
+/// QueryRewriter is the interface to rewrite PinotQuery.
+/// Rewrite is recommended to be in-place.
 public interface QueryRewriter {
   PinotQuery rewrite(PinotQuery pinotQuery);
 }

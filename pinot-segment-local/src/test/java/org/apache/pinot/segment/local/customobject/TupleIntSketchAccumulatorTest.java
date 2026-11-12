@@ -21,6 +21,9 @@ package org.apache.pinot.segment.local.customobject;
 
 import java.util.stream.IntStream;
 import org.apache.datasketches.tuple.CompactTupleSketch;
+import org.apache.datasketches.tuple.TupleSketch;
+import org.apache.datasketches.tuple.TupleSketchIterator;
+import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
@@ -91,6 +94,50 @@ public class TupleIntSketchAccumulatorTest {
     accumulator.apply(sketch2);
 
     Assert.assertEquals(accumulator.getResult().getEstimate(), sketch1.getEstimate() + sketch2.getEstimate());
+  }
+
+  // Summaries are summed, so a sketch merged twice doubles a summary while leaving the estimate right.
+  @Test
+  public void testInputsSurviveRepeatedFlushes() {
+    for (int threshold = 1; threshold <= 4; threshold++) {
+      TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(_setOps, _nominalEntries, threshold);
+      TupleUnion<IntegerSummary> expected = new TupleUnion<>(_nominalEntries, _setOps);
+      for (int i = 0; i < 7; i++) {
+        IntegerTupleSketch input = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
+        int base = i * 1000;
+        IntStream.range(base, base + 1000).forEach(k -> input.update(k, 1));
+        CompactTupleSketch<IntegerSummary> sketch = input.compact();
+        accumulator.apply(sketch);
+        expected.union(sketch);
+      }
+      TupleSketch<IntegerSummary> actual = accumulator.getResult();
+      TupleSketch<IntegerSummary> want = expected.getResult();
+      Assert.assertEquals(actual.getEstimate(), want.getEstimate(), 0.0, "threshold " + threshold);
+      Assert.assertEquals(summarySum(actual), summarySum(want), "threshold " + threshold);
+    }
+  }
+
+  @Test
+  public void testRepeatedGetResultIsStable() {
+    TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(_setOps, _nominalEntries, 2);
+    for (int i = 0; i < 5; i++) {
+      IntegerTupleSketch input = new IntegerTupleSketch(_lgK, IntegerSummary.Mode.Sum);
+      int base = i * 1000;
+      IntStream.range(base, base + 1000).forEach(k -> input.update(k, 1));
+      accumulator.apply(input.compact());
+    }
+    long first = summarySum(accumulator.getResult());
+    Assert.assertEquals(summarySum(accumulator.getResult()), first);
+    Assert.assertEquals(summarySum(accumulator.getResult()), first);
+  }
+
+  private static long summarySum(TupleSketch<IntegerSummary> sketch) {
+    long sum = 0;
+    TupleSketchIterator<IntegerSummary> it = sketch.iterator();
+    while (it.next()) {
+      sum += it.getSummary().getValue();
+    }
+    return sum;
   }
 
   @Test

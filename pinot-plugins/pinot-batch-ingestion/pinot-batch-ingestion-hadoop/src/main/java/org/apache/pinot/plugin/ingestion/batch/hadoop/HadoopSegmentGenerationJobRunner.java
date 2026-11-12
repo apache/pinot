@@ -297,22 +297,18 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     }
   }
 
-  /**
-   * Can be overridden to plug in custom mapper.
-   */
+  /// Can be overridden to plug in custom mapper.
   protected Class<? extends Mapper<LongWritable, Text, LongWritable, Text>> getMapperClass() {
     return HadoopSegmentCreationMapper.class;
   }
 
-  /**
-   * We have to put our jar (which contains the mapper) in the distributed cache and add it to the classpath,
-   * as otherwise it's not available (since the pinot-all jar - which is bigger - is what we've set as our job jar).
-   *
-   * @param job
-   * @param outputDirFS
-   * @param stagingDirURI
-   * @throws Exception
-   */
+  /// We have to put our jar (which contains the mapper) in the distributed cache and add it to the classpath,
+  /// as otherwise it's not available (since the pinot-all jar - which is bigger - is what we've set as our job jar).
+  ///
+  /// @param job
+  /// @param outputDirFS
+  /// @param stagingDirURI
+  /// @throws Exception
   protected void addMapperJarToDistributedCache(Job job, PinotFS outputDirFS, URI stagingDirURI)
       throws Exception {
     File ourJar = new File(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());

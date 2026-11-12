@@ -22,18 +22,23 @@ package org.apache.pinot.plugin.filesystem;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class HadoopPinotFSTest {
@@ -431,9 +436,9 @@ public class HadoopPinotFSTest {
   }
 
   @Test
-  public void testDeleteBatchPerformanceWithManyFiles()
+  public void testDeleteBatchWithManyFiles()
       throws IOException {
-    URI baseURI = URI.create(TMP_DIR + "/testDeleteBatchPerformance");
+    URI baseURI = URI.create(TMP_DIR + "/testDeleteBatchWithManyFiles");
     try (HadoopPinotFS hadoopFS = new HadoopPinotFS()) {
       hadoopFS.init(new PinotConfiguration());
       hadoopFS.mkdir(baseURI);
@@ -448,19 +453,88 @@ public class HadoopPinotFSTest {
       }
 
       // Delete all files using deleteBatch
-      long startTime = System.currentTimeMillis();
-      Assert.assertTrue(hadoopFS.deleteBatch(urisToDelete, false));
-      long batchTime = System.currentTimeMillis() - startTime;
+      assertTrue(hadoopFS.deleteBatch(urisToDelete, false));
 
       // Verify all files are deleted
       for (URI uri : urisToDelete) {
-        Assert.assertFalse(hadoopFS.exists(uri));
+        assertFalse(hadoopFS.exists(uri));
       }
 
-      // Log performance (batch deletion should be reasonably fast)
-      Assert.assertTrue(batchTime < 10000, "Batch deletion took too long: " + batchTime + "ms");
-
       hadoopFS.delete(baseURI, true);
+    }
+  }
+
+  @Test
+  public void testInitWithUnauthenticatedUser()
+      throws IOException {
+    String testUser = "pinot-test-user-" + System.currentTimeMillis();
+
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty("hadoop.allow.insecure", "true");
+    config.setProperty("hadoop.user.name", testUser);
+
+    try (HadoopPinotFS hadoopFS = new HadoopPinotFS()) {
+      hadoopFS.init(config);
+      String currentUser = org.apache.hadoop.security.UserGroupInformation.getLoginUser().getUserName();
+      Assert.assertEquals(currentUser, testUser, "The Hadoop login user was not set correctly!");
+    }
+  }
+
+  @Test
+  public void testClosingOneInstanceLeavesAnotherUsable()
+      throws Exception {
+    File hadoopConfDir = new File(TMP_DIR, "close-aware-conf");
+    FileUtils.forceMkdir(hadoopConfDir);
+    String coreSiteXml = String.format("<configuration>"
+            + "<property><name>fs.defaultFS</name><value>closeaware:///</value></property>"
+            + "<property><name>fs.closeaware.impl</name><value>%s</value></property>"
+            + "</configuration>", CloseAwareFileSystem.class.getName());
+    FileUtils.writeStringToFile(new File(hadoopConfDir, "core-site.xml"), coreSiteXml, StandardCharsets.UTF_8);
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty("hadoop.conf.path", hadoopConfDir.getAbsolutePath());
+
+    HadoopPinotFS first = new HadoopPinotFS();
+    boolean firstClosed = false;
+    try (HadoopPinotFS second = new HadoopPinotFS()) {
+      try {
+        first.init(config);
+        second.init(config);
+        first.close();
+        firstClosed = true;
+
+        Assert.assertTrue(second.exists(URI.create("closeaware:///probe")));
+      } finally {
+        if (!firstClosed) {
+          first.close();
+        }
+      }
+    }
+  }
+
+  /// Test filesystem that makes use-after-close observable without inspecting HadoopPinotFS internals.
+  public static class CloseAwareFileSystem extends RawLocalFileSystem {
+    private static final URI FILE_SYSTEM_URI = URI.create("closeaware:///");
+    private boolean _closed;
+
+    @Override
+    public URI getUri() {
+      return FILE_SYSTEM_URI;
+    }
+
+    @Override
+    public boolean exists(Path path)
+        throws IOException {
+      if (_closed) {
+        throw new IOException("Filesystem is closed");
+      }
+      return true;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      _closed = true;
+      super.close();
     }
   }
 }

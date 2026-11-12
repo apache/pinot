@@ -71,22 +71,25 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/**
- * JMH benchmark for DISTINCT over scalar {@code JSON_EXTRACT_INDEX(...)} on a table that is explicitly configured with
- * a JSON index on {@code tags}. The benchmark state is intended for single-threaded JMH execution and is not
- * thread-safe.
- *
- * <p>The base sample queries are:
- * {@code SELECT DISTINCT JSON_EXTRACT_INDEX(tags, '$.instance', 'STRING') AS tag_value FROM myTable WHERE
- * JSON_MATCH(tags, 'REGEXP_LIKE("$.instance", ''.*test.*'')')}
- * and
- * {@code SELECT DISTINCT JSON_EXTRACT_INDEX(tags, '$.instance', 'STRING', '') AS tag_value FROM myTable WHERE
- * JSON_MATCH(tags, 'REGEXP_LIKE("$.instance", ''.*test.*'')')}.
- *
- * <p>Pinot assigns {@code SELECT DISTINCT} queries without an explicit limit a default limit of {@code 10}. The
- * benchmark validates the exact sample query for planning, then executes the same query with an explicit large limit so
- * the full matching distinct set is measured and compared across operators.
- */
+/// JMH benchmark for DISTINCT over scalar `JSON_EXTRACT_INDEX(...)` on a table that is explicitly configured with
+/// a JSON index on `tags`. The benchmark state is intended for single-threaded JMH execution and is not
+/// thread-safe.
+///
+/// The base sample queries are:
+/// ```
+/// SELECT DISTINCT JSON_EXTRACT_INDEX(tags, '$.instance', 'STRING') AS tag_value FROM myTable
+///   WHERE JSON_MATCH(tags, 'REGEXP_LIKE("$.instance", ''.*test.*'')')
+/// ```
+/// and
+/// ```
+/// SELECT DISTINCT JSON_EXTRACT_INDEX(tags, '$.instance', 'STRING', '') AS tag_value FROM myTable
+///   WHERE JSON_MATCH(tags, 'REGEXP_LIKE("$.instance", ''.*test.*'')')
+/// ```
+/// .
+///
+/// Pinot assigns `SELECT DISTINCT` queries without an explicit limit a default limit of `10`. The benchmark
+/// validates the exact sample query for planning, then executes the same query with an explicit large limit so the full
+/// matching distinct set is measured and compared across operators.
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

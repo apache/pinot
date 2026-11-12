@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
 import org.apache.lucene.queries.spans.SpanQuery;
@@ -31,17 +33,23 @@ import org.apache.lucene.queries.spans.SpanTermQuery;
 import org.apache.lucene.search.AutomatonQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.CollectionTerminatedException;
+import org.apache.lucene.search.Collector;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.LeafCollector;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.Scorable;
+import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.Weight;
 import org.apache.lucene.search.WildcardQuery;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Utility class for Lucene text index operations.
- * Contains common methods for parsing options and creating query parsers.
- */
+/// Utility class for Lucene text index operations.
+/// Contains common methods for parsing options and creating query parsers.
 public class LuceneTextIndexUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexUtils.class);
 
@@ -59,10 +67,8 @@ public class LuceneTextIndexUtils {
   public static final String TRUE = "true";
   public static final String FALSE = "false";
 
-  /**
-   * Option keys for Lucene text index configuration.
-   * These keys are used in the options string format: "key1=value1,key2=value2"
-   */
+  /// Option keys for Lucene text index configuration.
+  /// These keys are used in the options string format: "key1=value1,key2=value2"
   public static class OptionKey {
     public static final String PARSER = "parser";
     public static final String DEFAULT_OPERATOR = "defaultOperator";
@@ -98,12 +104,9 @@ public class LuceneTextIndexUtils {
   private LuceneTextIndexUtils() {
   }
 
-  /**
-   *
-   * @param query a Lucene query
-   * @return a span query with 0 slop and the original clause order if the input query is boolean query with one or more
-   * prefix or wildcard subqueries; the same query otherwise.
-   */
+  /// @param query a Lucene query
+  /// @return a span query with 0 slop and the original clause order if the input query is boolean query with one or
+  /// more prefix or wildcard subqueries; the same query otherwise.
   public static Query convertToMultiTermSpanQuery(Query query) {
     if (!(query instanceof BooleanQuery)) {
       return query;
@@ -131,17 +134,15 @@ public class LuceneTextIndexUtils {
     return spanNearQuery;
   }
 
-  /**
-   * Creates a Lucene QueryParser with the specified options and parses the query.
-   * This method uses reflection to dynamically apply options to the query parser.
-   *
-   * @param actualQuery The search query string
-   * @param options The parsed options wrapper
-   * @param column The column name for the search
-   * @param analyzer The Lucene analyzer to use
-   * @return The parsed Lucene Query object
-   * @throws RuntimeException if parser creation or query parsing fails
-   */
+  /// Creates a Lucene QueryParser with the specified options and parses the query.
+  /// This method uses reflection to dynamically apply options to the query parser.
+  ///
+  /// @param actualQuery The search query string
+  /// @param options The parsed options wrapper
+  /// @param column The column name for the search
+  /// @param analyzer The Lucene analyzer to use
+  /// @return The parsed Lucene Query object
+  /// @throws RuntimeException if parser creation or query parsing fails
   public static Query createQueryParserWithOptions(String actualQuery, LuceneTextIndexOptions options, String column,
       Analyzer analyzer) {
     Map<String, String> optionsMap = options.getOptions();
@@ -252,10 +253,8 @@ public class LuceneTextIndexUtils {
     }
   }
 
-  /**
-   * Parse the options string into a map of key-value pairs.
-   * This method is now private and should be accessed through LuceneTextIndexOptions class.
-   */
+  /// Parse the options string into a map of key-value pairs.
+  /// This method is now private and should be accessed through LuceneTextIndexOptions class.
   private static Map<String, String> parseOptionsString(String optionsString) {
     if (optionsString == null || optionsString.trim().isEmpty()) {
       return new HashMap<>();
@@ -278,10 +277,8 @@ public class LuceneTextIndexUtils {
     return options;
   }
 
-  /**
-   * Helper class to wrap the parsed Lucene text index options.
-   * Similar to DistinctCountOffHeapAggregationFunction.Parameters pattern.
-   */
+  /// Helper class to wrap the parsed Lucene text index options.
+  /// Similar to DistinctCountOffHeapAggregationFunction.Parameters pattern.
   public static class LuceneTextIndexOptions {
     private final Map<String, String> _options;
 
@@ -366,14 +363,91 @@ public class LuceneTextIndexUtils {
     }
   }
 
-  /**
-   * Creates LuceneTextIndexOptions from a string.
-   * This is a convenience method for creating the options wrapper.
-   *
-   * @param optionsString The options string in format "key1=value1,key2=value2"
-   * @return The LuceneTextIndexOptions wrapper
-   */
+  /// Creates LuceneTextIndexOptions from a string.
+  /// This is a convenience method for creating the options wrapper.
+  ///
+  /// @param optionsString The options string in format "key1=value1,key2=value2"
+  /// @return The LuceneTextIndexOptions wrapper
   public static LuceneTextIndexOptions createOptions(String optionsString) {
     return new LuceneTextIndexOptions(optionsString);
+  }
+
+  /// Counts the documents matching `query` without materializing their ids.
+  ///
+  /// A `count(*)` over a text filter only needs the size of the match set. Collecting every matching doc id
+  /// into a bitmap first costs time proportional to the number of matches, which on a frequent term over a
+  /// large segment is most of the query.
+  ///
+  /// Runs as an ordinary search with a counting collector, so the `BulkScorer` path is preserved for the
+  /// shapes that need to iterate -- conjunctions, disjunctions and phrases, which are most of them. Per leaf,
+  /// [Weight#count] is tried first and the leaf is skipped entirely when it can answer from index metadata,
+  /// the same shortcut [org.apache.lucene.search.TotalHitCountCollector] uses.
+  ///
+  /// The query is passed through unwrapped so that it produces the same cache key as the doc-id path, rather
+  /// than a second [org.apache.lucene.search.LRUQueryCache] entry for the same predicate.
+  ///
+  /// Counts are invariant under Pinot's Lucene-to-Pinot doc id translation, which is 1:1, so no translator is
+  /// needed here. Callers that cannot guarantee that mapping must not use this method.
+  ///
+  /// @return the number of matching documents
+  public static int countWithoutMaterializing(IndexSearcher searcher, Query query)
+      throws IOException {
+    CountingCollector collector = new CountingCollector();
+    searcher.search(query, collector);
+    return collector.getTotalHits();
+  }
+
+  /// Counts matches without recording them, taking [Weight#count] where a leaf can answer from index
+  /// metadata and collecting otherwise.
+  ///
+  /// Mirrors [LuceneDocIdCollector]'s termination handling: a termination is converted to
+  /// [CollectionTerminatedException] so Lucene unwinds cleanly, and the real reason is read back later from
+  /// [QueryThreadContext#getTerminateException].
+  private static final class CountingCollector implements Collector {
+    private Weight _weight;
+    private int _totalHits;
+
+    @Override
+    public void setWeight(Weight weight) {
+      _weight = weight;
+    }
+
+    @Override
+    public ScoreMode scoreMode() {
+      return ScoreMode.COMPLETE_NO_SCORES;
+    }
+
+    int getTotalHits() {
+      return _totalHits;
+    }
+
+    @Override
+    public LeafCollector getLeafCollector(LeafReaderContext context)
+        throws IOException {
+      int leafCount = _weight == null ? -1 : _weight.count(context);
+      if (leafCount != -1) {
+        _totalHits += leafCount;
+        // Nothing to visit in this leaf; Lucene treats this as a clean stop for this leaf only.
+        throw new CollectionTerminatedException();
+      }
+      return new LeafCollector() {
+        private int _numCollected;
+
+        @Override
+        public void setScorer(Scorable scorer) {
+          // Not scoring.
+        }
+
+        @Override
+        public void collect(int doc) {
+          try {
+            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numCollected++, "LuceneCountCollector");
+          } catch (RuntimeException e) {
+            throw new CollectionTerminatedException();
+          }
+          _totalHits++;
+        }
+      };
+    }
   }
 }

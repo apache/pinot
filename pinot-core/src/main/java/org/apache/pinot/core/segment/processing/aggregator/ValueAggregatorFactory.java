@@ -23,9 +23,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Factory class to create instances of value aggregator from the given name.
- */
+/// Factory class to create instances of value aggregator from the given name.
 public class ValueAggregatorFactory {
   private ValueAggregatorFactory() {
   }

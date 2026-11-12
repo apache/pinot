@@ -46,11 +46,9 @@ import org.slf4j.LoggerFactory;
 import static com.google.common.base.Preconditions.checkState;
 
 
-/**
- * Decodes avro messages with confluent schema registry.
- * First byte is MAGIC = 0, second 4 bytes are the schema id, the remainder is the value.
- * NOTE: Do not use schema in the implementation, as schema will be removed from the params
- */
+/// Decodes avro messages with confluent schema registry.
+/// First byte is MAGIC = 0, second 4 bytes are the schema id, the remainder is the value.
+/// NOTE: Do not use schema in the implementation, as schema will be removed from the params
 public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConfluentSchemaRegistryAvroMessageDecoder.class);
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
@@ -127,12 +125,10 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     return decode(payload, destination);
   }
 
-  /**
-   * This method handles specific serialisation exceptions. If the exception cannot be ignored the method
-   * re-throws the exception.
-   *
-   * @param e exception to handle
-   */
+  /// This method handles specific serialisation exceptions. If the exception cannot be ignored the method
+  /// re-throws the exception.
+  ///
+  /// @param e exception to handle
   private void ignoreOrRethrowException(RuntimeException e) {
     if (isUnknownMagicByte(e) || isUnknownMagicByte(e.getCause())) {
       // Do nothing, the message is not an Avro message and can't be decoded

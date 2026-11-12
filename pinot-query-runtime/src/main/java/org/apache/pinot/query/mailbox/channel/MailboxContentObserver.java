@@ -37,13 +37,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@code MailboxContentObserver} is the content streaming observer used to receive mailbox content.
- *
- * <p>When the observer onNext() is called (e.g. when data packet has arrived at the receiving end), it puts the
- * mailbox content to the receiving mailbox buffer; response with the remaining buffer size of the receiving mailbox
- * to the sender side.
- */
+/// `MailboxContentObserver` is the content streaming observer used to receive mailbox content.
+///
+/// When the observer onNext() is called (e.g. when data packet has arrived at the receiving end), it puts the
+/// mailbox content to the receiving mailbox buffer; response with the remaining buffer size of the receiving mailbox
+/// to the sender side.
 public class MailboxContentObserver implements StreamObserver<MailboxContent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxContentObserver.class);
 

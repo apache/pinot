@@ -30,42 +30,40 @@ import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.ColumnReaderFactory;
 
 
-/**
- * {@link ColumnReaderFactory} backed by an Apache Arrow IPC file on disk.
- *
- * <p>File-specialised companion to {@link ArrowColumnReaderFactory} (which takes a caller-managed
- * reader): this class opens and owns the file, the {@link org.apache.arrow.vector.ipc.ArrowFileReader},
- * and a private allocator sized by {@link #CONFIG_ALLOCATOR_LIMIT}, all wrapped in a
- * {@link BatchedArrowFileSource}, and closes them on {@link #close}.
- *
- * <p><b>Memory model — one record batch resident.</b> See {@link BatchedArrowFileSource} for the
- * batch-bounded reading model and its read-amplification trade-off; the per-column {@link
- * BatchedArrowColumnReader}s created here share that source's single batch cursor. A pathological
- * single oversized batch is bounded by {@link #CONFIG_ALLOCATOR_LIMIT}, which throws a catchable
- * Arrow {@code OutOfMemoryException} at the ceiling rather than exhausting the heap.
- *
- * <p>{@link #getAvailableColumns()} reports the columns actually present in the Arrow source. A
- * target-schema column that is NOT present is absent from that set, and {@link
- * #getColumnReader(String)} returns {@code null} for it; supplying schema-evolution defaults for such
- * columns is the columnar build driver's responsibility.
- *
- * <p>Dictionary-encoded columns are supported; see {@link BatchedArrowFileSource} for how each batch
- * is decoded against its bound dictionary.
- *
- * <p>This class is not thread-safe. {@code @SuppressWarnings("serial")}: {@link ColumnReaderFactory}
- * is {@link java.io.Serializable} by SPI contract, but this factory holds non-serializable Arrow
- * handles and is never serialized.
- */
+/// [ColumnReaderFactory] backed by an Apache Arrow IPC file on disk.
+///
+/// File-specialised companion to [ArrowColumnReaderFactory] (which takes a caller-managed
+/// reader): this class opens and owns the file, the [org.apache.arrow.vector.ipc.ArrowFileReader],
+/// and a private allocator sized by [#CONFIG_ALLOCATOR_LIMIT], all wrapped in a
+/// [BatchedArrowFileSource], and closes them on [#close].
+///
+/// **Memory model — one record batch resident.** See [BatchedArrowFileSource] for the
+/// batch-bounded reading model and its read-amplification trade-off; the per-column [BatchedArrowColumnReader] s
+/// created here share that source's single batch cursor. A pathological
+/// single oversized batch is bounded by [#CONFIG_ALLOCATOR_LIMIT], which throws a catchable
+/// Arrow `OutOfMemoryException` at the ceiling rather than exhausting the heap.
+///
+/// [#getAvailableColumns()] reports the columns actually present in the Arrow source. A
+/// target-schema column that is NOT present is absent from that set, and [#getColumnReader(String)] returns `null` for
+/// it; supplying schema-evolution defaults for such
+/// columns is the columnar build driver's responsibility.
+///
+/// Dictionary-encoded columns are supported; see [BatchedArrowFileSource] for how each batch
+/// is decoded against its bound dictionary.
+///
+/// This class is not thread-safe. `@SuppressWarnings("serial")`: [ColumnReaderFactory]
+/// is [java.io.Serializable] by SPI contract, but this factory holds non-serializable Arrow
+/// handles and is never serialized.
 @SuppressWarnings("serial")
 public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
 
   /// Default allocator limit when no `configs` override is supplied. Matches
-  /// {@link ArrowRecordReaderConfig#DEFAULT_ALLOCATOR_LIMIT} so users get the same
+  /// [ArrowRecordReaderConfig#DEFAULT_ALLOCATOR_LIMIT] so users get the same
   /// memory ceiling whether they pick the row-major or column-major reader path.
   public static final String CONFIG_ALLOCATOR_LIMIT = "arrowAllocatorLimit";
   public static final long DEFAULT_ALLOCATOR_LIMIT = ArrowRecordReaderConfig.DEFAULT_ALLOCATOR_LIMIT;
 
-  /// Config key (mirrors {@link ArrowRecordExtractorConfig#EXTRACT_RAW_TIME_VALUES} on the row-major
+  /// Config key (mirrors [ArrowRecordExtractorConfig#EXTRACT_RAW_TIME_VALUES] on the row-major
   /// path): when `true`, temporal columns surface raw epoch values rather than canonical JDK types.
   public static final String CONFIG_EXTRACT_RAW_TIME_VALUES = ArrowRecordExtractorConfig.EXTRACT_RAW_TIME_VALUES;
 
@@ -77,11 +75,9 @@ public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
   private transient Set<String> _availableColumnNames;
   private transient boolean _initialized;
 
-  /**
-   * Construct a factory reading from the given Arrow IPC file.
-   *
-   * @param dataFile Path to the Arrow IPC file to read
-   */
+  /// Construct a factory reading from the given Arrow IPC file.
+  ///
+  /// @param dataFile Path to the Arrow IPC file to read
   public ArrowFileColumnReaderFactory(File dataFile) {
     _dataFile = dataFile;
   }
@@ -98,11 +94,9 @@ public class ArrowFileColumnReaderFactory implements ColumnReaderFactory {
     init(targetSchema, colsToRead, Map.of());
   }
 
-  /**
-   * Initialise the factory. {@code colsToRead == null} or an empty set both mean "read all
-   * non-virtual columns from {@code targetSchema} that the Arrow file actually contains"; pass a
-   * non-empty set to restrict to a subset.
-   */
+  /// Initialise the factory. `colsToRead == null` or an empty set both mean "read all
+  /// non-virtual columns from `targetSchema` that the Arrow file actually contains"; pass a
+  /// non-empty set to restrict to a subset.
   @Override
   public void init(Schema targetSchema, @Nullable Set<String> colsToRead, Map<String, String> configs)
       throws IOException {

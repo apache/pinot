@@ -33,99 +33,85 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
 
 
-/**
- * Builds a {@link Worker.MultiStageStatsTree} proto from an opchain's live operator tree and its accumulated
- * {@link MultiStageQueryStats}. Used by the stream-mode stats reporting path (gRPC {@code SubmitWithStream} RPC).
- *
- * <p>The encoder walks the operator tree in inorder (leftmost-leaf-first) in lock-step with the flat
- * {@link MultiStageQueryStats.StageStats#_operatorTypes _operatorTypes} /
- * {@link MultiStageQueryStats.StageStats#_operatorStats _operatorStats} lists, which are already maintained in
- * inorder (each operator appends its entry via
- * {@link MultiStageQueryStats.StageStats.Open#addLastOperator addLastOperator} just before emitting EOS). For each
- * operator the encoder produces a {@link Worker.StageStatsNode} carrying the operator type id, the serialized
- * {@link StatMap} bytes, the recursive children, and the stage-scoped plan-node ids gathered from the
- * {@link OpChainExecutionContext} during opchain construction.
- *
- * <p>Only the current-stage tree is encoded. Upstream stages reach the broker via the upstream opchains' own
- * reports in stream mode, so per-opchain reporting of upstream-stage trees is not needed.
- *
- * <p><b>Pipeline breakers.</b> A pipeline breaker (dynamic-broadcast semi-join / lookup-join build side) runs as a
- * pre-stage sub-execution: its operators are folded into the leaf opchain's flat stats (an inorder prefix before
- * the {@code LEAF} entry — see {@code LeafOperator.calculateUpstreamStats}), but they are <b>not</b> children of the
- * {@code LeafOperator} in the live operator tree. To keep the tree walk aligned with the flat list, callers pass the
- * pipeline-breaker's root operator via {@code pipelineBreakerRoot}; the encoder grafts it as a child of the
- * {@code LEAF} node, so the encoded tree matches what the legacy mailbox path serializes
- * ({@code MAILBOX_SEND -> LEAF -> PIPELINE_BREAKER -> MAILBOX_RECEIVE}).
- *
- * <p>Two cases make the graft narrower than the live pipeline-breaker tree, and the encoder accounts for both so it
- * stays aligned with the fold rather than overshooting it:
- * <ul>
- *   <li><b>Stage did not fold the breaker.</b> When {@code skip.pipeline.breaker.stats=true} the leaf opchain does
- *       not fold the breaker at all (its flat stats are just {@code LEAF}, {@code MAILBOX_SEND}). Callers must then
- *       pass {@code pipelineBreakerRoot == null} so nothing is grafted — even though a pipeline-breaker opchain ran.
- *   </li>
- *   <li><b>Multiple build sides.</b> A breaker with several {@code MAILBOX_RECEIVE} children folds to <i>fewer</i>
- *       receive entries than it has children, because {@code PipelineBreakerOperator.calculateUpstreamStats}
- *       collapses same-stage receives via {@code MultiStageQueryStats.mergeUpstream}. The encoder grafts only the
- *       receives the fold kept (see {@link #keptPipelineBreakerReceives}), matching what the legacy path also emits.
- *   </li>
- * </ul>
- */
+/// Builds a [Worker.MultiStageStatsTree] proto from an opchain's live operator tree and its accumulated
+/// [MultiStageQueryStats]. Used by the stream-mode stats reporting path (gRPC `SubmitWithStream` RPC).
+///
+/// The encoder walks the operator tree in inorder (leftmost-leaf-first) in lock-step with the flat
+/// [`_operatorTypes`]\[MultiStageQueryStats.StageStats#_operatorTypes\] /
+/// [`_operatorStats`]\[MultiStageQueryStats.StageStats#_operatorStats\] lists, which are already maintained in
+/// inorder (each operator appends its entry via
+/// [`addLastOperator`]\[MultiStageQueryStats.StageStats.Open#addLastOperator\] just before emitting EOS). For each
+/// operator the encoder produces a [Worker.StageStatsNode] carrying the operator type id, the serialized
+/// [StatMap] bytes, the recursive children, and the stage-scoped plan-node ids gathered from the
+/// [OpChainExecutionContext] during opchain construction.
+///
+/// Only the current-stage tree is encoded. Upstream stages reach the broker via the upstream opchains' own
+/// reports in stream mode, so per-opchain reporting of upstream-stage trees is not needed.
+///
+/// **Pipeline breakers.** A pipeline breaker (dynamic-broadcast semi-join / lookup-join build side) runs as a
+/// pre-stage sub-execution: its operators are folded into the leaf opchain's flat stats (an inorder prefix before
+/// the `LEAF` entry — see `LeafOperator.calculateUpstreamStats`), but they are **not** children of the
+/// `LeafOperator` in the live operator tree. To keep the tree walk aligned with the flat list, callers pass the
+/// pipeline-breaker's root operator via `pipelineBreakerRoot`; the encoder grafts it as a child of the
+/// `LEAF` node, so the encoded tree matches what the legacy mailbox path serializes
+/// (`MAILBOX_SEND -> LEAF -> PIPELINE_BREAKER -> MAILBOX_RECEIVE`).
+///
+/// Two cases make the graft narrower than the live pipeline-breaker tree, and the encoder accounts for both so it
+/// stays aligned with the fold rather than overshooting it:
+///
+/// - **Stage did not fold the breaker.** When `skip.pipeline.breaker.stats=true` the leaf opchain does
+///      not fold the breaker at all (its flat stats are just `LEAF`, `MAILBOX_SEND`). Callers must then
+///      pass `pipelineBreakerRoot == null` so nothing is grafted — even though a pipeline-breaker opchain ran.
+/// - **Multiple build sides.** A breaker with several `MAILBOX_RECEIVE` children folds to _fewer_
+///      receive entries than it has children, because `PipelineBreakerOperator.calculateUpstreamStats`
+///      collapses same-stage receives via `MultiStageQueryStats.mergeUpstream`. The encoder grafts only the
+///      receives the fold kept (see [#keptPipelineBreakerReceives]), matching what the legacy path also emits.
 public final class MultiStageStatsTreeEncoder {
   private MultiStageStatsTreeEncoder() {
   }
 
-  /**
-   * Convenience overload that resolves plan-node ids from the {@link OpChainExecutionContext}. This is the form
-   * called from production code (the opchain completion callback in {@code QueryServer}).
-   */
+  /// Convenience overload that resolves plan-node ids from the [OpChainExecutionContext]. This is the form
+  /// called from production code (the opchain completion callback in `QueryServer`).
   public static Worker.MultiStageStatsTree encode(MultiStageOperator root, MultiStageQueryStats stats,
       OpChainExecutionContext context)
       throws IOException {
     return encode(root, stats, context, null);
   }
 
-  /**
-   * As {@link #encode(MultiStageOperator, MultiStageQueryStats, OpChainExecutionContext)} but grafts the given
-   * pipeline-breaker root operator as a child of the {@code LEAF} node (see the class Javadoc). Pass {@code null}
-   * when the stage has no pipeline breaker.
-   */
+  /// As [#encode(MultiStageOperator, MultiStageQueryStats, OpChainExecutionContext)] but grafts the given
+  /// pipeline-breaker root operator as a child of the `LEAF` node (see the class Javadoc). Pass `null`
+  /// when the stage has no pipeline breaker.
   public static Worker.MultiStageStatsTree encode(MultiStageOperator root, MultiStageQueryStats stats,
       OpChainExecutionContext context, @Nullable MultiStageOperator pipelineBreakerRoot)
       throws IOException {
     return encode(root, stats, op -> resolvePlanNodeIds(op, context), pipelineBreakerRoot);
   }
 
-  /**
-   * Encodes the current-stage operator tree + stats into a {@link Worker.MultiStageStatsTree}. Tests use this entry
-   * point with a custom {@code planNodeIdResolver} so they don't need to construct a full
-   * {@link OpChainExecutionContext}.
-   *
-   * <p><b>All-or-nothing contract:</b> this method either returns a fully-built {@link Worker.MultiStageStatsTree}
-   * or throws without returning any partial result. Callers cannot recover partial stats on failure. Specifically:
-   * <ul>
-   *   <li>The upfront {@code treeSize != flatSize} check throws {@link IllegalStateException} before any proto
-   *       node is allocated.</li>
-   *   <li>An {@link java.io.IOException} from {@link #serializeStatMap} during node traversal leaves
-   *       {@link Worker.StageStatsNode} builders only on the Java call stack; they are discarded as the exception
-   *       unwinds. No partially-built tree is reachable by the caller.</li>
-   * </ul>
-   *
-   * @throws IllegalStateException if the operator tree shape does not align with the flat stats list (missing
-   *     entries — typically caused by an operator that failed before emitting EOS).
-   * @throws java.io.IOException if stat-map serialization fails for any node.
-   */
+  /// Encodes the current-stage operator tree + stats into a [Worker.MultiStageStatsTree]. Tests use this entry
+  /// point with a custom `planNodeIdResolver` so they don't need to construct a full
+  /// [OpChainExecutionContext].
+  ///
+  /// **All-or-nothing contract:** this method either returns a fully-built [Worker.MultiStageStatsTree]
+  /// or throws without returning any partial result. Callers cannot recover partial stats on failure. Specifically:
+  ///
+  /// - The upfront `treeSize != flatSize` check throws [IllegalStateException] before any proto
+  ///      node is allocated.
+  /// - An [java.io.IOException] from [#serializeStatMap] during node traversal leaves
+  ///      [Worker.StageStatsNode] builders only on the Java call stack; they are discarded as the exception
+  ///      unwinds. No partially-built tree is reachable by the caller.
+  ///
+  /// @throws IllegalStateException if the operator tree shape does not align with the flat stats list (missing
+  ///     entries — typically caused by an operator that failed before emitting EOS).
+  /// @throws java.io.IOException if stat-map serialization fails for any node.
   public static Worker.MultiStageStatsTree encode(MultiStageOperator root, MultiStageQueryStats stats,
       Function<MultiStageOperator, List<Integer>> planNodeIdResolver)
       throws IOException {
     return encode(root, stats, planNodeIdResolver, null);
   }
 
-  /**
-   * As {@link #encode(MultiStageOperator, MultiStageQueryStats, Function)} but grafts {@code pipelineBreakerRoot}
-   * (if non-null) as a child of the {@code LEAF} node so the walked operator tree aligns with the leaf opchain's
-   * folded flat stats. See the class Javadoc.
-   */
+  /// As [#encode(MultiStageOperator, MultiStageQueryStats, Function)] but grafts `pipelineBreakerRoot`
+  /// (if non-null) as a child of the `LEAF` node so the walked operator tree aligns with the leaf opchain's
+  /// folded flat stats. See the class Javadoc.
   public static Worker.MultiStageStatsTree encode(MultiStageOperator root, MultiStageQueryStats stats,
       Function<MultiStageOperator, List<Integer>> planNodeIdResolver,
       @Nullable MultiStageOperator pipelineBreakerRoot)
@@ -182,23 +168,21 @@ public final class MultiStageStatsTreeEncoder {
     return count;
   }
 
-  /**
-   * How many of the pipeline breaker's {@code MAILBOX_RECEIVE} children the leaf opchain's folded flat stats actually
-   * kept. The fold ({@code LeafOperator.calculateUpstreamStats}) prepends the pipeline breaker as an inorder prefix
-   * of {@code MAILBOX_RECEIVE} entries followed by a single {@code PIPELINE_BREAKER}. That prefix can hold
-   * <i>fewer</i> receives than the live {@link MultiStageOperator.Type#PIPELINE_BREAKER} operator has children,
-   * because {@code PipelineBreakerOperator.calculateUpstreamStats} combines its same-stage receives via
-   * {@code MultiStageQueryStats.mergeUpstream}, which collapses their current-stage entries (only the first receive's
-   * entry survives). We therefore graft only the receives the fold kept; grafting the full live receive list would
-   * make the tree larger than the flat list ({@code treeSize > flatSize}).
-   *
-   * <p>Returns 0 when there is no pipeline breaker to graft. Callers must pass {@code pipelineBreakerRoot == null}
-   * when the stage did not fold a pipeline breaker (e.g. {@code skip.pipeline.breaker.stats=true}); otherwise the
-   * leading entries are not the breaker's and this throws.
-   *
-   * @throws IllegalStateException if a pipeline breaker is expected but the flat list does not start with
-   *     {@code MAILBOX_RECEIVE}* then {@code PIPELINE_BREAKER} — a genuine shape mismatch we must not silently encode.
-   */
+  /// How many of the pipeline breaker's `MAILBOX_RECEIVE` children the leaf opchain's folded flat stats actually
+  /// kept. The fold (`LeafOperator.calculateUpstreamStats`) prepends the pipeline breaker as an inorder prefix
+  /// of `MAILBOX_RECEIVE` entries followed by a single `PIPELINE_BREAKER`. That prefix can hold
+  /// _fewer_ receives than the live [MultiStageOperator.Type#PIPELINE_BREAKER] operator has children,
+  /// because `PipelineBreakerOperator.calculateUpstreamStats` combines its same-stage receives via
+  /// `MultiStageQueryStats.mergeUpstream`, which collapses their current-stage entries (only the first receive's
+  /// entry survives). We therefore graft only the receives the fold kept; grafting the full live receive list would
+  /// make the tree larger than the flat list (`treeSize > flatSize`).
+  ///
+  /// Returns 0 when there is no pipeline breaker to graft. Callers must pass `pipelineBreakerRoot == null`
+  /// when the stage did not fold a pipeline breaker (e.g. `skip.pipeline.breaker.stats=true`); otherwise the
+  /// leading entries are not the breaker's and this throws.
+  ///
+  /// @throws IllegalStateException if a pipeline breaker is expected but the flat list does not start with
+  ///     `MAILBOX_RECEIVE`* then `PIPELINE_BREAKER` — a genuine shape mismatch we must not silently encode.
   private static int keptPipelineBreakerReceives(MultiStageQueryStats.StageStats openStats, int flatSize,
       @Nullable MultiStageOperator pipelineBreakerRoot, int stageId) {
     if (pipelineBreakerRoot == null) {
@@ -216,18 +200,16 @@ public final class MultiStageStatsTreeEncoder {
     return receives;
   }
 
-  /**
-   * The operators to recurse into for {@code op}. This is {@code op.getChildOperators()}, except for a folded
-   * pipeline breaker, which ran pre-stage and is not a live child of the {@code LeafOperator} even though its
-   * operators occupy the inorder prefix of the leaf opchain's flat stats:
-   * <ul>
-   *   <li>at the {@code LEAF} node the pipeline-breaker root is grafted as an extra child, and</li>
-   *   <li>at the grafted pipeline-breaker root itself only the first {@code keptPipelineBreakerReceives} children are
-   *       walked — the receives the fold actually kept (see {@link #keptPipelineBreakerReceives}).</li>
-   * </ul>
-   * The graft only applies at the {@code LEAF} (the sole place a pipeline breaker folds into); the pipeline-breaker
-   * subtree itself contains no {@code LEAF}, so there is no double-graft.
-   */
+  /// The operators to recurse into for `op`. This is `op.getChildOperators()`, except for a folded
+  /// pipeline breaker, which ran pre-stage and is not a live child of the `LeafOperator` even though its
+  /// operators occupy the inorder prefix of the leaf opchain's flat stats:
+  ///
+  /// - at the `LEAF` node the pipeline-breaker root is grafted as an extra child, and
+  /// - at the grafted pipeline-breaker root itself only the first `keptPipelineBreakerReceives` children are
+  ///      walked — the receives the fold actually kept (see [#keptPipelineBreakerReceives]).
+  ///
+  /// The graft only applies at the `LEAF` (the sole place a pipeline breaker folds into); the pipeline-breaker
+  /// subtree itself contains no `LEAF`, so there is no double-graft.
   private static List<MultiStageOperator> effectiveChildren(MultiStageOperator op,
       @Nullable MultiStageOperator pipelineBreakerRoot, int keptPipelineBreakerReceives) {
     if (pipelineBreakerRoot != null) {

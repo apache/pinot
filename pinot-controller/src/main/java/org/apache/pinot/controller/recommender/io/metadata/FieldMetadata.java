@@ -29,10 +29,8 @@ import static org.apache.pinot.controller.recommender.rules.io.params.Recommende
 import static org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.DEFAULT_DATA_LENGTH;
 
 
-/**
- * The field information metadata piggybacked on a schema FieldSpec. For parsing the "schema with metadata" in the
- * input.
- */
+/// The field information metadata piggybacked on a schema FieldSpec. For parsing the "schema with metadata" in the
+/// input.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class FieldMetadata extends FieldSpec {
 

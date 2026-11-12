@@ -32,9 +32,7 @@ import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.logging.log4j.spi.AbstractLogger;
 
 
-/**
- * Logger utils for process level logger management.
- */
+/// Logger utils for process level logger management.
 public class LoggerUtils {
   private static final String ROOT = "root";
   private static final String NAME = "name";
@@ -44,12 +42,10 @@ public class LoggerUtils {
   private LoggerUtils() {
   }
 
-  /**
-   * Set logger level at runtime.
-   * @param loggerName name of the logger whose level is to be changed
-   * @param logLevel the new log level
-   * @return logger info
-   */
+  /// Set logger level at runtime.
+  /// @param loggerName name of the logger whose level is to be changed
+  /// @param logLevel the new log level
+  /// @return logger info
   public static Map<String, String> setLoggerLevel(String loggerName, String logLevel) {
     Level level;
     try {
@@ -85,11 +81,9 @@ public class LoggerUtils {
     return getLoggerResponse(loggerConfig);
   }
 
-  /**
-   * Fetch logger info of name, level and filter.
-   * @param loggerName
-   * @return logger info
-   */
+  /// Fetch logger info of name, level and filter.
+  /// @param loggerName
+  /// @return logger info
   @Nullable
   public static Map<String, String> getLoggerInfo(String loggerName) {
     LoggerContext context = (LoggerContext) LogManager.getContext(false);
@@ -101,21 +95,31 @@ public class LoggerUtils {
     return getLoggerResponse(loggerConfig);
   }
 
-  /**
-   * @return a list of all the configured logger names
-   */
+  /// @return a list of all the configured logger names
   public static List<String> getAllConfiguredLoggers() {
     LoggerContext context = (LoggerContext) LogManager.getContext(false);
     Configuration config = context.getConfiguration();
     return config.getLoggers().values().stream().map(LoggerConfig::toString).collect(Collectors.toList());
   }
 
-  /**
-   * @return a list of all the logger names
-   */
+  /// @return a list of all the logger names
   public static List<String> getAllLoggers() {
     LoggerContext context = (LoggerContext) LogManager.getContext(false);
     return context.getLoggers().stream().map(AbstractLogger::getName).collect(Collectors.toList());
+  }
+
+  /// Escapes backslashes, CR and LF as `\\`, `\r` and `\n`, so that a value the caller of a request controls (a SQL
+  /// statement, a string literal or a quoted identifier of a predicate, a request option, a proxy header) occupies a
+  /// single log line: it cannot split a log record or append a line that looks like a log record, so it cannot forge
+  /// one. A line ending can terminate a `--` or `//` SQL comment, so it is escaped rather than replaced with a space,
+  /// and escaping the existing backslashes keeps literal escape sequences apart from encoded line endings: the three
+  /// escape sequences decode in a single pass. Returns null for null.
+  @Nullable
+  public static String toSingleLine(@Nullable String text) {
+    if (text == null || (text.indexOf('\\') < 0 && text.indexOf('\n') < 0 && text.indexOf('\r') < 0)) {
+      return text;
+    }
+    return text.replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n");
   }
 
   private static LoggerConfig getLoggerConfig(Configuration config, String loggerName) {

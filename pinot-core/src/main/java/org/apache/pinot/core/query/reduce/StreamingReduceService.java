@@ -45,10 +45,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code>StreamingReduceService</code> class provides service to reduce grpc response gathered from multiple servers
- * to {@link BrokerResponseNative}.
- */
+/// The `StreamingReduceService` class provides service to reduce grpc response gathered from multiple
+/// servers to [BrokerResponseNative].
 @ThreadSafe
 public class StreamingReduceService extends BaseReduceService {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamingReduceService.class);

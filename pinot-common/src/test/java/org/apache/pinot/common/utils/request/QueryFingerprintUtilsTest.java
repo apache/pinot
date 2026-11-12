@@ -36,11 +36,9 @@ public class QueryFingerprintUtilsTest {
     Assert.assertNull(fingerprint, "Null query should return null fingerprint");
   }
 
-  /**
-   * Data provider for single-stage query shapes.
-   * Returns: [queryString, expectedFingerprintPattern]
-   * Note: Calcite uses ANSI SQL standard syntax (FETCH NEXT instead of LIMIT, BETWEEN ASYMMETRIC)
-   */
+  /// Data provider for single-stage query shapes.
+  /// Returns: \[queryString, expectedFingerprintPattern\]
+  /// Note: Calcite uses ANSI SQL standard syntax (FETCH NEXT instead of LIMIT, BETWEEN ASYMMETRIC)
   @DataProvider(name = "singleStageQueryShapes")
   public Object[][] provideSingleStageQueryShapes() {
     return new Object[][]{
@@ -98,10 +96,8 @@ public class QueryFingerprintUtilsTest {
     };
   }
 
-  /**
-   * Data provider for multi-stage query shapes.
-   * Returns: [queryString, expectedFingerprintPattern]
-   */
+  /// Data provider for multi-stage query shapes.
+  /// Returns: \[queryString, expectedFingerprintPattern\]
   @DataProvider(name = "multiStageQueryShapes")
   public Object[][] provideMultiStageQueryShapes() {
     return new Object[][]{
@@ -285,11 +281,9 @@ public class QueryFingerprintUtilsTest {
         "Fingerprint should not contain newlines");
   }
 
-  /**
-   * Data provider for queries whose original SqlNode tree must not be mutated by fingerprint generation.
-   * The broker compiles the same SqlNode to a PinotQuery after computing the fingerprint, so any in-place
-   * mutation (e.g. literal -> SqlDynamicParam) breaks query execution downstream.
-   */
+  /// Data provider for queries whose original SqlNode tree must not be mutated by fingerprint generation.
+  /// The broker compiles the same SqlNode to a PinotQuery after computing the fingerprint, so any in-place
+  /// mutation (e.g. literal -> SqlDynamicParam) breaks query execution downstream.
   @DataProvider(name = "noMutationQueries")
   public Object[][] provideNoMutationQueries() {
     return new Object[][]{
@@ -316,12 +310,10 @@ public class QueryFingerprintUtilsTest {
     };
   }
 
-  /**
-   * Regression: {@link QueryFingerprintUtils#generateFingerprint(SqlNodeAndOptions)} must not mutate the
-   * input {@link SqlNodeAndOptions#getSqlNode()}. The broker passes the same SqlNode to the compiler after
-   * computing the fingerprint, so any in-place replacement of literals with dynamic params would poison
-   * the parse tree and break downstream query compilation.
-   */
+  /// Regression: [QueryFingerprintUtils#generateFingerprint(SqlNodeAndOptions)] must not mutate the
+  /// input [SqlNodeAndOptions#getSqlNode()]. The broker passes the same SqlNode to the compiler after
+  /// computing the fingerprint, so any in-place replacement of literals with dynamic params would poison
+  /// the parse tree and break downstream query compilation.
   @Test(dataProvider = "noMutationQueries")
   public void testFingerprintDoesNotMutateInputSqlNode(String query) throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
@@ -342,11 +334,9 @@ public class QueryFingerprintUtilsTest {
         "Original SqlNode should not contain dynamic params after fingerprinting. Query: " + query);
   }
 
-  /**
-   * Data provider for single-stage queries that the broker's SSE path must be able to compile to a
-   * PinotQuery after fingerprint generation. JOIN/CTE/OVER are excluded here because they are MSE-only
-   * constructs in {@link CalciteSqlParser#compileToPinotQuery}.
-   */
+  /// Data provider for single-stage queries that the broker's SSE path must be able to compile to a
+  /// PinotQuery after fingerprint generation. JOIN/CTE/OVER are excluded here because they are MSE-only
+  /// constructs in [CalciteSqlParser#compileToPinotQuery].
   @DataProvider(name = "noMutationSseQueries")
   public Object[][] provideNoMutationSseQueries() {
     return new Object[][]{
@@ -360,11 +350,9 @@ public class QueryFingerprintUtilsTest {
     };
   }
 
-  /**
-   * End-to-end regression for the SSE broker flow: generate a fingerprint, then compile the same
-   * SqlNodeAndOptions to a PinotQuery. With the visitor mutating literals in place this used to fail
-   * because compileToPinotQuery saw SqlDynamicParam nodes where literals were expected.
-   */
+  /// End-to-end regression for the SSE broker flow: generate a fingerprint, then compile the same
+  /// SqlNodeAndOptions to a PinotQuery. With the visitor mutating literals in place this used to fail
+  /// because compileToPinotQuery saw SqlDynamicParam nodes where literals were expected.
   @Test(dataProvider = "noMutationSseQueries")
   public void testFingerprintThenSseCompileSucceeds(String query) throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);

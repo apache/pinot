@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
@@ -33,9 +35,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * The {@link BaseFilterOperator} class is the base class for all filter operators.
- */
+/// The [BaseFilterOperator] class is the base class for all filter operators.
 public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   protected final int _numDocs;
   protected final boolean _nullHandlingEnabled;
@@ -47,51 +47,46 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
-  /**
-   * Returns {@code true} if the result is always empty, {@code false} otherwise.
-   */
+  /// Returns `true` if the result is always empty, `false` otherwise.
   public boolean isResultEmpty() {
     return false;
   }
 
-  /**
-   * Returns {@code true} if the result matches all the records, {@code false} otherwise.
-   */
+  /// Returns `true` if the result matches all the records, `false` otherwise.
   public boolean isResultMatchingAll() {
     return false;
   }
 
-  /**
-   * Returns {@code true} if the filter has an optimized count implementation.
-   */
+  /// Returns `true` if the filter has an optimized count implementation.
   public boolean canOptimizeCount() {
     return false;
   }
 
-  /**
-   * @return the number of matching docs, or throws if it cannot produce this count.
-   */
+  /// @return the number of matching docs, or throws if it cannot produce this count.
   public int getNumMatchingDocs() {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * @return true if the filter operator can produce a bitmap of docIds
-   */
+  /// @return true if the filter operator can produce a bitmap of docIds
   public boolean canProduceBitmaps() {
     return false;
   }
 
-  /**
-   * @return bitmaps of matching docIds
-   */
+  /// Returns the true documents as bitmaps. The collection leaves out the documents the filter is UNKNOWN for and
+  /// carries them, so that its inversion leaves them out as well.
   public BitmapCollection getBitmaps() {
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * Exact filtered docIds for the operator. {@code null} indicates match-all.
-   */
+  /// Returns whether some documents may be UNKNOWN to this filter, that is whether [#getNulls] may be non-empty. The
+  /// answer comes from metadata rather than from evaluating the filter, so it may be pessimistic, and it is `false`
+  /// whenever null handling is disabled, since every document then reads as a value. A parent that derives its result
+  /// from the two-valued shortcuts alone, such as a negation counting the complement, consults this before doing so.
+  public boolean mayHaveNulls() {
+    return _nullHandlingEnabled;
+  }
+
+  /// Exact filtered docIds for the operator. `null` indicates match-all.
   public static final class FilteredDocIds {
     @Nullable
     private final ImmutableRoaringBitmap _docIds;
@@ -112,10 +107,8 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     }
   }
 
-  /**
-   * Returns the exact filtered docIds for the operator. Implementations that cannot produce a bitmap directly are
-   * materialized once through the filter operator itself so callers can reuse the same primitive.
-   */
+  /// Returns the exact filtered docIds for the operator. Implementations that cannot produce a bitmap directly are
+  /// materialized once through the filter operator itself so callers can reuse the same primitive.
   public FilteredDocIds getFilteredDocIds() {
     if (_filteredDocIds != null) {
       return _filteredDocIds;
@@ -149,36 +142,65 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     return new FilterBlock(getTrues());
   }
 
-  /**
-   * @return document IDs in which the predicate evaluates to true.
-   */
+  /// @return document IDs in which the predicate evaluates to true.
   protected abstract BlockDocIdSet getTrues();
 
-  /**
-   * @return document IDs in which the predicate evaluates to NULL.
-   */
+  /// @return document IDs in which the predicate evaluates to NULL.
   protected BlockDocIdSet getNulls() {
-    return EmptyDocIdSet.getInstance();
+    return EmptyDocIdSet.unscanned();
   }
 
-  /**
-   * @return document IDs in which the predicate evaluates to false.
-   */
-  protected BlockDocIdSet getFalses() {
+  /// Returns the document IDs in which the predicate does not evaluate to false: the true ones and, with null
+  /// handling enabled, the NULL ones. The result is a [MatchAllDocIdSet] when the predicate is true everywhere and an
+  /// [EmptyDocIdSet] when it is false everywhere, so that a parent can short-circuit on either.
+  protected BlockDocIdSet getNotFalses() {
+    BlockDocIdSet trues = getTrues();
+    if (!_nullHandlingEnabled || trues instanceof MatchAllDocIdSet) {
+      return trues;
+    }
+    BlockDocIdSet nulls = getNulls();
+    if (nulls instanceof EmptyDocIdSet) {
+      return trues;
+    }
+    return trues instanceof EmptyDocIdSet ? nulls : new OrDocIdSet(List.of(trues, nulls), _numDocs);
+  }
+
+  /// Returns the document IDs in which the predicate evaluates to NULL, derived as the ones that are neither false
+  /// nor true.
+  ///
+  /// Only for operators that override [#getNotFalses]. The default [#getNotFalses] reads [#getNulls], so an operator
+  /// that keeps it would recurse; a leaf returns its UNKNOWN documents directly instead.
+  ///
+  /// `restrictionPushdownEnabled` is the AND restriction push-down flag for the AND of the not-false and the not-true
+  /// documents. Without the push-down, a composite child of that AND (for example the NOT of an OR over a scan)
+  /// evaluates its scans on the whole segment.
+  protected BlockDocIdSet deriveNulls(@Nullable Map<String, String> queryOptions,
+      boolean restrictionPushdownEnabled) {
+    BlockDocIdSet notFalses = getNotFalses();
+    if (notFalses instanceof EmptyDocIdSet) {
+      return EmptyDocIdSet.unscanned();
+    }
     BlockDocIdSet trues = getTrues();
     if (trues instanceof MatchAllDocIdSet) {
-      return EmptyDocIdSet.getInstance();
-    }
-    if (_nullHandlingEnabled) {
-      BlockDocIdSet nulls = getNulls();
-      if (!(nulls instanceof EmptyDocIdSet)) {
-        return new NotDocIdSet(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs),
-            _numDocs);
-      }
+      return EmptyDocIdSet.unscanned();
     }
     if (trues instanceof EmptyDocIdSet) {
+      return notFalses;
+    }
+    BlockDocIdSet notTrues = new NotDocIdSet(trues, _numDocs);
+    return notFalses instanceof MatchAllDocIdSet ? notTrues
+        : new AndDocIdSet(List.of(notFalses, notTrues), queryOptions, restrictionPushdownEnabled);
+  }
+
+  /// @return document IDs in which the predicate evaluates to false.
+  protected BlockDocIdSet getFalses() {
+    BlockDocIdSet notFalses = getNotFalses();
+    if (notFalses instanceof MatchAllDocIdSet) {
+      return EmptyDocIdSet.unscanned();
+    }
+    if (notFalses instanceof EmptyDocIdSet) {
       return new MatchAllDocIdSet(_numDocs);
     }
-    return new NotDocIdSet(trues, _numDocs);
+    return new NotDocIdSet(notFalses, _numDocs);
   }
 }

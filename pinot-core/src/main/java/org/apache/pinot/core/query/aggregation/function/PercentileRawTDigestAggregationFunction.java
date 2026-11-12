@@ -18,24 +18,26 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.tdunning.math.stats.TDigest;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.segment.local.customobject.SerializedTDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
-/**
- * The {@code PercentileRawTDigestAggregationFunction} returns the serialized {@code TDigest} data structure of the
- * {@code PercentileEstAggregationFunction}.
- */
+/// The `PercentileRawTDigestAggregationFunction` returns the serialized `TDigest` data structure of the
+/// `PercentileEstAggregationFunction`.
 public class PercentileRawTDigestAggregationFunction
-    extends BaseSingleInputAggregationFunction<TDigest, SerializedTDigest> {
+    extends BaseSingleInputAggregationFunction<TDigest, Comparable<?>> {
   private final PercentileTDigestAggregationFunction _percentileTDigestAggregationFunction;
 
   public PercentileRawTDigestAggregationFunction(ExpressionContext expressionContext, int percentile,
@@ -58,7 +60,8 @@ public class PercentileRawTDigestAggregationFunction
 
   protected PercentileRawTDigestAggregationFunction(ExpressionContext expression,
       PercentileTDigestAggregationFunction percentileTDigestAggregationFunction) {
-    super(expression);
+    // This wrapper only serializes what the delegate produced, so the delegate owns the option
+    super(expression, percentileTDigestAggregationFunction._nullHandlingEnabled);
     _percentileTDigestAggregationFunction = percentileTDigestAggregationFunction;
   }
 
@@ -131,7 +134,7 @@ public class PercentileRawTDigestAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(TDigest tDigest) {
+  public SerializedResult serializeIntermediateResult(TDigest tDigest) {
     return _percentileTDigestAggregationFunction.serializeIntermediateResult(tDigest);
   }
 
@@ -145,8 +148,31 @@ public class PercentileRawTDigestAggregationFunction
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public SerializedTDigest extractFinalResult(TDigest intermediateResult) {
+  public SerializedTDigest extractFinalResult(@Nullable TDigest intermediateResult) {
+    // A null intermediate result means nothing was aggregated. With null handling enabled that is NULL; with it
+    // disabled the answer has to stay what it has always been, which is an empty digest serialized, so the empty
+    // accumulator the delegate no longer substitutes is built here where it is rendered.
+    if (intermediateResult == null) {
+      return _percentileTDigestAggregationFunction._nullHandlingEnabled ? null
+          : new SerializedTDigest(
+              TDigestAccumulator.forLegacyAggregation(
+                  _percentileTDigestAggregationFunction._compressionFactor),
+              _percentileTDigestAggregationFunction._percentile);
+    }
     return new SerializedTDigest(intermediateResult, _percentileTDigestAggregationFunction._percentile);
+  }
+
+  /// Merges two final results, which are serialized digests in string form, into the string form of the merged
+  /// digest.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    TDigest merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedTDigest(merged, _percentileTDigestAggregationFunction._percentile).toString();
+  }
+
+  private static TDigest deserializeFinalResult(Comparable<?> finalResult) {
+    return ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) finalResult));
   }
 }

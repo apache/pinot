@@ -30,19 +30,20 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
 
-/**
- * Used to persist the null bitmap on disk. This is used by SegmentCreator while indexing rows.
- *
- * Although this class implements {@link IndexCreator}, it is not intended to be used as a normal IndexCreator.
- * Specifically, neither {@link #add(Object, int)} or {@link #add(Object[], int[])} should be called on this object.
- * In order to make sure these methods are not being called, they throw exceptions in this class.
- *
- * This requirement is a corollary from the fact that the {@link IndexCreator} contract assumes the value will never be
- * null, which is true for all index creators types unless this one.
- */
+/// Used to persist the null bitmap on disk. This is used by SegmentCreator while indexing rows.
+///
+/// Although this class implements [IndexCreator], it is not intended to be used as a normal IndexCreator.
+/// Specifically, neither [#add(Object, int)] or [#add(Object[], int[])] should be called on this object.
+/// In order to make sure these methods are not being called, they throw exceptions in this class.
+///
+/// This requirement is a corollary from the fact that the [IndexCreator] contract assumes the value will never be
+/// null, which is true for all index creators types unless this one.
 public class NullValueVectorCreator implements IndexCreator {
   private final RoaringBitmapWriter<RoaringBitmap> _bitmapWriter;
   private final File _nullValueVectorFile;
+  private boolean _hasNulls;
+  // Materialized from the writer on first access; see getNullBitmap() for the contract
+  private RoaringBitmap _nullBitmap;
 
   @Override
   public void add(Object value, int dictId)
@@ -62,23 +63,47 @@ public class NullValueVectorCreator implements IndexCreator {
   }
 
   public void setNull(int docId) {
+    // Enforces the contract documented on getNullBitmap(). Kept as an assert so the check is free in production while
+    // still catching a misordered caller in tests, where assertions are enabled.
+    assert _nullBitmap == null : "setNull() called after the null bitmap was materialized";
     _bitmapWriter.add(docId);
+    _hasNulls = true;
+  }
+
+  /// Returns `true` when no doc has been marked null, i.e. [#seal] writes no bitmap file.
+  public boolean isNonNull() {
+    return !_hasNulls;
+  }
+
+  /// Returns the number of docs marked null. Subject to the same contract as [#getNullBitmap].
+  public int getNumNulls() {
+    return _hasNulls ? getNullBitmap().getCardinality() : 0;
   }
 
   public void seal()
       throws IOException {
-    // Create null value vector file only if the bitmap is not empty
-    RoaringBitmap nullBitmap = _bitmapWriter.get();
-    if (!nullBitmap.isEmpty()) {
+    // Create null value vector file only if at least one doc was marked null
+    if (_hasNulls) {
       try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_nullValueVectorFile))) {
-        nullBitmap.serialize(outputStream);
+        getNullBitmap().serialize(outputStream);
       }
     }
   }
 
+  /// Returns the bitmap of null doc ids.
+  ///
+  /// Must be called only once every [#setNull] call has been made: materializing the bitmap flushes the writer, and the
+  /// result is cached here so that repeated calls (e.g. [#getNumNulls] followed by [#seal]) flush at most once. Doc ids
+  /// marked after the first call are therefore not guaranteed to be reflected.
+  ///
+  /// No explicit `runOptimize` is needed: the writer run-length encodes each container as it is appended
+  /// (`runCompress` defaults to `true`), which is what keeps a clustered or all-null vector compact.
   @VisibleForTesting
   RoaringBitmap getNullBitmap() {
-    return _bitmapWriter.get();
+    if (_nullBitmap == null) {
+      _nullBitmap = _bitmapWriter.get();
+    }
+    return _nullBitmap;
   }
 
   @Override

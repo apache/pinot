@@ -30,7 +30,10 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
@@ -43,10 +46,12 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -62,10 +67,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code InstanceRequestHandler} is the Netty inbound handler on Pinot Server side to handle the serialized
- * instance requests sent from Pinot Broker.
- */
+/// The `InstanceRequestHandler` is the Netty inbound handler on Pinot Server side to handle the serialized
+/// instance requests sent from Pinot Broker.
 @ChannelHandler.Sharable
 public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceRequestHandler.class);
@@ -125,20 +128,35 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED, requestSize);
     byte[] requestBytes = new byte[requestSize];
     msg.readBytes(requestBytes);
-    ServerQueryRequest queryRequest;
+    InstanceRequest instanceRequest = new InstanceRequest();
     try {
-      InstanceRequest instanceRequest = new InstanceRequest();
       THREAD_LOCAL_T_DESERIALIZER.get().deserialize(instanceRequest, requestBytes);
-      queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
-      _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES_ON_TABLE, 1);
-      queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
-          .stopAndRecord();
     } catch (Exception e) {
       // Do not send error response because request id is unknown.
       LOGGER.error("Failed to deserialize instance request: {}", BytesUtils.toHexString(requestBytes), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       return;
     }
+    if (instanceRequest.isPing()) {
+      sendPingResponse(ctx, instanceRequest.getRequestId());
+      return;
+    }
+    ServerQueryRequest queryRequest;
+    try {
+      queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
+    } catch (Exception e) {
+      // The request id is known, so reply with the error. Without a response, the broker waits until the query times
+      // out and reports the server as not responded, which hides the actual error (e.g. an unsupported function).
+      long requestId = instanceRequest.getRequestId();
+      String tableNameWithType = getTableNameWithType(instanceRequest);
+      LOGGER.error("Failed to compile query request: {} on table: {}", requestId, tableNameWithType, e);
+      sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
+          DataTableBuilderFactory.getEmptyDataTable(), e);
+      return;
+    }
+    _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES_ON_TABLE, 1);
+    queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
+        .stopAndRecord();
     try {
       submitQuery(queryRequest, ctx, queryArrivalTimeMs);
     } catch (Exception e) {
@@ -150,15 +168,28 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
   }
 
-  /**
-   * Submit query for execution and register callback for execution results.
-   * If query cancellation is enabled, the query future is tracked as well.
-   */
+  /// Answers a broker's ping with an empty data table carrying its request id, which is all the broker waits for.
+  ///
+  /// The reply is written straight from this event loop and never goes through the query scheduler. The broker pings a
+  /// server after a query to it timed out, to ask whether the server is alive at all; a server that is merely busy must
+  /// still answer promptly, so the reply cannot wait behind queued queries.
+  private void sendPingResponse(ChannelHandlerContext ctx, long requestId) {
+    try {
+      DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+      dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+      ctx.writeAndFlush(Unpooled.wrappedBuffer(dataTable.toBytes()));
+    } catch (Exception e) {
+      LOGGER.warn("Failed to answer ping request: {}", requestId, e);
+    }
+  }
+
+  /// Submit query for execution and register callback for execution results.
+  /// If query cancellation is enabled, the query future is tracked as well.
   @VisibleForTesting
   void submitQuery(ServerQueryRequest queryRequest, ChannelHandlerContext ctx, long queryArrivalTimeMs) {
     QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceName);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
-      ListenableFuture<byte[]> future = _queryScheduler.submit(queryRequest);
+      ListenableFuture<DataBuffer> future = _queryScheduler.submitResponse(queryRequest);
       if (_executionContexts != null) {
         String queryId = queryRequest.getQueryId();
         // Track the running query for cancellation.
@@ -172,11 +203,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
   }
 
-  private FutureCallback<byte[]> createCallback(ServerQueryRequest queryRequest, ChannelHandlerContext ctx,
+  private FutureCallback<DataBuffer> createCallback(ServerQueryRequest queryRequest, ChannelHandlerContext ctx,
       long queryArrivalTimeMs) {
     return new FutureCallback<>() {
       @Override
-      public void onSuccess(@Nullable byte[] responseBytes) {
+      public void onSuccess(@Nullable DataBuffer response) {
         if (_executionContexts != null) {
           String queryId = queryRequest.getQueryId();
           if (LOGGER.isDebugEnabled()) {
@@ -186,9 +217,9 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         }
         long requestId = queryRequest.getRequestId();
         String tableNameWithType = queryRequest.getTableNameWithType();
-        if (responseBytes != null) {
-          // responseBytes contains either query results or exception.
-          sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, responseBytes);
+        if (response != null) {
+          // response contains either query results or exception.
+          sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, response);
         } else {
           // Send exception response.
           sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
@@ -234,13 +265,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         new Exception(message, cause));
   }
 
-  /**
-   * Cancel a query as identified by the queryId. This method is non-blocking and the query may still run for a while
-   * after calling this method. This method can be called multiple times.
-   *
-   * @param queryId a unique Id to find the query
-   * @return true if a running query exists for the given queryId.
-   */
+  /// Cancel a query as identified by the queryId. This method is non-blocking and the query may still run for a while
+  /// after calling this method. This method can be called multiple times.
+  ///
+  /// @param queryId a unique Id to find the query
+  /// @return true if a running query exists for the given queryId.
   public boolean cancelQuery(String queryId) {
     Preconditions.checkState(_executionContexts != null, "Query cancellation is not enabled on server");
     QueryExecutionContext executionContext = _executionContexts.get(queryId);
@@ -258,17 +287,25 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     return true;
   }
 
-  /**
-   * @return list of ids of the queries currently running on the server.
-   */
+  /// @return list of ids of the queries currently running on the server.
   public Set<String> getRunningQueryIds() {
     Preconditions.checkState(_executionContexts != null, "Query cancellation is not enabled on server");
     return new HashSet<>(_executionContexts.keySet());
   }
 
-  /**
-   * Send an exception back to broker as response to the query request.
-   */
+  /// Returns the table name of a deserialized request that could not be compiled, or `null` if the request does not
+  /// carry one.
+  @Nullable
+  private static String getTableNameWithType(InstanceRequest instanceRequest) {
+    BrokerRequest brokerRequest = instanceRequest.getQuery();
+    if (brokerRequest == null || brokerRequest.getPinotQuery() == null
+        || brokerRequest.getPinotQuery().getDataSource() == null) {
+      return null;
+    }
+    return brokerRequest.getPinotQuery().getDataSource().getTableName();
+  }
+
+  /// Send an exception back to broker as response to the query request.
   private void sendErrorResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
       long queryArrivalTimeMs, DataTable dataTable, Exception e) {
     boolean cancelled = (e instanceof CancellationException);
@@ -282,8 +319,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         dataTable.addException(QueryErrorCode.QUERY_EXECUTION.getId(),
             "Query execution error on: " + _instanceName + " " + e.getMessage());
       }
-      byte[] serializedDataTable = dataTable.toBytes();
-      sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, serializedDataTable);
+      sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, dataTable.toDataBuffer());
     } catch (Exception exception) {
       LOGGER.error("Exception while sending query processing error to Broker.", exception);
     } finally {
@@ -295,19 +331,22 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     }
   }
 
-  /**
-   * Send a response (either query results or exception) back to broker as response to the query request.
-   */
+  /// Send a response (either query results or exception) back to broker as response to the query request.
+  ///
+  /// The response buffers are wrapped in one composite Netty buffer without copying them.
   private void sendResponse(ChannelHandlerContext ctx, long requestId, String tableNameWithType,
-      long queryArrivalTimeMs, byte[] serializedDataTable) {
+      long queryArrivalTimeMs, DataBuffer response) {
     long sendResponseStartTimeMs = System.currentTimeMillis();
     int queryProcessingTimeMs = (int) (sendResponseStartTimeMs - queryArrivalTimeMs);
-    ctx.writeAndFlush(Unpooled.wrappedBuffer(serializedDataTable)).addListener(f -> {
+    long responseSizeBytes = response.size();
+    List<ByteBuffer> responseBuffers = new ArrayList<>();
+    response.appendAsByteBuffers(responseBuffers);
+    ctx.writeAndFlush(Unpooled.wrappedBuffer(responseBuffers.toArray(new ByteBuffer[0]))).addListener(f -> {
       if (f.isSuccess()) {
         long sendResponseEndTimeMs = System.currentTimeMillis();
         int sendResponseLatencyMs = (int) (sendResponseEndTimeMs - sendResponseStartTimeMs);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_RESPONSES_SENT, 1);
-        _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_SENT, serializedDataTable.length);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.NETTY_CONNECTION_BYTES_SENT, responseSizeBytes);
         _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.NETTY_CONNECTION_SEND_RESPONSE_LATENCY,
             sendResponseLatencyMs, TimeUnit.MILLISECONDS);
 
@@ -317,9 +356,9 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
               "Slow query ({}): request handler processing time: {}, send response latency: {}, total time to handle "
                   + "request: {}", requestId, queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
         }
-        if (serializedDataTable.length > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
+        if (responseSizeBytes > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
           LOGGER.warn("Large query ({}): response size in bytes: {}, table name {}", requestId,
-              serializedDataTable.length, tableNameWithType);
+              responseSizeBytes, tableNameWithType);
           _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSES_SENT, 1);
         }
       } else {

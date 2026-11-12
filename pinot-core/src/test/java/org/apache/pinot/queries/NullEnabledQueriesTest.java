@@ -53,9 +53,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Queries test for FLOAT and DOUBLE data types with nullHandlingEnabled.
- */
+/// Queries test for FLOAT and DOUBLE data types with nullHandlingEnabled.
 public class NullEnabledQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NullEnabledQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";

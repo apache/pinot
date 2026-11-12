@@ -25,24 +25,18 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 
-/**
- * A {@code TableSampler} deterministically selects a subset of segments from the set of online segments for a table.
- *
- * <p>Selection is performed during routing table build/update so there is no additional per-query overhead beyond
- * selecting the pre-built routing entry.
- */
+/// A `TableSampler` deterministically selects a subset of segments from the set of online segments for a table.
+///
+/// Selection is performed during routing table build/update so there is no additional per-query overhead beyond
+/// selecting the pre-built routing entry.
 public interface TableSampler {
 
-  /**
-   * Initializes the sampler for a specific table and sampler config.
-   */
+  /// Initializes the sampler for a specific table and sampler config.
   void init(TableConfig tableConfig, TableSamplerConfig samplerConfig, ZkHelixPropertyStore<ZNRecord> propertyStore);
 
-  /**
-   * Selects a subset of segments from the provided online segments.
-   *
-   * <p>Implementations must not mutate the input set because the same pre-selected segment set can be reused by
-   * multiple samplers. Implementations must return a non-null set.
-   */
+  /// Selects a subset of segments from the provided online segments.
+  ///
+  /// Implementations must not mutate the input set because the same pre-selected segment set can be reused by
+  /// multiple samplers. Implementations must return a non-null set.
   Set<String> sampleSegments(Set<String> onlineSegments);
 }

@@ -37,17 +37,13 @@ import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 
 
-/**
- * Explicit client for Pinot controller endpoints that accept file or raw-body uploads.
- */
+/// Explicit client for Pinot controller endpoints that accept file or raw-body uploads.
 public class FileIngestClient extends BaseServiceAdminClient {
   public FileIngestClient(PinotAdminTransport transport, String controllerAddress, Map<String, String> headers) {
     super(transport, controllerAddress, headers);
   }
 
-  /**
-   * Builds the ingestion URL for ingestFromFile.
-   */
+  /// Builds the ingestion URL for ingestFromFile.
   public String buildIngestFromFileUrl(String tableNameWithType, Map<String, String> batchConfigMap)
       throws PinotAdminException {
     String batchConfigMapStr = serializeBatchConfigMap(batchConfigMap);
@@ -56,9 +52,7 @@ public class FileIngestClient extends BaseServiceAdminClient {
         + URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8);
   }
 
-  /**
-   * Builds the ingestion URL for ingestFromURI.
-   */
+  /// Builds the ingestion URL for ingestFromURI.
   public String buildIngestFromUriUrl(String tableNameWithType, Map<String, String> batchConfigMap, String sourceUri)
       throws PinotAdminException {
     String batchConfigMapStr = serializeBatchConfigMap(batchConfigMap);
@@ -77,26 +71,20 @@ public class FileIngestClient extends BaseServiceAdminClient {
     }
   }
 
-  /**
-   * Posts a multipart file upload to the ingestFromFile endpoint.
-   */
+  /// Posts a multipart file upload to the ingestFromFile endpoint.
   public int ingestFromFile(String tableNameWithType, Map<String, String> batchConfigMap, File inputFile)
       throws PinotAdminException {
     return postFile(buildIngestFromFileUrl(tableNameWithType, batchConfigMap), inputFile);
   }
 
-  /**
-   * Posts a multipart file upload to the ingestFromURI endpoint.
-   */
+  /// Posts a multipart file upload to the ingestFromURI endpoint.
   public int ingestFromUri(String tableNameWithType, Map<String, String> batchConfigMap, String sourceUri,
       File inputFile)
       throws PinotAdminException {
     return postFile(buildIngestFromUriUrl(tableNameWithType, batchConfigMap, sourceUri), inputFile);
   }
 
-  /**
-   * Posts a multipart file to an explicit URL.
-   */
+  /// Posts a multipart file to an explicit URL.
   public int postFile(String url, File inputFile)
       throws PinotAdminException {
     HttpEntity reqEntity =
@@ -104,9 +92,7 @@ public class FileIngestClient extends BaseServiceAdminClient {
     return execute(url, reqEntity);
   }
 
-  /**
-   * Posts a plain string body to an explicit URL.
-   */
+  /// Posts a plain string body to an explicit URL.
   public int postString(String url, String body)
       throws PinotAdminException {
     return execute(url, new StringEntity(body));

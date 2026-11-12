@@ -18,32 +18,22 @@
  */
 package org.apache.pinot.spi.metrics;
 
-/**
- * Metric Name in Pinot.
- */
+/// Metric Name in Pinot.
 public interface PinotMetricName {
 
-  /**
-   * Returns the actual metric name.
-   */
+  /// Returns the actual metric name.
   Object getMetricName();
 
-  /**
-   * Overrides the equals method. This is needed as {@link PinotMetricName} is used as the key of the key-value pair
-   * inside the hashmap in MetricsRegistry. Without overriding equals() and hashCode() methods, all the existing k-v
-   * pairs
-   * stored in hashmap cannot be retrieved by initializing a new key.
-   */
+  /// Overrides the equals method. This is needed as [PinotMetricName] is used as the key of the key-value pair
+  /// inside the hashmap in MetricsRegistry. Without overriding equals() and hashCode() methods, all the existing k-v
+  /// pairs
+  /// stored in hashmap cannot be retrieved by initializing a new key.
   boolean equals(Object obj);
 
-  /**
-   * Overrides the hashCode method. This method's contract is the same as equals() method.
-   */
+  /// Overrides the hashCode method. This method's contract is the same as equals() method.
   int hashCode();
 
-  /**
-   * Overrides the toString method.
-   * This could be used to print out the actual metrics name instead of the memory address under this wrapper.
-   */
+  /// Overrides the toString method.
+  /// This could be used to print out the actual metrics name instead of the memory address under this wrapper.
   String toString();
 }

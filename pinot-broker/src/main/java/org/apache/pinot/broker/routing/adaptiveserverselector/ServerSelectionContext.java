@@ -24,36 +24,30 @@ import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorConfig;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
-/**
- * This class encapsulates query options and ordered preferred pools that influence how
- * servers are selected for query execution.
- */
+/// This class encapsulates query options and ordered preferred pools that influence how
+/// servers are selected for query execution.
 public class ServerSelectionContext {
   private final InstanceSelectorConfig _config;
-  /**
-   * Map of query options that can influence server selection behavior.
-   * These options are passed into the context class to avoid endless constructor argument changes
-   * as new server selection preferences are added. Examples of such options include:
-   * <ul>
-   *   <li>Preferred pools for routing</li>
-   *   <li>Boolean fixedReplicaGroup</li>
-   *   <li>Other server selection related configurations in the future</li>
-   * </ul>
-   * The options are processed once during construction to extract relevant information
-   * (like ordered preferred pools) to avoid repeated parsing.
-   */
+  /// Map of query options that can influence server selection behavior.
+  /// These options are passed into the context class to avoid endless constructor argument changes
+  /// as new server selection preferences are added. Examples of such options include:
+  ///
+  /// - Preferred pools for routing
+  /// - Boolean fixedReplicaGroup
+  /// - Other server selection related configurations in the future
+  ///
+  /// The options are processed once during construction to extract relevant information
+  /// (like ordered preferred pools) to avoid repeated parsing.
   private final Map<String, String> _queryOptions;
   // If some query options need further processing, store the parsing result below to avoid duplicate parsing.
   private final List<Integer> _orderedPreferredPools;
   private final boolean _isUseFixedReplica;
 
-  /**
-   * Creates a new server selection context with the given query options.
-   * The ordered preferred pools are extracted from the query options using
-   * {@link QueryOptionsUtils#getOrderedPreferredPools(Map)}.
-   *
-   * @param queryOptions map of query options that may contain server selection preferences
-   */
+  /// Creates a new server selection context with the given query options.
+  /// The ordered preferred pools are extracted from the query options using
+  /// [QueryOptionsUtils#getOrderedPreferredPools(Map)].
+  ///
+  /// @param queryOptions map of query options that may contain server selection preferences
   public ServerSelectionContext(Map<String, String> queryOptions, InstanceSelectorConfig instanceSelectorConfig) {
     _queryOptions = queryOptions == null ? Map.of() : queryOptions;
     _config = instanceSelectorConfig;

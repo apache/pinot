@@ -43,12 +43,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * LogicalTableMetadataCache maintains the cache for logical tables, that includes the logical table configs,
- * logical table schemas, and reference offline and realtime table configs.
- * It listens to changes in the ZK property store for all the logical table configs and updates the cache accordingly.
- * For schema and table configs, it listens to only those configs that are required by the logical tables.
- */
+/// LogicalTableMetadataCache maintains the cache for logical tables, that includes the logical table configs,
+/// logical table schemas, and reference offline and realtime table configs.
+/// It listens to changes in the ZK property store for all the logical table configs and updates the cache accordingly.
+/// For schema and table configs, it listens to only those configs that are required by the logical tables.
 public class LogicalTableMetadataCache {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableMetadataCache.class);

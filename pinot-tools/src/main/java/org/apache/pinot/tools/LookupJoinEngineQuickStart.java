@@ -27,7 +27,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 
 
-public class LookupJoinEngineQuickStart extends MultistageEngineQuickStart {
+public class LookupJoinEngineQuickStart extends Quickstart {
   private static final String QUICKSTART_IDENTIFIER = "LOOKUP_JOIN";
   // Reuse userAttributes from ColocatedJoinEngineQuickStart
   private static final String[] LOOKUP_JOIN_DIRECTORIES = new String[]{

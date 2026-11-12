@@ -23,24 +23,22 @@ import java.util.Map;
 import org.apache.commons.configuration2.convert.PropertyConverter;
 
 
-/**
- * TemplateStringGenerator produces series of strings by cycling through a predefined list of values, optionally with
- * a number of repetitions per value.
- *
- * Generator example:
- * <pre>
- *     values = [ "hello", "world" ]
- *     repetitions = 2
- *
- *     returns [ "hello", "hello", "world", "world", "hello", ... ]
- * </pre>
- *
- * Configuration examples:
- * <ul>
- *     <li>./pinot-tools/src/main/resources/generator/simpleWebsite_generator.json</li>
- *     <li>./pinot-tools/src/main/resources/generator/complexWebsite_generator.json</li>
- * </ul>
- */
+/// TemplateStringGenerator produces series of strings by cycling through a predefined list of values, optionally with
+/// a number of repetitions per value.
+///
+/// Generator example:
+///
+/// ```
+/// values = [ "hello", "world" ]
+/// repetitions = 2
+///
+/// returns [ "hello", "hello", "world", "world", "hello", ... ]
+/// ```
+///
+/// Configuration examples:
+///
+/// - ./pinot-tools/src/main/resources/generator/simpleWebsite_generator.json
+/// - ./pinot-tools/src/main/resources/generator/complexWebsite_generator.json
 public class PatternStringGenerator implements Generator {
   private final String[] _values;
   private final long _repetitions;

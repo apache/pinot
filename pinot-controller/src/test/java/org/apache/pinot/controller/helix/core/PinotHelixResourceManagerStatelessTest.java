@@ -31,7 +31,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
 import org.apache.helix.model.ClusterConfig;
@@ -40,6 +43,8 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -77,8 +82,10 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -91,6 +98,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.apache.zookeeper.data.Stat;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
@@ -257,6 +265,22 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     allInstances = _helixResourceManager.getAllInstances();
     assertTrue(allInstances.contains(instanceName));
 
+    // An instance in the partition assignment of a table cannot be dropped, although it hosts no segment
+    String tableNameWithType = "partitionPinnedTable_OFFLINE";
+    IdealState idealState = new IdealState(tableNameWithType);
+    idealState.setStateModelDefRef("OnlineOffline");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    idealState.setReplicas("1");
+    idealState.setNumPartitions(0);
+    PartitionAssignmentUtils.setInstances(idealState, 0, List.of(instanceName));
+    _helixAdmin.addResource(getHelixClusterName(), tableNameWithType, idealState);
+    try {
+      assertFalse(_helixResourceManager.instanceDropSafetyCheck(instanceName).isSafe());
+      assertFalse(_helixResourceManager.dropInstance(instanceName).isSuccessful());
+    } finally {
+      _helixAdmin.dropResource(getHelixClusterName(), tableNameWithType);
+    }
+
     // Remove the added instance
     assertTrue(_helixResourceManager.dropInstance(instanceName).isSuccessful());
     allInstances = _helixResourceManager.getAllInstances();
@@ -329,10 +353,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     resetBrokerTags();
   }
 
-  /**
-   * Verifies that when a new broker is added with the same tenant as a logical table,
-   * the broker resource ideal state is updated for the logical table partition (Issue #15751).
-   */
+  /// Verifies that when a new broker is added with the same tenant as a logical table,
+  /// the broker resource ideal state is updated for the logical table partition (Issue #15751).
   @Test
   public void testUpdateBrokerResourceWithLogicalTable()
       throws Exception {
@@ -587,6 +609,51 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       assertEquals(retrievedSegmentsZKMetadata.size(), 1);
       assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, segmentName));
       assertTrue(_helixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME).isEmpty());
+    }
+  }
+
+  /// Pins the contract [org.apache.pinot.controller.helix.SegmentStatusChecker] depends on: the batched read returns
+  /// the metadata and the znode [Stat] index-aligned with the requested segment names, with `null` in both for a
+  /// segment that has no ZK metadata.
+  @Test
+  public void testRetrieveSegmentsZKMetadataBatched() {
+    long beforeMs = System.currentTimeMillis();
+    List<String> segmentNames = List.of("testSegment0", "testSegment1", "testSegment2");
+    // Write ZK metadata for the first and last segment only, leaving a gap in the middle
+    for (String segmentName : List.of("testSegment0", "testSegment2")) {
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+      segmentZKMetadata.setSizeInBytes(segmentName.hashCode());
+      ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadata);
+    }
+
+    try {
+      List<Stat> stats = new ArrayList<>();
+      List<SegmentZKMetadata> segmentsZKMetadata =
+          _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME, segmentNames, stats);
+
+      // Both lists must line up with the requested names, so that the gap does not shift the entries after it
+      assertEquals(segmentsZKMetadata.size(), 3);
+      assertEquals(stats.size(), 3);
+      for (int i : new int[]{0, 2}) {
+        String segmentName = segmentNames.get(i);
+        assertNotNull(segmentsZKMetadata.get(i), segmentName);
+        assertEquals(segmentsZKMetadata.get(i).getSegmentName(), segmentName);
+        assertEquals(segmentsZKMetadata.get(i).getSizeInBytes(), segmentName.hashCode());
+        // A real znode mtime, not a default or the metadata's own creation time
+        assertNotNull(stats.get(i), segmentName);
+        assertTrue(stats.get(i).getMtime() >= beforeMs,
+            segmentName + " mtime: " + stats.get(i).getMtime() + " < " + beforeMs);
+      }
+      assertNull(segmentsZKMetadata.get(1));
+      assertNull(stats.get(1));
+
+      // The stats are optional
+      assertEquals(
+          _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME, segmentNames, null).size(), 3);
+    } finally {
+      for (String segmentName : List.of("testSegment0", "testSegment2")) {
+        ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentName);
+      }
     }
   }
 
@@ -1087,11 +1154,39 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     }
   }
 
-  /**
-   * Tests the code path where a subset of merged segments (from the original segmentsTo list)
-   * is passed to the endReplace API.
-   * @throws Exception
-   */
+  @Test
+  public void testAddSchemaWithOverrideRefreshesServerCaches()
+      throws Exception {
+    String rawTableName = "schemaOverrideRefreshTest";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    addDummySchema(rawTableName);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(rawTableName)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    PinotHelixResourceManager resourceManager = spy(_helixResourceManager);
+    doNothing().when(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+
+    try {
+      Schema schema = createDummySchema(rawTableName);
+      schema.addField(new DimensionFieldSpec("dimC", FieldSpec.DataType.STRING, true));
+      resourceManager.addSchema(schema, true, false);
+
+      assertEquals(resourceManager.getSchema(rawTableName), schema);
+      verify(resourceManager).sendTableConfigSchemaRefreshMessage(offlineTableName);
+    } finally {
+      _helixResourceManager.deleteOfflineTable(rawTableName);
+      deleteSchema(rawTableName);
+    }
+  }
+
+  /// Tests the code path where a subset of merged segments (from the original segmentsTo list)
+  /// is passed to the endReplace API.
+  /// @throws Exception
   @Test
   public void testSegmentReplacementWithCustomToSegments()
       throws Exception {
@@ -1777,13 +1872,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     deleteSchema(rawTableName);
   }
 
-  /**
-   * Happy-path coverage for {@link PinotHelixResourceManager#multiWriteZK()}: pre-creates two
-   * segment ZK metadata znodes, atomically updates both via a single multi() transaction, then
-   * reads back through the property store and asserts the mutated fields round-tripped. Verifies
-   * the dedicated multi-write ZkClient is built correctly and the ZNRecord serialization /
-   * deserialization path matches what the rest of the controller uses.
-   */
+  /// Happy-path coverage for [PinotHelixResourceManager#multiWriteZK()]: pre-creates two
+  /// segment ZK metadata znodes, atomically updates both via a single multi() transaction, then
+  /// reads back through the property store and asserts the mutated fields round-tripped. Verifies
+  /// the dedicated multi-write ZkClient is built correctly and the ZNRecord serialization /
+  /// deserialization path matches what the rest of the controller uses.
   @Test
   public void testMultiWriteZkSegmentMetadataUpdates()
       throws Exception {
@@ -1822,6 +1915,137 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Cleanup
     assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName1));
     assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName2));
+  }
+
+  private static final String REMOVAL_TEST_TABLE = "removeSegmentsZKMetadataTest_REALTIME";
+
+  /// Creates the IdealState of the removal test table with the given segment, and IN_PROGRESS segment ZK metadata for
+  /// the given segments.
+  private void setUpRemovalTestTable(String segmentInIdealState, List<String> segmentsWithZKMetadata) {
+    IdealState idealState = new IdealState(REMOVAL_TEST_TABLE);
+    idealState.setStateModelDefRef(
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL);
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    idealState.setReplicas("1");
+    idealState.setNumPartitions(1);
+    idealState.setPartitionState(segmentInIdealState, "Server_unknown_0", Helix.StateModel.SegmentStateModel.ONLINE);
+    _helixResourceManager.getHelixAdmin().addResource(getHelixClusterName(), REMOVAL_TEST_TABLE, idealState);
+    for (String segmentName : segmentsWithZKMetadata) {
+      SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
+      segmentZKMetadata.setStatus(Segment.Realtime.Status.IN_PROGRESS);
+      assertTrue(ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, REMOVAL_TEST_TABLE, segmentZKMetadata));
+    }
+  }
+
+  private void tearDownRemovalTestTable(List<String> segmentNames) {
+    _helixResourceManager.getHelixAdmin().dropResource(getHelixClusterName(), REMOVAL_TEST_TABLE);
+    for (String segmentName : segmentNames) {
+      ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, REMOVAL_TEST_TABLE, segmentName);
+    }
+  }
+
+  /// Covers [PinotHelixResourceManager#removeInProgressSegmentsZKMetadataNotInIdealState]: removes the ZK metadata of
+  /// the IN_PROGRESS segments that are not in the IdealState, and keeps the others. The removal writes the unchanged
+  /// IdealState, so an IdealState update that read the IdealState before fails.
+  @Test
+  public void testRemoveInProgressSegmentsZKMetadataNotInIdealState() {
+    String segmentInIdealState = "segmentInIdealState";
+    String segmentNotInIdealState = "segmentNotInIdealState";
+    String doneSegmentNotInIdealState = "doneSegmentNotInIdealState";
+    List<String> segments = List.of(segmentInIdealState, segmentNotInIdealState, doneSegmentNotInIdealState);
+    setUpRemovalTestTable(segmentInIdealState, segments);
+    try {
+      SegmentZKMetadata doneSegmentZKMetadata = new SegmentZKMetadata(doneSegmentNotInIdealState);
+      doneSegmentZKMetadata.setStatus(Segment.Realtime.Status.DONE);
+      assertTrue(ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, REMOVAL_TEST_TABLE, doneSegmentZKMetadata));
+      IdealState idealStateBefore = _helixResourceManager.getTableIdealState(REMOVAL_TEST_TABLE);
+
+      List<String> segmentsToRemove = new ArrayList<>(segments);
+      segmentsToRemove.add("segmentWithoutZKMetadata");
+      assertEquals(_helixResourceManager.removeInProgressSegmentsZKMetadataNotInIdealState(REMOVAL_TEST_TABLE,
+          segmentsToRemove), Set.of(segmentNotInIdealState));
+      assertNotNull(ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, REMOVAL_TEST_TABLE, segmentInIdealState));
+      assertNull(ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, REMOVAL_TEST_TABLE, segmentNotInIdealState));
+      assertNotNull(
+          ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, REMOVAL_TEST_TABLE, doneSegmentNotInIdealState));
+      IdealState idealStateAfter = _helixResourceManager.getTableIdealState(REMOVAL_TEST_TABLE);
+      assertEquals(idealStateAfter.getRecord().getMapFields(), idealStateBefore.getRecord().getMapFields());
+      String idealStatePath = PropertyPathBuilder.idealState(getHelixClusterName(), REMOVAL_TEST_TABLE);
+      // An IdealState update based on the IdealState read before the removal fails
+      assertThrows(ZkBadVersionException.class,
+          () -> _helixResourceManager.getHelixZkManager().getHelixDataAccessor().getBaseDataAccessor()
+              .set(idealStatePath, idealStateBefore.getRecord(), idealStateBefore.getRecord().getVersion(),
+                  AccessOption.PERSISTENT));
+
+      // The table was deleted
+      assertEquals(_helixResourceManager.removeInProgressSegmentsZKMetadataNotInIdealState("deletedTable_REALTIME",
+          segments), Set.of());
+
+      // Nothing to remove: the IdealState is not written
+      assertEquals(_helixResourceManager.removeInProgressSegmentsZKMetadataNotInIdealState(REMOVAL_TEST_TABLE,
+          segmentsToRemove), Set.of());
+      assertEquals(_helixResourceManager.getTableIdealState(REMOVAL_TEST_TABLE).getRecord().getVersion(),
+          idealStateAfter.getRecord().getVersion());
+    } finally {
+      tearDownRemovalTestTable(segments);
+    }
+  }
+
+  /// Another controller adds the segment to the IdealState after the removal read the IdealState, e.g.
+  /// RealtimeSegmentValidationManager repairing the partition with it. The removal must keep its ZK metadata.
+  @Test
+  public void testRemoveInProgressSegmentsZKMetadataKeepsSegmentAddedToIdealStateConcurrently() {
+    String segmentInIdealState = "segmentInIdealState";
+    String segmentToRemove = "segmentToRemove";
+    setUpRemovalTestTable(segmentInIdealState, List.of(segmentToRemove));
+    try {
+      AtomicBoolean added = new AtomicBoolean();
+      Runnable addToIdealState = () -> {
+        if (added.compareAndSet(false, true)) {
+          IdealState idealState = _helixResourceManager.getTableIdealState(REMOVAL_TEST_TABLE);
+          idealState.setPartitionState(segmentToRemove, "Server_unknown_0",
+              Helix.StateModel.SegmentStateModel.CONSUMING);
+          _helixResourceManager.getHelixAdmin()
+              .setResourceIdealState(getHelixClusterName(), REMOVAL_TEST_TABLE, idealState);
+        }
+      };
+
+      assertEquals(_helixResourceManager.removeInProgressSegmentsZKMetadataNotInIdealState(REMOVAL_TEST_TABLE,
+          List.of(segmentToRemove), addToIdealState), Set.of());
+      assertTrue(added.get());
+      assertNotNull(ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, REMOVAL_TEST_TABLE, segmentToRemove));
+      assertNotNull(_helixResourceManager.getTableIdealState(REMOVAL_TEST_TABLE).getInstanceStateMap(segmentToRemove));
+    } finally {
+      tearDownRemovalTestTable(List.of(segmentToRemove));
+    }
+  }
+
+  /// The segment ZK metadata is overwritten after the removal read it, e.g. by an upload of a segment with the same
+  /// name. The removal must keep the new ZK metadata.
+  @Test
+  public void testRemoveInProgressSegmentsZKMetadataKeepsSegmentZKMetadataReplacedConcurrently() {
+    String segmentInIdealState = "segmentInIdealState";
+    String segmentToRemove = "segmentToRemove";
+    setUpRemovalTestTable(segmentInIdealState, List.of(segmentToRemove));
+    try {
+      AtomicBoolean replaced = new AtomicBoolean();
+      Runnable replaceSegmentZKMetadata = () -> {
+        if (replaced.compareAndSet(false, true)) {
+          SegmentZKMetadata uploadedSegmentZKMetadata = new SegmentZKMetadata(segmentToRemove);
+          uploadedSegmentZKMetadata.setStatus(Segment.Realtime.Status.UPLOADED);
+          assertTrue(
+              ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, REMOVAL_TEST_TABLE, uploadedSegmentZKMetadata));
+        }
+      };
+
+      assertEquals(_helixResourceManager.removeInProgressSegmentsZKMetadataNotInIdealState(REMOVAL_TEST_TABLE,
+          List.of(segmentToRemove), replaceSegmentZKMetadata), Set.of());
+      assertTrue(replaced.get());
+      assertEquals(ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, REMOVAL_TEST_TABLE, segmentToRemove)
+          .getStatus(), Segment.Realtime.Status.UPLOADED);
+    } finally {
+      tearDownRemovalTestTable(List.of(segmentToRemove));
+    }
   }
 
   @AfterClass

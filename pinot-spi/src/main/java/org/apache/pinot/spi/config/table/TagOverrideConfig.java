@@ -24,24 +24,21 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-/**
- * This config will allow specifying overrides to the tags derived from tenantConfig.
- * Supported override keys:
- *  - realtimeConsuming - value specifies the tag to be used for realtime consuming segments
- *  - realtimeCompleted - value specifies the tag to be used for realtime segments that are in ONLINE state.
- *
- * If a value is specified for the key 'realtimeCompleted' then realtime segments, once completed, will be moved
- * from the machines that consumed the rows in the segment to a pool of machines tagged with this value.
- *
- * These fields expect the complete tag name including the suffix, unlike the tenantConfig server and broker
- * where the suffix is added automatically. However the suffix in these tag names has to be one of OFFLINE
- * or REALTIME (for the present. We may extend it to have other tag suffixes later).
- *
- * Basic validation of the tags does happen when the table is being added. The validations include:
- * 1) checking if the suffix is correct (must be either _OFFLINE or _REALTIME)
- * 2) checking if instances with the tag exist
- *
- */
+/// This config will allow specifying overrides to the tags derived from tenantConfig.
+/// Supported override keys:
+///  - realtimeConsuming - value specifies the tag to be used for realtime consuming segments
+///  - realtimeCompleted - value specifies the tag to be used for realtime segments that are in ONLINE state.
+///
+/// If a value is specified for the key 'realtimeCompleted' then realtime segments, once completed, will be moved
+/// from the machines that consumed the rows in the segment to a pool of machines tagged with this value.
+///
+/// These fields expect the complete tag name including the suffix, unlike the tenantConfig server and broker
+/// where the suffix is added automatically. However the suffix in these tag names has to be one of OFFLINE
+/// or REALTIME (for the present. We may extend it to have other tag suffixes later).
+///
+/// Basic validation of the tags does happen when the table is being added. The validations include:
+/// 1) checking if the suffix is correct (must be either \_OFFLINE or \_REALTIME)
+/// 2) checking if instances with the tag exist
 public class TagOverrideConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Tag override for realtime consuming segments")

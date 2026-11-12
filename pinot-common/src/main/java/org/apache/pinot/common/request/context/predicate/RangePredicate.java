@@ -25,10 +25,9 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 
 
-/**
- * Predicate for RANGE.
- * <p>Pinot uses RANGE to represent '>', '>=', '<', '<=', BETWEEN so that intersection of multiple ranges can be merged.
- */
+/// Predicate for RANGE.
+///
+/// Pinot uses RANGE to represent '>', '>=', '<', '<=', BETWEEN so that intersection of multiple ranges can be merged.
 public class RangePredicate extends BasePredicate {
   public static final char DELIMITER = Range.DELIMITER;
   public static final char LOWER_EXCLUSIVE = Range.LOWER_EXCLUSIVE;
@@ -46,16 +45,14 @@ public class RangePredicate extends BasePredicate {
   private final String _upperBound;
   private final FieldSpec.DataType _rangeDataType;
 
-  /**
-   * The range is formatted as 5 parts:
-   * <ul>
-   *   <li>Lower inclusive '[' or exclusive '('</li>
-   *   <li>Lower bound ('*' for unbounded)</li>
-   *   <li>Delimiter ('\0')</li>
-   *   <li>Upper bound ('*' for unbounded)</li>
-   *   <li>Upper inclusive ']' or exclusive ')'</li>
-   * </ul>
-   */
+  /// The range is formatted as 5 parts:
+  /// <ul>
+  ///   <li>Lower inclusive '[' or exclusive '('</li>
+  ///   <li>Lower bound ('*' for unbounded)</li>
+  ///   <li>Delimiter ('\0')</li>
+  ///   <li>Upper bound ('*' for unbounded)</li>
+  ///   <li>Upper inclusive ']' or exclusive ')'</li>
+  /// </ul>
   public RangePredicate(ExpressionContext lhs, String range) {
     super(lhs);
     String[] split = StringUtils.split(range, DELIMITER);

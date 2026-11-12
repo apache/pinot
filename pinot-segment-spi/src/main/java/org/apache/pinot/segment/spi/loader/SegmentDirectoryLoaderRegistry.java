@@ -26,9 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Helper class to dynamically register all {@link SegmentDirectoryLoader} annotated with {@link SegmentLoader}
- */
+/// Helper class to dynamically register all [SegmentDirectoryLoader] annotated with [SegmentLoader]
 public class SegmentDirectoryLoaderRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDirectoryLoaderRegistry.class);
   public static final String DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME = "default";
@@ -68,23 +66,17 @@ public class SegmentDirectoryLoaderRegistry {
         (System.currentTimeMillis() - startTime));
   }
 
-  /**
-   * Returns the segment directory loader instance from instantiated map, for the given segmentDirectoryLoader name
-   */
+  /// Returns the segment directory loader instance from instantiated map, for the given segmentDirectoryLoader name
   public static SegmentDirectoryLoader getSegmentDirectoryLoader(String segmentDirectoryLoader) {
     return SEGMENT_DIRECTORY_LOADER_MAP.get(segmentDirectoryLoader);
   }
 
-  /**
-   * Explicitly adds a {@link SegmentDirectoryLoader} to the map
-   */
+  /// Explicitly adds a [SegmentDirectoryLoader] to the map
   public static void setSegmentDirectoryLoader(String segmentDirectoryLoaderName, SegmentDirectoryLoader loader) {
     SEGMENT_DIRECTORY_LOADER_MAP.put(segmentDirectoryLoaderName, loader);
   }
 
-  /**
-   * Returns the 'default' {@link SegmentDirectoryLoader}
-   */
+  /// Returns the 'default' [SegmentDirectoryLoader]
   public static SegmentDirectoryLoader getDefaultSegmentDirectoryLoader() {
     return SEGMENT_DIRECTORY_LOADER_MAP.get(DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME);
   }

@@ -24,8 +24,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.local.utils.HyperLogLogPlusUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -37,7 +37,7 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
   private final int _p;
   private final int _sp;
 
-  // Byte size won't change once we get the initial aggregated value
+  // Max of maxByteSize over the initial aggregated values. A merge keeps the p and sp of the value merged into
   private int _maxByteSize;
 
   public DistinctCountHLLPlusValueAggregator(List<ExpressionContext> arguments) {
@@ -48,6 +48,7 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
     } else if (arguments.size() == 2) {
       _p = arguments.get(0).getLiteral().getIntValue();
       _sp = arguments.get(1).getLiteral().getIntValue();
+      HyperLogLogPlusUtils.validateSp(_sp);
     } else {
       _p = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P;
       _sp = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_SP;
@@ -73,11 +74,11 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
       initialValue = deserializeAggregatedValue(bytes);
-      _maxByteSize = bytes.length;
+      _maxByteSize = Math.max(_maxByteSize, HyperLogLogPlusUtils.maxByteSize(bytes));
     } else {
       initialValue = new HyperLogLogPlus(_p, _sp);
       offerValue(initialValue, rawValue);
-      _maxByteSize = HyperLogLogPlusUtils.byteSize(_p, _sp);
+      _maxByteSize = Math.max(_maxByteSize, HyperLogLogPlusUtils.maxByteSize(_p, _sp));
     }
     return initialValue;
   }
@@ -96,9 +97,7 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
     return value;
   }
 
-  /**
-   * Offers a raw value (single value or multi-value array) to the HyperLogLogPlus.
-   */
+  /// Offers a raw value (single value or multi-value array) to the HyperLogLogPlus.
   protected void offerValue(HyperLogLogPlus hll, Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
@@ -127,24 +126,25 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
 
   @Override
   public boolean isAggregatedValueFixedSize() {
-    return true;
+    // The sparse representation grows with the number of distinct values until it converts to the normal one
+    return _sp == 0;
   }
 
   @Override
   public int getMaxAggregatedValueByteSize() {
     // NOTE: For aggregated metrics, initial aggregated value might have not been generated. Returns the byte size
     //       based on p and sp.
-    return _maxByteSize > 0 ? _maxByteSize : HyperLogLogPlusUtils.byteSize(_p, _sp);
+    return _maxByteSize > 0 ? _maxByteSize : HyperLogLogPlusUtils.maxByteSize(_p, _sp);
   }
 
   @Override
   public byte[] serializeAggregatedValue(HyperLogLogPlus value) {
-    return CustomSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(value);
+    return ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(value);
   }
 
   @Override
   public HyperLogLogPlus deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytes);
+    return ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytes);
   }
 
   @VisibleForTesting

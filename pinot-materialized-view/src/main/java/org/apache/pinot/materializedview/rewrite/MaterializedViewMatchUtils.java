@@ -68,11 +68,9 @@ public final class MaterializedViewMatchUtils {
   /// Extracts the output column name that a SELECT expression maps to in the
   /// MV table schema.
   ///
-  ///
   ///   - `as(expr, alias)` &rarr; alias identifier name
   ///   - bare identifier &rarr; identifier name
   ///   - anything else &rarr; throws [IllegalStateException]
-  ///
   ///
   /// @param expr a SELECT-list expression from the MV's compiled query
   /// @return the MV table column name
@@ -91,14 +89,12 @@ public final class MaterializedViewMatchUtils {
 
   /// Builds a mapping from alias-stripped expressions to MV table column names
   /// for all entries in the MV's SELECT list.
-  ///
 /// Example: for `SELECT city, SUM(revenue) AS sum_rev FROM ...`
 /// the returned map is:
 /// ```text
 ///   Identifier("city")                       -> "city"
 ///   Function("SUM", [Identifier("revenue")]) -> "sum_rev"
 /// ```
-  ///
   /// @param viewQuery the MV's compiled PinotQuery
   /// @return map from stripped expression to MV column name
   public static Map<Expression, String> buildMaterializedViewProjectionMap(PinotQuery viewQuery) {
@@ -196,7 +192,6 @@ public final class MaterializedViewMatchUtils {
   ///   - User has no filter, MV has a filter &rarr; not a superset, returns null
   ///   - User conjuncts contain all MV conjuncts &rarr; difference is residual
   ///   - Otherwise &rarr; returns null (no match)
-  ///
   ///
   /// **TODO(materialized-view): OR / IN subsumption is currently correctness-safe but conservative.**
   /// OR and IN nodes are treated as opaque atomic conjuncts and compared via

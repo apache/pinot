@@ -28,9 +28,7 @@ import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 
 
-/**
- * Constructor function for polygon object from text.
- */
+/// Constructor function for polygon object from text.
 public class StPolygonFunction extends ConstructFromTextFunction {
   public static final String FUNCTION_NAME = "ST_Polygon";
 

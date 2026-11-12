@@ -231,11 +231,9 @@ public class DictionaryIndexConfigTest {
     }
   }
 
-  /**
-   * Minimal {@link IndexType} stub used to drive the {@link DictionaryIndexConfig} static helpers under a controlled
-   * {@link IndexService}. All segment-creation/read entry points throw — the helpers only consult the two new
-   * dictionary-related methods plus {@link #getId()}.
-   */
+  /// Minimal [IndexType] stub used to drive the [DictionaryIndexConfig] static helpers under a controlled
+  /// [IndexService]. All segment-creation/read entry points throw — the helpers only consult the two new
+  /// dictionary-related methods plus [#getId()].
   private static final class StubIndexType<C extends IndexConfig> implements IndexType<IndexConfig, IndexReader,
       IndexCreator> {
     private final String _id;

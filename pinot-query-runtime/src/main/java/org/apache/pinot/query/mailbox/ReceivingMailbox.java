@@ -282,7 +282,7 @@ public class ReceivingMailbox {
     _blocks.offerEos(errorBlock, serializedStats);
   }
 
-  /// Returns the first block from the mailbox, or {@code null} if there is no block received yet.
+  /// Returns the first block from the mailbox, or `null` if there is no block received yet.
   @Nullable
   public MseBlockWithStats poll() {
     return _blocks.poll();

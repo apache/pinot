@@ -26,73 +26,61 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardTokenizer;
 
 
-/**
- * A {@link org.apache.lucene.analysis.Analyzer} for standard text that is case-aware.
- * This analyzer supports both case-sensitive and case-insensitive modes, making it
- * suitable for use cases where case sensitivity is configurable.
- * <p>
- * It's directly copied from {@link org.apache.lucene.analysis.standard.StandardAnalyzer} but
- * allows case-sensitive tokenization.
- * <p>
- * The analyzer applies lowercasing to tokens only when the {@code caseSensitive} flag is set to
- * {@code false} (the default behavior, same as {@link org.apache.lucene.analysis.standard.StandardAnalyzer}).
- * When {@code caseSensitive} is {@code true}, tokens preserve their original case.
- */
+/// A [org.apache.lucene.analysis.Analyzer] for standard text that is case-aware.
+/// This analyzer supports both case-sensitive and case-insensitive modes, making it
+/// suitable for use cases where case sensitivity is configurable.
+///
+/// It's directly copied from [org.apache.lucene.analysis.standard.StandardAnalyzer] but
+/// allows case-sensitive tokenization.
+///
+/// The analyzer applies lowercasing to tokens only when the `caseSensitive` flag is set to
+/// `false` (the default behavior, same as [org.apache.lucene.analysis.standard.StandardAnalyzer]).
+/// When `caseSensitive` is `true`, tokens preserve their original case.
 public class CaseAwareStandardAnalyzer extends StopwordAnalyzerBase {
 
-  /** Default maximum allowed token length */
+  /// Default maximum allowed token length
   public static final int DEFAULT_MAX_TOKEN_LENGTH = 255;
 
   private int _maxTokenLength = DEFAULT_MAX_TOKEN_LENGTH;
 
   private final boolean _caseSensitive;
 
-  /**
-   * Builds an analyzer with the given stop words.
-   *
-   * @param stopWords stop words
-   */
+  /// Builds an analyzer with the given stop words.
+  ///
+  /// @param stopWords stop words
   public CaseAwareStandardAnalyzer(CharArraySet stopWords) {
     this(stopWords, false);
   }
 
-  /** Builds an analyzer with no stop words. */
+  /// Builds an analyzer with no stop words.
   public CaseAwareStandardAnalyzer() {
     this(CharArraySet.EMPTY_SET, false);
   }
 
-  /**
-   * Builds an analyzer with the given stop words.
-   *
-   * @param stopWords stop words
-   */
+  /// Builds an analyzer with the given stop words.
+  ///
+  /// @param stopWords stop words
   public CaseAwareStandardAnalyzer(CharArraySet stopWords, boolean caseSensitive) {
     super(stopWords);
     _caseSensitive = caseSensitive;
   }
 
-  /**
-   * Set the max allowed token length. Tokens larger than this will be chopped up at this token
-   * length and emitted as multiple tokens. If you need to skip such large tokens, you could
-   * increase this max length, and then use {@code LengthFilter} to remove long tokens. The default
-   * is {@link CaseAwareStandardAnalyzer#DEFAULT_MAX_TOKEN_LENGTH}.
-   */
+  /// Set the max allowed token length. Tokens larger than this will be chopped up at this token
+  /// length and emitted as multiple tokens. If you need to skip such large tokens, you could
+  /// increase this max length, and then use `LengthFilter` to remove long tokens. The default
+  /// is [CaseAwareStandardAnalyzer#DEFAULT_MAX_TOKEN_LENGTH].
   public void setMaxTokenLength(int length) {
     _maxTokenLength = length;
   }
 
-  /**
-   * Returns the current maximum token length
-   *
-   * @see #setMaxTokenLength
-   */
+  /// Returns the current maximum token length
+  ///
+  /// @see #setMaxTokenLength
   public int getMaxTokenLength() {
     return _maxTokenLength;
   }
 
-  /**
-   * Returns true if the analyzer is case sensitive
-   */
+  /// Returns true if the analyzer is case sensitive
   public boolean isCaseSensitive() {
     return _caseSensitive;
   }

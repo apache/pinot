@@ -27,10 +27,8 @@ import org.apache.pinot.spi.utils.TimeConverter;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
-/**
- * An implementation of {@link FunctionEvaluator} for converting the time value based on the
- * {@link org.apache.pinot.spi.data.TimeFieldSpec}.
- */
+/// An implementation of [FunctionEvaluator] for converting the time value based on the
+/// [org.apache.pinot.spi.data.TimeFieldSpec].
 public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
   private final String _incomingTimeColumn;
   private final String _outgoingTimeColumn;
@@ -53,9 +51,7 @@ public class TimeSpecFunctionEvaluator implements FunctionEvaluator {
     return List.of(_incomingTimeColumn);
   }
 
-  /**
-   * Performs time transformation
-   */
+  /// Performs time transformation
   @Override
   public Object evaluate(GenericRow genericRow) {
     return evaluate(genericRow.getValue(_incomingTimeColumn));

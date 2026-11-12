@@ -19,11 +19,11 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -33,7 +33,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class PercentileEstAggregationFunction extends NullableSingleInputAggregationFunction<QuantileDigest, Long> {
+public class PercentileEstAggregationFunction extends BaseSingleInputAggregationFunction<QuantileDigest, Long> {
+  private static final int QUANTILE_DIGEST_TYPE = 7;
+
   public static final double DEFAULT_MAX_ERROR = 0.05;
 
   //version 0 functions specified in the of form PERCENTILEEST<2-digits>(column)
@@ -91,11 +93,11 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
           quantileDigest = quantile;
         } else {
           start = from + 1;
-          quantileDigest = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[from]);
+          quantileDigest = QuantileDigest.fromBytes(bytesValues[from]);
           aggregationResultHolder.setValue(quantileDigest);
         }
         for (int i = start; i < toEx; i++) {
-          quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
+          quantileDigest.merge(QuantileDigest.fromBytes(bytesValues[i]));
         }
         return quantileDigest;
       });
@@ -140,7 +142,7 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          QuantileDigest value = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]);
+          QuantileDigest value = QuantileDigest.fromBytes(bytesValues[i]);
           int groupKey = groupKeyArray[i];
           QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
           if (quantileDigest != null) {
@@ -192,7 +194,7 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          QuantileDigest value = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]);
+          QuantileDigest value = QuantileDigest.fromBytes(bytesValues[i]);
           for (int groupKey : groupKeysArray[i]) {
             QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
             if (quantileDigest != null) {
@@ -200,7 +202,7 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
             } else {
               // Create a new QuantileDigest for the group
               groupByResultHolder.setValueForKey(groupKey,
-                  ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
+                  QuantileDigest.fromBytes(bytesValues[i]));
             }
           }
         }
@@ -246,22 +248,12 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
 
   @Override
   public QuantileDigest extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    QuantileDigest quantileDigest = aggregationResultHolder.getResult();
-    if (quantileDigest == null) {
-      return new QuantileDigest(DEFAULT_MAX_ERROR);
-    } else {
-      return quantileDigest;
-    }
+    return aggregationResultHolder.getResult();
   }
 
   @Override
   public QuantileDigest extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
-    if (quantileDigest == null) {
-      return new QuantileDigest(DEFAULT_MAX_ERROR);
-    } else {
-      return quantileDigest;
-    }
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
@@ -282,14 +274,13 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(QuantileDigest quantileDigest) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.QuantileDigest.getValue(),
-        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
+  public SerializedResult serializeIntermediateResult(QuantileDigest quantileDigest) {
+    return new SerializedBytes(QUANTILE_DIGEST_TYPE, quantileDigest.toBytes());
   }
 
   @Override
   public QuantileDigest deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(customObject.getBuffer());
+    return QuantileDigest.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override
@@ -297,20 +288,23 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
     return ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Long extractFinalResult(QuantileDigest intermediateResult) {
-    if (intermediateResult.getCount() == 0 && _nullHandlingEnabled) {
-      return null;
+  public Long extractFinalResult(@Nullable QuantileDigest intermediateResult) {
+    // A null intermediate result means nothing was aggregated, and so does a zero-count digest, which is what a
+    // deserialized peer can still carry. With null handling enabled the percentile of nothing is NULL; with it
+    // disabled it is what an empty digest renders, which is the seed of its running maximum.
+    if (intermediateResult == null || intermediateResult.getCount() == 0) {
+      return _nullHandlingEnabled ? null : Long.MIN_VALUE;
     }
     return intermediateResult.getQuantile(_percentile / 100.0);
   }
 
-  /**
-   * Returns the QuantileDigest from the result holder or creates a new one with default max error if it does not exist.
-   *
-   * @param aggregationResultHolder Result holder
-   * @return QuantileDigest from the result holder
-   */
+  /// Returns the QuantileDigest from the result holder or creates a new one with default max error if it does not
+  /// exist.
+  ///
+  /// @param aggregationResultHolder Result holder
+  /// @return QuantileDigest from the result holder
   protected static QuantileDigest getDefaultQuantileDigest(AggregationResultHolder aggregationResultHolder) {
     QuantileDigest quantileDigest = aggregationResultHolder.getResult();
     if (quantileDigest == null) {
@@ -320,13 +314,11 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
     return quantileDigest;
   }
 
-  /**
-   * Returns the QuantileDigest for the given group key if exists, or creates a new one with default max error.
-   *
-   * @param groupByResultHolder Result holder
-   * @param groupKey Group key for which to return the QuantileDigest
-   * @return QuantileDigest for the group key
-   */
+  /// Returns the QuantileDigest for the given group key if exists, or creates a new one with default max error.
+  ///
+  /// @param groupByResultHolder Result holder
+  /// @param groupKey Group key for which to return the QuantileDigest
+  /// @return QuantileDigest for the group key
   protected static QuantileDigest getDefaultQuantileDigest(GroupByResultHolder groupByResultHolder, int groupKey) {
     QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
     if (quantileDigest == null) {

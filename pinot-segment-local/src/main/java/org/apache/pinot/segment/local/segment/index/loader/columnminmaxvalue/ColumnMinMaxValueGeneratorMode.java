@@ -21,15 +21,12 @@ package org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Mode for {@link ColumnMinMaxValueGenerator}.
- * <ul>
- *   <li>NONE: do not generate on any column</li>
- *   <li>TIME: generate on time column only</li>
- *   <li>NON_METRIC: generate on time/dimension columns</li>
- *   <li>ALL: generate on all columns</li>
- * </ul>
- */
+/// Mode for [ColumnMinMaxValueGenerator].
+///
+/// - NONE: do not generate on any column
+/// - TIME: generate on time column only
+/// - NON_METRIC: generate on time/dimension columns
+/// - ALL: generate on all columns
 public enum ColumnMinMaxValueGeneratorMode {
   NONE, TIME, NON_METRIC, ALL;
 

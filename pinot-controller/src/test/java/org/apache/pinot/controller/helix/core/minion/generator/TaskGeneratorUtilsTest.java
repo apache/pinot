@@ -235,9 +235,7 @@ public class TaskGeneratorUtilsTest {
             minionTenant, MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK, Integer.class, mockClusterInfoAccessor), 3);
   }
 
-  /**
-   * Test task generator that extends BaseTaskGenerator for testing purposes
-   */
+  /// Test task generator that extends BaseTaskGenerator for testing purposes
   private static class TestTaskGenerator extends BaseTaskGenerator {
     @Override
     public String getTaskType() {

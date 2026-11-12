@@ -24,24 +24,21 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 
 
-/**
- * The {@code OnHeapSingleTreeBuilder} class is the single star-tree builder that uses on-heap memory.
- */
+/// The `OnHeapSingleTreeBuilder` class is the single star-tree builder that uses on-heap memory.
 public class OnHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   private final List<Record> _records = new ArrayList<>();
 
-  /**
-   * Constructor for the on-heap single star-tree builder.
-   *
-   * @param builderConfig Builder config
-   * @param outputDir Directory to store the index files
-   * @param segment Index segment
-   * @param metadataProperties Segment metadata properties
-   */
+  /// Constructor for the on-heap single star-tree builder.
+  ///
+  /// @param builderConfig Builder config
+  /// @param outputDir Directory to store the index files
+  /// @param segment Index segment
+  /// @param metadataProperties Segment metadata properties
   public OnHeapSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir, ImmutableSegment segment,
       Configuration metadataProperties) {
     super(builderConfig, outputDir, segment, metadataProperties);
@@ -55,6 +52,28 @@ public class OnHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   @Override
   Record getStarTreeRecord(int docId) {
     return _records.get(docId);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  boolean[] preSerializeMetrics() {
+    // Only aggregators that derive their maximum size from serialization need it here. The others already know their
+    // maximum size and serialize during the index write without retaining a byte array for every record.
+    boolean[] preSerializedMetrics = new boolean[_numMetrics];
+    for (int i = 0; i < _numMetrics; i++) {
+      ValueAggregator valueAggregator = _valueAggregators[i];
+      if (!valueAggregator.isMaxAggregatedValueByteSizeDerivedFromSerialization()) {
+        continue;
+      }
+      for (Record record : _records) {
+        Object value = record._metrics[i];
+        if (value != null) {
+          record._metrics[i] = valueAggregator.serializeAggregatedValue(value);
+        }
+      }
+      preSerializedMetrics[i] = true;
+    }
+    return preSerializedMetrics;
   }
 
   @Override

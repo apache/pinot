@@ -23,9 +23,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 
 
-/**
- * An implementation of the {@link StreamPartitionMsgOffsetFactory} for Kinesis stream
- */
+/// An implementation of the [StreamPartitionMsgOffsetFactory] for Kinesis stream
 public class KinesisMsgOffsetFactory implements StreamPartitionMsgOffsetFactory {
 
   @Override

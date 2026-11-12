@@ -24,10 +24,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
 
 
-/**
- * Type-safe DTO (Data Transfer Object) for controller job ZK metadata.
- * Provides structured access to job metadata fields instead of using raw Map<String, String>
- */
+/// Type-safe DTO (Data Transfer Object) for controller job ZK metadata.
+/// Provides structured access to job metadata fields instead of using raw Map<String, String>
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class PinotControllerJobMetadataDto {

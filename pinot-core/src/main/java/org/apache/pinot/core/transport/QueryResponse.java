@@ -25,9 +25,7 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
-/**
- * The {@code QueryResponse} interface represents the server responses for a query.
- */
+/// The `QueryResponse` interface represents the server responses for a query.
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 @ThreadSafe
@@ -36,58 +34,42 @@ public interface QueryResponse {
     IN_PROGRESS, COMPLETED, FAILED, TIMED_OUT
   }
 
-  /**
-   * Returns the current {@link Status} of the query.
-   */
+  /// Returns the current [Status] of the query.
   Status getStatus();
 
-  /**
-   * Returns the number of servers responded.
-   */
+  /// Returns the number of servers responded.
   int getNumServersResponded();
 
-  /**
-   * Returns the current server responses without blocking.
-   */
+  /// Returns the current server responses without blocking.
   Map<ServerRoutingInstance, ServerResponse> getCurrentResponses();
 
-  /**
-   * Waits until the query is done (COMPLETED, FAILED or TIMED_OUT) and returns the final server responses.
-   */
+  /// Waits until the query is done (COMPLETED, FAILED or TIMED_OUT) and returns the final server responses.
   Map<ServerRoutingInstance, ServerResponse> getFinalResponses()
       throws InterruptedException;
 
-  /**
-   * Returns the server stats for the query. Should be called after query is done (COMPLETED, FAILED or TIMED_OUT).
-   */
+  /// Returns the server stats for the query. Should be called after query is done (COMPLETED, FAILED or TIMED_OUT).
   String getServerStats();
 
-  /**
-   * Returns the time taken for the server to respond to the query.
-   * @param serverRoutingInstance
-   * @return
-   */
+  /// Returns the time taken for the server to respond to the query.
+  /// @param serverRoutingInstance
+  /// @return
   long getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance);
 
-  /**
-   * Returns the failed server if the query fails.
-   */
+  /// Returns the server that went down during the query. Set when the query fails, and also when the query returns
+  /// partial results under `skipUnavailableServers` (used by the failure detector to quarantine the server from
+  /// routing). Because it can be set on a partial success, a non-null value does not by itself imply the query
+  /// failed; check [#getException()] / [#getStatus()] for that. At most one server is tracked per query -
+  /// when several servers go down, this holds the most recent one.
   @Nullable
   ServerRoutingInstance getFailedServer();
 
-  /**
-   * Returns the query request Id.
-   */
+  /// Returns the query request Id.
   long getRequestId();
 
-  /**
-   * Returns the query timeout in milliseconds.
-   */
+  /// Returns the query timeout in milliseconds.
   long getTimeoutMs();
 
-  /**
-   * Returns the exception if the query fails.
-   */
+  /// Returns the exception if the query fails.
   @Nullable
   Exception getException();
 }

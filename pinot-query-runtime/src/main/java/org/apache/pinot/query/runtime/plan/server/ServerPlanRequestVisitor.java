@@ -29,7 +29,6 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
@@ -50,19 +49,17 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Plan visitor for direct leaf-stage server request.
- *
- * This should be merged with logics in {@link InstancePlanMakerImplV2} in the future
- * to directly produce operator chain.
- *
- * As of now, the reason why we use the plan visitor for server request is for additional support such as dynamic
- * filtering and other auxiliary functionalities.
- */
+/// Plan visitor for direct leaf-stage server request.
+///
+/// This should be merged with logics in [org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2] in the future
+/// to directly produce operator chain.
+///
+/// As of now, the reason why we use the plan visitor for server request is for additional support such as dynamic
+/// filtering and other auxiliary functionalities.
 public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
   private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
 
@@ -78,17 +75,29 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       if (!groupByList.isEmpty()) {
         pinotQuery.setGroupByList(groupByList);
       }
-      List<Expression> selectList = CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(),
-          node.getFilterArgs(), pinotQuery.getSelectList());
+      // GROUP BY GROUPING SETS / ROLLUP / CUBE: push the per-set row expansion down to the single-stage engine. The
+      // per-set column-index lists are over groupByList (== node.getGroupKeys()), so they transfer directly. The
+      // single-stage leaf expands each row across the sets and appends the synthetic $groupingId ordinal column; the
+      // multi-stage final stage then groups on it (it is one of the group keys), keeping the grouping sets distinct.
+      if (node.isGroupingSets()) {
+        pinotQuery.setGroupingSets(node.getGroupingSets());
+      }
+      List<Expression> selectList =
+          CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(), node.getFilterArgs(),
+              pinotQuery.getSelectList());
       for (Expression expression : selectList) {
         applyTimestampIndex(expression, pinotQuery);
       }
       pinotQuery.setSelectList(selectList);
       if (node.getAggType() == AggregateNode.AggType.DIRECT) {
-        pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+        pinotQuery.putToQueryOptions(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
       } else if (node.isLeafReturnFinalResult()) {
-        pinotQuery.putToQueryOptions(
-            CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, "true");
+        // SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED only applies to group-by queries.
+        if (groupByList.isEmpty()) {
+          pinotQuery.putToQueryOptions(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+        } else {
+          pinotQuery.putToQueryOptions(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, "true");
+        }
       }
       int limit = node.getLimit();
       if (limit > 0) {
@@ -132,8 +141,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getFilterExpression() == null) {
-        Expression expression = CalciteRexExpressionParser.toExpression(node.getCondition(),
-            pinotQuery.getSelectList());
+        Expression expression =
+            CalciteRexExpressionParser.toExpression(node.getCondition(), pinotQuery.getSelectList());
         applyTimestampIndex(expression, pinotQuery);
         pinotQuery.setFilterExpression(expression);
       } else {
@@ -182,6 +191,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     return null;
   }
 
+  @Deprecated(forRemoval = true, since = "1.6.0")
   @Override
   public Void visitEnrichedJoin(EnrichedJoinNode node, ServerPlanRequestContext context) {
     // We can reach here for dynamic broadcast SEMI join and lookup join.
@@ -214,8 +224,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
           if (rex.getType() == EnrichedJoinNode.FilterProjectRexType.FILTER) {
             // filter logic here
             if (pinotQuery.getFilterExpression() == null) {
-              Expression expression = CalciteRexExpressionParser.toExpression(rex.getFilter(),
-                  pinotQuery.getSelectList());
+              Expression expression =
+                  CalciteRexExpressionParser.toExpression(rex.getFilter(), pinotQuery.getSelectList());
               applyTimestampIndex(expression, pinotQuery);
               pinotQuery.setFilterExpression(expression);
             } else {
@@ -225,8 +235,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
           } else {
             // project logic here
             List<Expression> selectList =
-                CalciteRexExpressionParser.convertRexNodes(
-                    rex.getProjectAndResultSchema().getProject(),
+                CalciteRexExpressionParser.convertRexNodes(rex.getProjectAndResultSchema().getProject(),
                     pinotQuery.getSelectList());
             for (Expression expression : selectList) {
               applyTimestampIndex(expression, pinotQuery);
@@ -264,8 +273,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
-      List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(node.getProjects(),
-          pinotQuery.getSelectList());
+      List<Expression> selectList =
+          CalciteRexExpressionParser.convertRexNodes(node.getProjects(), pinotQuery.getSelectList());
       for (Expression expression : selectList) {
         applyTimestampIndex(expression, pinotQuery);
       }

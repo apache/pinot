@@ -73,25 +73,22 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * End-to-end tests that build a Pinot segment from the same Arrow data via row-major and
- * column-major paths and assert the produced segments carry equivalent metadata.
- *
- * <p>Paths exercised:
- * <ul>
- *   <li>Row-major: {@link ArrowRecordReader} → {@code driver.init(config, recordReader)} →
- *       {@code driver.build()}</li>
- *   <li>Column-major (file): {@link ArrowFileColumnReaderFactory} →
- *       {@code driver.init(config, columnReaderFactory)} → {@code driver.build()} →
- *       {@code buildColumnar()}</li>
- *   <li>Column-major (in-memory, disk-free): {@link ArrowColumnReaderFactory} over an
- *       {@link ArrowStreamReader} backed by a {@link ByteArrayInputStream} → same driver path.
- *       Proves the disk-free path produces the same segment metadata as the file path.</li>
- * </ul>
- *
- * <p>The test asserts identical per-column cardinality, min, max, totalDocs, data type, and
- * segment-level doc count across each compared pair.
- */
+/// End-to-end tests that build a Pinot segment from the same Arrow data via row-major and
+/// column-major paths and assert the produced segments carry equivalent metadata.
+///
+/// Paths exercised:
+///
+/// - Row-major: [ArrowRecordReader] → `driver.init(config, recordReader)` →
+///      `driver.build()`
+/// - Column-major (file): [ArrowFileColumnReaderFactory] →
+///      `driver.init(config, columnReaderFactory)` → `driver.build()` →
+///      `buildColumnar()`
+/// - Column-major (in-memory, disk-free): [ArrowColumnReaderFactory] over an
+///      [ArrowStreamReader] backed by a [ByteArrayInputStream] → same driver path.
+///      Proves the disk-free path produces the same segment metadata as the file path.
+///
+/// The test asserts identical per-column cardinality, min, max, totalDocs, data type, and
+/// segment-level doc count across each compared pair.
 public class ArrowColumnarBuildIntegrationTest {
 
   private static final String TABLE_NAME = "arrowColumnarBuildTest";
@@ -147,14 +144,12 @@ public class ArrowColumnarBuildIntegrationTest {
     assertSegmentMetadataEquivalence(rowMajorSegmentDir, columnarSegmentDir);
   }
 
-  /**
-   * BOOLEAN and TIMESTAMP columns exercise the column-major type-normalization path: the Arrow source
-   * surfaces {@code Boolean} / {@code Timestamp} (or {@code LocalDateTime}) values that must be coerced
-   * to the stored {@code INT} / {@code LONG} to match what the row-major {@code DataTypeTransformer}
-   * produces. Before normalization the column-major build crashed on these types (the typed stats
-   * collectors / index creators cast-failed on the source Java type). Asserts both per-column metadata
-   * and per-docId record values match the row-major segment built from the same file.
-   */
+  /// BOOLEAN and TIMESTAMP columns exercise the column-major type-normalization path: the Arrow source
+  /// surfaces `Boolean` / `Timestamp` (or `LocalDateTime`) values that must be coerced
+  /// to the stored `INT` / `LONG` to match what the row-major `DataTypeTransformer`
+  /// produces. Before normalization the column-major build crashed on these types (the typed stats
+  /// collectors / index creators cast-failed on the source Java type). Asserts both per-column metadata
+  /// and per-docId record values match the row-major segment built from the same file.
   @Test
   public void testTypeNormalizationRowMajorVsColumnar()
       throws Exception {
@@ -276,17 +271,15 @@ public class ArrowColumnarBuildIntegrationTest {
     return out;
   }
 
-  /**
-   * Type-mismatch fallback: the Arrow source stores {@code intCol} as a 64-bit integer (INT64) while the Pinot
-   * schema declares it {@code INT} (32-bit). On the column-major build the typed fast path must decline this
-   * column ({@code ColumnReader.isInt()} is false for a 64-bit reader) WITHOUT advancing the reader, so the shared
-   * Object path re-reads it from the start and coerces INT64 -&gt; INT exactly as the row-major
-   * {@code DataTypeTransformer} does. This exercises the {@code indexSingleValuePrimitive} per-case guard
-   * ({@code if (!columnReader.isInt()) return false;}), which is otherwise unexercised because every other
-   * column-major test pairs a numeric column with a matching-width source. {@code longCol} (INT64 -&gt; LONG) is a
-   * matching-width control that stays on the fast path. Asserts per-doc equivalence with the row-major segment
-   * built from the same file.
-   */
+  /// Type-mismatch fallback: the Arrow source stores `intCol` as a 64-bit integer (INT64) while the Pinot
+  /// schema declares it `INT` (32-bit). On the column-major build the typed fast path must decline this
+  /// column (`ColumnReader.isInt()` is false for a 64-bit reader) WITHOUT advancing the reader, so the shared
+  /// Object path re-reads it from the start and coerces INT64 -&gt; INT exactly as the row-major
+  /// `DataTypeTransformer` does. This exercises the `indexSingleValuePrimitive` per-case guard
+  /// (`if (!columnReader.isInt()) return false;`), which is otherwise unexercised because every other
+  /// column-major test pairs a numeric column with a matching-width source. `longCol` (INT64 -&gt; LONG) is a
+  /// matching-width control that stays on the fast path. Asserts per-doc equivalence with the row-major segment
+  /// built from the same file.
   @Test
   public void testSourceSchemaTypeMismatchInt64ToIntEquivalence()
       throws Exception {
@@ -364,17 +357,15 @@ public class ArrowColumnarBuildIntegrationTest {
     return out;
   }
 
-  /**
-   * Guardrail for any change that processes the Arrow source one record batch at a time: a segment
-   * built from a multi-batch file must be byte-identical (same-path data CRC) and per-docId equal to
-   * one built from a single-batch file carrying the same logical rows, and the naturally-ascending
-   * column must stay sorted across the batch boundary. A batch-boundary ordering bug would change
-   * {@code isSorted}, the inverted index on {@code category}, or the per-doc values. Also cross-checks
-   * the multi-batch columnar segment against the row-major segment from the same file.
-   *
-   * <p>Passes on the current materialize-all build; its purpose is to fail loudly if a future
-   * batch-bounded reader misorders docs across a boundary.
-   */
+  /// Guardrail for any change that processes the Arrow source one record batch at a time: a segment
+  /// built from a multi-batch file must be byte-identical (same-path data CRC) and per-docId equal to
+  /// one built from a single-batch file carrying the same logical rows, and the naturally-ascending
+  /// column must stay sorted across the batch boundary. A batch-boundary ordering bug would change
+  /// `isSorted`, the inverted index on `category`, or the per-doc values. Also cross-checks
+  /// the multi-batch columnar segment against the row-major segment from the same file.
+  ///
+  /// Passes on the current materialize-all build; its purpose is to fail loudly if a future
+  /// batch-bounded reader misorders docs across a boundary.
   @Test
   public void testMultiBatchColumnarEquivalence()
       throws Exception {
@@ -476,14 +467,12 @@ public class ArrowColumnarBuildIntegrationTest {
     return out;
   }
 
-  /**
-   * The richest end-to-end equivalence: a multi-batch Arrow file combining a dictionary-encoded
-   * string, a nullable int with nulls crossing batch boundaries, a BOOLEAN, and a TIMESTAMP, built
-   * both row-major and column-major. Exercises together and across batch boundaries: the
-   * batch-bounded reader's per-batch dictionary decode, the null-value vector + default substitution,
-   * and Boolean/Timestamp stored-type coercion. Asserts per-docId record equality, metadata, and that
-   * the ascending id stays sorted across batches.
-   */
+  /// The richest end-to-end equivalence: a multi-batch Arrow file combining a dictionary-encoded
+  /// string, a nullable int with nulls crossing batch boundaries, a BOOLEAN, and a TIMESTAMP, built
+  /// both row-major and column-major. Exercises together and across batch boundaries: the
+  /// batch-bounded reader's per-batch dictionary decode, the null-value vector + default substitution,
+  /// and Boolean/Timestamp stored-type coercion. Asserts per-docId record equality, metadata, and that
+  /// the ascending id stays sorted across batches.
   @Test
   public void testRichMultiBatchEquivalence()
       throws Exception {
@@ -515,12 +504,10 @@ public class ArrowColumnarBuildIntegrationTest {
     }
   }
 
-  /**
-   * Multi-value column end-to-end across a batch boundary: a multi-batch Arrow file with an MV int
-   * column, built row-major and column-major. Exercises the column-major MV path through
-   * {@code ColumnarValueNormalizer} (Object[] standardisation) and the batch-bounded reader's MV reads
-   * across batches, asserting per-docId MV equality with the row-major segment.
-   */
+  /// Multi-value column end-to-end across a batch boundary: a multi-batch Arrow file with an MV int
+  /// column, built row-major and column-major. Exercises the column-major MV path through
+  /// `ColumnarValueNormalizer` (Object\[\] standardisation) and the batch-bounded reader's MV reads
+  /// across batches, asserting per-docId MV equality with the row-major segment.
   @Test
   public void testMultiValueMultiBatchEquivalence()
       throws Exception {

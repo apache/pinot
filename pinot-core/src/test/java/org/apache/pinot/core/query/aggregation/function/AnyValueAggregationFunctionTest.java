@@ -18,12 +18,81 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
+
 public class AnyValueAggregationFunctionTest extends AbstractAggregationFunctionTest {
+  private static final ExpressionContext EXPRESSION = ExpressionContext.forIdentifier("myField");
+
+  @DataProvider(name = "dictionaryEncoded")
+  Object[][] dictionaryEncoded() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "dictionaryEncoded")
+  void testBytesIntermediateResultRoundTrip(boolean dictionaryEncoded) {
+    ExpressionContext expression = ExpressionContext.forIdentifier("myField");
+    AnyValueAggregationFunction function = new AnyValueAggregationFunction(List.of(expression), true);
+    byte[] original = new byte[]{1, 2, 3};
+    ByteArray expected = new ByteArray(original);
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(DataType.BYTES);
+    if (dictionaryEncoded) {
+      Dictionary dictionary = mock(Dictionary.class);
+      when(dictionary.getByteArrayValue(0)).thenReturn(expected);
+      when(valueSet.isDictionaryEncoded()).thenReturn(true);
+      when(valueSet.getDictionary()).thenReturn(dictionary);
+      when(valueSet.getDictionaryIdsSV()).thenReturn(new int[]{0});
+    } else {
+      when(valueSet.getBytesValuesSV()).thenReturn(new byte[][]{original});
+    }
+    Map<ExpressionContext, BlockValSet> values = Map.of(expression, valueSet);
+
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(1, holder, values);
+    Object intermediate = function.extractAggregationResult(holder);
+    assertEquals(intermediate, expected);
+    assertEquals(function.extractFinalResult(intermediate), expected);
+
+    GroupByResultHolder groupHolder = function.createGroupByResultHolder(1, 2);
+    function.aggregateGroupBySV(1, new int[]{0}, groupHolder, values);
+    groupHolder.ensureCapacity(2);
+    function.aggregateGroupByMV(1, new int[][]{{1}}, groupHolder, values);
+    assertEquals(function.extractGroupByResult(groupHolder, 0), expected);
+    assertEquals(function.extractGroupByResult(groupHolder, 1), expected);
+
+    AggregationFunction.SerializedResult serialized = function.serializeIntermediateResult(intermediate);
+    Object restored = function.deserializeIntermediateResult(
+        new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
+
+    assertEquals(restored, expected);
+    assertEquals(function.extractFinalResult(restored), expected);
+    assertEquals(function.serializeIntermediateResult(restored).getBytes(), serialized.getBytes());
+  }
 
   // Constants for standardized test queries and expected results
   private static final String STANDARD_GROUP_BY_QUERY_TEMPLATE =
@@ -34,12 +103,12 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   @DataProvider(name = "scenarios")
   Object[] scenarios() {
     return new Object[] {
-        new DataTypeScenario(FieldSpec.DataType.STRING),
-        new DataTypeScenario(FieldSpec.DataType.INT),
-        new DataTypeScenario(FieldSpec.DataType.LONG),
-        new DataTypeScenario(FieldSpec.DataType.FLOAT),
-        new DataTypeScenario(FieldSpec.DataType.DOUBLE),
-        new DataTypeScenario(FieldSpec.DataType.BOOLEAN),
+        new DataTypeScenario(DataType.STRING),
+        new DataTypeScenario(DataType.INT),
+        new DataTypeScenario(DataType.LONG),
+        new DataTypeScenario(DataType.FLOAT),
+        new DataTypeScenario(DataType.DOUBLE),
+        new DataTypeScenario(DataType.BOOLEAN),
     };
   }
 
@@ -112,8 +181,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   // Test for different data types with specific values
   @Test
   void testIntegerDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.INT)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.INT).getDeclaringTable(true)
         .onFirstInstance("myField", "100", "null", "100") // Same non-null values
         .andOnSecondInstance("myField", "null", "100", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -123,8 +191,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testLongDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.LONG)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.LONG).getDeclaringTable(true)
         .onFirstInstance("myField", "1000", "null", "1000") // Same non-null values
         .andOnSecondInstance("myField", "null", "1000", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -134,8 +201,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testFloatDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.FLOAT)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.FLOAT).getDeclaringTable(true)
         .onFirstInstance("myField", "3.14", "null", "3.14") // Same non-null values
         .andOnSecondInstance("myField", "null", "3.14", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -145,8 +211,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testDoubleDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.DOUBLE)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.DOUBLE).getDeclaringTable(true)
         .onFirstInstance("myField", "2.718", "null", "2.718") // Same non-null values
         .andOnSecondInstance("myField", "null", "2.718", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -156,8 +221,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testBooleanDataType() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.BOOLEAN)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.BOOLEAN).getDeclaringTable(true)
         .onFirstInstance("myField", "1", "null", "1") // Use 1/0 for boolean, same values
         .andOnSecondInstance("myField", "null", "1", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -168,8 +232,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   // Edge case tests
   @Test
   void testAllNullValues() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.STRING)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
         .onFirstInstance("myField", "null", "null", "null")
         .andOnSecondInstance("myField", "null", "null", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -179,8 +242,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
 
   @Test
   void testSingleNonNullValue() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.STRING)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
         .onFirstInstance("myField", "null", "null", "null")
         .andOnSecondInstance("myField", "null", "unique_value", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -188,13 +250,29 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     validateAnyValueBehavior(result, true); // Should return non-null (unique_value exists)
   }
 
+  @Test
+  void testAllNullSegmentDoesNotEvaluateExpression() {
+    // Casting the null placeholder of a STRING column to INT throws, so a segment whose rows are all null must not
+    // evaluate the expression.
+    new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
+        .onFirstInstance("myField", "null", "null")
+        .andSegment("myField", "5", "5")
+        .whenQuery("select anyValue(cast(myField as int)) from testTable")
+        .thenResultIs("STRING", "5")
+        .whenQuery("select 'k', anyValue(cast(myField as int)) from testTable group by 'k'")
+        .thenResultIs("STRING | STRING", "k | 5")
+        .whenQuery("select anyValue(cast(myField as int), 'INT') from testTable")
+        .thenResultIs("INT", "5")
+        .whenQuery("select 'k', anyValue(cast(myField as int), 'INT') from testTable group by 'k'")
+        .thenResultIs("STRING | INT", "k | 5");
+  }
+
   // GROUP BY tests with different data types
   @Test
   void testGroupByWithMultipleGroups() {
     // ANY_VALUE can return any of the values (value1, value2, value3)
     // This test has mixed values, so ANY_VALUE could return any of them
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.STRING)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
         .onFirstInstance("myField", "value1", "value1", "value2")
         .andOnSecondInstance("myField", "value2", "value3", "value3")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -206,8 +284,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   void testGroupByWithNullsInGroups() {
     // ANY_VALUE can return any non-null value (100, 200, or 300)
     // This test has mixed values, so ANY_VALUE could return any of them
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.INT)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.INT).getDeclaringTable(true)
         .onFirstInstance("myField", "100", "null", "200")
         .andOnSecondInstance("myField", "null", "300", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -215,27 +292,25 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     validateAnyValueBehavior(result, true); // Should return non-null (multiple non-null values available)
   }
 
-  // Performance validation test - ensures ANY_VALUE doesn't require all values to be processed
   @Test
-  void testPerformanceWithLargeDataset() {
+  void testGroupByWithMultipleStringValues() {
     // ANY_VALUE can return any of the values in the dataset
     // This test has mixed values, so ANY_VALUE could return any of them
-    DataTypeScenario scenario = new DataTypeScenario(FieldSpec.DataType.STRING);
+    DataTypeScenario scenario = new DataTypeScenario(DataType.STRING);
     FluentQueryTest.DeclaringTable table = scenario.getDeclaringTable(true);
 
-    // Create a large dataset where ANY_VALUE can return any value
-    FluentQueryTest.QueryExecuted result = table
-        .onFirstInstance("myField", "first_value", "value_1", "value_2", "value_3", "value_4")
-        .andOnSecondInstance("myField", "value_5", "value_6", "value_7", "value_8", "value_9")
-        .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
+    // Each instance provides distinct string values that ANY_VALUE can return.
+    FluentQueryTest.QueryExecuted result =
+        table.onFirstInstance("myField", "first_value", "value_1", "value_2", "value_3", "value_4")
+            .andOnSecondInstance("myField", "value_5", "value_6", "value_7", "value_8", "value_9")
+            .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
     validateAnyValueBehavior(result, true); // Should return non-null (many values available)
   }
 
   // Test serialization/deserialization behavior
   @Test
   void testSerializationWithComplexValues() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.STRING)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.STRING).getDeclaringTable(true)
         .onFirstInstance("myField", "test_value", "null", "test_value") // Same values for deterministic results
         .andOnSecondInstance("myField", "null", "test_value", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -246,8 +321,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   // Test numeric edge cases
   @Test
   void testNumericEdgeCases() {
-    FluentQueryTest.QueryExecuted result = new DataTypeScenario(FieldSpec.DataType.DOUBLE)
-        .getDeclaringTable(true)
+    FluentQueryTest.QueryExecuted result = new DataTypeScenario(DataType.DOUBLE).getDeclaringTable(true)
         .onFirstInstance("myField", "0.0", "null", "0.0") // Same values
         .andOnSecondInstance("myField", "null", "0.0", "null")
         .whenQuery(STANDARD_GROUP_BY_QUERY_TEMPLATE);
@@ -256,7 +330,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
   }
 
   // Helper methods to handle different data types in parameterized tests
-  private String getTestValueForDataType(FieldSpec.DataType dataType) {
+  private String getTestValueForDataType(DataType dataType) {
     switch (dataType) {
       case STRING:
         return "test_value";
@@ -277,7 +351,7 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     }
   }
 
-  private String getExpectedResultForDataType(FieldSpec.DataType dataType, String testValue) {
+  private String getExpectedResultForDataType(DataType dataType, String testValue) {
     switch (dataType) {
       case BOOLEAN:
         return "1"; // Boolean values are stored as integers in Pinot, so ANY_VALUE returns "1"
@@ -286,10 +360,8 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
     }
   }
 
-  /**
-   * Validates ANY_VALUE behavior by checking if it returns non-null when expected.
-   * This makes tests deterministic by focusing on behavior rather than exact values.
-   */
+  /// Validates ANY_VALUE behavior by checking if it returns non-null when expected.
+  /// This makes tests deterministic by focusing on behavior rather than exact values.
   private void validateAnyValueBehavior(FluentQueryTest.QueryExecuted queryResult, boolean shouldReturnNonNull) {
     if (shouldReturnNonNull) {
       // For cases where non-null values exist, ANY_VALUE should return something non-null
@@ -311,5 +383,147 @@ public class AnyValueAggregationFunctionTest extends AbstractAggregationFunction
       // For cases where all values are null, ANY_VALUE should return null
       queryResult.thenResultIs(EXPECTED_COLUMN_TYPES, EXPECTED_NULL_RESULT);
     }
+  }
+
+  @DataProvider(name = "dataTypes")
+  Object[][] dataTypes() {
+    return new Object[][]{
+        {"INT", ColumnDataType.INT, ColumnDataType.INT},
+        {"LONG", ColumnDataType.LONG, ColumnDataType.LONG},
+        {"FLOAT", ColumnDataType.FLOAT, ColumnDataType.FLOAT},
+        {"DOUBLE", ColumnDataType.DOUBLE, ColumnDataType.DOUBLE},
+        {"BIG_DECIMAL", ColumnDataType.BIG_DECIMAL, ColumnDataType.BIG_DECIMAL},
+        {"BOOLEAN", ColumnDataType.INT, ColumnDataType.BOOLEAN},
+        {"TIMESTAMP", ColumnDataType.LONG, ColumnDataType.TIMESTAMP},
+        {"STRING", ColumnDataType.STRING, ColumnDataType.STRING},
+        {"BYTES", ColumnDataType.BYTES, ColumnDataType.BYTES},
+        {"uuid", ColumnDataType.BYTES, ColumnDataType.UUID}
+    };
+  }
+
+  @Test(dataProvider = "dataTypes")
+  void testDataTypeArgumentFixesResultTypes(String dataType, ColumnDataType intermediateResultType,
+      ColumnDataType finalResultType) {
+    // The types are known before any input, so an empty result is typed as well.
+    AnyValueAggregationFunction function = createFunction(dataType);
+    assertEquals(function.getIntermediateResultColumnType(), intermediateResultType);
+    assertEquals(function.getFinalResultColumnType(), finalResultType);
+    assertEquals(function.getResultColumnName(), "anyvalue(myField,'" + dataType.toUpperCase() + "')");
+    assertEquals(function.getInputExpressions(), List.of(EXPRESSION));
+    assertNull(function.extractAggregationResult(function.createAggregationResultHolder()));
+  }
+
+  @Test
+  void testDataTypeArgumentRejectsInvalidArguments() {
+    assertThrows(IllegalArgumentException.class, () -> createFunction("JSON"));
+    assertThrows(BadQueryRequestException.class, () -> createFunction("NOT_A_TYPE"));
+    assertThrows(IllegalArgumentException.class,
+        () -> new AnyValueAggregationFunction(List.of(EXPRESSION, ExpressionContext.forIdentifier("INT")), false));
+    assertThrows(IllegalArgumentException.class, () -> new AnyValueAggregationFunction(
+        List.of(EXPRESSION, ExpressionContext.forLiteral(DataType.STRING, "INT"), EXPRESSION), false));
+  }
+
+  @Test(dataProvider = "dictionaryEncoded")
+  void testDataTypeArgumentReadsBoundStoredType(boolean dictionaryEncoded) {
+    // A segment that still stores the column as INT after the schema widened it to LONG
+    AnyValueAggregationFunction function = createFunction("LONG");
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(DataType.INT);
+    if (dictionaryEncoded) {
+      Dictionary dictionary = mock(Dictionary.class);
+      when(dictionary.getLongValue(0)).thenReturn(5L);
+      when(valueSet.isDictionaryEncoded()).thenReturn(true);
+      when(valueSet.getDictionary()).thenReturn(dictionary);
+      when(valueSet.getDictionaryIdsSV()).thenReturn(new int[]{0});
+    } else {
+      when(valueSet.getLongValuesSV()).thenReturn(new long[]{5L});
+    }
+    Map<ExpressionContext, BlockValSet> values = Map.of(EXPRESSION, valueSet);
+
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(1, holder, values);
+    assertEquals(function.extractAggregationResult(holder), 5L);
+    GroupByResultHolder groupHolder = function.createGroupByResultHolder(1, 1);
+    function.aggregateGroupBySV(1, new int[]{0}, groupHolder, values);
+    assertEquals(function.extractGroupByResult(groupHolder, 0), 5L);
+    assertEquals(function.getIntermediateResultColumnType(), ColumnDataType.LONG);
+  }
+
+  @DataProvider(name = "nonDictionaryValues")
+  Object[][] nonDictionaryValues() {
+    return new Object[][]{
+        {DataType.INT, (Function<BlockValSet, Object>) BlockValSet::getIntValuesSV,
+            new int[]{1, 2, 3}, List.of(1, 2)},
+        {DataType.LONG, (Function<BlockValSet, Object>) BlockValSet::getLongValuesSV,
+            new long[]{1L, 2L, 3L}, List.of(1L, 2L)},
+        {DataType.FLOAT, (Function<BlockValSet, Object>) BlockValSet::getFloatValuesSV,
+            new float[]{1.5f, 2.5f, 3.5f}, List.of(1.5f, 2.5f)},
+        {DataType.DOUBLE, (Function<BlockValSet, Object>) BlockValSet::getDoubleValuesSV,
+            new double[]{1.25, 2.25, 3.25}, List.of(1.25, 2.25)},
+        {DataType.BIG_DECIMAL, (Function<BlockValSet, Object>) BlockValSet::getBigDecimalValuesSV,
+            new BigDecimal[]{new BigDecimal("1.01"), new BigDecimal("2.02"), new BigDecimal("3.03")},
+            List.of(new BigDecimal("1.01"), new BigDecimal("2.02"))},
+        {DataType.STRING, (Function<BlockValSet, Object>) BlockValSet::getStringValuesSV,
+            new String[]{"zone-1", "zone-2", "zone-3"}, List.of("zone-1", "zone-2")},
+        {DataType.BYTES, (Function<BlockValSet, Object>) BlockValSet::getBytesValuesSV,
+            new byte[][]{{1}, {2}, {3}}, List.of(new ByteArray(new byte[]{1}), new ByteArray(new byte[]{2}))}
+    };
+  }
+
+  @Test(dataProvider = "nonDictionaryValues")
+  void testGroupByReadsValuesOncePerBlock(DataType storedType, Function<BlockValSet, Object> valuesGetter,
+                                        Object values, List<?> expectedValues) {
+    AnyValueAggregationFunction function = new AnyValueAggregationFunction(List.of(EXPRESSION), false);
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(storedType);
+    when(valuesGetter.apply(valueSet)).thenReturn(values);
+    GroupByResultHolder holder = function.createGroupByResultHolder(2, 2);
+    function.aggregateGroupBySV(3, new int[]{0, 1, 0}, holder, Map.of(EXPRESSION, valueSet));
+    assertEquals(function.extractGroupByResult(holder, 0), expectedValues.get(0));
+    assertEquals(function.extractGroupByResult(holder, 1), expectedValues.get(1));
+    // Some block value sets build the value array on each call
+    valuesGetter.apply(verify(valueSet, times(1)));
+  }
+
+  @Test
+  void testDataTypeArgumentSerializedMerge() {
+    // One server found a value and the other did not.
+    AnyValueAggregationFunction function = createFunction("BOOLEAN");
+    BlockValSet valueSet = mock(BlockValSet.class);
+    when(valueSet.getValueType()).thenReturn(DataType.BOOLEAN);
+    when(valueSet.getIntValuesSV()).thenReturn(new int[]{1});
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    function.aggregate(1, holder, Map.of(EXPRESSION, valueSet));
+    CustomObject found = serialize(function, function.extractAggregationResult(holder));
+    CustomObject empty =
+        serialize(function, function.extractAggregationResult(function.createAggregationResultHolder()));
+
+    Object merged = AggregationFunctionUtils.mergeSerialized(function, null, empty);
+    assertNull(merged);
+    merged = AggregationFunctionUtils.mergeSerialized(function, merged, found);
+    merged = AggregationFunctionUtils.mergeSerialized(function, merged, empty);
+    assertEquals(merged, 1);
+    assertEquals(function.getFinalResultColumnType().convert(function.extractFinalResult(merged)), true);
+
+    AnyValueAggregationFunction bigDecimalFunction = createFunction("BIG_DECIMAL");
+    BigDecimal value = new BigDecimal("12345678901234567890.123");
+    assertEquals(bigDecimalFunction.merge(bigDecimalFunction.deserializeIntermediateResult(
+        serialize(bigDecimalFunction, value)), new BigDecimal("1")), value);
+  }
+
+  @Test
+  void testMergeFinalResult() {
+    AnyValueAggregationFunction function = createFunction("LONG");
+    assertEquals(function.mergeFinalResult(1L, 2L), 1L);
+  }
+
+  private static AnyValueAggregationFunction createFunction(String dataType) {
+    return new AnyValueAggregationFunction(List.of(EXPRESSION, ExpressionContext.forLiteral(DataType.STRING, dataType)),
+        true);
+  }
+
+  private static CustomObject serialize(AnyValueAggregationFunction function, Object intermediateResult) {
+    AggregationFunction.SerializedResult serialized = function.serializeIntermediateResult(intermediateResult);
+    return new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes()));
   }
 }

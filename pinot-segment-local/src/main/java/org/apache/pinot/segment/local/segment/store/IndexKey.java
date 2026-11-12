@@ -22,25 +22,19 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 
 
-/**
- * Class representing index name and type
- */
+/// Class representing index name and type
 public class IndexKey implements Comparable<IndexKey> {
   final String _name;
   final IndexType<?, ?, ?> _type;
 
-  /**
-   * @param name column name
-   * @param type index type
-   */
+  /// @param name column name
+  /// @param type index type
   public IndexKey(String name, IndexType<?, ?, ?> type) {
     _name = name;
     _type = type;
   }
 
-  /**
-   * @throws IllegalArgumentException if there is no index with the given index id
-   */
+  /// @throws IllegalArgumentException if there is no index with the given index id
   public static IndexKey fromIndexName(String name, String indexName) {
     IndexType<?, ?, ?> type = IndexService.getInstance().get(indexName);
     return new IndexKey(name, type);

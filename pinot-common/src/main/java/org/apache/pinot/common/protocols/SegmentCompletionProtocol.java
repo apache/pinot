@@ -26,15 +26,17 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /*
  * This class encapsulates the segment completion protocol used by the server and the controller for
- * low-level consumer realtime segments. The protocol has two requests: SegmentConsumedRequest
- * and SegmentCommitRequest.It has a response that may contain different status codes depending on the state machine
- * that the controller drives for that segment. All responses have two elements -- status and an offset.
+ * low-level consumer realtime segments. The protocol has a SegmentConsumedRequest and a split-commit request
+ * sequence (SegmentCommitStartRequest, segment upload, SegmentCommitEndWithMetadataRequest). It has a response that
+ * may contain different status codes depending on the state machine that the controller drives for that segment. All
+ * responses have two elements -- status and an offset.
  *
  * The overall idea is that when a server has completed consuming a segment until the "end criteria" that
  * is set (in the table configuration), it sends a SegmentConsumedRequest to the controller (leader).  The
@@ -42,8 +44,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * to the controller after a while.
  *
  * Meanwhile, the controller co-ordinates the SegmentConsumedRequest messages from replicas and selects a server
- * to commit the segment. The server uses SegmentCommitRequest message, in which it also posts the completed
- * segment to the controller.
+ * to commit the segment. The selected server commits the segment via the split-commit sequence: it sends a
+ * SegmentCommitStartRequest, uploads the completed segment, and finishes with a SegmentCommitEndWithMetadataRequest.
  *
  * The controller may respond with a failure for this commit message, but on success, the controller changes the
  * segment state to ONLINE in idealstate, and adds new CONSUMING segments as well.
@@ -55,55 +57,51 @@ public class SegmentCompletionProtocol {
   private SegmentCompletionProtocol() {
   }
 
-  /**
-   * MAX_HOLD_TIME_MS is the maximum time (msecs) for which a server will be in HOLDING state, after which it will
-   * send in a SegmentConsumedRequest with its current offset in the stream.
-   */
+  /// MAX_HOLD_TIME_MS is the maximum time (msecs) for which a server will be in HOLDING state, after which it will
+  /// send in a SegmentConsumedRequest with its current offset in the stream.
   public static final long MAX_HOLD_TIME_MS = 3000;
-  /**
-   * MAX_SEGMENT_COMMIT_TIME_MS is the longest time (msecs) a server will take to complete building a segment and
-   * committing
-   * it  (via a SegmentCommit message) after the server has been notified that it is the committer.
-   */
+  /// MAX_SEGMENT_COMMIT_TIME_MS is the longest time (msecs) a server will take to complete building a segment and
+  /// committing
+  /// it  (via a SegmentCommit message) after the server has been notified that it is the committer.
   private static final int DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC = 120;
   private static long _maxSegmentCommitTimeMs =
       TimeUnit.MILLISECONDS.convert(DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC, TimeUnit.SECONDS);
 
   public enum ControllerResponseStatus {
-    /** Never sent by the controller, but locally used by server when sending a request fails */
+    /// Never sent by the controller, but locally used by server when sending a request fails
     NOT_SENT,
 
-    /** Server should send back a SegmentCommitRequest after processing this response */
+    /// Server should start the split-commit sequence (SegmentCommitStartRequest) after processing this response
     COMMIT,
 
-    /** Server should send SegmentConsumedRequest after waiting for less than MAX_HOLD_TIME_MS */
+    /// Server should send SegmentConsumedRequest after waiting for less than MAX_HOLD_TIME_MS
     HOLD,
 
-    /** Server should consume stream events to catch up to the offset contained in this response */
+    /// Server should consume stream events to catch up to the offset contained in this response
     CATCH_UP,
 
-    /** Server should discard the rows in memory */
+    /// Server should discard the rows in memory
     DISCARD,
 
-    /** Server should build a segment out of the rows in memory, and replace in-memory rows with the segment built */
+    /// Server should build a segment out of the rows in memory, and replace in-memory rows with the segment built
     KEEP,
 
-    /** Server should locate the current controller leader and re-send the message */
+    /// Server should locate the current controller leader and re-send the message
     NOT_LEADER,
 
-    /** Commit failed. Server should go back to HOLDING state and re-start with the SegmentConsumed message  */
+    /// Commit failed. Server should go back to HOLDING state and re-start with the SegmentConsumed message
     FAILED,
 
-    /** Commit succeeded, behave exactly like KEEP */
+    /// Commit succeeded, behave exactly like KEEP
     COMMIT_SUCCESS,
 
-    /** Never sent by the controller, but locally used by the controller during the segmentCommit() processing */
+    /// Never sent by the controller, but locally used by the controller during the segmentCommit() processing
     COMMIT_CONTINUE,
 
-    /** Sent by controller as an acknowledgement to the SegmentStoppedConsuming message */
+    /// Sent by controller as an acknowledgement to the SegmentStoppedConsuming message
     PROCESSED,
 
-    /** Sent by controller as an acknowledgement during split commit for successful segment upload */
+    /// Sent by controller as an acknowledgement during split commit for successful segment upload
     UPLOAD_SUCCESS,
   }
 
@@ -116,10 +114,10 @@ public class SegmentCompletionProtocol {
   public static final String STREAM_PARTITION_MSG_OFFSET_KEY = "streamPartitionMsgOffset";
 
   public static final String MSG_TYPE_CONSUMED = "segmentConsumed";
+  // The non-split-commit endpoint is gone, but this message type remains as the segment-completion FSM lookup key.
   public static final String MSG_TYPE_COMMIT = "segmentCommit";
   public static final String MSG_TYPE_COMMIT_START = "segmentCommitStart";
   public static final String MSG_TYPE_SEGMENT_UPLOAD = "segmentUpload";
-  public static final String MSG_TYPE_COMMIT_END = "segmentCommitEnd";
   public static final String MSG_TYPE_COMMIT_END_METADATA = "segmentCommitEndWithMetadata";
   public static final String MSG_TYPE_STOPPED_CONSUMING = "segmentStoppedConsuming";
   public static final String MSG_TYPE_EXTEND_BUILD_TIME = "extendBuildTime";
@@ -132,6 +130,7 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_MEMORY_USED_BYTES = "memoryUsedBytes";
   public static final String PARAM_SEGMENT_SIZE_BYTES = "segmentSizeBytes";
   public static final String PARAM_REASON = "reason";
+  public static final String PARAM_REASON_CODE = "reasonCode";
   // Sent by servers to request additional time to build
   public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec";
   // Sent by servers to indicate the number of rows read so far
@@ -152,6 +151,62 @@ public class SegmentCompletionProtocol {
   // Stop reason sent by server as mutable index cannot consume more rows
   // (like size reaching close to its limit or number of col values for a col is about to overflow int max)
   public static final String REASON_INDEX_CAPACITY_THRESHOLD_BREACHED = "indexCapacityThresholdBreached";
+
+  /// Stable wire codes for server stop reasons.
+  ///
+  /// Numeric IDs are part of the segment-completion protocol and must remain unique, stable, and non-reusable.
+  /// Controllers ignore unknown numeric `reasonCode` values and fall back to the retained legacy `reason` value.
+  /// When both a known `reasonCode` and a legacy `reason` are present, the numeric code takes precedence and
+  /// normalizes the legacy reason string carried through the request params.
+  public enum ReasonCode {
+    ROW_LIMIT(100, REASON_ROW_LIMIT),
+    TIME_LIMIT(110, REASON_TIME_LIMIT),
+    END_OF_PARTITION_GROUP(120, REASON_END_OF_PARTITION_GROUP),
+    FORCE_COMMIT_MESSAGE_RECEIVED(130, REASON_FORCE_COMMIT_MESSAGE_RECEIVED),
+    INDEX_CAPACITY_THRESHOLD_BREACHED(140, REASON_INDEX_CAPACITY_THRESHOLD_BREACHED);
+
+    private static final Map<Integer, ReasonCode> BY_ID = new HashMap<>();
+
+    static {
+      for (ReasonCode value : values()) {
+        BY_ID.put(value.getId(), value);
+      }
+    }
+
+    private final int _id;
+    private final String _reason;
+
+    ReasonCode(int id, String reason) {
+      _id = id;
+      _reason = reason;
+    }
+
+    public int getId() {
+      return _id;
+    }
+
+    public String getReason() {
+      return _reason;
+    }
+
+    @Nullable
+    public static ReasonCode fromCode(int reasonCode) {
+      return BY_ID.get(reasonCode);
+    }
+
+    @Nullable
+    public static ReasonCode fromReason(@Nullable String reason) {
+      if (reason == null) {
+        return null;
+      }
+      for (ReasonCode value : values()) {
+        if (value.getReason().equals(reason)) {
+          return value;
+        }
+      }
+      return null;
+    }
+  }
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =
@@ -204,6 +259,9 @@ public class SegmentCompletionProtocol {
       if (_params.getReason() != null) {
         params.put(PARAM_REASON, _params.getReason());
       }
+      if (_params.getReasonCode() != null) {
+        params.put(PARAM_REASON_CODE, String.valueOf(_params.getReasonCode().getId()));
+      }
       if (_params.getBuildTimeMillis() > 0) {
         params.put(PARAM_BUILD_TIME_MILLIS, String.valueOf(_params.getBuildTimeMillis()));
       }
@@ -234,7 +292,10 @@ public class SegmentCompletionProtocol {
     public static class Params {
       private String _segmentName;
       private String _instanceId;
+      @Nullable
       private String _reason;
+      @Nullable
+      private ReasonCode _reasonCode;
       private int _numRows;
       private long _buildTimeMillis;
       private long _waitTimeMillis;
@@ -256,6 +317,7 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = SEGMENT_SIZE_BYTES_DEFAULT;
         _streamPartitionMsgOffset = null;
         _reason = null;
+        _reasonCode = null;
       }
 
       public Params(Params params) {
@@ -270,6 +332,7 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = params.getSegmentSizeBytes();
         _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset();
         _reason = params.getReason();
+        _reasonCode = params.getReasonCode();
       }
 
       public Params withSegmentName(String segmentName) {
@@ -282,8 +345,29 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withReason(String reason) {
+      public Params withReason(@Nullable String reason) {
         _reason = reason;
+        _reasonCode = ReasonCode.fromReason(reason);
+        return this;
+      }
+
+      /// Resolves the `reasonCode` query parameter. Missing or unknown values are ignored so the retained legacy
+      /// `reason` can continue to be used as fallback.
+      public Params withReasonCodeParam(@Nullable Integer reasonCode) {
+        ReasonCode parsedReasonCode = reasonCode != null ? ReasonCode.fromCode(reasonCode) : null;
+        if (parsedReasonCode != null) {
+          return withReasonCode(parsedReasonCode);
+        }
+        return this;
+      }
+
+      /// Sets the typed stop reason. A known code also sets the legacy reason string so older controllers can ignore
+      /// `reasonCode` and still use `reason`. Passing `null` clears only the typed code.
+      public Params withReasonCode(@Nullable ReasonCode reasonCode) {
+        _reasonCode = reasonCode;
+        if (reasonCode != null) {
+          _reason = reasonCode.getReason();
+        }
         return this;
       }
 
@@ -331,8 +415,14 @@ public class SegmentCompletionProtocol {
         return _segmentName;
       }
 
+      @Nullable
       public String getReason() {
         return _reason;
+      }
+
+      @Nullable
+      public ReasonCode getReasonCode() {
+        return _reasonCode;
       }
 
       public String getInstanceId() {
@@ -375,6 +465,7 @@ public class SegmentCompletionProtocol {
         return "Segment name: " + _segmentName
             + ",Instance Id: " + _instanceId
             + ",Reason: " + _reason
+            + ",ReasonCode: " + _reasonCode
             + ",NumRows: " + _numRows
             + ",BuildTimeMillis: " + _buildTimeMillis
             + ",WaitTimeMillis: " + _waitTimeMillis
@@ -399,12 +490,6 @@ public class SegmentCompletionProtocol {
     }
   }
 
-  public static class SegmentCommitRequest extends Request {
-    public SegmentCommitRequest(Params params) {
-      super(params, MSG_TYPE_COMMIT);
-    }
-  }
-
   public static class SegmentCommitStartRequest extends Request {
     public SegmentCommitStartRequest(Params params) {
       super(params, MSG_TYPE_COMMIT_START);
@@ -414,12 +499,6 @@ public class SegmentCompletionProtocol {
   public static class SegmentCommitUploadRequest extends Request {
     public SegmentCommitUploadRequest(Params params) {
       super(params, MSG_TYPE_SEGMENT_UPLOAD);
-    }
-  }
-
-  public static class SegmentCommitEndRequest extends Request {
-    public SegmentCommitEndRequest(Params params) {
-      super(params, MSG_TYPE_COMMIT_END);
     }
   }
 

@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.client;
 
-/**
- * Connections time out for AsyncHttpClient
- */
+/// Connections time out for AsyncHttpClient
 public class ConnectionTimeouts {
   private final int _readTimeoutMs;
   private final int _connectTimeoutMs;

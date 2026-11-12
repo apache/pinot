@@ -48,7 +48,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertTrue;
 
 
-/// Tests for {@link PinotSegmentSorter#getSortedDocIds}, covering both dictionary-encoded and no-dictionary columns
+/// Tests for [PinotSegmentSorter#getSortedDocIds], covering both dictionary-encoded and no-dictionary columns
 /// across all supported single-value stored types.
 public class PinotSegmentSorterTest implements PinotBuffersAfterMethodCheckRule {
 
@@ -206,7 +206,7 @@ public class PinotSegmentSorterTest implements PinotBuffersAfterMethodCheckRule 
     }
   }
 
-  /// Asserts that the values at {@code sortedDocIds} are in non-decreasing order.
+  /// Asserts that the values at `sortedDocIds` are in non-decreasing order.
   private static void assertAscending(int[] sortedDocIds, List<GenericRow> rows, String column, DataType dataType) {
     for (int i = 1; i < sortedDocIds.length; i++) {
       Object v1 = rows.get(sortedDocIds[i - 1]).getValue(column);

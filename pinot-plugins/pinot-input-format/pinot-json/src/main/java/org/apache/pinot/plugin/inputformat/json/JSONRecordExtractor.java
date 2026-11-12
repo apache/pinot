@@ -61,7 +61,7 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
   /// Walks a non-null Jackson-parsed value and produces the contract shape: `BigDecimal` for `BigInteger`
   /// (oversized ints), `Object[]` for JSON arrays, `Map<String, Object>` for JSON objects, pass-through for
   /// the other Jackson scalar types (`Boolean`, `Integer`, `Long`, `Double`, `String`).
-  private static Object convert(Object value) {
+  public static Object convert(Object value) {
     // BigInteger widens (Pinot has no BigInteger type)
     if (value instanceof BigInteger) {
       return new BigDecimal((BigInteger) value);

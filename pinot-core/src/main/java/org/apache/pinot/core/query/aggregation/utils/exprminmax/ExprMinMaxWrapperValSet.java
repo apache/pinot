@@ -23,10 +23,8 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Wrapper class for the value sets of the column to do exprmin/max on.
- * This class is used for type-generic implementation of exprmin/max.
- */
+/// Wrapper class for the value sets of the column to do exprmin/max on.
+/// This class is used for type-generic implementation of exprmin/max.
 @SuppressWarnings("rawtypes")
 public class ExprMinMaxWrapperValSet {
   final ColumnDataType _storedType;

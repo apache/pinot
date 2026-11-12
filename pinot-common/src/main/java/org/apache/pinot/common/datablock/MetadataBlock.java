@@ -24,10 +24,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
-/**
- * A block type to indicate some metadata about the current processing state.
- * For the different types of metadata blocks see {@link MetadataBlockType}.
- */
+/// A block type to indicate some metadata about the current processing state.
+/// For the different types of metadata blocks see [MetadataBlockType].
 public class MetadataBlock extends BaseDataBlock {
   @Nullable
   private List<DataBuffer> _statsByStage;
@@ -84,11 +82,9 @@ public class MetadataBlock extends BaseDataBlock {
     return _errCodeToExceptionMap.isEmpty() ? MetadataBlockType.EOS : MetadataBlockType.ERROR;
   }
 
-  /**
-   * Returns the list of serialized stats.
-   * <p>
-   * The returned list may contain nulls, which would mean that no stats were available for that stage.
-   */
+  /// Returns the list of serialized stats.
+  ///
+  /// The returned list may contain nulls, which would mean that no stats were available for that stage.
   @Nullable
   @Override
   public List<DataBuffer> getStatsByStage() {
@@ -124,17 +120,13 @@ public class MetadataBlock extends BaseDataBlock {
   }
 
   public enum MetadataBlockType {
-    /**
-     * Indicates that this block is the final block to be sent
-     * (End Of Stream) as part of an operator chain computation.
-     */
+    /// Indicates that this block is the final block to be sent
+    /// (End Of Stream) as part of an operator chain computation.
     EOS,
 
-    /**
-     * An {@code ERROR} metadata block indicates that there was
-     * some error during computation. To retrieve the error that
-     * occurred, use {@link MetadataBlock#getExceptions()}
-     */
+    /// An `ERROR` metadata block indicates that there was
+    /// some error during computation. To retrieve the error that
+    /// occurred, use [MetadataBlock#getExceptions()]
     ERROR
   }
 }

@@ -23,8 +23,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -37,7 +37,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -94,10 +93,11 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITHOUT_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
             .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
-                new SegmentAssignmentConfig(
-                    AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY))).build();
+                new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+                    null)))
+            .build();
     _segmentAssignmentWithoutPartition =
-        SegmentAssignmentFactory.getSegmentAssignment(null, tableConfigWithoutPartitions, null);
+        SegmentAssignmentFactory.getSegmentAssignment(null, tableConfigWithoutPartitions);
 
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5],
@@ -124,32 +124,30 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
       String segmentName = SEGMENTS.get(segmentId);
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
       int partitionId = segmentId % NUM_PARTITIONS;
-      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Map.of(PARTITION_COLUMN,
-          new ColumnPartitionMetadata(null, NUM_PARTITIONS, Set.of(partitionId), null))));
+      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(
+          Map.of(PARTITION_COLUMN, new ColumnPartitionMetadata(null, NUM_PARTITIONS, Set.of(partitionId), null))));
       ZNRecord segmentZKMetadataZNRecord = segmentZKMetadata.toZNRecord();
       when(propertyStoreWithPartitions.get(
           eq(ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME_WITH_PARTITION, segmentName)),
           any(), anyInt())).thenReturn(segmentZKMetadataZNRecord);
       segmentZKMetadataZNRecords.add(segmentZKMetadataZNRecord);
     }
-    when(propertyStoreWithPartitions
-        .getChildren(eq(ZKMetadataProvider.constructPropertyStorePathForResource(OFFLINE_TABLE_NAME_WITH_PARTITION)),
-            any(), anyInt(), anyInt(), anyInt())).thenReturn(segmentZKMetadataZNRecords);
+    when(propertyStoreWithPartitions.getChildren(
+        eq(ZKMetadataProvider.constructPropertyStorePathForResource(OFFLINE_TABLE_NAME_WITH_PARTITION)), any(),
+        anyInt(), anyInt(), anyInt())).thenReturn(segmentZKMetadataZNRecords);
     HelixManager helixManagerWithPartitions = mock(HelixManager.class);
     when(helixManagerWithPartitions.getHelixPropertyStore()).thenReturn(propertyStoreWithPartitions);
 
     int numInstancesPerPartition = numInstancesPerReplicaGroup / NUM_PARTITIONS;
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
-        new ReplicaGroupStrategyConfig(PARTITION_COLUMN, numInstancesPerPartition);
     TableConfig tableConfigWithPartitions =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
             .setNumReplicas(NUM_REPLICAS)
-            .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig)
             .setSegmentAssignmentConfigMap(Map.of(InstancePartitionsType.OFFLINE.toString(),
-                new SegmentAssignmentConfig(
-                    AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY))).build();
+                new SegmentAssignmentConfig(AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY,
+                    PARTITION_COLUMN)))
+            .build();
     _segmentAssignmentWithPartition =
-        SegmentAssignmentFactory.getSegmentAssignment(helixManagerWithPartitions, tableConfigWithPartitions, null);
+        SegmentAssignmentFactory.getSegmentAssignment(helixManagerWithPartitions, tableConfigWithPartitions);
 
     // {
     //   0_0=[instance_0, instance_1], 1_0=[instance_2, instance_3], 2_0=[instance_4, instance_5],
@@ -167,8 +165,7 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
         _instancePartitionsWithPartition.setInstances(partitionId, replicaGroupId, instancesForPartition);
       }
     }
-    _instancePartitionsMapWithPartition =
-        Map.of(InstancePartitionsType.OFFLINE, _instancePartitionsWithPartition);
+    _instancePartitionsMapWithPartition = Map.of(InstancePartitionsType.OFFLINE, _instancePartitionsWithPartition);
   }
 
   @Test
@@ -180,17 +177,17 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
   @Test
   public void testAssignSegmentWithoutPartition() {
     int numInstancesPerReplicaGroup = NUM_INSTANCES / NUM_REPLICAS; // 6
-    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    IdealState idealState = new IdealState(RAW_TABLE_NAME_WITHOUT_PARTITION);
+    Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
 
     // The counter initializes to a random value; derive the starting instanceId from the first result.
-    List<String> firstInstances = _segmentAssignmentWithoutPartition
-        .assignSegment(SEGMENTS.get(0), currentAssignment, _instancePartitionsMapWithoutPartition);
+    List<String> firstInstances = _segmentAssignmentWithoutPartition.assignSegment(SEGMENTS.get(0), idealState,
+        _instancePartitionsMapWithoutPartition);
     assertEquals(firstInstances.size(), NUM_REPLICAS);
     // The counter advances once per segment. Each replica group contributes the instance at the same instanceId.
     int startIdx = _instancePartitionsWithoutPartition.getInstances(0, 0).indexOf(firstInstances.get(0));
     for (int rgId = 0; rgId < NUM_REPLICAS; rgId++) {
-      assertEquals(firstInstances.get(rgId),
-          _instancePartitionsWithoutPartition.getInstances(0, rgId).get(startIdx));
+      assertEquals(firstInstances.get(rgId), _instancePartitionsWithoutPartition.getInstances(0, rgId).get(startIdx));
     }
     currentAssignment.put(SEGMENTS.get(0),
         SegmentAssignmentUtils.getInstanceStateMap(firstInstances, SegmentStateModel.ONLINE));
@@ -198,12 +195,11 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
     // Each subsequent segment advances the instanceId by 1 within the replica group.
     for (int segId = 1; segId < NUM_SEGMENTS; segId++) {
       int expectedIdx = (startIdx + segId) % numInstancesPerReplicaGroup;
-      List<String> instances = _segmentAssignmentWithoutPartition
-          .assignSegment(SEGMENTS.get(segId), currentAssignment, _instancePartitionsMapWithoutPartition);
+      List<String> instances = _segmentAssignmentWithoutPartition.assignSegment(SEGMENTS.get(segId), idealState,
+          _instancePartitionsMapWithoutPartition);
       assertEquals(instances.size(), NUM_REPLICAS);
       for (int rgId = 0; rgId < NUM_REPLICAS; rgId++) {
-        assertEquals(instances.get(rgId),
-            _instancePartitionsWithoutPartition.getInstances(0, rgId).get(expectedIdx));
+        assertEquals(instances.get(rgId), _instancePartitionsWithoutPartition.getInstances(0, rgId).get(expectedIdx));
       }
       currentAssignment.put(SEGMENTS.get(segId),
           SegmentAssignmentUtils.getInstanceStateMap(instances, SegmentStateModel.ONLINE));
@@ -214,7 +210,8 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
   public void testAssignSegmentWithPartition() {
     int numInstancesPerReplicaGroup = NUM_INSTANCES / NUM_REPLICAS; // 6
     int numInstancesPerPartition = numInstancesPerReplicaGroup / NUM_PARTITIONS; // 2
-    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME_WITH_PARTITION);
+    Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
 
     // Each partition has its own independent counter, so track start and assignment count per partition.
     int[] partitionStartIdx = new int[NUM_PARTITIONS];
@@ -223,8 +220,8 @@ public class RoundRobinReplicaGroupSegmentAssignmentStrategyTest {
 
     for (int segId = 0; segId < NUM_SEGMENTS; segId++) {
       int partitionId = segId % NUM_PARTITIONS;
-      List<String> instances = _segmentAssignmentWithPartition
-          .assignSegment(SEGMENTS.get(segId), currentAssignment, _instancePartitionsMapWithPartition);
+      List<String> instances = _segmentAssignmentWithPartition.assignSegment(SEGMENTS.get(segId), idealState,
+          _instancePartitionsMapWithPartition);
       assertEquals(instances.size(), NUM_REPLICAS);
 
       if (partitionStartIdx[partitionId] == -1) {

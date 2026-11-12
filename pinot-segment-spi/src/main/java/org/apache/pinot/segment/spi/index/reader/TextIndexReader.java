@@ -25,49 +25,76 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public interface TextIndexReader extends IndexReader {
-  /**
-   * Returns the matching dictionary ids for the given search query (optional).
-   */
+  /// Returns the matching dictionary ids for the given search query (optional).
   ImmutableRoaringBitmap getDictIds(String searchQuery);
 
-  /**
-   * Returns the matching document ids for the given search query.
-   * This is the legacy entry point retained for backward compatibility.
-   */
+  /// Returns the matching document ids for the given search query.
+  /// This is the legacy entry point retained for backward compatibility.
   MutableRoaringBitmap getDocIds(String searchQuery);
 
-  /**
-   * Returns the matching document ids for the given search query with options string.
-   * This method allows passing options as a string parameter that will be parsed internally.
-   * Lucene-based text index readers should implement this method.
-   * @param searchQuery The search query string
-   * @param optionsString Options string in format "key1=value1,key2=value2", can be null
-   * @return Matching document ids
-   */
+  /// Returns the matching document ids for the given search query with options string.
+  /// This method allows passing options as a string parameter that will be parsed internally.
+  /// Lucene-based text index readers should implement this method.
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @return Matching document ids
   default MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
     // Default implementation falls back to the legacy method for backward compatibility.
     return getDocIds(searchQuery);
   }
 
-  /**
-   * Marker method that allows to differentiate between single-column and multi-column text index reader .
-   */
+  /// Returns the matching document ids, reusing a query-scoped parse when the implementation supports it.
+  ///
+  /// Parsing a search string depends only on the string and the column's index configuration, so every
+  /// segment of one request would otherwise repeat identical work. Implementations that parse should
+  /// derive their cache key from the search string, the options and the configuration that affects
+  /// parsing. A `null` cache means "do not share", and must behave exactly like the two-argument form.
+  ///
+  /// Only the *parsed query* is shared. Doc ids are per-segment and must never be cached across readers.
+  default MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
+    return getDocIds(searchQuery, optionsString);
+  }
+
+  /// Returns the number of documents matching the given search query, without materializing the matching
+  /// document ids.
+  ///
+  /// A `count(*)` with a text-match filter only needs the size of the match set, not its contents. Building a
+  /// full bitmap of matching doc ids first is wasted work that grows with the number of matches, which on a
+  /// high-frequency term over a large segment is most of the query cost. Implementations backed by an inverted
+  /// index can usually read the count from index metadata instead.
+  ///
+  /// The default implementation falls back to materializing the doc ids, so an implementation that cannot do
+  /// better keeps its current behaviour.
+  ///
+  /// @param searchQuery The search query string
+  /// @param optionsString Options string in format "key1=value1,key2=value2", can be null
+  /// @return the number of matching documents
+  default int getNumMatchingDocs(String searchQuery, @Nullable String optionsString) {
+    return getDocIds(searchQuery, optionsString).getCardinality();
+  }
+
+  /// Counting counterpart of [#getDocIds(String, String, QueryScopedCache)].
+  default int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
+    return getNumMatchingDocs(searchQuery, optionsString);
+  }
+
+  /// Marker method that allows to differentiate between single-column and multi-column text index reader .
   default boolean isMultiColumn() {
     return false;
   }
 
-  /**
-   * Returns the number of documents that are searchable in the index. For near-realtime indexes
-   * (e.g. Lucene on consuming segments), this may be less than the total segment doc count because
-   * recently ingested documents may not yet be visible to the index searcher. For offline/completed
-   * segments, this returns -1 (meaning all docs are searchable).
-   *
-   * <p>This is used to implement the "searchable doc fence" for NOT filters: when inverting a
-   * text match result, only docs within [0, searchableDocCount) are considered, preventing
-   * unindexed documents from appearing as false positives.</p>
-   *
-   * @return the number of searchable documents, or -1 if all documents are searchable
-   */
+  /// Returns the number of documents that are searchable in the index. For near-realtime indexes
+  /// (e.g. Lucene on consuming segments), this may be less than the total segment doc count because
+  /// recently ingested documents may not yet be visible to the index searcher. For offline/completed
+  /// segments, this returns -1 (meaning all docs are searchable).
+  ///
+  /// This is used to implement the "searchable doc fence" for NOT filters: when inverting a
+  /// text match result, only docs within \[0, searchableDocCount) are considered, preventing
+  /// unindexed documents from appearing as false positives.
+  ///
+  /// @return the number of searchable documents, or -1 if all documents are searchable
   default int getSearchableDocCount() {
     return -1;
   }

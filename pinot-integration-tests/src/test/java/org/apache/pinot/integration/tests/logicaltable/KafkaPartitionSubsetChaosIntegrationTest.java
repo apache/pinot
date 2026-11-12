@@ -64,37 +64,30 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Chaos integration test for the Kafka partition subset feature.
- *
- * <p><b>Topology:</b>
- * <ul>
- *   <li>1 Kafka topic with {@value NUM_KAFKA_PARTITIONS} partitions</li>
- *   <li>1 "control" realtime table consuming <em>all</em> partitions (no subset filter), serving as ground truth</li>
- *   <li>3 "subset" realtime tables with <em>non-contiguous</em> partition assignments:
- *     <ul>
- *       <li>subset_0: partitions {0, 3}</li>
- *       <li>subset_1: partitions {1, 4}</li>
- *       <li>subset_2: partitions {2, 5}</li>
- *     </ul>
- *   </li>
- *   <li>1 logical table aggregating all three subset tables</li>
- * </ul>
- *
- * <p><b>Key invariant:</b> {@code COUNT(*) on logical table == COUNT(*) on control table}
- *
- * <p><b>Chaos scenarios tested:</b>
- * <ol>
- *   <li>Force-commit consuming segments on all subset tables</li>
- *   <li>Pause consumption, push more data, then resume – data must not be lost or duplicated</li>
- *   <li>Server restart – tables must recover and resume from their last committed offset</li>
- *   <li>Ingest a second batch after restart – counts must continue to match</li>
- * </ol>
- *
- * <p>The non-contiguous partition IDs (e.g., {0,3}) are intentional: they expose regressions
- * where code uses {@code getNumPartitions()} (returns a sequential 0..N-1 count) instead of
- * {@code getPartitionIds()} (returns the actual assigned partition ID set).
- */
+/// Chaos integration test for the Kafka partition subset feature.
+///
+/// **Topology:**
+///
+/// - 1 Kafka topic with {@value NUM_KAFKA_PARTITIONS} partitions
+/// - 1 "control" realtime table consuming _all_ partitions (no subset filter), serving as ground truth
+/// - 3 "subset" realtime tables with _non-contiguous_ partition assignments:
+///   - subset_0: partitions {0, 3}
+///   - subset_1: partitions {1, 4}
+///   - subset_2: partitions {2, 5}
+/// - 1 logical table aggregating all three subset tables
+///
+/// **Key invariant:** `COUNT(*) on logical table == COUNT(*) on control table`
+///
+/// **Chaos scenarios tested:**
+///
+/// 1. Force-commit consuming segments on all subset tables
+/// 2. Pause consumption, push more data, then resume – data must not be lost or duplicated
+/// 3. Server restart – tables must recover and resume from their last committed offset
+/// 4. Ingest a second batch after restart – counts must continue to match
+///
+/// The non-contiguous partition IDs (e.g., {0,3}) are intentional: they expose regressions
+/// where code uses `getNumPartitions()` (returns a sequential 0..N-1 count) instead of
+/// `getPartitionIds()` (returns the actual assigned partition ID set).
 public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegrationTest {
 
   // Kafka topic: 6 partitions to allow non-contiguous splits
@@ -133,7 +126,7 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
     return NUM_KAFKA_PARTITIONS;
   }
 
-  /** The "default" table name used by the base-class helper methods (schema creation, etc.). */
+  /// The "default" table name used by the base-class helper methods (schema creation, etc.).
   @Override
   public String getTableName() {
     return CONTROL_TABLE;
@@ -205,21 +198,17 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
   // Tests (run in declared order via priority)
   // ---------------------------------------------------------------------------
 
-  /**
-   * Sanity check: after initial ingestion the logical table and the control table must agree.
-   */
+  /// Sanity check: after initial ingestion the logical table and the control table must agree.
   @Test(priority = 0)
   public void testCountInvariantAfterInitialIngestion() {
     assertCountInvariant();
   }
 
-  /**
-   * Force-commit consuming segments on each subset table and verify no data is lost or duplicated.
-   *
-   * <p>This exercises the path where the controller picks up consuming segments by partition ID.
-   * A regression using {@code getNumPartitions()} would cause it to iterate partitions 0..1 for a
-   * table assigned to e.g. {0,3} and miss partition 3 entirely.
-   */
+  /// Force-commit consuming segments on each subset table and verify no data is lost or duplicated.
+  ///
+  /// This exercises the path where the controller picks up consuming segments by partition ID.
+  /// A regression using `getNumPartitions()` would cause it to iterate partitions 0..1 for a
+  /// table assigned to e.g. {0,3} and miss partition 3 entirely.
   @Test(priority = 1, dependsOnMethods = "testCountInvariantAfterInitialIngestion")
   public void testCountInvariantAfterForceCommit()
       throws Exception {
@@ -237,13 +226,11 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
     assertCountInvariant();
   }
 
-  /**
-   * Pause consumption on all subset tables, push a second batch of records, then resume.
-   *
-   * <p>While consumption is paused the control table keeps ingesting, so the logical table will
-   * temporarily fall behind. After resumption it must catch back up so that the invariant is
-   * restored.
-   */
+  /// Pause consumption on all subset tables, push a second batch of records, then resume.
+  ///
+  /// While consumption is paused the control table keeps ingesting, so the logical table will
+  /// temporarily fall behind. After resumption it must catch back up so that the invariant is
+  /// restored.
   @Test(priority = 2, dependsOnMethods = "testCountInvariantAfterForceCommit")
   public void testCountInvariantAfterPauseResume()
       throws Exception {
@@ -276,9 +263,7 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
     waitForCountInvariant(VERIFICATION_TIMEOUT_MS);
   }
 
-  /**
-   * Restart all servers and verify all tables recover and resume from their last committed offset.
-   */
+  /// Restart all servers and verify all tables recover and resume from their last committed offset.
   @Test(priority = 3, dependsOnMethods = "testCountInvariantAfterPauseResume")
   public void testCountInvariantAfterServerRestart()
       throws Exception {
@@ -299,13 +284,11 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
     assertCountInvariant();
   }
 
-  /**
-   * Push a third batch after server restart to confirm ongoing ingestion works correctly.
-   *
-   * <p>This catches regressions where partition state is re-initialised incorrectly after restart
-   * (e.g., resetting offsets to 0 based on a sequential 0..N-1 scan instead of the configured
-   * partition IDs).
-   */
+  /// Push a third batch after server restart to confirm ongoing ingestion works correctly.
+  ///
+  /// This catches regressions where partition state is re-initialised incorrectly after restart
+  /// (e.g., resetting offsets to 0 based on a sequential 0..N-1 scan instead of the configured
+  /// partition IDs).
   @Test(priority = 4, dependsOnMethods = "testCountInvariantAfterServerRestart")
   public void testCountInvariantAfterIngestPostRestart()
       throws Exception {
@@ -320,12 +303,10 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
   // Table-config builders
   // ---------------------------------------------------------------------------
 
-  /**
-   * Builds a realtime {@link TableConfig} for the given table name.
-   *
-   * @param tableName the raw (un-typed) table name
-   * @param partitionIds partition IDs to assign, or {@code null} to consume all partitions
-   */
+  /// Builds a realtime [TableConfig] for the given table name.
+  ///
+  /// @param tableName the raw (un-typed) table name
+  /// @param partitionIds partition IDs to assign, or `null` to consume all partitions
   private TableConfig buildRealtimeTableConfig(String tableName, int[] partitionIds) {
     Map<String, String> streamConfigMap = new HashMap<>(getStreamConfigMap());
 
@@ -396,14 +377,12 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
   // Data push helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Pushes all records from the given avro files to the Kafka topic in strict round-robin order
-   * across all {@value NUM_KAFKA_PARTITIONS} partitions, starting the message key sequence at
-   * {@code keyOffset}.
-   *
-   * <p>Each call atomically updates {@link #_partitionRecordCounts} so that
-   * {@link #totalExpectedCount()} always reflects the total number of records in Kafka.
-   */
+  /// Pushes all records from the given avro files to the Kafka topic in strict round-robin order
+  /// across all {@value NUM_KAFKA_PARTITIONS} partitions, starting the message key sequence at
+  /// `keyOffset`.
+  ///
+  /// Each call atomically updates [#_partitionRecordCounts] so that
+  /// [#totalExpectedCount()] always reflects the total number of records in Kafka.
   private void pushAvroRoundRobin(List<File> avroFiles, long keyOffset)
       throws Exception {
     Properties producerProps = new Properties();
@@ -443,7 +422,7 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
   // Verification helpers
   // ---------------------------------------------------------------------------
 
-  /** Returns the total number of records pushed across all partitions. */
+  /// Returns the total number of records pushed across all partitions.
   private long totalExpectedCount() {
     long total = 0;
     for (long count : _partitionRecordCounts) {
@@ -452,10 +431,8 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
     return total;
   }
 
-  /**
-   * Returns the expected record count for subset table {@code subsetIndex} based on its
-   * partition assignment and the number of records pushed to each partition so far.
-   */
+  /// Returns the expected record count for subset table `subsetIndex` based on its
+  /// partition assignment and the number of records pushed to each partition so far.
   private long expectedSubsetCount(int subsetIndex) {
     long count = 0;
     for (int partition : SUBSET_PARTITION_ASSIGNMENTS[subsetIndex]) {
@@ -464,10 +441,8 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
     return count;
   }
 
-  /**
-   * Waits until the logical table and the control table both reflect all pushed data, and each
-   * subset table reflects exactly the records pushed to its assigned partitions.
-   */
+  /// Waits until the logical table and the control table both reflect all pushed data, and each
+  /// subset table reflects exactly the records pushed to its assigned partitions.
   private void waitForCountInvariant(long timeoutMs) {
     long expectedTotal = totalExpectedCount();
 
@@ -494,9 +469,7 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
     }
   }
 
-  /**
-   * Hard assertion (no waiting) that all count invariants currently hold.
-   */
+  /// Hard assertion (no waiting) that all count invariants currently hold.
   private void assertCountInvariant() {
     long expectedTotal = totalExpectedCount();
     long controlCount = getCurrentCountStarResult(CONTROL_TABLE);

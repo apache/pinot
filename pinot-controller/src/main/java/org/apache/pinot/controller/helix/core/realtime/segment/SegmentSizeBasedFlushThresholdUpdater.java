@@ -22,14 +22,12 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 
 
-/**
- * Updates the flush threshold rows of the new segment metadata, based on the segment size and number of rows of
- * previous segment
- * The formula used to compute new number of rows is:
- * targetNumRows = ideal_segment_size * (a * current_rows_to_size_ratio + b * previous_rows_to_size_ratio)
- * where a = 0.1, b = 0.9, prev ratio= ratio collected over all previous segment completions
- * This ensures that we take into account the history of the segment size and number rows
- */
+/// Updates the flush threshold rows of the new segment metadata, based on the segment size and number of rows of
+/// previous segment
+/// The formula used to compute new number of rows is:
+/// targetNumRows = ideal_segment_size \* (a \* current_rows_to_size_ratio + b \* previous_rows_to_size_ratio)
+/// where a = 0.1, b = 0.9, prev ratio= ratio collected over all previous segment completions
+/// This ensures that we take into account the history of the segment size and number rows
 public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpdater {
   private final SizeBasedSegmentFlushThresholdComputer _flushThresholdComputer;
 

@@ -25,9 +25,7 @@ import java.util.Map;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
 
-/**
- * Class to represent system resources (CPU, Memory, etc) for an instance.
- */
+/// Class to represent system resources (CPU, Memory, etc) for an instance.
 @SuppressWarnings("unused")
 public class SystemResourceInfo {
   private static final int MEGA_BYTES = 1024 * 1024;
@@ -40,9 +38,7 @@ public class SystemResourceInfo {
   private final long _totalMemoryMB;
   private final long _maxHeapSizeMB;
 
-  /**
-   * Constructor that initializes the values from reading system properties.
-   */
+  /// Constructor that initializes the values from reading system properties.
   public SystemResourceInfo() {
     Runtime runtime = Runtime.getRuntime();
     _numCores = runtime.availableProcessors();
@@ -59,10 +55,8 @@ public class SystemResourceInfo {
     _maxHeapSizeMB = ResourceUsageUtils.getMaxHeapSize() / MEGA_BYTES;
   }
 
-  /**
-   * Constructor of class from map.
-   * @param map Map containing values for member variables.
-   */
+  /// Constructor of class from map.
+  /// @param map Map containing values for member variables.
   public SystemResourceInfo(Map<String, String> map) {
     _numCores = Integer.parseInt(map.get(NUM_CORES_KEY));
     _totalMemoryMB = Long.parseLong(map.get(TOTAL_MEMORY_MB_KEY));
@@ -81,11 +75,9 @@ public class SystemResourceInfo {
     return _maxHeapSizeMB;
   }
 
-  /**
-   * Returns a map containing names of fields along with their String values.
-   *
-   * @return Map of field names to values
-   */
+  /// Returns a map containing names of fields along with their String values.
+  ///
+  /// @return Map of field names to values
   public Map<String, String> toMap() {
     Map<String, String> map = new HashMap<>();
     map.put(NUM_CORES_KEY, Integer.toString(_numCores));

@@ -22,9 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 
 
-/**
- * Represents a table view (ideal state or external view) with offline and realtime segment assignments.
- */
+/// Represents a table view (ideal state or external view) with offline and realtime segment assignments.
 public class TableView {
   @JsonProperty("OFFLINE")
   public Map<String, Map<String, String>> _offline;

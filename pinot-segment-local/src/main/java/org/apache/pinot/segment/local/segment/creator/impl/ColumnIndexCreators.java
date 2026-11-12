@@ -31,10 +31,8 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Holds all the index creators and metadata for a single column during segment creation.
- * This is used by ColumnarSegmentCreator to avoid hashmap lookups when processing columns.
- */
+/// Holds all the index creators and metadata for a single column during segment creation.
+/// This is used by ColumnarSegmentCreator to avoid hashmap lookups when processing columns.
 public class ColumnIndexCreators implements Closeable {
   private final String _columnName;
   private final FieldSpec _fieldSpec;

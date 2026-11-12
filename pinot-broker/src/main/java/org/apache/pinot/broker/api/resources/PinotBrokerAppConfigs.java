@@ -40,10 +40,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Resource to get the app configs {@link PinotAppConfigs} for
- * the broker.
- */
+/// Resource to get the app configs [PinotAppConfigs] for
+/// the broker.
 @Api(tags = "AppConfig", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,

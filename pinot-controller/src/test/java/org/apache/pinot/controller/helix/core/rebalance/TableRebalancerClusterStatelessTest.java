@@ -34,6 +34,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
@@ -41,6 +42,7 @@ import org.apache.pinot.common.restlet.resources.RebalanceResult;
 import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
@@ -69,6 +71,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.testng.Assert.*;
 
@@ -277,31 +280,18 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
       Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
       assertNotNull(preCheckResult);
-      assertEquals(preCheckResult.size(), 6);
-      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
+      assertEquals(preCheckResult.size(), 4);
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
-      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
+      assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS));
       assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO));
-      // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
-      // manual check is needed
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
-          RebalancePreCheckerResult.PreCheckStatus.ERROR);
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
-          "Could not determine needReload status, run needReload API manually");
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
           "Instance assignment not allowed, no need for minimizeDataMovement");
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
-          .getMessage()
-          .startsWith("Within threshold"));
-      assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
-          RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
           .getMessage()
           .startsWith("Within threshold"));
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
@@ -911,6 +901,12 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (Map.Entry<String, Map<String, String>> entry : oldSegmentAssignment.entrySet()) {
       assertEquals(entry.getValue().size(), numReplicas);
     }
+    // With strict replica-group routing, the partition assignment holds every partition on the instances hosting its
+    // segments
+    InstancePartitions consumingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+            InstancePartitionsUtils.getInstancePartitionsName(REALTIME_TABLE_NAME, InstancePartitionsType.CONSUMING));
+    verifyPartitionAssignment(numPartitions, consumingInstancePartitions, oldSegmentAssignment);
 
     // Verify that segments are distributed equally across servers
     Map<String, Integer> numSegmentsPerServer = getNumSegmentsPerServer(oldSegmentAssignment);
@@ -967,6 +963,12 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // which partitions are assigned to instances (see InstanceReplicaGroupPartitionSelector)
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getTotalSegmentsToBeMoved(), 130);
 
+    // Drop the partition assignment, as for a table created before it was introduced: the rebalance must populate it
+    HelixHelper.updateIdealState(_helixManager, REALTIME_TABLE_NAME, idealState -> {
+      PartitionAssignmentUtils.setPartitionAssignment(idealState, Map.of());
+      return idealState;
+    });
+
     // Rebalance with reassignInstances and minimizeDataMovement enabled
     rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
     rebalanceConfig.setDryRun(false);
@@ -977,6 +979,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     instancePartitions = instanceAssignment.get(InstancePartitionsType.CONSUMING);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
+    verifyPartitionAssignment(numPartitions, instancePartitions, rebalanceResult.getSegmentAssignment());
 
     // Get number of segments moved
     int numSegmentsMoved = getNumSegmentsMoved(oldSegmentAssignment, rebalanceResult.getSegmentAssignment());
@@ -1016,11 +1019,38 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         }
       }
     }
+    verifyPartitionAssignment(newNumPartitions, instancePartitions, rebalanceResult.getSegmentAssignment());
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 
     for (int i = 0; i < numServers + numServersToAdd; i++) {
       stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  /// Verifies that the partition assignment of the realtime table holds every partition on the first instance of its
+  /// instance partition in each replica-group, and that every segment with ONLINE or CONSUMING replicas is on the
+  /// instances of a partition.
+  private void verifyPartitionAssignment(int numPartitions, InstancePartitions instancePartitions,
+      Map<String, Map<String, String>> segmentAssignment) {
+    Map<Integer, List<String>> partitionAssignment =
+        PartitionAssignmentUtils.getPartitionAssignment(_helixResourceManager.getTableIdealState(REALTIME_TABLE_NAME));
+    assertEquals(partitionAssignment.size(), numPartitions);
+    Set<List<String>> partitionInstances = new HashSet<>();
+    for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
+      List<String> expectedInstances = new ArrayList<>(instancePartitions.getNumReplicaGroups());
+      for (int replicaGroupId = 0; replicaGroupId < instancePartitions.getNumReplicaGroups(); replicaGroupId++) {
+        expectedInstances.add(instancePartitions.getInstances(partitionId, replicaGroupId).get(0));
+      }
+      List<String> instances = partitionAssignment.get(partitionId);
+      assertEquals(instances, PartitionAssignmentUtils.toInstanceList(expectedInstances));
+      partitionInstances.add(instances);
+    }
+    for (Map<String, String> instanceStateMap : segmentAssignment.values()) {
+      if (instanceStateMap.containsValue(ONLINE) || instanceStateMap.containsValue(CONSUMING)) {
+        assertTrue(partitionInstances.contains(PartitionAssignmentUtils.toInstanceList(instanceStateMap.keySet())),
+            "Segment on instances: " + instanceStateMap.keySet() + " is not on the instances of a partition");
+      }
     }
   }
 
@@ -1172,16 +1202,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
-        .getMessage()
-        .startsWith("Within threshold"));
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
         .getMessage()
         .startsWith("Within threshold"));
 
@@ -1199,11 +1223,24 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.ERROR);
-    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
+    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION)
+        .getMessage()
+        .startsWith("UNSAFE. Servers with unsafe disk utilization AFTER rebalance"));
+
+    // The servers are over the threshold no matter how the rebalance is run, so lowDiskMode does not help
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
+    rebalanceConfig.setLowDiskMode(true);
+
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    preCheckResult = rebalanceResult.getPreChecksResult();
+    assertNotNull(preCheckResult);
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.ERROR);
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
@@ -1316,6 +1353,17 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
+
+    // trigger the warning about lowDiskMode being inert with downtime, which replaces the IdealState in one go
+    rebalanceConfig.setLowDiskMode(true);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "lowDiskMode has no effect when downtime is enabled, disable downtime for segments to be deleted before the "
+            + "new ones are added.");
+    rebalanceConfig.setLowDiskMode(false);
 
     // trigger peer-download enabled table rebalance warning
     newTableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
@@ -2424,14 +2472,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     tgt3.put("server2", "ONLINE");
     targetAssignment.put("segment3", tgt3);
 
-    // Segment 4: one instance is ONLINE, should not be considered
+    // Segment 4: OFFLINE (no CONSUMING replica), should not be considered
     Map<String, String> cur4 = new HashMap<>();
-    cur4.put("server1", "ONLINE");
-    cur4.put("server2", "CONSUMING");
+    cur4.put("server1", "OFFLINE");
+    cur4.put("server2", "OFFLINE");
     currentAssignment.put("segment4", cur4);
     Map<String, String> tgt4 = new HashMap<>();
-    tgt4.put("server1", "ONLINE");
-    tgt4.put("server2", "CONSUMING");
+    tgt4.put("server3", "OFFLINE");
+    tgt4.put("server4", "OFFLINE");
     targetAssignment.put("segment4", tgt4);
 
     // Segment 5: no ONLINE instance, but at least one in CONSUMING, should be considered moving

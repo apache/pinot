@@ -187,7 +187,8 @@ public final class ColumnCompressionStatsInfo {
       return _encoding;
     }
 
-    /// Returns the raw forward-index chunk-compression type, or null for dictionary encoding.
+    /// Returns the raw forward-index chunk-compression type, or null for dictionary encoding and raw codec-pipeline
+    /// formats that cannot be represented by one legacy [ChunkCompressionType].
     @Nullable
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public ChunkCompressionType getChunkCompressionType() {

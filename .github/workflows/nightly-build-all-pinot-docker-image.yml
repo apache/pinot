@@ -32,7 +32,7 @@ jobs:
       commit-id: ${{ steps.generate-build-info.outputs.commit-id }}
       tags: ${{ steps.generate-build-info.outputs.tags }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Generate Build Info
         id: generate-build-info
         env:
@@ -52,11 +52,11 @@ jobs:
     needs: [generate-build-info]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Compile Pinot and push build image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
@@ -82,11 +82,11 @@ jobs:
     needs: [generate-build-info, compile-pinot]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Package and push the Docker image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
@@ -109,11 +109,11 @@ jobs:
     needs: [generate-build-info, package-pinot-docker-image]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Create Multi-Arch Manifest
         env:
           TAGS: "${{ needs.generate-build-info.outputs.tags }}"

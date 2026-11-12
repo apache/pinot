@@ -29,9 +29,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for {@link ColumnIndexContainer.FromMap} vector-index config propagation.
- */
+/// Tests for [ColumnIndexContainer.FromMap] vector-index config propagation.
 public class ColumnIndexContainerTest {
 
   @Test

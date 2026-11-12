@@ -26,14 +26,14 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Data table is used to transfer data from server to broker.
- */
+/// Data table is used to transfer data from server to broker.
 public interface DataTable {
 
   void addException(int exceptionCode, String exceptionMsg);
@@ -48,6 +48,15 @@ public interface DataTable {
 
   byte[] toBytes()
       throws IOException;
+
+  /// Serializes the table into the same bytes as [#toBytes()], but possibly split into several buffers. An
+  /// implementation can return its sections without copying them, so a large table does not need one large array.
+  ///
+  /// The default implementation wraps [#toBytes()].
+  default DataBuffer toDataBuffer()
+      throws IOException {
+    return PinotByteBuffer.wrap(toBytes());
+  }
 
   Map<String, String> getMetadata();
 
@@ -86,6 +95,11 @@ public interface DataTable {
   @Nullable
   Map<String, Object> getMap(int rowId, int colId);
 
+  /// Returns the custom object at the given cell, or `null` for a null value.
+  ///
+  /// The buffer of the returned object can be a read-only view, for example on a table built in this process. Code
+  /// that reads it, such as `AggregationFunction.deserializeIntermediateResult` implementations and
+  /// `ObjectSerDeUtils` deserializers, must read it through the `ByteBuffer` API and must not call `array()` on it.
   @Nullable
   CustomObject getCustomObject(int rowId, int colId);
 
@@ -162,11 +176,22 @@ public interface DataTable {
     // inputs. How a downstream consumer reacts (skip, retry, accept with annotation) is the
     // consumer's policy.
     INCOMPLETE_MERGE(43, "incompleteMerge", MetadataValueType.STRING),
-    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(44, "liteModeLeafStageLimitReached", MetadataValueType.STRING);
+    LITE_MODE_LEAF_STAGE_LIMIT_REACHED(44, "liteModeLeafStageLimitReached", MetadataValueType.STRING),
+    // Number of remote accesses (local cache misses) made to read segment data from a remote storage tier, and the
+    // number of bytes they read.
+    NUM_REMOTE_ACCESSES(45, "numRemoteAccesses", MetadataValueType.LONG),
+    REMOTE_ACCESS_BYTES(46, "remoteAccessBytes", MetadataValueType.LONG),
+    // The subset of the remote accesses made directly, i.e. outside the buffers fetched for the query, and the number
+    // of bytes they read.
+    NUM_DIRECT_REMOTE_ACCESSES(47, "numDirectRemoteAccesses", MetadataValueType.LONG),
+    DIRECT_REMOTE_ACCESS_BYTES(48, "directRemoteAccessBytes", MetadataValueType.LONG),
+    // Set when an aggregation function that can answer exactly returned an approximate final result on the server,
+    // for example a SMART function that switched to a sketch.
+    APPROXIMATED_RESULT(49, "approximatedResult", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getId();
+    private static final int MAX_ID = APPROXIMATED_RESULT.getId();
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
@@ -181,9 +206,7 @@ public interface DataTable {
       _valueType = valueType;
     }
 
-    /**
-     * Returns the MetadataKey for the given id, or {@code null} if the id does not exist.
-     */
+    /// Returns the MetadataKey for the given id, or `null` if the id does not exist.
     @Nullable
     public static MetadataKey getById(int id) {
       if (id >= 0 && id < ID_TO_ENUM_KEY_MAP.length) {
@@ -192,9 +215,7 @@ public interface DataTable {
       return null;
     }
 
-    /**
-     * Returns the MetadataKey for the given name, or {@code null} if the name does not exist.
-     */
+    /// Returns the MetadataKey for the given name, or `null` if the name does not exist.
     @Nullable
     public static MetadataKey getByName(String name) {
       return NAME_TO_ENUM_KEY_MAP.get(name);

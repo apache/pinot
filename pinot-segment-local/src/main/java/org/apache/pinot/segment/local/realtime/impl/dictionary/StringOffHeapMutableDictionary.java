@@ -33,13 +33,13 @@ import org.apache.pinot.spi.utils.Utf8Utils;
 
 @SuppressWarnings("Duplicates")
 public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
-  private final MutableOffHeapByteArrayStore _byteStore;
+  protected final MutableOffHeapByteArrayStore _byteStore;
 
-  private volatile String _min = null;
-  private volatile String _max = null;
-  private volatile int _lengthOfShortestElement = Integer.MAX_VALUE;
-  private volatile int _lengthOfLongestElement = 0;
-  private volatile boolean _isAscii = true;
+  protected volatile String _min = null;
+  protected volatile String _max = null;
+  protected volatile int _lengthOfShortestElement = Integer.MAX_VALUE;
+  protected volatile int _lengthOfLongestElement = 0;
+  protected volatile boolean _isAscii = true;
 
   public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
       PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgStringLen) {

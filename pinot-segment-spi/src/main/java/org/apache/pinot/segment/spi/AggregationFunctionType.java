@@ -39,16 +39,14 @@ import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * NOTES:
- * - No underscore is allowed in the enum name.
- * - '$' is allowed in the name field but not in the enum name.
- *
- * This enum is used both in the v1 engine and multistage engine to define the allowed Pinot aggregation functions.
- * The v1 engine only relies on the 'name' field, whereas all the other fields are used in the multistage engine
- * to register the aggregation function with Calcite. This allows using a unified approach to aggregations across both
- * the v1 and multistage engines.
- */
+/// NOTES:
+/// - No underscore is allowed in the enum name.
+/// - '$' is allowed in the name field but not in the enum name.
+///
+/// This enum is used both in the v1 engine and multistage engine to define the allowed Pinot aggregation functions.
+/// The v1 engine only relies on the 'name' field, whereas all the other fields are used in the multistage engine
+/// to register the aggregation function with Calcite. This allows using a unified approach to aggregations across both
+/// the v1 and multistage engines.
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
@@ -65,19 +63,21 @@ public enum AggregationFunctionType {
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
-  ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),
-  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
-  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0,
-      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
+  MODE("mode", null, null, ReturnTypes.explicit(SqlTypeName.OTHER), new ModeFinalReturnTypeInference()),
+  ANYVALUE("anyValue", ReturnTypes.ARG0,
+      OperandTypes.or(OperandTypes.ANY, OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
+      SqlTypeName.OTHER),
+  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0, OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
+  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0, OperandTypes.or(
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY),
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), SqlTypeName.OTHER),
   MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
 
-  /**
-   * for all distinct count family functions:
-   * (1) distinct_count only supports single argument;
-   * (2) count(distinct ...) support multi-argument and will be converted into DISTINCT + COUNT
-   */
+  /// for all distinct count family functions:
+  /// (1) distinct_count only supports single argument;
+  /// (2) count(distinct ...) support multi-argument and will be converted into DISTINCT + COUNT
   DISTINCTCOUNT("distinctCount", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.INTEGER),
   DISTINCTCOUNTOFFHEAP("distinctCountOffHeap", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
@@ -94,9 +94,11 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTRAWHLL("distinctCountRawHLL", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
   DISTINCTCOUNTSMARTHLL("distinctCountSmartHLL", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   DISTINCTCOUNTSMARTHLLPLUS("distinctCountSmartHLLPlus", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   @Deprecated FASTHLL("fastHLL"),
   DISTINCTCOUNTHLLPLUS("distinctCountHLLPlus", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
@@ -107,16 +109,18 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTRAWULL("distinctCountRawULL", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
   DISTINCTCOUNTSMARTULL("distinctCountSmartULL", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", ReturnTypes.BIGINT, OperandTypes.ONE_OR_MORE, SqlTypeName.OTHER),
   DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", ReturnTypes.VARCHAR, OperandTypes.ONE_OR_MORE,
       SqlTypeName.OTHER),
-  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch", ReturnTypes.BIGINT, OperandTypes.BINARY, SqlTypeName.OTHER),
-  DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch", ReturnTypes.VARCHAR,
-      OperandTypes.BINARY, SqlTypeName.OTHER),
-  SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch", ReturnTypes.BIGINT, OperandTypes.BINARY,
+  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch", ReturnTypes.BIGINT, TupleSketchOperands.CHECKER,
       SqlTypeName.OTHER),
-  AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch", ReturnTypes.BIGINT, OperandTypes.BINARY,
+  DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch", ReturnTypes.VARCHAR,
+      TupleSketchOperands.CHECKER, SqlTypeName.OTHER),
+  SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch", ReturnTypes.BIGINT, TupleSketchOperands.CHECKER,
+      SqlTypeName.OTHER),
+  AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch", ReturnTypes.BIGINT, TupleSketchOperands.CHECKER,
       SqlTypeName.OTHER),
   DISTINCTCOUNTCPCSKETCH("distinctCountCPCSketch", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
@@ -132,9 +136,12 @@ public enum AggregationFunctionType {
   PERCENTILERAWTDIGEST("percentileRawTDigest", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
       SqlTypeName.OTHER),
+  // The final return type is redundant with the standard return type above, and is declared because
+  // PinotApproximateAggregateRewriteRule pins the rewritten call to PERCENTILE's type, which is ARG0. Without it a
+  // leaf that returns the final result is typed from that pinned type and truncates on a non-DOUBLE column.
   PERCENTILESMARTTDIGEST("percentileSmartTDigest", ReturnTypes.DOUBLE,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER), i -> i == 2),
-      SqlTypeName.OTHER),
+      SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   PERCENTILEKLL("percentileKLL", ReturnTypes.DOUBLE,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
       SqlTypeName.OTHER),
@@ -244,6 +251,15 @@ public enum AggregationFunctionType {
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
       SqlTypeName.OTHER),
   TIMESERIESAGGREGATE("timeSeriesAggregate", SqlTypeName.OTHER, SqlTypeName.OTHER);
+
+  /// Nested because an enum constant's arguments cannot reference a static field of its own enum.
+  private static final class TupleSketchOperands {
+    static final SqlOperandTypeChecker CHECKER = OperandTypes.or(
+        OperandTypes.family(SqlTypeFamily.BINARY),
+        OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.CHARACTER),
+        OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.INTEGER)
+    );
+  }
 
   private static final Set<String> NAMES = Arrays.stream(values())
       .flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toLowerCase()))
@@ -359,13 +375,19 @@ public enum AggregationFunctionType {
     return Strings.CS.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
   }
 
-  /**
-   * Returns the corresponding aggregation function type for the given function name.
-   * <p>NOTE: Underscores in the function name are ignored.
-   */
+  /// Returns the corresponding aggregation function type for the given function name.
+  ///
+  /// NOTE: Underscores in the function name are ignored.
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
     String normalizedFunctionName = getNormalizedAggregationFunctionName(functionName);
     if (normalizedFunctionName.regionMatches(false, 0, "PERCENTILE", 0, 10)) {
+      // A canonical name wins over the numeric-suffix spellings below. Without this, names that are canonical but
+      // are not one of those spellings, such as PERCENTILESMARTTDIGEST, would fall through and be rejected.
+      try {
+        return AggregationFunctionType.valueOf(normalizedFunctionName);
+      } catch (IllegalArgumentException ignored) {
+        // Not a canonical name, so try the numeric-suffix spellings.
+      }
       // This style of aggregation functions is not supported in the multistage engine
       String remainingFunctionName = normalizedFunctionName.substring(10).toUpperCase();
       if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
@@ -395,7 +417,7 @@ public enum AggregationFunctionType {
       } else if (remainingFunctionName.equals("KLLMV") || remainingFunctionName.matches("KLL\\d+MV")) {
         return PERCENTILEKLLMV;
       } else if (remainingFunctionName.equals("RAWKLLMV") || remainingFunctionName.matches("RAWKLL\\d+MV")) {
-        return PERCENTILEKLLMV;
+        return PERCENTILERAWKLLMV;
       } else {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
@@ -405,6 +427,16 @@ public enum AggregationFunctionType {
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
+    }
+  }
+
+  /// Returns DOUBLE, or the type of the data argument for the explicit data type form MODE(expr, reducer, dataType).
+  /// Only a leaf stage that returns final results uses it; the query's result type comes from Calcite's MODE (ARG0).
+  private static class ModeFinalReturnTypeInference implements SqlReturnTypeInference {
+    @Override
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+      return opBinding.getOperandCount() == 3 ? ReturnTypes.ARG0.inferReturnType(opBinding)
+          : opBinding.getTypeFactory().createSqlType(SqlTypeName.DOUBLE);
     }
   }
 
@@ -423,10 +455,8 @@ public enum AggregationFunctionType {
     }
   }
 
-  /**
-   * Returns ARRAY of the component type of the first operand when the first operand is an ARRAY.
-   * Falls back to ARRAY of the operand type if the component type is unavailable.
-   */
+  /// Returns ARRAY of the component type of the first operand when the first operand is an ARRAY.
+  /// Falls back to ARRAY of the operand type if the component type is unavailable.
   private static class ArrayOfComponentReturnTypeInference implements SqlReturnTypeInference {
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {

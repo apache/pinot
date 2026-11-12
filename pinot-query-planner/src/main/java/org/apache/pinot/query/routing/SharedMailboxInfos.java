@@ -22,10 +22,8 @@ import com.google.protobuf.ByteString;
 import java.util.List;
 
 
-/**
- * {@code SharedMailboxInfos} is the shared version of the {@link MailboxInfos} which can cache the proto bytes and
- * reduce overhead of serialization.
- */
+/// `SharedMailboxInfos` is the shared version of the [MailboxInfos] which can cache the proto bytes and
+/// reduce overhead of serialization.
 public class SharedMailboxInfos extends MailboxInfos {
   private ByteString _protoBytes;
 

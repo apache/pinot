@@ -21,13 +21,11 @@ package org.apache.pinot.spi.auth;
 import java.util.Map;
 
 
-/**
- * Pluggable auth provider interface to augment authentication information in requests issued by pinot.
- *
- * Comes with several default implementation, including noop, static tokens, and token loaded from external urls.
- * The purpose of AuthProvider is enabling dynamic reconfiguration of pinot's internal auth tokens, for example with
- * expiring JWTs and other token rotation mechanisms.
- */
+/// Pluggable auth provider interface to augment authentication information in requests issued by pinot.
+///
+/// Comes with several default implementation, including noop, static tokens, and token loaded from external urls.
+/// The purpose of AuthProvider is enabling dynamic reconfiguration of pinot's internal auth tokens, for example with
+/// expiring JWTs and other token rotation mechanisms.
 public interface AuthProvider {
   Map<String, Object> getRequestHeaders();
 

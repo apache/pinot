@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -34,8 +35,11 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
-public class MaxAggregationFunction extends NullableSingleInputAggregationFunction<Double, Double> {
+public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   protected static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
+  private static final String NON_NUMERIC_TYPE_MESSAGE_SUFFIX = ". MAX only supports numeric columns; use MAXSTRING "
+      + "for string columns, or set the query option 'autoRewriteAggregationType=true' to automatically rewrite "
+      + "MAX to MAXSTRING on string columns.";
 
   public MaxAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(verifySingleArgument(arguments, "MAX"), nullHandlingEnabled);
@@ -70,12 +74,23 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-
-    if (blockValSet.isSingleValue()) {
-      aggregateSV(blockValSet, length, aggregationResultHolder);
-    } else {
-      aggregateMV(blockValSet, length, aggregationResultHolder);
+    try {
+      if (blockValSet.isSingleValue()) {
+        aggregateSV(blockValSet, length, aggregationResultHolder);
+      } else {
+        aggregateMV(blockValSet, length, aggregationResultHolder);
+      }
+    } catch (NumberFormatException e) {
+      throw nonNumericValueException(blockValSet, e);
     }
+  }
+
+  /// Wraps a failure to convert a non-numeric (e.g. STRING) value to a `double` into a descriptive
+  /// [BadQueryRequestException]. Numeric strings still convert successfully and are not affected.
+  private static BadQueryRequestException nonNumericValueException(BlockValSet blockValSet, NumberFormatException e) {
+    return new BadQueryRequestException(
+        "Cannot compute max for non-numeric value in column of type: " + blockValSet.getValueType()
+            + NON_NUMERIC_TYPE_MESSAGE_SUFFIX + " Cause: " + e.getMessage(), e);
   }
 
   protected void aggregateSV(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
@@ -152,7 +167,8 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
         break;
       }
       default:
-        throw new BadQueryRequestException("Cannot compute max for non-numeric type: " + blockValSet.getValueType());
+        throw new BadQueryRequestException(
+            "Cannot compute max for non-numeric type: " + blockValSet.getValueType() + NON_NUMERIC_TYPE_MESSAGE_SUFFIX);
     }
   }
 
@@ -190,11 +206,14 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-
-    if (blockValSet.isSingleValue()) {
-      aggregateSVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
-    } else {
-      aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+    try {
+      if (blockValSet.isSingleValue()) {
+        aggregateSVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+      } else {
+        aggregateMVGroupBySV(blockValSet, length, groupKeyArray, groupByResultHolder);
+      }
+    } catch (NumberFormatException e) {
+      throw nonNumericValueException(blockValSet, e);
     }
   }
 
@@ -259,11 +278,14 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-
-    if (blockValSet.isSingleValue()) {
-      aggregateSVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
-    } else {
-      aggregateMVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+    try {
+      if (blockValSet.isSingleValue()) {
+        aggregateSVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+      } else {
+        aggregateMVGroupByMV(blockValSet, length, groupKeysArray, groupByResultHolder);
+      }
+    } catch (NumberFormatException e) {
+      throw nonNumericValueException(blockValSet, e);
     }
   }
 
@@ -333,6 +355,7 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     }
   }
 
+  @Nullable
   @Override
   public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     if (_nullHandlingEnabled) {
@@ -341,6 +364,7 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     return aggregationResultHolder.getDoubleResult();
   }
 
+  @Nullable
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     if (_nullHandlingEnabled) {
@@ -351,15 +375,6 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
 
   @Override
   public Double merge(Double intermediateMaxResult1, Double intermediateMaxResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateMaxResult1 == null) {
-        return intermediateMaxResult2;
-      }
-      if (intermediateMaxResult2 == null) {
-        return intermediateMaxResult1;
-      }
-    }
-
     if (intermediateMaxResult1 > intermediateMaxResult2) {
       return intermediateMaxResult1;
     }
@@ -376,8 +391,9 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
     return ColumnDataType.DOUBLE;
   }
 
+  @Nullable
   @Override
-  public Double extractFinalResult(Double intermediateResult) {
+  public Double extractFinalResult(@Nullable Double intermediateResult) {
     return intermediateResult;
   }
 

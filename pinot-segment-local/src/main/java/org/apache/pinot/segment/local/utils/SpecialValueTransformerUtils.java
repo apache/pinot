@@ -26,30 +26,21 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Utility class for special value transformation logic shared between
- * {@link org.apache.pinot.segment.local.recordtransformer.SpecialValueTransformer} and
- * {@link org.apache.pinot.segment.local.columntransformer.SpecialValueColumnTransformer}.
- *
- * <p>This transformer handles special values according to the following rules:
- * <ul>
- *   <li>For FLOAT and DOUBLE:
- *     <ul>
- *       <li>Negative zero (-0.0) should be converted to 0.0</li>
- *       <li>NaN should be converted to null</li>
- *     </ul>
- *   </li>
- *   <li>For BIG_DECIMAL:
- *     <ul>
- *       <li>Strip trailing zeros (unless allowTrailingZeros is set)</li>
- *     </ul>
- *   </li>
- * </ul>
- *
- * <p>This transformation is required to ensure that the value is equal to itself, and the ordering
- * of the values is consistent with equals. This is required for certain data structures (e.g., sorted map)
- * and algorithms (e.g., binary search) to work correctly.
- */
+/// Utility class for special value transformation logic shared between
+/// [org.apache.pinot.segment.local.recordtransformer.SpecialValueTransformer] and
+/// [org.apache.pinot.segment.local.columntransformer.SpecialValueColumnTransformer].
+///
+/// This transformer handles special values according to the following rules:
+///
+/// - For FLOAT and DOUBLE:
+///   - Negative zero (-0.0) should be converted to 0.0
+///   - NaN should be converted to null
+/// - For BIG_DECIMAL:
+///   - Strip trailing zeros (unless allowTrailingZeros is set)
+///
+/// This transformation is required to ensure that the value is equal to itself, and the ordering
+/// of the values is consistent with equals. This is required for certain data structures (e.g., sorted map)
+/// and algorithms (e.g., binary search) to work correctly.
 public class SpecialValueTransformerUtils {
 
   private static final int NEGATIVE_ZERO_FLOAT_BITS = Float.floatToRawIntBits(-0.0f);
@@ -58,32 +49,27 @@ public class SpecialValueTransformerUtils {
   private SpecialValueTransformerUtils() {
   }
 
-  /**
-   * Check if a column needs special value transformation based on its data type.
-   *
-   * @param fieldSpec The field specification for the column
-   * @return true if the column needs transformation
-   */
+  /// Check if a column needs special value transformation based on its data type.
+  ///
+  /// @param fieldSpec The field specification for the column
+  /// @return true if the column needs transformation
   public static boolean needsTransformation(FieldSpec fieldSpec) {
     DataType dataType = fieldSpec.getDataType();
     return dataType == DataType.FLOAT || dataType == DataType.DOUBLE
         || (dataType == DataType.BIG_DECIMAL && !fieldSpec.isAllowTrailingZeros());
   }
 
-  /**
-   * Transform a single value to handle special float/double/BigDecimal values.
-   * <ul>
-   *   <li>Float/Double NaN → null</li>
-   *   <li>Float/Double -0.0 → 0.0</li>
-   *   <li>BigDecimal → strip trailing zeros</li>
-   * </ul>
-   *
-   * <p>Note: Only call this for columns that need transformation. For BigDecimal, only call
-   * if the column does not allow trailing zeros.
-   *
-   * @param value The value to transform
-   * @return Transformed value, or null for NaN values
-   */
+  /// Transform a single value to handle special float/double/BigDecimal values.
+  ///
+  /// - Float/Double NaN → null
+  /// - Float/Double -0.0 → 0.0
+  /// - BigDecimal → strip trailing zeros
+  ///
+  /// Note: Only call this for columns that need transformation. For BigDecimal, only call
+  /// if the column does not allow trailing zeros.
+  ///
+  /// @param value The value to transform
+  /// @return Transformed value, or null for NaN values
   @Nullable
   public static Object transformValue(@Nullable Object value) {
     if (value instanceof Float) {
@@ -112,17 +98,15 @@ public class SpecialValueTransformerUtils {
     return value;
   }
 
-  /**
-   * Transform an array of values (for multi-value columns).
-   * Returns a new array if any values were transformed, otherwise returns the original array.
-   * Null values from NaN transformation are filtered out.
-   *
-   * <p>Note: Only call this for columns that need transformation. For BigDecimal, only call
-   * if the column does not allow trailing zeros.
-   *
-   * @param values The array of values to transform
-   * @return Transformed array, or null if all values became null
-   */
+  /// Transform an array of values (for multi-value columns).
+  /// Returns a new array if any values were transformed, otherwise returns the original array.
+  /// Null values from NaN transformation are filtered out.
+  ///
+  /// Note: Only call this for columns that need transformation. For BigDecimal, only call
+  /// if the column does not allow trailing zeros.
+  ///
+  /// @param values The array of values to transform
+  /// @return Transformed array, or null if all values became null
   @Nullable
   public static Object[] transformValues(@Nullable Object[] values) {
     if (values == null || values.length == 0) {

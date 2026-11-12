@@ -66,14 +66,12 @@ public class TenantRebalancer {
     // Whether the rebalance should be done with downtime or minAvailableReplicas=0.
     private final boolean _withDowntime;
 
-    /**
-     * Create a context to run a table rebalance job with in a tenant rebalance operation.
-     *
-     * @param tableName The name of the table to rebalance.
-     * @param jobId The job ID for the rebalance operation.
-     * @param withDowntime Whether the rebalance should be done with downtime or minAvailableReplicas=0.
-     * @return The result of the rebalance operation.
-     */
+    /// Create a context to run a table rebalance job with in a tenant rebalance operation.
+    ///
+    /// @param tableName The name of the table to rebalance.
+    /// @param jobId The job ID for the rebalance operation.
+    /// @param withDowntime Whether the rebalance should be done with downtime or minAvailableReplicas=0.
+    /// @return The result of the rebalance operation.
     @JsonCreator
     public TenantTableRebalanceJobContext(@JsonProperty("tableName") String tableName,
         @JsonProperty("jobId") String jobId, @JsonProperty("withDowntime") boolean withDowntime) {
@@ -185,13 +183,11 @@ public class TenantRebalancer {
     return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResults, config.isVerboseResult());
   }
 
-  /**
-   * Spins up threads to rebalance the tenant with the given context and observer. The rebalance operation is performed
-   * in parallel for the tables in the parallel queue, then, sequentially for the tables in the sequential queue. The
-   * observer should be initiated with the tenantRebalanceContext in order to track the progress properly.
-   *
-   * @param observer The observer to notify about the rebalance progress and results.
-   */
+  /// Spins up threads to rebalance the tenant with the given context and observer. The rebalance operation is performed
+  /// in parallel for the tables in the parallel queue, then, sequentially for the tables in the sequential queue. The
+  /// observer should be initiated with the tenantRebalanceContext in order to track the progress properly.
+  ///
+  /// @param observer The observer to notify about the rebalance progress and results.
   public void rebalanceWithObserver(ZkBasedTenantRebalanceObserver observer, TenantRebalanceConfig config) {
     observer.onStart();
 
@@ -221,16 +217,14 @@ public class TenantRebalancer {
     }
   }
 
-  /**
-   * Consumes tables from the given queue from the DefaultTenantRebalanceContext that is being monitored by the
-   * observer and rebalances them using the provided config.
-   * The ongoing jobs are tracked in the ongoingJobs queue, which is also from the monitored
-   * DefaultTenantRebalanceContext.
-   *
-   * @param config The rebalance configuration to use for the rebalancing.
-   * @param observer The observer to notify about the rebalance progress and results, should be initiated with the
-   *                 DefaultTenantRebalanceContext that contains `queue` and `ongoingJobs`.
-   */
+  /// Consumes tables from the given queue from the DefaultTenantRebalanceContext that is being monitored by the
+  /// observer and rebalances them using the provided config.
+  /// The ongoing jobs are tracked in the ongoingJobs queue, which is also from the monitored
+  /// DefaultTenantRebalanceContext.
+  ///
+  /// @param config The rebalance configuration to use for the rebalancing.
+  /// @param observer The observer to notify about the rebalance progress and results, should be initiated with the
+  ///                 DefaultTenantRebalanceContext that contains `queue` and `ongoingJobs`.
   private void doConsumeTablesFromQueueAndRebalance(RebalanceConfig config,
       ZkBasedTenantRebalanceObserver observer, boolean isParallel) {
     while (true) {

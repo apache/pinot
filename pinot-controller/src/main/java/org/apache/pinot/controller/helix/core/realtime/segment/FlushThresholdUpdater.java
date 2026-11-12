@@ -22,22 +22,16 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 
 
-/**
- * Interface for the flush threshold updating strategies.
- */
+/// Interface for the flush threshold updating strategies.
 public interface FlushThresholdUpdater {
 
-  /**
-   * Invoked when a segment is committed.
-   */
+  /// Invoked when a segment is committed.
   default void onSegmentCommit(StreamConfig streamConfig, CommittingSegmentDescriptor committingSegmentDescriptor,
       SegmentZKMetadata committingSegmentZKMetadata) {
     // Do nothing by default
   }
 
-  /**
-   * Updates the flush threshold for the new consuming segment.
-   */
+  /// Updates the flush threshold for the new consuming segment.
   void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
       int maxNumPartitionsPerInstance);
 }

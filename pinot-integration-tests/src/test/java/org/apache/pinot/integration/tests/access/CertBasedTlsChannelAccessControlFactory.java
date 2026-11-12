@@ -31,6 +31,8 @@ import java.util.Set;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +73,12 @@ public class CertBasedTlsChannelAccessControlFactory implements AccessControlFac
     @Override
     public boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName) {
       return true;
+    }
+
+    @Override
+    public AuthorizationResult authorizeAdminAccess(RequesterIdentity requesterIdentity) {
+      // The integration-test admin listener requires a trusted client certificate before Jersey handles the request.
+      return BasicAuthorizationResultImpl.success();
     }
   }
 }

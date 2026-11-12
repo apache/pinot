@@ -135,7 +135,8 @@ public class FastFilteredCountTest extends BaseQueriesTest {
   // overridden in composite index test
   protected TableConfig getTableConfig() {
     List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null));
+        new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT), null,
+            null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)
@@ -184,6 +185,9 @@ public class FastFilteredCountTest extends BaseQueriesTest {
         {"select count(*) from " + RAW_TABLE_NAME
             + " where " + SORTED_COLUMN + " in " + allBuckets
             + " and " + CLASSIFICATION_COLUMN + " in " + allBuckets, BUCKET_SIZE},
+        {"select count(*) from " + RAW_TABLE_NAME
+            + " where " + SORTED_COLUMN + " in " + twoBuckets
+            + " and " + CLASSIFICATION_COLUMN + " in " + twoBuckets, 2},
         {"select count(*) from " + RAW_TABLE_NAME
             + " where " + CLASSIFICATION_COLUMN + " <> 1", bucketCountComplement},
         {"select count(*) from " + RAW_TABLE_NAME

@@ -21,53 +21,41 @@ package org.apache.pinot.query.runtime.operator.utils;
 import javax.annotation.Nullable;
 
 
-/**
- * An interface that represents an abstract asynchronous stream of elements that can be consumed.
- *
- * These streams are designed to be consumed by a single thread and do not support null elements.
- *
- * @param <E> The type of the elements, usually a {@link org.apache.pinot.query.runtime.blocks.MseBlock}
- */
+/// An interface that represents an abstract asynchronous stream of elements that can be consumed.
+///
+/// These streams are designed to be consumed by a single thread and do not support null elements.
+///
+/// @param <E> The type of the elements, usually a [org.apache.pinot.query.runtime.blocks.MseBlock]
 public interface AsyncStream<E> {
-  /**
-   * The id of the stream. Mostly used for logging.
-   *
-   * Implementations of this method must be thread safe.
-   */
+  /// The id of the stream. Mostly used for logging.
+  ///
+  /// Implementations of this method must be thread safe.
   Object getId();
 
-  /**
-   * Reads the next element, if there is any to read. Otherwise it returns null.
-   *
-   * Calling this method before setting a {@link OnNewData callback} with {@link #addOnNewDataListener(OnNewData)} is
-   * illegal as it may imply losing information.
-   *
-   * Only the consumer thread can call this method.
-   *
-   * @return the next element to consume, which cannot be null, or null if there is no element ready yet.
-   */
+  /// Reads the next element, if there is any to read. Otherwise it returns null.
+  ///
+  /// Calling this method before setting a [`callback`]\[OnNewData\] with [#addOnNewDataListener(OnNewData)] is
+  /// illegal as it may imply losing information.
+  ///
+  /// Only the consumer thread can call this method.
+  ///
+  /// @return the next element to consume, which cannot be null, or null if there is no element ready yet.
   @Nullable
   E poll();
 
-  /**
-   * Registers a callback.
-   *
-   * Once set, the callback cannot be changed. In order to call {@link #poll()}, a callback has to be registered.
-   *
-   * Only the consumer thread can call this method.
-   */
+  /// Registers a callback.
+  ///
+  /// Once set, the callback cannot be changed. In order to call [#poll()], a callback has to be registered.
+  ///
+  /// Only the consumer thread can call this method.
   void addOnNewDataListener(OnNewData onNewData);
 
-  /**
-   * Cancels this stream.
-   *
-   * Only the consumer thread can call this method.
-   */
+  /// Cancels this stream.
+  ///
+  /// Only the consumer thread can call this method.
   void cancel();
 
-  /**
-   * Set this stream to early terminate state, asking for metadata block.
-   */
+  /// Set this stream to early terminate state, asking for metadata block.
   void earlyTerminate();
 
   interface OnNewData {

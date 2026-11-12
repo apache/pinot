@@ -19,10 +19,11 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
@@ -30,9 +31,14 @@ import org.apache.pinot.spi.utils.TimeUtils;
 public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
+  private String _retentionSize;
   private String _deletedSegmentsRetentionPeriod;
   private String _replacedSegmentsRetentionPeriod;
   private String _lineageEntryCleanupRetentionPeriod;
+  // Stored as null when DEFAULT so that it is only serialized when explicitly set to ENABLE or DISABLE.
+  @JsonProperty("hybridTableRetentionStrategy")
+  @Nullable
+  private Enablement _hybridTableRetentionStrategy;
   @Deprecated
   private String _segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
   @Deprecated
@@ -42,7 +48,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _replicasPerPartition;
   private String _timeColumnName;
   private TimeUnit _timeType;
-  @Deprecated  // Use SegmentAssignmentConfig instead
+  // Superseded by the instance assignment config and the segment assignment config, still accepted and honored
+  @Deprecated(since = "1.3.0", forRemoval = true)
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -91,6 +98,59 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _retentionTimeValue = retentionTimeValue;
   }
 
+  /// Returns the size retention limit, expressed as a positive size understood by
+  /// [DataSizeUtils#toBytes(String)], for example `"100G"`.
+  ///
+  /// The limit sums compressed archive bytes for active, live completed segments, counted once regardless of
+  /// replication. Live-segment lineage filtering excludes sources of COMPLETED entries and destinations of other
+  /// entries to avoid counting shadow copies. OFFLINE APPEND and REALTIME limits are enforced independently, including
+  /// hybrid tables. Each typed table expires its own oldest eligible data without consulting the OFFLINE routing
+  /// time boundary. REALTIME size retention can therefore expire data newer than that boundary; hybrid time
+  /// retention continues to use its existing boundary rules.
+  /// For hybrid tables, size the REALTIME cap to comfortably retain all data newer than the routing boundary.
+  /// Otherwise size retention can delete input before RealtimeToOffline migrates it, and queries for that time
+  /// range can return no rows from either typed table without an error.
+  ///
+  /// Segments are ordered ascending by the first nonnegative end time, creation time, or push time, in that priority,
+  /// then by segment name. Eviction removes only an old prefix before the first active segment listed as a source or
+  /// destination in any retained lineage entry. Every listed segment is protected until its lineage entry is removed,
+  /// regardless of entry state, age, or the lineage-exclusive deletion setting. Listed shadow copies remain stop
+  /// positions even when their bytes are excluded. Missing live metadata or unknown live completed-segment sizes cause
+  /// the pass to skip safely. Missing metadata or timestamps for an active lineage stop prevent eviction when over cap.
+  ///
+  /// With the default lineage manager, COMPLETED sources wait for [#getReplacedSegmentsRetentionPeriod()] (4h for
+  /// APPEND, 24h for REFRESH) before deletion. The entry is removed on a subsequent cleanup pass after sources leave
+  /// IdealState. The retention schedule (6h by default) also delays release of the boundary. Stale IN_PROGRESS entries
+  /// use [#getLineageEntryCleanupRetentionPeriod()] (1d by default); REVERTED entries are eligible immediately.
+  /// These are cleanup eligibility windows, not deadlines for meeting the size cap. Continuous merge or rollup
+  /// activity can keep a lineage boundary present and leave an over-cap table at `sizeRetentionBlocked=1` for hours
+  /// or longer.
+  ///
+  /// The newest OFFLINE segment, highest-sequence DONE LLC segment per REALTIME partition group, and undated segments
+  /// are preserved. Consuming segments are neither counted nor removed. These protections can leave the table above
+  /// its cap.
+  ///
+  /// Size retention rechecks the complete lineage entry snapshot under the local updater lock before deletion,
+  /// regardless of the lineage-exclusive deletion setting. A changed snapshot aborts the batch for retry next cycle.
+  /// This deliberately includes timestamp-only changes and entries wholly newer than the boundary, even when the
+  /// selected prefix is unaffected.
+  /// The check and deletion are not a global transaction across controllers.
+  ///
+  /// This is an asynchronous, best-effort retention policy, not a limit on decompressed server disk usage,
+  /// memory usage, or ingestion. When time retention is also configured, a segment can be deleted by either criterion.
+  /// The table-scoped `sizeRetentionBlocked` controller gauge is 1 after an unsafe, failed, or still-over-cap pass,
+  /// 0 after a successful pass, and absent when the policy is disabled or unsupported.
+  /// A null value disables size retention.
+  public String getRetentionSize() {
+    return _retentionSize;
+  }
+
+  /// Sets the compressed segment archive size retention limit described by [#getRetentionSize()].
+  /// Set to null to disable size retention.
+  public void setRetentionSize(String retentionSize) {
+    _retentionSize = retentionSize;
+  }
+
   public String getDeletedSegmentsRetentionPeriod() {
     return _deletedSegmentsRetentionPeriod;
   }
@@ -99,18 +159,16 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
   }
 
-  /**
-   * Returns the retention period for segments replaced by a REFRESH ingestion job. Only applies to tables with
-   * REFRESH ingestion type; for APPEND tables this setting is ignored and replaced segments are deleted immediately.
-   *
-   * <p>When a lineage entry transitions to COMPLETED state, source segments are preserved for this duration before
-   * being scheduled for deletion, providing a rollback window. Consumers of this config (e.g. the lineage manager)
-   * treat a null or unparseable value as a 1 day default.
-   *
-   * <p>Accepts a human-readable period string (e.g. {@code "7d"}, {@code "12h"}) as understood by
-   * {@code TimeUtils.convertPeriodToMillis}. Setting this value too low (e.g. {@code "0d"}) eliminates the rollback
-   * window; source segments will be deleted on the next retention pass after the lineage is COMPLETED.
-   */
+  /// Returns the retention period for source segments replaced by a COMPLETED lineage entry. Applies to all ingestion
+  /// types, including APPEND and REFRESH.
+  ///
+  /// When a lineage entry transitions to COMPLETED state, source segments are preserved for this duration before
+  /// being scheduled for deletion. The default lineage manager uses 4 hours for APPEND and other ingestion types,
+  /// and 24 hours for REFRESH, when the value is unset, empty, or unparseable.
+  ///
+  /// Accepts a human-readable period string (e.g. `"7d"`, `"12h"`) as understood by
+  /// `TimeUtils.convertPeriodToMillis`. Setting this value too low (e.g. `"0d"`) eliminates the rollback
+  /// window; source segments will be deleted on the next retention pass after the lineage is COMPLETED.
   public String getReplacedSegmentsRetentionPeriod() {
     return _replacedSegmentsRetentionPeriod;
   }
@@ -119,14 +177,13 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _replacedSegmentsRetentionPeriod = replacedSegmentsRetentionPeriod;
   }
 
-  /**
-   * Returns the retention period before stale IN_PROGRESS or REVERTED lineage entries and their destination segments
-   * are cleaned up. Consumers of this config (e.g. the lineage manager) treat a null or unparseable value as a
-   * 1 day default.
-   *
-   * <p>Accepts a human-readable period string (e.g. {@code "7d"}, {@code "12h"}) as understood by
-   * {@code TimeUtils.convertPeriodToMillis}.
-   */
+  /// Returns the retention period before stale IN_PROGRESS lineage entries and their destination segments become
+  /// eligible for cleanup. The default lineage manager uses 1 day when the value is unset, empty, or unparseable.
+  /// REVERTED entries are eligible immediately. This period does not apply to COMPLETED entries: those are removed
+  /// on a cleanup pass after their source segments leave IdealState.
+  ///
+  /// Accepts a human-readable period string (e.g. `"7d"`, `"12h"`) as understood by
+  /// `TimeUtils.convertPeriodToMillis`.
   public String getLineageEntryCleanupRetentionPeriod() {
     return _lineageEntryCleanupRetentionPeriod;
   }
@@ -135,10 +192,30 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _lineageEntryCleanupRetentionPeriod = lineageEntryCleanupRetentionPeriod;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
-  @Deprecated
+  /// Whether to use the hybrid table retention strategy as the time-based retention policy for this table. Only
+  /// applicable to realtime tables. DEFAULT falls back to the controller-level config
+  /// `controller.enable.hybrid.table.retention.strategy`.
+  ///
+  /// When enabled and an OFFLINE counterpart exists, realtime segments are purged once the OFFLINE time boundary moves
+  /// past them instead of by `retentionTimeValue`. Valid `retentionTimeUnit` and `retentionTimeValue` are still
+  /// required for time-based retention to run. When disabled, or when there is no OFFLINE counterpart, ordinary
+  /// realtime time-based retention applies. Size-based retention ([#getRetentionSize()]) runs independently and may
+  /// still delete realtime data newer than the OFFLINE time boundary.
+  // Ignored for serialization so that DEFAULT is omitted, see the field
+  @JsonIgnore
+  public Enablement getHybridTableRetentionStrategy() {
+    return _hybridTableRetentionStrategy == null ? Enablement.DEFAULT : _hybridTableRetentionStrategy;
+  }
+
+  @JsonProperty("hybridTableRetentionStrategy")
+  public void setHybridTableRetentionStrategy(@Nullable Enablement hybridTableRetentionStrategy) {
+    _hybridTableRetentionStrategy =
+        hybridTableRetentionStrategy == Enablement.DEFAULT ? null : hybridTableRetentionStrategy;
+  }
+
+  /// @deprecated Use `segmentIngestionFrequency` from
+  ///     [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getBatchIngestionConfig()]
+  @Deprecated(since = "0.8.0", forRemoval = true)
   public String getSegmentPushFrequency() {
     return _segmentPushFrequency;
   }
@@ -148,10 +225,9 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _segmentPushFrequency = segmentPushFrequency;
   }
 
-  /**
-   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
-   */
-  @Deprecated
+  /// @deprecated Use `segmentIngestionType` from
+  ///     [org.apache.pinot.spi.config.table.ingestion.IngestionConfig#getBatchIngestionConfig()]
+  @Deprecated(since = "0.8.0", forRemoval = true)
   public String getSegmentPushType() {
     return _segmentPushType;
   }
@@ -161,9 +237,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _segmentPushType = segmentPushType;
   }
 
-  /**
-   * Try to Use {@link TableConfig#getReplication()}
-   */
+  /// Try to Use [TableConfig#getReplication()]
   public String getReplication() {
     return _replication;
   }
@@ -172,36 +246,32 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _replication = replication;
   }
 
-  /**
-   * Try to Use {@link TableConfig#getReplication()}
-   * @deprecated Use _replication instead
-   *
-   * Will be deleted in future version of Pinot
-   */
-  @Deprecated
+  /// Try to Use [TableConfig#getReplication()]
+  /// @deprecated Use \_replication instead
+  ///
+  /// Will be deleted in future version of Pinot
+  @Deprecated(since = "1.1.0", forRemoval = true)
   public String getReplicasPerPartition() {
     return _replicasPerPartition;
   }
 
-  /**
-   * Try to Use {@link SegmentsValidationAndRetentionConfig#setReplication(String)}
-   *
-   * Will be deleted in future version of Pinot
-   */
+  /// Try to Use [SegmentsValidationAndRetentionConfig#setReplication(String)]
+  ///
+  /// Will be deleted in future version of Pinot
   @Deprecated
   public void setReplicasPerPartition(String replicasPerPartition) {
     _replicasPerPartition = replicasPerPartition;
   }
 
-  /**
-   * @deprecated Use {@link InstanceAssignmentConfig} instead.
-   */
-  @Deprecated
+  /// @deprecated Configure the instance assignment in `instanceAssignmentConfigMap` with
+  /// [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] and the partition column in
+  /// `segmentAssignmentConfigMap` instead. This config is still accepted and honored.
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
     return _replicaGroupStrategyConfig;
   }
 
-  @Deprecated
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public void setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
   }
@@ -212,26 +282,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setCompletionConfig(CompletionConfig completionConfig) {
     _completionConfig = completionConfig;
-  }
-
-  /**
-   * Try to Use {@link TableConfig#getReplication()}
-   */
-  @Deprecated
-  @JsonIgnore
-  public int getReplicationNumber() {
-    return Integer.parseInt(_replication);
-  }
-
-  /**
-   * Try to Use {@link TableConfig#getReplication()}
-   *
-   * Will be deleted in future version of Pinot
-   */
-  @Deprecated
-  @JsonIgnore
-  public int getReplicasPerPartitionNumber() {
-    return Integer.parseInt(_replicasPerPartition);
   }
 
   public String getPeerSegmentDownloadScheme() {
@@ -250,10 +300,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _crypterClassName = crypterClassName;
   }
 
-  /**
-   * @deprecated Use {@link InstanceAssignmentConfig} instead
-   */
-  @Deprecated
+  /// @deprecated Use [org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig] instead
+  @Deprecated(since = "1.3.0", forRemoval = true)
   public boolean isMinimizeDataMovement() {
     return _minimizeDataMovement;
   }

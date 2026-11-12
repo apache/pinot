@@ -26,16 +26,14 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
-/**
- * PhysicalTableRouteProvider is used to calculate the routing table for a physical table.
- * It differs from ImplicitHybridTableRouteProvider in that it calls a different RoutingManager function to get the
- * routing table.
- * For Logical Tables, the broker request has the name of the logical table. It is inefficient to create a broker
- * request for every physical table. Therefore the name of the physical table is passed explicitly to the
- * RoutingManager.
- *
- * The relevant call is getRoutingTable(BrokerRequest, String, long)
- */
+/// PhysicalTableRouteProvider is used to calculate the routing table for a physical table.
+/// It differs from ImplicitHybridTableRouteProvider in that it calls a different RoutingManager function to get the
+/// routing table.
+/// For Logical Tables, the broker request has the name of the logical table. It is inefficient to create a broker
+/// request for every physical table. Therefore the name of the physical table is passed explicitly to the
+/// RoutingManager.
+///
+/// The relevant call is getRoutingTable(BrokerRequest, String, long)
 public class PhysicalTableRouteProvider extends ImplicitHybridTableRouteProvider {
   @Override
   public void calculateRoutes(TableRouteInfo tableRouteInfo, RoutingManager routingManager,

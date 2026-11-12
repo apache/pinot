@@ -25,13 +25,13 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>39</version>
+    <version>40</version>
     <relativePath />
   </parent>
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>1.6.0-SNAPSHOT</version>
+  <version>1.7.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -60,6 +60,7 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+    <module>pinot-java11-client-verifier</module>
     <module>pinot-query-planner-spi</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
@@ -139,9 +140,36 @@
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>
     <skip.unit.tests>false</skip.unit.tests>
+    <!--
+      Per-fork heap for unit tests. Defaults to 4g to preserve historical behavior. When
+      running multiple parallel forks (unit.test.fork.count > 1) CI lowers this so that
+      N forks * heap + the Maven JVM stay within the runner's memory.
+    -->
+    <unit.test.fork.heap>4g</unit.test.fork.heap>
     <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g</argLine>
+    <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap}</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
+    <!--
+      Number of parallel JVM forks used by surefire for unit tests. Defaults to 1 to
+      preserve the historical single-fork behavior for local/dev builds. CI overrides
+      this (e.g. -Dunit.test.fork.count=3) to run test classes in parallel forks and
+      shorten the unit-test phase. Must be a positive integer.
+    -->
+    <unit.test.fork.count>1</unit.test.fork.count>
+    <!--
+      Number of times surefire retries a failing unit test before failing the build. Defaults to
+      0 (no retry) so local/dev behavior is unchanged; CI raises it to absorb a few pre-existing
+      load-sensitive flaky tests exposed by parallel forks. A test passing only on retry is
+      reported as flaky, not silently passed.
+    -->
+    <unit.test.rerun.count>0</unit.test.rerun.count>
+    <!--
+      Suffix for the JaCoCo exec file name. Empty by default so coverage writes the
+      historical target/jacoco.exec (used by report / report-aggregate everywhere). The
+      unit-test script sets this to -${surefire.forkNumber} so parallel forks each write a
+      distinct jacoco-<n>.exec instead of appending to one shared file.
+    -->
+    <jacoco.exec.suffix></jacoco.exec.suffix>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -156,87 +184,93 @@
     <pinot.skip.remote.resources>false</pinot.skip.remote.resources>
 
     <arrow.version>19.0.0</arrow.version>
-    <avro.version>1.12.1</avro.version>
-    <bson.version>5.9.0</bson.version>
-    <parquet.version>1.17.1</parquet.version>
+    <avro.version>1.12.2</avro.version>
+    <bson.version>5.14.0</bson.version>
+    <parquet.version>1.18.2</parquet.version>
     <orc.version>1.9.9</orc.version>
-    <hive.version>2.8.1</hive.version>
+    <hive.version>4.2.1</hive.version>
     <helix.version>2.0.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.22.1</jackson.version>
-    <zookeeper.version>3.9.5</zookeeper.version>
-    <async-http-client.version>3.0.11</async-http-client.version>
+    <jackson.version>2.23.0</jackson.version>
+    <opentelemetry.version>1.68.0</opentelemetry.version>
+    <fory.version>1.7.7</fory.version>
+    <zookeeper.version>3.9.7</zookeeper.version>
+    <async-http-client.version>3.0.14</async-http-client.version>
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.32.8</swagger-ui.version>
+    <swagger-ui.version>5.34.1</swagger-ui.version>
     <hadoop.version>3.4.3</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
-    <jsonsmart.version>2.6.0</jsonsmart.version>
+    <jsonsmart.version>2.6.1</jsonsmart.version>
     <quartz.version>2.5.2</quartz.version>
     <calcite.version>1.42.0</calcite.version>
-    <joou.version>0.9.5</joou.version>
-    <immutables.version>2.12.2</immutables.version>
+    <joou.version>0.9.6</joou.version>
+    <immutables.version>2.12.3</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.30.0</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.31.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.39</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.8</snappy-java.version>
-    <zstd-jni.version>1.5.7-11</zstd-jni.version>
-    <lz4-java.version>1.11.1</lz4-java.version>
-    <libthrift.version>0.24.0</libthrift.version>
+    <dropwizard-metrics.version>4.2.40</dropwizard-metrics.version>
+    <snappy-java.version>1.1.10.12</snappy-java.version>
+    <zstd-jni.version>1.5.7-25</zstd-jni.version>
+    <lz4-java.version>1.14.0</lz4-java.version>
+    <libthrift.version>0.25.0</libthrift.version>
     <log4j.version>2.26.1</log4j.version>
-    <slf4j.version>2.0.18</slf4j.version>
-    <netty.version>4.1.136.Final</netty.version>
+    <slf4j.version>2.0.20</slf4j.version>
+    <netty.version>4.2.19.Final</netty.version>
+    <reactor-netty.version>1.3.8</reactor-netty.version>
+    <reactor-core.version>3.8.8</reactor-core.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
-    <h3.version>4.4.0</h3.version>
+    <h3.version>4.5.1</h3.version>
     <ipaddress.version>5.6.2</ipaddress.version>
     <openhft.chronicle-bom.version>2.27ea100</openhft.chronicle-bom.version>
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
-    <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.48.2</aws.sdk.version>
-    <azure.sdk.version>1.3.7</azure.sdk.version>
-    <azure.msal4j.version>1.25.0</azure.msal4j.version>
-    <joda-time.version>2.14.2</joda-time.version>
+    <stax2-api.version>4.3.2</stax2-api.version>
+    <aws.sdk.version>2.57.11</aws.sdk.version>
+    <azure.sdk.version>1.3.9</azure.sdk.version>
+    <azure.msal4j.version>1.26.0</azure.msal4j.version>
+    <joda-time.version>2.15.1</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <ayza.version>10.0.5</ayza.version>
+    <ayza.version>10.1.0</ayza.version>
     <jbcrypt.version>0.4</jbcrypt.version>
-    <scala-xml.version>2.4.0</scala-xml.version>
-    <plexus-classworlds.version>2.12.0</plexus-classworlds.version>
+    <scala-xml.version>2.5.0</scala-xml.version>
+    <plexus-classworlds.version>2.12.1</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
-    <checker-qual.version>4.2.1</checker-qual.version>
+    <jsr305.version>3.0.2</jsr305.version>
+    <jspecify.version>1.0.1</jspecify.version>
+    <checker-qual.version>4.4.0</checker-qual.version>
     <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
-    <roaring-bitmap.version>1.6.15</roaring-bitmap.version>
-    <prometheus.jmx-exporter.version>1.6.0</prometheus.jmx-exporter.version>
-    <prometheus.metrics.version>1.8.0</prometheus.metrics.version>
-    <fastutil.version>8.5.18</fastutil.version>
+    <roaring-bitmap.version>1.6.29</roaring-bitmap.version>
+    <prometheus.jmx-exporter.version>1.7.0</prometheus.jmx-exporter.version>
+    <prometheus.metrics.version>1.10.0</prometheus.metrics.version>
+    <fastutil.version>8.5.19</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
-    <snakeyaml.version>2.6</snakeyaml.version>
-    <hadoop-shaded-protobuf_3_25.version>1.5.0</hadoop-shaded-protobuf_3_25.version>
+    <snakeyaml.version>2.7</snakeyaml.version>
+    <hadoop-shaded-protobuf_3_25.version>1.6.0</hadoop-shaded-protobuf_3_25.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
     <datasketches-java.version>9.0.0</datasketches-java.version>
-    <t-digest.version>3.2</t-digest.version>
     <picocli.version>4.7.7</picocli.version>
     <tyrus-standalone-client.version>2.2.2</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
 
     <spark3.version>3.5.9</spark3.version>
-    <kafka3.version>3.9.2</kafka3.version>
-    <kafka4.version>4.2.0</kafka4.version>
-    <confluent.version>8.2.0</confluent.version>
-    <pulsar.version>4.0.12</pulsar.version>
+    <kafka4.version>4.4.0</kafka4.version>
+    <jose4j.version>0.9.7</jose4j.version>
+    <confluent.version>8.4.0</confluent.version>
+    <wire.version>7.1.2</wire.version>
+    <pulsar.version>5.0.1</pulsar.version>
     <flink.version>2.3.0</flink.version>
 
     <!-- Apache Commons Libraries -->
-    <commons-lang3.version>3.20.0</commons-lang3.version>
-    <commons-collections4.version>4.5.0</commons-collections4.version>
+    <commons-lang3.version>3.21.0</commons-lang3.version>
+    <commons-collections4.version>4.6.0</commons-collections4.version>
     <commons-text.version>1.15.0</commons-text.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
@@ -244,10 +278,10 @@
     <commons-configuration2.version>2.15.1</commons-configuration2.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
     <commons-io.version>2.22.0</commons-io.version>
-    <commons-codec.version>1.22.0</commons-codec.version>
+    <commons-codec.version>1.23.0</commons-codec.version>
     <commons-cli.version>1.11.0</commons-cli.version>
     <commons-net.version>3.13.0</commons-net.version>
-    <commons-validator.version>1.10.1</commons-validator.version>
+    <commons-validator.version>1.11.0</commons-validator.version>
 
     <!-- Java EE Libraries -->
     <!-- Include both newer jakarta ones and older javax ones, but not migrate to Jakarta EE yet -->
@@ -267,19 +301,20 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.6.2</httpclient5.version>
-    <httpcore5.version>5.4.3</httpcore5.version>
+    <httpclient5.version>5.6.5</httpclient5.version>
+    <httpcore5.version>5.4.4</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>4.35.1</protobuf.version>
-    <grpc.version>1.82.2</grpc.version>
-    <google.cloud.libraries.version>26.85.1</google.cloud.libraries.version>
-    <opentelemetry.gcp.resources.version>1.58.0-alpha</opentelemetry.gcp.resources.version>
+    <protobuf.version>4.36.2</protobuf.version>
+    <grpc.version>1.85.1</grpc.version>
+    <guava.version>33.8.0-jre</guava.version>
+    <google.cloud.libraries.version>26.93.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
-    <google.errorprone.version>2.50.0</google.errorprone.version>
+    <google.cloud.opentelemetry.version>0.36.0</google.cloud.opentelemetry.version>
+    <opentelemetry.gcp.resources.version>1.62.1-alpha</opentelemetry.gcp.resources.version>
+    <google.errorprone.version>2.52.0</google.errorprone.version>
     <google.j2objc.version>3.1</google.j2objc.version>
-    <google.jsr305.version>3.0.2</google.jsr305.version>
 
     <!-- Configuration for Scala -->
     <scala-2.12.version>2.12.20</scala-2.12.version>
@@ -288,53 +323,53 @@
     <scala.compat.version>2.13</scala.compat.version>
 
     <!-- For Dependency Verifier module -->
-    <enforcer-api.version>3.6.3</enforcer-api.version>
-    <maven.version>3.9.16</maven.version>
+    <enforcer-api.version>3.7.0</enforcer-api.version>
+    <maven.version>3.10.0</maven.version>
     <jdom2.version>2.0.6.1</jdom2.version>
-    <plexus-utils.version>4.0.3</plexus-utils.version>
-    <plexus-xml.version>3.0.2</plexus-xml.version>
+    <plexus-utils.version>4.1.0</plexus-utils.version>
+    <plexus-xml.version>3.1.0</plexus-xml.version>
 
     <!-- For maven-antrun-plugin -->
     <fmpp.version>0.9.16</fmpp.version>
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.2</kerby.version>
-    <jline.version>4.3.1</jline.version>
+    <jline.version>4.5.0</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
-    <jettison.version>1.5.6</jettison.version>
-    <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
-    <dnsjava.version>3.6.5</dnsjava.version>
+    <jettison.version>1.5.7</jettison.version>
+    <nimbus-jose-jwt.version>10.10</nimbus-jose-jwt.version>
+    <dnsjava.version>3.7.1</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
-    <woodstox.version>7.2.1</woodstox.version>
+    <woodstox.version>7.3.0</woodstox.version>
     <curator.version>5.9.0</curator.version>
-    <javassist.version>3.32.0-GA</javassist.version>
-    <bouncycastle.version>1.85</bouncycastle.version>
+    <javassist.version>3.33.0-GA</javassist.version>
+    <bouncycastle.version>1.86</bouncycastle.version>
     <aircompressor.version>2.0.3</aircompressor.version>
     <jna.version>5.19.1</jna.version>
-    <jnr-ffi.version>2.3.0</jnr-ffi.version>
-    <jnr-constants.version>0.11.0</jnr-constants.version>
-    <asm.version>9.10.1</asm.version>
+    <jnr-ffi.version>2.3.7</jnr-ffi.version>
+    <jnr-constants.version>0.11.4</jnr-constants.version>
+    <asm.version>9.11.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
-    <kotlin.stdlib.version>2.4.10</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.4.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
-    <okio.version>3.17.0</okio.version>
+    <okio.version>3.18.2</okio.version>
     <kryo.version>2.24.0</kryo.version>
-    <objenesis.version>3.5</objenesis.version>
+    <objenesis.version>3.6</objenesis.version>
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.6.0</ivy.version>
-    <c3p0.version>0.14.1</c3p0.version>
+    <c3p0.version>0.14.2</c3p0.version>
     <mchange-commons-java.version>0.6.1</mchange-commons-java.version>
-    <animal-sniffer-annotations.version>1.27</animal-sniffer-annotations.version>
+    <animal-sniffer-annotations.version>1.29</animal-sniffer-annotations.version>
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
-    <junit-jupiter-api.version>5.14.4</junit-jupiter-api.version>
-    <mockito-core.version>5.23.0</mockito-core.version>
+    <junit.version>6.1.3</junit.version>
+    <mockito-core.version>5.24.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.5</testcontainers.version>
-    <h2.version>2.4.240</h2.version>
-    <jnr-posix.version>3.2.1</jnr-posix.version>
+    <h2.version>2.5.252</h2.version>
+    <jnr-posix.version>3.2.8</jnr-posix.version>
     <scalatest.version>3.2.20</scalatest.version>
     <assertj.version>3.27.7</assertj.version>
 
@@ -557,7 +592,9 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
+        <!-- Inherits unit.test.fork.heap from the global properties (overridable via
+             -Dunit.test.fork.heap); adds the log4j2 config used under github-actions. -->
+        <argLine>-Xms${unit.test.fork.heap} -Xmx${unit.test.fork.heap} -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
     <profile>
@@ -578,6 +615,13 @@
                   <includes>
                     <include>org/apache/pinot/**/*</include>
                   </includes>
+                  <!-- Exec file suffix defaults to empty, keeping the historical
+                       target/jacoco.exec used by report / report-aggregate everywhere (incl.
+                       the integration lanes). The unit-test script sets jacoco.exec.suffix to
+                       -${surefire.forkNumber} so parallel forks (forkCount > 1) each write a
+                       distinct jacoco-<n>.exec instead of appending to one shared file; it
+                       then aggregates with a matching jacoco-*.exec glob. -->
+                  <destFile>${project.build.directory}/jacoco${jacoco.exec.suffix}.exec</destFile>
                 </configuration>
               </execution>
             </executions>
@@ -655,11 +699,23 @@
         <version>${arrow.version}</version>
       </dependency>
 
+      <!-- Nullness annotations -->
+      <dependency>
+        <groupId>com.google.code.findbugs</groupId>
+        <artifactId>jsr305</artifactId>
+        <version>${jsr305.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jspecify</groupId>
+        <artifactId>jspecify</artifactId>
+        <version>${jspecify.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
         <version>${checker-qual.version}</version>
       </dependency>
+
       <!-- Groovy 3.x publishes groovy-all as a POM aggregator that pulls in every sub-module.
            We exclude groovy-testng/groovy-test-junit5/groovy-test because their transitive TestNG and
            JUnit jars collide with Surefire's TestNG fork classpath and cause NoClassDefFoundError on
@@ -752,6 +808,23 @@
         <version>${netty.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+
+      <!-- Align Azure transports with the fixed Reactor Core release. -->
+      <dependency>
+        <groupId>io.projectreactor.netty</groupId>
+        <artifactId>reactor-netty-core</artifactId>
+        <version>${reactor-netty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.projectreactor.netty</groupId>
+        <artifactId>reactor-netty-http</artifactId>
+        <version>${reactor-netty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.projectreactor</groupId>
+        <artifactId>reactor-core</artifactId>
+        <version>${reactor-core.version}</version>
       </dependency>
 
       <dependency>
@@ -917,6 +990,17 @@
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- OpenTelemetry -->
+      <!-- opentelemetry-bom aligns the OpenTelemetry API and SDK, which Google libraries and Pulsar request at
+           different versions -->
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>${opentelemetry.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -1102,34 +1186,22 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <!-- libraries-bom should be imported after protobuf-bom and grpc-bom to honor their versions -->
+      <!-- guava-bom -->
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava-bom</artifactId>
+        <version>${guava.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- libraries-bom should be imported after protobuf-bom, grpc-bom, guava-bom and opentelemetry-bom to honor their
+           versions -->
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
         <version>${google.cloud.libraries.version}</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-      <!-- Explicit pins: libraries-bom transitively imports protobuf-bom:4.33.2, conflicting with our 4.34.0 -->
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java</artifactId>
-        <version>${protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java-util</artifactId>
-        <version>${protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-kotlin</artifactId>
-        <version>${protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.opentelemetry.contrib</groupId>
-        <artifactId>opentelemetry-gcp-resources</artifactId>
-        <version>${opentelemetry.gcp.resources.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.auto.service</groupId>
@@ -1142,6 +1214,17 @@
         <artifactId>re2j</artifactId>
         <version>${google.re2j.version}</version>
       </dependency>
+      <!-- Solve the dependency converge issue between google-cloud-storage and google-cloud-nio -->
+      <dependency>
+        <groupId>com.google.cloud.opentelemetry</groupId>
+        <artifactId>detector-resources-support</artifactId>
+        <version>${google.cloud.opentelemetry.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry.contrib</groupId>
+        <artifactId>opentelemetry-gcp-resources</artifactId>
+        <version>${opentelemetry.gcp.resources.version}</version>
+      </dependency>
       <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
         <groupId>com.google.errorprone</groupId>
@@ -1153,12 +1236,6 @@
         <groupId>com.google.j2objc</groupId>
         <artifactId>j2objc-annotations</artifactId>
         <version>${google.j2objc.version}</version>
-      </dependency>
-      <!-- Solve the dependency converge issue between google and flink libraries -->
-      <dependency>
-        <groupId>com.google.code.findbugs</groupId>
-        <artifactId>jsr305</artifactId>
-        <version>${google.jsr305.version}</version>
       </dependency>
 
       <!-- Hadoop -->
@@ -1387,14 +1464,14 @@
         <version>${dynatrace.hash4j.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.tdunning</groupId>
-        <artifactId>t-digest</artifactId>
-        <version>${t-digest.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.jayway.jsonpath</groupId>
         <artifactId>json-path</artifactId>
         <version>${jsonpath.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.fory</groupId>
+        <artifactId>fory-json</artifactId>
+        <version>${fory.version}</version>
       </dependency>
       <dependency>
         <groupId>net.minidev</groupId>
@@ -1480,12 +1557,6 @@
       <dependency>
         <groupId>io.swagger</groupId>
         <artifactId>swagger-jersey2-jaxrs</artifactId>
-        <version>${swagger.version}</version>
-      </dependency>
-      <!-- Also used by pulsar-common -->
-      <dependency>
-        <groupId>io.swagger</groupId>
-        <artifactId>swagger-annotations</artifactId>
         <version>${swagger.version}</version>
       </dependency>
       <dependency>
@@ -1623,30 +1694,34 @@
       <dependency>
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka-clients</artifactId>
-        <version>${kafka3.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.kafka</groupId>
-        <artifactId>kafka_${scala.compat.version}</artifactId>
-        <version>${kafka3.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.kafka</groupId>
-        <artifactId>kafka_${scala.compat.version}</artifactId>
-        <version>${kafka3.version}</version>
-        <classifier>test</classifier>
+        <version>${kafka4.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka-clients</artifactId>
-        <version>${kafka3.version}</version>
-        <classifier>test</classifier>
+        <version>${kafka4.version}</version>
+        <classifier>test-fixtures</classifier>
+      </dependency>
+      <dependency>
+        <groupId>org.bitbucket.b_c</groupId>
+        <artifactId>jose4j</artifactId>
+        <version>${jose4j.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.kafka</groupId>
-        <artifactId>kafka-server-common</artifactId>
-        <version>${kafka3.version}</version>
-        <classifier>test</classifier>
+        <artifactId>kafka_${scala.compat.version}</artifactId>
+        <version>${kafka4.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.kafka</groupId>
+        <artifactId>kafka-test-common-runtime</artifactId>
+        <version>${kafka4.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <dependency>
@@ -1668,6 +1743,17 @@
         <groupId>io.confluent</groupId>
         <artifactId>kafka-json-schema-serializer</artifactId>
         <version>${confluent.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.squareup.wire</groupId>
+        <artifactId>wire-schema-jvm</artifactId>
+        <version>${wire.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.wire</groupId>
+        <artifactId>wire-runtime-jvm</artifactId>
+        <version>${wire.version}</version>
       </dependency>
 
       <!-- pulsar bom -->
@@ -1792,7 +1878,7 @@
         <artifactId>dnsjava</artifactId>
         <version>${dnsjava.version}</version>
       </dependency>
-      <!-- Eclipse jetty dependencies in Hadoop/Spark/Pulsar -->
+      <!-- Eclipse jetty dependencies in Hadoop/Spark -->
       <dependency>
         <groupId>org.eclipse.jetty.websocket</groupId>
         <artifactId>websocket-client</artifactId>
@@ -1863,7 +1949,7 @@
         <artifactId>bcutil-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
       </dependency>
-      <!-- Used by ORC, Parquet and Pulsar -->
+      <!-- Used by ORC and Parquet -->
       <dependency>
         <groupId>io.airlift</groupId>
         <artifactId>aircompressor</artifactId>
@@ -1990,39 +2076,12 @@
         <version>${testng.version}</version>
         <scope>test</scope>
       </dependency>
-
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit-jupiter-api.version}</version>
-        <scope>test</scope>
-      </dependency>
-
-      <!-- mockito bom -->
-      <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-bom</artifactId>
-        <version>${mockito-core.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
         <version>${equalsverifier.version}</version>
         <scope>test</scope>
       </dependency>
-
-      <!-- testcontainers bom -->
-      <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>testcontainers-bom</artifactId>
-        <version>${testcontainers.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
@@ -2040,6 +2099,37 @@
         <artifactId>scalatest_${scala.compat.version}</artifactId>
         <version>${scalatest.version}</version>
         <scope>test</scope>
+      </dependency>
+
+      <!-- Tests are written with TestNG only (checkstyle rejects JUnit test APIs). JUnit is present as test
+           infrastructure: Surefire no longer ships a native TestNG provider and runs TestNG through the JUnit
+           Platform. -->
+      <!-- @Suite classes that group TestNG tests into one Surefire fork (shared @BeforeSuite cluster, class order,
+           TestNG groups) and OrderedTestNGSuite, which restores the declared class order. -->
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- mockito bom -->
+      <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-bom</artifactId>
+        <version>${mockito-core.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- testcontainers bom -->
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <!-- assertj bom -->
@@ -2061,7 +2151,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.46.1</version>
+          <version>3.0.0</version>
           <executions>
             <execution>
               <goals>
@@ -2128,7 +2218,7 @@
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.15</version>
+          <version>0.8.16</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -2167,13 +2257,20 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <configuration>
-            <forkCount>1</forkCount>
+            <!-- Overridable via -Dunit.test.fork.count (defaults to 1); see the property
+                 definition for details. -->
+            <forkCount>${unit.test.fork.count}</forkCount>
             <reuseForks>false</reuseForks>
+            <!-- Retries a failing test up to N times (default 0); see property definition. -->
+            <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
             <!-- 60 minutes -->
             <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
             <!-- Disable zookeeper force sync -->
             <systemPropertyVariables>
               <zookeeper.forceSync>no</zookeeper.forceSync>
+              <!-- Expose the 1-based fork index so tests can offset port bases / temp dirs per
+                   fork (1 even at forkCount=1, 1..N under parallel forks). -->
+              <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
@@ -2194,14 +2291,6 @@
               -XX:+EnableDynamicAgentLoading
             </argLine>
           </configuration>
-          <!-- Explicitly select the test provider, instead of relying on the classpath -->
-          <dependencies>
-            <dependency>
-              <groupId>org.apache.maven.surefire</groupId>
-              <artifactId>surefire-testng</artifactId>
-              <version>${surefire.version}</version>
-            </dependency>
-          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -2247,17 +2336,17 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>5.0.0</version>
+          <version>5.1.2</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>buildnumber-maven-plugin</artifactId>
-          <version>3.3.0</version>
+          <version>3.3.1</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>versions-maven-plugin</artifactId>
-          <version>2.21.0</version>
+          <version>2.24.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -2327,7 +2416,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>javacc-maven-plugin</artifactId>
-          <version>3.2.0</version>
+          <version>3.2.1</version>
           <dependencies>
             <dependency>
               <groupId>net.java.dev.javacc</groupId>
@@ -2340,7 +2429,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>4.9.10</version>
+          <version>4.10.0</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -2414,7 +2503,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>build-helper-maven-plugin</artifactId>
-          <version>3.6.1</version>
+          <version>3.7.0</version>
         </plugin>
         <plugin>
           <groupId>com.github.eirslett</groupId>
@@ -2429,12 +2518,12 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
-          <version>3.6.3</version>
+          <version>3.6.4</version>
         </plugin>
         <plugin>
           <groupId>org.eclipse.sisu</groupId>
           <artifactId>sisu-maven-plugin</artifactId>
-          <version>1.0.1</version>
+          <version>1.1.1</version>
           <executions>
             <execution>
               <goals>
@@ -2485,7 +2574,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.26.1</version>
+            <version>14.4.0</version>
           </dependency>
         </dependencies>
         <executions>
@@ -2513,8 +2602,29 @@
           <excludes>
             <exclude>**/*IT.java</exclude>
           </excludes>
-          <forkCount>1</forkCount>
+          <!-- forkCount is overridable via -Dunit.test.fork.count (defaults to 1). Each
+               fork runs a distinct test class (reuseForks=false), so raising the count
+               parallelizes classes across JVMs while preserving class-level isolation. -->
+          <forkCount>${unit.test.fork.count}</forkCount>
           <reuseForks>false</reuseForks>
+          <!-- Retries a failing test up to N times before marking it failed (default 0 = no
+               retry). CI sets this to tolerate a handful of pre-existing load-sensitive flaky
+               tests (Lucene NRT refresh, filesystem mtime) that surface only when many parallel
+               forks saturate the runner; a test that passes on retry is reported as flaky, not
+               green-washed. -->
+          <rerunFailingTestsCount>${unit.test.rerun.count}</rerunFailingTestsCount>
+          <properties>
+            <!-- Use Surefire's reports; TestNG's default reporters share files across parallel forks. -->
+            <configurationParameters>
+              testng.useDefaultListeners=false
+            </configurationParameters>
+          </properties>
+          <systemPropertyVariables>
+            <!-- Expose the 1-based fork index (1 even at forkCount=1, 1..N under parallel forks)
+                 so tests can offset port bases / temp dirs per fork (see ZkStarter.FORK_PORT_OFFSET,
+                 ControllerTest port bases). -->
+            <surefire.forkNumber>$${surefire.forkNumber}</surefire.forkNumber>
+          </systemPropertyVariables>
         </configuration>
         <executions>
           <execution>
@@ -2697,6 +2807,9 @@
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
+        <!-- RAT is not safe for concurrent executions (RAT-573), so a single execution at the root scans the whole tree
+          instead of one execution per module. -->
+        <inherited>false</inherited>
         <executions>
           <execution>
             <phase>verify</phase>
@@ -2706,6 +2819,7 @@
           </execution>
         </executions>
         <configuration>
+          <excludeSubProjects>false</excludeSubProjects>
           <excludes>
             <!-- Exclude license copies -->
             <exclude>licenses/**</exclude>
@@ -2766,19 +2880,19 @@
             <exclude>**/.settings/**</exclude>
             <exclude>**/.project</exclude>
             <exclude>**/.classpath</exclude>
-            <exclude>.externalToolBuilders/**</exclude>
+            <exclude>**/.externalToolBuilders/**</exclude>
 
             <!-- Knowledge base (not source code) -->
             <exclude>kb/**</exclude>
 
             <!-- GenAI Config files -->
-            <exclude>.claude/**</exclude>
-            <exclude>.codex/**</exclude>
-            <exclude>.continue/**</exclude>
-            <exclude>.copilot/**</exclude>
-            <exclude>.cursor/**</exclude>
-            <exclude>.openai/**</exclude>
-            <exclude>.ollama/**</exclude>
+            <exclude>**/.claude/**</exclude>
+            <exclude>**/.codex/**</exclude>
+            <exclude>**/.continue/**</exclude>
+            <exclude>**/.copilot/**</exclude>
+            <exclude>**/.cursor/**</exclude>
+            <exclude>**/.openai/**</exclude>
+            <exclude>**/.ollama/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>helm/**</exclude>
@@ -2807,6 +2921,7 @@
         <artifactId>buildnumber-maven-plugin</artifactId>
         <configuration>
           <skip>${pinot.skip.buildnumber}</skip>
+          <revisionOnScmFailure>UNKNOWN</revisionOnScmFailure>
         </configuration>
         <executions>
           <execution>
@@ -2869,8 +2984,85 @@
                 <!-- Solve NoClassDefFoundError. Borrowed from https://github.com/prometheus/jmx_exporter/issues/802 -->
                 <exclude>META-INF/versions/9/org/yaml/snakeyaml/internal/**</exclude>
 
+                <!-- Use the managed Jackson dependencies for Parquet instead of its embedded copy. -->
+                <exclude>shaded/parquet/com/fasterxml/jackson/**</exclude>
+                <exclude>META-INF/versions/**/shaded/parquet/com/fasterxml/jackson/**</exclude>
+
+                <!-- Keep Hadoop's shaded JAX-RS providers while using managed Jackson core and databind. -->
+                <exclude>org/apache/hadoop/shaded/com/fasterxml/jackson/core/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/fasterxml/jackson/core/**</exclude>
+                <exclude>org/apache/hadoop/shaded/com/fasterxml/jackson/databind/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/fasterxml/jackson/databind/**</exclude>
+                <exclude>org/apache/hadoop/shaded/com/fasterxml/jackson/annotation/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/fasterxml/jackson/annotation/**</exclude>
+                <exclude>com/facebook/presto/jdbc/internal/jackson/**</exclude>
+                <exclude>META-INF/versions/**/com/facebook/presto/jdbc/internal/jackson/**</exclude>
+                <exclude>software/amazon/awssdk/thirdparty/jackson/core/**</exclude>
+                <exclude>META-INF/versions/**/software/amazon/awssdk/thirdparty/jackson/core/**</exclude>
+                <!-- Presto's canonical Jackson Joda module must see canonical Joda-Time values. -->
+                <exclude>com/facebook/presto/jdbc/internal/joda/time/**</exclude>
+                <exclude>META-INF/versions/**/com/facebook/presto/jdbc/internal/joda/time/**</exclude>
+
+                <!-- Use managed Guava instead of copies embedded in dependencies. -->
+                <exclude>org/apache/hadoop/thirdparty/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/thirdparty/com/google/common/**</exclude>
+                <exclude>org/apache/hadoop/shaded/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/com/google/common/**</exclude>
+                <exclude>org/apache/hadoop/shaded/org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/hadoop/shaded/org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/curator/shaded/com/google/common/**</exclude>
+                <exclude>org/apache/iceberg/relocated/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/iceberg/relocated/com/google/common/**</exclude>
+                <exclude>org/apache/pulsar/shade/com/google/common/**</exclude>
+                <exclude>META-INF/versions/**/org/apache/pulsar/shade/com/google/common/**</exclude>
+                <exclude>com/facebook/presto/jdbc/internal/guava/**</exclude>
+                <exclude>META-INF/versions/**/com/facebook/presto/jdbc/internal/guava/**</exclude>
+                <exclude>net/snowflake/client/jdbc/internal/google/common/**</exclude>
+                <exclude>META-INF/versions/**/net/snowflake/client/jdbc/internal/google/common/**</exclude>
+
+                <!-- Azure storage uses only HTTP clients. Remove the unused Reactor Netty HTTP server
+                     and its vulnerable pipelining handler (CVE-2026-47874), including already shaded inputs. -->
+                <exclude>reactor/netty/http/server/**</exclude>
+                <exclude>META-INF/versions/**/reactor/netty/http/server/**</exclude>
+
                 <!-- Exclude NettyInstance because it includes Netty package literals -->
                 <exclude>src/main/java/org/apache/pinot/core/transport/NettyInstance.java</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <artifact>org.apache.parquet:parquet-jackson</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <!-- Also remove embedded Jackson metadata when consuming an already shaded Parquet plugin. -->
+              <artifact>org.apache.pinot:pinot-parquet</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <artifact>org.apache.hadoop*:*</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
+                <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
+                <exclude>META-INF/versions/**/module-info.class</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <artifact>org.apache.iceberg:iceberg-bundled-guava</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
+                <exclude>META-INF/versions/**/module-info.class</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <!-- Already shaded plugins can also carry embedded Guava metadata. -->
+              <artifact>org.apache.pinot:*</artifact>
+              <excludes>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
               </excludes>
             </filter>
             <filter>
@@ -2888,13 +3080,77 @@
                 <exclude>META-INF/maven/org.eclipse.jetty.websocket/**</exclude>
                 <!-- ServiceLoader entries whose implementation classes are removed above. -->
                 <exclude>META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty.**</exclude>
+                <!-- JLine is used only by YARN's unused interactive shell. -->
+                <exclude>org/apache/hadoop/shaded/org/jline/**</exclude>
+                <exclude>META-INF/maven/org.jline/**</exclude>
+                <exclude>META-INF/services/org.apache.hadoop.shaded.org.jline.**</exclude>
               </excludes>
             </filter>
           </filters>
           <relocations>
             <relocation>
+              <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.core</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.core</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.databind</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.databind</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.fasterxml.jackson.annotation</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.annotation</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.facebook.presto.jdbc.internal.jackson</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>software.amazon.awssdk.thirdparty.jackson.core</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson.core</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.facebook.presto.jdbc.internal.joda.time</pattern>
+              <shadedPattern>org.joda.time</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>shaded.parquet.com.fasterxml.jackson</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
               <pattern>com.fasterxml.jackson</pattern>
               <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.thirdparty.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.hadoop.shaded.org.apache.curator.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.curator.shaded.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.iceberg.relocated.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.pulsar.shade.com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.facebook.presto.jdbc.internal.guava</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>net.snowflake.client.jdbc.internal.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
             </relocation>
             <relocation>
               <pattern>com.google.common</pattern>

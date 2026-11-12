@@ -39,8 +39,15 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
     implements IndexType<C, IR, IC> {
 
   private final String _id;
-  private ColumnConfigDeserializer<C> _deserializer;
-  private IndexReaderFactory<IR> _readerFactory;
+
+  /// Lazily created caches of [#getConfig] and [#getReaderFactory].
+  ///
+  /// `volatile` is required, not just for the null checks in those methods: an index type is a process-wide singleton
+  /// held by [IndexService] and is used concurrently by the threads that load, reload and refresh segments. Without
+  /// `volatile` these values are published unsafely, so a racing thread can read the non-null reference while the
+  /// contents are not yet visible to it.
+  private volatile ColumnConfigDeserializer<C> _deserializer;
+  private volatile IndexReaderFactory<IR> _readerFactory;
 
   protected ColumnConfigDeserializer<C> createDeserializer() {
     ColumnConfigDeserializer<C> fromIndexes =
@@ -70,22 +77,30 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
 
   @Override
   public Map<String, C> getConfig(TableConfig tableConfig, Schema schema) {
-    if (_deserializer == null) {
-      _deserializer = createDeserializer();
+    ColumnConfigDeserializer<C> deserializer = _deserializer;
+    if (deserializer == null) {
+      deserializer = createDeserializer();
+      _deserializer = deserializer;
     }
     try {
-      return _deserializer.deserialize(tableConfig, schema);
+      return deserializer.deserialize(tableConfig, schema);
     } catch (MergedColumnConfigDeserializer.ConfigDeclaredTwiceException ex) {
       throw new MergedColumnConfigDeserializer.ConfigDeclaredTwiceException(ex.getColumn(), this, ex);
     }
   }
 
+  /// Returns the reader factory, lazily creating and caching it on first access.
+  ///
+  /// Uses the racy-single-check idiom: two threads may each create a factory, but the factories are equivalent, so
+  /// the duplicate work is harmless. Correctness relies on `_readerFactory` being `volatile`; see the field for why.
   @Override
   public IndexReaderFactory<IR> getReaderFactory() {
-    if (_readerFactory == null) {
-      _readerFactory = createReaderFactory();
+    IndexReaderFactory<IR> readerFactory = _readerFactory;
+    if (readerFactory == null) {
+      readerFactory = createReaderFactory();
+      _readerFactory = readerFactory;
     }
-    return _readerFactory;
+    return readerFactory;
   }
 
   public void convertToNewFormat(TableConfig tableConfig, Schema schema) {

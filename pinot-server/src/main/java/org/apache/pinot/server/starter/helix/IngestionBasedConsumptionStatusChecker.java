@@ -45,10 +45,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
   private final Map<String, Set<String>> _caughtUpSegmentsByTable = new HashMap<>();
   private final Function<String, Set<String>> _consumingSegmentsSupplier;
 
-  /**
-   * Both consumingSegmentsByTable and consumingSegmentsSupplier are provided as it can be costly to get
-   * consumingSegmentsByTable via the supplier, so only use it when any missing segment is detected.
-   */
+  /// Both consumingSegmentsByTable and consumingSegmentsSupplier are provided as it can be costly to get
+  /// consumingSegmentsByTable via the supplier, so only use it when any missing segment is detected.
   public IngestionBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
       Map<String, Set<String>> consumingSegmentsByTable, Function<String, Set<String>> consumingSegmentsSupplier) {
     _instanceDataManager = instanceDataManager;

@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.MapConfiguration;
@@ -36,6 +37,7 @@ import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.net.URLEncodedUtils;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -152,6 +154,12 @@ public class DriverUtils {
     if (columnDataType == null) {
       return Types.VARCHAR;
     }
+    if (ColumnDataType.isArray(columnDataType)) {
+      return Types.JAVA_OBJECT;
+    }
+    if (ColumnDataType.MAP.name().equals(columnDataType)) {
+      return Types.JAVA_OBJECT;
+    }
     Integer columnsSQLDataType;
     switch (columnDataType) {
       case "STRING":
@@ -181,6 +189,9 @@ public class DriverUtils {
       case "TIMESTAMP":
         columnsSQLDataType = Types.TIMESTAMP;
         break;
+      case "UUID":
+        columnsSQLDataType = Types.OTHER;
+        break;
       default:
         columnsSQLDataType = Types.NULL;
         break;
@@ -191,6 +202,12 @@ public class DriverUtils {
   public static String getJavaClassName(String columnDataType) {
     if (columnDataType == null) {
       return String.class.getTypeName();
+    }
+    if (ColumnDataType.isArray(columnDataType)) {
+      return List.class.getTypeName();
+    }
+    if (ColumnDataType.MAP.name().equals(columnDataType)) {
+      return Map.class.getTypeName();
     }
     String columnsJavaClassName;
     switch (columnDataType) {
@@ -220,6 +237,9 @@ public class DriverUtils {
         break;
       case "TIMESTAMP":
         columnsJavaClassName = Timestamp.class.getTypeName();
+        break;
+      case "UUID":
+        columnsJavaClassName = UUID.class.getTypeName();
         break;
       default:
         columnsJavaClassName = String.class.getTypeName();

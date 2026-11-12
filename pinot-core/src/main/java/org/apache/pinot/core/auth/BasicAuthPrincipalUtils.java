@@ -26,17 +26,19 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.BasicAuthTokenUtils;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.config.user.AccessType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-/**
- * Utility for extracting and constructing BasicAuth principals
- * from configuration and user metadata, including permissions,
- * table access rules, and row-level security (RLS) filters.
- */
+/// Utility for extracting and constructing BasicAuth principals
+/// from configuration and user metadata, including permissions,
+/// table access rules, and row-level security (RLS) filters.
 public final class BasicAuthPrincipalUtils {
   private static final String PASSWORD = "password";
   private static final String PERMISSIONS = "permissions";
@@ -49,23 +51,21 @@ public final class BasicAuthPrincipalUtils {
     // left blank
   }
 
-  /**
-   * Parse a pinot configuration namespace for access control settings, e.g. "controller.admin.access.control
-   * .principals".
-   *
-   * <pre>
-   *     Example:
-   *     my.prefix.access.control.principals=admin123,user456
-   *     my.prefix.access.control.principals.admin123.password=verysecret
-   *     my.prefix.access.control.principals.user456.password=kindasecret
-   *     my.prefix.access.control.principals.user456.tables=stuff,lessImportantStuff
-   *     my.prefix.access.control.principals.user456.permissions=read,update
-   * </pre>
-   *
-   * @param configuration pinot configuration
-   * @param prefix configuration namespace
-   * @return list of BasicAuthPrincipals
-   */
+  /// Parse a pinot configuration namespace for access control settings, e.g. "controller.admin.access.control
+  /// .principals".
+  ///
+  /// ```
+  /// Example:
+  /// my.prefix.access.control.principals=admin123,user456
+  /// my.prefix.access.control.principals.admin123.password=verysecret
+  /// my.prefix.access.control.principals.user456.password=kindasecret
+  /// my.prefix.access.control.principals.user456.tables=stuff,lessImportantStuff
+  /// my.prefix.access.control.principals.user456.permissions=read,update
+  /// ```
+  ///
+  /// @param configuration pinot configuration
+  /// @param prefix configuration namespace
+  /// @return list of BasicAuthPrincipals
   public static List<BasicAuthPrincipal> extractBasicAuthPrincipals(PinotConfiguration configuration, String prefix) {
     String principalNames = configuration.getProperty(prefix);
     Preconditions.checkArgument(StringUtils.isNotBlank(principalNames), "must provide principals");
@@ -129,6 +129,36 @@ public final class BasicAuthPrincipalUtils {
               BasicAuthTokenUtils.toBasicAuthToken(name, password), password, component, role,
               tables, excludeTables, permissions, Map.of());
         }).collect(Collectors.toList());
+  }
+
+  /// Authorizes a principal to delete rows from a table. Shared by the file-based and the ZooKeeper broker basic auth
+  /// (`BasicAuthAccessControlFactory`, `ZkBasicAuthAccessControlFactory`), which differ only in how they match the
+  /// table: each looks the principal up and matches the table its own way, then passes the outcome as `hasTable`, so
+  /// that the two deny with the same messages.
+  ///
+  /// Denied when the principal is missing (the credentials did not resolve to one), when `hasTable` is false, or
+  /// when the principal is not explicitly granted the `DELETE` permission, see
+  /// [BasicAuthPrincipal#hasExplicitPermission(String)]: a principal without a permission list, which
+  /// [BasicAuthPrincipal#hasPermission(String)] grants everything, may not delete rows.
+  ///
+  /// @param principal principal the credentials of the caller resolved to, or null when they did not resolve to one
+  /// @param tableName name of the table, as the caller gave it, for the failure message
+  /// @param hasTable whether the principal has access to the table, as the caller matched it
+  /// @return the authorization result, with the reason when denied
+  public static AuthorizationResult authorizeDeleteRows(@Nullable BasicAuthPrincipal principal, String tableName,
+      boolean hasTable) {
+    if (principal == null) {
+      return new BasicAuthorizationResultImpl(false, "Missing or invalid credentials");
+    }
+    if (!hasTable) {
+      return new BasicAuthorizationResultImpl(false,
+          "Principal: " + principal.getName() + " does not have access to table: " + tableName);
+    }
+    if (!principal.hasExplicitPermission(AccessType.DELETE.name())) {
+      return new BasicAuthorizationResultImpl(false,
+          "Principal: " + principal.getName() + " is not granted the DELETE permission");
+    }
+    return BasicAuthorizationResultImpl.success();
   }
 
   private static Set<String> extractSet(PinotConfiguration configuration, String key) {

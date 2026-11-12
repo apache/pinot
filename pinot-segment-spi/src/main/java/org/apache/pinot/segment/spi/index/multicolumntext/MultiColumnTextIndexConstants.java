@@ -21,9 +21,7 @@ package org.apache.pinot.segment.spi.index.multicolumntext;
 import org.apache.pinot.segment.spi.V1Constants;
 
 
-/**
- * This class contains keys of entries in metadata.properties files for multi-column text index.
- */
+/// This class contains keys of entries in metadata.properties files for multi-column text index.
 public class MultiColumnTextIndexConstants {
 
   public static final String INDEX_DIR_NAME = "multi_col_text_idx";

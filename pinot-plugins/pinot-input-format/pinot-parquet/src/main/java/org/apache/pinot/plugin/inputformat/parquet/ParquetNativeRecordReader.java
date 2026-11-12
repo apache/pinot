@@ -41,9 +41,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 
 
-/**
- * Record reader for Native Parquet file.
- */
+/// Record reader for Native Parquet file.
 public class ParquetNativeRecordReader implements RecordReader {
   private static final String EXTENSION = "parquet";
 
@@ -124,9 +122,10 @@ public class ParquetNativeRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new RecordFetchException("Failed to read next Parquet native record", e);
     }
+    // The physical row is consumed even if extraction fails and the caller skips it.
+    _currentPageIdx++;
     // Data parsing: extract into GenericRow.
     _recordExtractor.extract(_nextRecord, reuse);
-    _currentPageIdx++;
     return reuse;
   }
 

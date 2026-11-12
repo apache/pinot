@@ -16,352 +16,183 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.core.query.aggregation.utils.exprminmax;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockEquals;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.query.aggregation.utils.ParentAggregationFunctionResultObject;
-import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
+import org.apache.pinot.core.util.DataBlockExtractUtils;
 
 
-@SuppressWarnings("rawtypes")
+/// The result of an `EXPR_MIN` / `EXPR_MAX` aggregation: the extremum key seen so far over the measuring columns, and
+/// the projection columns of every row that holds it. The object has no key until the first one is set, which is what
+/// a server returns when it has no row for the query.
+///
+/// The serialized form is a header int, `0` without a key and `1` with one, followed by a data block holding the key
+/// as its single row and a data block holding the projection rows. Deserialization reads the values out of the data
+/// blocks, so a deserialized object is the same as an aggregated one: it can be merged, extended and serialized again.
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
+  private static final int NULL_HEADER = 0;
+  private static final int NON_NULL_HEADER = 1;
 
-  // if the object is created but not yet populated, this happens e.g. when a server has no data for
-  // the query and returns a default value
-  enum ObjectNullState {
-    NULL(0),
-    NON_NULL(1);
-
-    final int _state;
-
-    ObjectNullState(int i) {
-      _state = i;
-    }
-
-    int getState() {
-      return _state;
-    }
-  }
-
-  // if the object contains non null values
-  private boolean _isNull;
-
-  // if the value is stored in a mutable list, this is false only when the Object is deserialized from a byte buffer
-  // if the object is mutable, it means that the object is read only and the values are stored in
-  // _immutableMeasuringKeys and _immutableProjectionVals, otherwise we read and write from _extremumMeasuringKeys
-  // and _extremumProjectionValues
-  private boolean _mutable;
-
-  // the schema of the measuring columns
   private final DataSchema _measuringSchema;
-  // the schema of the projection columns
   private final DataSchema _projectionSchema;
+  private final int _numMeasuringColumns;
+  private final int _numProjectionColumns;
 
-  // the size of the extremum key cols and value cols
-  private final int _sizeOfExtremumMeasuringKeys;
-  private final int _sizeOfExtremumProjectionVals;
-
-  // the current extremum keys, keys are the extremum values of the measuring columns,
-  // used for comparison
-  private Comparable[] _extremumMeasuringKeys = null;
-  // the current extremum values, values are the values of the projection columns
-  // associated with the minimum measuring column, used for projection
-  private final List<Object[]> _extremumProjectionValues = new ArrayList<>();
-
-  // used for ser/de
-  private DataBlock _immutableMeasuringKeys;
-  private DataBlock _immutableProjectionVals;
+  // The extremum key, one value per measuring column; null until the first key is set
+  private Comparable[] _extremumKey;
+  // The projection columns of the rows that hold the extremum key
+  private final List<Object[]> _extremumProjectionValues;
 
   public ExprMinMaxObject(DataSchema measuringSchema, DataSchema projectionSchema) {
-    _isNull = true;
-    _mutable = true;
-
     _measuringSchema = measuringSchema;
     _projectionSchema = projectionSchema;
-
-    _sizeOfExtremumMeasuringKeys = _measuringSchema.size();
-    _sizeOfExtremumProjectionVals = _projectionSchema.size();
+    _numMeasuringColumns = measuringSchema.size();
+    _numProjectionColumns = projectionSchema.size();
+    _extremumProjectionValues = new ArrayList<>();
   }
 
+  /// Reads the object that [#toBytes] wrote from the current position of the big-endian `byteBuffer`, and leaves the
+  /// position at the end of the object. The values are copied out of the buffer, so the object does not reference the
+  /// buffer afterwards.
   public ExprMinMaxObject(ByteBuffer byteBuffer)
       throws IOException {
-    _mutable = false;
-    _isNull = byteBuffer.getInt() == ObjectNullState.NULL.getState();
-    byteBuffer = byteBuffer.slice();
-    _immutableMeasuringKeys = DataBlockUtils.readFrom(byteBuffer);
-    byteBuffer = byteBuffer.slice();
-    _immutableProjectionVals = DataBlockUtils.readFrom(byteBuffer);
-
-    _measuringSchema = _immutableMeasuringKeys.getDataSchema();
-    _projectionSchema = _immutableProjectionVals.getDataSchema();
-
-    _sizeOfExtremumMeasuringKeys = _measuringSchema.size();
-    _sizeOfExtremumProjectionVals = _projectionSchema.size();
+    int header = byteBuffer.getInt();
+    DataBlock measuringKeys = DataBlockUtils.readFrom(byteBuffer);
+    DataBlock projectionValues = DataBlockUtils.readFrom(byteBuffer);
+    _measuringSchema = measuringKeys.getDataSchema();
+    _projectionSchema = projectionValues.getDataSchema();
+    _numMeasuringColumns = _measuringSchema.size();
+    _numProjectionColumns = _projectionSchema.size();
+    if (header == NULL_HEADER) {
+      _extremumProjectionValues = new ArrayList<>();
+    } else {
+      Object[] key = DataBlockExtractUtils.extractRows(measuringKeys).get(0);
+      _extremumKey = Arrays.copyOf(key, _numMeasuringColumns, Comparable[].class);
+      _extremumProjectionValues = DataBlockExtractUtils.extractRows(projectionValues);
+    }
   }
 
-  public static ExprMinMaxObject fromBytes(byte[] bytes)
-      throws IOException {
-    return fromByteBuffer(ByteBuffer.wrap(bytes));
-  }
-
-  public static ExprMinMaxObject fromByteBuffer(ByteBuffer byteBuffer)
-      throws IOException {
-    return new ExprMinMaxObject(byteBuffer);
-  }
-
-  // used for result serialization
+  /// Returns the serialized form of this object.
   public byte[] toBytes()
       throws IOException {
-    int header;
-    if (_isNull) {
-      // serialize the null object with schemas
-      header = ObjectNullState.NULL.getState();
-      _immutableMeasuringKeys = DataBlockBuilder.buildFromRows(List.of(), _measuringSchema);
-      _immutableProjectionVals = DataBlockBuilder.buildFromRows(List.of(), _projectionSchema);
-    } else {
-      header = ObjectNullState.NON_NULL.getState();
-      _immutableMeasuringKeys =
-          DataBlockBuilder.buildFromRows(List.<Object[]>of(_extremumMeasuringKeys), _measuringSchema);
-      _immutableProjectionVals = DataBlockBuilder.buildFromRows(_extremumProjectionValues, _projectionSchema);
+    int header = _extremumKey != null ? NON_NULL_HEADER : NULL_HEADER;
+    List<Object[]> keyRows = _extremumKey != null ? List.<Object[]>of(_extremumKey) : List.of();
+    List<ByteBuffer> buffers =
+        new ArrayList<>(DataBlockUtils.serialize(DataBlockBuilder.buildFromRows(keyRows, _measuringSchema)));
+    buffers.addAll(
+        DataBlockUtils.serialize(DataBlockBuilder.buildFromRows(_extremumProjectionValues, _projectionSchema)));
+    int size = Integer.BYTES;
+    for (ByteBuffer buffer : buffers) {
+      size = Math.addExact(size, buffer.remaining());
     }
-    List<ByteBuffer> measuringKeys = DataBlockUtils.serialize(_immutableMeasuringKeys);
-    List<ByteBuffer> projectionVals = DataBlockUtils.serialize(_immutableProjectionVals);
-
-    CompoundDataBuffer compoundDataBuffer = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN)
-        .addBuffers(measuringKeys)
-        .addBuffers(projectionVals)
-        .build();
-
-    long size = 4 + compoundDataBuffer.size();
-    Preconditions.checkState(size <= Integer.MAX_VALUE, "Data size is too large: %s", size);
-    int sizeInt = (int) size;
-    byte[] bytes = new byte[sizeInt];
-
-    ByteBuffer buffer = ByteBuffer.wrap(bytes)
-        .order(ByteOrder.BIG_ENDIAN);
-    buffer.putInt(header);
-    compoundDataBuffer.copyTo(0, bytes, 4, sizeInt - 4);
-
-    ExprMinMaxObject exprMinMaxObject = fromBytes(bytes);
-    assert DataBlockEquals.sameContent(exprMinMaxObject._immutableMeasuringKeys, _immutableMeasuringKeys);
-    assert DataBlockEquals.sameContent(exprMinMaxObject._immutableProjectionVals, _immutableProjectionVals);
-
+    byte[] bytes = new byte[size];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    byteBuffer.putInt(header);
+    for (ByteBuffer buffer : buffers) {
+      byteBuffer.put(buffer);
+    }
     return bytes;
   }
 
-  /**
-   * Used during segment processing
-   * Compare the current key with the new key, and return the comparison result.
-   * > 0: the key is replaced because the new key is the new extremum
-   * = 0: new key is the same as the current extremum
-   * < 0: current key is still the extremum
-   */
-  public int compareAndSetKey(List<ExprMinMaxMeasuringValSetWrapper> exprMinMaxWrapperValSets, int offset,
-      boolean isMax) {
-    Preconditions.checkState(_mutable, "Cannot compare and set key after the object is serialized");
-    if (!_isNull) {
-      for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
-        ExprMinMaxMeasuringValSetWrapper exprMinMaxWrapperValSet = exprMinMaxWrapperValSets.get(i);
-        int result = exprMinMaxWrapperValSet.compare(offset, _extremumMeasuringKeys[i]);
-        if (result != 0) {
-          if (isMax ? result < 0 : result > 0) {
-            for (int j = 0; j < _sizeOfExtremumMeasuringKeys; j++) {
-              _extremumMeasuringKeys[j] = exprMinMaxWrapperValSets.get(j).getComparable(offset);
-            }
-            return 1;
-          }
-          return -1;
+  /// Compares the key at `offset` of the measuring columns with the extremum key, and makes it the extremum key when
+  /// it wins or when there is no key yet. Returns:
+  /// - a positive value when the key replaced the extremum key
+  /// - `0` when the key equals the extremum key, or is the first key
+  /// - a negative value when the extremum key stays
+  public int compareAndSetKey(List<ExprMinMaxMeasuringValSetWrapper> measuringValSets, int offset, boolean isMax) {
+    if (_extremumKey == null) {
+      _extremumKey = new Comparable[_numMeasuringColumns];
+      setKey(measuringValSets, offset);
+      return 0;
+    }
+    for (int i = 0; i < _numMeasuringColumns; i++) {
+      int result = measuringValSets.get(i).compare(offset, _extremumKey[i]);
+      if (result != 0) {
+        if (isMax ? result < 0 : result > 0) {
+          setKey(measuringValSets, offset);
+          return 1;
         }
-      }
-    } else {
-      _isNull = false;
-      _extremumMeasuringKeys = new Comparable[_sizeOfExtremumMeasuringKeys];
-      for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
-        _extremumMeasuringKeys[i] = exprMinMaxWrapperValSets.get(i).getComparable(offset);
+        return -1;
       }
     }
     return 0;
   }
 
-  /**
-   * Used during segment processing with compareAndSetKey
-   * Set the vals to the new vals if the key is replaced.
-   */
-  public void setToNewVal(List<ExprMinMaxProjectionValSetWrapper> exprMinMaxProjectionValSetWrappers, int offset) {
+  private void setKey(List<ExprMinMaxMeasuringValSetWrapper> measuringValSets, int offset) {
+    for (int i = 0; i < _numMeasuringColumns; i++) {
+      _extremumKey[i] = measuringValSets.get(i).getComparable(offset);
+    }
+  }
+
+  /// Replaces the projection rows with the row at `offset` of the projection columns, after the key was replaced.
+  public void setToNewVal(List<ExprMinMaxProjectionValSetWrapper> projectionValSets, int offset) {
     _extremumProjectionValues.clear();
-    addVal(exprMinMaxProjectionValSetWrappers, offset);
+    addVal(projectionValSets, offset);
   }
 
-  /**
-   * Used during segment processing with compareAndSetKey
-   * Add the vals to the list of vals if the key is the same.
-   */
-  public void addVal(List<ExprMinMaxProjectionValSetWrapper> exprMinMaxProjectionValSetWrappers, int offset) {
-    Object[] val = new Object[_projectionSchema.size()];
-    for (int i = 0; i < _projectionSchema.size(); i++) {
-      val[i] = exprMinMaxProjectionValSetWrappers.get(i).getValue(offset);
+  /// Adds the row at `offset` of the projection columns, after the key was matched.
+  public void addVal(List<ExprMinMaxProjectionValSetWrapper> projectionValSets, int offset) {
+    Object[] values = new Object[_numProjectionColumns];
+    for (int i = 0; i < _numProjectionColumns; i++) {
+      values[i] = projectionValSets.get(i).getValue(offset);
     }
-    _extremumProjectionValues.add(val);
+    _extremumProjectionValues.add(values);
   }
 
+  /// Returns the extremum key, or `null` when no key has been set.
+  @Nullable
   public Comparable[] getExtremumKey() {
-    if (_mutable) {
-      return _extremumMeasuringKeys;
-    } else {
-      Comparable[] extremumKeys = new Comparable[_sizeOfExtremumMeasuringKeys];
-      for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
-        switch (_measuringSchema.getColumnDataType(i)) {
-          case INT:
-            extremumKeys[i] = _immutableMeasuringKeys.getInt(0, i);
-            break;
-          case LONG:
-            extremumKeys[i] = _immutableMeasuringKeys.getLong(0, i);
-            break;
-          case FLOAT:
-            extremumKeys[i] = _immutableMeasuringKeys.getFloat(0, i);
-            break;
-          case DOUBLE:
-            extremumKeys[i] = _immutableMeasuringKeys.getDouble(0, i);
-            break;
-          case BIG_DECIMAL:
-            extremumKeys[i] = _immutableMeasuringKeys.getBigDecimal(0, i);
-            break;
-          case STRING:
-            extremumKeys[i] = _immutableMeasuringKeys.getString(0, i);
-            break;
-          case BYTES:
-            extremumKeys[i] = _immutableMeasuringKeys.getBytes(0, i);
-            break;
-          default:
-            throw new IllegalStateException("Unsupported data type: " + _measuringSchema.getColumnDataType(i));
-        }
-      }
-      return extremumKeys;
-    }
+    return _extremumKey;
   }
 
   @Override
   public Object getField(int rowId, int colId) {
-    if (_mutable) {
-      return _extremumProjectionValues.get(rowId)[colId];
-    } else {
-      switch (_projectionSchema.getColumnDataType(colId)) {
-        case INT:
-          return _immutableProjectionVals.getInt(rowId, colId);
-        case LONG:
-          return _immutableProjectionVals.getLong(rowId, colId);
-        case FLOAT:
-          return _immutableProjectionVals.getFloat(rowId, colId);
-        case DOUBLE:
-          return _immutableProjectionVals.getDouble(rowId, colId);
-        case BIG_DECIMAL:
-          return _immutableProjectionVals.getBigDecimal(rowId, colId);
-        case STRING:
-          return _immutableProjectionVals.getString(rowId, colId);
-        case BYTES:
-          return _immutableProjectionVals.getBytes(rowId, colId);
-        case INT_ARRAY:
-          return _immutableProjectionVals.getIntArray(rowId, colId);
-        case LONG_ARRAY:
-          return _immutableProjectionVals.getLongArray(rowId, colId);
-        case FLOAT_ARRAY:
-          return _immutableProjectionVals.getFloatArray(rowId, colId);
-        case DOUBLE_ARRAY:
-          return _immutableProjectionVals.getDoubleArray(rowId, colId);
-        case BIG_DECIMAL_ARRAY:
-          return _immutableProjectionVals.getBigDecimalArray(rowId, colId);
-        case STRING_ARRAY:
-          return _immutableProjectionVals.getStringArray(rowId, colId);
-        case BYTES_ARRAY:
-          return _immutableProjectionVals.getBytesArray(rowId, colId);
-        default:
-          throw new IllegalStateException("Unsupported data type: " + _projectionSchema.getColumnDataType(colId));
-      }
-    }
+    return _extremumProjectionValues.get(rowId)[colId];
   }
 
-  /**
-   * Merge two exprminMaxObjects
-   */
+  /// Merges `other` into this object and returns the object with the winning key. When the keys are equal, the
+  /// projection rows of `other` are appended to this object.
   public ExprMinMaxObject merge(ExprMinMaxObject other, boolean isMax) {
-    if (_isNull && other._isNull) {
-      return this;
-    } else if (_isNull) {
-      return other;
-    } else if (other._isNull) {
-      return this;
-    } else {
-      int result;
-      Comparable[] key = getExtremumKey();
-      Comparable[] otherKey = other.getExtremumKey();
-      for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
-        result = key[i].compareTo(otherKey[i]);
-        if (result != 0) {
-          // If the keys are not equal, return the object with the extremum key
-          if (isMax) {
-            return result > 0 ? this : other;
-          } else {
-            return result < 0 ? this : other;
-          }
-        }
-      }
-      // If the keys are equal, add the values of the other object to this object
-      if (!_mutable) {
-        // If the result is immutable, we need to copy the values from the serialized result to the mutable result
-        _mutable = true;
-        for (int i = 0; i < getNumberOfRows(); i++) {
-          Object[] val = new Object[_sizeOfExtremumProjectionVals];
-          for (int j = 0; j < _sizeOfExtremumProjectionVals; j++) {
-            val[j] = getField(i, j);
-          }
-          _extremumProjectionValues.add(val);
-        }
-      }
-      for (int i = 0; i < other.getNumberOfRows(); i++) {
-        Object[] val = new Object[_sizeOfExtremumProjectionVals];
-        for (int j = 0; j < _sizeOfExtremumProjectionVals; j++) {
-          val[j] = other.getField(i, j);
-        }
-        _extremumProjectionValues.add(val);
-      }
+    if (other._extremumKey == null) {
       return this;
     }
+    if (_extremumKey == null) {
+      return other;
+    }
+    for (int i = 0; i < _numMeasuringColumns; i++) {
+      int result = _extremumKey[i].compareTo(other._extremumKey[i]);
+      if (result != 0) {
+        return (isMax ? result > 0 : result < 0) ? this : other;
+      }
+    }
+    _extremumProjectionValues.addAll(other._extremumProjectionValues);
+    return this;
   }
 
-  /**
-   * get the number of rows in the projection data
-   */
   @Override
   public int getNumberOfRows() {
-    if (_mutable) {
-      return _extremumProjectionValues.size();
-    } else {
-      return _immutableProjectionVals.getNumberOfRows();
-    }
+    return _extremumProjectionValues.size();
   }
 
-  /**
-   * return the schema of the projection data
-   */
+  /// Returns the schema of the projection columns, the only columns the final result exposes.
   @Override
   public DataSchema getSchema() {
-    // the final parent aggregation result only cares about the projection columns
     return _projectionSchema;
   }
 
   @Override
   public int compareTo(ParentAggregationFunctionResultObject o) {
-    return this.getNumberOfRows() - o.getNumberOfRows();
+    return getNumberOfRows() - o.getNumberOfRows();
   }
 }

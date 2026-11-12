@@ -44,22 +44,20 @@ import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
-/**
- * Quick start for Logical Tables.
- *
- * This quickstart demonstrates how to create and query logical tables that provide
- * a unified view over multiple physical tables. In this example, we create three
- * physical tables (ordersUS_OFFLINE, ordersEU_OFFLINE, and ordersAPAC_OFFLINE)
- * and then create a logical table (orders) that allows querying all tables as if
- * they were one. Each physical table is regionally partitioned by the region column
- * (us, eu, or apac). All orders tables are organized under examples/batch/orders/.
- *
- * Logical tables are useful for:
- * - Creating unified views over similar tables with the same schema
- * - Implementing table partitioning strategies (regional partitioning in this case)
- * - Providing abstraction layers over complex table hierarchies
- * - Time-based or geography-based table splitting
- */
+/// Quick start for Logical Tables.
+///
+/// This quickstart demonstrates how to create and query logical tables that provide
+/// a unified view over multiple physical tables. In this example, we create three
+/// physical tables (ordersUS_OFFLINE, ordersEU_OFFLINE, and ordersAPAC_OFFLINE)
+/// and then create a logical table (orders) that allows querying all tables as if
+/// they were one. Each physical table is regionally partitioned by the region column
+/// (us, eu, or apac). All orders tables are organized under examples/batch/orders/.
+///
+/// Logical tables are useful for:
+/// - Creating unified views over similar tables with the same schema
+/// - Implementing table partitioning strategies (regional partitioning in this case)
+/// - Providing abstraction layers over complex table hierarchies
+/// - Time-based or geography-based table splitting
 public class LogicalTableQuickstart extends Quickstart {
 
   protected String[] getDefaultBatchTableDirectories() {

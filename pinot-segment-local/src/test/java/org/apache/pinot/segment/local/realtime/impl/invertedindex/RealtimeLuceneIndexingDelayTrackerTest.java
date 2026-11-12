@@ -105,10 +105,8 @@ public class RealtimeLuceneIndexingDelayTrackerTest {
     verifyGaugeValue("table2", 1, ServerGauge.LUCENE_INDEXING_DELAY_MS, 30);
   }
 
-  /**
-   * Helper method to verify the value of a gauge. If the gauge's supplier is updated multiple times, only
-   * the last value will be verified.
-   */
+  /// Helper method to verify the value of a gauge. If the gauge's supplier is updated multiple times, only
+  /// the last value will be verified.
   private void verifyGaugeValue(String table, int partition, ServerGauge gauge, long expectedValue) {
     ArgumentCaptor<Supplier<Long>> gaugeSupplierCaptor = ArgumentCaptor.forClass(Supplier.class);
     verify(_serverMetrics, atLeastOnce()).setOrUpdatePartitionGauge(eq(table), eq(partition), eq(gauge),

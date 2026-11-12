@@ -38,12 +38,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-/**
- * Class for command to stop a process.
- * Relies on pid written by process, and works on local-host only.
- *
- *
- */
+/// Class for command to stop a process.
+/// Relies on pid written by process, and works on local-host only.
 @CommandLine.Command(name = "StopProcess", mixinStandardHelpOptions = true)
 public class StopProcessCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StopProcessCommand.class);

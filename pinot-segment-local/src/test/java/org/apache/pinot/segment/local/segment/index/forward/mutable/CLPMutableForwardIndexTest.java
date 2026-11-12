@@ -65,9 +65,7 @@ public class CLPMutableForwardIndexTest implements PinotBuffersAfterClassCheckRu
     _memoryManager.close();
   }
 
-  /**
-   * Test using CLPMutableForwardIndex
-   */
+  /// Test using CLPMutableForwardIndex
   @Test
   public void testString()
       throws IOException {
@@ -80,9 +78,7 @@ public class CLPMutableForwardIndexTest implements PinotBuffersAfterClassCheckRu
     }
   }
 
-  /**
-   * Same as testString() except it is using CLPMutableForwardIndexV2
-   */
+  /// Same as testString() except it is using CLPMutableForwardIndexV2
   @Test
   public void testStringV2()
       throws IOException {

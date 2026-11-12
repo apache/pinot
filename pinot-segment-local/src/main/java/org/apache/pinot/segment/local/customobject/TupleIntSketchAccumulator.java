@@ -25,16 +25,14 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 
 
-/**
- * Intermediate state used by {@code IntegerTupleSketchAggregationFunction} which gives
- * the end user more control over how sketches are merged for performance.
- * In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
- * processing beyond the minimum Theta value.  This applies to Tuple sketches because they are an extension of the
- * Theta sketch.
- * The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
- * that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
- * set to the minimum immediately, further gains can be realised.
- */
+/// Intermediate state used by `IntegerTupleSketchAggregationFunction` which gives
+/// the end user more control over how sketches are merged for performance.
+/// In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
+/// processing beyond the minimum Theta value.  This applies to Tuple sketches because they are an extension of the
+/// Theta sketch.
+/// The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
+/// that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
+/// set to the minimum immediately, further gains can be realised.
 public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSketch<IntegerSummary>> {
   private IntegerSummarySetOperations _setOperations;
   private int _nominalEntries;
@@ -62,24 +60,12 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSket
   }
 
   @Override
-  public TupleSketch<IntegerSummary> getResult() {
-    return unionAll();
-  }
-
-  private TupleSketch<IntegerSummary> unionAll() {
+  protected void flush() {
+    if (_accumulator == null || _accumulator.isEmpty()) {
+      return;
+    }
     if (_union == null) {
       _union = new TupleUnion<>(_nominalEntries, _setOperations);
-    }
-    // Return the default update "gadget" sketch as a compact sketch
-    if (isEmpty()) {
-      return _union.getResult();
-    }
-    // Corner-case: the parameters are not strictly respected when there is a single sketch.
-    // This single sketch might have been the result of a previously accumulated union and
-    // would already have the parameters set.  The sketch is returned as-is without adjusting
-    // nominal entries which requires an additional union operation.
-    if (getNumInputs() == 1) {
-      return _accumulator.get(0);
     }
 
     // Performance optimization: ensure that the minimum Theta is used for "early stop".
@@ -96,7 +82,25 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSket
       _union.union(accumulatedSketch);
     }
     _accumulator.clear();
+  }
 
+  @Override
+  public TupleSketch<IntegerSummary> getResult() {
+    if (_union == null) {
+      _union = new TupleUnion<>(_nominalEntries, _setOperations);
+    }
+    // Return the default update "gadget" sketch as a compact sketch
+    if (isEmpty()) {
+      return _union.getResult();
+    }
+    // Corner-case: the parameters are not strictly respected when there is a single sketch.
+    // This single sketch might have been the result of a previously accumulated union and
+    // would already have the parameters set.  The sketch is returned as-is without adjusting
+    // nominal entries which requires an additional union operation.
+    if (getNumInputs() == 1 && _accumulator != null && _accumulator.size() == 1) {
+      return _accumulator.get(0);
+    }
+    flush();
     return _union.getResult();
   }
 }

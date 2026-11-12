@@ -23,9 +23,7 @@ import java.util.concurrent.ExecutorService;
 import org.apache.pinot.spi.executor.DecoratorExecutorService;
 
 
-/**
- * An ExecutorService wrapper that automatically wraps all submitted tasks with segment operations context.
- */
+/// An ExecutorService wrapper that automatically wraps all submitted tasks with segment operations context.
 public class SegmentOperationsExecutorService extends DecoratorExecutorService {
   private final SegmentOperationsTaskType _taskType;
   private final String _tableNameWithType;

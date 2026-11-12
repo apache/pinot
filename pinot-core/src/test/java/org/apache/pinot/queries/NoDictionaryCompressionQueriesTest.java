@@ -49,13 +49,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-/**
- * Functional tests for compression type feature.
- * The tests use three kinds of input data
- * (1) string
- * (2) integer
- * (3) long
- */
+/// Functional tests for compression type feature.
+/// The tests use three kinds of input data
+/// (1) string
+/// (2) integer
+/// (3) long
 public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "CompressionCodecQueriesTest");
   private static final String TABLE_NAME = "MyTable";
@@ -244,9 +242,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     return rows;
   }
 
-  /**
-   * Tests for basic compression codec queries.
-   */
+  /// Tests for basic compression codec queries.
   @Test
   public void testQueriesWithCompressionCodec() {
     String query = "SELECT SNAPPY_STRING, ZSTANDARD_STRING, PASS_THROUGH_STRING, LZ4_STRING, "
@@ -268,9 +264,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     testSelectQueryHelper(query, expected.size(), expected);
   }
 
-  /**
-   * Tests for filter over integer values compression codec queries.
-   */
+  /// Tests for filter over integer values compression codec queries.
   @Test
   public void testZstandardIntegerFilterQueriesWithCompressionCodec() {
     String query = "SELECT ZSTANDARD_INTEGER FROM MyTable WHERE ZSTANDARD_INTEGER > 1000 LIMIT 1000";
@@ -285,9 +279,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     testSelectQueryHelper(query, expected.size(), expected);
   }
 
-  /**
-   * Tests for filter over integer values LZ4 compression codec queries.
-   */
+  /// Tests for filter over integer values LZ4 compression codec queries.
   @Test
   public void testLZ4IntegerFilterQueriesWithCompressionCodec() {
     String query = "SELECT LZ4_INTEGER FROM MyTable WHERE LZ4_INTEGER > 1000 LIMIT 1000";
@@ -302,9 +294,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     testSelectQueryHelper(query, expected.size(), expected);
   }
 
-  /**
-   * Tests for filter over integer values GZIP compression codec queries.
-   */
+  /// Tests for filter over integer values GZIP compression codec queries.
   @Test
   public void testGZIPIntegerFilterQueriesWithCompressionCodec() {
     String query = "SELECT GZIP_INTEGER FROM MyTable WHERE GZIP_INTEGER > 1000 LIMIT 1000";
@@ -319,9 +309,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     testSelectQueryHelper(query, expected.size(), expected);
   }
 
-  /**
-   * Tests for filter over integer values compression codec queries.
-   */
+  /// Tests for filter over integer values compression codec queries.
   @Test
   public void testSnappyIntegerFilterQueriesWithCompressionCodec() {
     String query = "SELECT SNAPPY_INTEGER FROM MyTable WHERE SNAPPY_INTEGER > 100 LIMIT 1000";
@@ -336,9 +324,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     testSelectQueryHelper(query, expected.size(), expected);
   }
 
-  /**
-   * Tests for filter over integer values compression codec queries.
-   */
+  /// Tests for filter over integer values compression codec queries.
   @Test
   public void testPassThroughIntegerFilterQueriesWithCompressionCodec() {
     String query = "SELECT PASS_THROUGH_INTEGER FROM MyTable WHERE PASS_THROUGH_INTEGER > 100 LIMIT 1000";
@@ -353,9 +339,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     testSelectQueryHelper(query, expected.size(), expected);
   }
 
-  /**
-   * Tests for filter over string values zstandard compression codec queries.
-   */
+  /// Tests for filter over string values zstandard compression codec queries.
   @Test
   public void testZstandardStringFilterQueriesWithCompressionCodec() {
     String query = "SELECT ZSTANDARD_STRING FROM MyTable WHERE ZSTANDARD_STRING = 'hello_world_123' LIMIT 1000";
@@ -370,9 +354,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     testSelectQueryHelper(query, expected.size(), expected);
   }
 
-  /**
-   * Tests for filter over string values LZ4 compression codec queries.
-   */
+  /// Tests for filter over string values LZ4 compression codec queries.
   @Test
   public void testLZ4StringFilterQueriesWithCompressionCodec() {
     String query = "SELECT LZ4_STRING FROM MyTable WHERE LZ4_STRING = 'hello_world_123' LIMIT 1000";
@@ -387,9 +369,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     testSelectQueryHelper(query, expected.size(), expected);
   }
 
-  /**
-   * Tests for filter over string values GZIP compression codec queries.
-   */
+  /// Tests for filter over string values GZIP compression codec queries.
   @Test
   public void testGZIPStringFilterQueriesWithCompressionCodec() {
     String query = "SELECT GZIP_STRING FROM MyTable WHERE GZIP_STRING = 'hello_world_123' LIMIT 1000";
@@ -404,9 +384,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     testSelectQueryHelper(query, expected.size(), expected);
   }
 
-  /**
-   * Tests for filter over string values snappy compression codec queries.
-   */
+  /// Tests for filter over string values snappy compression codec queries.
   @Test
   public void testSnappyStringFilterQueriesWithCompressionCodec() {
     String query = "SELECT SNAPPY_STRING FROM MyTable WHERE SNAPPY_STRING = 'hello_world_123' LIMIT 1000";

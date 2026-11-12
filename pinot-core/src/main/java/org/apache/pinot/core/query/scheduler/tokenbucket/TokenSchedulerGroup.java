@@ -27,16 +27,14 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.query.scheduler.fcfs.FCFSSchedulerGroup;
 
 
-/**
- * Scheduler group that manages accounting based on the number of tokens.
- *
- * Each SchedulerGroup is allotted a set of token periodically. Token represents
- * a unit of thread wall clock time. Tokens are deducted from group for each unit
- * of time per thread that this group uses. New batch of tokens are allotted periodically
- * by applying linear decay. Linear decay memorizes resource utilization in the previous
- * time quantum penalizing heavy users. This is important to give fair chance to low qps
- * workloads.
- */
+/// Scheduler group that manages accounting based on the number of tokens.
+///
+/// Each SchedulerGroup is allotted a set of token periodically. Token represents
+/// a unit of thread wall clock time. Tokens are deducted from group for each unit
+/// of time per thread that this group uses. New batch of tokens are allotted periodically
+/// by applying linear decay. Linear decay memorizes resource utilization in the previous
+/// time quantum penalizing heavy users. This is important to give fair chance to low qps
+/// workloads.
 public class TokenSchedulerGroup extends AbstractSchedulerGroup {
 
   // constant factor for applying linear decay when allotting tokens.
@@ -104,18 +102,16 @@ public class TokenSchedulerGroup extends AbstractSchedulerGroup {
     super.endQuery();
   }
 
-  /**
-   * Compares priority of this group with respect to another scheduler group.
-   * Priority is compared on the basis of available tokens. SchedulerGroup with
-   * higher number of tokens wins. If both groups have same tokens then the group
-   * with earliest waiting job has higher priority (FCFS if tokens are equal).
-   * If the arrival times of first waiting jobs are also equal then the group
-   * with least reserved resources is selected
-   * @param rhs SchedulerGroupAccount to compare with
-   * @return < 0 if lhs has lower priority than rhs
-   *     > 0 if lhs has higher priority than rhs
-   *     = 0 if lhs has same priority as rhs
-   */
+  /// Compares priority of this group with respect to another scheduler group.
+  /// Priority is compared on the basis of available tokens. SchedulerGroup with
+  /// higher number of tokens wins. If both groups have same tokens then the group
+  /// with earliest waiting job has higher priority (FCFS if tokens are equal).
+  /// If the arrival times of first waiting jobs are also equal then the group
+  /// with least reserved resources is selected
+  /// @param rhs SchedulerGroupAccount to compare with
+  /// @return < 0 if lhs has lower priority than rhs
+  ///     > 0 if lhs has higher priority than rhs
+  ///     = 0 if lhs has same priority as rhs
   @Override
   public int compareTo(SchedulerGroupAccountant rhs) {
     if (rhs == null) {

@@ -50,10 +50,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Single entry point for all table rebalance related operations. This class should be used to initiate table rebalance
- * operations, rather than directly instantiating objects of {@link TableRebalancer}.
- */
+/// Single entry point for all table rebalance related operations. This class should be used to initiate table rebalance
+/// operations, rather than directly instantiating objects of [TableRebalancer].
 public class TableRebalanceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalanceManager.class);
 
@@ -72,15 +70,13 @@ public class TableRebalanceManager {
     _executorService = executorService;
   }
 
-  /**
-   * Do a table rebalance dry-run for the table with the given name and type.
-   *
-   * @param tableNameWithType name of the table to rebalance
-   * @param rebalanceConfig configuration for the rebalance operation
-   * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
-   * @return result of the rebalance dry-run operation
-   * @throws TableNotFoundException if the table does not exist
-   */
+  /// Do a table rebalance dry-run for the table with the given name and type.
+  ///
+  /// @param tableNameWithType name of the table to rebalance
+  /// @param rebalanceConfig configuration for the rebalance operation
+  /// @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
+  /// @return result of the rebalance dry-run operation
+  /// @throws TableNotFoundException if the table does not exist
   public RebalanceResult rebalanceTableDryRun(String tableNameWithType, RebalanceConfig rebalanceConfig,
       String rebalanceJobId)
       throws TableNotFoundException {
@@ -98,20 +94,18 @@ public class TableRebalanceManager {
     }
   }
 
-  /**
-   * Rebalance the table with the given name and type synchronously. It's the responsibility of the caller to ensure
-   * that this rebalance is run on the rebalance thread pool in the controller that respects the configuration
-   * {@link org.apache.pinot.controller.ControllerConf#CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS}.
-   *
-   * @param tableNameWithType name of the table to rebalance
-   * @param rebalanceConfig configuration for the rebalance operation
-   * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
-   * @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
-   *                     {@link RebalanceChecker}).
-   * @return result of the rebalance operation
-   * @throws TableNotFoundException if the table does not exist
-   * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
-   */
+  /// Rebalance the table with the given name and type synchronously. It's the responsibility of the caller to ensure
+  /// that this rebalance is run on the rebalance thread pool in the controller that respects the configuration
+  /// [org.apache.pinot.controller.ControllerConf#CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS].
+  ///
+  /// @param tableNameWithType name of the table to rebalance
+  /// @param rebalanceConfig configuration for the rebalance operation
+  /// @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
+  /// @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
+  ///                     [RebalanceChecker]).
+  /// @return result of the rebalance operation
+  /// @throws TableNotFoundException if the table does not exist
+  /// @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
   public RebalanceResult rebalanceTable(String tableNameWithType, RebalanceConfig rebalanceConfig,
       String rebalanceJobId, boolean allowRetries)
       throws TableNotFoundException, RebalanceInProgressException {
@@ -131,20 +125,18 @@ public class TableRebalanceManager {
         zkBasedTableRebalanceObserver);
   }
 
-  /**
-   * Rebalance the table with the given name and type asynchronously. The number of concurrent rebalances permitted
-   * on this controller is configured by
-   * {@link org.apache.pinot.controller.ControllerConf#CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS}
-   *
-   * @param tableNameWithType name of the table to rebalance
-   * @param rebalanceConfig configuration for the rebalance operation
-   * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
-   * @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
-   *                     {@link RebalanceChecker}).
-   * @return a CompletableFuture that will complete with the result of the rebalance operation
-   * @throws TableNotFoundException if the table does not exist
-   * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
-   */
+  /// Rebalance the table with the given name and type asynchronously. The number of concurrent rebalances permitted
+  /// on this controller is configured by
+  /// [org.apache.pinot.controller.ControllerConf#CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS]
+  ///
+  /// @param tableNameWithType name of the table to rebalance
+  /// @param rebalanceConfig configuration for the rebalance operation
+  /// @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
+  /// @param allowRetries whether to allow retries for failed or stuck rebalance operations (through
+  ///                     [RebalanceChecker]).
+  /// @return a CompletableFuture that will complete with the result of the rebalance operation
+  /// @throws TableNotFoundException if the table does not exist
+  /// @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
   public CompletableFuture<RebalanceResult> rebalanceTableAsync(String tableNameWithType,
       RebalanceConfig rebalanceConfig, String rebalanceJobId, boolean allowRetries)
       throws TableNotFoundException, RebalanceInProgressException {
@@ -169,19 +161,17 @@ public class TableRebalanceManager {
         _executorService);
   }
 
-  /**
-   * Rebalance the table with the given name and type asynchronously. The number of concurrent rebalances permitted
-   * on this controller is configured by
-   * {@link org.apache.pinot.controller.ControllerConf#CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS}
-   *
-   * @param tableNameWithType name of the table to rebalance
-   * @param tableConfig configuration for the table to rebalance
-   * @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
-   * @param rebalanceConfig configuration for the rebalance operation
-   * @param zkBasedTableRebalanceObserver observer to track rebalance progress in ZK
-   * @return a CompletableFuture that will complete with the result of the rebalance operation
-   * @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
-   */
+  /// Rebalance the table with the given name and type asynchronously. The number of concurrent rebalances permitted
+  /// on this controller is configured by
+  /// [org.apache.pinot.controller.ControllerConf#CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS]
+  ///
+  /// @param tableNameWithType name of the table to rebalance
+  /// @param tableConfig configuration for the table to rebalance
+  /// @param rebalanceJobId ID of the rebalance job, which is used to track the progress of the rebalance operation
+  /// @param rebalanceConfig configuration for the rebalance operation
+  /// @param zkBasedTableRebalanceObserver observer to track rebalance progress in ZK
+  /// @return a CompletableFuture that will complete with the result of the rebalance operation
+  /// @throws RebalanceInProgressException if a rebalance job is already in progress for the table (as per ZK metadata)
   public CompletableFuture<RebalanceResult> rebalanceTableAsync(String tableNameWithType, TableConfig tableConfig,
       String rebalanceJobId, RebalanceConfig rebalanceConfig,
       @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver)
@@ -225,15 +215,13 @@ public class TableRebalanceManager {
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }
 
-  /**
-   * Cancels ongoing rebalance jobs (if any) for the given table.
-   *
-   * @param tableNameWithType name of the table for which to cancel any ongoing rebalance job
-   * @param resourceManager resource manager to use for updating the job metadata in ZK
-   * @param setToStatus status to set the cancelled jobs to. Must be either {@link RebalanceResult.Status#ABORTED}
-   *                    or {@link RebalanceResult.Status#CANCELLED}
-   * @return the list of job IDs that were cancelled
-   */
+  /// Cancels ongoing rebalance jobs (if any) for the given table.
+  ///
+  /// @param tableNameWithType name of the table for which to cancel any ongoing rebalance job
+  /// @param resourceManager resource manager to use for updating the job metadata in ZK
+  /// @param setToStatus status to set the cancelled jobs to. Must be either [RebalanceResult.Status#ABORTED]
+  ///                    or [RebalanceResult.Status#CANCELLED]
+  /// @return the list of job IDs that were cancelled
   public static List<String> cancelRebalance(String tableNameWithType, PinotHelixResourceManager resourceManager,
       RebalanceResult.Status setToStatus) {
     Preconditions.checkArgument(setToStatus.equals(RebalanceResult.Status.ABORTED) || setToStatus.equals(
@@ -267,14 +255,12 @@ public class TableRebalanceManager {
     return cancelledJobIds;
   }
 
-  /**
-   * Gets the status of the rebalance job with the given ID.
-   *
-   * @param jobId ID of the rebalance job to get the status for
-   * @return response containing the status of the rebalance job
-   * @throws JsonProcessingException if there is an error processing the rebalance progress stats from ZK
-   * @throws NotFoundException if the rebalance job with the given ID does not exist
-   */
+  /// Gets the status of the rebalance job with the given ID.
+  ///
+  /// @param jobId ID of the rebalance job to get the status for
+  /// @return response containing the status of the rebalance job
+  /// @throws JsonProcessingException if there is an error processing the rebalance progress stats from ZK
+  /// @throws NotFoundException if the rebalance job with the given ID does not exist
   public ServerRebalanceJobStatusResponse getRebalanceStatus(String jobId)
       throws JsonProcessingException {
     Map<String, String> controllerJobZKMetadata =
@@ -313,13 +299,11 @@ public class TableRebalanceManager {
     }
   }
 
-  /**
-   * Checks if there is an ongoing rebalance job for the given table.
-   *
-   * @param tableNameWithType name of the table to check for ongoing rebalance jobs
-   * @param propertyStore ZK property store to read the job metadata from
-   * @return jobId of the ongoing rebalance job if one exists, {@code null} otherwise
-   */
+  /// Checks if there is an ongoing rebalance job for the given table.
+  ///
+  /// @param tableNameWithType name of the table to check for ongoing rebalance jobs
+  /// @param propertyStore ZK property store to read the job metadata from
+  /// @return jobId of the ongoing rebalance job if one exists, `null` otherwise
   @Nullable
   public static String rebalanceJobInProgress(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     // Get all jobMetadata for the given table with a single ZK read.

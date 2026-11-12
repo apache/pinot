@@ -372,17 +372,15 @@ public class SegmentDeletionManager {
   }
 
 
-  /**
-   * Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
-   * Looks for the segment file in two formats:
-   * - Without extension (conventional naming)
-   * - With .tar.gz extension (used by minions in BaseMultipleSegmentsConversionExecutor)
-   *
-   * @param rawTableName name of the table containing the segment
-   * @param segmentId name of the segment
-   * @return URI of the existing segment file if found in either format, null if segment doesn't exist in either format
-   *         or if there are filesystem access errors
-   */
+  /// Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
+  /// Looks for the segment file in two formats:
+  /// - Without extension (conventional naming)
+  /// - With .tar.gz extension (used by minions in BaseMultipleSegmentsConversionExecutor)
+  ///
+  /// @param rawTableName name of the table containing the segment
+  /// @param segmentId name of the segment
+  /// @return URI of the existing segment file if found in either format, null if segment doesn't exist in either format
+  ///         or if there are filesystem access errors
   @Nullable
   private URI getFileToDeleteURI(String rawTableName, String segmentId) {
     try {
@@ -408,24 +406,20 @@ public class SegmentDeletionManager {
       return null;
     }
   }
-  /**
-   * Removes aged deleted segments from the deleted directory using the default batch size.
-   * This method processes aged segments in batches to avoid overwhelming the system.
-   *
-   * @param leadControllerManager the lead controller manager to check if this controller is the leader for tables
-   */
+  /// Removes aged deleted segments from the deleted directory using the default batch size.
+  /// This method processes aged segments in batches to avoid overwhelming the system.
+  ///
+  /// @param leadControllerManager the lead controller manager to check if this controller is the leader for tables
   public void removeAgedDeletedSegments(LeadControllerManager leadControllerManager) {
     removeAgedDeletedSegments(leadControllerManager, NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT);
   }
 
-  /**
-   * Removes aged deleted segments from the deleted directory with a custom batch size.
-   * This method asynchronously deletes segments that have exceeded their retention period.
-   * Only the leader controller for each table will perform the deletion to avoid conflicts.
-   *
-   * @param leadControllerManager the lead controller manager to check if this controller is the leader for tables
-   * @param agedSegmentsDeletionBatchSize the maximum number of aged segments to process in a single batch
-   */
+  /// Removes aged deleted segments from the deleted directory with a custom batch size.
+  /// This method asynchronously deletes segments that have exceeded their retention period.
+  /// Only the leader controller for each table will perform the deletion to avoid conflicts.
+  ///
+  /// @param leadControllerManager the lead controller manager to check if this controller is the leader for tables
+  /// @param agedSegmentsDeletionBatchSize the maximum number of aged segments to process in a single batch
   public void removeAgedDeletedSegments(LeadControllerManager leadControllerManager,
       int agedSegmentsDeletionBatchSize) {
     if (_dataDir != null) {

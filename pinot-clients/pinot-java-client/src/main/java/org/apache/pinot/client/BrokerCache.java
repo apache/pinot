@@ -51,10 +51,8 @@ import org.asynchttpclient.Dsl;
 import org.asynchttpclient.Response;
 
 
-/**
- * Maintains table -> list of brokers, supports update
- * TODO can we introduce a SSE based controller endpoint to make the update reactive in the client?
- */
+/// Maintains table -> list of brokers, supports update
+/// TODO can we introduce a SSE based controller endpoint to make the update reactive in the client?
 public class BrokerCache {
 
   @JsonIgnoreProperties(ignoreUnknown = true)

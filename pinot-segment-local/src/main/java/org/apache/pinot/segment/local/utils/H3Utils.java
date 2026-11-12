@@ -49,9 +49,7 @@ public class H3Utils {
     }
   }
 
-  /**
-   * Returns the H3 cells that is crossed by the line.
-   */
+  /// Returns the H3 cells that is crossed by the line.
   private static LongSet coverLineInH3(LineString lineString, int resolution) {
     Coordinate[] endPoints = lineString.getCoordinates();
     int numEndPoints = endPoints.length;
@@ -71,9 +69,7 @@ public class H3Utils {
     return coveringCells;
   }
 
-  /**
-   * Returns the H3 cells that is fully covered and potentially covered (excluding fully covered) by the polygon.
-   */
+  /// Returns the H3 cells that is fully covered and potentially covered (excluding fully covered) by the polygon.
   private static Pair<LongSet, LongSet> coverPolygonInH3(Polygon polygon, int resolution) {
     // TODO: this can be further optimized to use native H3 implementation. They have plan to support natively.
     // https://github.com/apache/pinot/issues/8547
@@ -117,9 +113,7 @@ public class H3Utils {
     return GeometryUtils.GEOMETRY_FACTORY.createPolygon(coordinates);
   }
 
-  /**
-   * Returns the H3 cells that is fully covered and potentially covered (excluding fully covered) by the geometry.
-   */
+  /// Returns the H3 cells that is fully covered and potentially covered (excluding fully covered) by the geometry.
   public static Pair<LongSet, LongSet> coverGeometryInH3(Geometry geometry, int resolution) {
     if (geometry instanceof Point) {
       return Pair.of(LongSets.EMPTY_SET,

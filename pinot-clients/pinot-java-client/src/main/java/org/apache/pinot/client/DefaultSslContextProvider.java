@@ -25,9 +25,7 @@ import javax.net.ssl.SSLEngine;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 
 
-/**
- * Default SSL context provider that uses the JDK/BCJSSE stack and disables OpenSSL.
- */
+/// Default SSL context provider that uses the JDK/BCJSSE stack and disables OpenSSL.
 public class DefaultSslContextProvider implements SslContextProvider {
 
   @Override

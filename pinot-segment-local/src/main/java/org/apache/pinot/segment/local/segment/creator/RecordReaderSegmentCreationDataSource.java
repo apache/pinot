@@ -29,10 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * {@link SegmentCreationDataSource} that uses a
- * {@link RecordReader} as the underlying data source.
- */
+/// [SegmentCreationDataSource] that uses a
+/// [RecordReader] as the underlying data source.
 // TODO: make it Closeable so that resource in record reader can be released
 public class RecordReaderSegmentCreationDataSource implements SegmentCreationDataSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordReaderSegmentCreationDataSource.class);
@@ -72,7 +70,7 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
           }
         } catch (Exception e) {
           if (!continueOnError) {
-            throw new RuntimeException("Caught exception while reading data", e);
+            throw new RecordProcessingException("Caught exception while reading data", e);
           }
           LOGGER.debug("Caught exception while reading data", e);
         }

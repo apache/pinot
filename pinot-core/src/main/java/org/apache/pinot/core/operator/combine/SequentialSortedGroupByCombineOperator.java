@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.combine;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Record;
@@ -37,21 +36,19 @@ import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.core.util.GroupByUtils;
 
 
-/**
- * <p>Sequential Combine operator for sort-aggregation</p>
- *
- * <p>This operator merges sorted group-by results similar to other
- * {@link BaseSingleBlockCombineOperator}s,
- * as it uses a producer-consumer paradigm.</p>
- *
- * <p>Each worker thread produces sorted segment-level group-by results
- * while the main thread consumer via a {@code _blockingQueue} and merges them</p>
- *
- * <p>This allows merging in a streaming fashion without having to wait
- * for all segments to be ready. This sequential merging is usually
- * more efficient than the pair-size merging {@link SortedGroupByCombineOperator}
- * when the number of segments is smaller than the available number of cores</p>
- */
+/// Sequential Combine operator for sort-aggregation
+///
+/// This operator merges sorted group-by results similar to other
+/// [BaseSingleBlockCombineOperator]s,
+/// as it uses a producer-consumer paradigm.
+///
+/// Each worker thread produces sorted segment-level group-by results
+/// while the main thread consumer via a `_blockingQueue` and merges them
+///
+/// This allows merging in a streaming fashion without having to wait
+/// for all segments to be ready. This sequential merging is usually
+/// more efficient than the pair-size merging [SortedGroupByCombineOperator]
+/// when the number of segments is smaller than the available number of cores
 @SuppressWarnings({"rawtypes"})
 public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
   // TODO: Consider changing it to "COMBINE_GROUP_BY_SEQUENTIAL_SORTED" to distinguish from GroupByCombineOperator
@@ -75,10 +72,8 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
     _sortedRecordsMerger = new SortedRecordsMerger(queryContext, queryContext.getLimit(), recordKeyComparator);
   }
 
-  /**
-   * For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many tasks as
-   * the default number of query worker threads (or the number of operators / segments if that's lower).
-   */
+  /// For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many
+  /// tasks as the default number of query worker threads (or the number of operators / segments if that's lower).
   private static QueryContext overrideMaxExecutionThreads(QueryContext queryContext, int numOperators) {
     int maxExecutionThreads = queryContext.getMaxExecutionThreads();
     if (maxExecutionThreads <= 0) {
@@ -92,9 +87,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
     return EXPLAIN_NAME;
   }
 
-  /**
-   * Executes query on one sorted segment in a worker thread and ship them via {@link this#_blockingQueue}
-   */
+  /// Executes query on one sorted segment in a worker thread and ship them via [this#_blockingQueue]
   @Override
   protected void processSegments() {
     int operatorId;
@@ -133,7 +126,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
       if (waitTimeMs <= 0) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }
-      BaseResultsBlock blockToMerge = _blockingQueue.poll(waitTimeMs, TimeUnit.MILLISECONDS);
+      BaseResultsBlock blockToMerge = pollResultsBlock(_blockingQueue, endTimeMs);
       if (blockToMerge == null) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }
@@ -143,6 +136,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
         return blockToMerge;
       }
       GroupByResultsBlock groupByResultBlockToMerge = (GroupByResultsBlock) blockToMerge;
+      GroupByUtils.validateFullGroupingSetsLayout(groupByResultBlockToMerge, _queryContext);
       if (dataSchema == null) {
         dataSchema = groupByResultBlockToMerge.getDataSchema();
       }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import com.google.common.collect.Maps;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.nio.charset.StandardCharsets;
@@ -25,26 +26,39 @@ import java.sql.Timestamp;
 import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
+import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.function.scalar.IpAddressFunctions;
 import org.apache.pinot.common.function.scalar.StringFunctions;
+import org.apache.pinot.common.function.scalar.uuid.UuidToStringScalarFunction;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.RoaringBitmap;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -62,6 +76,32 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       expectedValues[i] = _stringAlphaNumericSVValues[i].toLowerCase();
     }
     testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testGenerateArrayOnColumnsTransformFunction() {
+    // GenerateArrayTransformFunction takes only literals, so a call on columns must use the scalar function.
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("generateArray(%s, %s, 1)", INT_SV_COLUMN, INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    int[][] expectedIntValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedIntValues[i] = new int[]{_intSVValues[i]};
+    }
+    testTransformFunctionMV(transformFunction, expectedIntValues);
+
+    expression =
+        RequestContextUtils.getExpression(String.format("generateArray(%s, %s)", LONG_SV_COLUMN, LONG_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
+    long[][] expectedLongValues = new long[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedLongValues[i] = new long[]{_longSVValues[i]};
+    }
+    testTransformFunctionMV(transformFunction, expectedLongValues);
   }
 
   @Test
@@ -1199,6 +1239,46 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testUuidToStringTransformFunction()
+      throws NoSuchMethodException {
+    byte[][] uuidValues = new byte[NUM_ROWS][];
+    String[] uuidStrings = new String[NUM_ROWS];
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      UUID uuid = new UUID(i, i + 1L);
+      uuidValues[i] = UuidUtils.toBytes(uuid);
+      uuidStrings[i] = uuid.toString().toUpperCase();
+      expectedValues[i] = uuid.toString();
+    }
+
+    ScalarTransformFunctionWrapper uuidTransform =
+        new ScalarTransformFunctionWrapper(FunctionInfo.fromMethod(
+            UuidToStringScalarFunction.class.getDeclaredMethod("uuidToString", UUID.class)));
+    StaticUuidTransformFunction uuidTransformFunction = new StaticUuidTransformFunction(uuidValues);
+    uuidTransformFunction.init(List.of(), Map.of());
+    uuidTransform.init(List.of(uuidTransformFunction), Map.of());
+
+    ScalarTransformFunctionWrapper bytesTransform =
+        new ScalarTransformFunctionWrapper(FunctionInfo.fromMethod(
+            UuidToStringScalarFunction.class.getDeclaredMethod("uuidToString", byte[].class)));
+    StaticBytesTransformFunction bytesTransformFunction = new StaticBytesTransformFunction(uuidValues);
+    bytesTransformFunction.init(List.of(), Map.of());
+    bytesTransform.init(List.of(bytesTransformFunction), Map.of());
+
+    ScalarTransformFunctionWrapper stringTransform =
+        new ScalarTransformFunctionWrapper(FunctionInfo.fromMethod(
+            UuidToStringScalarFunction.class.getDeclaredMethod("uuidToString", String.class)));
+    StaticStringTransformFunction stringTransformFunction = new StaticStringTransformFunction(uuidStrings);
+    stringTransformFunction.init(List.of(), Map.of());
+    stringTransform.init(List.of(stringTransformFunction), Map.of());
+
+    assertEquals(uuidTransform.getName(), "uuidToString");
+    testTransformFunction(uuidTransform, expectedValues);
+    testTransformFunction(bytesTransform, expectedValues);
+    testTransformFunction(stringTransform, expectedValues);
+  }
+
+  @Test
   public void testStringLowerTransformFunctionNullLiteral() {
     ExpressionContext expression =
         RequestContextUtils.getExpression("lower(null)");
@@ -1228,6 +1308,66 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
+  @Test
+  public void testNullArgumentsWithNullHandling() {
+    String expression = String.format("prefixesWithPrefix(%s, 3, %s)", STRING_SV_COLUMN, STRING_SV_NULL_COLUMN);
+    TransformFunction transformFunction = getTransformFunctionWithNullHandling(expression);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertNull(transformFunction.getNullBitmap(_projectionBlock));
+    String[][] values = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      String prefix = isNullRow(i) ? null : _stringSVValues[i];
+      assertEquals(values[i], StringFunctions.prefixesWithPrefix(_stringSVValues[i], 3, prefix));
+    }
+
+    // Without null handling, a null argument makes the row null
+    transformFunction = TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), _dataSourceMap);
+    assertEquals(transformFunction.getNullBitmap(_projectionBlock), getNullRows());
+  }
+
+  @Test
+  public void testNullLiteralArgumentWithNullHandling() {
+    TransformFunction transformFunction =
+        getTransformFunctionWithNullHandling(String.format("prefixesWithPrefix(%s, 3, null)", STRING_SV_COLUMN));
+    assertNull(transformFunction.getNullBitmap(_projectionBlock));
+    String[][] values = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(values[i], StringFunctions.prefixes(_stringSVValues[i], 3));
+    }
+  }
+
+  @Test
+  public void testNullResultsWithNullHandling() {
+    TransformFunction transformFunction =
+        getTransformFunctionWithNullHandling(String.format("prefixesWithPrefix(%s, 3, '^')", STRING_SV_NULL_COLUMN));
+    String[][] values = transformFunction.transformToStringValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      String[] expectedValues = isNullRow(i) ? NullValuePlaceHolder.STRING_ARRAY
+          : StringFunctions.prefixesWithPrefix(_stringSVValues[i], 3, "^");
+      assertEquals(values[i], expectedValues);
+    }
+    assertEquals(transformFunction.getNullBitmap(_projectionBlock), getNullRows());
+  }
+
+  private TransformFunction getTransformFunctionWithNullHandling(String expression) {
+    Map<String, ColumnContext> columnContextMap = Maps.newHashMapWithExpectedSize(_dataSourceMap.size());
+    _dataSourceMap.forEach(
+        (column, dataSource) -> columnContextMap.put(column, ColumnContext.fromDataSource(dataSource)));
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SET enableNullHandling=true; SELECT * FROM testTable");
+    return TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), columnContextMap, queryContext);
+  }
+
+  private RoaringBitmap getNullRows() {
+    RoaringBitmap nullRows = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        nullRows.add(i);
+      }
+    }
+    return nullRows;
   }
 
   @Test
@@ -1662,5 +1802,126 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       expectedValues[i] = sum;
     }
     testTransformFunction(transformFunction, expectedValues);
+  }
+
+  // Test-only scalar function with an `Object` parameter, registered the same way as the ones above. It returns the
+  // Java class of the argument, so the test below can check which class an `Object` parameter receives per type.
+
+  @ScalarFunction
+  public static String objectArgumentClass(Object value) {
+    return value.getClass().getSimpleName();
+  }
+
+  @DataProvider
+  public static Object[][] objectArgumentClassDataProvider() {
+    // The argument should be the external Java value, the same as ColumnDataType.toExternal() in the multi-stage
+    // engine FunctionOperand.
+    return new Object[][]{
+        {INT_SV_COLUMN, "Integer"},
+        {LONG_SV_COLUMN, "Long"},
+        {FLOAT_SV_COLUMN, "Float"},
+        {DOUBLE_SV_COLUMN, "Double"},
+        {BIG_DECIMAL_SV_COLUMN, "BigDecimal"},
+        {String.format("CAST(%s AS BOOLEAN)", INT_SV_COLUMN), "Boolean"},
+        {TIMESTAMP_COLUMN, "Timestamp"},
+        {STRING_SV_COLUMN, "String"},
+        {JSON_COLUMN, "String"},
+        {BYTES_SV_COLUMN, "byte[]"},
+        {UUID_SV_COLUMN, "UUID"},
+        {INT_MV_COLUMN, "int[]"},
+        {LONG_MV_COLUMN, "long[]"},
+        {FLOAT_MV_COLUMN, "float[]"},
+        {DOUBLE_MV_COLUMN, "double[]"},
+        {String.format("CAST(%s AS BIG_DECIMAL)", INT_MV_COLUMN), "BigDecimal[]"},
+        {String.format("CAST(%s AS BOOLEAN)", INT_MV_COLUMN), "boolean[]"},
+        {String.format("CAST(%s AS TIMESTAMP)", LONG_MV_COLUMN), "Timestamp[]"},
+        {STRING_MV_COLUMN, "String[]"}
+    };
+  }
+
+  @Test(dataProvider = "objectArgumentClassDataProvider")
+  public void testObjectParameter(String argument, String expectedClass) {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("objectArgumentClass(%s)", argument));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, expectedClass);
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  private static class StaticUuidTransformFunction extends BaseTransformFunction {
+    private static final TransformResultMetadata RESULT_METADATA =
+        new TransformResultMetadata(DataType.UUID, true, false);
+    private final byte[][] _uuidValues;
+
+    private StaticUuidTransformFunction(byte[][] uuidValues) {
+      _uuidValues = uuidValues;
+    }
+
+    @Override
+    public String getName() {
+      return "staticUuid";
+    }
+
+    @Override
+    public TransformResultMetadata getResultMetadata() {
+      return RESULT_METADATA;
+    }
+
+    @Override
+    public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+      return _uuidValues;
+    }
+  }
+
+  private static class StaticBytesTransformFunction extends BaseTransformFunction {
+    private static final TransformResultMetadata RESULT_METADATA =
+        new TransformResultMetadata(DataType.BYTES, true, false);
+    private final byte[][] _values;
+
+    private StaticBytesTransformFunction(byte[][] values) {
+      _values = values;
+    }
+
+    @Override
+    public String getName() {
+      return "staticBytes";
+    }
+
+    @Override
+    public TransformResultMetadata getResultMetadata() {
+      return RESULT_METADATA;
+    }
+
+    @Override
+    public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+      return _values;
+    }
+  }
+
+  private static class StaticStringTransformFunction extends BaseTransformFunction {
+    private static final TransformResultMetadata RESULT_METADATA =
+        new TransformResultMetadata(DataType.STRING, true, false);
+    private final String[] _values;
+
+    private StaticStringTransformFunction(String[] values) {
+      _values = values;
+    }
+
+    @Override
+    public String getName() {
+      return "staticString";
+    }
+
+    @Override
+    public TransformResultMetadata getResultMetadata() {
+      return RESULT_METADATA;
+    }
+
+    @Override
+    public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+      return _values;
+    }
   }
 }

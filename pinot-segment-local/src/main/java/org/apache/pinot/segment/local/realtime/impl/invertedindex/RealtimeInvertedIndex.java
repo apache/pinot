@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.segment.spi.index.mutable.MutableInvertedIndex;
@@ -25,10 +26,9 @@ import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * Real-time bitmap based inverted index reader which allows adding values on the fly.
- * <p>This class is thread-safe for single writer multiple readers.
- */
+/// Real-time bitmap based inverted index reader which allows adding values on the fly.
+///
+/// This class is thread-safe for single writer multiple readers.
 public class RealtimeInvertedIndex implements MutableInvertedIndex {
   private final ArrayList<ThreadSafeMutableRoaringBitmap> _bitmaps = new ArrayList<>();
   private final ReentrantReadWriteLock.ReadLock _readLock;
@@ -40,9 +40,7 @@ public class RealtimeInvertedIndex implements MutableInvertedIndex {
     _writeLock = readWriteLock.writeLock();
   }
 
-  /**
-   * Adds the document id to the bitmap of the given dictionary id.
-   */
+  /// Adds the document id to the bitmap of the given dictionary id.
   @Override
   public void add(int dictId, int docId) {
     if (_bitmaps.size() == dictId) {
@@ -57,6 +55,22 @@ public class RealtimeInvertedIndex implements MutableInvertedIndex {
     } else {
       // Bitmap for the dictionary id already exists, check and add document id into the bitmap
       _bitmaps.get(dictId).add(docId);
+    }
+  }
+
+  /// Pre-creates an empty bitmap for the next dictionary id. Used by callers that reserve a
+  /// dictionary id upfront (e.g. OPEN_STRUCT key columns reserve dictId 0 for the default null
+  /// value) so that subsequent contiguous [#add] calls stay aligned with dictionary ids. Must be
+  /// called before any [#add] call, on a single thread, prior to publishing this index to readers.
+  public void reserveNextDictId() {
+    Preconditions.checkState(_bitmaps.isEmpty(), "reserveNextDictId() must be called on an empty index, found %s "
+        + "existing bitmap(s)", _bitmaps.size());
+    ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap();
+    try {
+      _writeLock.lock();
+      _bitmaps.add(bitmap);
+    } finally {
+      _writeLock.unlock();
     }
   }
 

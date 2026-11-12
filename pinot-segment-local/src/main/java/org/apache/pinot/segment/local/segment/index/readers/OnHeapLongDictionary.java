@@ -26,26 +26,23 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Implementation of long dictionary that cache all values on-heap.
- * <p>This is useful for Long columns that:
- * <ul>
- *   <li>Have low cardinality long dictionary where memory footprint on-heap is acceptably small</li>
- *   <li>Is heavily queried</li>
- * </ul>
- * <p>This helps avoid creation of Long from byte[].
- */
+/// Implementation of long dictionary that cache all values on-heap.
+///
+/// This is useful for Long columns that:
+///
+/// - Have low cardinality long dictionary where memory footprint on-heap is acceptably small
+/// - Is heavily queried
+///
+/// This helps avoid creation of Long from byte\[\].
 public class OnHeapLongDictionary extends BaseImmutableDictionary {
   private final Long2IntOpenHashMap _valToDictId;
   private final long[] _dictIdToVal;
 
-  /**
-   * Constructor for the class.
-   * Populates the value <-> mappings.
-   *
-   * @param dataBuffer Pinot data buffer
-   * @param length Length of the dictionary
-   */
+  /// Constructor for the class.
+  /// Populates the value <-> mappings.
+  ///
+  /// @param dataBuffer Pinot data buffer
+  /// @param length Length of the dictionary
   public OnHeapLongDictionary(PinotDataBuffer dataBuffer, int length) {
     super(dataBuffer, length, Long.BYTES);
 

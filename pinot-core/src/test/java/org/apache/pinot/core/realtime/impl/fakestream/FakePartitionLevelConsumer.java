@@ -41,10 +41,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils.unpackAvroTarFile;
 
 
-/**
- * Implementation of {@link PartitionGroupConsumer} for fake stream
- * Unpacks tar files in /resources/data/On_Time_Performance_2014_partition_<partition>.tar.gz as source of messages
- */
+/// Implementation of [PartitionGroupConsumer] for fake stream
+/// Unpacks tar files in /resources/data/On_Time_Performance_2014_partition\_<partition>.tar.gz as source of messages
 public class FakePartitionLevelConsumer implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(FakePartitionLevelConsumer.class);
 
@@ -108,10 +106,8 @@ public class FakePartitionLevelConsumer implements PartitionGroupConsumer {
       throws IOException {
   }
 
-  /**
-   * Partitions the raw data
-   * This can be abstracted out and injected via stream configs to incorporate custom partitioning logic
-   */
+  /// Partitions the raw data
+  /// This can be abstracted out and injected via stream configs to incorporate custom partitioning logic
   public int getPartitionNumber(int recordNumber, int numPartitions) {
     return recordNumber % numPartitions;
   }

@@ -94,9 +94,7 @@ public class PhysicalTimeSeriesServerPlanVisitor {
         segments, getServerQueryRequestMetadataMap(context), _serverMetrics);
   }
 
-  /**
-   * Create a transform expression, and link it with an aggregation function.
-   */
+  /// Create a transform expression, and link it with an aggregation function.
   @VisibleForTesting
   QueryContext compileQueryContext(LeafTimeSeriesPlanNode leafNode, TimeSeriesExecutionContext context) {
     FilterContext filterContext =

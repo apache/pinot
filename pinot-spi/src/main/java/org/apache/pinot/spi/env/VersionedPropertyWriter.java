@@ -23,11 +23,9 @@ import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesWrite
 import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 
 
-/**
- * SegmentMetadataPropertyWriter extends the PropertiesWriter
- * <p>
- * Purpose: custom property writer for writing the segment metadata faster by skipping the escaping of key.
- */
+/// SegmentMetadataPropertyWriter extends the PropertiesWriter
+///
+/// Purpose: custom property writer for writing the segment metadata faster by skipping the escaping of key.
 public class VersionedPropertyWriter extends PropertiesWriter {
 
   public VersionedPropertyWriter(final Writer writer, ListDelimiterHandler handler) {

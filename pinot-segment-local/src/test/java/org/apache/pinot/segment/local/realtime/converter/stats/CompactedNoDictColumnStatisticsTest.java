@@ -25,13 +25,12 @@ import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -41,6 +40,115 @@ import static org.testng.Assert.assertTrue;
 /// STRING, BYTES), single-value and multi-value columns, with and without `sortedDocIds`, with partial and full valid
 /// doc sets, and edge cases such as empty bitmaps and the `isSortedColumn` flag.
 public class CompactedNoDictColumnStatisticsTest {
+
+  // ======== Constant value ========
+
+  @Test
+  public void testConstantValueSkipsScan() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.INT, true);
+
+    DataSource dataSource = mockDataSource(forwardIndex);
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    when(metadata.getMinValue()).thenReturn(42);
+    when(metadata.getMaxValue()).thenReturn(42);
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1, 2);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(dataSource, null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), 42);
+    assertEquals(stats.getMaxValue(), 42);
+    assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 3);
+    // Every document holds the same value, so the forward index is never read
+    verify(forwardIndex, never()).getInt(anyInt());
+  }
+
+  @Test
+  public void testConstantBigDecimalDerivesLengthWithoutScan() {
+    BigDecimal value = new BigDecimal("10.5");
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.BIG_DECIMAL, true);
+
+    DataSource dataSource = mockDataSource(forwardIndex);
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    when(metadata.getMinValue()).thenReturn(value);
+    when(metadata.getMaxValue()).thenReturn(value);
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(dataSource, null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), value);
+    assertEquals(stats.getMaxValue(), value);
+    assertEquals(stats.getLengthOfShortestElement(), BigDecimalUtils.byteSize(value));
+    assertEquals(stats.getLengthOfLongestElement(), BigDecimalUtils.byteSize(value));
+    assertTrue(stats.isSorted());
+    verify(forwardIndex, never()).getBigDecimal(anyInt());
+  }
+
+  @Test
+  public void testConstantAsciiStringDerivesLengthWithoutScan() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.STRING, true);
+
+    DataSource dataSource = mockDataSource(forwardIndex);
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    when(metadata.getMinValue()).thenReturn("abc");
+    when(metadata.getMaxValue()).thenReturn("abc");
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(dataSource, null, false, validDocIds);
+
+    assertEquals(stats.getLengthOfShortestElement(), 3);
+    assertEquals(stats.getLengthOfLongestElement(), 3);
+    assertTrue(stats.isAscii());
+    assertTrue(stats.isSorted());
+    verify(forwardIndex, never()).getString(anyInt());
+  }
+
+  @Test
+  public void testConstantNonAsciiStringDerivesLengthWithoutScan() {
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.STRING, true);
+
+    DataSource dataSource = mockDataSource(forwardIndex);
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    when(metadata.getMinValue()).thenReturn("é");
+    when(metadata.getMaxValue()).thenReturn("é");
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(dataSource, null, false, validDocIds);
+
+    // Two UTF-8 bytes for one char -- the derived length must be the encoded length, not the char count
+    assertEquals(stats.getLengthOfShortestElement(), 2);
+    assertEquals(stats.getLengthOfLongestElement(), 2);
+    assertFalse(stats.isAscii());
+    verify(forwardIndex, never()).getString(anyInt());
+  }
+
+  @Test
+  public void testConstantBytesDerivesLengthWithoutScan() {
+    byte[] value = new byte[]{1, 2, 3};
+    MutableForwardIndex forwardIndex = mockForwardIndex(DataType.BYTES, true);
+
+    DataSource dataSource = mockDataSource(forwardIndex);
+    DataSourceMetadata metadata = dataSource.getDataSourceMetadata();
+    // Min and max are tracked as ByteArray, which is the form getElementLength expects
+    when(metadata.getMinValue()).thenReturn(new ByteArray(value));
+    when(metadata.getMaxValue()).thenReturn(new ByteArray(value));
+
+    RoaringBitmap validDocIds = RoaringBitmap.bitmapOf(0, 1);
+    CompactedNoDictColumnStatistics stats =
+        new CompactedNoDictColumnStatistics(dataSource, null, false, validDocIds);
+
+    assertEquals(stats.getMinValue(), new ByteArray(value));
+    assertEquals(stats.getMaxValue(), new ByteArray(value));
+    assertEquals(stats.getLengthOfShortestElement(), 3);
+    assertEquals(stats.getLengthOfLongestElement(), 3);
+    assertTrue(stats.isSorted());
+    assertEquals(stats.getTotalNumberOfEntries(), 2);
+    verify(forwardIndex, never()).getBytes(anyInt());
+  }
 
   // ======== INT SV ========
 

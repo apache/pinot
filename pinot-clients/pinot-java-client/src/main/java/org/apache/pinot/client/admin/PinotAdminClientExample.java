@@ -28,9 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Example demonstrating how to use PinotAdminClient.
- */
+/// Example demonstrating how to use PinotAdminClient.
 public class PinotAdminClientExample {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdminClientExample.class);
 

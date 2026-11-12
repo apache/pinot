@@ -27,9 +27,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 
 
-/**
- * execution result encapsulation for {@link PipelineBreakerExecutor}.
- */
+/// execution result encapsulation for [PipelineBreakerExecutor].
 public class PipelineBreakerResult {
   private final Map<PlanNode, Integer> _nodeIdMap;
   private final Map<Integer, List<MseBlock>> _resultMap;

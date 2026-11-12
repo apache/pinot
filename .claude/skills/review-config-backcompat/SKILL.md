@@ -1,6 +1,6 @@
 ---
 name: review-config-backcompat
-description: Review Apache Pinot diffs for configuration and backward-compatibility risks. Covers config key renames, SPI signature changes, schema/enum additions, feature-flag defaults, multi-level config override validation, rolling-upgrade safety, REST/JSON/Protobuf field evolution, and segment/DataTable format versioning. Trigger keywords — config key, config rename, SPI, feature flag, enum, schema type, DataTable version, segment version, Protobuf, Thrift, REST endpoint, @Deprecated, mixed-version, rolling upgrade, ZooKeeper schema.
+description: Review Apache Pinot compatibility when configs, public APIs, SPI contracts, or serialized formats change.
 domain: kb/code-review-principles.md#1-configuration--backward-compatibility
 triggers:
   - diff touches config constants (*ConfigConstants.java, *Config.java)

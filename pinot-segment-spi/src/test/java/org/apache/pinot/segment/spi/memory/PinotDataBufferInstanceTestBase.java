@@ -30,9 +30,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * A test contract that all pinot data buffer implementations should include.
- */
+/// A test contract that all pinot data buffer implementations should include.
 public abstract class PinotDataBufferInstanceTestBase extends PinotDataBufferTestBase {
 
   public final PinotBufferFactory _factory;

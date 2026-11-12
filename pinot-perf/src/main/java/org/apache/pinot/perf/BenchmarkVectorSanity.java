@@ -29,12 +29,10 @@ import org.apache.pinot.segment.local.segment.index.readers.vector.IvfFlatVector
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
-/**
- * Fast sanity check for the vector benchmark suite.
- *
- * <p>This mode intentionally stays small so benchmark changes can be smoke-tested before running
- * the heavier workload suites.</p>
- */
+/// Fast sanity check for the vector benchmark suite.
+///
+/// This mode intentionally stays small so benchmark changes can be smoke-tested before running
+/// the heavier workload suites.
 public final class BenchmarkVectorSanity {
   private static final int NUM_VECTORS =
       Integer.getInteger("pinot.perf.vector.sanity.size", 5_000);
@@ -52,9 +50,7 @@ public final class BenchmarkVectorSanity {
   private BenchmarkVectorSanity() {
   }
 
-  /**
-   * Validates exact scan recall, IVF_FLAT recall at various nprobe, and IVF_PQ when available.
-   */
+  /// Validates exact scan recall, IVF_FLAT recall at various nprobe, and IVF_PQ when available.
   public static void main(String[] args)
       throws Exception {
     run(System.out);

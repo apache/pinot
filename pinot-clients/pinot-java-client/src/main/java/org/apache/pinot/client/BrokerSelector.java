@@ -21,20 +21,14 @@ package org.apache.pinot.client;
 import java.util.List;
 
 public interface BrokerSelector {
-  /**
-   * Returns the broker address in the form host:port
-   * @param tableNames
-   * @return
-   */
+  /// Returns the broker address in the form host:port
+  /// @param tableNames
+  /// @return
   String selectBroker(String... tableNames);
 
-  /**
-   * Returns list of all brokers.
-   */
+  /// Returns list of all brokers.
   List<String> getBrokers();
 
-  /**
-   * Close any resources
-   */
+  /// Close any resources
   void close();
 }

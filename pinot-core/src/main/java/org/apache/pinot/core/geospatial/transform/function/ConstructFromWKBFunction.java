@@ -34,9 +34,7 @@ import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKBReader;
 
 
-/**
- * An abstract class for implementing the geo constructor functions from well-known binary (WKB) format.
- */
+/// An abstract class for implementing the geo constructor functions from well-known binary (WKB) format.
 abstract class ConstructFromWKBFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   private WKBReader _reader;

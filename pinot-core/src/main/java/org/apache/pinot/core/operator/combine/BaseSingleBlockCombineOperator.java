@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -36,12 +35,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Base implementation of the combine operator.
- * <p>Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
- * the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
- * detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
- */
+/// Base implementation of the combine operator.
+///
+/// Combine operator uses multiple worker threads to process segments in parallel, and uses the main thread to merge
+/// the results blocks from the processed segments. It can early-terminate the query to save the system resources if it
+/// detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock> extends BaseCombineOperator<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleBlockCombineOperator.class);
@@ -134,9 +132,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   protected void onProcessSegmentsFinish() {
   }
 
-  /**
-   * Merges the results from the worker threads into a results block.
-   */
+  /// Merges the results from the worker threads into a results block.
   protected BaseResultsBlock mergeResults()
       throws Exception {
     T mergedBlock = null;
@@ -149,7 +145,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
       if (waitTimeMs <= 0) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }
-      BaseResultsBlock blockToMerge = _blockingQueue.poll(waitTimeMs, TimeUnit.MILLISECONDS);
+      BaseResultsBlock blockToMerge = pollResultsBlock(_blockingQueue, endTimeMs);
       if (blockToMerge == null) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }

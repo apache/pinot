@@ -22,21 +22,15 @@ import java.io.IOException;
 import java.util.Set;
 import javax.ws.rs.core.Response;
 
-/**
- * Log file server interface
- */
+/// Log file server interface
 public interface LogFileServer {
-  /**
-   * Returns all log file paths relative to logger root dir
-   * @return a set of all log file paths relative to logger root dir
-   * @throws IOException if there is problem reading all file paths
-   */
+  /// Returns all log file paths relative to logger root dir
+  /// @return a set of all log file paths relative to logger root dir
+  /// @throws IOException if there is problem reading all file paths
   Set<String> getAllLogFilePaths() throws IOException;
 
-  /**
-   * Downloads a log file from the given file path (relative to logger root dir)
-   * @param filePath file path relative to logger root dir
-   * @return the log file content
-   */
+  /// Downloads a log file from the given file path (relative to logger root dir)
+  /// @param filePath file path relative to logger root dir
+  /// @return the log file content
   Response downloadLogFile(String filePath);
 }

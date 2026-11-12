@@ -33,6 +33,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
@@ -52,12 +53,10 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
   private long _taskStartTime;
 
-  /**
-   * The code here currently covers segment refresh for the following cases:
-   * 1. Process newly added columns.
-   * 2. Addition/removal of indexes.
-   * 3. Compatible datatype change for existing columns
-   */
+  /// The code here currently covers segment refresh for the following cases:
+  /// 1. Process newly added columns.
+  /// 2. Addition/removal of indexes.
+  /// 3. Compatible datatype change for existing columns
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception {
@@ -142,8 +141,11 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
     // Refresh the segment. Segment reload is achieved by generating a new segment from scratch using the updated schema
     // and table configs.
+    // Load with the table-config-derived IndexLoadingConfig so column readers configured via the table config are
+    // honored (needPreprocess=false: read-only).
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, false);
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      recordReader.init(indexDir, null, null);
+      recordReader.init(segment);
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
           getSchema(tableNameWithType));
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -152,6 +154,8 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
       _eventObserver.notifyProgress(pinotTaskConfig,
           "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
               + driver.getSkippedRowsFound() + ", sanitized rows:" + driver.getSanitizedRowsFound());
+    } finally {
+      segment.destroy();
     }
 
     File refreshedSegmentFile = new File(workingDir, segmentName);

@@ -30,9 +30,7 @@ public class ParserUtils {
   private ParserUtils() {
   }
 
-  /**
-   * Returns whether the query can be parsed and compiled using the multi-stage query engine.
-   */
+  /// Returns whether the query can be parsed and compiled using the multi-stage query engine.
   public static boolean canCompileWithMultiStageEngine(String query, String database, TableCache tableCache) {
     // try to parse and compile the query with the Calcite planner used by the multi-stage query engine
     long compileStartTime = System.currentTimeMillis();

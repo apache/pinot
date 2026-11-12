@@ -19,11 +19,9 @@
 package org.apache.pinot.spi.exception;
 
 
-/**
- * Thrown by {@link org.apache.pinot.spi.config.table.TableConfigValidator} and
- * {@link org.apache.pinot.spi.config.instance.InstanceConfigValidator} implementations
- * to reject a config mutation. Should be mapped to HTTP 400 by the REST layer.
- */
+/// Thrown by [org.apache.pinot.spi.config.table.TableConfigValidator] and
+/// [org.apache.pinot.spi.config.instance.InstanceConfigValidator] implementations
+/// to reject a config mutation. Should be mapped to HTTP 400 by the REST layer.
 public class ConfigValidationException extends RuntimeException {
   public ConfigValidationException(String message) {
     super(message);

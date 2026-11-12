@@ -27,10 +27,14 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -40,9 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Record reader for Pinot segment.
- */
+/// Record reader for Pinot segment.
 public class PinotSegmentRecordReader implements RecordReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentRecordReader.class);
 
@@ -55,47 +57,53 @@ public class PinotSegmentRecordReader implements RecordReader {
   private ArrayList<PinotSegmentColumnReader> _columnReaders;
 
   private Map<String, PinotSegmentColumnReader> _columnReaderMap;
+  // OPEN_STRUCT parent columns have no forward index of their own (they expose per-key sub-columns),
+  // so they cannot be read via PinotSegmentColumnReader. Their per-doc value is reconstructed as a map.
+  private Map<String, OpenStructDataSource> _openStructDataSources;
+  // Scan-scoped readers opened once per column (see OpenStructDataSource#openMapValueReader), reused
+  // across every getRecord() call instead of reconstructing per-key forward-index readers per doc.
+  private Map<String, OpenStructDataSource.MapValueReader> _openStructMapValueReaders;
   private int[] _sortedDocIds;
   private boolean _skipDefaultNullValues;
 
   private int _nextDocId = 0;
+  private List<String> _primaryKeyColumns;
+  private int[] _primaryKeyIndexes;
 
   public PinotSegmentRecordReader() {
   }
 
-  /**
-   * Deprecated: use empty constructor and init() instead.
-   *
-   * Read records using the segment schema
-   * @param indexDir input path for the segment index
-   */
+  /// Deprecated: use empty constructor and init() instead.
+  ///
+  /// Read records using the segment schema
+  /// @param indexDir input path for the segment index
   @Deprecated
   public PinotSegmentRecordReader(File indexDir)
       throws Exception {
     try {
-      init(indexDir, null, null, false);
+      init(indexDir, null, null, false, null);
     } catch (Exception e) {
       close();
       throw e;
     }
   }
 
-  /**
-   * Deprecated: use empty constructor and init() instead.
-   *
-   * Read records using the segment schema with the given schema and sort order
-   * <p>Passed in schema must be a subset of the segment schema.
-   *
-   * @param indexDir input path for the segment index
-   * @param schema input schema that is a subset of the segment schema
-   * @param sortOrder a list of column names that represent the sorting order
-   */
+  /// Deprecated: use empty constructor and init() instead.
+  ///
+  /// Read records using the segment schema with the given schema and sort order
+  ///
+  /// Passed in schema must be a subset of the segment schema.
+  ///
+  /// @param indexDir input path for the segment index
+  /// @param schema input schema that is a subset of the segment schema
+  /// @param sortOrder a list of column names that represent the sorting order
   @Deprecated
   public PinotSegmentRecordReader(File indexDir, @Nullable Schema schema, @Nullable List<String> sortOrder)
       throws Exception {
     Set<String> fieldsToRead = schema != null ? schema.getPhysicalColumnNames() : null;
+    List<String> primaryKeyColumns = schema != null ? schema.getPrimaryKeyColumns() : null;
     try {
-      init(indexDir, fieldsToRead, sortOrder, false);
+      init(indexDir, fieldsToRead, sortOrder, false, primaryKeyColumns);
     } catch (Exception e) {
       close();
       throw e;
@@ -104,74 +112,99 @@ public class PinotSegmentRecordReader implements RecordReader {
 
   @Override
   public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
-    init(indexDir, fieldsToRead, null, true);
+    init(indexDir, fieldsToRead, null, true, null);
   }
 
-  /**
-   * Initializes the record reader from an index directory.
-   *
-   * @param indexDir Index directory
-   * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
-   * @param sortOrder List of sorted columns
-   * @param skipDefaultNullValues Whether to skip putting default null values into the record
-   */
+  /// Initializes the record reader from an index directory.
+  ///
+  /// @param indexDir Index directory
+  /// @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+  /// @param sortOrder List of sorted columns
+  /// @param skipDefaultNullValues Whether to skip putting default null values into the record
+  /// @param primaryKeyColumns Columns which are marked as primary keys
+  public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
+      boolean skipDefaultNullValues, @Nullable List<String> primaryKeyColumns) {
+    init(indexDir, fieldsToRead, sortOrder, skipDefaultNullValues, false, primaryKeyColumns);
+  }
+
+  /// Initializes the record reader from an index directory.
+  ///
+  /// @param indexDir Index directory
+  /// @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+  /// @param sortOrder List of sorted columns
+  /// @param skipDefaultNullValues Whether to skip putting default null values into the record
   public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
       boolean skipDefaultNullValues) {
-    init(indexDir, fieldsToRead, sortOrder, skipDefaultNullValues, false);
+    init(indexDir, fieldsToRead, sortOrder, skipDefaultNullValues, false, null);
   }
 
-  /**
-   * Initializes the record reader from an index directory with an option to skip column-level secondary indexes.
-   *
-   * @param indexDir Index directory
-   * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
-   * @param sortOrder List of sorted columns
-   * @param skipDefaultNullValues Whether to skip putting default null values into the record
-   * @param forwardIndexOnly Whether to load only column-level forward index, dictionary, and null value vector,
-   *                         skipping other column-level secondary indexes
-   */
+  /// Initializes the record reader from an index directory with an option to skip column-level secondary indexes.
+  ///
+  /// @param indexDir Index directory
+  /// @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+  /// @param sortOrder List of sorted columns
+  /// @param skipDefaultNullValues Whether to skip putting default null values into the record
+  /// @param forwardIndexOnly Whether to load only column-level forward index, dictionary, and null value vector,
+  ///                         skipping other column-level secondary indexes
+  /// @param primaryKeyColumns Columns which are marked as primary keys
   public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
-      boolean skipDefaultNullValues, boolean forwardIndexOnly) {
+      boolean skipDefaultNullValues, boolean forwardIndexOnly, @Nullable List<String> primaryKeyColumns) {
     IndexSegment indexSegment;
     try {
       indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap, forwardIndexOnly);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while loading the segment from: " + indexDir, e);
     }
-    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues);
+    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues, primaryKeyColumns);
   }
 
-  /**
-   * Initializes the record reader from a segment.
-   *
-   * @param indexSegment Index segment to read from
-   */
+  /// Initializes the record reader from an index directory with an option to skip column-level secondary indexes.
+  ///
+  /// @param indexDir Index directory
+  /// @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+  /// @param sortOrder List of sorted columns
+  /// @param skipDefaultNullValues Whether to skip putting default null values into the record
+  /// @param forwardIndexOnly Whether to load only column-level forward index, dictionary, and null value vector,
+  ///                         skipping other column-level secondary indexes
+  public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
+      boolean skipDefaultNullValues, boolean forwardIndexOnly) {
+    init(indexDir, fieldsToRead, sortOrder, skipDefaultNullValues, forwardIndexOnly, null);
+  }
+
+  /// Initializes the record reader from a segment.
+  ///
+  /// @param indexSegment Index segment to read from
+  /// @param primaryKeyColumns Columns which are marked as primary keys
+  public void init(IndexSegment indexSegment, @Nullable List<String> primaryKeyColumns) {
+    init(indexSegment, false, null, null, null, false, primaryKeyColumns);
+  }
+
+  /// Initializes the record reader from a segment.
+  ///
+  /// @param indexSegment Index segment to read from
   public void init(IndexSegment indexSegment) {
-    init(indexSegment, false, null, null, null, false);
+    init(indexSegment, false, null, null, null, false, null);
   }
 
-  /**
-   * Initializes the record reader from a mutable segment with optional sorted document ids.
-   *
-   * @param mutableSegment Mutable segment
-   * @param sortedDocIds Array of sorted document ids
-   */
+  /// Initializes the record reader from a mutable segment with optional sorted document ids.
+  ///
+  /// @param mutableSegment Mutable segment
+  /// @param sortedDocIds Array of sorted document ids
   public void init(MutableSegment mutableSegment, @Nullable int[] sortedDocIds) {
-    init(mutableSegment, false, null, sortedDocIds, null, false);
+    init(mutableSegment, false, null, sortedDocIds, null, false, null);
   }
 
-  /**
-   * Initializes the record reader.
-   *
-   * @param indexSegment Index segment to read from
-   * @param destroySegmentOnClose Whether to destroy the segment when closing the record reader
-   * @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
-   * @param sortedDocIds Array of sorted document ids
-   * @param sortOrder List of sorted columns
-   * @param skipDefaultNullValues Whether to skip putting default null values into the record
-   */
+  /// Initializes the record reader.
+  ///
+  /// @param indexSegment Index segment to read from
+  /// @param destroySegmentOnClose Whether to destroy the segment when closing the record reader
+  /// @param fieldsToRead The fields to read from the segment. If null or empty, reads all fields
+  /// @param sortedDocIds Array of sorted document ids
+  /// @param sortOrder List of sorted columns
+  /// @param skipDefaultNullValues Whether to skip putting default null values into the record
   private void init(IndexSegment indexSegment, boolean destroySegmentOnClose, @Nullable Set<String> fieldsToRead,
-      @Nullable int[] sortedDocIds, @Nullable List<String> sortOrder, boolean skipDefaultNullValues) {
+      @Nullable int[] sortedDocIds, @Nullable List<String> sortOrder, boolean skipDefaultNullValues,
+      @Nullable List<String> primaryKeyColumns) {
     _indexSegment = indexSegment;
     _destroySegmentOnClose = destroySegmentOnClose;
     _numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
@@ -180,21 +213,17 @@ public class PinotSegmentRecordReader implements RecordReader {
       _columnReaderMap = new HashMap<>();
       _columnReaders = new ArrayList<>();
       _columnNames = new ArrayList<>();
+      _openStructDataSources = new HashMap<>();
+      _openStructMapValueReaders = new HashMap<>();
       Set<String> columnsInSegment = _indexSegment.getPhysicalColumnNames();
       if (CollectionUtils.isEmpty(fieldsToRead)) {
         for (String column : columnsInSegment) {
-          PinotSegmentColumnReader reader = new PinotSegmentColumnReader(indexSegment, column);
-          _columnReaderMap.put(column, reader);
-          _columnNames.add(column);
-          _columnReaders.add(reader);
+          addColumnReader(column);
         }
       } else {
         for (String column : fieldsToRead) {
           if (columnsInSegment.contains(column)) {
-            PinotSegmentColumnReader reader = new PinotSegmentColumnReader(indexSegment, column);
-            _columnReaderMap.put(column, reader);
-            _columnNames.add(column);
-            _columnReaders.add(reader);
+            addColumnReader(column);
           } else {
             LOGGER.warn("Ignoring column: {} that does not exist in the segment", column);
           }
@@ -212,12 +241,47 @@ public class PinotSegmentRecordReader implements RecordReader {
       }
 
       _skipDefaultNullValues = skipDefaultNullValues;
+      _primaryKeyColumns = primaryKeyColumns;
     }
   }
 
-  /**
-   * Returns the sorted document ids.
-   */
+  /// Registers a reader for the given column. OPEN_STRUCT parent columns are tracked separately and
+  /// reconstructed as maps at read time (they have no forward index of their own); all other columns
+  /// use a [PinotSegmentColumnReader].
+  private void addColumnReader(String column) {
+    DataSource dataSource = _indexSegment.getDataSourceNullable(column);
+    if (dataSource instanceof OpenStructDataSource) {
+      OpenStructDataSource openStructDataSource = (OpenStructDataSource) dataSource;
+      _openStructDataSources.put(column, openStructDataSource);
+      _openStructMapValueReaders.put(column, openStructDataSource.openMapValueReader());
+      return;
+    }
+    if (isMaterializedOpenStructChild(column)) {
+      // A materialized OPEN_STRUCT/MAP child (e.g. "event$clicks") is a physical column on disk but
+      // not independently queryable -- it has no DataSource of its own (see
+      // ImmutableSegmentImpl#_dataSources), only its parent does, and the parent's OpenStructDataSource
+      // registered above already covers its value. This is reachable whenever the segment is loaded
+      // without an explicit table schema (e.g. the File-based constructors of this class), since
+      // SegmentMetadataImpl then self-derives a schema from every physical column on disk, children
+      // included.
+      return;
+    }
+    PinotSegmentColumnReader reader = new PinotSegmentColumnReader(_indexSegment, column);
+    _columnReaderMap.put(column, reader);
+    _columnNames.add(column);
+    _columnReaders.add(reader);
+  }
+
+  private boolean isMaterializedOpenStructChild(String column) {
+    // Mutable/consuming segments never materialize OPEN_STRUCT children on disk and have no column metadata map.
+    if (_indexSegment.getSegmentMetadata().isMutableSegment()) {
+      return false;
+    }
+    ColumnMetadata columnMetadata = _indexSegment.getSegmentMetadata().getColumnMetadataFor(column);
+    return columnMetadata != null && columnMetadata.isMaterializedChild();
+  }
+
+  /// Returns the sorted document ids.
   @Nullable
   public int[] getSortedDocIds() {
     return _sortedDocIds;
@@ -253,6 +317,14 @@ public class PinotSegmentRecordReader implements RecordReader {
         buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }
     }
+    for (Map.Entry<String, OpenStructDataSource.MapValueReader> entry : _openStructMapValueReaders.entrySet()) {
+      Map<String, Object> value = entry.getValue().getMapValue(docId);
+      // A null map means no key is present at this doc; leave the column unset so the OPEN_STRUCT
+      // build treats it as an absent/empty struct.
+      if (value != null) {
+        buffer.putValue(entry.getKey(), value);
+      }
+    }
   }
 
   public Object[] getRecordValues(int docId, int[] columnIndexes) {
@@ -286,6 +358,10 @@ public class PinotSegmentRecordReader implements RecordReader {
   //   - Currently there is no check on column existence
   //   - Null value is not handled (default null value is returned)
   public Object getValue(int docId, String column) {
+    OpenStructDataSource openStructDataSource = _openStructDataSources.get(column);
+    if (openStructDataSource != null) {
+      return openStructDataSource.getMapValue(docId);
+    }
     return _columnReaderMap.get(column).getValue(docId);
   }
 
@@ -297,13 +373,50 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
+    IOException closeException = null;
     if (_columnReaderMap != null) {
-      for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
-        columnReader.close();
+      try {
+        FileUtils.close(_columnReaderMap.values());
+      } catch (IOException e) {
+        closeException = e;
+      }
+    }
+    if (_openStructMapValueReaders != null) {
+      for (OpenStructDataSource.MapValueReader reader : _openStructMapValueReaders.values()) {
+        reader.close();
       }
     }
     if (_destroySegmentOnClose && _indexSegment != null) {
       _indexSegment.destroy();
     }
+    if (closeException != null) {
+      throw closeException;
+    }
+  }
+
+  public Object[] getPrimaryKeys(int docId) {
+    int[] primaryKeyIndexes = getPrimaryKeyIndexes();
+    Object[] values = new Object[primaryKeyIndexes.length];
+    for (int i = 0, n = primaryKeyIndexes.length; i < n; i++) {
+      int columnIndex = primaryKeyIndexes[i];
+      if (columnIndex > -1) {
+        PinotSegmentColumnReader columnReader = _columnReaders.get(columnIndex);
+        if (!columnReader.isNull(docId)) {
+          values[i] = columnReader.getInternalValue(docId);
+        } else if (!_skipDefaultNullValues) {
+          values[i] = columnReader.getInternalValue(docId);
+        } // else null value is kept
+      } // else keep null value
+    }
+
+    return values;
+  }
+
+  private int[] getPrimaryKeyIndexes() {
+    if (_primaryKeyIndexes != null) {
+      return _primaryKeyIndexes;
+    }
+    _primaryKeyIndexes = getIndexesForColumns(_primaryKeyColumns);
+    return _primaryKeyIndexes;
   }
 }

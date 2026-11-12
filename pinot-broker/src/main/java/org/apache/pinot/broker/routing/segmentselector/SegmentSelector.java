@@ -21,32 +21,25 @@ package org.apache.pinot.broker.routing.segmentselector;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.request.BrokerRequest;
 
 
-/**
- * The segment selector selects the segments for the query. The segments selected should cover the whole dataset (table)
- * without overlap.
- */
+/// The segment selector selects the segments for the query. The segments selected should cover the whole dataset
+/// (table) without overlap.
 public interface SegmentSelector {
 
-  /**
-   * Initializes the segment selector with the ideal state, external view and online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Should be called
-   * only once before calling other methods.
-   */
+  /// Initializes the segment selector with the ideal state, external view and online segments (segments with
+  /// ONLINE/CONSUMING instances in the ideal state and pre-selected by the
+  /// [org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector]). Should be called only once before
+  /// calling other methods.
   void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
 
-  /**
-   * Processes the segment assignment (ideal state or external view) change based on the given online segments (segments
-   * with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
-   */
+  /// Processes the segment assignment (ideal state or external view) change based on the given online segments
+  /// (segments with ONLINE/CONSUMING instances in the ideal state and pre-selected by the
+  /// [org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector]).
   void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
 
-  /**
-   * Selects the segments queried by the given broker request. The segments selected should cover the whole dataset
-   * (table) without overlap.
-   */
+  /// Selects the segments queried by the given broker request. The segments selected should cover the whole dataset
+  /// (table) without overlap.
   Set<String> select(BrokerRequest brokerRequest);
 }

@@ -19,9 +19,14 @@
 package org.apache.pinot.core.operator.streaming;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.proto.Server;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Response;
 
 
@@ -47,6 +52,19 @@ public class StreamingResponseUtils {
   private static Server.ServerResponse getResponse(DataTable dataTable, String responseType)
       throws IOException {
     return Server.ServerResponse.newBuilder().putMetadata(Response.MetadataKeys.RESPONSE_TYPE, responseType)
-        .setPayload(ByteString.copyFrom(dataTable.toBytes())).build();
+        .setPayload(toByteString(dataTable.toDataBuffer())).build();
+  }
+
+  /// Wraps the buffers of a serialized data table in one [ByteString] without copying them. The buffers must not change
+  /// after this call, which holds for a serialized data table.
+  private static ByteString toByteString(DataBuffer dataBuffer) {
+    List<ByteBuffer> buffers = new ArrayList<>();
+    dataBuffer.appendAsByteBuffers(buffers);
+    List<ByteString> byteStrings = new ArrayList<>(buffers.size());
+    for (ByteBuffer buffer : buffers) {
+      byteStrings.add(UnsafeByteOperations.unsafeWrap(buffer));
+    }
+    // Despite its name, copyFrom(Iterable) concatenates the byte strings into a balanced rope without copying them.
+    return ByteString.copyFrom(byteStrings);
   }
 }

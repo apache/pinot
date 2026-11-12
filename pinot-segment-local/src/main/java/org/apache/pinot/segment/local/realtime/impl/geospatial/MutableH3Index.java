@@ -35,10 +35,9 @@ import org.locationtech.jts.geom.Point;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * A H3 index reader for the real-time H3 index values on the fly.
- * <p>This class is thread-safe for single writer multiple readers.
- */
+/// A H3 index reader for the real-time H3 index values on the fly.
+///
+/// This class is thread-safe for single writer multiple readers.
 public class MutableH3Index implements H3IndexReader, MutableIndex {
   private final H3IndexResolution _resolution;
   private final int _lowestResolution;
@@ -67,9 +66,7 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
     throw new UnsupportedOperationException("Mutable H3 indexes are not supported for multi-valued columns");
   }
 
-  /**
-   * Adds the next geospatial value.
-   */
+  /// Adds the next geospatial value.
   public void add(Geometry geometry) {
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());

@@ -34,9 +34,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
-/**
- * Serialize RexExpressions to the Protobuf equivalent classes defined expressions.proto.
- */
+/// Serialize RexExpressions to the Protobuf equivalent classes defined expressions.proto.
 public class RexExpressionToProtoExpression {
   private RexExpressionToProtoExpression() {
   }
@@ -170,6 +168,8 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.JSON;
       case BYTES:
         return Expressions.ColumnDataType.BYTES;
+      case UUID:
+        return Expressions.ColumnDataType.UUID;
       case MAP:
         return Expressions.ColumnDataType.MAP;
       case INT_ARRAY:
@@ -190,6 +190,8 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:
         return Expressions.ColumnDataType.BYTES_ARRAY;
+      case UUID_ARRAY:
+        return Expressions.ColumnDataType.UUID_ARRAY;
       case OBJECT:
         return Expressions.ColumnDataType.OBJECT;
       case UNKNOWN:

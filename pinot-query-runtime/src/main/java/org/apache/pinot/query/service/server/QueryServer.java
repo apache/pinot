@@ -19,6 +19,7 @@
 package org.apache.pinot.query.service.server;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
@@ -86,10 +87,6 @@ import org.slf4j.LoggerFactory;
 public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
 
-  // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
-  // See https://github.com/apache/pinot/issues/10331
-  private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
-
   private final String _instanceId;
   private final int _port;
   private final QueryRunner _queryRunner;
@@ -100,6 +97,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private final ThreadAccountant _threadAccountant;
   private final int _permitKeepAliveTimeMs;
   private final boolean _permitKeepAliveWithoutCalls;
+  // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
+  // See https://github.com/apache/pinot/issues/10331
+  private final int _maxInboundMessageSizeBytes;
 
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
@@ -162,6 +162,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     _permitKeepAliveWithoutCalls = serverConf.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS);
+    _maxInboundMessageSizeBytes = serverConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES);
+    Preconditions.checkArgument(_maxInboundMessageSizeBytes > 0, "%s must be positive, got: %s",
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_MAX_INBOUND_MESSAGE_SIZE_BYTES,
+        _maxInboundMessageSizeBytes);
 
     ExecutorService baseExecutorService =
         ExecutorServiceUtils.create(serverConf, CommonConstants.Server.MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX,
@@ -193,8 +199,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         }
         _server = buildGrpcServer(serverBuilder);
         LOGGER.info(
-            "Initialized QueryServer on port: {} with permitKeepAliveTimeMs: {}, permitKeepAliveWithoutCalls: {}",
-            _port, _permitKeepAliveTimeMs, _permitKeepAliveWithoutCalls);
+            "Initialized QueryServer on port: {} with permitKeepAliveTimeMs: {}, permitKeepAliveWithoutCalls: {}, "
+                + "maxInboundMessageSizeBytes: {}", _port, _permitKeepAliveTimeMs, _permitKeepAliveWithoutCalls,
+            _maxInboundMessageSizeBytes);
       }
       _queryRunner.start();
       _server.start();
@@ -213,6 +220,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     return _permitKeepAliveWithoutCalls;
   }
 
+  @VisibleForTesting
+  int getMaxInboundMessageSizeBytes() {
+    return _maxInboundMessageSizeBytes;
+  }
+
   private Server buildGrpcServer(NettyServerBuilder builder) {
     // By using directExecutor, GRPC doesn't need to manage its own thread pool
     builder.directExecutor();
@@ -225,7 +237,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       builder.permitKeepAliveTime(_permitKeepAliveTimeMs, TimeUnit.MILLISECONDS);
     }
     builder.permitKeepAliveWithoutCalls(_permitKeepAliveWithoutCalls);
-    return builder.addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+    return builder.addService(this).maxInboundMessageSize(_maxInboundMessageSizeBytes).build();
   }
 
   public void shutdown() {
@@ -259,7 +271,6 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// The request is deserialized on the GRPC thread and the rest of the work is done on the submission thread pool.
   /// Given the submission code should be not blocking, we could directly use the GRPC thread pool, but we decide to
   /// use a different thread pool to be able to time out the submission in the rare case it takes too long.
-  ///
   // TODO: Study if that is actually needed. We could just use the GRPC thread pool and timeout once the execution
   //   starts in the query runner.
   @Override
@@ -424,8 +435,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         }
         ByteString rootAsBytes = PlanNodeSerializer.process(explainPlan.getRootNode()).toByteString();
         StageMetadata metadata = explainPlan.getStageMetadata();
+        // The segment maps are dropped rather than encoded: QueryDispatcher#explain, the only reader of this
+        // response, reads just the root node of each stage plan, and has since MSE explain was introduced in
+        // 1.3.0, so encoding them would cost a JSON encode of every segment list on every EXPLAIN for nothing.
+        List<WorkerMetadata> explainWorkerMetadataList = new ArrayList<>(metadata.getWorkerMetadataList().size());
+        for (WorkerMetadata explainWorkerMetadata : metadata.getWorkerMetadataList()) {
+          explainWorkerMetadataList.add(new WorkerMetadata(explainWorkerMetadata.getWorkerId(),
+              explainWorkerMetadata.getMailboxInfosMap(), explainWorkerMetadata.getCustomProperties()));
+        }
         List<Worker.WorkerMetadata> protoWorkerMetadataList =
-            QueryPlanSerDeUtils.toProtoWorkerMetadataList(metadata.getWorkerMetadataList());
+            QueryPlanSerDeUtils.toProtoWorkerMetadataList(explainWorkerMetadataList, false);
         builder.addStagePlan(Worker.StagePlan.newBuilder()
             .setRootNode(rootAsBytes)
             .setStageMetadata(Worker.StageMetadata.newBuilder()
@@ -456,37 +475,37 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   }
 
   /// Stream-mode submission handler. The broker keeps the stream open for the query lifetime; the server replies
-  /// with a {@code submit_ack} as the first message and (in subsequent commits) per-opchain
-  /// {@link Worker.OpChainComplete} messages followed by a final {@link Worker.ServerDone}.
+  /// with a `submit_ack` as the first message and (in subsequent commits) per-opchain
+  /// [Worker.OpChainComplete] messages followed by a final [Worker.ServerDone].
   ///
   /// Wires up the gRPC mechanics + plan submission via the existing submission path. A per-opchain completion
-  /// listener registered on {@link org.apache.pinot.query.runtime.executor.OpChainSchedulerService} emits one
-  /// {@link Worker.OpChainComplete} per finished opchain and {@link Worker.ServerDone} once all have reported.
-  /// Cancel is accepted both via the in-stream {@code BrokerToServer.cancel} message and via the legacy unary
-  /// {@link #cancel(Worker.CancelRequest, StreamObserver)} RPC; broker stream-close also triggers a cancel here.
+  /// listener registered on [org.apache.pinot.query.runtime.executor.OpChainSchedulerService] emits one
+  /// [Worker.OpChainComplete] per finished opchain and [Worker.ServerDone] once all have reported.
+  /// Cancel is accepted both via the in-stream `BrokerToServer.cancel` message and via the legacy unary
+  /// [#cancel(Worker.CancelRequest, StreamObserver)] RPC; broker stream-close also triggers a cancel here.
   @Override
   public StreamObserver<Worker.BrokerToServer> submitWithStream(
       StreamObserver<Worker.ServerToBroker> responseObserver) {
     return new SubmitWithStreamObserver(responseObserver);
   }
 
-  /// Per-query state for an open {@code SubmitWithStream} call. Owns the response stream and serialises every
-  /// {@code onNext} call on it via a {@code synchronized} block — gRPC requires {@code StreamObserver.onNext} to be
+  /// Per-query state for an open `SubmitWithStream` call. Owns the response stream and serialises every
+  /// `onNext` call on it via a `synchronized` block — gRPC requires `StreamObserver.onNext` to be
   /// called serially.
   ///
   /// Tracks the expected number of opchains for the request (sum of WorkerMetadata across all stages). An
-  /// {@link OpChainCompletionListener} registered with {@link QueryRunner#registerOpChainCompletionListener}
-  /// fires once per opchain finishing, encodes its stats via {@link MultiStageStatsTreeEncoder}, and emits an
-  /// {@link Worker.OpChainComplete} on the response stream. When the per-request completed-count reaches the
-  /// expected total, {@link Worker.ServerDone} is emitted and the stream is closed.
+  /// [OpChainCompletionListener] registered with [QueryRunner#registerOpChainCompletionListener]
+  /// fires once per opchain finishing, encodes its stats via [MultiStageStatsTreeEncoder], and emits an
+  /// [Worker.OpChainComplete] on the response stream. When the per-request completed-count reaches the
+  /// expected total, [Worker.ServerDone] is emitted and the stream is closed.
   ///
   /// All blocking work (plan deserialization, opchain construction) runs on
-  /// {@link QueryServer#_submissionExecutorService}.
+  /// [QueryServer#_submissionExecutorService].
   private final class SubmitWithStreamObserver implements StreamObserver<Worker.BrokerToServer> {
     private final StreamObserver<Worker.ServerToBroker> _responseObserver;
     /// Serialises onNext calls on the response stream and guards mutable session state.
     private final Object _streamLock = new Object();
-    /// True once we've received the first {@code submit} and dispatched it.
+    /// True once we've received the first `submit` and dispatched it.
     private final AtomicBoolean _submitted = new AtomicBoolean(false);
     /// True once we've completed the response stream (success or error). Idempotent guard.
     private final AtomicBoolean _completed = new AtomicBoolean(false);
@@ -494,27 +513,27 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     private final AtomicInteger _expectedOpChains = new AtomicInteger(-1);
     /// Number of opchains that have reported so far via the completion listener.
     private final AtomicInteger _completedOpChains = new AtomicInteger(0);
-    /// Pipeline-breaker root operators awaiting their stage's main (leaf) opchain, keyed by {@link OpChainId}. A
+    /// Pipeline-breaker root operators awaiting their stage's main (leaf) opchain, keyed by [OpChainId]. A
     /// pipeline-breaker opchain shares the same OpChainId as its leaf opchain and is not reported as a separate
     /// stage; its operators are folded into the leaf's flat stats but are absent from the leaf's live operator tree,
     /// so we stash the PB root here and graft it onto the leaf when the leaf opchain reports (see
-    /// {@link #onOpChainComplete} and {@link MultiStageStatsTreeEncoder}). Keyed by OpChainId to support multiple
+    /// [#onOpChainComplete] and [MultiStageStatsTreeEncoder]). Keyed by OpChainId to support multiple
     /// PB-bearing leaf opchains per request (multiple leaf stages / workers). The PB opchain completes strictly
     /// before its leaf — the leaf consumes the PB results, gated on the PB's CountDownLatch in
-    /// {@code PipelineBreakerExecutor}, which establishes a happens-before from this {@code put} to the leaf's
-    /// {@code remove}; {@link ConcurrentHashMap} also makes the cross-executor-thread read safe directly.
+    /// `PipelineBreakerExecutor`, which establishes a happens-before from this `put` to the leaf's
+    /// `remove`; [ConcurrentHashMap] also makes the cross-executor-thread read safe directly.
     private final Map<OpChainId, MultiStageOperator> _pipelineBreakerRoots = new ConcurrentHashMap<>();
     /// Set once we successfully parse the request id from the submit metadata. Used by cancel-via-stream.
     private volatile long _requestId = -1;
-    /// Completed once {@link #sendSubmitAck} has been called (success or error path). Guards the ack/done race:
-    /// if a trivial opchain finishes before the {@code whenComplete} callback fires, {@code onOpChainComplete}
-    /// waits for this future via {@code thenRun} instead of calling {@link #sendDoneAndComplete} immediately,
-    /// ensuring the broker always receives the {@code submit_ack} before {@code ServerDone}.
+    /// Completed once [#sendSubmitAck] has been called (success or error path). Guards the ack/done race:
+    /// if a trivial opchain finishes before the `whenComplete` callback fires, `onOpChainComplete`
+    /// waits for this future via `thenRun` instead of calling [#sendDoneAndComplete] immediately,
+    /// ensuring the broker always receives the `submit_ack` before `ServerDone`.
     private final CompletableFuture<Void> _ackSentFuture = new CompletableFuture<>();
-    /// True once a {@code submit_ack} has been emitted on the response stream. Unlike {@link #_ackSentFuture}
-    /// (completed outside the lock, after the fact), this flag is set under {@link #_streamLock} at the moment of
-    /// emission, so {@link #sendErrorAndComplete} can reliably decide whether an error may still be delivered as
-    /// the (single allowed) submit_ack or would be a duplicate the broker ignores. Guarded by {@link #_streamLock}.
+    /// True once a `submit_ack` has been emitted on the response stream. Unlike [#_ackSentFuture]
+    /// (completed outside the lock, after the fact), this flag is set under [#_streamLock] at the moment of
+    /// emission, so [#sendErrorAndComplete] can reliably decide whether an error may still be delivered as
+    /// the (single allowed) submit_ack or would be a duplicate the broker ignores. Guarded by [#_streamLock].
     private boolean _ackEmitted;
 
     SubmitWithStreamObserver(StreamObserver<Worker.ServerToBroker> responseObserver) {
@@ -641,11 +660,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           });
     }
 
-    /**
-     * Fires once per opchain on this server completing. Encodes the stats into a {@link Worker.MultiStageStatsTree},
-     * emits an {@link Worker.OpChainComplete}, and emits {@link Worker.ServerDone} once all expected opchains have
-     * reported.
-     */
+    /// Fires once per opchain on this server completing. Encodes the stats into a [Worker.MultiStageStatsTree],
+    /// emits an [Worker.OpChainComplete], and emits [Worker.ServerDone] once all expected opchains have
+    /// reported.
     private void onOpChainComplete(OpChainId opChainId, MultiStageOperator rootOperator,
         @Nullable MultiStageQueryStats stats, OpChainExecutionContext context, @Nullable Throwable error) {
       // A pipeline-breaker opchain (dynamic-broadcast semi-join / lookup-join build side) is built from the SAME
@@ -738,11 +755,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       } catch (Throwable t) {
         LOGGER.warn("Caught exception cancelling request {} via SubmitWithStream", cancel.getRequestId(), t);
       }
-      // Once this stream's request is cancelled, no further meaningful OpChainComplete reports will arrive — in
-      // particular, opchains cancelled before they register never fire the completion listener, so _completedOpChains
-      // would never reach _expectedOpChains and ServerDone would never be sent. Close the stream promptly so the
-      // broker stops waiting out its full drain window. Gated on the ack so the broker still sees submit_ack before
-      // ServerDone; cleanupListener and sendDoneAndComplete are both idempotent, so racing onOpChainComplete is safe.
+      // Once this stream's request is cancelled, no further meaningful OpChainComplete reports will arrive. Close the
+      // stream promptly so the broker stops waiting out its full drain window. Gated on the ack so the broker still
+      // sees submit_ack before ServerDone; cleanupListener and sendDoneAndComplete are both idempotent, so racing
+      // onOpChainComplete is safe.
       if (cancel.getRequestId() == _requestId) {
         _ackSentFuture.thenRun(() -> {
           cleanupListener();

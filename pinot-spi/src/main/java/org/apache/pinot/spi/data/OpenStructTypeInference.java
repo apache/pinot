@@ -18,20 +18,21 @@
  */
 package org.apache.pinot.spi.data;
 
+import java.util.Collection;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.PinotDataType;
 
 
-/// Infers the {@link FieldSpec.DataType} for an OPEN_STRUCT key from raw ingested values when the key has
-/// no declared child {@link FieldSpec}. This is OPEN_STRUCT-specific policy (it keeps TIMESTAMP, folds
-/// DATE/TIME/UUID to STRING, widens BYTE/CHARACTER/SHORT to INT, and returns {@code null} for values that
+/// Infers the [FieldSpec.DataType] for an OPEN_STRUCT key from raw ingested values when the key has
+/// no declared child [FieldSpec]. This is OPEN_STRUCT-specific policy (it keeps TIMESTAMP, folds
+/// DATE/TIME/UUID to STRING, widens BYTE/CHARACTER/SHORT to INT, and returns `null` for values that
 /// cannot be represented as a stored column type), distinct from the JSON-node-based inference in
-/// {@code JsonUtils.valueOf}.
+/// `JsonUtils.valueOf`.
 public final class OpenStructTypeInference {
   private OpenStructTypeInference() {
   }
 
-  /// Infers the {@link FieldSpec.DataType} from a raw ingested value. Returns {@code null} when the value
+  /// Infers the [FieldSpec.DataType] from a raw ingested value. Returns `null` when the value
   /// cannot be represented as a stored column type; callers decide whether to drop the entry or fall back
   /// to a default (e.g. STRING).
   @Nullable
@@ -64,5 +65,43 @@ public final class OpenStructTypeInference {
       default:
         return null;
     }
+  }
+
+  /// The elements of a multi-value raw value, or null when the value is not a collection.
+  ///
+  /// Covers what actually reaches an OPEN_STRUCT map value: a `List` from a JSON decoder, a `GenericData.Array`
+  /// or any other `Collection` from Avro, and an `Object[]` from a GenericRow that was already normalized.
+  @Nullable
+  public static Object[] asMultiValue(Object rawValue) {
+    if (rawValue instanceof Object[]) {
+      return (Object[]) rawValue;
+    }
+    if (rawValue instanceof Collection) {
+      return ((Collection<?>) rawValue).toArray();
+    }
+    return null;
+  }
+
+  /// One element type for a multi-value value, or null when the elements say nothing -- an empty collection, or
+  /// one holding only nulls. Elements that disagree resolve to STRING, the same answer a key whose values drift
+  /// across rows gets, so a mixed array stays readable rather than losing its odd elements.
+  @Nullable
+  public static FieldSpec.DataType inferElementDataType(Object[] elements) {
+    FieldSpec.DataType resolved = null;
+    for (Object element : elements) {
+      if (element == null) {
+        continue;
+      }
+      FieldSpec.DataType elementType = inferDataType(element);
+      if (elementType == null) {
+        return FieldSpec.DataType.STRING;
+      }
+      if (resolved == null) {
+        resolved = elementType;
+      } else if (resolved != elementType) {
+        return FieldSpec.DataType.STRING;
+      }
+    }
+    return resolved;
   }
 }

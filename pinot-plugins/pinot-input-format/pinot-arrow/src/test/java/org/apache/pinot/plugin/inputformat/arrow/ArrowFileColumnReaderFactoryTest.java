@@ -242,11 +242,9 @@ public class ArrowFileColumnReaderFactoryTest {
     }
   }
 
-  /**
-   * A wrong-type accessor must fail with {@link IOException} (the reader's {@code typeMismatch}
-   * contract), not return garbage or throw an opaque cast error: calling a STRING accessor on an INT
-   * column, a scalar accessor mismatch, and a multi-value accessor on a single-value column.
-   */
+  /// A wrong-type accessor must fail with [IOException] (the reader's `typeMismatch`
+  /// contract), not return garbage or throw an opaque cast error: calling a STRING accessor on an INT
+  /// column, a scalar accessor mismatch, and a multi-value accessor on a single-value column.
   @Test
   public void testTypeMismatchAccessorsThrow()
       throws IOException {
@@ -267,12 +265,10 @@ public class ArrowFileColumnReaderFactoryTest {
     }
   }
 
-  /**
-   * {@code CONFIG_EXTRACT_RAW_TIME_VALUES} must flow through the factory to each column reader,
-   * mirroring the row-major {@code ArrowRecordExtractorConfig.EXTRACT_RAW_TIME_VALUES}: with it set, a
-   * TIMESTAMP column surfaces the raw epoch {@code long}; without it (the default), it surfaces a
-   * canonical {@link Timestamp}. Same fixture, two factories — proves the flag flips the behavior.
-   */
+  /// `CONFIG_EXTRACT_RAW_TIME_VALUES` must flow through the factory to each column reader,
+  /// mirroring the row-major `ArrowRecordExtractorConfig.EXTRACT_RAW_TIME_VALUES`: with it set, a
+  /// TIMESTAMP column surfaces the raw epoch `long`; without it (the default), it surfaces a
+  /// canonical [Timestamp]. Same fixture, two factories — proves the flag flips the behavior.
   @Test
   public void testExtractRawTimeValuesSurfacesRawEpoch()
       throws IOException {

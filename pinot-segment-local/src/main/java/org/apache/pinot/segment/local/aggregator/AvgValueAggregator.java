@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.aggregator;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.customobject.AvgPair;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -76,17 +75,15 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
 
   @Override
   public byte[] serializeAggregatedValue(AvgPair value) {
-    return CustomSerDeUtils.AVG_PAIR_SER_DE.serialize(value);
+    return value.toBytes();
   }
 
   @Override
   public AvgPair deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytes);
+    return AvgPair.fromBytes(bytes);
   }
 
-  /**
-   * Processes a raw value (either multi-value array or single number) and returns an AvgPair with the sum and count.
-   */
+  /// Processes a raw value (either multi-value array or single number) and returns an AvgPair with the sum and count.
   protected AvgPair processRawValue(Object rawValue) {
     if (rawValue instanceof byte[]) {
       return deserializeAggregatedValue((byte[]) rawValue);

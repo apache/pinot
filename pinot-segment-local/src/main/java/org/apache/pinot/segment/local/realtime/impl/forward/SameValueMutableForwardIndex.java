@@ -18,17 +18,15 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
-import com.google.common.base.Utf8;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
-/**
- * SameValueMutableForwardIndex is used to wrap any MutableForwardIndex, but store the same value. This is done to
- * allow noRawDataForTextIndex config to work with mutable indexes.
- */
+/// SameValueMutableForwardIndex is used to wrap any MutableForwardIndex, but store the same value. This is done to
+/// allow noRawDataForTextIndex config to work with mutable indexes.
 public class SameValueMutableForwardIndex implements MutableForwardIndex {
   private final String _actualValue;
   private final Object[] _actualValues;
@@ -38,7 +36,7 @@ public class SameValueMutableForwardIndex implements MutableForwardIndex {
   public SameValueMutableForwardIndex(Object actualValue, MutableForwardIndex delegate) {
     _actualValue = actualValue.toString();
     _actualValues = new Object[]{_actualValue};
-    _valueLength = Utf8.encodedLength(_actualValue);
+    _valueLength = Utf8Utils.encodedLength(_actualValue);
     _delegate = delegate;
   }
 

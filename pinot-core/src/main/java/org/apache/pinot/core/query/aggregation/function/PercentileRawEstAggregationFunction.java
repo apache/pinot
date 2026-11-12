@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -28,14 +29,13 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.SerializedQuantileDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
-/**
- * The {@code PercentileRawEstAggregationFunction} returns the serialized {@code QuantileDigest} data structure of the
- * {@code PercentileEstAggregationFunction}.
- */
+/// The `PercentileRawEstAggregationFunction` returns the serialized `QuantileDigest` data structure of the
+/// `PercentileEstAggregationFunction`.
 public class PercentileRawEstAggregationFunction
-    extends BaseSingleInputAggregationFunction<QuantileDigest, SerializedQuantileDigest> {
+    extends BaseSingleInputAggregationFunction<QuantileDigest, Comparable<?>> {
   private final PercentileEstAggregationFunction _percentileEstAggregationFunction;
 
   public PercentileRawEstAggregationFunction(ExpressionContext expressionContext, double percentile,
@@ -50,7 +50,8 @@ public class PercentileRawEstAggregationFunction
 
   protected PercentileRawEstAggregationFunction(ExpressionContext expression,
       PercentileEstAggregationFunction percentileEstAggregationFunction) {
-    super(expression);
+    // This wrapper only serializes what the delegate produced, so the delegate owns the option
+    super(expression, percentileEstAggregationFunction._nullHandlingEnabled);
     _percentileEstAggregationFunction = percentileEstAggregationFunction;
   }
 
@@ -119,7 +120,7 @@ public class PercentileRawEstAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(QuantileDigest quantileDigest) {
+  public SerializedResult serializeIntermediateResult(QuantileDigest quantileDigest) {
     return _percentileEstAggregationFunction.serializeIntermediateResult(quantileDigest);
   }
 
@@ -133,8 +134,29 @@ public class PercentileRawEstAggregationFunction
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public SerializedQuantileDigest extractFinalResult(QuantileDigest intermediateResult) {
+  public SerializedQuantileDigest extractFinalResult(@Nullable QuantileDigest intermediateResult) {
+    // A null intermediate result means nothing was aggregated. With null handling enabled that is NULL; with it
+    // disabled the answer has to stay what it has always been, which is an empty digest serialized, so the empty
+    // accumulator the delegate no longer substitutes is built here where it is rendered.
+    if (intermediateResult == null) {
+      return _percentileEstAggregationFunction._nullHandlingEnabled ? null
+          : new SerializedQuantileDigest(new QuantileDigest(PercentileEstAggregationFunction.DEFAULT_MAX_ERROR),
+              _percentileEstAggregationFunction._percentile);
+    }
     return new SerializedQuantileDigest(intermediateResult, _percentileEstAggregationFunction._percentile);
+  }
+
+  /// Merges two final results, which are serialized digests in string form, into the string form of the merged
+  /// digest.
+  @Override
+  public String mergeFinalResult(Comparable<?> finalResult1, Comparable<?> finalResult2) {
+    QuantileDigest merged = merge(deserializeFinalResult(finalResult1), deserializeFinalResult(finalResult2));
+    return new SerializedQuantileDigest(merged, _percentileEstAggregationFunction._percentile).toString();
+  }
+
+  private static QuantileDigest deserializeFinalResult(Comparable<?> finalResult) {
+    return QuantileDigest.fromBytes(BytesUtils.toBytes((String) finalResult));
   }
 }

@@ -51,9 +51,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
-/**
- * Test class for PinotTaskManager with distributed locking enabled. Tests scenarios run across multiple controllers
- */
+/// Test class for PinotTaskManager with distributed locking enabled. Tests scenarios run across multiple controllers
 public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
 
   private static final String RAW_TABLE_NAME_1 = "testTable1";
@@ -99,24 +97,20 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     stopZk();
   }
 
-  /**
-   * Test scenario: Tests the schedule task happy path on a single controller to ensure task generation goes through
-   * for all tables
-   */
+  /// Test scenario: Tests the schedule task happy path on a single controller to ensure task generation goes through
+  /// for all tables
   @Test
   public void testScheduleTaskForSpecificTables() throws Exception {
     // Setup first controller with distributed locking enabled
     Map<String, Object> properties1 = getDefaultControllerConfiguration();
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties1.put(ControllerConf.CONTROLLER_PORT, 21002);
 
     // Setup second controller with distributed locking enabled (different port)
     Map<String, Object> properties2 = getDefaultControllerConfiguration();
     // Disable scheduler to avoid Quartz conflicts
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties2.put(ControllerConf.CONTROLLER_PORT, 21003);
 
     // Start both controllers
     startController(properties1);
@@ -256,23 +250,19 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test scenario: Two actual controllers trying to submit createTask for the same table simultaneously.
-   * This test starts multiple controller instances to test true multi-controller distributed locking.
-   */
+  /// Test scenario: Two actual controllers trying to submit createTask for the same table simultaneously.
+  /// This test starts multiple controller instances to test true multi-controller distributed locking.
   @Test
   public void testConcurrentCreateTaskFromMultipleControllers() throws Exception {
     // Setup first controller with distributed locking enabled
     Map<String, Object> properties1 = getDefaultControllerConfiguration();
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties1.put(ControllerConf.CONTROLLER_PORT, 21000);
 
     // Setup second controller with distributed locking enabled (different port)
     Map<String, Object> properties2 = getDefaultControllerConfiguration();
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties2.put(ControllerConf.CONTROLLER_PORT, 21001);
 
     // Start both controllers
     startController(properties1);
@@ -393,25 +383,21 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test scenario: One controller runs createTask for a specific table while another controller
-   * runs scheduleTasks for multiple tables including the locked table.
-   * The scheduleTasks should succeed for other tables but fail for the locked table.
-   */
+  /// Test scenario: One controller runs createTask for a specific table while another controller
+  /// runs scheduleTasks for multiple tables including the locked table.
+  /// The scheduleTasks should succeed for other tables but fail for the locked table.
   @Test
   public void testCreateTaskBlocksScheduleTaskForSpecificTable() throws Exception {
     // Setup first controller with distributed locking enabled
     Map<String, Object> properties1 = getDefaultControllerConfiguration();
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties1.put(ControllerConf.CONTROLLER_PORT, 21002);
 
     // Setup second controller with distributed locking enabled (different port)
     Map<String, Object> properties2 = getDefaultControllerConfiguration();
     // Disable scheduler to avoid Quartz conflicts
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties2.put(ControllerConf.CONTROLLER_PORT, 21003);
 
     // Start both controllers
     startController(properties1);
@@ -572,24 +558,20 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test scenario: Both controllers scheduleTasks for the same table.
-   * The scheduleTasks should succeed for one of the controllers.
-   */
+  /// Test scenario: Both controllers scheduleTasks for the same table.
+  /// The scheduleTasks should succeed for one of the controllers.
   @Test
   public void testMultipleScheduleTaskForSpecificTableOnBothControllers() throws Exception {
     // Setup first controller with distributed locking enabled
     Map<String, Object> properties1 = getDefaultControllerConfiguration();
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties1.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties1.put(ControllerConf.CONTROLLER_PORT, 21002);
 
     // Setup second controller with distributed locking enabled (different port)
     Map<String, Object> properties2 = getDefaultControllerConfiguration();
     // Disable scheduler to avoid Quartz conflicts
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, false);
     properties2.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING, true);
-    properties2.put(ControllerConf.CONTROLLER_PORT, 21003);
 
     // Start both controllers
     startController(properties1);
@@ -766,9 +748,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     }
   }
 
-  /**
-   * Helper method to start a second controller instance on a different port
-   */
+  /// Helper method to start a second controller instance on a different port
   private BaseControllerStarter startControllerOnDifferentPort(Map<String, Object> properties) throws Exception {
     BaseControllerStarter controllerStarter = createControllerStarter();
     controllerStarter.init(new org.apache.pinot.spi.env.PinotConfiguration(properties));
@@ -776,15 +756,13 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     return controllerStarter;
   }
 
-  /**
-   * Helper to create a single test table.
-   * <p>
-   * The cron schedule is intentionally set to a one-time fire date in the year 2099 so that the Quartz cron scheduler
-   * (enabled via {@code PINOT_TASK_MANAGER_SCHEDULER_ENABLED}) never fires during the test. Tests in this class
-   * assert on exact {@link ControllableTaskGenerator#getTaskGenerationCount()} values driven by explicit
-   * {@code createTask} / {@code scheduleTasks} calls, and a spurious cron firing at a :00 minute boundary would
-   * produce an extra {@code generateTasks} invocation and make the test flaky.
-   */
+  /// Helper to create a single test table.
+  ///
+  /// The cron schedule is intentionally set to a one-time fire date in the year 2099 so that the Quartz cron scheduler
+  /// (enabled via `PINOT_TASK_MANAGER_SCHEDULER_ENABLED`) never fires during the test. Tests in this class
+  /// assert on exact [ControllableTaskGenerator#getTaskGenerationCount()] values driven by explicit
+  /// `createTask` / `scheduleTasks` calls, and a spurious cron firing at a :00 minute boundary would
+  /// produce an extra `generateTasks` invocation and make the test flaky.
   private void createSingleTestTable(String rawTableName) throws Exception {
     Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
     taskTypeConfigsMap.put(TEST_TASK_TYPE, Map.of("schedule", "0 0 0 1 1 ? 2099"));
@@ -797,9 +775,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     addTableConfig(tableConfig);
   }
 
-  /**
-   * Task generator with controllable behavior
-   */
+  /// Task generator with controllable behavior
   private static class ControllableTaskGenerator implements PinotTaskGenerator {
     private final String _taskType;
     private int _taskGenerationCount = 0;
@@ -877,11 +853,9 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test scenario: Tests the forceReleaseLock API functionality.
-   * Verifies that when forceReleaseLock is called during task execution,
-   * the lock is released and another createTask can be started for the same table.
-   */
+  /// Test scenario: Tests the forceReleaseLock API functionality.
+  /// Verifies that when forceReleaseLock is called during task execution,
+  /// the lock is released and another createTask can be started for the same table.
   @Test
   public void testForceReleaseLockDuringTaskExecution() throws Exception {
     // Setup controller with distributed locking enabled
@@ -1009,9 +983,7 @@ public class PinotTaskManagerDistributedLockingTest extends ControllerTest {
     }
   }
 
-  /**
-   * Test scenario: Tests the forceReleaseLock API functionality to ensure it throws exception if no lock is present
-   */
+  /// Test scenario: Tests the forceReleaseLock API functionality to ensure it throws exception if no lock is present
   @Test
   public void testForceReleaseLockWhenNoLockExists() throws Exception {
     // Setup controller with distributed locking enabled

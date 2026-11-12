@@ -44,15 +44,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Stores responses in a file system. All storage schemes supported by PinotFS can be used.
- * Responses are stored in "data.dir" directory with the following structure:
- * - A directory is created for every request id.
- * - Response metadata is stored with filename "response"
- * - Results are stored with filename "resultTable"
- * The extension of the file is determined by the config "extension"
- *
- */
+/// Stores responses in a file system. All storage schemes supported by PinotFS can be used.
+/// Responses are stored in "data.dir" directory with the following structure:
+/// - A directory is created for every request id.
+/// - Response metadata is stored with filename "response"
+/// - Results are stored with filename "resultTable"
+/// The extension of the file is determined by the config "extension"
 @AutoService(ResponseStore.class)
 public class FsResponseStore extends AbstractResponseStore {
   private static final Logger LOGGER = LoggerFactory.getLogger(FsResponseStore.class);

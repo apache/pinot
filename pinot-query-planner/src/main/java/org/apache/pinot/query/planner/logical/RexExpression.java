@@ -22,13 +22,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-/**
- * {@code RexExpression} is the serializable format of the {@link RexNode}.
- */
+/// `RexExpression` is the serializable format of the [org.apache.calcite.rex.RexNode].
 public interface RexExpression {
 
   class InputRef implements RexExpression {
@@ -67,9 +64,7 @@ public interface RexExpression {
     private final ColumnDataType _dataType;
     private final Object _value;
 
-    /**
-     * NOTE: Value is the internal stored value for the data type. E.g. BOOLEAN -> int, TIMESTAMP -> long.
-     */
+    /// NOTE: Value is the internal stored value for the data type. E.g. BOOLEAN -> int, TIMESTAMP -> long.
     public Literal(ColumnDataType dataType, @Nullable Object value) {
       _dataType = dataType;
       _value = value;
@@ -156,13 +151,14 @@ public interface RexExpression {
         return false;
       }
       FunctionCall that = (FunctionCall) o;
-      return _isDistinct == that._isDistinct && _dataType == that._dataType && Objects.equals(_functionName,
-          that._functionName) && Objects.equals(_functionOperands, that._functionOperands);
+      return _isDistinct == that._isDistinct && _ignoreNulls == that._ignoreNulls && _dataType == that._dataType
+          && Objects.equals(_functionName, that._functionName)
+          && Objects.equals(_functionOperands, that._functionOperands);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(_dataType, _functionName, _functionOperands, _isDistinct);
+      return Objects.hash(_dataType, _functionName, _functionOperands, _isDistinct, _ignoreNulls);
     }
   }
 }

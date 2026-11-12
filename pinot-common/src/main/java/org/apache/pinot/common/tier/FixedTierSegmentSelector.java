@@ -22,9 +22,7 @@ import java.util.Set;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 
 
-/**
- * A {@link TierSegmentSelector} strategy which selects segments for a tier based on a fixed list
- */
+/// A [TierSegmentSelector] strategy which selects segments for a tier based on a fixed list
 public class FixedTierSegmentSelector implements TierSegmentSelector {
   private final Set<String> _segmentsToSelect;
   // ["*"] means select all completed segments

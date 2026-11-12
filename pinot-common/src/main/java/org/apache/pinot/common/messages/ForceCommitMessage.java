@@ -27,10 +27,8 @@ import org.apache.helix.model.Message;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
-/**
- * Force commit helix message is created on controller and get sent to servers to instruct them to stop consumption and
- * immediately start committing the segment.
- */
+/// Force commit helix message is created on controller and get sent to servers to instruct them to stop consumption and
+/// immediately start committing the segment.
 public class ForceCommitMessage extends Message {
   public static final String FORCE_COMMIT_MSG_SUB_TYPE = "FORCE_COMMIT";
   private static final String TABLE_NAME = "tableName";

@@ -21,9 +21,7 @@ package org.apache.pinot.common.metrics;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Controller gauges.
- */
+/// Controller gauges.
 public enum ControllerGauge implements AbstractMetrics.Gauge {
   VERSION("version", true),
 
@@ -210,6 +208,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Metric used to track errors during the periodic table retention management
   RETENTION_MANAGER_ERROR("retentionManagerError", false),
 
+  /// Status of the latest completed table size retention pass: 1 when a configured policy cannot run safely, deletion
+  /// fails, or protected data keeps the table above its cap; 0 when the configured policy succeeds within the cap.
+  /// Published once when each configured pass completes; absent when size retention is disabled or unsupported.
+  SIZE_RETENTION_BLOCKED("sizeRetentionBlocked", false),
+
   // Gauge to reflect whether pauseless is enabled or not
   PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
 
@@ -271,11 +274,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
     return _unit;
   }
 
-  /**
-   * Returns true if the gauge is global (not attached to a particular resource)
-   *
-   * @return true if the gauge is global
-   */
+  /// Returns true if the gauge is global (not attached to a particular resource)
+  ///
+  /// @return true if the gauge is global
   @Override
   public boolean isGlobal() {
     return _global;

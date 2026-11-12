@@ -28,18 +28,14 @@ import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 
 
-/**
- * Dispatch client used to dispatch a runnable plan to the server.
- * TODO(timeseries): This shouldn't exist and we should re-use DispatchClient. TBD as part of multi-stage
- *   engine integration.
- */
+/// Dispatch client used to dispatch a runnable plan to the server.
+/// TODO(timeseries): This shouldn't exist and we should re-use DispatchClient. TBD as part of multi-stage
+///   engine integration.
 public class TimeSeriesDispatchClient {
   // TODO(timeseries): Note that time-series engine at present uses QueryServer for data transfer from server to broker.
   //   This will be fixed as we integrate with MSE.
   private static final int INBOUND_SIZE_LIMIT = 256 * 1024 * 1024;
-  /**
-   * Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
-   */
+  /// Shared buffer allocator configured to prefer direct (off-heap) buffers for better performance.
   private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
 
   private final ManagedChannel _channel;

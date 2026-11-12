@@ -93,7 +93,6 @@ import org.slf4j.LoggerFactory;
 ///   - `preProcess` – validates watermark against windowStartMs
 ///   - `executeTask` – queries broker, builds segment, uploads
 ///   - `postProcess` – advances watermark to windowEndMs
-///
 public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(MaterializedViewTaskExecutor.class);
 
@@ -655,7 +654,6 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
   ///   - the runtime `watermarkMs` / partitions map are NOT advanced, so the broker will not
   ///       rewrite subsequent queries against the incomplete MV;
   ///   - Helix retries the task, letting transient causes self-heal.
-  ///
   ///
   /// If the config is missing (older tasks in flight during rolling upgrade) or non-positive,
   /// the task fails loud — silently disabling the saturation gate is exactly the silent-truncation

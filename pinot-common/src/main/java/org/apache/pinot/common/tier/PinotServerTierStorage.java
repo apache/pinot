@@ -22,9 +22,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 
-/**
- * Tier storage type which uses Pinot servers as storage
- */
+/// Tier storage type which uses Pinot servers as storage
 public class PinotServerTierStorage implements TierStorage {
   private final String _serverTag;
   private final String _tierBackend;
@@ -37,9 +35,7 @@ public class PinotServerTierStorage implements TierStorage {
     _tierBackendProperties = tierBackendProperties;
   }
 
-  /**
-   * Returns the tag used to identify the servers being used as the tier storage
-   */
+  /// Returns the tag used to identify the servers being used as the tier storage
   public String getServerTag() {
     return _serverTag;
   }

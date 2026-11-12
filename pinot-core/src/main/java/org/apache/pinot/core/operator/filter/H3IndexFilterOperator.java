@@ -24,6 +24,7 @@ import com.uber.h3core.LengthUnit;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
@@ -31,27 +32,30 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.locationtech.jts.geom.Coordinate;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * A filter operator that uses H3 index for geospatial data retrieval
- */
+/// A filter operator that uses H3 index for geospatial data retrieval
 public class H3IndexFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_H3_INDEX";
 
   private final IndexSegment _segment;
   private final QueryContext _queryContext;
   private final Predicate _predicate;
+  private final String _column;
   private final H3IndexReader _h3IndexReader;
   private final long _h3Id;
   private final double _edgeLength;
@@ -68,12 +72,13 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
     Coordinate coordinate;
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
-      _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
+      _column = arguments.get(0).getIdentifier();
       coordinate = GeometrySerializer.deserialize(arguments.get(1).getLiteral().getBytesValue()).getCoordinate();
     } else {
-      _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
+      _column = arguments.get(1).getIdentifier();
       coordinate = GeometrySerializer.deserialize(arguments.get(0).getLiteral().getBytesValue()).getCoordinate();
     }
+    _h3IndexReader = segment.getDataSource(_column).getH3Index();
     assert _h3IndexReader != null;
     int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
     _h3Id = H3Utils.H3_CORE.latLngToCell(coordinate.y, coordinate.x, resolution);
@@ -96,7 +101,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     if (_upperBound < 0 || _lowerBound > _upperBound) {
       // Invalid upper bound, return an empty block
-      return EmptyDocIdSet.getInstance();
+      return EmptyDocIdSet.unscanned();
     }
 
     try {
@@ -104,8 +109,16 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
         // No lower bound
 
         if (Double.isNaN(_upperBound)) {
-          // No bound, return a match-all block
-          return new MatchAllDocIdSet(_numDocs);
+          // No bound, return a match-all block. Null geometries have no H3 posting, so with query null handling
+          // enabled they must be excluded from the match-all result instead of being reported as matches.
+          ImmutableRoaringBitmap nullDocIds = getNullDocIds();
+          if (nullDocIds == null) {
+            return new MatchAllDocIdSet(_numDocs);
+          }
+          MutableRoaringBitmap matchAllDocIds = new MutableRoaringBitmap();
+          matchAllDocIds.add(0L, _numDocs);
+          matchAllDocIds.andNot(nullDocIds);
+          return BitmapDocIdSet.create(matchAllDocIds, _numDocs);
         }
 
         // Upper bound only
@@ -138,6 +151,12 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
           fullMatchDocIds.or(_h3IndexReader.getDocIds(partialMatchH3Id));
         }
         fullMatchDocIds.flip(0L, _numDocs);
+        // The flip turns non-matching docs into full matches, but null geometries have no posting and must not be
+        // reported as matches when query null handling is enabled, so exclude them.
+        ImmutableRoaringBitmap nullDocIds = getNullDocIds();
+        if (nullDocIds != null) {
+          fullMatchDocIds.andNot(nullDocIds);
+        }
 
         // Remove the always not match H3 ids from possible not match H3 ids to get the partial match H3 ids
         possibleNotMatchH3Ids.removeAll(alwaysNotMatchH3Ids);
@@ -186,61 +205,86 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     }
   }
 
-  /**
-   * Returns the H3 ids that is ALWAYS fully covered by the circle with the given distance as the radius and a point
-   * within the _h3Id hexagon as the center.
-   * <p>The farthest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
-   * {@code sqrt(3) * n * edgeLength}. Counting the distance from the center to a point in the hexagon, which is up
-   * to the edge length, it is guaranteed that the hexagons in the nth ring are always fully covered if:
-   * {@code distance >= (sqrt(3) * n + 2) * edgeLength}.
-   */
+  /// Returns the H3 ids that is ALWAYS fully covered by the circle with the given distance as the radius and a point
+  /// within the \_h3Id hexagon as the center.
+  ///
+  /// The farthest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
+  /// `sqrt(3) * n * edgeLength`. Counting the distance from the center to a point in the hexagon, which is up
+  /// to the edge length, it is guaranteed that the hexagons in the nth ring are always fully covered if:
+  /// `distance >= (sqrt(3) * n + 2) * edgeLength`.
   private List<Long> getAlwaysMatchH3Ids(double distance) {
     // NOTE: Pick a constant slightly larger than sqrt(3) to be conservative
     int numRings = (int) Math.floor((distance / _edgeLength - 2) / 1.7321);
     return numRings >= 0 ? getH3Ids(numRings) : List.of();
   }
 
-  /**
-   * Returns the H3 ids that MIGHT BE fully/partially covered by the circle with the given distance as the radius and a
-   * point within the _h3Id hexagon as the center.
-   * <p>The shortest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
-   * {@code >= 1.5 * n * edgeLength}. Counting the distance from the center to a point in the hexagon, which is up
-   * to the edge length, it is guaranteed that the hexagons in the nth ring are always not fully/partially covered if:
-   * {@code distance < (1.5 * n - 2) * edgeLength}.
-   */
+  /// Returns the H3 ids that MIGHT BE fully/partially covered by the circle with the given distance as the radius and a
+  /// point within the \_h3Id hexagon as the center.
+  ///
+  /// The shortest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
+  /// `>= 1.5 * n * edgeLength`. Counting the distance from the center to a point in the hexagon, which is up
+  /// to the edge length, it is guaranteed that the hexagons in the nth ring are always not fully/partially covered if:
+  /// `distance < (1.5 * n - 2) * edgeLength`.
   private List<Long> getPossibleMatchH3Ids(double distance) {
     // NOTE: Add a small delta (0.001) to be conservative
     int numRings = (int) Math.floor((distance / _edgeLength + 2) / 1.5 + 0.001);
     return getH3Ids(numRings);
   }
 
-  /**
-   * Returns the H3 ids for the given number of rings around the _h3Id.
-   * IMPORTANT: Throw exception when number of rings is too large because H3 library might send SIGILL for large number
-   * of rings, which can terminate the JVM. Also, the result won't be accurate when the distance is too large. In such
-   * case, the operator will fallback to ExpressionFilterOperator.
-   */
+  /// Returns the H3 ids for the given number of rings around the \_h3Id.
+  /// IMPORTANT: Throw exception when number of rings is too large because H3 library might send SIGILL for large number
+  /// of rings, which can terminate the JVM. Also, the result won't be accurate when the distance is too large. In such
+  /// case, the operator will fallback to ExpressionFilterOperator.
   private List<Long> getH3Ids(int numRings) {
     Preconditions.checkState(numRings <= 100, "Expect numRings <= 100, got: %s", numRings);
     return H3Utils.H3_CORE.gridDisk(_h3Id, numRings);
   }
 
-  /**
-   * Returns the filter block document IDs based on the given full match doc ids and the partial match doc ids.
-   */
+  /// Returns the filter block document IDs based on the given full match doc ids and the partial match doc ids.
   private BlockDocIdSet getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
-    ExpressionFilterOperator expressionFilterOperator =
-        new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs);
-    ScanBasedDocIdIterator docIdIterator =
-        (ScanBasedDocIdIterator) expressionFilterOperator.getTrues().iterator();
+    return getFilterBlock(_segment, _queryContext, _predicate, _numDocs, fullMatchDocIds, partialMatchDocIds);
+  }
+
+  /// Returns the documents that match an H3 predicate: the full match documents, plus the partial match documents on
+  /// which the predicate expression evaluates to true.
+  ///
+  /// Without row-level security (RLS), the expression is evaluated here, so the result is a bitmap and the operator
+  /// stays index-based for the AND that encloses it.
+  ///
+  /// With RLS, the result is the lazy `OR(fullMatch, AND(partialMatch, expression))`. The AND of the RLS filter
+  /// pushes its documents into it (see `RowLevelSecurityFilterOperator`), so the expression runs only on the partial
+  /// match documents that the RLS filter allows. An eager bitmap would evaluate the expression on hidden rows and
+  /// report their number in `numEntriesScannedInFilter`.
+  static BlockDocIdSet getFilterBlock(IndexSegment segment, QueryContext queryContext, Predicate predicate,
+      int numDocs, MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
+    BlockDocIdSet expressionDocIdSet =
+        new ExpressionFilterOperator(segment, queryContext, predicate, numDocs).getTrues();
+    if (queryContext.getRowFilter() != null) {
+      BlockDocIdSet partialMatch =
+          new AndDocIdSet(List.of(BitmapDocIdSet.create(partialMatchDocIds, numDocs), expressionDocIdSet),
+              queryContext.getQueryOptions(), queryContext.isAndRestrictionPushdownEnabled());
+      return new OrDocIdSet(List.of(BitmapDocIdSet.create(fullMatchDocIds, numDocs), partialMatch), numDocs);
+    }
+    ScanBasedDocIdIterator docIdIterator = (ScanBasedDocIdIterator) expressionDocIdSet.iterator();
     MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
     result.or(fullMatchDocIds);
-    return new BitmapDocIdSet(result, _numDocs) {
-      @Override
-      public long getNumEntriesScannedInFilter() {
-        return docIdIterator.getNumEntriesScanned();
-      }
-    };
+    return BitmapDocIdSet.create(result, numDocs, docIdIterator.getNumEntriesScanned());
+  }
+
+  /// Returns the null document IDs for the indexed column when query null handling is enabled and the column has a
+  /// non-empty null-value vector, otherwise `null`. Used to exclude null rows from match-all and complement results,
+  /// which are built across all document IDs and would otherwise include null rows that have no H3 posting.
+  @Nullable
+  private ImmutableRoaringBitmap getNullDocIds() {
+    if (!_queryContext.isNullHandlingEnabled()) {
+      return null;
+    }
+    NullValueVectorReader nullValueVector = _segment.getDataSource(_column).getNullValueVector();
+    if (nullValueVector == null) {
+      return null;
+    }
+    ImmutableRoaringBitmap nullDocIds = nullValueVector.getNullBitmap();
+    return nullDocIds != null && !nullDocIds.isEmpty() ? nullDocIds : null;
   }
 
   @Override

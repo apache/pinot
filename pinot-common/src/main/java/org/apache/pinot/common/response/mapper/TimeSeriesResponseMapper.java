@@ -43,10 +43,8 @@ public class TimeSeriesResponseMapper {
   private TimeSeriesResponseMapper() {
   }
 
-  /**
-   * Creates a BrokerResponseNativeV2 from a TimeSeriesBlock.
-   * This method converts the time series data into a format compatible with the broker response.
-   */
+  /// Creates a BrokerResponseNativeV2 from a TimeSeriesBlock.
+  /// This method converts the time series data into a format compatible with the broker response.
   public static BrokerResponse toBrokerResponse(TimeSeriesBlock timeSeriesBlock) {
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     if (timeSeriesBlock == null) {
@@ -168,6 +166,14 @@ public class TimeSeriesResponseMapper {
         getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT));
     map.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE,
         getIntMetadataValue(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_REMOTE_ACCESSES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_REMOTE_ACCESSES));
+    map.merge(BrokerResponseNativeV2.StatKey.REMOTE_ACCESS_BYTES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.REMOTE_ACCESS_BYTES));
+    map.merge(BrokerResponseNativeV2.StatKey.NUM_DIRECT_REMOTE_ACCESSES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.NUM_DIRECT_REMOTE_ACCESSES));
+    map.merge(BrokerResponseNativeV2.StatKey.DIRECT_REMOTE_ACCESS_BYTES,
+        getLongMetadataValue(metadata, DataTable.MetadataKey.DIRECT_REMOTE_ACCESS_BYTES));
     brokerResponse.addBrokerStats(map);
     brokerResponse.setTimeUsedMs(getLongMetadataValue(metadata, DataTable.MetadataKey.TIME_USED_MS));
   }

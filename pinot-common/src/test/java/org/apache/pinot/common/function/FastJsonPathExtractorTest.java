@@ -21,15 +21,8 @@ package org.apache.pinot.common.function;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.StreamReadFeature;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jayway.jsonpath.Configuration;
-import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.Predicate;
-import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
-import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,12 +41,12 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/// Differential test for {@link FastJsonPathExtractor} and the opt-in fast scalar overloads, with
+/// Differential test for [FastJsonPathExtractor] and the opt-in fast scalar overloads, with
 /// Jayway as the oracle.
-/// <p>
+///
 /// Every case runs the same {json, path} pair through the fast extractor and through the exact Jayway
 /// configuration it replaces, and asserts the two produce the same value - or the same exception type. The
-/// oracle is the real production Jayway config ({@link #PLAIN_CONTEXT} / {@link #BIG_DECIMAL_CONTEXT}) and the
+/// oracle is the real production Jayway config ([#PLAIN_CONTEXT] / [#BIG_DECIMAL_CONTEXT]) and the
 /// existing Jayway scalar overloads, so it cannot drift away from what Pinot actually does today.
 public class FastJsonPathExtractorTest {
   private static final Predicate[] NO_PREDICATES = new Predicate[0];
@@ -62,17 +55,9 @@ public class FastJsonPathExtractorTest {
   private static final JsonFactory STRICT_FACTORY =
       JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
 
-  /// Mirrors {@code JsonExtractScalarTransformFunction.JSON_PARSER_CONTEXT}.
-  private static final ParseContext PLAIN_CONTEXT = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
-          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
-
-  /// Mirrors {@code JsonExtractScalarTransformFunction.JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL}, the one production
-  /// context that is not reachable through {@link JsonFunctions}.
-  private static final ParseContext BIG_DECIMAL_CONTEXT = JsonPath.using(
-      new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider(
-              new ObjectMapper().configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)))
-          .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS).build());
+  /// Production Jayway contexts from [JsonFunctions], shared with `JsonExtractScalarTransformFunction`.
+  private static final ParseContext PLAIN_CONTEXT = JsonFunctions.PARSE_CONTEXT;
+  private static final ParseContext BIG_DECIMAL_CONTEXT = JsonFunctions.PARSE_CONTEXT_WITH_BIG_DECIMAL;
 
   static {
     /// JsonFunctions registers Pinot's JsonPath cache in its static initializer, and Jayway rejects that
@@ -342,8 +327,8 @@ public class FastJsonPathExtractorTest {
     assertParity(json, path);
   }
 
-  /// The {@code USE_BIG_DECIMAL_FOR_FLOATS} context used by {@code jsonExtractScalar} for STRING and BIG_DECIMAL
-  /// results is not reachable through {@link JsonFunctions}, so it gets its own oracle.
+  /// The `USE_BIG_DECIMAL_FOR_FLOATS` context used by `jsonExtractScalar` for STRING and BIG_DECIMAL
+  /// results is not reachable through [JsonFunctions], so it gets its own oracle.
   @Test(dataProvider = "parityCases")
   public void testBigDecimalParityWithJayway(String json, String path) {
     SimpleJsonPath simpleJsonPath = SimpleJsonPath.compile(path);
@@ -357,8 +342,8 @@ public class FastJsonPathExtractorTest {
             jayway));
   }
 
-  /// The {@code byte[]} overloads back {@code jsonExtractScalar} over a BYTES column, which reaches
-  /// {@code parseContext.parseUtf8} rather than {@code parse}. They get their own oracle.
+  /// The `byte[]` overloads back `jsonExtractScalar` over a BYTES column, which reaches
+  /// `parseContext.parseUtf8` rather than `parse`. They get their own oracle.
   @Test(dataProvider = "parityCases")
   public void testBytesParityWithJayway(String json, String path) {
     SimpleJsonPath simpleJsonPath = SimpleJsonPath.compile(path);
@@ -374,7 +359,7 @@ public class FastJsonPathExtractorTest {
         String.format("bytes mismatch for json=<%s> path=<%s>: fast=%s jayway=%s", json, path, fast, jayway));
   }
 
-  /// Multibyte UTF-8 in keys and values, which only the {@code byte[]} path can get wrong.
+  /// Multibyte UTF-8 in keys and values, which only the `byte[]` path can get wrong.
   @Test
   public void testBytesParityWithMultibyteContent() {
     for (String[] jsonAndPath : new String[][]{
@@ -388,8 +373,8 @@ public class FastJsonPathExtractorTest {
   }
 
   /// The opt-in fast overloads are new SQL-visible signatures, so resolve and invoke them through the
-  /// {@link FunctionRegistry} the query/ingestion path uses. This is what a Java-level call cannot prove: that
-  /// the four-argument overloads register under their own arity and that a {@code boolean} literal converts.
+  /// [FunctionRegistry] the query/ingestion path uses. This is what a Java-level call cannot prove: that
+  /// the four-argument overloads register under their own arity and that a `boolean` literal converts.
   @Test
   public void testFastFunctionsResolveThroughFunctionRegistry()
       throws Exception {
@@ -397,6 +382,7 @@ public class FastJsonPathExtractorTest {
     assertEquals(invoke("jsonPathStringFast", json, "$.user.country", "DEFAULT"), "US");
     assertEquals(invoke("jsonPathStringFirstMatch", json, "$.user.country", "DEFAULT"), "US");
     assertEquals(invoke("jsonPathStringFast", json, "$.missing", "DEFAULT"), "DEFAULT");
+    assertEquals(invoke("jsonPathLongFast", json, "$.user.age", -7L), 41L);
     assertEquals(invoke("jsonPathLongFirstMatch", json, "$.user.age", -7L), 41L);
     assertEquals(invoke("jsonPathDoubleFast", json, "$.user.score", -7.5d), 9.5d);
     /// A complex path must still resolve through the function by falling back to Jayway, i.e. produce exactly
@@ -405,7 +391,7 @@ public class FastJsonPathExtractorTest {
         JsonFunctions.jsonPathString(json, "$..country", "DEFAULT"));
   }
 
-  /// Function-level coverage of the {@code FirstMatch} (early-exit) functions: they equal {@code Fast}/Jayway on
+  /// Function-level coverage of the `FirstMatch` (early-exit) functions: they equal `Fast`/Jayway on
   /// clean data, and diverge to the first occurrence on the documented duplicate-key case.
   @Test
   public void testFirstMatchFunctions() {
@@ -423,7 +409,8 @@ public class FastJsonPathExtractorTest {
 
   private static Object invoke(String name, Object... arguments)
       throws Exception {
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(name, arguments.length);
+    FunctionInfo functionInfo =
+        FunctionRegistry.lookupFunctionInfo(FunctionRegistry.canonicalize(name), arguments.length);
     assertNotNull(functionInfo, name + "/" + arguments.length + " is not registered");
     FunctionInvoker invoker = new FunctionInvoker(functionInfo);
     Object[] copy = arguments.clone();
@@ -443,7 +430,7 @@ public class FastJsonPathExtractorTest {
     assertEquals(fast, jayway);
   }
 
-  /// The {@code long} live-path bitmask special-cases a full 64-path batch; anything more must be rejected.
+  /// The `long` live-path bitmask special-cases a full 64-path batch; anything more must be rejected.
   @Test
   public void testMaxPathsBoundary() {
     String json = "{\"k0\":0,\"k63\":63,\"k64\":64}";
@@ -502,8 +489,8 @@ public class FastJsonPathExtractorTest {
         "fast never materializes the unaddressed string, so it does not hit the limit");
   }
 
-  /// The {@code useBigDecimal} context backs {@code jsonExtractScalar(..., 'STRING')} and {@code 'BIG_DECIMAL'} -
-  /// the most common result types - but is unreachable through {@link JsonFunctions}, so the other fuzzers never
+  /// The `useBigDecimal` context backs `jsonExtractScalar(..., 'STRING')` and `'BIG_DECIMAL'` -
+  /// the most common result types - but is unreachable through [JsonFunctions], so the other fuzzers never
   /// touch it. Fuzz it directly against its own Jayway oracle.
   @Test
   public void testBigDecimalFuzzAgainstJayway() {
@@ -620,7 +607,10 @@ public class FastJsonPathExtractorTest {
     }
     Object[] batch = new Object[paths.length];
     FastJsonPathExtractor.extract(json, compiled, batch, false, false);
+    Object[] bytesBatch = new Object[paths.length];
+    FastJsonPathExtractor.extract(json.getBytes(StandardCharsets.UTF_8), compiled, bytesBatch, false, false);
     for (int i = 0; i < paths.length; i++) {
+      assertEquals(bytesBatch[i], batch[i], paths[i]);
       assertEquals(batch[i], FastJsonPathExtractor.extract(json, compiled[i], false, false), paths[i]);
       assertEquals(batch[i], PLAIN_CONTEXT.parse(json).read(paths[i], NO_PREDICATES), paths[i]);
     }

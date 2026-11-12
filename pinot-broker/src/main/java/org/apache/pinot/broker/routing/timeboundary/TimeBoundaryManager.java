@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.timeboundary;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +32,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -49,10 +49,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@code TimeBoundaryManager} class manages the time boundary information for a table.
- * <p>TODO: Support SDF (simple date format) time column
- */
+/// The `TimeBoundaryManager` class manages the time boundary information for a table.
+///
+/// TODO: Support SDF (simple date format) time column
 public class TimeBoundaryManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeBoundaryManager.class);
   private static final long INVALID_TIME_MS = -1;
@@ -65,6 +64,9 @@ public class TimeBoundaryManager {
   private final DateTimeFormatSpec _timeFormatSpec;
   private final long _timeOffsetMs;
   private final Map<String, Long> _endTimeMsMap = new HashMap<>();
+  // Max value in _endTimeMsMap, or INVALID_TIME_MS when it is empty. Kept in sync with the map so that an assignment
+  // change does not scan all the segments.
+  private long _maxEndTimeMs = INVALID_TIME_MS;
 
   private long _explicitlySetTimeBoundaryMs = INVALID_TIME_MS;
   private volatile TimeBoundaryInfo _timeBoundaryInfo;
@@ -102,13 +104,13 @@ public class TimeBoundaryManager {
         _timeColumn, dateTimeSpec.getFormat(), isHourlyTable, _offlineTableName);
   }
 
-  /**
-   * Initializes the time boundary manager with the ideal state, external view and online segments (segments with
-   * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}). Should be called
-   * only once before calling other methods.
-   * <p>NOTE: {@code idealState} and {@code externalView} are unused, but intentionally passed in in case they are
-   * needed in the future.
-   */
+  /// Initializes the time boundary manager with the ideal state, external view and online segments (segments with
+  /// ONLINE/CONSUMING instances in the ideal state and pre-selected by the
+  /// [org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector]). Should be called only once before
+  /// calling other methods.
+  ///
+  /// NOTE: `idealState` and `externalView` are unused, but intentionally passed in in case they are
+  /// needed in the future.
   @SuppressWarnings("unused")
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
     updateExplicitlySetTimeBoundary(idealState);
@@ -122,14 +124,12 @@ public class TimeBoundaryManager {
       segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
     }
     List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    long maxEndTimeMs = INVALID_TIME_MS;
     for (int i = 0; i < numSegments; i++) {
       String segment = segments.get(i);
-      long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecords.get(i));
-      _endTimeMsMap.put(segment, endTimeMs);
-      maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
+      _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecords.get(i)));
     }
-    updateTimeBoundaryInfo(maxEndTimeMs);
+    _maxEndTimeMs = computeMaxEndTimeMs();
+    updateTimeBoundaryInfo(_maxEndTimeMs);
   }
 
   private void updateExplicitlySetTimeBoundary(IdealState idealState) {
@@ -195,32 +195,71 @@ public class TimeBoundaryManager {
     }
   }
 
-  /**
-   * Processes the segment assignment (ideal state or external view) change based on the given online segments (segments
-   * with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
-   * <p>NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
-   * ones. The refreshed segment ZK metadata change won't be picked up.
-   * <p>NOTE: {@code idealState} is unused, but intentionally passed in in case it is needed in the future.
-   */
+  /// Processes the segment assignment (ideal state or external view) change based on the given online segments
+  /// (segments with ONLINE/CONSUMING instances in the ideal state and pre-selected by the
+  /// [org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector]).
+  ///
+  /// NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
+  /// ones. The refreshed segment ZK metadata change won't be picked up.
+  ///
+  /// NOTE: `idealState` is unused, but intentionally passed in in case it is needed in the future.
   @SuppressWarnings("unused")
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     updateExplicitlySetTimeBoundary(idealState);
 
+    // Read the ZK metadata of the new segments in one batch
+    List<String> newSegments = new ArrayList<>();
+    List<String> newSegmentZKMetadataPaths = new ArrayList<>();
     for (String segment : onlineSegments) {
       // NOTE: Only update the segment end time when there are ONLINE instances in the external view to prevent moving
       //       the time boundary before the new segment is picked up by the servers
-      Map<String, String> instanceStateMap = externalView.getStateMap(segment);
-      if (instanceStateMap != null && instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
-        _endTimeMsMap.computeIfAbsent(segment, k -> extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
-            _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
+      if (!_endTimeMsMap.containsKey(segment)) {
+        Map<String, String> instanceStateMap = externalView.getStateMap(segment);
+        if (instanceStateMap != null && instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
+          newSegments.add(segment);
+          newSegmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
+        }
       }
     }
-    _endTimeMsMap.keySet().retainAll(onlineSegments);
-    updateTimeBoundaryInfo(getMaxEndTimeMs());
+    // NOTE: Read before changing any state, so that a failed read leaves the state as it was. The read throws on a ZK
+    //       error other than a missing node, so that the routing entry keeps its IS/EV versions and retries.
+    List<ZNRecord> znRecords = newSegments.isEmpty() ? List.of()
+        : _propertyStore.get(newSegmentZKMetadataPaths, null, AccessOption.PERSISTENT, true);
+    boolean recomputeMaxEndTime = false;
+    // NOTE: Removing a segment can only lower the max end time, so a full scan is needed only when a removed segment
+    //       holds the current max end time.
+    Iterator<Map.Entry<String, Long>> iterator = _endTimeMsMap.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<String, Long> entry = iterator.next();
+      if (!onlineSegments.contains(entry.getKey())) {
+        if (entry.getValue() >= _maxEndTimeMs) {
+          recomputeMaxEndTime = true;
+        }
+        iterator.remove();
+      }
+    }
+    if (recomputeMaxEndTime) {
+      _maxEndTimeMs = computeMaxEndTimeMs();
+    }
+    int numNewSegments = newSegments.size();
+    for (int i = 0; i < numNewSegments; i++) {
+      String segment = newSegments.get(i);
+      ZNRecord znRecord = znRecords.get(i);
+      if (znRecord == null) {
+        // NOTE: The node does not exist. Do not record the segment, so that the next assignment change reads it again.
+        LOGGER.warn("Failed to find segment ZK metadata for segment: {}, table: {}, will retry on next change", segment,
+            _offlineTableName);
+        continue;
+      }
+      long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment, znRecord);
+      _endTimeMsMap.put(segment, endTimeMs);
+      _maxEndTimeMs = Math.max(_maxEndTimeMs, endTimeMs);
+    }
+    updateTimeBoundaryInfo(_maxEndTimeMs);
   }
 
-  private long getMaxEndTimeMs() {
+  private long computeMaxEndTimeMs() {
     long maxEndTimeMs = INVALID_TIME_MS;
     for (long endTimeMs : _endTimeMsMap.values()) {
       maxEndTimeMs = Math.max(maxEndTimeMs, endTimeMs);
@@ -228,13 +267,18 @@ public class TimeBoundaryManager {
     return maxEndTimeMs;
   }
 
-  /**
-   * Refreshes the metadata for the given segment (called when segment is getting refreshed).
-   */
+  /// Refreshes the metadata for the given segment (called when segment is getting refreshed).
   public synchronized void refreshSegment(String segment) {
-    _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
-        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
-    updateTimeBoundaryInfo(getMaxEndTimeMs());
+    long endTimeMs = extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
+        _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT));
+    Long previousEndTimeMs = _endTimeMsMap.put(segment, endTimeMs);
+    if (previousEndTimeMs != null && previousEndTimeMs >= _maxEndTimeMs && endTimeMs < previousEndTimeMs) {
+      // The refreshed segment held the max end time and moved it back
+      _maxEndTimeMs = computeMaxEndTimeMs();
+    } else {
+      _maxEndTimeMs = Math.max(_maxEndTimeMs, endTimeMs);
+    }
+    updateTimeBoundaryInfo(_maxEndTimeMs);
   }
 
   @Nullable

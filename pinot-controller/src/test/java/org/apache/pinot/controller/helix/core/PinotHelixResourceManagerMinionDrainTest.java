@@ -39,9 +39,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for minion drain functionality in PinotHelixResourceManager
- */
+/// Unit tests for minion drain functionality in PinotHelixResourceManager
 public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
   private List<HelixManager> _fakeMinionHelixManagers = new java.util.ArrayList<>();
 
@@ -52,10 +50,8 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
     startController();
   }
 
-  /**
-   * Creates a fake minion HelixManager that connects to the cluster, creating a LiveInstance entry.
-   * This is needed for enableInstance to work in tests.
-   */
+  /// Creates a fake minion HelixManager that connects to the cluster, creating a LiveInstance entry.
+  /// This is needed for enableInstance to work in tests.
   private void createFakeMinionLiveInstance(String instanceId)
       throws Exception {
     HelixManager helixManager =

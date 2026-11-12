@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 
-/// Parses the <a href="https://sqlite.org/jsonb.html">SQLite JSONB</a> binary format (SQLite 3.45+).
+/// Parses the [SQLite JSONB](https://sqlite.org/jsonb.html) binary format (SQLite 3.45+).
 ///
 /// Every element is a 1–9 byte header followed by a payload. The header's first byte packs the element type in
 /// the low nibble and a payload-size descriptor in the high nibble; descriptors 12–15 mean the size is a big-
@@ -117,7 +117,7 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
     }
   }
 
-  /// Payload size declared by the element header starting at {@code offset}. The caller must first ensure
+  /// Payload size declared by the element header starting at `offset`. The caller must first ensure
   /// [#headerLength] bytes are available. A descriptor-15 size with its sign bit set yields a negative value,
   /// which every caller rejects (it can neither be a valid length nor equal a payload length).
   private static long declaredSize(byte[] payload, int offset, int sizeDescriptor) {
@@ -135,7 +135,7 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
     }
   }
 
-  /// Reads {@code count} big-endian bytes as an unsigned value. An 8-byte field with the sign bit set yields a
+  /// Reads `count` big-endian bytes as an unsigned value. An 8-byte field with the sign bit set yields a
   /// negative long, which never equals a payload length and is rejected by the bounds checks.
   private static long readUnsignedBE(byte[] payload, int offset, int count) {
     long value = 0;
@@ -164,7 +164,7 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
     return (Map<String, Object>) value;
   }
 
-  /// Reads one element. {@code parentEnd} is the exclusive end of the enclosing container (the whole payload at
+  /// Reads one element. `parentEnd` is the exclusive end of the enclosing container (the whole payload at
   /// the top level); an element may never extend past it, otherwise a nested element could overrun its parent
   /// while still fitting the payload and silently swallow its following siblings.
   private static Object readElement(Cursor cursor, int parentEnd, int depth) {
@@ -246,7 +246,7 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
     return map;
   }
 
-  /// Returns {@code depth + 1} for the children of a container, throwing once nesting would exceed
+  /// Returns `depth + 1` for the children of a container, throwing once nesting would exceed
   /// [#MAX_NESTING_DEPTH]. Keeps deep nesting on the `IllegalArgumentException` path (handled as a bad record)
   /// rather than letting the recursion overflow the stack with a `StackOverflowError`.
   private static int nextDepth(int depth) {
@@ -337,7 +337,7 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
   }
 
   /// Single-pass JSON string unescape. Returns the input unchanged (no allocation) when it contains no
-  /// backslash. Rejects invalid escapes for `TEXTJ`; when {@code json5} is set, also accepts the JSON5 escape
+  /// backslash. Rejects invalid escapes for `TEXTJ`; when `json5` is set, also accepts the JSON5 escape
   /// extensions (`\'`, `\v`, `\0`, `\xHH`, line continuations, and `\<char>` passthrough).
   private static String unescape(String content, boolean json5) {
     int firstEscape = content.indexOf('\\');
@@ -458,7 +458,7 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
       return _buf[_pos] & 0xFF;
     }
 
-    /// Advances past {@code count} bytes, verifying they are present. Compares without adding to {@code _pos}
+    /// Advances past `count` bytes, verifying they are present. Compares without adding to `_pos`
     /// so the check cannot overflow.
     private void skip(int count) {
       if (count > _limit - _pos) {
@@ -467,11 +467,11 @@ class SqliteJsonbPayloadParser implements JsonPayloadParser {
       _pos += count;
     }
 
-    /// Validates that a payload of {@code size} bytes starting at {@code start} fits inside the enclosing
+    /// Validates that a payload of `size` bytes starting at `start` fits inside the enclosing
     /// container (never merely inside the whole payload) and returns its exclusive end. Compares without adding
-    /// to {@code start} so an adversarial `uint64` size cannot overflow past the guard. A {@code start} already
-    /// past {@code parentEnd} — possible when a trailing element's header straddles the boundary — makes
-    /// {@code parentEnd - start} negative and is therefore rejected too.
+    /// to `start` so an adversarial `uint64` size cannot overflow past the guard. A `start` already
+    /// past `parentEnd` — possible when a trailing element's header straddles the boundary — makes
+    /// `parentEnd - start` negative and is therefore rejected too.
     private int boundedEnd(int start, long size, int parentEnd) {
       if (size < 0 || size > parentEnd - start) {
         throw new IllegalArgumentException("SQLite JSONB element size exceeds its enclosing container");

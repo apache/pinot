@@ -42,16 +42,12 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Factory for {@link DistinctExecutor}.
- */
+/// Factory for [DistinctExecutor].
 public class DistinctExecutorFactory {
   private DistinctExecutorFactory() {
   }
 
-  /**
-   * Returns the {@link DistinctExecutor} for the given distinct query.
-   */
+  /// Returns the [DistinctExecutor] for the given distinct query.
   public static DistinctExecutor getDistinctExecutor(BaseProjectOperator<?> projectOperator,
       QueryContext queryContext) {
     List<ExpressionContext> expressions = queryContext.getSelectExpressions();

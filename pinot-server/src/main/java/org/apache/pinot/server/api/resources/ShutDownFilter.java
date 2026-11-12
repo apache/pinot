@@ -28,10 +28,8 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 
 
-/**
- * This filter is used to reject all requests when server is shutting down, and only allow the liveness check to go
- * through.
- */
+/// This filter is used to reject all requests when server is shutting down, and only allow the liveness check to go
+/// through.
 @Provider
 public class ShutDownFilter implements ContainerRequestFilter {
 

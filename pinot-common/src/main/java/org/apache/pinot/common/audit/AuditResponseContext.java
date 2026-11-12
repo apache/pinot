@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.common.audit;
 
-/**
- * Context object for passing audit information from request to response filter.
- * This object is stored in the ContainerRequestContext and retrieved during response processing.
- */
+/// Context object for passing audit information from request to response filter.
+/// This object is stored in the ContainerRequestContext and retrieved during response processing.
 public class AuditResponseContext {
   private String _requestId;
   private long _startTimeNanos;

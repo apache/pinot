@@ -91,10 +91,8 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
     addSchema(schema);
   }
 
-  /**
-   * Validates if we are able to ingest segments into realtime table, via adhoc mode.
-   * @throws Exception
-   */
+  /// Validates if we are able to ingest segments into realtime table, via adhoc mode.
+  /// @throws Exception
   @Test
   public void testAdhocIngestionIntoRealtimeTable()
       throws Exception {
@@ -121,10 +119,8 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
     assertEquals(result.get("numSegmentsQueried").asInt(), 14);
   }
 
-  /**
-   * Validates ingestion to realtime table via scheduled mode
-   * @throws Exception
-   */
+  /// Validates ingestion to realtime table via scheduled mode
+  /// @throws Exception
   @Test
   public void testScheduledIngestionIntoRealtimeTable()
       throws Exception {

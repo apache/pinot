@@ -19,19 +19,17 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 
-/**
- * Declares the query-time capabilities of a vector index backend.
- *
- * <p>This model allows the query planner and runtime to reason about what a backend can do
- * without backend-specific branching. Each {@link VectorBackendType} returns its own
- * capabilities instance via {@link VectorBackendType#getCapabilities()}.</p>
- *
- * <p>Capability flags are intentionally conservative: a backend should only declare a
- * capability if it can deliver correct results for that mode. The runtime uses these
- * flags to select execution modes and to decide when an exact-scan fallback is required.</p>
- *
- * <p>This class is immutable and thread-safe.</p>
- */
+/// Declares the query-time capabilities of a vector index backend.
+///
+/// This model allows the query planner and runtime to reason about what a backend can do
+/// without backend-specific branching. Each [VectorBackendType] returns its own
+/// capabilities instance via [VectorBackendType#getCapabilities()].
+///
+/// Capability flags are intentionally conservative: a backend should only declare a
+/// capability if it can deliver correct results for that mode. The runtime uses these
+/// flags to select execution modes and to decide when an exact-scan fallback is required.
+///
+/// This class is immutable and thread-safe.
 public final class VectorBackendCapabilities {
 
   private final boolean _supportsTopKAnn;
@@ -49,48 +47,38 @@ public final class VectorBackendCapabilities {
     _supportsRuntimeSearchParams = supportsRuntimeSearchParams;
   }
 
-  /**
-   * Whether the backend can answer top-K approximate nearest-neighbor queries.
-   * All current backends support this.
-   */
+  /// Whether the backend can answer top-K approximate nearest-neighbor queries.
+  /// All current backends support this.
   public boolean supportsTopKAnn() {
     return _supportsTopKAnn;
   }
 
-  /**
-   * Whether the backend can internally prune candidates using a metadata filter bitmap
-   * during ANN search. When false, filtering must happen as a separate post-ANN step.
-   *
-   * <p>Currently no backend supports this; the flag exists to enable future backends
-   * (e.g., Lucene HNSW with filtered search, or a future IVF variant) without API changes.</p>
-   */
+  /// Whether the backend can internally prune candidates using a metadata filter bitmap
+  /// during ANN search. When false, filtering must happen as a separate post-ANN step.
+  ///
+  /// Currently no backend supports this; the flag exists to enable future backends
+  /// (e.g., Lucene HNSW with filtered search, or a future IVF variant) without API changes.
   public boolean supportsFilterAwareSearch() {
     return _supportsFilterAwareSearch;
   }
 
-  /**
-   * Whether the backend can natively answer approximate radius/threshold queries
-   * (returning all vectors within a distance threshold rather than top-K).
-   *
-   * <p>When false, the runtime must use ANN candidate generation followed by exact
-   * threshold refinement.</p>
-   */
+  /// Whether the backend can natively answer approximate radius/threshold queries
+  /// (returning all vectors within a distance threshold rather than top-K).
+  ///
+  /// When false, the runtime must use ANN candidate generation followed by exact
+  /// threshold refinement.
   public boolean supportsApproximateRadius() {
     return _supportsApproximateRadius;
   }
 
-  /**
-   * Whether the backend's ANN results can be refined using exact distance from the
-   * forward index. All current backends support this when a forward index is available.
-   */
+  /// Whether the backend's ANN results can be refined using exact distance from the
+  /// forward index. All current backends support this when a forward index is available.
   public boolean supportsExactRerank() {
     return _supportsExactRerank;
   }
 
-  /**
-   * Whether the backend accepts runtime search parameters (e.g., nprobe).
-   * True for IVF_FLAT and IVF_PQ; false for HNSW.
-   */
+  /// Whether the backend accepts runtime search parameters (e.g., nprobe).
+  /// True for IVF_FLAT and IVF_PQ; false for HNSW.
   public boolean supportsRuntimeSearchParams() {
     return _supportsRuntimeSearchParams;
   }
@@ -106,9 +94,7 @@ public final class VectorBackendCapabilities {
         + '}';
   }
 
-  /**
-   * Builder for constructing capability instances.
-   */
+  /// Builder for constructing capability instances.
   public static final class Builder {
     private boolean _supportsTopKAnn;
     private boolean _supportsFilterAwareSearch;

@@ -40,9 +40,7 @@ import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * {@link DistinctExecutor} for multiple columns where some columns are raw (non-dictionary-encoded).
- */
+/// [DistinctExecutor] for multiple columns where some columns are raw (non-dictionary-encoded).
 public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   private final List<ExpressionContext> _expressions;
   private final boolean _hasMVExpression;

@@ -34,19 +34,17 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/**
- * Query server enclosure for testing Pinot query planner & runtime.
- *
- * This enclosure simulates a deployable component of Pinot that serves
- *   - regular Pinot query server (that serves segment-based queries)
- *   - intermediate stage queries (such as JOIN operator that awaits data scanned from left/right tables)
- *
- * Inside this construct it runs a regular pinot QueryExecutor as well as the new runtime - WorkerExecutor
- * Depending on the query request type it gets routed to either one of the two for execution.
- *
- * It also runs a GRPC Mailbox service that runs the new transport layer protocol as the backbone for all
- * multi-stage query communication.
- */
+/// Query server enclosure for testing Pinot query planner & runtime.
+///
+/// This enclosure simulates a deployable component of Pinot that serves
+///   - regular Pinot query server (that serves segment-based queries)
+///   - intermediate stage queries (such as JOIN operator that awaits data scanned from left/right tables)
+///
+/// Inside this construct it runs a regular pinot QueryExecutor as well as the new runtime - WorkerExecutor
+/// Depending on the query request type it gets routed to either one of the two for execution.
+///
+/// It also runs a GRPC Mailbox service that runs the new transport layer protocol as the backbone for all
+/// multi-stage query communication.
 public class QueryServerEnclosure {
   private final int _queryRunnerPort;
   private final QueryRunner _queryRunner;
@@ -84,7 +82,14 @@ public class QueryServerEnclosure {
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadataMap) {
-    QueryExecutionContext executionContext = QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId");
+    return processQuery(workerMetadata, stagePlan, requestMetadataMap,
+        QueryExecutionContext.forMseServerRequest(requestMetadataMap, "serverId"));
+  }
+
+  /// Like [#processQuery(WorkerMetadata, StagePlan, Map)], but runs the stage in the given execution context. Like the
+  /// query server, callers can share one context between all the stages of a query on this server.
+  public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> requestMetadataMap, QueryExecutionContext executionContext) {
     QueryThreadContext.MseWorkerInfo mseWorkerInfo =
         new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,

@@ -44,19 +44,15 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 
-/**
- * Common utils for segment merge tasks.
- */
+/// Common utils for segment merge tasks.
 public class MergeTaskUtils {
   private MergeTaskUtils() {
   }
 
   private static final int AGGREGATION_TYPE_KEY_SUFFIX_LENGTH = MergeTask.AGGREGATION_TYPE_KEY_SUFFIX.length();
 
-  /**
-   * Creates the time handler config based on the given table config, schema and task config. Returns {@code null} if
-   * the table does not have a time column.
-   */
+  /// Creates the time handler config based on the given table config, schema and task config. Returns `null` if
+  /// the table does not have a time column.
   @Nullable
   public static TimeHandlerConfig getTimeHandlerConfig(TableConfig tableConfig, Schema schema,
       Map<String, String> taskConfig) {
@@ -90,9 +86,7 @@ public class MergeTaskUtils {
     return timeHandlerConfigBuilder.build();
   }
 
-  /**
-   * Creates the partitioner configs based on the given table config, schema and task config.
-   */
+  /// Creates the partitioner configs based on the given table config, schema and task config.
   public static List<PartitionerConfig> getPartitionerConfigs(TableConfig tableConfig, Schema schema,
       Map<String, String> taskConfig) {
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
@@ -114,18 +108,14 @@ public class MergeTaskUtils {
     return partitionerConfigs;
   }
 
-  /**
-   * Returns the merge type based on the task config. Returns {@code null} if it is not configured.
-   */
+  /// Returns the merge type based on the task config. Returns `null` if it is not configured.
   @Nullable
   public static MergeType getMergeType(Map<String, String> taskConfig) {
     String mergeType = taskConfig.get(MergeTask.MERGE_TYPE_KEY);
     return mergeType != null ? MergeType.valueOf(mergeType.toUpperCase()) : null;
   }
 
-  /**
-   * Returns the map from column name to the aggregation type associated with it based on the task config.
-   */
+  /// Returns the map from column name to the aggregation type associated with it based on the task config.
   public static Map<String, AggregationFunctionType> getAggregationTypes(Map<String, String> taskConfig) {
     Map<String, AggregationFunctionType> aggregationTypes = new HashMap<>();
     for (Map.Entry<String, String> entry : taskConfig.entrySet()) {
@@ -184,10 +174,8 @@ public class MergeTaskUtils {
         aggregationType, column, fieldSpec.getDataType());
   }
 
-  /**
-   * Returns the segment config based on the task config.
-   * TODO - Ensure all tasks that build SegmentConfig use this method so that all appropriate configs are set.
-   */
+  /// Returns the segment config based on the task config.
+  /// TODO - Ensure all tasks that build SegmentConfig use this method so that all appropriate configs are set.
   public static SegmentConfig getSegmentConfig(Map<String, String> taskConfig) {
     SegmentConfig.Builder segmentConfigBuilder = new SegmentConfig.Builder();
     String maxNumRecordsPerSegment = taskConfig.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
@@ -208,10 +196,8 @@ public class MergeTaskUtils {
     return segmentConfigBuilder.build();
   }
 
-  /**
-   * Check if the segment can be merged. Only skip merging the segment if 'shouldNotMerge'
-   * field exists and is set to true in its segment metadata custom map.
-   */
+  /// Check if the segment can be merged. Only skip merging the segment if 'shouldNotMerge'
+  /// field exists and is set to true in its segment metadata custom map.
   public static boolean allowMerge(SegmentZKMetadata segmentZKMetadata) {
     Map<String, String> customMap = segmentZKMetadata.getCustomMap();
     return MapUtils.isEmpty(customMap) || !Boolean.parseBoolean(

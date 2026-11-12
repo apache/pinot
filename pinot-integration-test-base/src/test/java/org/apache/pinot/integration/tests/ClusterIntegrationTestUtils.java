@@ -99,14 +99,12 @@ public class ClusterIntegrationTestUtils {
 
   private static final Random RANDOM = new Random();
 
-  /**
-   * Set up an H2 table with records from the given Avro files inserted.
-   *
-   * @param avroFiles Avro files that contains the records to be inserted
-   * @param tableName Name of the table to be created
-   * @param h2Connection H2 connection
-   * @throws Exception
-   */
+  /// Set up an H2 table with records from the given Avro files inserted.
+  ///
+  /// @param avroFiles Avro files that contains the records to be inserted
+  /// @param tableName Name of the table to be created
+  /// @param h2Connection H2 connection
+  /// @throws Exception
   @SuppressWarnings("SqlNoDataSourceInspection")
   public static void setUpH2TableWithAvro(List<File> avroFiles, String tableName, Connection h2Connection)
       throws Exception {
@@ -207,13 +205,12 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Helper method to extract the single value Avro field type from a two sized UNION Avro field type if the UNION
-   * contains one single-value type and one NULL type; otherwise, fail the test.
-   * @param type1 the first type in the UNION
-   * @param type2 the second type in the UNION
-   * @return the single value Avro field type in the UNION if the UNION contains one single-value type and one NULL type
-   */
+  /// Helper method to extract the single value Avro field type from a two sized UNION Avro field type if the UNION
+  /// contains one single-value type and one NULL type; otherwise, fail the test.
+  /// @param type1 the first type in the UNION
+  /// @param type2 the second type in the UNION
+  /// @return the single value Avro field type in the UNION if the UNION contains one single-value type and one NULL
+  ///         type
   private static Schema.Type extractSingleValueAvroFieldTypeFromTwoSizedUnion(Schema.Type type1, Schema.Type type2) {
     if (type1 == Schema.Type.NULL) {
       Assert.assertTrue(isSingleValueAvroFieldType(type2));
@@ -227,39 +224,33 @@ public class ClusterIntegrationTestUtils {
     return null;
   }
 
-  /**
-   * Helper method to check whether the given Avro field type is a single value type (non-NULL).
-   *
-   * @param avroFieldType Avro field type
-   * @return Whether the given Avro field type is a single value type (non-NULL)
-   */
+  /// Helper method to check whether the given Avro field type is a single value type (non-NULL).
+  ///
+  /// @param avroFieldType Avro field type
+  /// @return Whether the given Avro field type is a single value type (non-NULL)
   private static boolean isSingleValueAvroFieldType(Schema.Type avroFieldType) {
     return (avroFieldType == Schema.Type.BOOLEAN) || (avroFieldType == Schema.Type.INT) || (avroFieldType
         == Schema.Type.LONG) || (avroFieldType == Schema.Type.FLOAT) || (avroFieldType == Schema.Type.DOUBLE) || (
         avroFieldType == Schema.Type.STRING);
   }
 
-  /**
-   * Helper method to build H2 field name and type.
-   *
-   * @param fieldName Field name
-   * @param avroFieldType Avro field type
-   * @param nullable Whether the column is nullable
-   * @return H2 field name and type
-   */
+  /// Helper method to build H2 field name and type.
+  ///
+  /// @param fieldName Field name
+  /// @param avroFieldType Avro field type
+  /// @param nullable Whether the column is nullable
+  /// @return H2 field name and type
   private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable) {
     return buildH2FieldNameAndType(fieldName, avroFieldType, nullable, false);
   }
 
-  /**
-   * Helper method to build H2 field name and type.
-   *
-   * @param fieldName Field name
-   * @param avroFieldType Avro field type
-   * @param nullable Whether the column is nullable
-   * @param arrayType Whether the column is array data type or not
-   * @return H2 field name and type
-   */
+  /// Helper method to build H2 field name and type.
+  ///
+  /// @param fieldName Field name
+  /// @param avroFieldType Avro field type
+  /// @param nullable Whether the column is nullable
+  /// @param arrayType Whether the column is array data type or not
+  /// @return H2 field name and type
   private static String buildH2FieldNameAndType(String fieldName, Schema.Type avroFieldType, boolean nullable,
       boolean arrayType) {
     String avroFieldTypeName = avroFieldType.getName();
@@ -286,16 +277,14 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Builds Pinot segments from the given Avro files. Each segment will be built using a separate thread.
-   *
-   * @param avroFiles List of Avro files
-   * @param tableConfig Pinot table config
-   * @param schema Pinot schema
-   * @param baseSegmentIndex Base segment index number
-   * @param segmentDir Output directory for the un-tarred segments
-   * @param tarDir Output directory for the tarred segments
-   */
+  /// Builds Pinot segments from the given Avro files. Each segment will be built using a separate thread.
+  ///
+  /// @param avroFiles List of Avro files
+  /// @param tableConfig Pinot table config
+  /// @param schema Pinot schema
+  /// @param baseSegmentIndex Base segment index number
+  /// @param segmentDir Output directory for the un-tarred segments
+  /// @param tarDir Output directory for the tarred segments
   public static void buildSegmentsFromAvro(List<File> avroFiles, TableConfig tableConfig,
       org.apache.pinot.spi.data.Schema schema, int baseSegmentIndex, File segmentDir, File tarDir)
       throws Exception {
@@ -321,16 +310,14 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Builds one Pinot segment from the given Avro file.
-   *
-   * @param avroFile Avro file
-   * @param tableConfig Pinot table config
-   * @param schema Pinot schema
-   * @param segmentIndex Segment index number
-   * @param segmentDir Output directory for the un-tarred segments
-   * @param tarDir Output directory for the tarred segments
-   */
+  /// Builds one Pinot segment from the given Avro file.
+  ///
+  /// @param avroFile Avro file
+  /// @param tableConfig Pinot table config
+  /// @param schema Pinot schema
+  /// @param segmentIndex Segment index number
+  /// @param segmentDir Output directory for the un-tarred segments
+  /// @param tarDir Output directory for the tarred segments
   public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
       org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
       throws Exception {
@@ -338,16 +325,14 @@ public class ClusterIntegrationTestUtils {
     buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex + " %", segmentDir, tarDir);
   }
 
-  /**
-   * Builds one Pinot segment from the given Avro file.
-   *
-   * @param avroFile Avro file
-   * @param tableConfig Pinot table config
-   * @param schema Pinot schema
-   * @param segmentNamePostfix Segment name postfix
-   * @param segmentDir Output directory for the un-tarred segments
-   * @param tarDir Output directory for the tarred segments
-   */
+  /// Builds one Pinot segment from the given Avro file.
+  ///
+  /// @param avroFile Avro file
+  /// @param tableConfig Pinot table config
+  /// @param schema Pinot schema
+  /// @param segmentNamePostfix Segment name postfix
+  /// @param segmentDir Output directory for the un-tarred segments
+  /// @param tarDir Output directory for the tarred segments
   public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
       org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir)
       throws Exception {
@@ -386,9 +371,7 @@ public class ClusterIntegrationTestUtils {
     return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
-  /**
-   * Push the records from the given CSV file into a Kafka stream.
-   */
+  /// Push the records from the given CSV file into a Kafka stream.
   public static void pushCsvIntoKafka(File csvFile, String kafkaBroker, String kafkaTopic,
       @Nullable Integer partitionColumnIndex, boolean injectTombstones)
       throws Exception {
@@ -397,9 +380,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Push the records from the given CSV file into a Kafka stream.
-   */
+  /// Push the records from the given CSV file into a Kafka stream.
   public static void pushCsvIntoKafka(File csvFile, String kafkaTopic, @Nullable Integer partitionColumnIndex,
       boolean injectTombstones, StreamDataProducer producer)
       throws Exception {
@@ -426,9 +407,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Push the records from the given CSV file into a Kafka stream.
-   */
+  /// Push the records from the given CSV file into a Kafka stream.
   public static void pushCsvIntoKafka(List<String> csvRecords, String kafkaBroker, String kafkaTopic,
       @Nullable Integer partitionColumnIndex, boolean injectTombstones)
       throws Exception {
@@ -437,9 +416,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Push the CSV records into a Kafka stream.
-   */
+  /// Push the CSV records into a Kafka stream.
   public static void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic,
       @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
       throws Exception {
@@ -468,9 +445,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Push the records from the given Avro files into a Kafka stream.
-   */
+  /// Push the records from the given Avro files into a Kafka stream.
   public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic,
       int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn,
       boolean injectTombstones)
@@ -481,9 +456,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Push the records from the given Avro files into a Kafka stream.
-   */
+  /// Push the records from the given Avro files into a Kafka stream.
   public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaTopic, int maxNumKafkaMessagesPerBatch,
       @Nullable byte[] header, @Nullable String partitionColumn, boolean injectTombstones, StreamDataProducer producer)
       throws Exception {
@@ -518,9 +491,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Push the records from the given Avro files into a Kafka stream with transaction.
-   */
+  /// Push the records from the given Avro files into a Kafka stream with transaction.
   public static void pushAvroIntoKafkaWithTransaction(List<File> avroFiles, String kafkaBroker, String kafkaTopic,
       int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn, boolean commit)
       throws Exception {
@@ -540,9 +511,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Push the records from the given Avro files into a Kafka stream with transaction.
-   */
+  /// Push the records from the given Avro files into a Kafka stream with transaction.
   public static void pushAvroIntoKafkaWithTransaction(List<File> avroFiles, String kafkaTopic,
       int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn, boolean commit,
       KafkaProducer<byte[], byte[]> producer)
@@ -599,9 +568,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Push random generated records with the given Avro file schema into a Kafka stream.
-   */
+  /// Push random generated records with the given Avro file schema into a Kafka stream.
   public static void pushRandomAvroIntoKafka(File avroFile, String kafkaBroker, String kafkaTopic,
       int numKafkaMessagesToPush, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
       @Nullable String partitionColumn)
@@ -612,9 +579,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Push random generated records with the given Avro file schema into a Kafka stream.
-   */
+  /// Push random generated records with the given Avro file schema into a Kafka stream.
   public static void pushRandomAvroIntoKafka(File avroFile, String kafkaTopic, int numKafkaMessagesToPush,
       int maxNumKafkaMessagesPerBatch, @Nullable byte[] header, @Nullable String partitionColumn,
       StreamDataProducer producer)
@@ -648,12 +613,10 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Helper method to generate random record.
-   *
-   * @param genericRecord Reusable generic record
-   * @param avroSchema Avro schema
-   */
+  /// Helper method to generate random record.
+  ///
+  /// @param genericRecord Reusable generic record
+  /// @param avroSchema Avro schema
   private static void generateRandomRecord(GenericRecord genericRecord, Schema avroSchema) {
     for (Schema.Field field : avroSchema.getFields()) {
       String fieldName = field.name();
@@ -682,12 +645,10 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Helper method to generate random value for the given field type.
-   *
-   * @param fieldType Field type
-   * @return Random value for the given field type
-   */
+  /// Helper method to generate random value for the given field type.
+  ///
+  /// @param fieldType Field type
+  /// @return Random value for the given field type
   private static Object generateRandomValue(Schema.Type fieldType) {
     switch (fieldType) {
       case BOOLEAN:
@@ -707,18 +668,14 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
+  /// Run equivalent Pinot and H2 query and compare the results.
   static void testQuery(@Language("sql") String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, @Language("sql") String h2Query, Connection h2Connection)
       throws Exception {
     testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, null);
   }
 
-  /**
-   * Run equivalent Pinot and H2 query and compare the results.
-   */
+  /// Run equivalent Pinot and H2 query and compare the results.
   static void testQuery(@Language("sql") String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, @Language("sql") String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers)
@@ -726,10 +683,8 @@ public class ClusterIntegrationTestUtils {
     testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null, false);
   }
 
-  /**
-   * Compare # of rows in pinot and H2 only. Succeed if # of rows matches. Note this only applies to non-aggregation
-   * query.
-   */
+  /// Compare # of rows in pinot and H2 only. Succeed if # of rows matches. Note this only applies to non-aggregation
+  /// query.
   static void testQueryWithMatchingRowCount(@Language("sql") String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, @Language("sql") String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
@@ -1123,14 +1078,12 @@ public class ClusterIntegrationTestUtils {
     failure(pinotQuery, h2Query, failureMessage, e);
   }
 
-  /**
-   * Helper method to report failures.
-   *
-   * @param pinotQuery Pinot query
-   * @param h2Query H2 query
-   * @param failureMessage Failure message
-   * @param e Exception
-   */
+  /// Helper method to report failures.
+  ///
+  /// @param pinotQuery Pinot query
+  /// @param h2Query H2 query
+  /// @param failureMessage Failure message
+  /// @param e Exception
   private static void failure(@Language("sql") String pinotQuery, @Language("sql") String h2Query,
       String failureMessage, @Nullable Exception e) {
     failureMessage += "\nPinot query: " + pinotQuery + "\nH2 query: " + h2Query;
@@ -1141,15 +1094,15 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  /**
-   * Helper method to convert boolean value to lower case.
-   * <p>The reason for this method is that boolean values in H2 results are all uppercase characters, while in Pinot
-   * they are all lowercase characters.
-   * <p>If value is neither <code>TRUE</code> or <code>FALSE</code>, return itself.
-   *
-   * @param value raw value.
-   * @return converted value.
-   */
+  /// Helper method to convert boolean value to lower case.
+  ///
+  /// The reason for this method is that boolean values in H2 results are all uppercase characters, while in Pinot
+  /// they are all lowercase characters.
+  ///
+  /// If value is neither `TRUE` or `FALSE`, return itself.
+  ///
+  /// @param value raw value.
+  /// @return converted value.
   private static String convertBooleanToLowerCase(String value) {
     if (value.equals("TRUE")) {
       return "true";

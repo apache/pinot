@@ -31,10 +31,8 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
 
 
-/**
- * Adds an exchange node at the root of the plan if the root node is not already located as a singleton on the broker.
- * This is because the entire data needs to be returned by the broker to the client.
- */
+/// Adds an exchange node at the root of the plan if the root node is not already located as a singleton on the broker.
+/// This is because the entire data needs to be returned by the broker to the client.
 public class RootExchangeInsertRule implements PRelNodeTransformer {
   private final PhysicalPlannerContext _context;
 
@@ -65,9 +63,8 @@ public class RootExchangeInsertRule implements PRelNodeTransformer {
     return _context.getNodeIdGenerator().get();
   }
 
-  /**
-   * If the current node is distributed to a single worker, inherit the collation trait from it. Otherwise, return null.
-   */
+  /// If the current node is distributed to a single worker, inherit the collation trait from it. Otherwise, return
+  /// null.
   @Nullable
   private RelCollation inferCollation(PRelNode currentNode) {
     // Infer collation from the current node if needed.

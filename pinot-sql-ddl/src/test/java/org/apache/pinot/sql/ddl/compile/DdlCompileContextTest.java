@@ -26,8 +26,8 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.expectThrows;
 
 
-/// Behavioural tests for the new stateful {@link DdlCompiler#compile(String,
-/// DdlCompileContext)} entry point and its STATELESS shim.
+/// Behavioural tests for the new stateful [DdlCompiler#compile(String, DdlCompileContext)] entry point and its
+/// STATELESS shim.
 public class DdlCompileContextTest {
 
   @Test

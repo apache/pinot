@@ -21,62 +21,43 @@ package org.apache.pinot.spi.ingestion.batch.spec;
 import java.io.Serializable;
 
 
-/**
- * PushJobSpec defines segment push job related configuration
- */
+/// PushJobSpec defines segment push job related configuration
 public class PushJobSpec implements Serializable {
 
-  /**
-   * number of attempts for push job, default is 1, which means no retry.
-   */
+  /// number of attempts for push job, default is 1, which means no retry.
   private int _pushAttempts = 1;
 
-  /**
-   * push job parallelism, default is 1.
-   */
+  /// push job parallelism, default is 1.
   private int _pushParallelism = 1;
 
-  /**
-   * retry wait Ms, default to 1 second.
-   */
+  /// retry wait Ms, default to 1 second.
   private long _pushRetryIntervalMillis = 1000;
 
-  /**
-   * Applicable for URI and METADATA push types.
-   * If true, and if segment was not already in the deep store, move it to deep store.
-   */
+  /// Applicable for URI and METADATA push types.
+  /// If true, and if segment was not already in the deep store, move it to deep store.
   private boolean _copyToDeepStoreForMetadataPush;
 
-  /**
-   * Applicable for METADATA push type.
-   * If true, multiple segment metadata files are uploaded to the controller in a single call.
-   */
+  /// Applicable for METADATA push type.
+  /// If true, multiple segment metadata files are uploaded to the controller in a single call.
   private boolean _batchSegmentUpload;
 
-  /**
-   * Applicable for METADATA push type.
-   * Number of threads to use for segment metadata generation.
-   */
+  /// Applicable for METADATA push type.
+  /// Number of threads to use for segment metadata generation.
   private int _segmentMetadataGenerationParallelism = 1;
 
-  /**
-   * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
-   * The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
-   */
+  /// Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
+  /// The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
   private String _segmentUriPrefix;
   private String _segmentUriSuffix;
 
-  /**
-   * Segments to push file name pattern, supported glob pattern.
-   * Sample usage:
-   *    'glob:2022/*.tar.gz' will include all segments under _outputDirURI/2022/, but not sub directories;
-   *    'glob:**\/stats_*.tar.gz' will include all the segments starting with "stats_" under _outputDirURI recursively.
-   */
+  /// Segments to push file name pattern, supported glob pattern.
+  /// Sample usage:
+  ///    'glob:2022/\*.tar.gz' will include all segments under \_outputDirURI/2022/, but not sub directories;
+  ///    'glob:\*\*\/stats\_\*.tar.gz' will include all the segments starting with "stats\_" under \_outputDirURI
+  ///    recursively.
   private String _pushFileNamePattern;
 
-  /**
-   * Prefer using segment metadata tar gz file to push segment if exists.
-   */
+  /// Prefer using segment metadata tar gz file to push segment if exists.
   private boolean _preferMetadataTarGz = true;
 
   public boolean isPreferMetadataTarGz() {
@@ -100,11 +81,9 @@ public class PushJobSpec implements Serializable {
     return _segmentUriPrefix;
   }
 
-  /**
-   * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
-   * The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
-   * @param segmentUriPrefix
-   */
+  /// Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
+  /// The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
+  /// @param segmentUriPrefix
   public void setSegmentUriPrefix(String segmentUriPrefix) {
     _segmentUriPrefix = segmentUriPrefix;
   }
@@ -113,11 +92,9 @@ public class PushJobSpec implements Serializable {
     return _segmentUriSuffix;
   }
 
-  /**
-   * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
-   * The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
-   * @param segmentUriSuffix
-   */
+  /// Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
+  /// The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
+  /// @param segmentUriSuffix
   public void setSegmentUriSuffix(String segmentUriSuffix) {
     _segmentUriSuffix = segmentUriSuffix;
   }
@@ -126,10 +103,8 @@ public class PushJobSpec implements Serializable {
     return _pushAttempts;
   }
 
-  /**
-   * number of attempts for push job, default is 1, which means no retry.
-   * @param pushAttempts
-   */
+  /// number of attempts for push job, default is 1, which means no retry.
+  /// @param pushAttempts
   public void setPushAttempts(int pushAttempts) {
     _pushAttempts = pushAttempts;
   }
@@ -138,10 +113,8 @@ public class PushJobSpec implements Serializable {
     return _pushRetryIntervalMillis;
   }
 
-  /**
-   * retry wait Ms, default to 1 second.
-   * @param pushRetryIntervalMillis
-   */
+  /// retry wait Ms, default to 1 second.
+  /// @param pushRetryIntervalMillis
   public void setPushRetryIntervalMillis(long pushRetryIntervalMillis) {
     _pushRetryIntervalMillis = pushRetryIntervalMillis;
   }

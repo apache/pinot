@@ -25,10 +25,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Annotation to be used on top of REST endpoints. Methods annotated with this annotation automatically get
- * authorized in {@link AuthenticationFilter} and if validation passes, then the methods get executed.
- */
+/// Annotation to be used on top of REST endpoints. Methods annotated with this annotation automatically get
+/// authorized in [AuthenticationFilter] and if validation passes, then the methods get executed.
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface Authorize {
@@ -38,6 +36,13 @@ public @interface Authorize {
   // The query or path parameter to use to get the id of the resource
   // If the target type is the Pinot cluster, then this field is not required
   String paramName() default "";
+
+  /// Optional path or query parameter that narrows a cluster operation to one table for coarse access control.
+  /// Use only when the entire operation is limited to that table, rather than filtering part of the response.
+  /// A missing parameter, or a name absent from the endpoint's path parameters and declared query parameters,
+  /// resolves no table and retains cluster-wide scope, which denies table-scoped principals. Fine-grained
+  /// authorization still uses targetType.
+  String tableScopeParam() default "";
 
   // action to validate on the specific resource
   String action();

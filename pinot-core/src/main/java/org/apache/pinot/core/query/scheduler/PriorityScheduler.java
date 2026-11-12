@@ -30,22 +30,19 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Schedules queries from a {@link SchedulerGroup} with highest number of tokens on priority
- */
+/// Schedules queries from a [SchedulerGroup] with highest number of tokens on priority
 public abstract class PriorityScheduler extends QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PriorityScheduler.class);
 
-  /**
-   * A {@link Semaphore} subclass that supports adjusting the number of permits at runtime.
-   * This is needed because {@link Semaphore#reducePermits(int)} is protected.
-   */
+  /// A [Semaphore] subclass that supports adjusting the number of permits at runtime.
+  /// This is needed because [Semaphore#reducePermits(int)] is protected.
   @VisibleForTesting
   static class ResizableSemaphore extends Semaphore {
     ResizableSemaphore(int permits) {
@@ -86,9 +83,9 @@ public abstract class PriorityScheduler extends QueryScheduler {
   }
 
   @Override
-  public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+  public ListenableFuture<DataBuffer> submitResponse(ServerQueryRequest queryRequest) {
     if (!_isRunning) {
-      return shuttingDown(queryRequest);
+      return shuttingDownResponse(queryRequest);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     final SchedulerQueryContext schedQueryContext = new SchedulerQueryContext(queryRequest);
@@ -96,7 +93,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
       _queryQueue.put(schedQueryContext);
     } catch (OutOfCapacityException e) {
       LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableNameWithType(), e.getMessage());
-      return outOfCapacity(queryRequest);
+      return outOfCapacityResponse(queryRequest);
     }
     return schedQueryContext.getResultFuture();
   }
@@ -126,7 +123,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
             ServerQueryRequest queryRequest = request.getQueryRequest();
             SchedulerGroup schedulerGroup = request.getSchedulerGroup();
             QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, schedulerGroup);
-            ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, executorService);
+            ListenableFutureTask<DataBuffer> queryFutureTask = createResponseFutureTask(queryRequest, executorService);
             queryFutureTask.addListener(new Runnable() {
               @Override
               public void run() {
@@ -174,7 +171,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
   synchronized private void failAllPendingQueries() {
     List<SchedulerQueryContext> pending = _queryQueue.drain();
     for (SchedulerQueryContext queryContext : pending) {
-      queryContext.setResultFuture(shuttingDown(queryContext.getQueryRequest()));
+      queryContext.setResultFuture(shuttingDownResponse(queryContext.getQueryRequest()));
     }
   }
 

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,16 +41,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Utility class for extracting audit information from Jersey HTTP requests.
- * Handles all the complex logic for IP address extraction, user identification,
- * and request payload capture for audit logging purposes.
- * Uses dynamic configuration to control audit behavior.
- */
+/// Utility class for extracting audit information from Jersey HTTP requests.
+/// Handles all the complex logic for IP address extraction, user identification,
+/// and request payload capture for audit logging purposes.
+/// Uses dynamic configuration to control audit behavior.
+///
+/// Everything captured from the caller - query parameters, allow-listed headers and the request
+/// body - passes through [AuditRedactor] before it reaches the [AuditEvent], so that credentials
+/// sent to an audited endpoint are masked rather than written to the audit log. That step is
+/// unconditional and has no corresponding configuration key. It matches on key names, so it is a
+/// strong default rather than a guarantee - see the residual gap noted on [AuditRedactor].
 @Singleton
 public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
+  /// Appended to the redacted prefix of a body that was cut at the capture cap.
   static final String TRUNCATION_MARKER = "...[truncated]";
 
   private final AuditConfigManager _configManager;
@@ -66,16 +72,14 @@ public class AuditRequestProcessor {
     _auditMetrics = auditMetrics;
   }
 
-  /**
-   * Converts a MultivaluedMap into a Map of query parameters.
-   * If a key in the MultivaluedMap has a single value, that value is added directly to the resulting map.
-   * If a key has multiple values, the list of values is added instead.
-   *
-   * @param multimap the input MultivaluedMap containing keys and their associated values
-   * @param allowedKeys optional set of allowed keys for case-insensitive filtering.
-   *                    If null or empty, all keys are included
-   * @return a Map where each key is mapped to either a single value or a list of values
-   */
+  /// Converts a MultivaluedMap into a Map of query parameters.
+  /// If a key in the MultivaluedMap has a single value, that value is added directly to the resulting map.
+  /// If a key has multiple values, the list of values is added instead.
+  ///
+  /// @param multimap the input MultivaluedMap containing keys and their associated values
+  /// @param allowedKeys optional set of allowed keys for case-insensitive filtering.
+  ///                    If null or empty, all keys are included
+  /// @return a Map where each key is mapped to either a single value or a list of values
   private static Map<String, Object> toMap(MultivaluedMap<String, String> multimap, Set<String> allowedKeys) {
     Map<String, Object> resultMap = new HashMap<>();
     boolean filterKeys = allowedKeys != null && !allowedKeys.isEmpty();
@@ -97,13 +101,11 @@ public class AuditRequestProcessor {
     return resultMap;
   }
 
-  /**
-   * Converts a MultivaluedMap into a Map of query parameters without filtering.
-   * Backward compatibility method.
-   *
-   * @param multimap the input MultivaluedMap containing keys and their associated values
-   * @return a Map where each key is mapped to either a single value or a list of values
-   */
+  /// Converts a MultivaluedMap into a Map of query parameters without filtering.
+  /// Backward compatibility method.
+  ///
+  /// @param multimap the input MultivaluedMap containing keys and their associated values
+  /// @return a Map where each key is mapped to either a single value or a list of values
   private static Map<String, Object> toMap(MultivaluedMap<String, String> multimap) {
     return toMap(multimap, null);
   }
@@ -143,13 +145,11 @@ public class AuditRequestProcessor {
     return null;
   }
 
-  /**
-   * Extracts service ID from request headers.
-   * Service ID should be provided by the client in headers, not from configuration.
-   *
-   * @param requestContext the container request context
-   * @return the service ID or "unknown" if not found
-   */
+  /// Extracts service ID from request headers.
+  /// Service ID should be provided by the client in headers, not from configuration.
+  ///
+  /// @param requestContext the container request context
+  /// @return the service ID or "unknown" if not found
   private String extractServiceId(ContainerRequestContext requestContext) {
     // TODO spyne to be implemented
     return null;
@@ -161,7 +161,7 @@ public class AuditRequestProcessor {
       UriInfo uriInfo = requestContext.getUriInfo();
       MultivaluedMap<String, String> queryParams = uriInfo.getQueryParameters();
       if (!queryParams.isEmpty()) {
-        payload.setQueryParameters(toMap(queryParams));
+        payload.setQueryParameters(AuditRedactor.redact(toMap(queryParams)));
       }
 
       final AuditConfig config = _configManager.getCurrentConfig();
@@ -172,16 +172,13 @@ public class AuditRequestProcessor {
         if (!allHeaders.isEmpty()) {
           Map<String, Object> filteredHeaders = toMap(allHeaders, allowedHeaders);
           if (!filteredHeaders.isEmpty()) {
-            payload.setHeaders(filteredHeaders);
+            payload.setHeaders(AuditRedactor.redact(filteredHeaders));
           }
         }
       }
 
       if (config.isCaptureRequestPayload() && requestContext.hasEntity()) {
-        String requestBody = readRequestBody(requestContext, config.getMaxPayloadSize());
-        if (StringUtils.isNotBlank(requestBody)) {
-          payload.setBody(requestBody);
-        }
+        payload.setBody(AuditRedactor.redactBody(readRequestBody(requestContext, config.getMaxPayloadSize())));
       }
 
       if (payload.getQueryParameters() == null && payload.getBody() == null && payload.getHeaders() == null) {
@@ -196,13 +193,11 @@ public class AuditRequestProcessor {
   }
 
 
-  /**
-   * Parses a comma-separated list of headers into a Set of lowercase header names
-   * for case-insensitive comparison.
-   *
-   * @param headerList comma-separated list of header names
-   * @return Set of lowercase header names, empty if headerList is blank
-   */
+  /// Parses a comma-separated list of headers into a Set of lowercase header names
+  /// for case-insensitive comparison.
+  ///
+  /// @param headerList comma-separated list of header names
+  /// @return Set of lowercase header names, empty if headerList is blank
   @VisibleForTesting
   static Set<String> parseAllowedHeaders(String headerList) {
     if (StringUtils.isBlank(headerList)) {
@@ -220,18 +215,17 @@ public class AuditRequestProcessor {
     return headers;
   }
 
-  /**
-   * Reads the request body from the entity input stream.
-   * Restores the input stream for downstream processing.
-   * Limits the amount of data read based on configuration.
-   *
-   * @param requestContext the request context
-   * @param maxPayloadSize maximum bytes to read from the request body
-   * @return the request body as string (potentially truncated)
-   */
+  /// Reads the request body from the entity input stream.
+  /// Restores the input stream for downstream processing.
+  /// Limits the amount of data read based on configuration.
+  ///
+  /// @param requestContext the request context
+  /// @param maxPayloadSize maximum bytes to capture from the request body
+  /// @return the captured body, or null if there is none
   @VisibleForTesting
-  String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
-    if (!requestContext.hasEntity()) {
+  CapturedBody readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
+    // With no room to capture anything, the stream is left alone, and nothing is reported as truncated.
+    if (!requestContext.hasEntity() || maxPayloadSize <= 0) {
       return null;
     }
 
@@ -246,8 +240,10 @@ public class AuditRequestProcessor {
       requestContext.setEntityStream(bufferedStream);
       bufferedStream.mark(maxPayloadSize + 1);
 
-      final InputStream limitedStream = ByteStreams.limit(bufferedStream, maxPayloadSize);
-      final byte[] capturedBytes = ByteStreams.toByteArray(limitedStream);
+      // One byte beyond the cap is read only to learn whether the body continues past it, so that a body of
+      // exactly maxPayloadSize bytes is not mistaken for a truncated one.
+      final InputStream limitedStream = ByteStreams.limit(bufferedStream, maxPayloadSize + 1L);
+      final byte[] readBytes = ByteStreams.toByteArray(limitedStream);
 
       try {
         bufferedStream.reset();
@@ -256,17 +252,45 @@ public class AuditRequestProcessor {
         LOG.error("Failed to reset stream for downstream consumers", resetException);
       }
 
-      if (capturedBytes.length > 0) {
-        String requestBody = new String(capturedBytes, StandardCharsets.UTF_8);
-        if (capturedBytes.length >= maxPayloadSize) {
-          requestBody += TRUNCATION_MARKER;
+      if (readBytes.length > 0) {
+        boolean truncated = readBytes.length > maxPayloadSize;
+        byte[] capturedBytes = truncated ? Arrays.copyOf(readBytes, maxPayloadSize) : readBytes;
+        if (truncated) {
           _auditMetrics.addMeteredGlobalValue(AuditMetrics.AuditMeter.AUDIT_REQUEST_PAYLOAD_TRUNCATED, 1L);
         }
-        return requestBody;
+        return new CapturedBody(new String(capturedBytes, StandardCharsets.UTF_8), capturedBytes.length, truncated);
       }
     } catch (IOException e) {
       LOG.warn("Failed to capture request body", e);
     }
     return null;
+  }
+
+  /// A request body as captured for the audit log. Truncation is carried as a flag, and the size as the
+  /// number of bytes actually captured, so neither has to be re-derived from the decoded text.
+  static final class CapturedBody {
+    private final String _text;
+    private final int _capturedBytes;
+    private final boolean _truncated;
+
+    CapturedBody(String text, int capturedBytes, boolean truncated) {
+      _text = text;
+      _capturedBytes = capturedBytes;
+      _truncated = truncated;
+    }
+
+    /// The captured bytes decoded as UTF-8. A cut through a multi-byte character decodes to U+FFFD.
+    String getText() {
+      return _text;
+    }
+
+    int getCapturedBytes() {
+      return _capturedBytes;
+    }
+
+    /// True when the body continued past the capture cap.
+    boolean isTruncated() {
+      return _truncated;
+    }
   }
 }

@@ -71,6 +71,16 @@ public class PipelineBreakerOperator extends MultiStageOperator {
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
+  /// Deliberately releases nothing, unlike every other operator.
+  ///
+  /// `_resultMap` is this operator's *output*, not scratch space: [PipelineBreakerExecutor] reads it through
+  /// [#getResultMap()] after the op chain has finished, and `OpChain#close()` fires the callback that unblocks that
+  /// read only after `close()` has already run. Dropping the map here would hand the main op chain empty
+  /// pipeline-breaker results, which `nextBlock()` would then surface as an unexplained error block.
+  @Override
+  protected void releaseBuffers() {
+  }
+
   @Override
   public List<MultiStageOperator> getChildOperators() {
     return _childOperators;
@@ -89,6 +99,18 @@ public class PipelineBreakerOperator extends MultiStageOperator {
   @Nullable
   public ErrorMseBlock getErrorBlock() {
     return _errorBlock;
+  }
+
+  /// Keeps the cancellation reason as the error, so that a pipeline breaker cancelled before it collected its results
+  /// (e.g. the query was terminated before it started) does not look like it collected no rows.
+  @Override
+  public void cancel(Throwable e) {
+    if (_errorBlock == null) {
+      // Not only an Exception: the scheduler also cancels an op chain that failed with an Error, e.g. an
+      // OutOfMemoryError while the pipeline breaker collects its results
+      _errorBlock = ErrorMseBlock.fromException(e instanceof Exception ? (Exception) e : new RuntimeException(e));
+    }
+    super.cancel(e);
   }
 
   @Override
@@ -163,13 +185,9 @@ public class PipelineBreakerOperator extends MultiStageOperator {
   public enum StatKey implements StatMap.Key {
     EXECUTION_TIME_MS(StatMap.Type.LONG),
     EMITTED_ROWS(StatMap.Type.LONG),
-    /**
-     * Allocated memory in bytes for this operator or its children in the same stage.
-     */
+    /// Allocated memory in bytes for this operator or its children in the same stage.
     ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
-    /**
-     * Time spent on GC while this operator or its children in the same stage were running.
-     */
+    /// Time spent on GC while this operator or its children in the same stage were running.
     GC_TIME_MS(StatMap.Type.LONG);
     private final StatMap.Type _type;
 

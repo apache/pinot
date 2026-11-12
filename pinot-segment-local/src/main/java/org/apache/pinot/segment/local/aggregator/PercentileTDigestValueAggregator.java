@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import com.tdunning.math.stats.TDigest;
-import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.customobject.tdigest.NonFiniteAwareTDigest;
+import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -32,9 +31,6 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   // TODO: This is copied from PercentileTDigestAggregationFunction.
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
-  private static final int CENTROID_CAPACITY_PADDING = 10;
-  private static final int VERBOSE_HEADER_SIZE = Integer.BYTES + 3 * Double.BYTES + Integer.BYTES;
-  private static final int VERBOSE_CENTROID_SIZE = 2 * Double.BYTES;
   private final int _compressionFactor;
   private int _maxByteSize;
 
@@ -65,7 +61,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       byte[] bytes = (byte[]) rawValue;
       initialValue = deserializeAggregatedValue(bytes);
     } else {
-      initialValue = TDigest.createMergingDigest(_compressionFactor);
+      initialValue = NonFiniteAwareTDigest.forLegacyAggregation(_compressionFactor);
       addToDigest(initialValue, rawValue);
     }
     updateMaxByteSize(initialValue);
@@ -74,6 +70,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public TDigest applyRawValue(TDigest value, Object rawValue) {
+    value = asNonFiniteAware(value);
     if (rawValue instanceof byte[]) {
       value.add(deserializeAggregatedValue((byte[]) rawValue));
     } else {
@@ -83,9 +80,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     return value;
   }
 
-  /**
-   * Adds a raw value (single value or multi-value array) to the TDigest.
-   */
+  /// Adds a raw value (single value or multi-value array) to the TDigest.
   protected void addToDigest(TDigest digest, Object rawValue) {
     if (rawValue instanceof Object[]) {
       Object[] values = (Object[]) rawValue;
@@ -99,6 +94,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public TDigest applyAggregatedValue(TDigest value, TDigest aggregatedValue) {
+    value = asNonFiniteAware(value);
     value.add(aggregatedValue);
     updateMaxByteSize(value);
     return value;
@@ -106,7 +102,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public TDigest cloneAggregatedValue(TDigest value) {
-    return deserializeAggregatedValue(serializeAggregatedValue(value));
+    return NonFiniteAwareTDigest.copyOf(value);
   }
 
   @Override
@@ -121,38 +117,29 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public byte[] serializeAggregatedValue(TDigest value) {
-    value.compress();
-    byte[] bytes;
-    if (value.centroidCount() > getDefaultCentroidCapacity(value.compression())) {
-      // Verbose decoding recreates the default centroid capacity, while compact decoding preserves the stored one.
-      ByteBuffer buffer = ByteBuffer.allocate(value.smallByteSize());
-      value.asSmallBytes(buffer);
-      bytes = buffer.array();
-    } else {
-      bytes = CustomSerDeUtils.TDIGEST_SER_DE.serialize(value);
-    }
+    NonFiniteAwareTDigest wrapped = asNonFiniteAware(value);
+    updateMaxByteSize(wrapped);
+    byte[] bytes = wrapped.serialize();
     _maxByteSize = Math.max(_maxByteSize, bytes.length);
     return bytes;
   }
 
   @Override
   public TDigest deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.TDIGEST_SER_DE.deserialize(bytes);
+    _maxByteSize = Math.max(_maxByteSize, bytes.length);
+    return NonFiniteAwareTDigest.fromBytes(bytes);
+  }
+
+  private static NonFiniteAwareTDigest asNonFiniteAware(TDigest value) {
+    if (value instanceof NonFiniteAwareTDigest) {
+      return (NonFiniteAwareTDigest) value;
+    }
+    NonFiniteAwareTDigest wrapper = NonFiniteAwareTDigest.forLegacyAggregation(value.compression());
+    wrapper.add(value);
+    return wrapper;
   }
 
   private void updateMaxByteSize(TDigest value) {
-    long defaultCapacity = getDefaultCentroidCapacity(value.compression());
-    long maxCentroids = Math.max(value.centroidCount(), Math.min(value.size(), defaultCapacity));
-    _maxByteSize = Math.max(_maxByteSize, getMaxVerboseByteSize(maxCentroids));
-  }
-
-  private static int getMaxVerboseByteSize(long centroidCount) {
-    long maxCentroids = Math.max(centroidCount, 0L);
-    return Math.toIntExact(Math.addExact(VERBOSE_HEADER_SIZE,
-        Math.multiplyExact(VERBOSE_CENTROID_SIZE, maxCentroids)));
-  }
-
-  private static long getDefaultCentroidCapacity(double compression) {
-    return Math.addExact(Math.multiplyExact(2L, (long) Math.ceil(compression)), CENTROID_CAPACITY_PADDING);
+    _maxByteSize = Math.max(_maxByteSize, value.maxSerializedByteSize());
   }
 }

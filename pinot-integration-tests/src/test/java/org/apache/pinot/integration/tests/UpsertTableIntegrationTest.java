@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -64,13 +65,11 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Input data - Scores of players
- * Schema
- *  - Dimension fields: playerId:int (primary key), name:string, game:string, deleted:boolean
- *  - Metric fields: score:float
- *  - DataTime fields: timestampInEpoch:long
- */
+/// Input data - Scores of players
+/// Schema
+///  - Dimension fields: playerId:int (primary key), name:string, game:string, deleted:boolean
+///  - Metric fields: score:float
+///  - DataTime fields: timestampInEpoch:long
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   private static final String INPUT_DATA_SMALL_TAR_FILE = "gameScores_csv.tar.gz";
   private static final String INPUT_DATA_LARGE_TAR_FILE = "gameScores_large_csv.tar.gz";
@@ -535,6 +534,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 3, 0);
     getOrCreateAdminClient().getTableClient().resumeConsumption(tableName, null);
     waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 5, 2);
+    // Compaction selects ONLINE segments from the external view, which can lag behind query results.
+    waitForNumSegmentsInDesiredStateInEV(tableName, SegmentStateModel.ONLINE, 3 * getNumReplicas(), TableType.REALTIME);
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
             .setTablesToSchedule(Set.of(realtimeTableName)))
@@ -569,6 +570,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
 
     // NOTE: When in-memory valid doc ids are used, no need to pause/resume consumption to trigger the snapshot.
+    waitForNumSegmentsInDesiredStateInEV(tableName, SegmentStateModel.ONLINE, getNumReplicas(), TableType.REALTIME);
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
             .setTablesToSchedule(Set.of(realtimeTableName)))
@@ -612,6 +614,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     // Force commit the segments to ensure the deleting rows are part of the committed segments
     getOrCreateAdminClient().getTableClient().forceCommit(tableName);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 5, 2);
+    waitForNumSegmentsInDesiredStateInEV(tableName, SegmentStateModel.ONLINE, 3 * getNumReplicas(), TableType.REALTIME);
 
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()

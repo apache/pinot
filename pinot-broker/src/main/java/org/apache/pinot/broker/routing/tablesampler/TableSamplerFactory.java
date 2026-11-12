@@ -153,11 +153,9 @@ public class TableSamplerFactory {
     return REGISTERED_TABLE_SAMPLER_CLASS_MAP.get(normalizeType(type));
   }
 
-  /**
-   * Normalizes a table sampler alias for registry lookup.
-   *
-   * <p>Both registration and lookup go through this method, so aliases are matched case-insensitively after trimming.
-   */
+  /// Normalizes a table sampler alias for registry lookup.
+  ///
+  /// Both registration and lookup go through this method, so aliases are matched case-insensitively after trimming.
   private static String normalizeType(String type) {
     return type.trim().toLowerCase(Locale.ROOT);
   }

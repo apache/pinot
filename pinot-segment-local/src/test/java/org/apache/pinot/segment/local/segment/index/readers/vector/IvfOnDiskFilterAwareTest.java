@@ -39,9 +39,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-/**
- * Tests for IVF_ON_DISK filter-aware ANN search behavior.
- */
+/// Tests for IVF_ON_DISK filter-aware ANN search behavior.
 public class IvfOnDiskFilterAwareTest {
   private static final String COLUMN_NAME = "vectorCol";
   private static final long TEST_SEED = 1234L;
@@ -118,6 +116,29 @@ public class IvfOnDiskFilterAwareTest {
       Assert.assertTrue(result.contains(0));
       Assert.assertEquals(reader.getDistanceComputationCount(), 1,
           "Only docs that survive the pre-filter should be decoded and scored");
+    }
+  }
+
+  /// Every filter-aware reader rejects a null bitmap with the same contract failure, so a caller that loses its
+  /// filter never silently receives documents outside it. See FilterAwareVectorIndexReader#getDocIds.
+  @Test
+  public void testPreFilterRejectsNullBitmap()
+      throws Exception {
+    int numVectors = 24;
+    int dimension = 4;
+    int nlist = 4;
+    float[][] vectors = generateVectors(numVectors, dimension, new Random(TEST_SEED));
+    createIvfFlatIndex(vectors, dimension, nlist, VectorIndexConfig.VectorDistanceFunction.COSINE);
+
+    VectorIndexConfig readerConfig =
+        createReaderConfig(dimension, nlist, VectorIndexConfig.VectorDistanceFunction.COSINE);
+    try (IvfOnDiskVectorIndexReader reader = new IvfOnDiskVectorIndexReader(COLUMN_NAME,
+        IvfCombinedBuffers.mapCombined(_tempDir, COLUMN_NAME, readerConfig, "test-vector"), readerConfig)) {
+      NullPointerException thrown = Assert.expectThrows(NullPointerException.class,
+          () -> reader.getDocIds(vectors[0], 5, (ImmutableRoaringBitmap) null));
+      Assert.assertNotNull(thrown.getMessage(), "The rejection must carry the pre-filter contract message");
+      Assert.assertTrue(thrown.getMessage().contains("must not be null"),
+          "Expected the pre-filter contract message, got: " + thrown.getMessage());
     }
   }
 

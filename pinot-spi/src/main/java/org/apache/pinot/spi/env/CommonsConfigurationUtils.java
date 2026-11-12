@@ -46,9 +46,7 @@ import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.commons.lang3.StringUtils;
 
 
-/**
- * Provide utility functions to manipulate Apache Commons {@link Configuration} instances.
- */
+/// Provide utility functions to manipulate Apache Commons [Configuration] instances.
 public class CommonsConfigurationUtils {
   // value to be used to set the global separator for versioned properties configuration.
   // the value is same of PropertiesConfiguration `DEFAULT_SEPARATOR` constant.
@@ -69,23 +67,19 @@ public class CommonsConfigurationUtils {
   private CommonsConfigurationUtils() {
   }
 
-  /**
-   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
-   * @param path representing the path of file
-   * @return a {@link PropertiesConfiguration} instance.
-   */
+  /// Instantiate a [PropertiesConfiguration] from an [String].
+  /// @param path representing the path of file
+  /// @return a [PropertiesConfiguration] instance.
   public static PropertiesConfiguration fromPath(String path)
       throws ConfigurationException {
     return fromPath(path, true, null);
   }
 
-  /**
-   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
-   * @param path representing the path of file
-   * @param setDefaultDelimiter representing to set the default list delimiter.
-   * @param ioFactoryKind representing to set IOFactory. It can be null.
-   * @return a {@link PropertiesConfiguration} instance.
-   */
+  /// Instantiate a [PropertiesConfiguration] from an [String].
+  /// @param path representing the path of file
+  /// @param setDefaultDelimiter representing to set the default list delimiter.
+  /// @param ioFactoryKind representing to set IOFactory. It can be null.
+  /// @return a [PropertiesConfiguration] instance.
   public static PropertiesConfiguration fromPath(@Nullable String path, boolean setDefaultDelimiter,
       @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
@@ -98,23 +92,19 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-  /**
-   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
-   * @param stream containing properties
-   * @return a {@link PropertiesConfiguration} instance.
-   */
+  /// Instantiate a [PropertiesConfiguration] from an [InputStream].
+  /// @param stream containing properties
+  /// @return a [PropertiesConfiguration] instance.
   public static PropertiesConfiguration fromInputStream(InputStream stream)
       throws ConfigurationException {
     return fromInputStream(stream, true, PropertyIOFactoryKind.DefaultIOFactory);
   }
 
-  /**
-   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
-   * @param stream containing properties
-   * @param setDefaultDelimiter representing to set the default list delimiter.
-   * @param ioFactoryKind representing to set IOFactory. It can be null.
-   * @return a {@link PropertiesConfiguration} instance.
-   */
+  /// Instantiate a [PropertiesConfiguration] from an [InputStream].
+  /// @param stream containing properties
+  /// @param setDefaultDelimiter representing to set the default list delimiter.
+  /// @param ioFactoryKind representing to set IOFactory. It can be null.
+  /// @return a [PropertiesConfiguration] instance.
   public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream, boolean setDefaultDelimiter,
       @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
@@ -127,12 +117,10 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-  /**
-   * Instantiate a Segment Metadata {@link PropertiesConfiguration} from a {@link File}.
-   * @param file containing properties
-   * @param setDefaultDelimiter representing to set the default list delimiter.
-   * @return a {@link PropertiesConfiguration} instance.
-   */
+  /// Instantiate a Segment Metadata [PropertiesConfiguration] from a [File].
+  /// @param file containing properties
+  /// @param setDefaultDelimiter representing to set the default list delimiter.
+  /// @return a [PropertiesConfiguration] instance.
   public static PropertiesConfiguration getSegmentMetadataFromFile(File file, boolean setDefaultDelimiter)
       throws ConfigurationException {
     PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultIOFactory;
@@ -145,24 +133,20 @@ public class CommonsConfigurationUtils {
     return fromFile(file, setDefaultDelimiter, ioFactoryKind);
   }
 
-  /**
-   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
-   * @param file containing properties
-   * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
-   */
+  /// Instantiate a [PropertiesConfiguration] from a [File].
+  /// @param file containing properties
+  /// @return a [PropertiesConfiguration] instance. Empty if file does not exist.
   public static PropertiesConfiguration fromFile(File file)
       throws ConfigurationException {
     return fromFile(file, true, PropertyIOFactoryKind.DefaultIOFactory);
   }
 
-  /**
-   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
-   * This method will merge duplicate keys to a list.
-   * @param file containing properties
-   * @param setDefaultDelimiter representing to set the default list delimiter.
-   * @param ioFactoryKind representing to set IOFactory. It can be null.
-   * @return a {@link PropertiesConfiguration} instance.
-   */
+  /// Instantiate a [PropertiesConfiguration] from a [File].
+  /// This method will merge duplicate keys to a list.
+  /// @param file containing properties
+  /// @param setDefaultDelimiter representing to set the default list delimiter.
+  /// @param ioFactoryKind representing to set IOFactory. It can be null.
+  /// @return a [PropertiesConfiguration] instance.
   public static PropertiesConfiguration fromFile(@Nullable File file, boolean setDefaultDelimiter,
       @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
@@ -175,12 +159,10 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-  /**
-   * save the segment metadata configuration content into the provided file based on the version header.
-   * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
-   * @param file a {@link File} instance.
-   * @param versionHeader a Nullable {@link String} instance.
-   */
+  /// save the segment metadata configuration content into the provided file based on the version header.
+  /// @param propertiesConfiguration a [PropertiesConfiguration] instance.
+  /// @param file a [File] instance.
+  /// @param versionHeader a Nullable [String] instance.
   public static void saveSegmentMetadataToFile(PropertiesConfiguration propertiesConfiguration, File file,
       @Nullable String versionHeader) {
     if (StringUtils.isNotEmpty(versionHeader)) {
@@ -200,11 +182,9 @@ public class CommonsConfigurationUtils {
     saveToFile(propertiesConfiguration, file);
   }
 
-  /**
-   * Save the propertiesConfiguration content into the provided file.
-   * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
-   * @param file a {@link File} instance.
-   */
+  /// Save the propertiesConfiguration content into the provided file.
+  /// @param propertiesConfiguration a [PropertiesConfiguration] instance.
+  /// @param file a [File] instance.
   public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
     FileHandler fileHandler = new FileHandler(propertiesConfiguration);
     fileHandler.setFile(file);
@@ -286,17 +266,15 @@ public class CommonsConfigurationUtils {
     }
   }
 
-  /**
-   * Replaces the special character in the given property value.
-   * - Leading/trailing space is prefixed/suffixed with "\0"
-   * - Comma is replaced with "\0\0"
-   * Returns {@code null} when the given value contains surrogate characters because it is not supported by
-   * {@link PropertiesConfiguration}.
-   *
-   * Note:
-   * - '\0' is not allowed in string values, so we can use it as the replaced character
-   * - Escaping comma with backslash doesn't work when comma is preceded by a backslash
-   */
+  /// Replaces the special character in the given property value.
+  /// - Leading/trailing space is prefixed/suffixed with "\0"
+  /// - Comma is replaced with "\0\0"
+  /// Returns `null` when the given value contains surrogate characters because it is not supported by
+  /// [PropertiesConfiguration].
+  ///
+  /// Note:
+  /// - '\0' is not allowed in string values, so we can use it as the replaced character
+  /// - Escaping comma with backslash doesn't work when comma is preceded by a backslash
   @Nullable
   public static String replaceSpecialCharacterInPropertyValue(String value) {
     int length = value.length();
@@ -325,10 +303,8 @@ public class CommonsConfigurationUtils {
     return value;
   }
 
-  /**
-   * Recovers the special character in the given property value that is previous replaced by
-   * {@link #replaceSpecialCharacterInPropertyValue(String)}.
-   */
+  /// Recovers the special character in the given property value that is previous replaced by
+  /// [#replaceSpecialCharacterInPropertyValue(String)].
   public static String recoverSpecialCharacterInPropertyValue(String value) {
     if (value.isEmpty()) {
       return value;
@@ -342,15 +318,13 @@ public class CommonsConfigurationUtils {
     return value.replace("\0\0", ",");
   }
 
-  /**
-   * creates the instance of the {@link PropertiesConfiguration}
-   * with custom IO factory based on kind {@link PropertiesConfiguration.IOFactory}
-   * and legacy list delimiter {@link LegacyListDelimiterHandler}
-   *
-   * @param setDefaultDelimiter sets the default list delimiter.
-   * @param ioFactoryKind IOFactory kind, can be null.
-   * @return PropertiesConfiguration
-   */
+  /// creates the instance of the [PropertiesConfiguration]
+  /// with custom IO factory based on kind [PropertiesConfiguration.IOFactory]
+  /// and legacy list delimiter [LegacyListDelimiterHandler]
+  ///
+  /// @param setDefaultDelimiter sets the default list delimiter.
+  /// @param ioFactoryKind IOFactory kind, can be null.
+  /// @return PropertiesConfiguration
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setDefaultDelimiter,
       @Nullable PropertyIOFactoryKind ioFactoryKind) {
     PropertiesConfiguration config = new PropertiesConfiguration();
@@ -367,12 +341,10 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-  /**
-   * checks whether the configuration file first line is version header or not.
-   * @param file configuration file
-   * @return String
-   * @throws ConfigurationException exception.
-   */
+  /// checks whether the configuration file first line is version header or not.
+  /// @param file configuration file
+  /// @return String
+  /// @throws ConfigurationException exception.
   private static String getConfigurationHeaderVersion(File file)
       throws ConfigurationException {
     String versionValue = DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION;
@@ -402,13 +374,11 @@ public class CommonsConfigurationUtils {
     return VERSION_HEADER_IDENTIFIER + VERSIONED_CONFIG_SEPARATOR + versionHeaderValue;
   }
 
-  /**
-   * Get the {@link PropertiesConfiguration.PropertiesWriter} from the provided generic writer. PropertiesWriter
-   * ensures properties are written correctly with default delimiter/separators.
-   * <p>
-   * This method is useful when writing is done incrementally and modifying a PropertiesConfiguration instance
-   * is not ideal.
-   */
+  /// Get the [PropertiesConfiguration.PropertiesWriter] from the provided generic writer. PropertiesWriter
+  /// ensures properties are written correctly with default delimiter/separators.
+  ///
+  /// This method is useful when writing is done incrementally and modifying a PropertiesConfiguration instance
+  /// is not ideal.
   public static PropertiesConfiguration.PropertiesWriter getPropertiesWriterFromWriter(Writer writer) {
     PropertiesConfiguration.PropertiesWriter propertiesWriter =
         new PropertiesConfiguration.PropertiesWriter(writer, DEFAULT_LIST_DELIMITER_HANDLER);
@@ -416,11 +386,9 @@ public class CommonsConfigurationUtils {
     return propertiesWriter;
   }
 
-  /**
-   * Validates that the given config file does not contain duplicate keys.
-   * @param configFile the config file to validate.
-   * @throws ConfigurationException if duplicate keys are found or the file cannot be read.
-   */
+  /// Validates that the given config file does not contain duplicate keys.
+  /// @param configFile the config file to validate.
+  /// @throws ConfigurationException if duplicate keys are found or the file cannot be read.
   public static void validateNoDuplicateKeys(File configFile)
       throws ConfigurationException {
     try (Reader reader = Files.newBufferedReader(configFile.toPath(), StandardCharsets.UTF_8);

@@ -20,27 +20,28 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
-/**
- * Class that executes all non-keyed aggregation functions (when there are no group by keys) for the multistage
- * AggregateOperator.
- */
+/// Class that executes all non-keyed aggregation functions (when there are no group by keys) for the multistage
+/// AggregateOperator.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultistageAggregationExecutor {
   private final AggregationFunction[] _aggFunctions;
   private final int[] _filterArgIds;
   private final int _maxFilterArgId;
   private final AggType _aggType;
+  private final boolean _leafReturnFinalResult;
   private final DataSchema _resultSchema;
 
   // Result holders for each mode.
@@ -48,11 +49,12 @@ public class MultistageAggregationExecutor {
   private final Object[] _mergeResultHolder;
 
   public MultistageAggregationExecutor(AggregationFunction[] aggFunctions, int[] filterArgIds, int maxFilterArgId,
-      AggType aggType, DataSchema resultSchema) {
+      AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema) {
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
     _maxFilterArgId = maxFilterArgId;
     _aggType = aggType;
+    _leafReturnFinalResult = leafReturnFinalResult;
     _resultSchema = resultSchema;
 
     int numFunctions = aggFunctions.length;
@@ -68,39 +70,46 @@ public class MultistageAggregationExecutor {
     }
   }
 
-  /**
-   * Performs aggregation for the data in the block.
-   */
+  /// Performs aggregation for the data in the block.
   public void processBlock(MseBlock.Data block) {
     if (!_aggType.isInputIntermediateFormat()) {
       processAggregate(block);
+    } else if (_leafReturnFinalResult) {
+      processMergeFinalResults(block);
     } else {
       processMerge(block);
     }
   }
 
-  /**
-   * Fetches the result.
-   */
+  /// Fetches the result.
   public List<Object[]> getResult() {
     Object[] row = new Object[_aggFunctions.length];
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
       Object value;
       switch (_aggType) {
-        case LEAF:
-          value = aggFunction.extractAggregationResult(_aggregateResultHolder[i]);
+        case LEAF: {
+          Object intermediateResult = aggFunction.extractAggregationResult(_aggregateResultHolder[i]);
+          value = _leafReturnFinalResult ? aggFunction.extractFinalResult(intermediateResult) : intermediateResult;
           break;
+        }
         case INTERMEDIATE:
           value = _mergeResultHolder[i];
           break;
-        case FINAL:
-          value = aggFunction.extractFinalResult(_mergeResultHolder[i]);
+        case FINAL: {
+          Object mergedResult = _mergeResultHolder[i];
+          // The merged result stays null when there is no input row, even if the leaf returns final results. In that
+          // case, extract the final result of the empty input, e.g. 0 for COUNT.
+          value = _leafReturnFinalResult && mergedResult != null
+              ? mergedResult
+              : aggFunction.extractFinalResult(mergedResult);
           break;
-        case DIRECT:
+        }
+        case DIRECT: {
           Object intermediate = aggFunction.extractAggregationResult(_aggregateResultHolder[i]);
           value = aggFunction.extractFinalResult(intermediate);
           break;
+        }
         default:
           throw new UnsupportedOperationException("Unsupported aggTyp: " + _aggType);
       }
@@ -150,18 +159,30 @@ public class MultistageAggregationExecutor {
   private void processMerge(MseBlock.Data block) {
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
+      DataBlock serializedResults = AggregateOperator.getSerializedIntermediateResults(aggFunction, block);
+      if (serializedResults != null) {
+        int colId = AggregateOperator.getIntermediateResultColId(aggFunction);
+        int numRows = serializedResults.getNumberOfRows();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          _mergeResultHolder[i] = AggregationFunctionUtils.mergeSerialized(aggFunction, _mergeResultHolder[i],
+              serializedResults.getCustomObject(rowId, colId));
+        }
+        continue;
+      }
       Object[] intermediateResults = AggregateOperator.getIntermediateResults(aggFunction, block);
       for (Object intermediateResult : intermediateResults) {
-        // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
-        // TODO: Fix it
-        if (intermediateResult == null) {
-          continue;
-        }
-        if (_mergeResultHolder[i] == null) {
-          _mergeResultHolder[i] = intermediateResult;
-        } else {
-          _mergeResultHolder[i] = aggFunction.merge(_mergeResultHolder[i], intermediateResult);
-        }
+        _mergeResultHolder[i] = AggregationFunctionUtils.merge(aggFunction, _mergeResultHolder[i], intermediateResult);
+      }
+    }
+  }
+
+  private void processMergeFinalResults(MseBlock.Data block) {
+    for (int i = 0; i < _aggFunctions.length; i++) {
+      AggregationFunction aggFunction = _aggFunctions[i];
+      Object[] finalResults = AggregateOperator.getIntermediateResults(aggFunction, block);
+      for (Object finalResult : finalResults) {
+        _mergeResultHolder[i] =
+            AggregationFunctionUtils.mergeFinalResult(aggFunction, _mergeResultHolder[i], finalResult);
       }
     }
   }
