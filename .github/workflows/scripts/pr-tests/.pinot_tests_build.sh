@@ -45,15 +45,7 @@ else
       -P github-actions \
       -P tesseracta-build \
       -pl 'pinot-bom' \
-      -pl 'pinot-spi' \
-      -pl 'pinot-segment-spi' \
-      -pl 'pinot-timeseries/pinot-timeseries-spi' \
-      -pl 'pinot-common' \
-      -pl 'pinot-segment-local' \
-      -pl 'pinot-core' \
-      -pl 'pinot-query-planner' \
-      -pl 'pinot-timeseries/pinot-timeseries-planner' \
-      -pl 'pinot-query-runtime' || exit 1
+      -pl 'pinot-spi' || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
     mvn clean install \

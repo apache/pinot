@@ -69,24 +69,12 @@ if [ "$RUN_TEST_SET" == "1" ]; then
   # No -am on this command, so only the listed modules test.
   mvn test ${FORK_OPTS} \
       -pl 'pinot-spi' \
-      -pl 'pinot-segment-spi' \
-      -pl 'pinot-common' \
-      -pl ':pinot-yammer' \
-      -pl 'pinot-core' \
-      -pl 'pinot-query-planner' \
-      -pl 'pinot-query-runtime' \
       -Dtest=WorkloadBudgetManagerTest \
       -P github-actions,no-integration-tests${COVERAGE_PROFILE},tesseracta-build || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
   mvn test ${FORK_OPTS} \
     -pl '!pinot-spi' \
-    -pl '!pinot-segment-spi' \
-    -pl '!pinot-common' \
-    -pl '!pinot-core' \
-    -pl '!pinot-query-planner' \
-    -pl '!pinot-query-runtime' \
-    -pl '!:pinot-yammer' \
     -Dtest=WorkloadBudgetManagerTest \
     -P github-actions,no-integration-tests${COVERAGE_PROFILE},tesseracta-build || exit 1
 fi
