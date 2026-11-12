@@ -239,7 +239,8 @@ public class ContinuousJfrStarterTest {
   @Test
   public void ignoresTheRemovedRepositoryConfigs() {
     _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true", "pinot.jfr.directory", "/does/not/exist",
-        "pinot.jfr.preserveRepository", "true", "pinot.jfr.repositoryMaxTotalSize", "1GB"));
+        "pinot.jfr.preserveRepository", "true", "pinot.jfr.repositoryMaxTotalSize", "1GB",
+        "pinot.jfr.maxDumps", "3"));
 
     assertThat(_server.isRunning()).isTrue();
   }
@@ -273,5 +274,54 @@ public class ContinuousJfrStarterTest {
 
     assertThat(_server.getRecording().getName()).isEqualTo("renamed");
     assertThat(oldRecording.getState()).isEqualTo(RecordingState.STOPPED);
+  }
+
+  @Test
+  public void closeGivesBackTheReferenceOfAStoppedComponent() {
+    // A component that restarts in the same JVM creates a new instance with the same instance ID.
+    ContinuousJfrStarter restarted = new ContinuousJfrStarter(SERVER_ID, List.of());
+    Map<String, String> enabled = Map.of("pinot.jfr.enabled", "true");
+    _server.onChange(Set.of(), enabled);
+    restarted.onChange(Set.of(), enabled);
+    Recording recording = restarted.getRecording();
+
+    _server.close();
+    assertThat(recording.getState()).isEqualTo(RecordingState.RUNNING);
+
+    restarted.onChange(ENABLED_CHANGED, Map.of("pinot.jfr.enabled", "false"));
+    assertThat(recording.getState()).isEqualTo(RecordingState.STOPPED);
+  }
+
+  @Test
+  public void closedInstanceIgnoresLaterConfigChanges() {
+    _server.onChange(Set.of(), Map.of("pinot.jfr.enabled", "true"));
+    Recording recording = _server.getRecording();
+
+    _server.close();
+    assertThat(recording.getState()).isEqualTo(RecordingState.STOPPED);
+
+    _server.onChange(ENABLED_CHANGED, Map.of("pinot.jfr.enabled", "true", "pinot.jfr.maxSize", "1GB"));
+    assertThat(_server.isRunning()).isFalse();
+    assertThat(_server.getRecording()).isNull();
+  }
+
+  @Test
+  public void replacesARecordingClosedOutsidePinot() {
+    Map<String, String> config = new HashMap<>(Map.of("pinot.jfr.enabled", "true"));
+    _server.onChange(Set.of(), config);
+    Recording closedRecording = _server.getRecording();
+
+    // jcmd <pid> JFR.stop closes the recording.
+    closedRecording.close();
+    assertThat(_server.isRunning()).isFalse();
+
+    config.put("pinot.jfr.maxSize", "1GB");
+    _server.onChange(Set.of("pinot.jfr.maxSize"), config);
+
+    assertThat(_server.isRunning()).isTrue();
+    Recording newRecording = _server.getRecording();
+    assertThat(newRecording).isNotSameAs(closedRecording);
+    assertThat(newRecording.getState()).isEqualTo(RecordingState.RUNNING);
+    assertThat(newRecording.getMaxSize()).isEqualTo(DataSizeUtils.toBytes("1GB"));
   }
 }

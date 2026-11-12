@@ -169,6 +169,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
   // Dedicated handler for listening to cluster config changes
+  @Nullable
+  private ContinuousJfrStarter _continuousJfrStarter;
   protected final DefaultClusterConfigChangeHandler _clusterConfigChangeHandler =
       new DefaultClusterConfigChangeHandler();
 
@@ -688,7 +690,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Wiring up cluster config change handler with helix");
     _spectatorHelixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
     // Registered before the query endpoints start so that the cluster configs are applied before the first query
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new ContinuousJfrStarter(_instanceId));
+    _continuousJfrStarter = new ContinuousJfrStarter(_instanceId);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_continuousJfrStarter);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverRoutingStatsManager);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(new QueryOptionConfigListener());
 
@@ -1170,6 +1173,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   public void stop() {
     LOGGER.info("Shutting down Pinot broker");
     _isShuttingDown = true;
+    if (_continuousJfrStarter != null) {
+      _continuousJfrStarter.close();
+    }
     stopWarmup();
     stopPreConnect();
 

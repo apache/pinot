@@ -39,6 +39,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import jdk.jfr.Configuration;
 import jdk.jfr.Recording;
+import jdk.jfr.RecordingState;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -135,13 +136,14 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   private static final Map<String, String> REMOVED_KEYS = Map.of(
       "directory", "-XX:FlightRecorderOptions:repository=<path>",
       "dumpPath", "-XX:FlightRecorderOptions:dumppath=<path>",
+      "maxDumps", "a cleanup of the repository directory outside the JVM",
       "preserveRepository", "-XX:FlightRecorderOptions:preserve-repository=true",
       "repositoryMaxTotalSize", "a cleanup of the repository directory outside the JVM");
 
   private static final Object GLOBAL_RECORDING_LOCK = new Object();
   /// The recordings that this class runs, by recording name. Several instances in the same JVM share an entry.
   @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private static final Map<String, RecordingState> GLOBAL_RECORDINGS = new HashMap<>();
+  private static final Map<String, SharedRecording> GLOBAL_RECORDINGS = new HashMap<>();
   /// The last stopped recording for each recording name.
   ///
   /// `Recording.stop()` keeps the recorded chunks in the repository, but `Recording.close()` deletes them. This class
@@ -161,6 +163,8 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   private String _recordingName;
   @GuardedBy("GLOBAL_RECORDING_LOCK")
   private boolean _jvmArgumentWarningLogged;
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private boolean _closed;
 
   public ContinuousJfrStarter(String instanceId) {
     this(instanceId, ManagementFactory.getRuntimeMXBean().getInputArguments());
@@ -180,6 +184,9 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     PinotConfiguration subset = new PinotConfiguration(clusterConfigs).subset(CommonConstants.JFR);
 
     synchronized (GLOBAL_RECORDING_LOCK) {
+      if (_closed) {
+        return;
+      }
       if (!jfrChanged && _currentConfig != null) {
         LOGGER.debug("ChangedConfigs: {} does not contain any JFR config. Skipping updates", changedConfigs);
         return;
@@ -197,9 +204,25 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     }
   }
 
+  /// Returns whether this instance holds a reference to a recording that is running.
   public boolean isRunning() {
     synchronized (GLOBAL_RECORDING_LOCK) {
-      return _recordingName != null;
+      return _recordingName != null
+          && GLOBAL_RECORDINGS.get(_recordingName)._recording.getState() == RecordingState.RUNNING;
+    }
+  }
+
+  /// Gives back the reference of this instance to its recording, and ignores later config changes. The component that
+  /// registered this instance calls this method when it stops. Without it, a component that restarts in the same JVM
+  /// (for example in tests) keeps a reference to the recording, and `enabled=false` no longer stops it.
+  public void close() {
+    synchronized (GLOBAL_RECORDING_LOCK) {
+      if (_closed) {
+        return;
+      }
+      _closed = true;
+      releaseRecordingReference();
+      _currentConfig = null;
     }
   }
 
@@ -207,7 +230,7 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   @VisibleForTesting
   static void resetGlobalStateForTesting() {
     synchronized (GLOBAL_RECORDING_LOCK) {
-      GLOBAL_RECORDINGS.values().forEach(recordingState -> recordingState._recording.close());
+      GLOBAL_RECORDINGS.values().forEach(sharedRecording -> sharedRecording._recording.close());
       GLOBAL_RECORDINGS.clear();
       STOPPED_RECORDINGS.values().forEach(Recording::close);
       STOPPED_RECORDINGS.clear();
@@ -292,21 +315,25 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
 
   @GuardedBy("GLOBAL_RECORDING_LOCK")
   private boolean acquireRecordingReference(RecordingSpec spec) {
-    RecordingState recordingState = GLOBAL_RECORDINGS.get(spec._name);
-    if (recordingState == null) {
+    SharedRecording sharedRecording = GLOBAL_RECORDINGS.get(spec._name);
+    if (sharedRecording == null) {
       Recording recording = startRecording(spec);
       if (recording == null) {
         return false;
       }
-      GLOBAL_RECORDINGS.put(spec._name, new RecordingState(recording, spec));
+      GLOBAL_RECORDINGS.put(spec._name, new SharedRecording(recording, spec));
       _recordingName = spec._name;
       return true;
     }
-    if (!recordingState._spec.equals(spec) && !updateRecording(recordingState, spec)) {
+    if (isStopped(sharedRecording._recording)) {
+      if (!restartRecording(sharedRecording, spec)) {
+        return false;
+      }
+    } else if (!sharedRecording._spec.equals(spec) && !updateRecording(sharedRecording, spec)) {
       return false;
     }
     if (!spec._name.equals(_recordingName)) {
-      recordingState._referenceCount++;
+      sharedRecording._referenceCount++;
       _recordingName = spec._name;
     }
     return true;
@@ -317,11 +344,11 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     if (_recordingName == null) {
       return;
     }
-    RecordingState recordingState = GLOBAL_RECORDINGS.get(_recordingName);
-    if (recordingState._referenceCount > 1) {
-      recordingState._referenceCount--;
+    SharedRecording sharedRecording = GLOBAL_RECORDINGS.get(_recordingName);
+    if (sharedRecording._referenceCount > 1) {
+      sharedRecording._referenceCount--;
     } else {
-      stopRecording(_recordingName, recordingState._recording);
+      stopRecording(_recordingName, sharedRecording._recording);
       GLOBAL_RECORDINGS.remove(_recordingName);
     }
     _recordingName = null;
@@ -330,24 +357,46 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
   /// Applies a new spec to a running recording. JFR can change all the options of a running recording, except the
   /// `toDisk` option. For that option, this method starts a new recording and stops the old one.
   @GuardedBy("GLOBAL_RECORDING_LOCK")
-  private boolean updateRecording(RecordingState recordingState, RecordingSpec spec) {
-    if (recordingState._spec._toDisk != spec._toDisk) {
+  private boolean updateRecording(SharedRecording sharedRecording, RecordingSpec spec) {
+    if (sharedRecording._spec._toDisk != spec._toDisk) {
       Recording recording = startRecording(spec);
       if (recording == null) {
         return false;
       }
-      stopRecording(spec._name, recordingState._recording);
-      recordingState._recording = recording;
+      stopRecording(spec._name, sharedRecording._recording);
+      sharedRecording._recording = recording;
     } else {
       try {
-        applyOptions(recordingState._recording, spec);
+        applyOptions(sharedRecording._recording, spec);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to update continuous JFR recording '{}'", spec._name, e);
         return false;
       }
       LOGGER.info("Updated continuous JFR recording '{}' to {}", spec._name, spec);
     }
-    recordingState._spec = spec;
+    sharedRecording._spec = spec;
+    return true;
+  }
+
+  /// Returns whether the recording stopped without this class, for example with `jcmd <pid> JFR.stop`.
+  private static boolean isStopped(Recording recording) {
+    RecordingState state = recording.getState();
+    return state == RecordingState.STOPPED || state == RecordingState.CLOSED;
+  }
+
+  /// Replaces a recording that stopped without this class with a new one. JFR cannot start a stopped or closed
+  /// recording again, and rejects any change to a closed one.
+  @GuardedBy("GLOBAL_RECORDING_LOCK")
+  private boolean restartRecording(SharedRecording sharedRecording, RecordingSpec spec) {
+    LOGGER.warn("Continuous JFR recording '{}' is {}, but Pinot did not stop it. Starting a new recording", spec._name,
+        sharedRecording._recording.getState());
+    Recording recording = startRecording(spec);
+    if (recording == null) {
+      return false;
+    }
+    stopRecording(spec._name, sharedRecording._recording);
+    sharedRecording._recording = recording;
+    sharedRecording._spec = spec;
     return true;
   }
 
@@ -395,12 +444,12 @@ public class ContinuousJfrStarter implements PinotClusterConfigChangeListener {
     LOGGER.info("Stopped continuous JFR recording '{}'", recordingName);
   }
 
-  private static class RecordingState {
+  private static class SharedRecording {
     private Recording _recording;
     private RecordingSpec _spec;
     private int _referenceCount = 1;
 
-    private RecordingState(Recording recording, RecordingSpec spec) {
+    private SharedRecording(Recording recording, RecordingSpec spec) {
       _recording = recording;
       _spec = spec;
     }

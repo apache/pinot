@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -100,6 +101,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   protected List<ListenerConfig> _listenerConfigs;
   protected ExecutorService _executorService;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
+  @Nullable
+  private ContinuousJfrStarter _continuousJfrStarter;
 
   @Override
   public void init(PinotConfiguration config)
@@ -141,7 +144,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     MinionEventObservers.init(_config, _executorService);
 
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(new ContinuousJfrStarter(_instanceId));
+    _continuousJfrStarter = new ContinuousJfrStarter(_instanceId);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_continuousJfrStarter);
   }
 
   /// Can be overridden to apply custom configs to the minion conf.
@@ -373,6 +377,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   /// Stops the Pinot Minion instance.
   @Override
   public void stop() {
+    if (_continuousJfrStarter != null) {
+      _continuousJfrStarter.close();
+    }
     try {
       LOGGER.info("Closing PinotFS classes");
       PinotFSFactory.shutdown();
