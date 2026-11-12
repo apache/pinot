@@ -703,7 +703,7 @@ public class DataBlockBuilder {
   }
 
   private static void setColumn(ByteBuffer fixedSize, PagedPinotOutputStream varSize,
-      AggregationFunction.SerializedIntermediateResult value)
+      AggregationFunction.SerializedResult value)
       throws IOException {
     writeVarOffsetInFixed(fixedSize, varSize);
     fixedSize.putInt(value.getSize());

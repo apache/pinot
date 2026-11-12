@@ -367,8 +367,7 @@ public class FunnelEventsFunctionEvalAggregationFunction
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(
-      PriorityQueue<FunnelStepEventWithExtraFields> funnelStepEvents) {
+  public SerializedResult serializeIntermediateResult(PriorityQueue<FunnelStepEventWithExtraFields> funnelStepEvents) {
     int numEvents = funnelStepEvents.size();
     List<byte[]> serializedEvents = new ArrayList<>(numEvents);
     long bufferSize = Integer.BYTES; // Start with size for number of events
@@ -394,7 +393,7 @@ public class FunnelEventsFunctionEvalAggregationFunction
       byteBuffer.putInt(eventBytes.length); // Write length of each event
       byteBuffer.put(eventBytes); // Write event content
     }
-    return new SerializedIntermediateResult(INTERMEDIATE_RESULT_SERDE_VERSION, bytes);
+    return new SerializedBytes(INTERMEDIATE_RESULT_SERDE_VERSION, bytes);
   }
 
   @Override

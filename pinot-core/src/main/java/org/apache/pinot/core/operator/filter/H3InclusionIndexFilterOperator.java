@@ -30,8 +30,6 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
-import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
-import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
@@ -127,12 +125,8 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
   /// Returns the filter block document IDs based on the given the partial match doc ids.
   private BlockDocIdSet getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
-    ExpressionFilterOperator expressionFilterOperator =
-        new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs);
-    ScanBasedDocIdIterator docIdIterator = (ScanBasedDocIdIterator) expressionFilterOperator.getTrues().iterator();
-    MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
-    result.or(fullMatchDocIds);
-    return BitmapDocIdSet.create(result, _numDocs, docIdIterator.getNumEntriesScanned());
+    return H3IndexFilterOperator.getFilterBlock(_segment, _queryContext, _predicate, _numDocs, fullMatchDocIds,
+        partialMatchDocIds);
   }
 
   /// Returns the null document IDs for the indexed column when query null handling is enabled and the column has a

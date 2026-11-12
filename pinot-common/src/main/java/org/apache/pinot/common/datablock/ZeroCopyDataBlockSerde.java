@@ -199,7 +199,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
       Header header = Header.deserialize(stream);
 
       if (finalOffsetConsumer != null) {
-        finalOffsetConsumer.accept(offset + calculateEndOffset(buffer, header));
+        finalOffsetConsumer.accept(calculateEndOffset(buffer, offset, header));
       }
 
       switch (type) {
@@ -215,7 +215,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
               bufferView(buffer, header._variableSizeDataStart + offset, header._variableSizeDataLength));
         case METADATA: {
           ErrorsAndMetadata exceptions = deserializeExceptions(stream, header);
-          List<DataBuffer> metadata = deserializeMetadata(buffer, header);
+          List<DataBuffer> metadata = deserializeMetadata(buffer, offset, header);
           return exceptions.asBlock(metadata);
         }
         default:
@@ -225,8 +225,9 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     }
   }
 
-  private static List<DataBuffer> deserializeMetadata(DataBuffer buffer, Header header) {
-    long currentOffset = header._metadataStart;
+  /// Reads the stats of the block that starts at `offset` of `buffer`.
+  private static List<DataBuffer> deserializeMetadata(DataBuffer buffer, long offset, Header header) {
+    long currentOffset = offset + header._metadataStart;
     int statsSize = buffer.getInt(currentOffset);
     currentOffset += Integer.BYTES;
 
@@ -247,8 +248,9 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     return stats;
   }
 
-  private long calculateEndOffset(DataBuffer buffer, Header header) {
-    long currentOffset = header._metadataStart;
+  /// Returns the offset in `buffer` right after the block that starts at `offset`.
+  private long calculateEndOffset(DataBuffer buffer, long offset, Header header) {
+    long currentOffset = offset + header._metadataStart;
     int statsSize = buffer.getInt(currentOffset);
     currentOffset += Integer.BYTES;
 

@@ -86,10 +86,11 @@ public class ServerTableSizeReaderTest {
     _tableInfo3 = createTableSizeInfo(TABLE_NAME, new ArrayList<Integer>());
     startServer(0, createHandler(200, _tableInfo1, 0));
     startServer(1, createHandler(200, _tableInfo2, 0));
-    _endpointList.set(2, endpoint(findUnusedPort()));
     startServer(3, createHandler(500, null, 0));
     startServer(4, createHandler(200, null, TIMEOUT_MSEC + 1000));
     startServer(5, createHandler(200, _tableInfo3, 0));
+    // Choose the unused port last so a mock server cannot reuse it after findUnusedPort() releases it.
+    _endpointList.set(2, endpoint(findUnusedPort()));
   }
 
   @AfterClass

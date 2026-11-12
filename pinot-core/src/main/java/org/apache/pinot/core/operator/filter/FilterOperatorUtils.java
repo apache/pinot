@@ -200,7 +200,7 @@ public class FilterOperatorUtils {
       } else {
         // Return the OR filter operator with child filter operators
         return new OrFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
-            queryContext.isNullHandlingEnabled());
+            queryContext.isNullHandlingEnabled(), queryContext.isAndRestrictionPushdownEnabled());
       }
     }
 

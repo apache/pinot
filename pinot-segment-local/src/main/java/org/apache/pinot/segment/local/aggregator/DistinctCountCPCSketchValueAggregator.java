@@ -19,12 +19,12 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.lang.foreign.MemorySegment;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -123,12 +123,12 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
   @Override
   public byte[] serializeAggregatedValue(Object value) {
     CpcSketch sketch = extractSketch(value);
-    return CustomSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(sketch);
+    return sketch.toByteArray();
   }
 
   @Override
   public CpcSketch deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes);
+    return CpcSketch.heapify(MemorySegment.ofArray(bytes));
   }
 
   @VisibleForTesting

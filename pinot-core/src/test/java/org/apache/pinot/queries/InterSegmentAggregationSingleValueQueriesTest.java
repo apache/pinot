@@ -26,8 +26,9 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.annotations.Test;
@@ -586,7 +587,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   private void testPercentileRawEst(int percentile) {
     Function<Object, Object> quantileExtractor =
-        value -> ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+        value -> QuantileDigest.fromBytes(BytesUtils.toBytes((String) value))
             .getQuantile(percentile / 100.0);
 
     String rawQuery =

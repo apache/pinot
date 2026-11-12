@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.lang.foreign.MemorySegment;
 import java.util.Map;
 import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -52,9 +53,11 @@ public class IntegerTupleSketchAggregator implements ValueAggregator {
       integerUnion = new TupleUnion<>(sketchNominalEntries, setOperations);
     }
 
-    TupleSketch<IntegerSummary> first = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) value1);
-    TupleSketch<IntegerSummary> second = ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) value2);
+    TupleSketch<IntegerSummary> first = TupleSketch.heapifySketch(MemorySegment.ofArray((byte[]) value1),
+        new IntegerSummaryDeserializer());
+    TupleSketch<IntegerSummary> second = TupleSketch.heapifySketch(MemorySegment.ofArray((byte[]) value2),
+        new IntegerSummaryDeserializer());
     TupleSketch<IntegerSummary> result = integerUnion.union(first, second);
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(result);
+    return result.compact().toByteArray();
   }
 }

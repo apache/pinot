@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -43,6 +42,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 /// AnyValue aggregation function returns any arbitrary NON-NULL value from the column for each group.
@@ -66,6 +66,10 @@ import org.apache.pinot.spi.utils.ByteArray;
 /// GROUP BY CustomerID
 /// ```
 public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunction<Object, Object> {
+  // Wire type values of the intermediate result: no value, or a value with its data type
+  private static final int NULL_VALUE_TYPE = 0;
+  private static final int VALUE_TYPE = 1;
+
   private static final DataType[] DATA_TYPE_VALUES = DataType.values();
   // Data type argument, or null when the result type is determined at runtime from the input blocks
   @Nullable
@@ -239,12 +243,12 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(Object value) {
+  public SerializedResult serializeIntermediateResult(Object value) {
     if (value == null) {
-      return new SerializedIntermediateResult(0, new byte[0]);
+      return new SerializedBytes(NULL_VALUE_TYPE, new byte[0]);
     }
     byte[] bytes = serializeValue(value);
-    return new SerializedIntermediateResult(1, bytes);
+    return new SerializedBytes(VALUE_TYPE, bytes);
   }
 
   @Override
@@ -341,23 +345,17 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   /// Custom serialization for ANY_VALUE that handles all supported data types efficiently
   /// Note: value is never null - null is handled at the serializeIntermediateResult layer
   private byte[] serializeValue(Object value) {
-    if (value instanceof Integer) {
-      return serializeFixedValue(DataType.INT, 4, buffer -> buffer.putInt((Integer) value));
-    } else if (value instanceof Long) {
-      return serializeFixedValue(DataType.LONG, 8, buffer -> buffer.putLong((Long) value));
-    } else if (value instanceof Float) {
-      return serializeFixedValue(DataType.FLOAT, 4, buffer -> buffer.putFloat((Float) value));
-    } else if (value instanceof Double) {
-      return serializeFixedValue(DataType.DOUBLE, 8, buffer -> buffer.putDouble((Double) value));
-    } else if (value instanceof String) {
-      return serializeVariableValue(DataType.STRING, ((String) value).getBytes(StandardCharsets.UTF_8));
-    } else if (value instanceof BigDecimal) {
-      return serializeVariableValue(DataType.BIG_DECIMAL, value.toString().getBytes(StandardCharsets.UTF_8));
-    } else if (value instanceof ByteArray) {
-      return serializeVariableValue(DataType.BYTES, ((ByteArray) value).getBytes());
-    } else {
-      throw new IllegalStateException("Unsupported value type for serialization: " + value.getClass().getName());
-    }
+    return switch (value) {
+      case Integer v -> serializeFixedValue(DataType.INT, 4, buffer -> buffer.putInt(v));
+      case Long v -> serializeFixedValue(DataType.LONG, 8, buffer -> buffer.putLong(v));
+      case Float v -> serializeFixedValue(DataType.FLOAT, 4, buffer -> buffer.putFloat(v));
+      case Double v -> serializeFixedValue(DataType.DOUBLE, 8, buffer -> buffer.putDouble(v));
+      case String v -> serializeVariableValue(DataType.STRING, Utf8Utils.encode(v));
+      case BigDecimal v -> serializeVariableValue(DataType.BIG_DECIMAL, Utf8Utils.encode(v.toString()));
+      case ByteArray v -> serializeVariableValue(DataType.BYTES, v.getBytes());
+      default ->
+          throw new IllegalStateException("Unsupported value type for serialization: " + value.getClass().getName());
+    };
   }
 
   /// Helper method for serializing fixed-length values
@@ -382,24 +380,16 @@ public class AnyValueAggregationFunction extends BaseSingleInputAggregationFunct
   private Object deserializeValue(ByteBuffer buffer) {
     int typeOrdinal = buffer.getInt();
     DataType dataType = DATA_TYPE_VALUES[typeOrdinal];
-    switch (dataType) {
-      case INT:
-        return buffer.getInt();
-      case LONG:
-        return buffer.getLong();
-      case FLOAT:
-        return buffer.getFloat();
-      case DOUBLE:
-        return buffer.getDouble();
-      case STRING:
-        return new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8);
-      case BIG_DECIMAL:
-        return new BigDecimal(new String(deserializeVariableBytes(buffer), StandardCharsets.UTF_8));
-      case BYTES:
-        return new ByteArray(deserializeVariableBytes(buffer));
-      default:
-        throw new IllegalStateException("Unsupported data type for deserialization: " + dataType);
-    }
+    return switch (dataType) {
+      case INT -> buffer.getInt();
+      case LONG -> buffer.getLong();
+      case FLOAT -> buffer.getFloat();
+      case DOUBLE -> buffer.getDouble();
+      case STRING -> Utf8Utils.decode(deserializeVariableBytes(buffer));
+      case BIG_DECIMAL -> new BigDecimal(Utf8Utils.decode(deserializeVariableBytes(buffer)));
+      case BYTES -> new ByteArray(deserializeVariableBytes(buffer));
+      default -> throw new IllegalStateException("Unsupported data type for deserialization: " + dataType);
+    };
   }
 
   /// Helper method for deserializing variable-length byte arrays
