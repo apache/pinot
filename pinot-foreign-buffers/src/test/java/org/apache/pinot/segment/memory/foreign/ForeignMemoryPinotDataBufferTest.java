@@ -19,7 +19,9 @@
 package org.apache.pinot.segment.memory.foreign;
 
 import java.io.RandomAccessFile;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferTest;
@@ -116,6 +118,71 @@ public class ForeignMemoryPinotDataBufferTest extends PinotDataBufferTest {
       }
     } finally {
       FileUtils.forceDelete(TEMP_FILE);
+    }
+  }
+
+  /// Verifies the leak safety net: an owning buffer that is never closed has its arena closed once the buffer is
+  /// garbage collected. The probe is a [ByteBuffer] from [PinotDataBuffer#toDirectByteBuffer], which does not keep
+  /// the owner reachable, so it fails with [IllegalStateException] once the arena is closed.
+  @Test
+  public void testLeakedBufferIsFreedOnCollection()
+      throws InterruptedException {
+    PinotDataBuffer buffer = _factory.allocateDirect(BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER);
+    ByteBuffer probe = buffer.toDirectByteBuffer(0, Long.BYTES);
+    WeakReference<PinotDataBuffer> ownerRef = new WeakReference<>(buffer);
+    buffer = null;
+
+    long deadline = System.currentTimeMillis() + 10_000;
+    boolean freed = false;
+    while (!freed && System.currentTimeMillis() < deadline) {
+      System.gc();
+      Thread.sleep(10);
+      try {
+        probe.getLong(0);
+      } catch (IllegalStateException e) {
+        freed = true;
+      }
+    }
+    Assert.assertNull(ownerRef.get(), "the leaked buffer must be collected");
+    Assert.assertTrue(freed, "the arena of a leaked buffer must be closed after the buffer is collected");
+  }
+
+  /// Verifies that a view keeps its owning buffer reachable, as the `Unsafe` and `ByteBuffer` implementations do. If
+  /// the owner is leaked (never closed) while a view is still in use, the leak safety net must not close the arena
+  /// under the view. This covers native and non-native order views and a view of a view.
+  @Test
+  public void testViewKeepsLeakedOwnerAlive()
+      throws Exception {
+    PinotDataBuffer owner = _factory.allocateDirect(BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER);
+    owner.putLong(0, 0x1122334455667788L);
+    ByteOrder nonNativeOrder =
+        PinotDataBuffer.NATIVE_ORDER == ByteOrder.BIG_ENDIAN ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
+    PinotDataBuffer nativeView = owner.view(0, Long.BYTES, PinotDataBuffer.NATIVE_ORDER);
+    PinotDataBuffer nonNativeView = owner.view(0, Long.BYTES, nonNativeOrder);
+    WeakReference<PinotDataBuffer> ownerRef = new WeakReference<>(owner);
+    owner = null;
+
+    forceGc();
+    Assert.assertNotNull(ownerRef.get(), "a reachable view must keep its owner reachable");
+    Assert.assertEquals(nativeView.getLong(0), 0x1122334455667788L);
+    Assert.assertEquals(nonNativeView.getLong(0), Long.reverseBytes(0x1122334455667788L));
+
+    // A view of a view must keep the original owner reachable too.
+    PinotDataBuffer nestedView = nativeView.view(0, Long.BYTES, PinotDataBuffer.NATIVE_ORDER);
+    nativeView = null;
+    nonNativeView = null;
+    forceGc();
+    Assert.assertNotNull(ownerRef.get(), "a view of a view must keep the original owner reachable");
+    Assert.assertEquals(nestedView.getLong(0), 0x1122334455667788L);
+
+    ownerRef.get().close();
+  }
+
+  private static void forceGc()
+      throws InterruptedException {
+    for (int i = 0; i < 5; i++) {
+      System.gc();
+      Thread.sleep(20);
     }
   }
 }

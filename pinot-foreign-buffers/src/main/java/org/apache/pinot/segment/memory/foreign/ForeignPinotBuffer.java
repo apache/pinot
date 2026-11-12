@@ -73,14 +73,26 @@ public class ForeignPinotBuffer extends PinotDataBuffer {
   /// The handle to the registered cleaning action, used to free eagerly (and de-register) on explicit close.
   @Nullable
   private final Cleaner.Cleanable _cleanable;
+  /// For a view, the owning buffer whose arena backs this view, or {@code null} for an owning buffer. The field is
+  /// never read. It keeps the owner reachable while the view is reachable, so the leak safety net of a leaked owner
+  /// cannot close the arena under a view that is still in use. The `Unsafe` and `ByteBuffer` implementations give
+  /// their views the same guarantee.
+  @SuppressWarnings({"unused", "FieldCanBeLocal"})
+  @Nullable
+  private final ForeignPinotBuffer _owner;
 
   /// Creates a buffer over the given segment.
   ///
   /// @param segment the memory segment this buffer reads and writes. Its [MemorySegment#byteSize()] is the buffer size.
   /// @param arena the arena to close when this buffer is released, or {@code null} for a non-owning view.
   public ForeignPinotBuffer(MemorySegment segment, @Nullable Arena arena) {
+    this(segment, arena, null);
+  }
+
+  private ForeignPinotBuffer(MemorySegment segment, @Nullable Arena arena, @Nullable ForeignPinotBuffer owner) {
     super(arena != null);
     _segment = segment;
+    _owner = owner;
     if (arena != null) {
       _cleanup = new ArenaCleanup(arena, segment.byteSize());
       // The registered action (ArenaCleanup) must not reference this buffer, otherwise it would never be collected.
@@ -185,8 +197,10 @@ public class ForeignPinotBuffer extends PinotDataBuffer {
 
   @Override
   public PinotDataBuffer view(long start, long end, ByteOrder byteOrder) {
-    // asSlice validates start/size against the segment bounds.
-    ForeignPinotBuffer nativeView = new ForeignPinotBuffer(_segment.asSlice(start, end - start), null);
+    // asSlice validates start/size against the segment bounds. The view references the owning buffer (for a view of a
+    // view, the original owner) so the owner stays reachable while the view is reachable.
+    ForeignPinotBuffer owner = _cleanable != null ? this : _owner;
+    ForeignPinotBuffer nativeView = new ForeignPinotBuffer(_segment.asSlice(start, end - start), null, owner);
     if (byteOrder == ByteOrder.nativeOrder()) {
       return nativeView;
     } else {
