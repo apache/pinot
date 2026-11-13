@@ -31,6 +31,7 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentMetadataPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentTarPushJobRunner;
@@ -49,7 +50,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -66,6 +69,24 @@ import static org.testng.Assert.expectThrows;
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class SegmentUploadIntegrationTest extends SharedOfflineUploadIntegrationTestSuite {
   private static String _tableNameSuffix;
+  private Boolean _originalRejectOutOfRetention;
+
+  @Override
+  @BeforeClass
+  public void setUp() {
+    ControllerConf controllerConf = getSharedControllerStarter().getConfig();
+    _originalRejectOutOfRetention = controllerConf.isSegmentUploadRejectOutOfRetention();
+    // Scope the policy to this class without changing the other shared-suite participants.
+    controllerConf.setSegmentUploadRejectOutOfRetention(true);
+  }
+
+  @Override
+  @AfterClass(alwaysRun = true)
+  public void tearDown() {
+    if (_originalRejectOutOfRetention != null) {
+      getSharedControllerStarter().getConfig().setSegmentUploadRejectOutOfRetention(_originalRejectOutOfRetention);
+    }
+  }
 
   @Override
   protected Map<String, String> getStreamConfigs() {
@@ -424,6 +445,8 @@ public class SegmentUploadIntegrationTest extends SharedOfflineUploadIntegration
 
     assertEquals(getSegmentsList().size(), 1);
     assertEquals(getOutOfRetentionRejectedCount(), rejectedBefore);
+    // Table deletion targets servers in the external view, so wait for the accepted segment to appear there.
+    waitForNumSegmentsInDesiredStateInEV(getTableName(), "ONLINE", getNumReplicas(), TableType.OFFLINE);
   }
 
   private File createTableAndBuildSegment(String retentionDays)
@@ -445,7 +468,7 @@ public class SegmentUploadIntegrationTest extends SharedOfflineUploadIntegration
   }
 
   private long getOutOfRetentionRejectedCount() {
-    PinotMeter meter = _controllerStarter.getControllerMetrics()
+    PinotMeter meter = getSharedControllerStarter().getControllerMetrics()
         .getMeteredValue(ControllerMeter.OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED);
     return meter != null ? meter.count() : 0L;
   }
