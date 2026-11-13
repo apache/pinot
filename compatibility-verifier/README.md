@@ -54,6 +54,25 @@ OPTIONAL:
   -h, --help                             Prints this help
 ```
 
+### Server readiness and failure diagnostics
+
+The verifier waits for each server's health endpoint to return success before running operations after startup,
+upgrade, or rollback. HTTP errors do not count as ready. The wait fails if the process exits or does not become
+ready within 600 seconds (configurable with `SERVER_READY_TIMEOUT_SECONDS`).
+
+Each server start writes its application and Helix logs under `<workingDir>/logs/server.<N>/` (or `server2.<N>/`).
+Verifier servers use synchronous logging with immediate flushing so the last diagnostic messages survive forced
+termination during upgrades, rollbacks, and failure cleanup.
+On a readiness or test failure, the verifier captures a thread dump before stopping the cluster. `-k` keeps the cluster
+running for inspection while still collecting diagnostics. The pull-request compatibility jobs upload the logs
+as artifacts retained for three days, including on failure.
+
+Run the standalone readiness regression tests without building Pinot:
+
+```shell
+python3 compatibility-verifier/test_server_readiness.py
+```
+
 ## T-digest accuracy baseline
 
 Run `compatibility-verifier/tdigest-compatibility/generate-rank-errors.sh` from a checkout with JDK 25+ to verify the

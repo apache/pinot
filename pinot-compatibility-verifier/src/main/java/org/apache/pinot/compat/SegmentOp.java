@@ -23,14 +23,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SqlResultComparator;
 import org.apache.pinot.common.utils.TarCompressionUtils;
-import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -40,7 +40,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.slf4j.Logger;
@@ -67,6 +67,11 @@ public class SegmentOp extends BaseOp {
 
   public enum Op {
     UPLOAD, DELETE
+  }
+
+  /// Upload readiness for one OFFLINE segment. Values are immutable and safe to share across threads.
+  enum SegmentStatus {
+    PENDING, ONLINE, ERROR
   }
 
   private Op _op;
@@ -159,8 +164,7 @@ public class SegmentOp extends BaseOp {
 
       File segmentTarFile = generateSegment(localOutputTempDir, localReplacedInputDataFile.getAbsolutePath());
       uploadSegment(segmentTarFile);
-      return verifySegmentInState(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)
-          && verifyRoutingTableUpdated();
+      return verifySegmentOnline() && verifyRoutingTableUpdated();
     } catch (Exception e) {
       LOGGER.error("Failed to create and upload segment for input data file {}.", _inputDataFileName, e);
       return false;
@@ -220,31 +224,31 @@ public class SegmentOp extends BaseOp {
     }
   }
 
-  /// Verify given table and segment name in the controller are in the state matching the parameter.
-  /// @param state of the segment to be verified in the controller.
-  /// @return true if segment is in the state provided in the parameter, else false.
+  /// Wait until the uploaded OFFLINE segment has replicas and all of them are ONLINE.
+  /// @return true when all replicas are ONLINE, false on an ERROR replica or timeout.
   /// @throws IOException when unable to get the external view for the table.
   /// @throws InterruptedException when thread sleep is interrupted.
-  private boolean verifySegmentInState(String state)
+  private boolean verifySegmentOnline()
       throws IOException, InterruptedException {
     long startTime = System.currentTimeMillis();
-    long segmentCount;
-    while ((segmentCount = getSegmentCountInState(state)) <= 0) {
-      if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
-        LOGGER.error("Upload segment verification failed, count is zero after max wait time {} ms.",
-            DEFAULT_MAX_SLEEP_TIME_MS);
-        return false;
-      } else if (segmentCount == -1) {
-        LOGGER.error("Upload segment verification failed, one or more segment(s) is in {} state.",
-            CommonConstants.Helix.StateModel.SegmentStateModel.ERROR);
+    while (true) {
+      SegmentStatus status = getSegmentStatus(getExternalViewForTable(), _segmentName);
+      if (status == SegmentStatus.ONLINE) {
+        LOGGER.info("Verified all replicas of segment {} are ONLINE", _segmentName);
+        return true;
+      }
+      if (status == SegmentStatus.ERROR) {
+        LOGGER.error("Upload segment verification failed, segment {} has a replica in ERROR state", _segmentName);
         return false;
       }
-      LOGGER.warn("Upload segment verification count is zero, will retry after {} ms.", DEFAULT_SLEEP_INTERVAL_MS);
+      if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
+        LOGGER.error("Upload segment verification failed, segment {} is not ONLINE after max wait time {} ms",
+            _segmentName, DEFAULT_MAX_SLEEP_TIME_MS);
+        return false;
+      }
+      LOGGER.warn("Segment {} is not yet ONLINE, will retry after {} ms", _segmentName, DEFAULT_SLEEP_INTERVAL_MS);
       Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
     }
-
-    LOGGER.info("Successfully verified segment {} and its current status is {}.", _segmentName, state);
-    return true;
   }
 
   // TODO: verify by getting the number of rows before adding the segment, and the number of rows after adding the
@@ -299,52 +303,53 @@ public class SegmentOp extends BaseOp {
   private boolean verifySegmentDeleted()
       throws IOException, InterruptedException {
     long startTime = System.currentTimeMillis();
-    while (getCountForSegmentName() > 0) {
+    while (isSegmentPresent()) {
       if ((System.currentTimeMillis() - startTime) > DEFAULT_MAX_SLEEP_TIME_MS) {
-        LOGGER.error("Delete segment verification failed, count is greater than zero after max wait time {} ms.",
-            DEFAULT_MAX_SLEEP_TIME_MS);
+        LOGGER.error("Delete segment verification failed, segment {} is still present after max wait time {} ms",
+            _segmentName, DEFAULT_MAX_SLEEP_TIME_MS);
         return false;
       }
-      LOGGER.warn("Delete segment verification count greater than zero, will retry after {} ms.",
-          DEFAULT_SLEEP_INTERVAL_MS);
+      LOGGER.warn("Segment {} is still present, will retry after {} ms", _segmentName, DEFAULT_SLEEP_INTERVAL_MS);
       Thread.sleep(DEFAULT_SLEEP_INTERVAL_MS);
     }
 
-    LOGGER.info("Successfully delete the segment {} for the table {}.", _segmentName, _tableName);
+    LOGGER.info("Verified segment {} was deleted from table {}", _segmentName, _tableName);
     return true;
   }
 
   /// Retrieve external view for the given table name.
-  /// @return TableViews.TableView of OFFLINE and REALTIME segments.
-  private TableViews.TableView getExternalViewForTable()
+  /// @return OFFLINE and REALTIME segment assignments, or null if the controller returns a null view.
+  @Nullable
+  private TableView getExternalViewForTable()
       throws IOException {
     return JsonUtils.stringToObject(ControllerTest.sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
-            .forTableExternalView(_tableName)), TableViews.TableView.class);
+            .forTableExternalView(_tableName)), TableView.class);
   }
 
-  /// Retrieve the number of segments for OFFLINE which are in state matching the parameter.
-  /// @param state of the segment to be verified in the controller.
-  /// @return -1 in case of ERROR, 1 if all matches the state else 0.
-  private long getSegmentCountInState(String state)
-      throws IOException {
-    final Set<String> segmentState =
-        getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
-            .filter(k -> k.getKey().equals(_segmentName)).flatMap(x -> x.getValue().values().stream())
-            .collect(Collectors.toSet()) : Set.of();
-
-    if (segmentState.contains(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
-      return -1;
+  /// Classify an OFFLINE segment from one external-view snapshot without modifying it. Missing assignments are
+  /// PENDING; any ERROR replica takes precedence; otherwise replicas must exist and all be ONLINE.
+  static SegmentStatus getSegmentStatus(@Nullable TableView externalView, String segmentName) {
+    if (externalView == null || externalView._offline == null) {
+      return SegmentStatus.PENDING;
+    }
+    Map<String, String> segmentStates = externalView._offline.get(segmentName);
+    if (segmentStates == null || segmentStates.isEmpty()) {
+      return SegmentStatus.PENDING;
+    }
+    if (segmentStates.containsValue(SegmentStateModel.ERROR)) {
+      return SegmentStatus.ERROR;
     }
 
-    return segmentState.stream().allMatch(x -> x.contains(state)) ? 1 : 0;
+    return segmentStates.values().stream().allMatch(SegmentStateModel.ONLINE::equals)
+        ? SegmentStatus.ONLINE
+        : SegmentStatus.PENDING;
   }
 
-  /// Retrieve the number of segments for both OFFLINE irrespective of the state.
-  /// @return count for OFFLINE segments.
-  private long getCountForSegmentName()
+  /// Whether the OFFLINE external view still contains the segment, regardless of its replicas' states.
+  private boolean isSegmentPresent()
       throws IOException {
-    return getExternalViewForTable()._offline != null ? getExternalViewForTable()._offline.entrySet().stream()
-        .filter(k -> k.getKey().equals(_segmentName)).count() : 0;
+    TableView externalView = getExternalViewForTable();
+    return externalView != null && externalView._offline != null && externalView._offline.containsKey(_segmentName);
   }
 }
