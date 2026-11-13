@@ -291,8 +291,8 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
     IntIterator luceneDocIDIterator = luceneDocIds.getIntIterator();
     MutableRoaringBitmap actualDocIDs = new MutableRoaringBitmap();
     try {
-      // One stored-fields reader for all hits, so consecutive documents in a compressed block are not decompressed
-      // again for each hit, and only the doc id field is loaded
+      // Use the non-deprecated StoredFields API (IndexSearcher#doc is removed in Lucene 10) and load only the doc id
+      // field
       StoredFields storedFields = indexSearcher.storedFields();
       while (luceneDocIDIterator.hasNext()) {
         int luceneDocId = luceneDocIDIterator.next();
