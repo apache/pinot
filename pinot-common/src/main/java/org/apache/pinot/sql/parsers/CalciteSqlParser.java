@@ -77,6 +77,7 @@ import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTableLike;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
 import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateMaterializedView;
@@ -200,6 +201,7 @@ public class CalciteSqlParser {
       } else if (sqlNode instanceof SqlPinotShowTables
           || sqlNode instanceof SqlPinotShowMaterializedViews
           || sqlNode instanceof SqlPinotCreateTable
+          || sqlNode instanceof SqlPinotCreateTableLike
           || sqlNode instanceof SqlPinotShowCreateTable
           || sqlNode instanceof SqlPinotDropTable
           || sqlNode instanceof SqlPinotCreateMaterializedView

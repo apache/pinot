@@ -57,6 +57,7 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPinotColumnDeclaration;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTableLike;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
 import org.apache.pinot.sql.parsers.parser.SqlPinotProperty;
@@ -73,14 +74,15 @@ import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 /// ```
 ///   SQL String
 ///     → CalciteSqlParser (in pinot-common, generated parser)
-///     → SqlNode (one of SqlPinot{ShowTables,ShowMaterializedViews,CreateTable,ShowCreateTable,
+///     → SqlNode (one of SqlPinot{ShowTables,ShowMaterializedViews,CreateTable,CreateTableLike,ShowCreateTable,
 ///                                DropTable,CreateMaterializedView,ShowCreateMaterializedView,
 ///                                DropMaterializedView})
-///     → ResolvedTableDefinition (CREATE only)
-///     → Schema + TableConfig (CREATE only) via [PropertyMapping] /
+///     → ResolvedTableDefinition (column-list CREATE only)
+///     → Schema + TableConfig (column-list CREATE only) via [PropertyMapping] /
 ///       [MaterializedViewPropertyRouter]
 ///     → CompiledDdl
 /// ```
+/// `CREATE TABLE LIKE` retains both table references and its optional source type without resolving cluster metadata.
 ///
 /// Both the dispatch in [#compile] and the section ordering below follow [DdlOperation]:
 /// Catalog → Table → Materialized View, lifecycle CREATE → SHOW CREATE → DROP within each
@@ -191,6 +193,9 @@ public final class DdlCompiler {
     if (node instanceof SqlPinotCreateTable) {
       return compileCreate((SqlPinotCreateTable) node, ctx);
     }
+    if (node instanceof SqlPinotCreateTableLike) {
+      return compileCreateLike((SqlPinotCreateTableLike) node);
+    }
     if (node instanceof SqlPinotShowCreateTable) {
       return compileShowCreate((SqlPinotShowCreateTable) node);
     }
@@ -208,7 +213,7 @@ public final class DdlCompiler {
     }
     throw new DdlCompilationException(
         "Unsupported DDL statement; expected SHOW TABLES, SHOW MATERIALIZED VIEWS, "
-            + "CREATE TABLE, SHOW CREATE TABLE, DROP TABLE, CREATE MATERIALIZED VIEW, "
+            + "CREATE TABLE, CREATE TABLE LIKE, SHOW CREATE TABLE, DROP TABLE, CREATE MATERIALIZED VIEW, "
             + "SHOW CREATE MATERIALIZED VIEW, or DROP MATERIALIZED VIEW.");
   }
 
@@ -294,6 +299,14 @@ public final class DdlCompiler {
 
     return new CompiledCreateTable(resolved.getDatabaseName(), schema, tableConfig,
         resolved.isIfNotExists(), warnings);
+  }
+
+  private static CompiledCreateTableLike compileCreateLike(SqlPinotCreateTableLike node) {
+    QualifiedName target = parseQualifiedName(node.getName());
+    QualifiedName source = parseQualifiedName(node.getSourceName());
+    TableType tableType = node.getTableType() == null ? null : parseTableType(node.getTableType().toValue());
+    return new CompiledCreateTableLike(target._databaseName, target._tableName,
+        source._databaseName, source._tableName, tableType, node.isIfNotExists());
   }
 
   /// Compiles the options-defined `CREATE TABLE ... WITH (key = value, ...)` form by delegating

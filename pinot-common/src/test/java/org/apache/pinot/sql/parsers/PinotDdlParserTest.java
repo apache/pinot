@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import java.util.List;
 import java.util.Locale;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlNode;
@@ -25,6 +26,7 @@ import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import org.apache.pinot.sql.parsers.parser.SqlPinotColumnDeclaration;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTableLike;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
 import org.apache.pinot.sql.parsers.parser.SqlPinotProperty;
@@ -49,6 +51,59 @@ import static org.testng.Assert.fail;
 /// Verifies that statements parse, produce the expected AST shape, and that [CalciteSqlParser]
 /// classifies them as [PinotSqlType#DDL].
 public class PinotDdlParserTest {
+
+  @Test
+  public void createTableLikeSelectsAllSourceVariantsByDefault() {
+    SqlPinotCreateTableLike node = parseCreateLike("CREATE TABLE new_table LIKE old_table");
+    assertEquals(node.getName().getSimple(), "new_table");
+    assertEquals(node.getSourceName().getSimple(), "old_table");
+    assertFalse(node.isIfNotExists());
+    assertNull(node.getTableType());
+  }
+
+  @Test
+  public void createTableLikeQualifiedNamesAndModifiersRoundTrip() {
+    SqlPinotCreateTableLike node = parseCreateLike(
+        "CREATE TABLE IF NOT EXISTS \"Destination\".\"NewTable\" "
+            + "LIKE \"Source\".\"OldTable\" TYPE OFFLINE");
+    assertEquals(node.getName().names, List.of("Destination", "NewTable"));
+    assertEquals(node.getSourceName().names, List.of("Source", "OldTable"));
+    assertTrue(node.isIfNotExists());
+    assertEquals(node.getTableType().toValue(), "OFFLINE");
+
+    SqlPinotCreateTableLike reparsed = parseCreateLike(node.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
+    assertEquals(reparsed.getName().names, node.getName().names);
+    assertEquals(reparsed.getSourceName().names, node.getSourceName().names);
+    assertTrue(reparsed.isIfNotExists());
+    assertEquals(reparsed.getTableType().toValue(), "OFFLINE");
+  }
+
+  @Test
+  public void createTableLikeRealtimeAndUntypedRoundTrip() {
+    SqlPinotCreateTableLike realtime = parseCreateLike("create table new_table like old_table type realtime");
+    assertEquals(realtime.getTableType().toValue(), "REALTIME");
+    SqlPinotCreateTableLike untyped = parseCreateLike("CREATE TABLE new_table LIKE old_table");
+    SqlPinotCreateTableLike reparsed = parseCreateLike(untyped.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
+    assertEquals(reparsed.getSourceName().getSimple(), "old_table");
+    assertNull(reparsed.getTableType());
+    assertFalse(reparsed.isIfNotExists());
+  }
+
+  @Test
+  public void createTableLikeRejectsMissingSourceAndUnsupportedClauses() {
+    String[] invalidStatements = {
+        "CREATE TABLE new_table LIKE",
+        "CREATE TABLE new_table LIKE old_table TYPE",
+        "CREATE TABLE new_table LIKE old_table TYPE HYBRID",
+        "CREATE TABLE new_table (id INT) LIKE old_table",
+        "CREATE TABLE new_table LIKE old_table TABLE_TYPE = OFFLINE",
+        "CREATE TABLE new_table LIKE old_table PROPERTIES ('replication' = '2')",
+        "CREATE TABLE new_table LIKE old_table WITH (type = 'iceberg')"
+    };
+    for (String sql : invalidStatements) {
+      expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToSqlNodeAndOptions(sql));
+    }
+  }
 
   // -------------------------------------------------------------------------------------------
   // CREATE TABLE
@@ -653,6 +708,8 @@ public class PinotDdlParserTest {
   public void allDdlNodesClassifyAsDdl() {
     String[] ddlStatements = {
         "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE",
+        "CREATE TABLE copied LIKE original",
+        "CREATE TABLE IF NOT EXISTS copied LIKE original TYPE REALTIME",
         "CREATE MATERIALIZED VIEW mv (id INT METRIC) REFRESH EVERY '1d' AS SELECT id FROM t",
         "DROP TABLE t",
         "DROP TABLE IF EXISTS t TYPE OFFLINE",
@@ -812,6 +869,12 @@ public class PinotDdlParserTest {
       fail("Expected SqlPinotCreateTable; got " + node.getClass().getSimpleName());
     }
     return (SqlPinotCreateTable) node;
+  }
+
+  private static SqlPinotCreateTableLike parseCreateLike(String sql) {
+    SqlNode node = parseSingle(sql);
+    assertTrue(node instanceof SqlPinotCreateTableLike, "Expected CREATE TABLE LIKE AST for: " + sql);
+    return (SqlPinotCreateTableLike) node;
   }
 
   private static SqlPinotDropTable parseDrop(String sql) {

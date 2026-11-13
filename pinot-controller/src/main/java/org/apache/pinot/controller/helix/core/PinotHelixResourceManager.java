@@ -4057,6 +4057,17 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
   }
 
+  /// Reads the persisted definition without resolving variables or applying decorators.
+  /// Returns `null` only when no record is returned; malformed definitions and storage failures propagate.
+  ///
+  /// @param tableNameWithType table name including its OFFLINE or REALTIME suffix
+  /// @throws IOException if the persisted config cannot be deserialized
+  @Nullable
+  public TableConfig getRawTableConfig(String tableNameWithType)
+      throws IOException {
+    return ZKMetadataProvider.getRawTableConfig(_propertyStore, tableNameWithType);
+  }
+
   /// Get all table configs.
   ///
   /// @return List of table configs. Empty list in case of tables configs does not exist.
