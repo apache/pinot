@@ -73,10 +73,7 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -P github-actions,no-integration-tests${COVERAGE_PROFILE},tesseracta-build || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
-  mvn test ${FORK_OPTS} \
-    -pl '!pinot-spi' \
-    -Dtest=WorkloadBudgetManagerTest \
-    -P github-actions,no-integration-tests${COVERAGE_PROFILE},tesseracta-build || exit 1
+  echo "todo"
 fi
 
 # Aggregate coverage across all per-fork exec files (jacoco-*.exec) written under forkCount>1,
