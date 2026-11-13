@@ -43,8 +43,10 @@ RM="/bin/rm"
 logCount=1
 #Declare the number of mandatory args
 cmdName=`basename $0`
-source "$(dirname "$0")/utils.inc"
-source "$(dirname "$0")/server-readiness.inc"
+source "$(dirname "${BASH_SOURCE[0]}")/utils.inc"
+source "$(dirname "${BASH_SOURCE[0]}")/server-readiness.inc"
+# Resolve this before changing directory to a distribution's bin directory.
+COMPAT_SERVER_LOG4J_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/server-log4j2.xml"
 
 function cleanupControllerDirs() {
   local dirName=$(grep -F controller.data.dir "${CONTROLLER_CONF}" | awk '{print $3}')
@@ -127,13 +129,45 @@ function waitForBrokerReady() {
   done
 }
 
+# Collect diagnostics from every server we started before applying the suite's cleanup policy.
+function abortCompatibilityCheck() {
+  echo "$1"
+  local serviceName pid serverLogDir port
+  for serviceName in server server2; do
+    pid=$(cat "${PID_DIR}/${serviceName}.pid" 2>/dev/null) || continue
+    serverLogDir=$(cat "${PID_DIR}/${serviceName}.logdir" 2>/dev/null) || continue
+    port=$SERVER_ADMIN_PORT
+    if [ "$serviceName" = "server2" ]; then
+      port=$SERVER_2_ADMIN_PORT
+    fi
+    collectServerDiagnostics "$serviceName" "$pid" "$port" "$serverLogDir"
+  done
+  if [ "$keepClusterOnFailure" = "false" ]; then
+    stopServices
+  fi
+  exit 1
+}
+
+# Readiness is mandatory at each startup/upgrade/rollback boundary; failure aborts the suite.
+function requireServerReady() {
+  local serviceName=$1
+  local port=$2
+  local pid serverLogDir
+  if ! pid=$(cat "${PID_DIR}/${serviceName}.pid") \
+      || ! serverLogDir=$(cat "${PID_DIR}/${serviceName}.logdir") \
+      || ! waitForServerReadiness "$serviceName" "$pid" "$port" "$serverLogDir" \
+          "${SERVER_READY_TIMEOUT_SECONDS:-600}"; then
+    abortCompatibilityCheck "$serviceName readiness check failed"
+  fi
+}
+
 function waitForClusterReady() {
   waitForBrokerReady
-  waitForServerReady
+  requireServerReady server "$SERVER_ADMIN_PORT"
 
   # Check second server if configured
   if [ -f "${SERVER_CONF_2}" ]; then
-      waitForServer2Ready
+      requireServerReady server2 "$SERVER_2_ADMIN_PORT"
   fi
 
   waitForKafkaReady
@@ -144,6 +178,30 @@ function setConfigFileArg() {
   if [[ -f $1 ]]; then
     echo "-configFileName ${1}"
   fi
+}
+
+# Each start records its PID and log directory for readiness, diagnostics, and cleanup.
+function startServerWithLogs() {
+  local serviceName=$1
+  local launcher=$2
+  local configFile=$3
+  local serverLogDir="${LOG_DIR}/${serviceName}.${logCount}"
+  mkdir -p "$serverLogDir" || abortCompatibilityCheck "Cannot create log directory $serverLogDir"
+  echo "$serverLogDir" > "${PID_DIR}/${serviceName}.logdir" \
+      || abortCompatibilityCheck "Cannot record log directory for $serviceName"
+  (
+    # Flush server and Helix logs before stopService kills the JVM. Use an environment variable
+    # so configuration paths with spaces work without changing the launcher's JAVA_OPTS.
+    export LOG4J_CONFIGURATION_FILE="$COMPAT_SERVER_LOG4J_CONFIG"
+    export LOG_ROOT="$serverLogDir"
+    export PINOT_COMPONENT="$serviceName"
+    if [ -f "$configFile" ]; then
+      exec "$launcher" StartServer -configFileName "$configFile"
+    else
+      exec "$launcher" StartServer
+    fi
+  ) > "${LOG_DIR}/${serviceName}.${logCount}.log" 2>&1 &
+  echo $! > "${PID_DIR}/${serviceName}.pid"
 }
 
 # Given a component and directory, start that version of the specific component
@@ -396,6 +454,11 @@ function checkPortAvailable() {
 # Main
 #
 
+# Sourcing exposes the runner functions without starting a cluster.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  return 0
+fi
+
 # create subdirectories for given commits
 workingDir=
 testSuiteDir=
@@ -536,7 +599,7 @@ fi
 echo "Upgrading server"
 stopService server
 startService server "$newTargetDir" "$SERVER_CONF"
-waitForServerReady
+requireServerReady server "$SERVER_ADMIN_PORT"
 
 if [ -f $testSuiteDir/post-server-upgrade.yaml ]; then
   echo "Running tests after server upgrade"
@@ -551,7 +614,7 @@ if [ -f "${SERVER_CONF_2}" ]; then
   echo "Upgrading server 2"
   stopService server2
   startService server2 "$newTargetDir" "$SERVER_CONF_2"
-  waitForServer2Ready
+  requireServerReady server2 "$SERVER_2_ADMIN_PORT"
 
   if [ -f $testSuiteDir/post-server-2-upgrade.yaml ]; then
     echo "Running tests after server 2 upgrade"
@@ -566,7 +629,7 @@ if [ -f "${SERVER_CONF_2}" ]; then
   # Upgrade completed, now do a rollback
   stopService server2
   startService server2 "$oldTargetDir" "$SERVER_CONF_2"
-  waitForServer2Ready
+  requireServerReady server2 "$SERVER_2_ADMIN_PORT"
 
   if [ -f $testSuiteDir/post-server-2-rollback.yaml ]; then
     echo "Running tests after server 2 downgrade"
@@ -582,7 +645,7 @@ echo "Downgrading server"
 # Upgrade completed, now do a rollback
 stopService server
 startService server "$oldTargetDir" "$SERVER_CONF"
-waitForServerReady
+requireServerReady server "$SERVER_ADMIN_PORT"
 
 if [ -f $testSuiteDir/post-server-rollback.yaml ]; then
   echo "Running tests after server downgrade"

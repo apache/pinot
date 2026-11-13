@@ -19,7 +19,7 @@
 package org.apache.pinot.compat;
 
 import org.apache.pinot.common.restlet.resources.TableView;
-import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.compat.SegmentOp.SegmentStatus;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -32,26 +32,26 @@ public class SegmentOpTest {
   @DataProvider(name = "externalViews")
   public Object[][] externalViews() {
     return new Object[][]{
-        {"null", 0L},
-        {"{}", 0L},
-        {"{\"OFFLINE\":null}", 0L},
-        {"{\"OFFLINE\":{}}", 0L},
-        {"{\"OFFLINE\":{\"otherSegment\":{\"server1\":\"ONLINE\"}}}", 0L},
-        {"{\"OFFLINE\":{\"segment\":null}}", 0L},
-        {"{\"OFFLINE\":{\"segment\":{}}}", 0L},
-        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"ONLINE\"}}}", 1L},
-        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"ONLINE\",\"server2\":\"ONLINE\"}}}", 1L},
-        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"ONLINE\",\"server2\":\"OFFLINE\"}}}", 0L},
-        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"ONLINE\",\"server2\":\"ERROR\"}}}", -1L},
-        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"NOT_ONLINE\"}}}", 0L},
-        {"{\"OFFLINE\":{\"segment\":{\"server1\":null}}}", 0L}
+        {"null", SegmentStatus.PENDING},
+        {"{}", SegmentStatus.PENDING},
+        {"{\"OFFLINE\":null}", SegmentStatus.PENDING},
+        {"{\"OFFLINE\":{}}", SegmentStatus.PENDING},
+        {"{\"OFFLINE\":{\"otherSegment\":{\"server1\":\"ONLINE\"}}}", SegmentStatus.PENDING},
+        {"{\"OFFLINE\":{\"segment\":null}}", SegmentStatus.PENDING},
+        {"{\"OFFLINE\":{\"segment\":{}}}", SegmentStatus.PENDING},
+        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"ONLINE\"}}}", SegmentStatus.ONLINE},
+        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"ONLINE\",\"server2\":\"ONLINE\"}}}", SegmentStatus.ONLINE},
+        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"ONLINE\",\"server2\":\"OFFLINE\"}}}", SegmentStatus.PENDING},
+        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"ONLINE\",\"server2\":\"ERROR\"}}}", SegmentStatus.ERROR},
+        {"{\"OFFLINE\":{\"segment\":{\"server1\":\"NOT_ONLINE\"}}}", SegmentStatus.PENDING},
+        {"{\"OFFLINE\":{\"segment\":{\"server1\":null}}}", SegmentStatus.PENDING}
     };
   }
 
   @Test(dataProvider = "externalViews")
-  public void testSegmentCountInState(String response, long expectedCount)
+  public void testSegmentStatus(String response, SegmentStatus expectedStatus)
       throws Exception {
     TableView externalView = JsonUtils.stringToObject(response, TableView.class);
-    assertEquals(SegmentOp.getSegmentCountInState(externalView, "segment", SegmentStateModel.ONLINE), expectedCount);
+    assertEquals(SegmentOp.getSegmentStatus(externalView, "segment"), expectedStatus);
   }
 }

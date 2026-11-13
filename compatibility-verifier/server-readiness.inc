@@ -17,46 +17,22 @@
 # under the License.
 #
 
-# Resolve this before compCheck.sh changes directory to a distribution's bin directory.
-COMPAT_SERVER_LOG4J_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/server-log4j2.xml"
-
-# Shared by compCheck.sh and the readiness regression tests. Each server start gets its own
-# log directory, including both servers in the MSE suite.
-function startServerWithLogs() {
-  local serviceName=$1
-  local launcher=$2
-  local configFile=$3
-  local serverLogDir="${LOG_DIR}/${serviceName}.${logCount}"
-  mkdir -p "$serverLogDir" || exit 1
-  echo "$serverLogDir" > "${PID_DIR}/${serviceName}.logdir"
-  (
-    # Flush server and Helix logs before stopService kills the JVM. Use an environment variable
-    # so configuration paths with spaces work without changing the launcher's JAVA_OPTS.
-    export LOG4J_CONFIGURATION_FILE="$COMPAT_SERVER_LOG4J_CONFIG"
-    export LOG_ROOT="$serverLogDir"
-    export PINOT_COMPONENT="$serviceName"
-    if [ -f "$configFile" ]; then
-      exec "$launcher" StartServer -configFileName "$configFile"
-    else
-      exec "$launcher" StartServer
-    fi
-  ) > "${LOG_DIR}/${serviceName}.${logCount}.log" 2>&1 &
-  echo $! > "${PID_DIR}/${serviceName}.pid"
-}
-
+# Single-server checks write to the supplied, existing log directory. The caller owns
+# launching/stopping services and deciding what to do when readiness fails.
+# Returns success only for a live process with a successful health response within the timeout.
 function waitForServerReadiness() {
   local serviceName=$1
-  local port=$2
-  local timeoutSeconds=${SERVER_READY_TIMEOUT_SECONDS:-600}
-  local pid serverLogDir remaining requestTimeout
+  local pid=$2
+  local port=$3
+  local serverLogDir=$4
+  local timeoutSeconds=$5
+  local remaining requestTimeout
   case "$timeoutSeconds" in
-    ''|*[!0-9]*|0) echo "SERVER_READY_TIMEOUT_SECONDS must be a positive integer"; return 1 ;;
+    ''|*[!0-9]*|0) echo "Readiness timeout must be a positive integer: $timeoutSeconds"; return 1 ;;
   esac
-  pid=$(cat "${PID_DIR}/${serviceName}.pid") || return 1
-  serverLogDir=$(cat "${PID_DIR}/${serviceName}.logdir") || return 1
   timeoutSeconds=$((10#$timeoutSeconds))
   if [ "$timeoutSeconds" -le 0 ]; then
-    echo "SERVER_READY_TIMEOUT_SECONDS must be a positive integer"
+    echo "Readiness timeout must be a positive integer: $timeoutSeconds"
     return 1
   fi
   local deadline=$((SECONDS + timeoutSeconds))
@@ -87,12 +63,13 @@ function waitForServerReadiness() {
   return 1
 }
 
+# Best-effort, bounded diagnostics for one server. Does not stop the server or exit the caller.
 function collectServerDiagnostics() {
   local serviceName=$1
-  local port=$2
-  local pid serverLogDir dumpPid dumpDeadline jstackCommand
-  serverLogDir=$(cat "${PID_DIR}/${serviceName}.logdir" 2>/dev/null) || return 0
-  pid=$(cat "${PID_DIR}/${serviceName}.pid" 2>/dev/null) || return 0
+  local pid=$2
+  local port=$3
+  local serverLogDir=$4
+  local dumpPid dumpDeadline jstackCommand
   echo "Collecting diagnostics for $serviceName (pid $pid) in $serverLogDir"
   ps -p "$pid" -o pid,ppid,stat,args > "$serverLogDir/process.txt" 2>&1
   curl --silent --show-error --connect-timeout 2 --max-time 5 \
@@ -106,7 +83,7 @@ function collectServerDiagnostics() {
   if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/jstack" ]; then
     jstackCommand="$JAVA_HOME/bin/jstack"
   fi
-  # Attach before stopServices kills the JVM, but do not let a stuck attach block cleanup.
+  # Do not let a stuck attach block the caller's failure handling.
   "$jstackCommand" -l "$pid" > "$serverLogDir/threads.txt" 2>&1 &
   dumpPid=$!
   dumpDeadline=$((SECONDS + 10))
@@ -119,24 +96,4 @@ function collectServerDiagnostics() {
     sleep 1
   done
   wait "$dumpPid" 2>/dev/null || true
-}
-
-function abortCompatibilityCheck() {
-  echo "$1"
-  collectServerDiagnostics server "$SERVER_ADMIN_PORT"
-  if [ -f "${SERVER_CONF_2}" ]; then
-    collectServerDiagnostics server2 "$SERVER_2_ADMIN_PORT"
-  fi
-  if [ "$keepClusterOnFailure" = "false" ]; then
-    stopServices
-  fi
-  exit 1
-}
-
-function waitForServerReady() {
-  waitForServerReadiness server "$SERVER_ADMIN_PORT" || abortCompatibilityCheck "Server readiness check failed"
-}
-
-function waitForServer2Ready() {
-  waitForServerReadiness server2 "$SERVER_2_ADMIN_PORT" || abortCompatibilityCheck "Server 2 readiness check failed"
 }

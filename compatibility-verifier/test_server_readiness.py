@@ -31,6 +31,7 @@ import unittest
 
 
 HELPER = Path(__file__).with_name("server-readiness.inc").resolve()
+RUNNER = HELPER.with_name("compCheck.sh")
 
 
 class ReadinessTest(unittest.TestCase):
@@ -47,7 +48,7 @@ class ReadinessTest(unittest.TestCase):
                         JAVA_HOME="", PATH=str(self.bin) + os.pathsep + os.environ["PATH"],
                         TRACE=str(self.trace), SERVER_READY_TIMEOUT_SECONDS="2",
                         SERVER_CONF_2=str(self.root / "server2.properties"),
-                        keepClusterOnFailure="false", HELPER=str(HELPER))
+                        keepClusterOnFailure="false")
         self.processes = []
         self.servers = []
         self.write_script("jstack", 'kill -0 "$2" || exit 1\necho "thread dump"\necho dump >> "$TRACE"')
@@ -106,9 +107,10 @@ class ReadinessTest(unittest.TestCase):
         self.servers.append(server)
         return server
 
-    def run_shell(self, body, **env):
-        preamble = r'''
-source "$HELPER"
+    def run_shell(self, body, runner=False, **env):
+        preamble = 'source "$SCRIPT"\n'
+        if runner:
+            preamble += r'''
 function stopServices() {
   echo cleanup >> "$TRACE"
   for pidFile in "$PID_DIR"/*.pid; do
@@ -116,13 +118,18 @@ function stopServices() {
   done
 }
 '''
-        return subprocess.run(["bash", "-c", preamble + body], env=dict(self.env, **env),
+        shell_env = dict(self.env, SCRIPT=str(RUNNER if runner else HELPER))
+        shell_env.update(env)
+        return subprocess.run(["bash", "-c", preamble + body], env=shell_env,
                               capture_output=True, text=True, timeout=20, cwd=self.root)
 
     def test_retries_503_until_200(self):
-        _, log_dir = self.server_process()
+        process, log_dir = self.server_process()
         server = self.http_server((503, 200))
-        result = self.run_shell('waitForServerReady', SERVER_ADMIN_PORT=str(server.server_port),
+        result = self.run_shell('waitForServerReadiness server "$SERVER_PID" "$SERVER_ADMIN_PORT" '
+                               '"$SERVER_LOG_DIR" "$SERVER_READY_TIMEOUT_SECONDS"',
+                                SERVER_PID=str(process.pid), SERVER_LOG_DIR=str(log_dir),
+                                SERVER_ADMIN_PORT=str(server.server_port),
                                 SERVER_READY_TIMEOUT_SECONDS="5")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(server.requests, 2)
@@ -133,7 +140,7 @@ function stopServices() {
     def test_timeout_collects_threads_before_cleanup_and_aborts(self):
         process, log_dir = self.server_process()
         server = self.http_server()
-        result = self.run_shell('waitForServerReady\necho should-not-run',
+        result = self.run_shell('requireServerReady server "$SERVER_ADMIN_PORT"\necho should-not-run', runner=True,
                                 SERVER_ADMIN_PORT=str(server.server_port))
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertNotIn("should-not-run", result.stdout)
@@ -143,28 +150,36 @@ function stopServices() {
         process.wait(timeout=2)
 
     def test_dead_process_fails_without_http_request(self):
-        process, _ = self.server_process()
+        process, log_dir = self.server_process()
         process.terminate()
         process.wait()
         server = self.http_server((200,))
-        result = self.run_shell('waitForServerReadiness server "$SERVER_ADMIN_PORT"',
+        result = self.run_shell('waitForServerReadiness server "$SERVER_PID" "$SERVER_ADMIN_PORT" '
+                               '"$SERVER_LOG_DIR" "$SERVER_READY_TIMEOUT_SECONDS"',
+                                SERVER_PID=str(process.pid), SERVER_LOG_DIR=str(log_dir),
                                 SERVER_ADMIN_PORT=str(server.server_port))
         self.assertEqual(result.returncode, 1)
         self.assertEqual(server.requests, 0)
         self.assertIn("exited before becoming ready", result.stdout)
 
     def test_hanging_http_request_obeys_overall_deadline(self):
-        self.server_process()
+        process, log_dir = self.server_process()
         server = self.http_server((200,), delay=60)
-        result = self.run_shell('waitForServerReadiness server "$SERVER_ADMIN_PORT"',
+        result = self.run_shell('waitForServerReadiness server "$SERVER_PID" "$SERVER_ADMIN_PORT" '
+                               '"$SERVER_LOG_DIR" "$SERVER_READY_TIMEOUT_SECONDS"\n'
+                               'status=$?\necho caller-continues\nexit "$status"',
+                                SERVER_PID=str(process.pid), SERVER_LOG_DIR=str(log_dir),
                                 SERVER_ADMIN_PORT=str(server.server_port))
         self.assertEqual(result.returncode, 1)
+        self.assertIn("caller-continues", result.stdout)
+        self.assertFalse(self.trace.exists())
+        self.assertIsNone(process.poll())
 
     def test_server2_failure_keeps_cluster_when_requested(self):
         process, log_dir = self.server_process("server2")
         Path(self.env["SERVER_CONF_2"]).touch()
         server = self.http_server()
-        result = self.run_shell('waitForServer2Ready', SERVER_ADMIN_PORT="1",
+        result = self.run_shell('requireServerReady server2 "$SERVER_2_ADMIN_PORT"', runner=True, SERVER_ADMIN_PORT="1",
                                 SERVER_2_ADMIN_PORT=str(server.server_port), keepClusterOnFailure="true")
         self.assertEqual(result.returncode, 1)
         self.assertEqual(self.trace.read_text().splitlines(), ["dump"])
@@ -175,7 +190,8 @@ function stopServices() {
         process, log_dir = self.server_process()
         server = self.http_server()
         self.write_script("jstack", "exec sleep 60")
-        result = self.run_shell('collectServerDiagnostics server "$SERVER_ADMIN_PORT"',
+        result = self.run_shell('collectServerDiagnostics server "$SERVER_PID" "$SERVER_ADMIN_PORT" "$SERVER_LOG_DIR"',
+                                SERVER_PID=str(process.pid), SERVER_LOG_DIR=str(log_dir),
                                 SERVER_ADMIN_PORT=str(server.server_port))
         self.assertEqual(result.returncode, 0)
         self.assertIn("Thread dump timed out", (log_dir / "threads.txt").read_text())
@@ -187,11 +203,11 @@ function stopServices() {
                                      'echo "$JAVA_OPTS" > "$LOG_ROOT/java-options.txt"\n'
                                      'echo server-and-helix > "$LOG_ROOT/pinot-$PINOT_COMPONENT.log"\n'
                                      'exec sleep 60')
-        helper_dir = self.root / "helper with spaces"
-        helper_dir.mkdir()
-        copied_helper = helper_dir / HELPER.name
-        shutil.copyfile(HELPER, copied_helper)
-        copied_config = helper_dir / "server-log4j2.xml"
+        script_dir = self.root / "scripts with spaces"
+        script_dir.mkdir()
+        for source in (RUNNER, HELPER, RUNNER.with_name("utils.inc")):
+            shutil.copyfile(source, script_dir / source.name)
+        copied_config = script_dir / "server-log4j2.xml"
         shutil.copyfile(HELPER.with_name(copied_config.name), copied_config)
         launch_dir = self.root / "distribution-bin"
         launch_dir.mkdir()
@@ -202,7 +218,8 @@ logCount=1
 startServerWithLogs server "$LAUNCHER" missing-config
 logCount=2
 startServerWithLogs server2 "$LAUNCHER" missing-config
-''', LAUNCHER=str(launcher), HELPER=str(copied_helper), LAUNCH_DIR=str(launch_dir), JAVA_OPTS=java_options)
+''', runner=True, LAUNCHER=str(launcher), SCRIPT=str(script_dir / RUNNER.name),
+                                LAUNCH_DIR=str(launch_dir), JAVA_OPTS=java_options)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for name, number in (("server", 1), ("server2", 2)):
             directory = self.logs / (name + "." + str(number))
