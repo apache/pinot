@@ -629,6 +629,57 @@ public class SegmentPushUtilsTest {
     assertEquals(result.get(segmentFiles[3]), segmentFiles[3]);
   }
 
+  @Test
+  public void testGetSegmentUriToTarPathMapWithoutArchiveExtension() {
+    URI outputDirURI = _tempDir.toURI();
+    String segmentWithoutExtension = outputDirURI.resolve("myTable__0__0__20260601T1557Z").toString();
+    String segmentArchive = outputDirURI.resolve("myTable_offline.tar.gz").toString();
+    String[] files = {
+        segmentWithoutExtension, segmentArchive, outputDirURI.resolve("myTable_offline.metadata.tar.gz").toString(),
+        outputDirURI.resolve("myTable__0__0__20260601T1557Z.tmp." + UUID.randomUUID()).toString(),
+        outputDirURI.resolve("_SUCCESS").toString()
+    };
+
+    // Files without archive extension are selected only for URI push, when allowSegmentsWithoutArchiveExtension is
+    // enabled and the files are matched by the push file name pattern
+    PushJobSpec pushSpec = new PushJobSpec();
+    pushSpec.setPushFileNamePattern("glob:**/myTable*");
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files, true),
+        Map.of(segmentArchive, segmentArchive));
+    pushSpec.setAllowSegmentsWithoutArchiveExtension(true);
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files),
+        Map.of(segmentArchive, segmentArchive));
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files, true),
+        Map.of(segmentWithoutExtension, segmentWithoutExtension, segmentArchive, segmentArchive));
+    pushSpec.setPushFileNamePattern(null);
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files, true),
+        Map.of(segmentArchive, segmentArchive));
+
+    pushSpec.setPushFileNamePattern("glob:**/myTable*");
+    pushSpec.setSegmentUriPrefix("adl2://deepstore");
+    assertEquals(SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, files, true),
+        Map.of("adl2://deepstore" + URI.create(segmentWithoutExtension).getRawPath(), segmentWithoutExtension,
+            "adl2://deepstore" + URI.create(segmentArchive).getRawPath(), segmentArchive));
+
+    assertEquals(SegmentPushUtils.getSegmentName(segmentWithoutExtension), "myTable__0__0__20260601T1557Z");
+    assertEquals(SegmentPushUtils.getSegmentName(segmentArchive), "myTable_offline");
+  }
+
+  @Test
+  public void testValidateUriPushJobSpec() {
+    SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
+    PushJobSpec pushSpec = new PushJobSpec();
+    spec.setPushJobSpec(pushSpec);
+    spec.setCleanUpOutputDir(true);
+    SegmentPushUtils.validateUriPushJobSpec(spec);
+
+    // Pushed segments must not be deleted from the deep store
+    pushSpec.setAllowSegmentsWithoutArchiveExtension(true);
+    expectThrows(IllegalArgumentException.class, () -> SegmentPushUtils.validateUriPushJobSpec(spec));
+    spec.setCleanUpOutputDir(false);
+    SegmentPushUtils.validateUriPushJobSpec(spec);
+  }
+
   @DataProvider(name = "segmentTarExtensions")
   public Object[][] segmentTarExtensions() {
     return new Object[][]{{".tar.gz"}, {".tar.lz4"}, {".tar.zst"}};

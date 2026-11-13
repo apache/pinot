@@ -57,6 +57,14 @@ public class PushJobSpec implements Serializable {
   ///    recursively.
   private String _pushFileNamePattern;
 
+  /// Applicable for URI push type.
+  /// If true, and `pushFileNamePattern` is configured, the files matched by the pattern are pushed even without a
+  /// segment archive extension, e.g. segments stored in the deep store such as committed REALTIME segments.
+  /// Directories, segment metadata files and temporary segment files (`<segment>.tmp.<uuid>`) are always skipped.
+  /// When this is true, `cleanUpOutputDir` must be false, otherwise the URI push job fails before pushing any segment,
+  /// so that the pushed segments are not deleted from the deep store.
+  private boolean _allowSegmentsWithoutArchiveExtension;
+
   /// Prefer using segment metadata tar gz file to push segment if exists.
   private boolean _preferMetadataTarGz = true;
 
@@ -75,6 +83,14 @@ public class PushJobSpec implements Serializable {
 
   public void setPushFileNamePattern(String pushFileNamePattern) {
     _pushFileNamePattern = pushFileNamePattern;
+  }
+
+  public boolean isAllowSegmentsWithoutArchiveExtension() {
+    return _allowSegmentsWithoutArchiveExtension;
+  }
+
+  public void setAllowSegmentsWithoutArchiveExtension(boolean allowSegmentsWithoutArchiveExtension) {
+    _allowSegmentsWithoutArchiveExtension = allowSegmentsWithoutArchiveExtension;
   }
 
   public String getSegmentUriPrefix() {

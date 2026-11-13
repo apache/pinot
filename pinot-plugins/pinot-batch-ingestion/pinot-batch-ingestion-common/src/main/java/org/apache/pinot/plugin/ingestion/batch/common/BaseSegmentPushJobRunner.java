@@ -89,7 +89,7 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
 
     // Get list of files to process
     try {
-      _files = _outputDirFS.listFiles(_outputDirURI, true);
+      _files = SegmentPushUtils.listFiles(_outputDirFS, _outputDirURI, _spec.getPushJobSpec());
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + _outputDirURI + "'");
     }
@@ -103,9 +103,14 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     Collection<String> tarFilePaths = segmentsUriToTarPathMap.values();
     List<String> segmentNames = new ArrayList<>(tarFilePaths.size());
     for (String tarFilePath : tarFilePaths) {
-      segmentNames.add(SegmentPushUtils.getSegmentNameFromTarFile(tarFilePath));
+      segmentNames.add(SegmentPushUtils.getSegmentName(tarFilePath));
     }
     return segmentNames;
+  }
+
+  /// Returns the map from segment URI to corresponding tar path for the segments to upload.
+  protected Map<String, String> getSegmentUriToTarPathMap() {
+    return SegmentPushUtils.getSegmentUriToTarPathMap(_outputDirURI, _spec.getPushJobSpec(), _files);
   }
 
   /// Upload segments supplied in segmentsUriToTarPathMap.
@@ -123,8 +128,7 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     initFileSys();
     Map<URI, String> uriToLineageEntryIdMap = null;
     try {
-      Map<String, String> segmentsUriToTarPathMap =
-          SegmentPushUtils.getSegmentUriToTarPathMap(_outputDirURI, _spec.getPushJobSpec(), _files);
+      Map<String, String> segmentsUriToTarPathMap = getSegmentUriToTarPathMap();
       if (segmentsUriToTarPathMap.isEmpty()) {
         return;
       }
