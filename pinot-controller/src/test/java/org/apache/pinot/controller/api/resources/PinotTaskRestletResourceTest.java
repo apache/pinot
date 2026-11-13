@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -35,6 +36,9 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingInfo;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -67,6 +71,8 @@ public class PinotTaskRestletResourceTest {
   Executor _executor;
   @Mock
   HttpClientConnectionManager _connectionManager;
+  @Mock
+  PinotTaskManager _pinotTaskManager;
 
   @InjectMocks
   PinotTaskRestletResource _pinotTaskRestletResource;
@@ -127,6 +133,24 @@ public class PinotTaskRestletResourceTest {
     verify(asyncResponse).resume(responseCaptor.capture());
     assertEquals(responseCaptor.getValue(), "{}");
     return minionWorkerEndpointsCaptor.getValue();
+  }
+
+  /// A task type whose generator created no task is left out instead of returned with an empty task name.
+  @Test
+  public void testScheduleTasksLeavesOutTaskTypesThatCreatedNoTask() {
+    Map<String, TaskSchedulingInfo> infos = new HashMap<>();
+    infos.put("NoTaskType", new TaskSchedulingInfo().setScheduledTaskNames(List.of()));
+    infos.put("ScheduledType", new TaskSchedulingInfo().setScheduledTaskNames(List.of("Task_ScheduledType_1")));
+    infos.put("NotRunType", new TaskSchedulingInfo());
+    when(_pinotTaskManager.scheduleTasks(any(TaskSchedulingContext.class))).thenReturn(infos);
+    AsyncResponse asyncResponse = Mockito.mock(AsyncResponse.class);
+    ArgumentCaptor<Object> responseCaptor = ArgumentCaptor.forClass(Object.class);
+
+    _pinotTaskRestletResource.scheduleTasks(null, "myTable_OFFLINE", null, null, asyncResponse);
+
+    verify(asyncResponse).resume(responseCaptor.capture());
+    assertEquals(responseCaptor.getValue(), Map.of("ScheduledType", "Task_ScheduledType_1",
+        PinotTaskRestletResource.GENERATION_ERRORS_KEY, "", PinotTaskRestletResource.SCHEDULING_ERRORS_KEY, ""));
   }
 
   private InstanceConfig createInstanceConfig(String instanceId, String hostName, String port) {
