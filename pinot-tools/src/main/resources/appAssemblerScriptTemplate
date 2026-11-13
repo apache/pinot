@@ -179,7 +179,7 @@ jdk_version() {
   IFS='
 '
   # remove \r for Cygwin
-  lines=$(java -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
+  lines=$("$JAVACMD" -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
   for line in $lines; do
     if test -z $result && echo "$line" | grep -q 'version "'
     then
@@ -204,8 +204,6 @@ else
 fi
 
 JDK_VERSION=$(jdk_version)
-# ALL_JAVA_OPTS holds JAVA_OPTS, or the JVM settings of this program when JAVA_OPTS is empty. Add to it; do not
-# replace it with JAVA_OPTS, which would drop those settings.
 if [ "$JDK_VERSION" -gt 11 ]; then
   ALL_JAVA_OPTS="--add-opens=java.base/java.nio=ALL-UNNAMED \
   --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
@@ -215,15 +213,16 @@ if [ "$JDK_VERSION" -gt 11 ]; then
   --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED \
   -Dio.netty.tryReflectionSetAccessible=true \
   -Dio.grpc.netty.shaded.io.netty.tryReflectionSetAccessible=true \
-  $ALL_JAVA_OPTS"
+  $JAVA_OPTS"
 fi
 
 # JDK 24+ warns on sun.misc.Unsafe memory access (JEP 471), and Netty 4.2 stops using Unsafe on JDK 25+ unless the
 # JVM allows it. Without Unsafe, Netty creates and closes one shared Arena per pooled chunk, which makes allocation
 # and release much slower, and PlatformDependent.allocateMemory (used for buffers over 2 GB) fails. Allowing it
 # also removes the JEP 471 warning from Pinot's own Unsafe-based buffers. --enable-native-access lets JNI and FFM
-# libraries load without the JEP 472 warnings. JAVA_OPTS comes later on the command line, so a value set there
-# overrides these.
+# libraries load without the JEP 472 warnings. JAVA_OPTS comes later on the command line, so a
+# --sun-misc-unsafe-memory-access value set there overrides this one. Native access grants add up: JAVA_OPTS cannot
+# remove the ALL-UNNAMED grant.
 if [ "$JDK_VERSION" -ge 24 ]; then
   ALL_JAVA_OPTS="--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED $ALL_JAVA_OPTS"
 fi
