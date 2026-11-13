@@ -26,10 +26,12 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
@@ -68,6 +70,7 @@ import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.MvAggregateMode;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
@@ -226,6 +229,101 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
         handler.shutDown();
       }
     }
+  }
+
+  @Test
+  public void testUseMvAggregateBrokerConfig()
+      throws Exception {
+    // auto by default.
+    MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration());
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.AUTO);
+    Assert.assertEquals(handler.getQueryEnvConf(null, Map.of(), 1L).defaultMvAggregateMode(), MvAggregateMode.AUTO);
+
+    handler = newHandler(mvAggregateConfig("true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.TRUE);
+    Assert.assertEquals(handler.getQueryEnvConf(null, Map.of(), 1L).defaultMvAggregateMode(), MvAggregateMode.TRUE);
+    Assert.assertEquals(newHandler(mvAggregateConfig(" False ")).getMvAggregateMode(), MvAggregateMode.FALSE);
+
+    // An invalid broker config value fails the broker start.
+    Assert.expectThrows(IllegalArgumentException.class, () -> newHandler(mvAggregateConfig("sometimes")));
+  }
+
+  @Test
+  public void testUseMvAggregateClusterConfigAppliesWithoutRestart()
+      throws Exception {
+    String key = CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE;
+    MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration());
+
+    // The cluster config wins over the broker config and applies to the next query.
+    handler.onChange(Set.of(key), Map.of(key, "true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.TRUE);
+    Assert.assertEquals(handler.getQueryEnvConf(null, Map.of(), 1L).defaultMvAggregateMode(), MvAggregateMode.TRUE);
+    handler.onChange(Set.of(key), Map.of(key, " FALSE "));
+    Assert.assertEquals(handler.getQueryEnvConf(null, Map.of(), 1L).defaultMvAggregateMode(), MvAggregateMode.FALSE);
+
+    // A change of another key keeps the value.
+    handler.onChange(Set.of(key), Map.of(key, "true"));
+    handler.onChange(Set.of("some.other.key"), Map.of(key, "true", "some.other.key", "x"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.TRUE);
+
+    // A removed key restores the broker config value.
+    handler.onChange(Set.of(key), Map.of());
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.AUTO);
+
+    handler = newHandler(mvAggregateConfig("false"));
+    handler.onChange(Set.of(key), Map.of(key, "auto"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.AUTO);
+    handler.onChange(Set.of(key), Map.of());
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.FALSE);
+
+    // An invalid value falls back to the broker config value.
+    handler.onChange(Set.of(key), Map.of(key, "true"));
+    handler.onChange(Set.of(key), Map.of(key, "sometimes"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.FALSE);
+  }
+
+  /// The cluster config alias `pinot.all.multistage.use.mv.aggregate` applies at startup and on a live change. The
+  /// broker-specific cluster config key wins over the alias, and the alias wins over the broker config.
+  @Test
+  public void testUseMvAggregateClusterConfigAlias()
+      throws Exception {
+    String key = CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE;
+    String alias = "pinot.all.multistage.use.mv.aggregate";
+
+    // Startup: the broker starter registers the listener after the cluster config is read, and the registration
+    // reports every key as changed.
+    DefaultClusterConfigChangeHandler clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    ClusterConfig clusterConfig = new ClusterConfig("testCluster");
+    clusterConfig.getRecord().setSimpleField(alias, "false");
+    clusterConfigChangeHandler.onClusterConfigChange(clusterConfig, null);
+    MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration());
+    clusterConfigChangeHandler.registerClusterConfigChangeListener(handler);
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.FALSE);
+
+    // Live update of the alias.
+    handler.onChange(Set.of(alias), Map.of(alias, "true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.TRUE);
+
+    // The broker-specific key wins over the alias, and its removal restores the alias value.
+    handler.onChange(Set.of(key), Map.of(key, "auto", alias, "true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.AUTO);
+    handler.onChange(Set.of(key), Map.of(alias, "true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.TRUE);
+
+    // A removed alias restores the broker config value.
+    handler.onChange(Set.of(alias), Map.of());
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.AUTO);
+    handler = newHandler(mvAggregateConfig("false"));
+    handler.onChange(Set.of(alias), Map.of(alias, "true"));
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.TRUE);
+    handler.onChange(Set.of(alias), Map.of());
+    Assert.assertEquals(handler.getMvAggregateMode(), MvAggregateMode.FALSE);
+  }
+
+  private static PinotConfiguration mvAggregateConfig(String value) {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, value);
+    return config;
   }
 
   @Test

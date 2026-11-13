@@ -25,6 +25,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.PlannerImpl;
@@ -39,6 +40,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
 import org.apache.pinot.query.validate.Validator;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.MvAggregateMode;
 
 
 /// Holds all per-query contextual information used during the planning phase.
@@ -54,8 +56,15 @@ public class PlannerContext implements AutoCloseable, Context {
 
   private final SqlValidator _validator;
 
-  private final RelOptPlanner _relOptPlanner;
-  private final LogicalPlanner _relTraitPlanner;
+  // Kept to create new planners in #enableMvAggregateFallback()
+  private final HepProgram _optProgram;
+  private final HepProgram _traitProgram;
+  @Nullable
+  private final List<RelTraitDef> _optTraitDefs;
+  private RelOptPlanner _relOptPlanner;
+  private LogicalPlanner _relTraitPlanner;
+  // Set when the query is optimized again with the MV aggregate, see #enableMvAggregateFallback()
+  private boolean _mvAggregateFallback;
 
   private final Map<String, String> _options;
   private final QueryEnvironment.Config _envConfig;
@@ -72,7 +81,10 @@ public class PlannerContext implements AutoCloseable, Context {
     _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
     _options = options;
     _envConfig = envConfig;
-    _relOptPlanner = new LogicalPlanner(optProgram, this, config.getTraitDefs());
+    _optProgram = optProgram;
+    _traitProgram = traitProgram;
+    _optTraitDefs = config.getTraitDefs();
+    _relOptPlanner = new LogicalPlanner(optProgram, this, _optTraitDefs);
     _relTraitPlanner = new LogicalPlanner(traitProgram, this,
         List.of(RelDistributionTraitDef.INSTANCE));
     _plannerOutput = new HashMap<>();
@@ -96,6 +108,9 @@ public class PlannerContext implements AutoCloseable, Context {
     _options = options;
     _envConfig = envConfig;
     HepProgram emptyProgram = new HepProgramBuilder().build();
+    _optProgram = emptyProgram;
+    _traitProgram = emptyProgram;
+    _optTraitDefs = null;
     _relOptPlanner = new LogicalPlanner(emptyProgram, this);
     _relTraitPlanner = new LogicalPlanner(emptyProgram, this);
     _plannerOutput = new HashMap<>();
@@ -175,5 +190,27 @@ public class PlannerContext implements AutoCloseable, Context {
 
   public boolean isUsePhysicalOptimizer() {
     return _physicalPlannerContext != null;
+  }
+
+  /// The mode of the MV aggregate for this query: the query option `useMvAggregate`, else
+  /// [QueryEnvironment.Config#defaultMvAggregateMode()].
+  public MvAggregateMode getMvAggregateMode() {
+    return QueryOptionsUtils.getMvAggregateMode(_options, _envConfig.defaultMvAggregateMode());
+  }
+
+  /// Whether the planner plans `GROUP BY ARRAY_TO_MV(expr)` as an MV aggregate in this planner run: when the mode is
+  /// [MvAggregateMode#TRUE], or after [#enableMvAggregateFallback()].
+  public boolean isUseMvAggregate() {
+    return _mvAggregateFallback || getMvAggregateMode() == MvAggregateMode.TRUE;
+  }
+
+  /// Turns the MV aggregate on and replaces the planners with new ones, so that the query can be optimized again from
+  /// its unoptimized plan. The [MvAggregateMode#AUTO] mode calls it when the plan without the MV aggregate fails the
+  /// `ARRAY_TO_MV` validation. A new planner starts without the vertices of the plan that the old one optimized.
+  public void enableMvAggregateFallback() {
+    _mvAggregateFallback = true;
+    _relOptPlanner = _optTraitDefs != null ? new LogicalPlanner(_optProgram, this, _optTraitDefs)
+        : new LogicalPlanner(_optProgram, this);
+    _relTraitPlanner = new LogicalPlanner(_traitProgram, this, List.of(RelDistributionTraitDef.INSTANCE));
   }
 }

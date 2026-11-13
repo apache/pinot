@@ -131,6 +131,12 @@ public class PinotEvaluateLiteralRule {
       super(operand(LogicalFilter.class, any()), factory, description);
     }
 
+    /// Evaluates every call in `node` whose operands are literals, the same way as this rule does. A call that cannot
+    /// be evaluated stays as it is.
+    static RexNode evaluateLiterals(RexNode node, RexBuilder rexBuilder) {
+      return node.accept(new EvaluateLiteralShuttle(rexBuilder));
+    }
+
     @Override
     public void onMatch(RelOptRuleCall call) {
       LogicalFilter oldFilter = call.rel(0);

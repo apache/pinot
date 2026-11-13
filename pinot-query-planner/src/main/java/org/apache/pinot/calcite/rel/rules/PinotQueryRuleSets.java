@@ -27,7 +27,6 @@ import org.apache.calcite.rel.rules.AggregateProjectPullUpConstantsRule;
 import org.apache.calcite.rel.rules.AggregateRemoveRule;
 import org.apache.calcite.rel.rules.AggregateUnionAggregateRule;
 import org.apache.calcite.rel.rules.CoreRules;
-import org.apache.calcite.rel.rules.FilterAggregateTransposeRule;
 import org.apache.calcite.rel.rules.FilterMergeRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
@@ -71,8 +70,8 @@ public class PinotQueryRuleSets {
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
       // push filter through an aggregation
-      FilterAggregateTransposeRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE).toRule(),
+      PinotFilterAggregateTransposeRule
+          .instanceWithDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE),
       // push filter through set operation
       FilterSetOpTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_SET_OP_TRANSPOSE).toRule(),
@@ -108,6 +107,9 @@ public class PinotQueryRuleSets {
           .instanceWithDescription(PlannerRuleNames.EVALUATE_LITERAL_PROJECT),
       PinotEvaluateLiteralRule.Filter
           .instanceWithDescription(PlannerRuleNames.EVALUATE_LITERAL_FILTER),
+      // rewrite COALESCE(ARRAY_TO_MV(array), default) in filters, so the leaf stage can run them
+      PinotArrayToMvCoalesceFilterRule
+          .instanceWithDescription(PlannerRuleNames.ARRAY_TO_MV_COALESCE_FILTER),
 
       // sort join rules
       // push sort through join for left/right outer join only, disabled by default
@@ -191,8 +193,8 @@ public class PinotQueryRuleSets {
   public static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
-      FilterAggregateTransposeRule.Config.DEFAULT
-          .withDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE).toRule(),
+      PinotFilterAggregateTransposeRule
+          .instanceWithDescription(PlannerRuleNames.FILTER_AGGREGATE_TRANSPOSE),
       FilterSetOpTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_SET_OP_TRANSPOSE).toRule(),
       FilterProjectTransposeRule.Config.DEFAULT

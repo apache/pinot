@@ -18,43 +18,27 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.docvalsets.DataBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.FilteredDataBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.FilteredRowBasedBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
-import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.query.parser.CalciteRexExpressionParser;
-import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
-import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
-import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,76 +47,23 @@ import org.slf4j.LoggerFactory;
 /// AggregateOperator is used to aggregate values over a (potentially empty) set of group by keys in V2/MSQE.
 /// Output data will be in the format of \[group by key, aggregate result1, ... aggregate resultN\]
 /// When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
-public class AggregateOperator extends MultiStageOperator {
+public class AggregateOperator extends BaseAggregateOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
-  private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
-      new CountAggregationFunction(List.of(ExpressionContext.forIdentifier("*")), false);
 
-  private final MultiStageOperator _input;
-  private final DataSchema _resultSchema;
-  private final AggregationFunction<?, ?>[] _aggFunctions;
-  /// Whether this operator groups. Decides which of the two executors below is in use; kept separate from them so
-  /// that releasing an executor cannot change the mode.
+  /// Whether this operator groups. Decides which of the two executors is in use; kept separate from them so that
+  /// releasing an executor cannot change the mode.
   private final boolean _isGroupBy;
   @Nullable
   private MultistageAggregationExecutor _aggregationExecutor;
-  @Nullable
-  private MultistageGroupByExecutor _groupByExecutor;
-
-  @Nullable
-  private MseBlock.Eos _eosBlock;
-  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
-
-  private final boolean _errorOnNumGroupsLimit;
-
-  // trimming - related members
-  private final int _groupTrimSize;
-  @Nullable
-  private final List<RelFieldCollation> _collations;
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {
-    super(context);
-    _resultSchema = node.getDataSchema();
-    _aggFunctions = getAggFunctions(node.getAggCalls());
-    int numFunctions = _aggFunctions.length;
-
-    // Process the filter argument indices
-    List<Integer> filterArgs = node.getFilterArgs();
-    int[] filterArgIds = new int[numFunctions];
-    int maxFilterArgId = -1;
-    for (int i = 0; i < numFunctions; i++) {
-      filterArgIds[i] = filterArgs.get(i);
-      maxFilterArgId = Math.max(maxFilterArgId, filterArgIds[i]);
-    }
+    super(context, input, node.getDataSchema(), node.getAggCalls(), node.getFilterArgs(), node.getNodeHint(),
+        node.getLimit(), node.getCollations());
 
     /// Grouping-set aggregates never reach this operator directly: PlanNodeToOpChain pre-wraps the input in a
     /// RepeatOperator and rewrites the node into the equivalent plain GROUP BY over the expanded input.
     List<Integer> groupKeys = node.getGroupKeys();
-    _input = input;
-
-    int groupTrimSize = Integer.MAX_VALUE;
-    List<RelFieldCollation> trimCollations = null;
-    int limit = node.getLimit();
-    int minGroupTrimSize = getMinGroupTrimSize(node.getNodeHint(), context.getOpChainMetadata());
-    if (limit > 0 && minGroupTrimSize > 0) {
-      // Trim is enabled
-      List<RelFieldCollation> collations = node.getCollations();
-      if (collations.isEmpty()) {
-        // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
-        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
-        groupTrimSize = limit;
-      } else {
-        groupTrimSize = GroupByUtils.getTableCapacity(limit, minGroupTrimSize);
-        if (groupTrimSize < Integer.MAX_VALUE) {
-          trimCollations = collations;
-        }
-      }
-    }
-    _groupTrimSize = groupTrimSize;
-    _collations = trimCollations;
-
-    _errorOnNumGroupsLimit = getErrorOnNumGroupsLimit(node.getNodeHint(), context.getOpChainMetadata());
 
     // Initialize the appropriate executor.
     AggregateNode.AggType aggType = node.getAggType();
@@ -140,43 +71,15 @@ public class AggregateOperator extends MultiStageOperator {
     _isGroupBy = !groupKeys.isEmpty();
     if (!_isGroupBy) {
       _aggregationExecutor =
-          new MultistageAggregationExecutor(_aggFunctions, filterArgIds, maxFilterArgId, aggType, leafReturnFinalResult,
-              _resultSchema);
+          new MultistageAggregationExecutor(_aggFunctions, _filterArgIds, _maxFilterArgId, aggType,
+              leafReturnFinalResult, _resultSchema);
       _groupByExecutor = null;
     } else {
       _groupByExecutor =
-          new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), _aggFunctions, filterArgIds, maxFilterArgId, aggType,
-              leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
+          new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), _aggFunctions, _filterArgIds, _maxFilterArgId,
+              aggType, leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
       _aggregationExecutor = null;
     }
-  }
-
-  private static int getMinGroupTrimSize(PlanNode.NodeHint nodeHint, Map<String, String> opChainMetadata) {
-    String option = getOption(nodeHint, PinotHintOptions.AggregateOptions.MSE_MIN_GROUP_TRIM_SIZE);
-    if (option != null) {
-      return Integer.parseInt(option);
-    }
-    Integer minGroupTrimSize = QueryOptionsUtils.getMSEMinGroupTrimSize(opChainMetadata);
-    return minGroupTrimSize != null ? minGroupTrimSize : Server.DEFAULT_MSE_MIN_GROUP_TRIM_SIZE;
-  }
-
-  private static boolean getErrorOnNumGroupsLimit(PlanNode.NodeHint nodeHint, Map<String, String> opChainMetadata) {
-    String option = getOption(nodeHint, PinotHintOptions.AggregateOptions.ERROR_ON_NUM_GROUPS_LIMIT);
-    return option != null ? Boolean.parseBoolean(option) : QueryOptionsUtils.getErrorOnNumGroupsLimit(opChainMetadata);
-  }
-
-  @Nullable
-  private static String getOption(PlanNode.NodeHint nodeHint, String key) {
-    Map<String, String> options = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
-    return options != null ? options.get(key) : null;
-  }
-
-  @Override
-  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
-    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
-    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
-    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
-    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -190,32 +93,8 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
-    return List.of(_input);
-  }
-
-  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
-  }
-
-  @Override
-  protected MseBlock getNextBlock() {
-    if (_eosBlock != null) {
-      return _eosBlock;
-    }
-    MseBlock.Eos finalBlock = _isGroupBy ? consumeGroupBy() : consumeAggregation();
-    _eosBlock = finalBlock;
-
-    if (finalBlock.isError()) {
-      // The upstream failed, so no result will ever be produced from what we accumulated: drop it right away instead
-      // of waiting for close()/cancel().
-      releaseBuffers();
-      return finalBlock;
-    }
-    MseBlock mseBlock = produceAggregatedBlock();
-    releaseBuffers();
-    return mseBlock;
   }
 
   /// Drops the executors, and with them the group-by hash maps and the aggregate result holders they own. Marks the
@@ -224,88 +103,29 @@ public class AggregateOperator extends MultiStageOperator {
   @Override
   protected void releaseBuffers() {
     _aggregationExecutor = null;
-    _groupByExecutor = null;
-    if (_eosBlock == null) {
-      _eosBlock = SuccessMseBlock.INSTANCE;
-    }
+    super.releaseBuffers();
   }
 
   @Override
   protected boolean hasBufferedState() {
-    return _aggregationExecutor != null || _groupByExecutor != null;
+    return _aggregationExecutor != null || super.hasBufferedState();
   }
 
-  private MseBlock produceAggregatedBlock() {
+  @Override
+  protected MseBlock.Eos consumeInput() {
+    return _isGroupBy ? consumeGroupBy() : consumeAggregation();
+  }
+
+  @Override
+  protected MseBlock produceAggregatedBlock() {
     if (!_isGroupBy) {
       assert _aggregationExecutor != null;
       List<Object[]> rows = _aggregationExecutor.getResult();
       recordApproximatedResult();
       return new RowHeapDataBlock(rows, _resultSchema, _aggFunctions);
     } else {
-      assert _groupByExecutor != null;
-      List<Object[]> rows;
-      if (_collations != null) {
-        rows = _groupByExecutor.getResult(_collations, _groupTrimSize);
-      } else {
-        rows = _groupByExecutor.getResult(_groupTrimSize);
-      }
-      recordApproximatedResult();
-
-      // Record stat before we check for limit so we can propagate to query response
-      _statMap.merge(StatKey.NUM_GROUPS, _groupByExecutor.getNumGroups());
-
-      if (rows.isEmpty()) {
-        return _eosBlock;
-      } else {
-        MseBlock dataBlock = new RowHeapDataBlock(rows, _resultSchema, _aggFunctions);
-        if (_groupByExecutor.getRowsProcessed() > _groupTrimSize) {
-          _statMap.merge(StatKey.GROUPS_TRIMMED, true);
-        }
-
-        if (_groupByExecutor.isNumGroupsLimitReached()) {
-          if (_errorOnNumGroupsLimit) {
-            throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
-                "NUM_GROUPS_LIMIT has been reached at: " + _operatorId);
-          } else {
-            _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
-            _input.earlyTerminate();
-          }
-        }
-        if (_groupByExecutor.getNumGroups() >= _groupByExecutor.getNumGroupsWarningLimit()) {
-          LOGGER.warn("numGroups reached warning limit: {} (actual: {})", _groupByExecutor.getNumGroupsWarningLimit(),
-              _groupByExecutor.getNumGroups());
-          _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, true);
-        }
-        return dataBlock;
-      }
+      return produceGroupByBlock();
     }
-  }
-
-  /// Records a function that returned an approximate final result while the executor extracted the results, see
-  /// [AggregationFunction#hasApproximatedResult()].
-  private void recordApproximatedResult() {
-    if (AggregationFunctionUtils.hasApproximatedResult(_aggFunctions)) {
-      _statMap.merge(StatKey.APPROXIMATED_RESULT, true);
-    }
-  }
-
-  @Override
-  public StatMap<StatKey> copyStatMaps() {
-    return new StatMap<>(_statMap);
-  }
-
-  /// Consumes the input blocks as a group by
-  ///
-  /// @return the last block, which must always be either an error or the end of the stream
-  private MseBlock.Eos consumeGroupBy() {
-    assert _groupByExecutor != null;
-    MseBlock block = _input.nextBlock();
-    while (block.isData()) {
-      _groupByExecutor.processBlock((MseBlock.Data) block);
-      checkTerminationAndSampleUsage();
-      block = _input.nextBlock();
-    }
-    return (MseBlock.Eos) block;
   }
 
   /// Consumes the input blocks as an aggregation
@@ -320,58 +140,6 @@ public class AggregateOperator extends MultiStageOperator {
       block = _input.nextBlock();
     }
     return (MseBlock.Eos) block;
-  }
-
-  private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression.FunctionCall> aggCalls) {
-    int numFunctions = aggCalls.size();
-    AggregationFunction<?, ?>[] aggFunctions = new AggregationFunction[numFunctions];
-    for (int i = 0; i < numFunctions; i++) {
-      aggFunctions[i] = getAggFunction(aggCalls.get(i));
-    }
-    return aggFunctions;
-  }
-
-  private AggregationFunction<?, ?> getAggFunction(RexExpression.FunctionCall functionCall) {
-    String functionName = functionCall.getFunctionName();
-    List<RexExpression> operands = functionCall.getFunctionOperands();
-    int numArguments = operands.size();
-    if (numArguments == 0) {
-      Preconditions.checkState(functionName.equals("COUNT"),
-          "Aggregate function without argument must be COUNT, got: %s", functionName);
-      return COUNT_STAR_AGG_FUNCTION;
-    }
-    List<ExpressionContext> arguments = new ArrayList<>(numArguments);
-    for (RexExpression operand : operands) {
-      if (operand instanceof RexExpression.InputRef) {
-        RexExpression.InputRef inputRef = (RexExpression.InputRef) operand;
-        arguments.add(ExpressionContext.forIdentifier(fromColIdToIdentifier(inputRef.getIndex())));
-      } else {
-        assert operand instanceof RexExpression.Literal;
-        arguments.add(
-            ExpressionContext.forLiteral(CalciteRexExpressionParser.toLiteral((RexExpression.Literal) operand)));
-      }
-    }
-    return AggregationFunctionFactory.getAggregationFunction(
-        new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
-  }
-
-  private static String fromColIdToIdentifier(int colId) {
-    return "$" + colId;
-  }
-
-  private static int fromIdentifierToColId(String identifier) {
-    Preconditions.checkArgument(identifier.charAt(0) == '$', "Got identifier not representing column index: %s",
-        identifier);
-    return Integer.parseInt(identifier.substring(1));
-  }
-
-  private int[] getGroupKeyIds(List<Integer> groupKeys) {
-    int numKeys = groupKeys.size();
-    int[] groupKeyIds = new int[numKeys];
-    for (int i = 0; i < numKeys; i++) {
-      groupKeyIds[i] = groupKeys.get(i);
-    }
-    return groupKeyIds;
   }
 
   static RoaringBitmap getMatchedBitmap(MseBlock.Data block, int filterArgId) {
@@ -545,10 +313,5 @@ public class AggregateOperator extends MultiStageOperator {
     public StatMap.Type getType() {
       return _type;
     }
-  }
-
-  @VisibleForTesting
-  int getGroupTrimSize() {
-    return _groupTrimSize;
   }
 }

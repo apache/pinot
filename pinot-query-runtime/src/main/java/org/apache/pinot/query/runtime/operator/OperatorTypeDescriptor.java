@@ -36,7 +36,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 public interface OperatorTypeDescriptor {
 
   /// First id available to plugin-defined operator types. Built-in types ([MultiStageOperator.Type]) use ids
-  /// 0–15; ids 16–255 are reserved for future built-ins. Plugin ids must be &ge; this value.
+  /// 0–17; ids 18–255 are reserved for future built-ins. Plugin ids must be &ge; this value.
   int PLUGIN_ID_FLOOR = 256;
 
   /// Stable numeric id used in the gRPC wire format and the legacy binary stat format. Must be unique across all

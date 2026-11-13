@@ -109,6 +109,7 @@ import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.MvAggregateMode;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
@@ -137,6 +138,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///  </Loggers>
   /// ```
   private static final Marker MSE_STATS_MARKER = MarkerFactory.getMarker("MSE_STATS_MARKER");
+  /// The `pinot.all.*` alias of [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE] in the cluster config.
+  private static final String ALL_ROLES_USE_MV_AGGREGATE = "pinot.all.multistage.use.mv.aggregate";
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
   // Extra column of the EXPLAIN response with the IdSet subqueries as a JSON array. EXPLAIN does not run them: the plan
@@ -155,6 +158,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final Set<String> _defaultDisabledPlannerRules;
   protected final long _extraPassiveTimeoutMs;
   private final boolean _streamStatsDefault;
+  // The broker config value of CONFIG_OF_USE_MV_AGGREGATE. The cluster config overrides it.
+  private final MvAggregateMode _mvAggregateModeBrokerConf;
+  // Written by the cluster config change callback, read by query threads.
+  private volatile MvAggregateMode _mvAggregateMode;
   @Nullable
   protected final String _defaultStreamingGroupByFlushThreshold;
   @Nullable
@@ -214,6 +221,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean dispatchKeepAliveWithoutCalls = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS);
+    _mvAggregateModeBrokerConf = MvAggregateMode.fromString(_config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, CommonConstants.Broker.DEFAULT_USE_MV_AGGREGATE));
+    _mvAggregateMode = _mvAggregateModeBrokerConf;
     _streamStatsDefault = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_STREAM_STATS,
         CommonConstants.Broker.DEFAULT_STREAM_STATS);
@@ -551,7 +561,46 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return applied;
   }
 
-  private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
+  /// Applies [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE] from the cluster config, so that a change applies to
+  /// the next query without a broker restart. The value comes from the first of:
+  /// 1. The cluster config key [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE].
+  /// 2. The cluster config key `pinot.all.multistage.use.mv.aggregate`, which applies to every role.
+  /// 3. The broker config.
+  ///
+  /// A removed key restores the next value in this list. An invalid value is logged and falls back to the broker config
+  /// value. The broker starter registers this listener after startup with every cluster config key as changed, so the
+  /// cluster config value applies at startup too.
+  @Override
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    super.onChange(changedConfigs, clusterConfigs);
+    if (!changedConfigs.contains(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE)
+        && !changedConfigs.contains(ALL_ROLES_USE_MV_AGGREGATE)) {
+      return;
+    }
+    String key = clusterConfigs.containsKey(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE)
+        ? CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE : ALL_ROLES_USE_MV_AGGREGATE;
+    String value = clusterConfigs.get(key);
+    MvAggregateMode mvAggregateMode = _mvAggregateModeBrokerConf;
+    if (value != null) {
+      try {
+        mvAggregateMode = MvAggregateMode.fromString(value);
+      } catch (IllegalArgumentException e) {
+        LOGGER.error("Ignoring invalid value '{}' for cluster config: {}, falling back to the broker config: {}", value,
+            key, _mvAggregateModeBrokerConf);
+      }
+    }
+    _mvAggregateMode = mvAggregateMode;
+    LOGGER.info("Updated {}: {}", CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, mvAggregateMode);
+  }
+
+  /// The value of [CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE] that the next query uses.
+  @VisibleForTesting
+  MvAggregateMode getMvAggregateMode() {
+    return _mvAggregateMode;
+  }
+
+  @VisibleForTesting
+  ImmutableQueryEnvironment.Config getQueryEnvConf(@Nullable HttpHeaders httpHeaders, Map<String, String> queryOptions,
       long requestId) {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
     boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
@@ -631,6 +680,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .approximateFunctionPercentileParams(approximateFunctionSettings._percentileParams)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
+        .defaultMvAggregateMode(_mvAggregateMode)
         .defaultUseLiteMode(defaultUseLiteMode)
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)

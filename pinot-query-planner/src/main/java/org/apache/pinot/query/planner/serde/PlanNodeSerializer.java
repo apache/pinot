@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
@@ -94,19 +95,39 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitAggregate(AggregateNode node, Plan.PlanNode.Builder builder) {
-      Plan.AggregateNode.Builder aggregateNodeBuilder = Plan.AggregateNode.newBuilder()
-          .addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
-          .addAllFilterArgs(node.getFilterArgs())
-          .addAllGroupKeys(node.getGroupKeys())
-          .setAggType(convertAggType(node.getAggType()))
-          .setLeafReturnFinalResult(node.isLeafReturnFinalResult())
-          .addAllCollations(convertCollations(node.getCollations()))
-          .setLimit(node.getLimit());
+      Plan.AggregateNode.Builder aggregateNodeBuilder =
+          newAggregateNodeBuilder(node.getAggCalls(), node.getFilterArgs(), node.getGroupKeys(), node.getAggType(),
+              node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit());
       for (List<Integer> groupingSet : node.getGroupingSets()) {
         aggregateNodeBuilder.addGroupingSets(Plan.GroupingSet.newBuilder().addAllGroupKeyIndexes(groupingSet).build());
       }
       builder.setAggregateNode(aggregateNodeBuilder.build());
       return null;
+    }
+
+    @Override
+    public Void visitMvAggregate(MvAggregateNode node, Plan.PlanNode.Builder builder) {
+      Plan.AggregateNode aggregateNode =
+          newAggregateNodeBuilder(node.getAggCalls(), node.getFilterArgs(), node.getGroupKeys(), node.getAggType(),
+              node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit()).build();
+      builder.setMvAggregateNode(Plan.MvAggregateNode.newBuilder()
+          .setAggregate(aggregateNode)
+          .addAllMvKeyIndexes(node.getMvKeyIndexes())
+          .build());
+      return null;
+    }
+
+    private static Plan.AggregateNode.Builder newAggregateNodeBuilder(List<RexExpression.FunctionCall> aggCalls,
+        List<Integer> filterArgs, List<Integer> groupKeys, AggregateNode.AggType aggType,
+        boolean leafReturnFinalResult, List<RelFieldCollation> collations, int limit) {
+      return Plan.AggregateNode.newBuilder()
+          .addAllAggCalls(convertFunctionCalls(aggCalls))
+          .addAllFilterArgs(filterArgs)
+          .addAllGroupKeys(groupKeys)
+          .setAggType(convertAggType(aggType))
+          .setLeafReturnFinalResult(leafReturnFinalResult)
+          .addAllCollations(convertCollations(collations))
+          .setLimit(limit);
     }
 
     @Override
