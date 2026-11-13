@@ -153,4 +153,24 @@ public class GenerateArrayFunctionsTest {
     assertEquals(ArrayFunctions.generateDoubleArray(0, 0.2999, 0.1).length, 3);
     assertEquals(ArrayFunctions.generateFloatArray(0f, 0.95f, 0.1f).length, 10);
   }
+
+  @Test
+  public void testDecimalStepsKeepEndDespiteRounding() {
+    assertEquals(ArrayFunctions.generateDoubleArray(0.1, 0.7, 0.1).length, 7);
+    assertEquals(ArrayFunctions.generateDoubleArray(0.7, 0.1, -0.1).length, 7);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.3, 0.1).length, 4);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.6, 0.1).length, 7);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.7, 0.1).length, 8);
+    assertEquals(ArrayFunctions.generateDoubleArray(0, 0.9, 0.3).length, 4);
+
+    assertEquals(ArrayFunctions.generateFloatArray(0.1f, 0.7f, 0.1f).length, 7);
+    assertEquals(ArrayFunctions.generateFloatArray(0.7f, 0.1f, -0.1f).length, 7);
+    assertEquals(ArrayFunctions.generateFloatArray(0, 0.3f, 0.1f).length, 4);
+    assertEquals(ArrayFunctions.generateFloatArray(0, 0.6f, 0.1f).length, 7);
+    assertEquals(ArrayFunctions.generateFloatArray(0, 0.7f, 0.1f).length, 8);
+    assertEquals(ArrayFunctions.generateFloatArray(0, 0.9f, 0.3f).length, 4);
+
+    // The tolerance scales with the magnitude of the input values.
+    assertEquals(ArrayFunctions.generateDoubleArray(1e6 + 0.1, 1e6 + 0.3, 0.1).length, 3);
+  }
 }
