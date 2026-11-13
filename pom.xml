@@ -359,7 +359,7 @@
     <ivy.version>2.6.0</ivy.version>
     <c3p0.version>0.15.1</c3p0.version>
     <mchange-commons-java.version>0.7.0</mchange-commons-java.version>
-    <animal-sniffer-annotations.version>1.29</animal-sniffer-annotations.version>
+    <animal-sniffer-annotations.version>1.29.1</animal-sniffer-annotations.version>
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
