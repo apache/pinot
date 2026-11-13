@@ -54,6 +54,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
@@ -142,27 +143,33 @@ public class PrioritySchedulerTest {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create(new PinotConfiguration(properties));
     int totalPermits = scheduler.getRunningQueriesSemaphore().availablePermits();
     scheduler.start();
-    ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", METRICS));
-    _startupBarrier.await();
-    TestSchedulerGroup group = TestPriorityScheduler._groupFactory._groupMap.get("1");
-    assertEquals(group.numRunning(), 1);
-    assertEquals(group.getThreadsInUse(), 1);
-    // The total number of threads allocated for query execution will be dependent on the underlying
-    // platform (number of cores). Scheduler will assign total threads up to but not exceeding total
-    // number of segments. On servers with less cores, this can assign only 1 thread (less than total segments)
-    assertTrue(group.totalReservedThreads() <= 2 /* 2: numSegments in request*/);
-    _validationBarrier.await();
-    byte[] resultData = result.get();
-    DataTable table = DataTableFactory.getDataTable(resultData);
-    assertEquals(table.getMetadata().get(MetadataKey.TABLE.getName()), "1");
-    // verify that accounting is handled right
-    assertEquals(group.numPending(), 0);
-    assertEquals(group.getThreadsInUse(), 0);
-    assertEquals(group.totalReservedThreads(), 0);
-    // -1 because we expect that 1 permit is blocked by the scheduler main thread
-    assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), totalPermits - 1);
-    assertTrue(scheduler.getLatestQueryTime() > 0 && scheduler.getLatestQueryTime() <= System.currentTimeMillis());
-    scheduler.stop();
+    try {
+      ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", METRICS));
+      _startupBarrier.await();
+      TestSchedulerGroup group = TestPriorityScheduler._groupFactory._groupMap.get("1");
+      assertEquals(group.numRunning(), 1);
+      assertEquals(group.getThreadsInUse(), 1);
+      // The total number of threads allocated for query execution will be dependent on the underlying
+      // platform (number of cores). Scheduler will assign total threads up to but not exceeding total
+      // number of segments. On servers with less cores, this can assign only 1 thread (less than total segments)
+      assertTrue(group.totalReservedThreads() <= 2 /* 2: numSegments in request*/);
+      _validationBarrier.await();
+      byte[] resultData = result.get();
+      DataTable table = DataTableFactory.getDataTable(resultData);
+      assertEquals(table.getMetadata().get(MetadataKey.TABLE.getName()), "1");
+      // verify that accounting is handled right
+      assertEquals(group.numPending(), 0);
+      assertEquals(group.getThreadsInUse(), 0);
+      assertEquals(group.totalReservedThreads(), 0);
+      // Query completion does not guarantee that the scheduler has acquired its next permit to wait for more queries.
+      TestUtils.waitForCondition(
+          ignored -> scheduler.getRunningQueriesSemaphore().availablePermits() == totalPermits - 1,
+          10_000, "Scheduler did not acquire its idle permit");
+      assertTrue(scheduler.getLatestQueryTime() > 0 && scheduler.getLatestQueryTime() <= System.currentTimeMillis());
+    } finally {
+      scheduler.stop();
+      scheduler.getResourceManager().stop();
+    }
   }
 
   @Test
