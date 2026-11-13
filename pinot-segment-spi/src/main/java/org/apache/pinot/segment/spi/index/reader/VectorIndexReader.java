@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -30,6 +32,22 @@ public interface VectorIndexReader extends IndexReader {
   /// @param topK number of closest vectors to return
   /// @return bitmap of top k closest vectors
   ImmutableRoaringBitmap getDocIds(float[] vector, int topK);
+
+  /// Searches like [#getDocIds(float[], int)] and returns the same top k documents, keyed by doc id, with the distance
+  /// the index computed for each. The search keeps no state: every call searches the index again.
+  ///
+  /// Distances follow the column's configured vector distance function, in the units Pinot uses for exact rerank and
+  /// distance thresholds:
+  /// - `COSINE`: `1 - cosine similarity`
+  /// - `EUCLIDEAN` / `L2`: Euclidean distance
+  /// - `INNER_PRODUCT` / `DOT_PRODUCT`: the negated dot product
+  ///
+  /// Returns `null` when the index cannot return distances in those units for this column; callers then compute the
+  /// distances from the forward index.
+  @Nullable
+  default Int2FloatMap getDocDistances(float[] vector, int topK) {
+    return null;
+  }
 
   /// Returns a map of effective runtime state for debug and explain output.
   /// Implementations should report actual loaded values, not just requested config.
