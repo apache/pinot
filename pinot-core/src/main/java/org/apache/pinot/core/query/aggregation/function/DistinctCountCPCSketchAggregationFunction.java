@@ -598,8 +598,6 @@ public class DistinctCountCPCSketchAggregationFunction
     if (intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
-    intermediateResult1.setLgNominalEntries(_lgNominalEntries);
-    intermediateResult1.setThreshold(_accumulatorThreshold);
     intermediateResult1.merge(intermediateResult2);
     return intermediateResult1;
   }
@@ -616,10 +614,8 @@ public class DistinctCountCPCSketchAggregationFunction
 
   @Override
   public CpcSketchAccumulator deserializeIntermediateResult(CustomObject customObject) {
-    // The accumulator serializes as its sketch, so a new accumulator takes the sketch read back
-    CpcSketchAccumulator cpcSketchAccumulator = new CpcSketchAccumulator();
-    cpcSketchAccumulator.apply(CpcSketch.heapify(MemorySegment.ofBuffer(customObject.getBuffer())));
-    return cpcSketchAccumulator;
+    return new CpcSketchAccumulator(_lgNominalEntries, _accumulatorThreshold,
+        CpcSketch.heapify(MemorySegment.ofBuffer(customObject.getBuffer())));
   }
 
   @Override
@@ -632,8 +628,6 @@ public class DistinctCountCPCSketchAggregationFunction
     if (intermediateResult == null) {
       return 0L;
     }
-    intermediateResult.setLgNominalEntries(_lgNominalEntries);
-    intermediateResult.setThreshold(_accumulatorThreshold);
     return Math.round(intermediateResult.getResult().getEstimate());
   }
 

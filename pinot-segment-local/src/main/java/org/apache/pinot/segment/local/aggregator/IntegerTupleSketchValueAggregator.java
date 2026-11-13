@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.lang.foreign.MemorySegment;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.datasketches.common.Util;
 import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
@@ -126,22 +127,13 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
     return true;
   }
 
-  /// Returns the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given
-  /// number of actual entries. Note that this assumes the worst case of the sketch in
-  /// estimation mode, which requires storing theta and count.
-  /// @return the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given number
-  /// of entries.
+  /// Returns the maximum serialized size after unioning at the configured nominal entries. The union rounds the
+  /// nominal entries up to a power of two. In estimation mode the compact sketch has a 24-byte header, followed by
+  /// an 8-byte hash and a 5-byte integer summary (value and mode) for each retained entry.
   @Override
   public int getMaxAggregatedValueByteSize() {
-    if (_nominalEntries == 0) {
-      return 8;
-    }
-    if (_nominalEntries == 1) {
-      return 16;
-    }
-    int longSizeInBytes = Long.BYTES;
-    int intSizeInBytes = Integer.BYTES;
-    return (_nominalEntries * (longSizeInBytes + intSizeInBytes)) + 24;
+    long nominalEntries = Util.ceilingPowerOf2(_nominalEntries);
+    return Math.toIntExact(nominalEntries * (Long.BYTES + Integer.BYTES + Byte.BYTES) + 24);
   }
 
   @Override

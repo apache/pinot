@@ -25,38 +25,25 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 
 
-/// Intermediate state used by `IntegerTupleSketchAggregationFunction` which gives
-/// the end user more control over how sketches are merged for performance.
-/// In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
-/// processing beyond the minimum Theta value.  This applies to Tuple sketches because they are an extension of the
-/// Theta sketch.
-/// The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
-/// that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
-/// set to the minimum immediately, further gains can be realised.
+/// Buffers integer tuple sketches and reuses a union with the configured summary operations and nominal entries.
+/// Instances are mutable and not thread-safe.
 public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSketch<IntegerSummary>> {
-  private IntegerSummarySetOperations _setOperations;
-  private int _nominalEntries;
+  private final IntegerSummarySetOperations _setOperations;
+  private final int _nominalEntries;
   private TupleUnion<IntegerSummary> _union;
 
-  public TupleIntSketchAccumulator() {
-  }
-
-  // Note: The accumulator is serialized as a sketch.  This means that the majority of the processing
-  // happens on serialization. Therefore, when deserialized, the values may be null and will
-  // require re-initialisation. Since the primary use case is at query time for the Broker
-  // and Server, these properties are already in memory and are re-set.
   public TupleIntSketchAccumulator(IntegerSummarySetOperations setOperations, int nominalEntries, int threshold) {
     super(threshold);
     _nominalEntries = nominalEntries;
     _setOperations = setOperations;
   }
 
-  public void setSetOperations(IntegerSummarySetOperations setOperations) {
-    _setOperations = setOperations;
-  }
-
-  public void setNominalEntries(int nominalEntries) {
+  /// Retains a deserialized sketch without unioning it, using the receiving query's configuration for future merges.
+  public TupleIntSketchAccumulator(IntegerSummarySetOperations setOperations, int nominalEntries, int threshold,
+      TupleSketch<IntegerSummary> initialSketch) {
+    super(threshold, initialSketch);
     _nominalEntries = nominalEntries;
+    _setOperations = setOperations;
   }
 
   @Override
@@ -68,15 +55,6 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSket
       _union = new TupleUnion<>(_nominalEntries, _setOperations);
     }
 
-    // Performance optimization: ensure that the minimum Theta is used for "early stop".
-    // The "early stop" optimization is implemented in the Apache Datasketches TupleUnion operation for
-    // ordered and compact Theta sketches. Internally, a compact and ordered Theta sketch can be
-    // compared to a sorted array of K items.  When performing a union, only those items from
-    // the input sketch less than Theta need to be processed.  The loop terminates as soon as a hash
-    // is seen that is > Theta.
-    // The following "sort" improves on this further by selecting the minimal Theta value up-front,
-    // which results in fewer redundant entries being retained and subsequently discarded during the
-    // union operation.
     _accumulator.sort(Comparator.comparingDouble(TupleSketch::getTheta));
     for (TupleSketch<IntegerSummary> accumulatedSketch : _accumulator) {
       _union.union(accumulatedSketch);
@@ -86,19 +64,12 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<TupleSket
 
   @Override
   public TupleSketch<IntegerSummary> getResult() {
+    // Return a single pending sketch unchanged. Its nominal entries are not adjusted until a union is needed.
+    if (getNumInputs() == 1 && _accumulator.size() == 1) {
+      return _accumulator.get(0);
+    }
     if (_union == null) {
       _union = new TupleUnion<>(_nominalEntries, _setOperations);
-    }
-    // Return the default update "gadget" sketch as a compact sketch
-    if (isEmpty()) {
-      return _union.getResult();
-    }
-    // Corner-case: the parameters are not strictly respected when there is a single sketch.
-    // This single sketch might have been the result of a previously accumulated union and
-    // would already have the parameters set.  The sketch is returned as-is without adjusting
-    // nominal entries which requires an additional union operation.
-    if (getNumInputs() == 1 && _accumulator != null && _accumulator.size() == 1) {
-      return _accumulator.get(0);
     }
     flush();
     return _union.getResult();

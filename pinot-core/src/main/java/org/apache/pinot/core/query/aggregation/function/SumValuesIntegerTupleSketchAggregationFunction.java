@@ -56,9 +56,6 @@ public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTuple
       return _nullHandlingEnabled ? null : 0L;
     }
     double retainedTotal = 0L;
-    accumulator.setNominalEntries(_nominalEntries);
-    accumulator.setSetOperations(_setOps);
-    accumulator.setThreshold(_accumulatorThreshold);
     TupleSketch<IntegerSummary> result = accumulator.getResult();
     TupleSketchIterator<IntegerSummary> summaries = result.iterator();
     while (summaries.next()) {
