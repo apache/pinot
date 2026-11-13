@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
+import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -37,6 +39,7 @@ import org.apache.lucene.search.ReferenceManager.RefreshListener;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -280,6 +283,60 @@ public class LuceneMutableTextIndexTest {
     if (_realtimeLuceneTextIndex != null) {
       _realtimeLuceneTextIndex.close();
       _realtimeLuceneTextIndex = null;
+    }
+  }
+
+  /// Every hit maps to its own Pinot doc id, across enough documents to span many stored-field blocks.
+  @Test
+  public void testHitsMapToPinotDocIdsAcrossManyDocuments()
+      throws IOException {
+    TextIndexConfig config = new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).build();
+    RealtimeLuceneTextIndex index = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
+        "table__0__" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement() + "__20240601T1818Z", config);
+    try {
+      MutableRoaringBitmap expected = new MutableRoaringBitmap();
+      for (int docId = 0; docId < 5000; docId++) {
+        boolean hit = docId % 7 == 3;
+        index.add(hit ? "common needle " + docId : "common hay " + docId);
+        if (hit) {
+          expected.add(docId);
+        }
+      }
+      index.getSearcherManager().maybeRefreshBlocking();
+      assertEquals(index.getDocIds("needle"), expected);
+    } finally {
+      index.close();
+    }
+  }
+
+  /// The multi-column realtime index maps hits to Pinot doc ids for each column.
+  @Test
+  public void testMultiColumnHitsMapToPinotDocIdsAcrossManyDocuments()
+      throws IOException {
+    List<String> columns = List.of("title", "body");
+    MultiColumnRealtimeLuceneTextIndex index = new MultiColumnRealtimeLuceneTextIndex(columns,
+        new BooleanArrayList(new boolean[]{true, true}), INDEX_DIR,
+        "table__0__" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement() + "__20240601T1818Z",
+        new MultiColumnTextIndexConfig(columns));
+    try {
+      MutableRoaringBitmap expectedTitle = new MutableRoaringBitmap();
+      MutableRoaringBitmap expectedBody = new MutableRoaringBitmap();
+      for (int docId = 0; docId < 5000; docId++) {
+        boolean titleHit = docId % 5 == 1;
+        boolean bodyHit = docId % 11 == 4;
+        index.add(List.of(titleHit ? "needle " + docId : "hay " + docId, bodyHit ? "needle " + docId : "hay " + docId));
+        if (titleHit) {
+          expectedTitle.add(docId);
+        }
+        if (bodyHit) {
+          expectedBody.add(docId);
+        }
+      }
+      index.getSearcherManager().maybeRefreshBlocking();
+      assertEquals(index.getDocIds("title", "needle"), expectedTitle);
+      assertEquals(index.getDocIds("body", "needle"), expectedBody);
+    } finally {
+      index.close();
     }
   }
 

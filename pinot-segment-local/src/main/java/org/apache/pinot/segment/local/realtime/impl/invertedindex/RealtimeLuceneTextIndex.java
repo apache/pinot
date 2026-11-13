@@ -22,11 +22,13 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -49,6 +51,8 @@ import org.slf4j.LoggerFactory;
 /// as and when they are indexed by the consuming segment.
 public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndex.class);
+  // The only field read from a hit's stored document
+  private static final Set<String> DOC_ID_FIELDS = Set.of(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME);
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
       RealtimeLuceneTextIndexSearcherPool.getInstance();
   private final LuceneTextIndexCreator _indexCreator;
@@ -255,9 +259,12 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     IntIterator luceneDocIDIterator = luceneDocIds.getIntIterator();
     MutableRoaringBitmap actualDocIDs = new MutableRoaringBitmap();
     try {
+      // Use the non-deprecated StoredFields API (IndexSearcher#doc is removed in Lucene 10) and load only the doc id
+      // field
+      StoredFields storedFields = indexSearcher.storedFields();
       while (luceneDocIDIterator.hasNext()) {
         int luceneDocId = luceneDocIDIterator.next();
-        Document document = indexSearcher.doc(luceneDocId);
+        Document document = storedFields.document(luceneDocId, DOC_ID_FIELDS);
         int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.PINOT_DOC_ID_STORED_FIELD_NAME));
         actualDocIDs.add(pinotDocId);
       }
