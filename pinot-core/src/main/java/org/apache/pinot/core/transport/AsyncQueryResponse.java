@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
@@ -48,8 +49,9 @@ public class AsyncQueryResponse implements QueryResponse {
   private final long _timeoutMs;
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final boolean _skipUnavailableServers;
-  // Servers whose latch slot has already been released via a down-path (skipServerResponse or markServerUnavailable).
-  // A server can be reported down more than once for the same query
+  // Tracks servers whose latch slot has already been released (via receiveDataTable, receiveDeserializationError,
+  // skipServerResponse, or markServerUnavailable) ensuring each server's slot is counted down at most once for this
+  // query.
   private final Set<ServerRoutingInstance> _countedDownServers = ConcurrentHashMap.newKeySet();
 
   private volatile ServerRoutingInstance _failedServer;
@@ -214,8 +216,36 @@ public class AsyncQueryResponse implements QueryResponse {
     _responseMap.get(serverRoutingInstance).markRequestSent(requestSentLatencyMs);
   }
 
+  // Handle server DataTable deserialization errors without waiting for query timeout
+  void receiveDeserializationError(ServerRoutingInstance serverRoutingInstance, Exception exception,
+      int responseSize, int deserializationTimeMs) {
+    receiveDeserializationError(serverRoutingInstance, null, exception, responseSize, deserializationTimeMs);
+  }
+
+  void receiveDeserializationError(ServerRoutingInstance serverRoutingInstance, @Nullable Channel channel,
+      Exception exception, int responseSize, int deserializationTimeMs) {
+    if (!shouldActOnServerDown(serverRoutingInstance, channel)) {
+      return;
+    }
+    if (!_countedDownServers.add(serverRoutingInstance)) {
+      return;
+    }
+    _failedServer = serverRoutingInstance;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(DataTable.MetadataKey.REQUEST_ID.getName(), Long.toString(_requestId));
+    dataTable.addException(QueryErrorCode.DESERIALIZATION_ERROR.getId(),
+        exception.getMessage() != null ? exception.getMessage() : exception.toString());
+    ServerResponse response = _responseMap.get(serverRoutingInstance);
+    response.receiveDeserializationError(dataTable, responseSize, deserializationTimeMs);
+    _numServersResponded.getAndIncrement();
+    _countDownLatch.countDown();
+  }
+
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
+    if (!_countedDownServers.add(serverRoutingInstance)) {
+      return;
+    }
     ServerResponse response = _responseMap.get(serverRoutingInstance);
     response.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
 
