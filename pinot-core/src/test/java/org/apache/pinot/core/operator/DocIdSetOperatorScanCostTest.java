@@ -37,10 +37,12 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /// [DocIdSetOperator] reports the entries that the filter scans to the scan cost of the query, block by block. A lazy
 /// filter can scan the rest of the segment in the last call, which returns no document, so that call must report too.
+/// It also closes the scans of a lazy filter when its consumer stops before the end.
 public class DocIdSetOperatorScanCostTest {
   private static final int NUM_DOCS = 50000;
   private static final int MAX_DOCS_PER_BLOCK = 100;
@@ -64,6 +66,36 @@ public class DocIdSetOperatorScanCostTest {
       assertEquals(scan.getNumEntriesScannedInFilter(), NUM_DOCS, "The scan visits every candidate");
       assertEquals(scanCost.getNumEntriesScannedInFilter(), NUM_DOCS, "Every scanned entry must reach the scan cost");
     }
+  }
+
+  @Test
+  public void testCloseBeforeTheEndClosesTheScans() {
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      MutableRoaringBitmap candidates = new MutableRoaringBitmap();
+      candidates.add(0L, NUM_DOCS);
+      CountingScanDocIdSet scan = new CountingScanDocIdSet(NUM_DOCS);
+      AndDocIdSet filter = new AndDocIdSet(List.of(BitmapDocIdSet.create(candidates, NUM_DOCS), scan), null,
+          AndRestrictionPushdown.streaming(MAX_DOCS_PER_BLOCK));
+      DocIdSetOperator operator = new DocIdSetOperator(new FixedFilterOperator(filter), MAX_DOCS_PER_BLOCK);
+
+      // The consumer reads one block, as a selection that fills its LIMIT, and stops
+      assertEquals(operator.nextBlock().getLength(), MAX_DOCS_PER_BLOCK);
+      assertEquals(scan._iterator._numCloseCalls, 0);
+      operator.close();
+      assertEquals(scan._iterator._numCloseCalls, 1, "Closing the operator must close the scan");
+      assertTrue(scan.getNumEntriesScannedInFilter() < NUM_DOCS, "The scan must stop at the chunk it was reading");
+      assertNull(operator.nextBlock(), "A closed operator returns no more documents");
+      operator.close();
+      assertEquals(scan._iterator._numCloseCalls, 1, "Closing twice must not close the scan twice");
+    }
+  }
+
+  @Test
+  public void testCloseBeforeTheFirstBlockIsANoOp() {
+    CountingScanDocIdSet scan = new CountingScanDocIdSet(NUM_DOCS);
+    DocIdSetOperator operator = new DocIdSetOperator(new FixedFilterOperator(scan), MAX_DOCS_PER_BLOCK);
+    operator.close();
+    assertEquals(scan._iterator._numCloseCalls, 0);
   }
 
   /// A filter operator that returns a given DocIdSet.
@@ -121,6 +153,7 @@ public class DocIdSetOperatorScanCostTest {
     private final int _matchingBound;
     private long _numEntriesScanned;
     private int _nextDocId;
+    private int _numCloseCalls;
 
     private CountingScanDocIdIterator(int matchingBound) {
       _matchingBound = matchingBound;
@@ -164,6 +197,11 @@ public class DocIdSetOperatorScanCostTest {
     @Override
     public long getNumEntriesScanned() {
       return _numEntriesScanned;
+    }
+
+    @Override
+    public void close() {
+      _numCloseCalls++;
     }
   }
 }

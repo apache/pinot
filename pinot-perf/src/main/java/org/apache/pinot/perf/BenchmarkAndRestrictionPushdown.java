@@ -66,7 +66,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 ///   [issue 19339](https://github.com/apache/pinot/issues/19339)) or is entirely index-based (`INDEXED_OR`, where
 ///   there is nothing to gain and the question is only how much the machinery costs). `SCAN_ONLY_OR` is the third
 ///   case: scans directly under the OR with no index-based sibling, so the OR is already lazy today and a LIMIT
-///   really does stop early -- the shape the AUTO mode exists to protect.
+///   really does stop early -- the shape the AUTO mode exists to protect. `SINGLE_SCAN` is a bitmap AND one scan, the
+///   shape of a row-level security filter with a single scan predicate in the WHERE. `INDEXED_OR` has no scan.
 /// - `_consume`: whether the consumer drains the filter, as an aggregation does, or stops at a LIMIT, as a
 ///   selection does. The push-down materializes, so this is where it can lose.
 /// - `_candidateSelectivity`: how much the enclosing AND narrows things before the OR is reached.
@@ -90,7 +91,7 @@ public class BenchmarkAndRestrictionPushdown {
   @Param({"OFF", "EAGER", "STREAMING"})
   private String _strategy;
 
-  @Param({"SCAN_IN_OR", "SCAN_ONLY_OR"})
+  @Param({"SINGLE_SCAN", "SCAN_IN_OR", "SCAN_ONLY_OR", "INDEXED_OR"})
   private String _shape;
 
   @Param({"DRAIN", "LIMIT"})
@@ -191,8 +192,13 @@ public class BenchmarkAndRestrictionPushdown {
     return numDocs;
   }
 
-  /// `AND(candidates, OR(...))`, rebuilt on every invocation because a DocIdSet is single-use.
+  /// `AND(candidates, OR(...))`, or `AND(candidates, scan)` for `SINGLE_SCAN`, rebuilt on every invocation because a
+  /// DocIdSet is single-use.
   private BlockDocIdSet buildFilter() {
+    if ("SINGLE_SCAN".equals(_shape)) {
+      return new AndDocIdSet(List.of(BitmapDocIdSet.create(_candidateDocIds, NUM_DOCS), newScanDocIdSet()), null,
+          getPushdown());
+    }
     BlockDocIdSet orDocIdSet;
     if ("INDEXED_OR".equals(_shape)) {
       orDocIdSet = new OrDocIdSet(List.of(BitmapDocIdSet.create(_firstBranchDocIds, NUM_DOCS),
