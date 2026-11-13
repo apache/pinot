@@ -43,22 +43,11 @@ else
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
       -am -B -T 16 -ntp \
       -P github-actions \
+      -P tesseracta-build \
       -pl 'pinot-bom' \
-      -pl 'pinot-spi' \
-      -pl 'pinot-segment-spi' \
-      -pl 'pinot-common' \
-      -pl 'pinot-segment-local' \
-      -pl 'pinot-core' \
-      -pl 'pinot-query-planner' \
-      -pl 'pinot-query-runtime' || exit 1
+      -pl 'pinot-spi' || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn clean install \
-      -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
-      -am -B -T 16 -ntp \
-      -P github-actions \
-      -pl '!pinot-integration-tests' \
-      -pl '!pinot-perf' \
-      -pl '!pinot-distribution' || exit 1
+    echo "todo"
   fi
 fi

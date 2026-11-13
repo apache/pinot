@@ -182,6 +182,7 @@
     <package.info.phase>generate-sources</package.info.phase>
     <pinot.skip.remote.resources>false</pinot.skip.remote.resources>
 
+    <dependency.classifier></dependency.classifier>
     <arrow.version>19.0.0</arrow.version>
     <avro.version>1.12.2</avro.version>
     <bson.version>5.14.0</bson.version>
@@ -656,6 +657,96 @@
         <scala.compat.version>2.12</scala.compat.version>
       </properties>
     </profile>
+
+    <profile>
+      <id>tesseracta-build</id>
+      <properties>
+        <dependency.classifier>tesseracta</dependency.classifier>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>io.tesseracta</groupId>
+          <artifactId>tesseracta-runtime</artifactId>
+          <version>0.2.37</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.22</version>
+            <optional>true</optional>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>io.tesseracta</groupId>
+            <artifactId>tesseracta-maven-plugin</artifactId>
+            <version>0.1.26</version>
+            <configuration>
+              <orgName>demo</orgName>
+              <teamName>pinot</teamName>
+              <allowUnpushedChanges>true</allowUnpushedChanges>
+            </configuration>
+            <executions>
+              <execution>
+                <id>tesseracta-compile</id>
+                <phase>compile</phase>
+                <goals>
+                  <goal>compile</goal>
+                </goals>
+              </execution>
+                <execution>
+                  <id>tesseracta-testCompile</id>
+                  <phase>test-compile</phase>
+                  <goals>
+                    <goal>testCompile</goal>
+                  </goals>
+                </execution>
+            </executions>
+          </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                  <execution>
+                    <id>default-compile</id>
+                    <phase>none</phase>
+                  </execution>
+                  <execution>
+                    <id>default-testCompile</id>
+                    <phase>none</phase>
+                  </execution>
+                </executions>
+            </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <configuration>
+                  <classesDirectory>${project.build.outputDirectory}-tesseracta</classesDirectory>
+                  <testClassesDirectory>${project.build.testOutputDirectory}-tesseracta</testClassesDirectory>
+              </configuration>
+            </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>tesseracta-jar</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <configuration>
+                  <classesDirectory>${project.build.outputDirectory}-tesseracta</classesDirectory>
+                  <classifier>tesseracta</classifier>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
   </profiles>
 
   <dependencyManagement>

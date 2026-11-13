@@ -312,7 +312,7 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
     }
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDoNotTrace
   public void testSelectAllResultsQueryWithReload()
       throws Exception {
     // Select query with order by on column9 with limit == totalDocs
