@@ -480,9 +480,10 @@ public class PagedPinotOutputStreamTest {
     int[] pageSizes = {3, 7, 13, 100, PagedPinotOutputStream.PageAllocator.MIN_RECOMMENDED_PAGE_SIZE};
     // Bytes written before the values, so the values start at different offsets in a page.
     int[] prefixes = {0, 1, 5};
-    // Lengths on both sides of PrimitiveArrays.MIN_BULK_VALUES (64), where the per-value path takes over.
+    // Lengths on both sides of PagedPinotOutputStream.MIN_BULK_WRITE_VALUES, where the per-value path takes over.
     int[][] ranges = {
-        {0, 0}, {7, 0}, {0, NUM_BULK_VALUES}, {3, NUM_BULK_VALUES - 10}, {NUM_BULK_VALUES - 1, 1}, {9, 63}, {9, 64}
+        {0, 0}, {7, 0}, {0, NUM_BULK_VALUES}, {3, NUM_BULK_VALUES - 10}, {NUM_BULK_VALUES - 1, 1},
+        {9, PagedPinotOutputStream.MIN_BULK_WRITE_VALUES - 1}, {9, PagedPinotOutputStream.MIN_BULK_WRITE_VALUES}
     };
     List<Object[]> cases = new ArrayList<>();
     for (BulkType type : BulkType.values()) {

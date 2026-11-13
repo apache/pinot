@@ -43,7 +43,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /// Compares reading a serialized primitive array list one value at a time (`perValue`, the loop the list SerDes used
 /// before) with the ObjectSerDeUtils list SerDes (`bulk`), from a heap or a direct buffer. The SerDes read in bulk from
-/// PrimitiveArrays.MIN_BULK_VALUES values up, and one value at a time below it.
+/// PrimitiveArrays.MIN_BULK_READ_VALUES values up, and one value at a time below it.
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Fork(3)

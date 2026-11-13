@@ -45,7 +45,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 /// already holds `size` values:
 /// - `deserializeAndAddAll`: reads the incoming list one value at a time, then calls `merge` (`addAll`).
 /// - `mergeSerialized`: [PercentileAggregationFunction#mergeSerializedIntermediateResult], which reads the values
-///   straight into the merged list (in bulk from PrimitiveArrays.MIN_BULK_VALUES values up).
+///   straight into the merged list (in bulk from PrimitiveArrays.MIN_BULK_READ_VALUES values up).
 ///
 /// Each operation first truncates the merged list back to `size` values, so it never reallocates.
 @BenchmarkMode(Mode.AverageTime)
