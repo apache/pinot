@@ -46,7 +46,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -121,10 +120,7 @@ public class TableStateUtilsTest {
     fixture.assign(fixture._consumer.getSegmentName(), ONLINE);
     fixture.assign(segment(1, 2), CONSUMING);
     fixture._idealState.setInstanceStateMap(segment(1, 0), Map.of(OTHER_SERVER, ONLINE));
-    assertTrue(TableStateUtils.isReadyToConsume(fixture._manager, TABLE, fixture._consumer, segmentName -> {
-      assertEquals(segmentName, predecessor, "Only required segments should be considered for local readiness");
-      return false;
-    }));
+    assertTrue(fixture.isReady());
     assertFalse(TableStateUtils.isAllSegmentsLoaded(fixture._manager, TABLE),
         "The legacy table-wide check still includes other partitions and successors");
   }
@@ -149,12 +145,13 @@ public class TableStateUtilsTest {
       fixture.metadata(segmentName, columns);
     }
     assertFalse(fixture.isReady(), "Unresolved metadata may hold base rows for this consumer");
-    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot snapshot =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     assertFalse(snapshot.isReadyToConsume(fixture._consumer, name -> false));
     assertTrue(snapshot.isReadyToConsume(fixture._consumer, segmentName::equals));
     fixture._currentState.setState(segmentName, ONLINE);
     assertTrue(fixture.isReady());
-    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE)
+    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false)
         .isReadyToConsume(fixture._consumer, name -> false));
   }
 
@@ -194,12 +191,13 @@ public class TableStateUtilsTest {
       fixture._currentState.setState(segmentName, state);
     }
     assertTrue(fixture.isReady(), "A custom-named segment in another partition must not block consumption");
-    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE)
+    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false)
         .isReadyToConsume(fixture._consumer, name -> false));
 
     metadata.setPartitionMetadata(new SegmentPartitionMetadata(partitionColumns(1)));
     assertEquals(fixture.isReady(), ONLINE.equals(state));
-    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot snapshot =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     assertEquals(snapshot.isReadyToConsume(fixture._consumer, name -> false), ONLINE.equals(state));
     assertTrue(snapshot.isReadyToConsume(fixture._consumer, segmentName::equals),
         "Local completion must still satisfy custom-named history");
@@ -212,13 +210,57 @@ public class TableStateUtilsTest {
     fixture.assign(predecessor, ONLINE);
     fixture._currentState.setState(predecessor, ONLINE);
     fixture.assign(new UploadedRealtimeSegmentName(TABLE, 2, 0, "uploaded", "base").getSegmentName(), ONLINE);
+    fixture.assign(segment(2, 0), ONLINE);
     fixture.assign("offlineCustomSegment", OFFLINE);
     fixture.assign("consumingCustomSegment", CONSUMING);
     fixture._idealState.setInstanceStateMap("remoteCustomSegment", Map.of(OTHER_SERVER, ONLINE));
     assertTrue(fixture.isReady());
-    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE)
+    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false)
         .isReadyToConsume(fixture._consumer, name -> false));
     verifyNoInteractions(fixture._propertyStore);
+  }
+
+  @Test
+  public void testOnlineCustomSegmentsDoNotReadMetadata() {
+    Assignment fixture = new Assignment();
+    String segmentName = "customSegmentName";
+    fixture.assign(segmentName, ONLINE);
+    fixture._currentState.setState(segmentName, ONLINE);
+    assertTrue(fixture.isReady());
+    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false)
+        .isReadyToConsume(fixture._consumer, name -> false));
+    verifyNoInteractions(fixture._propertyStore);
+  }
+
+  @Test
+  public void testSkippedMetadataDoesNotCacheLocalReadiness() {
+    Assignment fixture = new Assignment();
+    String segmentName = "customSegmentName";
+    fixture.assign(segmentName, ONLINE);
+    fixture._currentState.setState(segmentName, OFFLINE);
+    fixture.metadata(segmentName, partitionColumns(2));
+    Set<String> locallyReady = new HashSet<>(Set.of(segmentName));
+    ReadinessSnapshot snapshot =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, locallyReady::contains);
+    assertTrue(snapshot.isReadyToConsume(fixture._consumer, locallyReady::contains));
+    assertTrue(TableStateUtils.isReadyToConsume(fixture._manager, TABLE, fixture._consumer, locallyReady::contains));
+    verifyNoInteractions(fixture._propertyStore);
+
+    // Replacing the local manager can invalidate its initialized metadata before CurrentState changes.
+    locallyReady.clear();
+    clearInvocations(fixture._accessor, fixture._propertyStore);
+    assertFalse(snapshot.isReadyToConsume(fixture._consumer, locallyReady::contains),
+        "A skipped lookup leaves the partition unknown; local readiness must be checked again");
+    locallyReady.add(segmentName);
+    assertTrue(snapshot.isReadyToConsume(fixture._consumer, locallyReady::contains));
+    locallyReady.clear();
+    assertFalse(snapshot.isReadyToConsume(fixture._consumer, locallyReady::contains));
+    verifyNoInteractions(fixture._accessor, fixture._propertyStore);
+
+    assertTrue(fixture.isReady(), "A fresh lookup must resolve the now-unloaded segment to its other partition");
+    ReadinessSnapshot refreshed =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
+    assertTrue(refreshed.isReadyToConsume(fixture._consumer, locallyReady::contains));
   }
 
   @Test
@@ -229,7 +271,8 @@ public class TableStateUtilsTest {
     String segmentName = "customSegmentName";
     fixture.assign(segmentName, ONLINE);
     SegmentZKMetadata metadata = fixture.metadata(segmentName, partitionColumns(2));
-    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot snapshot =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     verify(fixture._propertyStore).get(ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE, segmentName),
         null, AccessOption.PERSISTENT);
     verifyNoMoreInteractions(fixture._propertyStore);
@@ -243,7 +286,8 @@ public class TableStateUtilsTest {
     verifyNoInteractions(fixture._accessor, fixture._propertyStore);
 
     assertFalse(fixture.isReady(), "Fresh confirmation must observe a changed partition for the same segment name");
-    ReadinessSnapshot refreshed = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot refreshed =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     assertFalse(refreshed.isReadyToConsume(fixture._consumer, name -> false));
     assertTrue(refreshed.isReadyToConsume(otherConsumer, name -> false));
   }
@@ -303,11 +347,13 @@ public class TableStateUtilsTest {
     Assignment fixture = new Assignment();
     String predecessor = segment(1, 1);
     fixture.assign(predecessor, ONLINE);
-    ReadinessSnapshot missingHistory = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot missingHistory =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     assertFalse(missingHistory.isReadyToConsume(fixture._consumer, segmentName -> false));
 
     fixture._currentState.setState(predecessor, ONLINE);
-    ReadinessSnapshot loadedHistory = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot loadedHistory =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     assertTrue(loadedHistory.isReadyToConsume(fixture._consumer, segmentName -> false));
     assertFalse(missingHistory.isReadyToConsume(fixture._consumer, segmentName -> false),
         "Updating the source CurrentState must not change an earlier snapshot");
@@ -335,7 +381,8 @@ public class TableStateUtilsTest {
     if (state != null) {
       fixture._currentState.setState(uploaded, state);
     }
-    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot snapshot =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     assertEquals(snapshot.isReadyToConsume(fixture._consumer, segmentName -> false), ONLINE.equals(state));
     assertEquals(snapshot.isReadyToConsume(fixture._consumer, segmentName -> false, true), ONLINE.equals(state));
     assertEquals(snapshot.isReadyToConsume(fixture._consumer, segmentName -> false), fixture.isReady());
@@ -348,7 +395,8 @@ public class TableStateUtilsTest {
     String n2 = segment(1, 2);
     fixture.assign(n1, ONLINE);
     fixture.assign(n2, ONLINE);
-    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot snapshot =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     Set<String> locallyReady = new HashSet<>(Set.of(n2));
     clearInvocations(fixture._accessor);
     assertFalse(snapshot.isReadyToConsume(fixture._consumer, locallyReady::contains));
@@ -363,17 +411,18 @@ public class TableStateUtilsTest {
   public void testReadinessSnapshotHandlesUnavailableRecords() {
     Assignment fixture = new Assignment();
     when(fixture._accessor.getProperty(fixture._keys.idealStates(TABLE))).thenReturn(null);
-    assertFalse(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE)
+    assertFalse(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false)
         .isReadyToConsume(fixture._consumer, segmentName -> true));
     when(fixture._accessor.getProperty(fixture._keys.idealStates(TABLE))).thenReturn(fixture._idealState);
     String predecessor = segment(1, 1);
     fixture.assign(predecessor, ONLINE);
     when(fixture._accessor.getProperty(fixture._keys.liveInstance(SERVER))).thenReturn(null);
-    assertFalse(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE)
+    assertFalse(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false)
         .isReadyToConsume(fixture._consumer, segmentName -> false));
     when(fixture._accessor.getProperty(fixture._keys.liveInstance(SERVER))).thenReturn(fixture._liveInstance);
     when(fixture._accessor.getProperty(fixture._keys.currentState(SERVER, SESSION, TABLE))).thenReturn(null);
-    ReadinessSnapshot missingCurrentState = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot missingCurrentState =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     assertFalse(missingCurrentState.isReadyToConsume(fixture._consumer, segmentName -> false));
     assertTrue(missingCurrentState.isReadyToConsume(fixture._consumer, predecessor::equals),
         "Locally completed history needs no CurrentState, matching fresh evaluation");
@@ -382,16 +431,17 @@ public class TableStateUtilsTest {
   }
 
   @Test
-  public void testSnapshotReadsOnceAndFreshCheckRemainsLazy() {
+  public void testFreshAndSnapshotReadStateOnce() {
     Assignment fixture = new Assignment();
     clearInvocations(fixture._accessor);
     assertTrue(fixture.isReady());
     verify(fixture._accessor).getProperty(fixture._keys.idealStates(TABLE));
-    verify(fixture._accessor, never()).getProperty(fixture._keys.liveInstance(SERVER));
-    verify(fixture._accessor, never()).getProperty(fixture._keys.currentState(SERVER, SESSION, TABLE));
+    verify(fixture._accessor).getProperty(fixture._keys.liveInstance(SERVER));
+    verify(fixture._accessor).getProperty(fixture._keys.currentState(SERVER, SESSION, TABLE));
 
     clearInvocations(fixture._accessor);
-    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    ReadinessSnapshot snapshot =
+        TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE, name -> false);
     verify(fixture._accessor).getProperty(fixture._keys.idealStates(TABLE));
     verify(fixture._accessor).getProperty(fixture._keys.liveInstance(SERVER));
     verify(fixture._accessor).getProperty(fixture._keys.currentState(SERVER, SESSION, TABLE));

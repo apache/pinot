@@ -266,11 +266,43 @@ public class RealtimeTableReadinessTest {
       // but a fresh metadata lookup now places the ERROR segment in this consumer's partition.
       manager.markPartitionMetadataInitialized();
       assertFalse(ready.getAsBoolean(), "Cached partition metadata must not hide newly required history");
+      metadata.verify(() -> ZKMetadataProvider.getSegmentZKMetadata(
+          table.getHelixManager().getHelixPropertyStore(), TABLE, customSegment), times(2));
       table._currentState.setState(customSegment, ONLINE);
       assertTrue(ready.getAsBoolean(), "The same consumer must become ready after that history loads");
-      metadata.verify(() -> ZKMetadataProvider.getSegmentZKMetadata(
-          table.getHelixManager().getHelixPropertyStore(), TABLE, customSegment), times(3));
+      metadata.verifyNoMoreInteractions();
       table.verifySnapshotReads(3);
+    }
+  }
+
+  @Test
+  public void testReadyCustomHistoryDoesNotReadPartitionMetadata() throws Exception {
+    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL);
+        MockedStatic<ZKMetadataProvider> metadata = mockStatic(ZKMetadataProvider.class)) {
+      LLCSegmentName consumer = name(0, 1);
+      table.assign(consumer, CONSUMING);
+      for (int i = 0; i < 16; i++) {
+        String segment = "loadedCustomSegment" + i;
+        table._assignment.setInstanceStateMap(segment, Map.of(SERVER, ONLINE));
+        table._currentState.setState(segment, ONLINE);
+      }
+      String localSegment = "locallyInitializedCustomSegment";
+      table._assignment.setInstanceStateMap(localSegment, Map.of(SERVER, ONLINE));
+      table._currentState.setState(localSegment, ERROR);
+      ImmutableSegmentDataManager manager = new ImmutableSegmentDataManager(mock(ImmutableSegment.class));
+      manager.markPartitionMetadataInitialized();
+      table.registerLocal(localSegment, manager);
+
+      BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
+      assertTrue(ready.getAsBoolean(), "Ready history needs no partition metadata in the initial snapshot");
+      assertTrue(ready.getAsBoolean(), "Cached-positive confirmation must also skip ready history metadata");
+      table.verifySnapshotReads(2);
+      metadata.verifyNoInteractions();
+
+      table.registerLocal(localSegment, new ImmutableSegmentDataManager(mock(ImmutableSegment.class)));
+      assertFalse(ready.getAsBoolean(), "A snapshot must not retain local readiness after the manager is replaced");
+      table.verifySnapshotReads(2);
+      metadata.verifyNoInteractions();
     }
   }
 
@@ -367,15 +399,15 @@ public class RealtimeTableReadinessTest {
       String customSegment = "customSegment";
       table.assign(consumer, CONSUMING);
       table._assignment.setInstanceStateMap(customSegment, Map.of(SERVER, ONLINE));
-      table._currentState.setState(customSegment, ONLINE);
+      table._currentState.setState(customSegment, ERROR);
       metadata.when(() -> ZKMetadataProvider.getSegmentZKMetadata(
           table.getHelixManager().getHelixPropertyStore(), TABLE, customSegment))
           .thenThrow(new ZkTimeoutException("Transient segment metadata read failure"))
-          .thenReturn(customSegmentMetadata(customSegment, 0));
+          .thenReturn(customSegmentMetadata(customSegment, 1));
 
       BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
       assertFalse(ready.getAsBoolean(), "A metadata lookup failure must hold consumption without terminating it");
-      assertTrue(ready.getAsBoolean(), "The same consumer must retry the failed metadata lookup");
+      assertTrue(ready.getAsBoolean(), "Metadata retry must exclude history from another partition");
       metadata.verify(() -> ZKMetadataProvider.getSegmentZKMetadata(
           table.getHelixManager().getHelixPropertyStore(), TABLE, customSegment), times(2));
     }
@@ -572,7 +604,11 @@ public class RealtimeTableReadinessTest {
     }
 
     void registerLocal(LLCSegmentName name, SegmentDataManager segment) {
-      _segmentDataManagerMap.put(name.getSegmentName(), segment);
+      registerLocal(name.getSegmentName(), segment);
+    }
+
+    void registerLocal(String name, SegmentDataManager segment) {
+      _segmentDataManagerMap.put(name, segment);
     }
 
     void removeLocal(LLCSegmentName name) {

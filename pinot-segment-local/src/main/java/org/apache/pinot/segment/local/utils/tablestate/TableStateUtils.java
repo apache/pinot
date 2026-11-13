@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixDataAccessor;
@@ -103,39 +102,20 @@ public class TableStateUtils {
   ///                      transition, such as a predecessor that finished consumption and released its permit
   public static boolean isReadyToConsume(HelixManager helixManager, String tableNameWithType, LLCSegmentName consumer,
       Predicate<String> isLocallyReady) {
-    HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
-    IdealState idealState = dataAccessor.getProperty(dataAccessor.keyBuilder().idealStates(tableNameWithType));
-    if (idealState == null) {
-      LOGGER.warn("Failed to find ideal state for table: {}", tableNameWithType);
-      return false;
-    }
-    String instanceName = helixManager.getInstanceName();
-    Map<String, String> consumerAssignment = idealState.getInstanceStateMap(consumer.getSegmentName());
-    String consumerState = consumerAssignment != null ? consumerAssignment.get(instanceName) : null;
-    if (!SegmentStateModel.CONSUMING.equals(consumerState) && !SegmentStateModel.ONLINE.equals(consumerState)) {
-      return false;
-    }
-
-    List<String> requiredSegments = new ArrayList<>();
-    Function<String, Integer> partitionIdFromMetadata =
-        segmentName -> getPartitionIdFromMetadata(helixManager, tableNameWithType, segmentName);
-    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
-      if (!SegmentStateModel.ONLINE.equals(entry.getValue().get(instanceName))) {
-        continue;
-      }
-      String segmentName = entry.getKey();
-      if (isRequiredHistory(segmentName, consumer, partitionIdFromMetadata) && !isLocallyReady.test(segmentName)) {
-        requiredSegments.add(segmentName);
-      }
-    }
-    return areSegmentsLoaded(helixManager, tableNameWithType, requiredSegments);
+    return getReadinessSnapshot(helixManager, tableNameWithType, isLocallyReady)
+        .isReadyToConsume(consumer, isLocallyReady, true);
   }
 
-  /// Reads the table assignment, this live instance's current state, and partition metadata for custom-named ONLINE
-  /// segments once for evaluation by multiple consumers. Subsequent Helix updates cannot mutate the snapshot.
+  /// Reads the table assignment and this live instance's current state once for evaluation by multiple consumers.
+  /// Partition metadata is read only for custom-named ONLINE segments that are neither ONLINE in current state nor
+  /// locally ready. Loaded segments cannot block consumption, so their partition is irrelevant to this check.
   /// A cached snapshot must only reject readiness; callers must perform a fresh check before authorizing consumption
   /// from a cached result.
-  public static ReadinessSnapshot getReadinessSnapshot(HelixManager helixManager, String tableNameWithType) {
+  ///
+  /// @param isLocallyReady a thread-safe predicate used only to skip unnecessary partition lookups. Its results are
+  ///                      not retained: evaluation must check local readiness again in case a manager was replaced.
+  public static ReadinessSnapshot getReadinessSnapshot(HelixManager helixManager, String tableNameWithType,
+      Predicate<String> isLocallyReady) {
     HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
     IdealState idealState = dataAccessor.getProperty(dataAccessor.keyBuilder().idealStates(tableNameWithType));
     if (idealState == null) {
@@ -144,13 +124,15 @@ public class TableStateUtils {
     }
     String instanceName = helixManager.getInstanceName();
     Map<String, String> idealStates = new HashMap<>();
+    Map<String, String> currentStates = getCurrentStates(helixManager, tableNameWithType);
     Map<String, Integer> metadataPartitionIds = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
       String segmentName = entry.getKey();
       String state = entry.getValue().get(instanceName);
       if (state != null) {
         idealStates.put(segmentName, state);
-        if (SegmentStateModel.ONLINE.equals(state) && SegmentUtils.getPartitionIdFromSegmentName(segmentName) == null) {
+        if (SegmentStateModel.ONLINE.equals(state) && !SegmentStateModel.ONLINE.equals(currentStates.get(segmentName))
+            && SegmentUtils.getPartitionIdFromSegmentName(segmentName) == null && !isLocallyReady.test(segmentName)) {
           Integer partitionId = getPartitionIdFromMetadata(helixManager, tableNameWithType, segmentName);
           if (partitionId != null) {
             metadataPartitionIds.put(segmentName, partitionId);
@@ -158,16 +140,19 @@ public class TableStateUtils {
         }
       }
     }
-    return new ReadinessSnapshot(idealStates, getCurrentStates(helixManager, tableNameWithType), metadataPartitionIds);
+    return new ReadinessSnapshot(idealStates, currentStates, metadataPartitionIds);
   }
 
   /// An immutable view of this instance's assignment, current state, and metadata-derived partition ids, safe to share
   /// between consumer threads.
-  /// Evaluation performs no ZooKeeper reads and reevaluates the supplied local-readiness predicate for each required
-  /// segment. The predicate must itself be safe for its caller's threads; its results are never retained here.
+  /// Evaluation performs no ZooKeeper reads. It rechecks local readiness for assigned ONLINE segments that were not
+  /// ONLINE in the captured current state, then determines whether any unavailable segment is required history.
+  /// The predicate must itself be safe for its caller's threads. Its results are never retained here; an omitted or
+  /// unresolved partition id is treated conservatively if the segment is no longer locally ready.
   public static final class ReadinessSnapshot {
     private final Map<String, String> _idealStates;
     private final Map<String, String> _currentStates;
+    // Only known ids for custom-named segments that could block when captured. Absence means unknown, not ready.
     private final Map<String, Integer> _metadataPartitionIds;
 
     private ReadinessSnapshot(Map<String, String> idealStates, Map<String, String> currentStates,
@@ -189,43 +174,38 @@ public class TableStateUtils {
       if (!SegmentStateModel.CONSUMING.equals(consumerState) && !SegmentStateModel.ONLINE.equals(consumerState)) {
         return false;
       }
-      Function<String, Integer> partitionIdFromMetadata = _metadataPartitionIds::get;
       for (Map.Entry<String, String> entry : _idealStates.entrySet()) {
         String segmentName = entry.getKey();
-        if (SegmentStateModel.ONLINE.equals(entry.getValue())
-            && isRequiredHistory(segmentName, consumer, partitionIdFromMetadata)
-            && !isLocallyReady.test(segmentName)) {
-          String actualState = _currentStates.get(segmentName);
-          if (!SegmentStateModel.ONLINE.equals(actualState)) {
-            if (logUnavailableSegments) {
-              if (SegmentStateModel.ERROR.equals(actualState)) {
-                LOGGER.error("Consumer: {} is waiting for history segment: {} in ERROR state, expected: {}",
-                    consumer.getSegmentName(), segmentName, SegmentStateModel.ONLINE);
-              } else {
-                LOGGER.info("Consumer: {} is waiting for history segment: {} in state: {}, expected: {}",
-                    consumer.getSegmentName(), segmentName, actualState, SegmentStateModel.ONLINE);
-              }
+        String actualState = _currentStates.get(segmentName);
+        if (SegmentStateModel.ONLINE.equals(entry.getValue()) && !SegmentStateModel.ONLINE.equals(actualState)
+            && !isLocallyReady.test(segmentName) && isRequiredHistory(segmentName, consumer)) {
+          if (logUnavailableSegments) {
+            if (SegmentStateModel.ERROR.equals(actualState)) {
+              LOGGER.error("Consumer: {} is waiting for history segment: {} in ERROR state, expected: {}",
+                  consumer.getSegmentName(), segmentName, SegmentStateModel.ONLINE);
+            } else {
+              LOGGER.info("Consumer: {} is waiting for history segment: {} in state: {}, expected: {}",
+                  consumer.getSegmentName(), segmentName, actualState, SegmentStateModel.ONLINE);
             }
-            return false;
           }
+          return false;
         }
       }
       return true;
     }
-  }
 
-  private static boolean isRequiredHistory(String segmentName, LLCSegmentName consumer,
-      Function<String, Integer> partitionIdFromMetadata) {
-    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-    if (llcSegmentName != null) {
-      return llcSegmentName.getPartitionGroupId() == consumer.getPartitionGroupId()
-          && llcSegmentName.getSequenceNumber() < consumer.getSequenceNumber();
+    private boolean isRequiredHistory(String segmentName, LLCSegmentName consumer) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName != null) {
+        return llcSegmentName.getPartitionGroupId() == consumer.getPartitionGroupId()
+            && llcSegmentName.getSequenceNumber() < consumer.getSequenceNumber();
+      }
+      Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
+      if (partitionId == null) {
+        partitionId = _metadataPartitionIds.get(segmentName);
+      }
+      return partitionId == null || partitionId == consumer.getPartitionGroupId();
     }
-    Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
-    if (partitionId == null) {
-      partitionId = partitionIdFromMetadata.apply(segmentName);
-    }
-    return partitionId == null || partitionId == consumer.getPartitionGroupId();
   }
 
   /// Keep partition interpretation in SegmentUtils, as in upsert/dedup loading. A missing metadata record can race

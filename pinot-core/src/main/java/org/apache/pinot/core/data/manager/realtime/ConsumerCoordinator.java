@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 
 
 /// Coordinates consumer admission and exclusive consumption for one table partition. History readiness replaces
-/// predecessor registration for tables that require complete history. Other tables retain optional registration
+/// predecessor registration for tables that require their assigned history. Other tables retain optional registration
 /// ordering. Consumer and Helix threads share this coordinator; readiness callbacks run outside coordination locks.
 public class ConsumerCoordinator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);
@@ -87,7 +87,7 @@ public class ConsumerCoordinator {
     _serverMetrics = ServerMetrics.get();
   }
 
-  /// Waits for server/history readiness, then acquires the consumer permit. Complete history readiness supersedes
+  /// Waits for server/history readiness, then acquires the consumer permit. Required history readiness supersedes
   /// predecessor registration; other tables retain registration ordering when configured.
   /// @return true if the caller owns the permit and must release it, or false if stopped before admission
   public boolean acquire(LLCSegmentName llcSegmentName, BooleanSupplier isReadyToConsume, BooleanSupplier shouldStop)
@@ -144,7 +144,7 @@ public class ConsumerCoordinator {
       while (!shouldStop.getAsBoolean()) {
         long releaseVersion = _releaseVersion;
         // Keep the first check for diagnostics, but avoid polling history while another consumer holds the permit.
-        // A release wakes this loop; permit availability never substitutes for the complete readiness check.
+        // A release wakes this loop; permit availability never substitutes for the required history check.
         if ((!counted || _semaphore.availablePermits() > 0) && isReadyToConsume.getAsBoolean()) {
           return !shouldStop.getAsBoolean();
         }
@@ -236,7 +236,7 @@ public class ConsumerCoordinator {
     }
   }
 
-  /// Waits for the previous segment to be registered to the server. Used only when complete history is not required.
+  /// Waits for the previous segment to be registered to the server. Used only when history readiness is not required.
   ///
   /// TODO: Legacy registration ordering can miss earlier segments in the following corner case:
   ///   - Seg 100 (OFFLINE -> CONSUMING pending)

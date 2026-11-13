@@ -284,7 +284,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           || nowNs - _readinessSnapshotTimeNs >= TimeUnit.MILLISECONDS.toNanos(
               READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS)) {
         // A new consumer must see its own assignment. Record the read's start time, not its completion time.
-        snapshot = TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType);
+        snapshot = TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType,
+            this::isPartitionMetadataInitialized);
         _readinessSnapshot = snapshot;
         _readinessSnapshotTimeNs = nowNs;
         return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized, true);
@@ -292,7 +293,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       snapshot = _readinessSnapshot;
     }
     // Local completion can clear a cached rejection immediately, without waiting for the next ZooKeeper poll.
-    // A cached success must never authorize consumption: newly assigned history could be absent from the snapshot.
+    // A cached success must never authorize consumption: assignment, current state, or partition metadata may change.
     return snapshot.isReadyToConsume(consumer, this::isPartitionMetadataInitialized)
         && TableStateUtils.isReadyToConsume(_helixManager, _tableNameWithType, consumer,
             this::isPartitionMetadataInitialized);
