@@ -27,11 +27,12 @@ import java.util.Random;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.spi.memory.PrimitiveArrays.MIN_BULK_READ_VALUES;
 import static org.testng.Assert.assertEquals;
 
 
 /// Checks that the bulk reads read the same values as one [ByteBuffer] get per value, from heap and direct buffers of
-/// either byte order, on both sides of [PrimitiveArrays#MIN_BULK_VALUES], into a range of the target array.
+/// either byte order, on both sides of [PrimitiveArrays#MIN_BULK_READ_VALUES], into a range of the target array.
 public class PrimitiveArraysTest {
   private static final int NUM_VALUES = 200;
   /// Bytes before the values in the buffer, so they are not aligned to their width.
@@ -44,7 +45,7 @@ public class PrimitiveArraysTest {
     List<Object[]> cases = new ArrayList<>();
     for (boolean direct : new boolean[]{false, true}) {
       for (ByteOrder order : new ByteOrder[]{ByteOrder.BIG_ENDIAN, ByteOrder.LITTLE_ENDIAN}) {
-        for (int length : new int[]{0, 1, 63, 64, NUM_VALUES}) {
+        for (int length : new int[]{0, 1, MIN_BULK_READ_VALUES - 1, MIN_BULK_READ_VALUES, NUM_VALUES}) {
           cases.add(new Object[]{direct, order, length});
         }
       }
