@@ -168,6 +168,33 @@ public class CosineDistanceIndexTransformFunctionTest extends BaseTransformFunct
     }
   }
 
+  /// A non-finite distance from the search (a zero vector, or a norm that underflows in float) is computed exactly
+  /// instead, which applies the default value where one is given.
+  @Test
+  public void testComputesDistancesWhenSearchReturnsNonFinite() {
+    float[] query = _vector2Values[0];
+    for (float nonFinite : new float[]{Float.NaN, Float.POSITIVE_INFINITY}) {
+      for (String defaultValue : new String[]{"", ", 7"}) {
+        VectorIndexReader reader = mock(VectorIndexReader.class);
+        QueryContext queryContext = newQueryContext();
+        TransformFunction function = create(withVectorIndex(reader, VectorDistanceFunction.COSINE),
+            "cosineDistance(vector1, " + toLiteral(query) + defaultValue + ")", queryContext);
+        Int2FloatOpenHashMap served = new Int2FloatOpenHashMap();
+        served.put(0, nonFinite);
+        for (int i = 1; i < NUM_ROWS; i++) {
+          served.put(i, -i);
+        }
+        VectorSearchDistances.of(queryContext).getRequest(reader, query).setDistances(served);
+        double[] actual = function.transformToDoubleValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          double expected = defaultValue.isEmpty() ? VectorFunctions.cosineDistance(_vector1Values[i], query)
+              : VectorFunctions.cosineDistance(_vector1Values[i], query, 7);
+          assertEquals(actual[i], expected, 1e-9);
+        }
+      }
+    }
+  }
+
   /// An integer vector literal (`ARRAY[1, 0, ...]`) requests the search for the same vector VECTOR_SIMILARITY parses.
   @Test
   public void testIntegerVectorLiteralMatchesTheSearch() {

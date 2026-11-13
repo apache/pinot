@@ -31,8 +31,10 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
@@ -67,20 +69,19 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   private final ThreadLocal<Boolean> _useRelativeDistanceOverride = new ThreadLocal<>();
   private final ThreadLocal<Boolean> _useBoundedQueueOverride = new ThreadLocal<>();
   /// Lucene returns cosine similarity scores, which convert exactly to `1 - cosine similarity`; other functions use
-  /// scaled scores, so distances are only returned for COSINE.
+  /// scaled scores, so distances are only returned when the loaded index uses COSINE.
   private final boolean _returnsDistances;
 
   /// File-backed constructor: opens a [FSDirectory] from the Lucene HNSW index directory
   /// found under `indexDir`.
   public HnswVectorIndexReader(String column, File indexDir, int numDocs, VectorIndexConfig config) {
     _column = column;
-    _returnsDistances = config != null
-        && config.getVectorDistanceFunction() == VectorIndexConfig.VectorDistanceFunction.COSINE;
     try {
       File indexFile = getVectorIndexFile(indexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
+      _returnsDistances = isCosineIndex(_indexReader, column);
 
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
@@ -105,12 +106,11 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
   /// @param config      vector index configuration
   public HnswVectorIndexReader(String column, PinotDataBuffer indexBuffer, int numDocs, VectorIndexConfig config) {
     _column = column;
-    _returnsDistances = config != null
-        && config.getVectorDistanceFunction() == VectorIndexConfig.VectorDistanceFunction.COSINE;
     try {
       _indexDirectory = HnswVectorIndexBufferReader.createLuceneDirectory(indexBuffer, column);
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
+      _returnsDistances = isCosineIndex(_indexReader, column);
 
       // Try to extract the mapping from the packed buffer first; build from the Lucene index if absent.
       PinotDataBuffer mappingBuffer = HnswVectorIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
@@ -119,6 +119,18 @@ public class HnswVectorIndexReader implements FilterAwareVectorIndexReader, EfSe
       LOGGER.error("Failed to instantiate buffer-backed HNSW index reader for column {}", column, e);
       throw new RuntimeException(e);
     }
+  }
+
+  /// Whether the loaded index was built with COSINE similarity. The table config can name another function than the
+  /// one persisted in Lucene (changing it does not rebuild the index on reload), so the persisted one decides.
+  private static boolean isCosineIndex(IndexReader indexReader, String column) {
+    for (LeafReaderContext leaf : indexReader.leaves()) {
+      FieldInfo fieldInfo = leaf.reader().getFieldInfos().fieldInfo(column);
+      if (fieldInfo != null && fieldInfo.getVectorDimension() > 0) {
+        return fieldInfo.getVectorSimilarityFunction() == VectorSimilarityFunction.COSINE;
+      }
+    }
+    return false;
   }
 
   /// CASE 1: If IndexLoadingConfig specifies a segment version to load and if it is different then the on-disk version

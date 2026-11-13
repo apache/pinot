@@ -238,6 +238,44 @@ public class HnswVectorIndexCreatorTest {
     }
   }
 
+  /// The metric persisted in the index decides whether distances are served: a table config changed to another
+  /// function without rebuilding the index must not convert the old scores as cosine scores.
+  @Test
+  public void testServesDistancesByThePersistedMetric()
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "metric");
+    FileUtils.forceMkdir(indexDir);
+    float[][] vectors = {{2, 0}, {0, 1}, {1, 1}, {3, 4}};
+    float[] query = {1, 0};
+    for (String[] builtAndLoaded : new String[][]{{"EUCLIDEAN", "COSINE"}, {"COSINE", "EUCLIDEAN"}}) {
+      FileUtils.cleanDirectory(indexDir);
+      try (HnswVectorIndexCreator creator =
+          new HnswVectorIndexCreator("baz", indexDir, hnswConfig(builtAndLoaded[0]))) {
+        for (float[] vector : vectors) {
+          creator.add(vector);
+        }
+        creator.seal();
+      }
+      try (HnswVectorIndexReader reader =
+          new HnswVectorIndexReader("baz", indexDir, vectors.length, hnswConfig(builtAndLoaded[1]))) {
+        if (builtAndLoaded[0].equals("EUCLIDEAN")) {
+          Assert.assertNull(reader.getDocDistances(query, 4));
+          Assert.assertNull(reader.getDocDistances(query, 4, MutableRoaringBitmap.bitmapOf(0, 1)));
+        } else {
+          assertCosineDistances(reader.getDocDistances(query, 4), vectors, query);
+        }
+      }
+    }
+  }
+
+  private static VectorIndexConfig hnswConfig(String distanceFunction) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "2");
+    properties.put("vectorDistanceFunction", distanceFunction);
+    return new VectorIndexConfig(properties);
+  }
+
   private static int[] sortedDocIds(Int2FloatMap distances) {
     int[] docIds = distances.keySet().toIntArray();
     Arrays.sort(docIds);

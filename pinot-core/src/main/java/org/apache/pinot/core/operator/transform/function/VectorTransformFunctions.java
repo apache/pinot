@@ -141,11 +141,14 @@ public class VectorTransformFunctions {
         initDoubleValuesSV(length);
         boolean allServed = true;
         for (int i = 0; i < length; i++) {
-          if (!distances.containsKey(docIds[i])) {
+          // A missing or non-finite distance (zero vector, float underflow) is computed exactly, which also applies
+          // the optional default value
+          float distance = distances.getOrDefault(docIds[i], Float.NaN);
+          if (!Float.isFinite(distance)) {
             allServed = false;
             break;
           }
-          _doubleValuesSV[i] = distances.get(docIds[i]);
+          _doubleValuesSV[i] = distance;
         }
         if (allServed) {
           return _doubleValuesSV;
