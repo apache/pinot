@@ -80,6 +80,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -867,20 +868,30 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
 
   @DataProvider
   public Object[][] dictionaryTextConversionParams() {
-    return new Object[][]{{false}, {true}};
+    return new Object[][]{
+        {false, "none"}, {true, "none"}, {false, "native"}, {true, "native"}, {false, "legacy"}, {true, "legacy"}
+    };
   }
 
   @Test(dataProvider = "dictionaryTextConversionParams")
-  public void testDictionaryBasedTextIndexConversion(boolean compacted)
+  public void testDictionaryBasedTextIndexConversion(boolean compacted, String rawValueConfig)
       throws Exception {
-    File tmpDir = new File(TMP_DIR, "dictionaryText_" + compacted);
-    Map<String, String> properties = Map.of(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, "true",
-        FieldConfig.TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX, "true");
+    File tmpDir = new File(TMP_DIR, "dictionaryText_" + compacted + "_" + rawValueConfig);
+    Map<String, String> properties = new HashMap<>(Map.of(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, "true",
+        FieldConfig.TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX, "true"));
+    FieldConfig.Builder fieldConfig = new FieldConfig.Builder(STRING_COLUMN1)
+        .withEncodingType(FieldConfig.EncodingType.DICTIONARY).withIndexTypes(List.of(FieldConfig.IndexType.TEXT))
+        .withProperties(properties);
+    if (rawValueConfig.equals("native")) {
+      fieldConfig.withIndexTypes(List.of()).withProperties(null).withIndexes(JsonUtils.stringToJsonNode(
+          "{\"text\":{\"buildOnDictionary\":true,\"reuseMutableIndex\":true,\"rawValue\":\"n\"}}"));
+    } else if (rawValueConfig.equals("legacy")) {
+      properties.put(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true");
+      properties.put(FieldConfig.TEXT_INDEX_RAW_VALUE, "n");
+    }
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setTimeColumnName(DATE_TIME_COLUMN).setColumnMajorSegmentBuilderEnabled(false)
-        .setFieldConfigList(List.of(new FieldConfig.Builder(STRING_COLUMN1)
-            .withEncodingType(FieldConfig.EncodingType.DICTIONARY).withIndexTypes(List.of(FieldConfig.IndexType.TEXT))
-            .withProperties(properties).build())).build();
+        .setFieldConfigList(List.of(fieldConfig.build())).build();
     if (compacted) {
       UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
       upsertConfig.setEnableCommitTimeCompaction(true);
@@ -894,7 +905,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         .setTableNameWithType(tableConfig.getTableName()).setSegmentName(segmentName)
         .setStreamName(tableConfig.getTableName()).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN)
         .setCapacity(10).setIndex(Set.of(STRING_COLUMN1), StandardIndexes.text(),
-            new TextIndexConfigBuilder().withProperties(properties).build())
+            StandardIndexes.text().getConfig(tableConfig, schema).get(STRING_COLUMN1))
         .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
         .setMemoryManager(new DirectMemoryManager(segmentName))
         .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))

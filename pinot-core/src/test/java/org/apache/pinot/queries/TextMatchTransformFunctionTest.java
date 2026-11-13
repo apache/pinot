@@ -23,20 +23,39 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.operator.transform.function.IdentifierTransformFunction;
+import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TextMatchTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class TextMatchTransformFunctionTest {
@@ -77,6 +96,46 @@ public class TextMatchTransformFunctionTest {
       throws IOException {
     if (_baseDir != null) {
       FileUtils.deleteDirectory(_baseDir);
+    }
+  }
+
+  @Test
+  public void testDictionaryMatchesAreCachedUntilInit() {
+    for (boolean rawForward : new boolean[]{false, true}) {
+      TextIndexReader reader = mock(TextIndexReader.class);
+      when(reader.isBuildOnDictionary()).thenReturn(true);
+      when(reader.getDictIds("alpha", null)).thenReturn(MutableRoaringBitmap.bitmapOf(0),
+          MutableRoaringBitmap.bitmapOf(1));
+      Dictionary dictionary = mock(Dictionary.class);
+      when(dictionary.getStringValue(0)).thenReturn("alpha");
+      when(dictionary.getStringValue(1)).thenReturn("beta");
+      DataSource dataSource = mock(DataSource.class);
+      when(dataSource.getTextIndex()).thenReturn(reader);
+      when(dataSource.getDictionary()).thenReturn(dictionary);
+      ColumnContext columnContext = mock(ColumnContext.class);
+      when(columnContext.getDataSource()).thenReturn(dataSource);
+      IdentifierTransformFunction column = mock(IdentifierTransformFunction.class);
+      when(column.getColumnName()).thenReturn("skills");
+      when(column.getResultMetadata()).thenReturn(new TransformResultMetadata(DataType.STRING, true, true));
+      when(column.getDictionary()).thenReturn(rawForward ? null : dictionary);
+      LiteralTransformFunction predicate = mock(LiteralTransformFunction.class);
+      when(predicate.getResultMetadata()).thenReturn(
+          new TransformResultMetadata(DataType.STRING, true, false));
+      when(predicate.getStringLiteral()).thenReturn("alpha");
+      ValueBlock block = mock(ValueBlock.class);
+      when(block.getNumDocs()).thenReturn(2);
+      when(column.transformToDictIdsSV(block)).thenReturn(new int[]{0, 1});
+      when(column.transformToStringValuesSV(block)).thenReturn(new String[]{"alpha", "beta"});
+      List<TransformFunction> arguments = List.of(column, predicate);
+      Map<String, ColumnContext> contexts = Map.of("skills", columnContext);
+      TextMatchTransformFunction function = new TextMatchTransformFunction();
+      function.init(arguments, contexts);
+      assertEquals(function.transformToIntValuesSV(block), new int[]{1, 0});
+      assertEquals(function.transformToIntValuesSV(block), new int[]{1, 0});
+      verify(reader).getDictIds("alpha", null);
+      function.init(arguments, contexts);
+      assertEquals(function.transformToIntValuesSV(block), new int[]{0, 1});
+      verify(reader, times(2)).getDictIds("alpha", null);
     }
   }
 

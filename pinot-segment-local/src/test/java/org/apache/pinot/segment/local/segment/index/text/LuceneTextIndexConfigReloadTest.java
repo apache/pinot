@@ -31,11 +31,13 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -47,6 +49,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -55,6 +58,10 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /// Tests for Lucene text index backward compatibility and upgrade scenarios.
@@ -150,6 +157,47 @@ public class LuceneTextIndexConfigReloadTest {
     // Same config - should return false
     needsUpdate = checkNeedUpdateIndices(newSegmentFile, newConfig, schema);
     Assert.assertFalse(needsUpdate, "needUpdateIndices should return false when config is not changed");
+  }
+
+  @Test
+  public void testDictionaryTextReloadWithoutForwardIndex()
+      throws Exception {
+    FieldConfig fieldConfig = new FieldConfig(TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.INVERTED), null, Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+        .setFieldConfigList(List.of(fieldConfig)).build();
+    Schema schema = createSchema();
+    File segmentDir = createSegment(tableConfig, schema);
+
+    FieldConfig textFieldConfig = new FieldConfig(TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.TEXT), null,
+        Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true", FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, "true",
+            "storeInSegmentFile", "true"));
+    tableConfig.setFieldConfigList(List.of(textFieldConfig));
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory directory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+        SegmentDirectory.Writer writer = directory.createWriter()) {
+      assertTrue(writer.hasIndexFor(TEST_COLUMN, StandardIndexes.inverted()));
+      assertFalse(writer.hasIndexFor(TEST_COLUMN, StandardIndexes.forward()));
+      TextIndexHandler handler = new TextIndexHandler(directory, loadingConfig.getFieldIndexConfigByColName(),
+          tableConfig, schema);
+      assertTrue(handler.needUpdateIndices(writer));
+      handler.updateIndices(writer);
+      // Check before cleanup so a temporary forward-index reconstruction cannot go unnoticed.
+      assertFalse(writer.hasIndexFor(TEST_COLUMN, StandardIndexes.forward()));
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, loadingConfig);
+    try {
+      DataSource dataSource = segment.getDataSource(TEST_COLUMN);
+      assertTrue(dataSource.getTextIndex().isBuildOnDictionary());
+      assertEquals(dataSource.getTextIndex().getDictIds("programming", null).getCardinality(), TEST_DOCUMENTS.length);
+      assertEquals(dataSource.getTextIndex().getDictIds("java", null).toArray(),
+          new int[]{dataSource.getDictionary().indexOf(TEST_DOCUMENTS[0])});
+    } finally {
+      segment.destroy();
+    }
   }
 
   /// Helper method to create a segment with given table config and schema
