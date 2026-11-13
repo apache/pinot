@@ -330,6 +330,8 @@ public class AggregationFunctionFactory {
             return new CovarianceAggregationFunction(arguments, false, nullHandlingEnabled);
           case COVARSAMP:
             return new CovarianceAggregationFunction(arguments, true, nullHandlingEnabled);
+          case CORR:
+            return new CorrelationAggregationFunction(arguments, nullHandlingEnabled);
           case BOOLAND:
             return new BooleanAndAggregationFunction(arguments, nullHandlingEnabled);
           case BOOLOR:

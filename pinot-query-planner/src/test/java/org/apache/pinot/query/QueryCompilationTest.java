@@ -614,6 +614,19 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testCorrelationAggregateResolves() {
+    // CORR is not a Calcite built-in, so this also verifies the operator registered from AggregationFunctionType is
+    // resolvable with two numeric operands, as a plain aggregate and in a GROUP BY.
+    List<String> queries = List.of(
+        "SELECT corr(col3, col7) FROM a",
+        "SELECT col1, corr(col3, col7) FROM a GROUP BY col1",
+        "SELECT corr(col3, col4) FROM a");
+    for (String sql : queries) {
+      assertNotNull(_queryEnvironment.planQuery(sql), "expected a multi-stage plan for: " + sql);
+    }
+  }
+
+  @Test
   public void testAggregateCaseToFilter() {
     // Tests that queries like "SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a" are rewritten to
     // "SELECT COUNT(a) FROM a WHERE col1 = 'a'"
