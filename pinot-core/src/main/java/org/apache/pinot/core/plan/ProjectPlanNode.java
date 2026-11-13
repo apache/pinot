@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -40,7 +41,6 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 /// The `ProjectPlanNode` provides the execution plan for fetching column values on a single segment.
 public class ProjectPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
-  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
   private final Collection<ExpressionContext> _expressions;
   private final int _maxDocsPerCall;
@@ -49,7 +49,6 @@ public class ProjectPlanNode implements PlanNode {
   public ProjectPlanNode(SegmentContext segmentContext, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall, BaseFilterOperator filterOperator) {
     _indexSegment = segmentContext.getIndexSegment();
-    _segmentContext = segmentContext;
     _queryContext = queryContext;
     _expressions = expressions;
     _maxDocsPerCall = maxDocsPerCall;
@@ -64,6 +63,15 @@ public class ProjectPlanNode implements PlanNode {
 
   @Override
   public BaseProjectOperator<?> run() {
+    // LIMIT 0 requires column metadata only.
+    return run(_maxDocsPerCall > 0 ? createDocIdSetOperator() : null);
+  }
+
+  DocIdSetOperator createDocIdSetOperator() {
+    return new DocIdSetOperator(_filterOperator, _maxDocsPerCall);
+  }
+
+  BaseProjectOperator<?> run(@Nullable DocIdSetOperator docIdSetOperator) {
     Set<String> projectionColumns = new HashSet<>();
     boolean hasNonIdentifierExpression = false;
     for (ExpressionContext expression : _expressions) {
@@ -75,11 +83,6 @@ public class ProjectPlanNode implements PlanNode {
     Map<String, DataSource> dataSourceMap = new HashMap<>(HashUtil.getHashMapCapacity(projectionColumns.size()));
     projectionColumns.forEach(
         column -> dataSourceMap.put(column, _indexSegment.getDataSource(column, _queryContext.getSchema())));
-    // NOTE: Skip creating DocIdSetOperator when maxDocsPerCall is 0 (for selection query with LIMIT 0)
-    DocIdSetOperator docIdSetOperator = _maxDocsPerCall > 0
-        ? new DocIdSetPlanNode(_segmentContext, _queryContext, _maxDocsPerCall, _filterOperator).run()
-        : null;
-
     // TODO: figure out a way to close this operator, as it may hold reader context
     ProjectionOperator projectionOperator =
         ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator, _queryContext);
