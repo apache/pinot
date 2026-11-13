@@ -56,8 +56,9 @@ public final class RestrictedScanDocIdIterator implements BlockDocIdIterator {
   private final PeekableIntIterator _candidateDocIdIterator;
   private final ScanBasedDocIdIterator[] _scanDocIdIterators;
   private final int[] _buffer;
+  private final int _initialChunkSize;
 
-  private int _chunkSize = MIN_CHUNK_SIZE;
+  private int _chunkSize;
   private int _cursor;
   private int _limit;
   private boolean _closed;
@@ -66,7 +67,20 @@ public final class RestrictedScanDocIdIterator implements BlockDocIdIterator {
   /// @param scanDocIdIterators the scans to apply to every chunk, in order. Not empty.
   public RestrictedScanDocIdIterator(PeekableIntIterator candidateDocIdIterator,
       List<ScanBasedDocIdIterator> scanDocIdIterators) {
+    this(candidateDocIdIterator, scanDocIdIterators, MIN_CHUNK_SIZE);
+  }
+
+  /// Same as the other constructor, with a different first chunk size. Only benchmarks pass a value other than
+  /// [#MIN_CHUNK_SIZE].
+  ///
+  /// @param initialChunkSize the size of the first chunk, and of the chunk after an [#advance] that skips candidates.
+  ///                         Between 1 and [#MAX_CHUNK_SIZE].
+  public RestrictedScanDocIdIterator(PeekableIntIterator candidateDocIdIterator,
+      List<ScanBasedDocIdIterator> scanDocIdIterators, int initialChunkSize) {
     assert !scanDocIdIterators.isEmpty();
+    assert initialChunkSize > 0 && initialChunkSize <= MAX_CHUNK_SIZE;
+    _initialChunkSize = initialChunkSize;
+    _chunkSize = initialChunkSize;
     _candidateDocIdIterator = candidateDocIdIterator;
     _scanDocIdIterators = scanDocIdIterators.toArray(new ScanBasedDocIdIterator[0]);
     _buffer = new int[MAX_CHUNK_SIZE];
@@ -94,7 +108,7 @@ public final class RestrictedScanDocIdIterator implements BlockDocIdIterator {
     // Move the candidate stream itself to the target, so that the scans are never asked about documents below it
     if (_candidateDocIdIterator.hasNext() && _candidateDocIdIterator.peekNext() < targetDocId) {
       _candidateDocIdIterator.advanceIfNeeded(targetDocId);
-      _chunkSize = MIN_CHUNK_SIZE;
+      _chunkSize = _initialChunkSize;
     }
     return next();
   }
