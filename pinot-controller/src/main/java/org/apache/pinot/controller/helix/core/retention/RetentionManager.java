@@ -125,13 +125,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   /// Runs the per-table work of one run. `context` memoizes the segment ZK metadata list and the deep-store directory
-  /// listing, so each is read at most once per table per run. Subclasses that add per-table work override this method
-  /// and read through the same context, which keeps the added cost at zero extra ZK reads and zero extra listings.
+  /// listing used by time retention and the untracked-segment sweep. A subclass that adds per-table work overrides
+  /// this method and reads through the same context before calling `super`: it then shares the reads those steps
+  /// make, and reads on its own only where they skip one (a non-APPEND OFFLINE table, a table without retention,
+  /// untracked-segment deletion off). Hybrid-strategy and size-based retention read ZK themselves. The context is
+  /// released after time retention, which can delete segments, so a read after `super` sees fresh state.
   protected void processTable(TableConfig tableConfig, TableRunContext context) {
     // Manage normal table retention except segment lineage cleanup.
     // The reason of separating the logic is that REFRESH only table will be skipped in the first part,
     // whereas the segment lineage cleanup needs to be handled.
     manageRetentionForTable(tableConfig, context);
+    // The memoized reads predate the deletes above, and the steps below read what they need themselves.
+    context.release();
 
     // Delete segments based on segment lineage and clean up segment lineage metadata.
     manageSegmentLineageCleanupForTable(tableConfig);
@@ -700,10 +705,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   /// Per-table state of one run. Memoizes the segment ZK metadata list and the deep-store directory listing, the two
-  /// reads that dominate the cost on a large table, so each happens at most once per table per run and every consumer
-  /// in the same `processTable` call sees the same snapshot. A context lives for one `processTable` call only, so the
-  /// memory held for one table is released before the next table is processed. Not thread-safe: the task processes
-  /// tables sequentially under its run lock.
+  /// reads that dominate the cost on a large table, so every consumer before the release sees one snapshot and pays
+  /// for each read once. The base releases the reads after time retention, and a context lives for one `processTable`
+  /// call only. Not thread-safe: the task processes tables sequentially under its run lock.
   public final class TableRunContext {
     private final String _tableNameWithType;
     private final String _rawTableName;
@@ -754,6 +758,13 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         _deepStoreListed = true;
       }
       return _deepStoreFiles;
+    }
+
+    /// Drops the memoized reads, so the next call to a getter reads again.
+    private void release() {
+      _segmentsZKMetadata = null;
+      _deepStoreFiles = null;
+      _deepStoreListed = false;
     }
   }
 
