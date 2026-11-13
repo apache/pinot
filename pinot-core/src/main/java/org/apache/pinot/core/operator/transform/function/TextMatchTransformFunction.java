@@ -44,6 +44,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
   private TransformFunction _columnArg;
   private Dictionary _dictionary;
   private Set<String> _matchingRawValues;
+  private ImmutableRoaringBitmap _matchingDictIds;
   private String _column;
 
   @Override
@@ -115,6 +116,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     _columnArg = columnArg;
     _dictionary = dataSource.getDictionary();
     _matchingRawValues = null;
+    _matchingDictIds = null;
   }
 
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
@@ -124,10 +126,13 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     int[] ids;
     ImmutableRoaringBitmap matchingIds;
     if (_textIndexReader.isBuildOnDictionary()) {
+      if (_matchingDictIds == null) {
+        _matchingDictIds = _textIndexReader.getDictIds(_predicate, _options);
+      }
+      matchingIds = _matchingDictIds;
       if (_columnArg.getDictionary() == null) {
         // A standalone dictionary can coexist with a raw forward index.
         if (_matchingRawValues == null) {
-          matchingIds = _textIndexReader.getDictIds(_predicate, _options);
           _matchingRawValues = new ObjectOpenHashSet<>(matchingIds.getCardinality());
           for (int dictId : matchingIds.toArray()) {
             _matchingRawValues.add(_dictionary.getStringValue(dictId));
@@ -141,7 +146,6 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
         }
         return _intValuesSV;
       }
-      matchingIds = _textIndexReader.getDictIds(_predicate, _options);
       ids = _columnArg.transformToDictIdsSV(valueBlock);
     } else {
       ids = valueBlock.getDocIds();

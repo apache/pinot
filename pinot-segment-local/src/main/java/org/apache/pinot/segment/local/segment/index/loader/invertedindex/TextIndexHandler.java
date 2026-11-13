@@ -308,11 +308,11 @@ public class TextIndexHandler extends BaseIndexHandler {
     int numDocs = columnMetadata.getTotalDocs();
     boolean hasDictionary = columnMetadata.hasDictionary();
 
-    // Create a temporary forward index if it is disabled and does not exist
-    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
-
-    // Get text index configuration to check if storeInSegmentFile is enabled
     TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
+    if (!config.isBuildOnDictionary()) {
+      // Row-based text indexes need a temporary forward index when it is disabled.
+      columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
+    }
     boolean storeInSegmentFile = config.isStoreInSegmentFile();
 
     LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}, storeInSegmentFile: {}",
@@ -331,11 +331,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         .withTextCommitOnClose(true)
         .build();
 
-    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
-        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
-        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        TextIndexCreator textIndexCreator = StandardIndexes.text().createIndexCreator(context, config)) {
+    try (TextIndexCreator textIndexCreator = StandardIndexes.text().createIndexCreator(context, config)) {
       if (config.isBuildOnDictionary()) {
         // Dictionary-based text index: build one Lucene document per distinct value, storing its dictId,
         // matching the dictionary order used by FSTIndexHandler. Requires a dictionary (validated upstream).
@@ -344,12 +340,19 @@ public class TextIndexHandler extends BaseIndexHandler {
             textIndexCreator.add(dictionary.getStringValue(dictId));
           }
         }
-      } else if (columnMetadata.isSingleValue()) {
-        processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
-            columnMetadata);
       } else {
-        processMVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
-            columnMetadata);
+        IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+        try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+            _fieldIndexConfigs.get(columnName), columnMetadata);
+            ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
+          if (columnMetadata.isSingleValue()) {
+            processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
+                columnMetadata);
+          } else {
+            processMVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
+                columnMetadata);
+          }
+        }
       }
       textIndexCreator.seal();
     }

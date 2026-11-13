@@ -232,9 +232,15 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery, @Nullable String optionsString) {
+    return getDictIds(searchQuery, optionsString, null);
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDictIds(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
     if (_buildOnDictionary) {
       // The translator resolves Lucene document IDs to the original dictionary IDs, including after merges.
-      return getDocIds(searchQuery, optionsString, null);
+      return getDocIds(searchQuery, optionsString, queryScopedCache);
     }
     throw new UnsupportedOperationException(
         "getDictIds is only supported when the text index is built on the dictionary for column: " + _column);

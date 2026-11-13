@@ -115,8 +115,12 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
   }
 
   private static List<GenericRow> createTestData() {
-    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
-    for (int i = 0; i < NUM_ROWS; i++) {
+    return createTestData(NUM_ROWS);
+  }
+
+  private static List<GenericRow> createTestData(int numRows) {
+    List<GenericRow> rows = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
       GenericRow row = new GenericRow();
       row.putValue(SV_COL, SV_TOKENS[i % SV_TOKENS.length]);
       row.putValue(MV_COL, new String[]{"fruit", MV_TOKENS[i % MV_TOKENS.length]});
@@ -283,6 +287,30 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
     }
     dictBased.destroy();
     _indexSegment = null;
+  }
+
+  @Test
+  public void dictionaryBasedTextMatchAcrossProjectionBatches()
+      throws Exception {
+    int numRows = 10_005;
+    ImmutableSegment segment = buildAndLoad("dictBatches", tableConfig(true), createTestData(numRows));
+    _indexSegment = segment;
+    _indexSegments = List.of(segment);
+    try {
+      String expression = "TEXT_MATCH(" + SV_COL + ", 'apple')";
+      SelectionResultsBlock result = (SelectionResultsBlock) getOperator("SELECT " + INT_COL + ", CAST("
+          + expression + " AS INT) FROM " + TABLE_NAME + " ORDER BY " + INT_COL + " LIMIT " + numRows).nextBlock();
+      List<Object[]> rows = result.getRows();
+      assertEquals(rows.size(), numRows);
+      for (int i = 0; i < numRows; i++) {
+        assertEquals(rows.get(i)[0], i);
+        assertEquals(rows.get(i)[1], i % SV_TOKENS.length == 0 ? 1 : 0);
+      }
+      assertEquals(count("SELECT SUM(" + expression + ") FROM " + TABLE_NAME), numRows / SV_TOKENS.length);
+    } finally {
+      segment.destroy();
+      _indexSegment = null;
+    }
   }
 
   @Test

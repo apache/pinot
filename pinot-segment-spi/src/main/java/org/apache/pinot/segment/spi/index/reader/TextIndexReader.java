@@ -36,6 +36,13 @@ public interface TextIndexReader extends IndexReader {
     return getDictIds(searchQuery);
   }
 
+  /// Dictionary-id counterpart of [#getDocIds(String, String, QueryScopedCache)].
+  /// Only parsed queries may be shared across readers. Matching dictionary ids remain segment-specific.
+  default ImmutableRoaringBitmap getDictIds(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
+    return getDictIds(searchQuery, optionsString);
+  }
+
   /// Returns the matching document ids for the given search query.
   /// This is the legacy entry point retained for backward compatibility.
   MutableRoaringBitmap getDocIds(String searchQuery);

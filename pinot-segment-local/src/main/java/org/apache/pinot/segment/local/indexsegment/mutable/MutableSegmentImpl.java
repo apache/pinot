@@ -89,6 +89,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.VectorIndexConfigProvider;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -424,10 +425,12 @@ public class MutableSegmentImpl implements MutableSegment {
       // If the raw value is provided, use it for the forward/dictionary index of this column by wrapping the
       // already created MutableIndex with a SameValue implementation. This optimization can only be done when
       // the mutable index is being reused
-      boolean reuseMutableIndex = indexConfigs.getConfig(StandardIndexes.text()).isReuseMutableIndex();
+      // Dictionary-based text indexes rebuild at sealing and require the original dictionary values.
+      TextIndexConfig textIndexConfig = indexConfigs.getConfig(StandardIndexes.text());
+      boolean reuseMutableIndex = textIndexConfig.isReuseMutableIndex() && !textIndexConfig.isBuildOnDictionary();
       if (reuseMutableIndex) {
         hasColumnWithReuseMutableTextIndex = true;
-        Object rawValueForTextIndex = indexConfigs.getConfig(StandardIndexes.text()).getRawValueForTextIndex();
+        Object rawValueForTextIndex = textIndexConfig.getRawValueForTextIndex();
         if (rawValueForTextIndex != null) {
           if (dictionary == null) {
             MutableIndex forwardIndex = mutableIndexes.get(StandardIndexes.forward());

@@ -49,7 +49,7 @@ public class TextMatchDictIdPredicateEvaluatorFactory {
       TextIndexReader textIndexReader, DataSource dataSource, QueryContext queryContext) {
     Dictionary dictionary = dataSource.getDictionary();
     PredicateEvaluator evaluator =
-        new TextMatchDictIdPredicateEvaluator(textMatchPredicate, textIndexReader, dictionary);
+        new TextMatchDictIdPredicateEvaluator(textMatchPredicate, textIndexReader, dictionary, queryContext);
     if (!evaluator.isAlwaysTrue() && !evaluator.isAlwaysFalse()
         && PredicateEvaluatorProvider.getDictionaryUsableForFiltering(dataSource, queryContext, textMatchPredicate)
         == null) {
@@ -83,10 +83,10 @@ public class TextMatchDictIdPredicateEvaluatorFactory {
     final ImmutableRoaringBitmap _matchingDictIdBitmap;
 
     public TextMatchDictIdPredicateEvaluator(TextMatchPredicate textMatchPredicate, TextIndexReader textIndexReader,
-        Dictionary dictionary) {
+        Dictionary dictionary, QueryContext queryContext) {
       super(textMatchPredicate, dictionary);
       _matchingDictIdBitmap =
-          textIndexReader.getDictIds(textMatchPredicate.getValue(), textMatchPredicate.getOptions());
+          textIndexReader.getDictIds(textMatchPredicate.getValue(), textMatchPredicate.getOptions(), queryContext);
       int numMatchingDictIds = _matchingDictIdBitmap.getCardinality();
       if (numMatchingDictIds == 0) {
         _alwaysFalse = true;
