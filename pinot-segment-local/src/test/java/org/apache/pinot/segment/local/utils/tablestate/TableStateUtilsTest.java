@@ -21,15 +21,22 @@ package org.apache.pinot.segment.local.utils.tablestate;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.LiveInstance;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils.ReadinessSnapshot;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -42,6 +49,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -121,14 +129,33 @@ public class TableStateUtilsTest {
         "The legacy table-wide check still includes other partitions and successors");
   }
 
-  @Test
-  public void testRequiresSegmentsWithUnknownPartition() {
+  @DataProvider
+  public Object[][] unresolvedPartitionMetadata() {
+    return new Object[][]{
+        {null},
+        {Map.of()},
+        {Map.of("primaryKey", new ColumnPartitionMetadata("Murmur", 8, Set.of(2, 3), null))},
+        {Map.of("primaryKey", new ColumnPartitionMetadata("Murmur", 8, Set.of(2), null),
+            "otherColumn", new ColumnPartitionMetadata("Murmur", 8, Set.of(3), null))}
+    };
+  }
+
+  @Test(dataProvider = "unresolvedPartitionMetadata")
+  public void testRequiresSegmentsWithUnknownPartition(Map<String, ColumnPartitionMetadata> columns) {
     Assignment fixture = new Assignment();
-    String uploadedSegment = "customSegmentName";
-    fixture.assign(uploadedSegment, ONLINE);
-    assertFalse(fixture.isReady(), "A segment with an unknown partition may hold base rows for this consumer");
-    fixture._currentState.setState(uploadedSegment, ONLINE);
+    String segmentName = "customSegmentName";
+    fixture.assign(segmentName, ONLINE);
+    if (columns != null) {
+      fixture.metadata(segmentName, columns);
+    }
+    assertFalse(fixture.isReady(), "Unresolved metadata may hold base rows for this consumer");
+    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    assertFalse(snapshot.isReadyToConsume(fixture._consumer, name -> false));
+    assertTrue(snapshot.isReadyToConsume(fixture._consumer, segmentName::equals));
+    fixture._currentState.setState(segmentName, ONLINE);
     assertTrue(fixture.isReady());
+    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE)
+        .isReadyToConsume(fixture._consumer, name -> false));
   }
 
   @DataProvider
@@ -155,6 +182,70 @@ public class TableStateUtilsTest {
         "An uploaded segment in this partition must still finish loading");
     fixture._currentState.setState(samePartition, ONLINE);
     assertTrue(fixture.isReady(), "Readiness must depend only on the required partition's uploaded segment");
+  }
+
+  @Test(dataProvider = "uploadedSegmentStates")
+  public void testCustomSegmentsAreScopedByPartitionMetadata(String state) {
+    Assignment fixture = new Assignment();
+    String segmentName = "customSegmentName";
+    fixture.assign(segmentName, ONLINE);
+    SegmentZKMetadata metadata = fixture.metadata(segmentName, partitionColumns(2));
+    if (state != null) {
+      fixture._currentState.setState(segmentName, state);
+    }
+    assertTrue(fixture.isReady(), "A custom-named segment in another partition must not block consumption");
+    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE)
+        .isReadyToConsume(fixture._consumer, name -> false));
+
+    metadata.setPartitionMetadata(new SegmentPartitionMetadata(partitionColumns(1)));
+    assertEquals(fixture.isReady(), ONLINE.equals(state));
+    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    assertEquals(snapshot.isReadyToConsume(fixture._consumer, name -> false), ONLINE.equals(state));
+    assertTrue(snapshot.isReadyToConsume(fixture._consumer, segmentName::equals),
+        "Local completion must still satisfy custom-named history");
+  }
+
+  @Test
+  public void testNamedAndUnassignedSegmentsDoNotReadMetadata() {
+    Assignment fixture = new Assignment();
+    String predecessor = segment(1, 1);
+    fixture.assign(predecessor, ONLINE);
+    fixture._currentState.setState(predecessor, ONLINE);
+    fixture.assign(new UploadedRealtimeSegmentName(TABLE, 2, 0, "uploaded", "base").getSegmentName(), ONLINE);
+    fixture.assign("offlineCustomSegment", OFFLINE);
+    fixture.assign("consumingCustomSegment", CONSUMING);
+    fixture._idealState.setInstanceStateMap("remoteCustomSegment", Map.of(OTHER_SERVER, ONLINE));
+    assertTrue(fixture.isReady());
+    assertTrue(TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE)
+        .isReadyToConsume(fixture._consumer, name -> false));
+    verifyNoInteractions(fixture._propertyStore);
+  }
+
+  @Test
+  public void testSnapshotFreezesPartitionMetadataUntilFreshRead() {
+    Assignment fixture = new Assignment();
+    LLCSegmentName otherConsumer = new LLCSegmentName(TABLE, 2, 3, 0);
+    fixture.assign(otherConsumer.getSegmentName(), CONSUMING);
+    String segmentName = "customSegmentName";
+    fixture.assign(segmentName, ONLINE);
+    SegmentZKMetadata metadata = fixture.metadata(segmentName, partitionColumns(2));
+    ReadinessSnapshot snapshot = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    verify(fixture._propertyStore).get(ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE, segmentName),
+        null, AccessOption.PERSISTENT);
+    verifyNoMoreInteractions(fixture._propertyStore);
+
+    // The mocked store returns this same mutable record. A snapshot must retain the resolved id, not the record.
+    metadata.setPartitionMetadata(new SegmentPartitionMetadata(partitionColumns(1)));
+    clearInvocations(fixture._accessor, fixture._propertyStore);
+    assertTrue(snapshot.isReadyToConsume(fixture._consumer, name -> false));
+    assertFalse(snapshot.isReadyToConsume(otherConsumer, name -> false));
+    assertTrue(snapshot.isReadyToConsume(fixture._consumer, name -> false));
+    verifyNoInteractions(fixture._accessor, fixture._propertyStore);
+
+    assertFalse(fixture.isReady(), "Fresh confirmation must observe a changed partition for the same segment name");
+    ReadinessSnapshot refreshed = TableStateUtils.getReadinessSnapshot(fixture._manager, TABLE);
+    assertFalse(refreshed.isReadyToConsume(fixture._consumer, name -> false));
+    assertTrue(refreshed.isReadyToConsume(otherConsumer, name -> false));
   }
 
   @Test
@@ -309,6 +400,10 @@ public class TableStateUtilsTest {
     verifyNoInteractions(fixture._accessor);
   }
 
+  private static Map<String, ColumnPartitionMetadata> partitionColumns(int partitionId) {
+    return Map.of("primaryKey", new ColumnPartitionMetadata("Murmur", 8, Set.of(partitionId), null));
+  }
+
   private static String segment(int partitionId, int sequenceNumber) {
     return new LLCSegmentName(TABLE, partitionId, sequenceNumber, 0).getSegmentName();
   }
@@ -318,6 +413,8 @@ public class TableStateUtilsTest {
     private final LLCSegmentName _consumer = new LLCSegmentName(TABLE, 1, 3, 0);
     private final HelixManager _manager = mock(HelixManager.class);
     private final HelixDataAccessor _accessor = mock(HelixDataAccessor.class);
+    @SuppressWarnings("unchecked")
+    private final ZkHelixPropertyStore<ZNRecord> _propertyStore = mock(ZkHelixPropertyStore.class);
     private final PropertyKey.Builder _keys = new PropertyKey.Builder("test-cluster");
     private final IdealState _idealState = new IdealState(TABLE);
     private final CurrentState _currentState = new CurrentState(TABLE);
@@ -326,6 +423,7 @@ public class TableStateUtilsTest {
     Assignment() {
       when(_manager.getInstanceName()).thenReturn(SERVER);
       when(_manager.getHelixDataAccessor()).thenReturn(_accessor);
+      when(_manager.getHelixPropertyStore()).thenReturn(_propertyStore);
       when(_accessor.keyBuilder()).thenReturn(_keys);
       when(_accessor.getProperty(_keys.idealStates(TABLE))).thenReturn(_idealState);
       when(_accessor.getProperty(_keys.liveInstance(SERVER))).thenReturn(_liveInstance);
@@ -336,6 +434,16 @@ public class TableStateUtilsTest {
 
     void assign(String segmentName, String state) {
       _idealState.setInstanceStateMap(segmentName, Map.of(SERVER, state));
+    }
+
+    SegmentZKMetadata metadata(String segmentName, Map<String, ColumnPartitionMetadata> columns) {
+      SegmentZKMetadata metadata = new SegmentZKMetadata(segmentName);
+      if (!columns.isEmpty()) {
+        metadata.setPartitionMetadata(new SegmentPartitionMetadata(columns));
+      }
+      when(_propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE, segmentName), null,
+          AccessOption.PERSISTENT)).thenReturn(metadata.toZNRecord());
+      return metadata;
     }
 
     boolean isReady() {

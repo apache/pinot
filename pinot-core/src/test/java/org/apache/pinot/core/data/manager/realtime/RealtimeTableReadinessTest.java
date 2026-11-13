@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,6 +39,8 @@ import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.zookeeper.zkclient.exception.ZkTimeoutException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -55,6 +58,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -74,6 +78,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
@@ -236,6 +241,40 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
+  public void testCachedSuccessRechecksCustomSegmentPartitionMetadata() throws Exception {
+    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL);
+        MockedStatic<ZKMetadataProvider> metadata = mockStatic(ZKMetadataProvider.class)) {
+      LLCSegmentName base = name(0, 1);
+      LLCSegmentName consumer = name(0, 2);
+      String customSegment = "customSegment";
+      table.assign(base, ONLINE);
+      table.assign(consumer, CONSUMING);
+      table._assignment.setInstanceStateMap(customSegment, Map.of(SERVER, ONLINE));
+      table._currentState.setState(customSegment, ERROR);
+      ImmutableSegmentDataManager manager = new ImmutableSegmentDataManager(mock(ImmutableSegment.class));
+      table.registerLocal(base, manager);
+      metadata.when(() -> ZKMetadataProvider.getSegmentZKMetadata(
+          table.getHelixManager().getHelixPropertyStore(), TABLE, customSegment))
+          .thenReturn(customSegmentMetadata(customSegment, 1), customSegmentMetadata(customSegment, 0));
+
+      BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
+      assertFalse(ready.getAsBoolean(), "The missing base must reject the first snapshot");
+      metadata.verify(() -> ZKMetadataProvider.getSegmentZKMetadata(
+          table.getHelixManager().getHelixPropertyStore(), TABLE, customSegment));
+
+      // Keep the snapshot's clock and Helix records unchanged. Local completion makes its cached answer positive,
+      // but a fresh metadata lookup now places the ERROR segment in this consumer's partition.
+      manager.markPartitionMetadataInitialized();
+      assertFalse(ready.getAsBoolean(), "Cached partition metadata must not hide newly required history");
+      table._currentState.setState(customSegment, ONLINE);
+      assertTrue(ready.getAsBoolean(), "The same consumer must become ready after that history loads");
+      metadata.verify(() -> ZKMetadataProvider.getSegmentZKMetadata(
+          table.getHelixManager().getHelixPropertyStore(), TABLE, customSegment), times(3));
+      table.verifySnapshotReads(3);
+    }
+  }
+
+  @Test
   public void testNewConsumerRefreshesOlderSnapshot() throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName first = name(0, 0);
@@ -321,6 +360,28 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
+  public void testReadinessRetriesTransientSegmentMetadataFailure() throws Exception {
+    try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL);
+        MockedStatic<ZKMetadataProvider> metadata = mockStatic(ZKMetadataProvider.class)) {
+      LLCSegmentName consumer = name(0, 1);
+      String customSegment = "customSegment";
+      table.assign(consumer, CONSUMING);
+      table._assignment.setInstanceStateMap(customSegment, Map.of(SERVER, ONLINE));
+      table._currentState.setState(customSegment, ONLINE);
+      metadata.when(() -> ZKMetadataProvider.getSegmentZKMetadata(
+          table.getHelixManager().getHelixPropertyStore(), TABLE, customSegment))
+          .thenThrow(new ZkTimeoutException("Transient segment metadata read failure"))
+          .thenReturn(customSegmentMetadata(customSegment, 0));
+
+      BooleanSupplier ready = table.createReadyToConsumeDataSupplier(consumer);
+      assertFalse(ready.getAsBoolean(), "A metadata lookup failure must hold consumption without terminating it");
+      assertTrue(ready.getAsBoolean(), "The same consumer must retry the failed metadata lookup");
+      metadata.verify(() -> ZKMetadataProvider.getSegmentZKMetadata(
+          table.getHelixManager().getHelixPropertyStore(), TABLE, customSegment), times(2));
+    }
+  }
+
+  @Test
   public void testDedupWaitsForHistoricalSegments() throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.NONE, true)) {
       LLCSegmentName base = name(0, 1);
@@ -399,6 +460,13 @@ public class RealtimeTableReadinessTest {
 
   private static LLCSegmentName name(int partition, int sequence) {
     return new LLCSegmentName(RAW_TABLE, partition, sequence, 0);
+  }
+
+  private static SegmentZKMetadata customSegmentMetadata(String segmentName, int partition) {
+    SegmentZKMetadata metadata = new SegmentZKMetadata(segmentName);
+    metadata.setPartitionMetadata(new SegmentPartitionMetadata(
+        Map.of(KEY, new ColumnPartitionMetadata("Murmur", 2, Set.of(partition), null))));
+    return metadata;
   }
 
   private static GenericRow row(String key, long value, long timestamp) {
