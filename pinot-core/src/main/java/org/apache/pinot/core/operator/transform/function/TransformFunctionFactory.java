@@ -176,6 +176,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.TEXT_MATCH, TextMatchTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TEXT_SCORE, TextScoreTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.EQUALS, EqualsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.NOT_EQUALS, NotEqualsTransformFunction.class);
