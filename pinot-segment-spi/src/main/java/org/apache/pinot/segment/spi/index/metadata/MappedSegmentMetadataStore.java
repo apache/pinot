@@ -74,7 +74,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 /// The big-endian file starts with a 64-byte header containing the magic, format version, total length, source
 /// `metadata.properties` and `index_map` length/CRC fingerprints, registered index IDs, payload CRC,
 /// segment-property blob reference,
-/// column count, and record-table bounds. Sorted columns occupy fixed 180-byte records, followed by variable blobs;
+/// column count, and record-table bounds. Sorted columns occupy fixed 200-byte records, followed by variable blobs;
 /// each blob reference is an absolute 32-bit offset and length. Numeric column statistics are read directly from the
 /// backing buffer. The column layout retains names and reusable [FieldSpec] references on heap.
 ///
@@ -95,9 +95,9 @@ final class MappedSegmentMetadataStore implements Closeable {
   }
 
   private static final int MAGIC = 0x504d4431; // PMD1
-  private static final int VERSION = 1;
+  private static final int VERSION = 2;
   private static final int HEADER_SIZE = 64;
-  private static final int RECORD_SIZE = 180;
+  private static final int RECORD_SIZE = 200;
 
   static final int NAME = 0;
   static final int FIELD_SPEC = 8;
@@ -128,6 +128,10 @@ final class MappedSegmentMetadataStore implements Closeable {
   static final int COMPRESSION_TYPE = 160;
   static final int INDEXES = 168;
   static final int INDEX_COUNT = 176;
+  // Added in version 2. Version 1 sidecars lack transform provenance and are rebuilt.
+  static final int TRANSFORM_FUNCTION = 180;
+  static final int TRANSFORM_PROVENANCE_VERSION = 188;
+  static final int TRANSFORM_FINGERPRINT = 192;
 
   static final int HAS_DICTIONARY = 1;
   static final int SORTED = 1 << 1;
@@ -468,6 +472,9 @@ final class MappedSegmentMetadataStore implements Closeable {
       putRef(recordBuffer, offset + COMPRESSION_TYPE,
           blobs.add(metadata.getRawForwardIndexChunkCompressionType() != null
               ? metadata.getRawForwardIndexChunkCompressionType().name() : null));
+      putRef(recordBuffer, offset + TRANSFORM_FUNCTION, blobs.add(metadata.getTransformFunction()));
+      recordBuffer.putInt(offset + TRANSFORM_PROVENANCE_VERSION, metadata.getTransformFunctionProvenanceVersion());
+      putRef(recordBuffer, offset + TRANSFORM_FINGERPRINT, blobs.add(metadata.getTransformFunctionFingerprint()));
       int numIndexes = metadata.getNumIndexes();
       recordBuffer.putInt(offset + INDEX_COUNT, numIndexes);
       if (numIndexes == 0) {
@@ -697,7 +704,8 @@ final class MappedSegmentMetadataStore implements Closeable {
     for (int i = 0; i < count; i++) {
       int record = table + i * RECORD_SIZE;
       for (int field : new int[]{NAME, FIELD_SPEC, MIN_BLOB, MAX_BLOB, PARTITION_FUNCTION, PARTITIONS, PARENT,
-          SPARSE_KEYS, SPARSE_MULTI_VALUE_KEYS, SPARSE_KEY_TYPES, COMPRESSION_TYPE, INDEXES}) {
+          SPARSE_KEYS, SPARSE_MULTI_VALUE_KEYS, SPARSE_KEY_TYPES, COMPRESSION_TYPE, INDEXES, TRANSFORM_FUNCTION,
+          TRANSFORM_FINGERPRINT}) {
         validateBlob(buffer, buffer.getInt(record + field), buffer.getInt(record + field + 4), blobStart,
             bytes.length, field != NAME && field != FIELD_SPEC);
       }
