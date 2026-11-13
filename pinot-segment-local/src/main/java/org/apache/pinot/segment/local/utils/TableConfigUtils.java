@@ -591,6 +591,12 @@ public final class TableConfigUtils {
       Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
           "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
       StreamIngestionConfig streamIngestionConfig = ingestionConfig.getStreamIngestionConfig();
+      if (streamIngestionConfig.isReplicateMode()) {
+        Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+            "replicateMode is only supported for REALTIME tables");
+        Preconditions.checkState(!tableConfig.isUpsertEnabled() && !tableConfig.isDedupEnabled(),
+            "replicateMode currently supports only append-only tables without upsert or dedup");
+      }
       List<Map<String, String>> streamConfigMaps = streamIngestionConfig.getStreamConfigMaps();
       Preconditions.checkState(!streamConfigMaps.isEmpty(), "Must have at least 1 stream in REALTIME table");
       // TODO: for multiple stream configs, validate them

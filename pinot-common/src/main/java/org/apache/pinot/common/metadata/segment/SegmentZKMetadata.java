@@ -370,6 +370,15 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.Realtime.NUM_REPLICAS, numReplicas);
   }
 
+  /// Returns the consumption mode captured when this segment was created. Legacy metadata defaults to false.
+  public boolean isReplicateMode() {
+    return Boolean.parseBoolean(_simpleFields.get(Segment.Realtime.REPLICATE_MODE));
+  }
+
+  public void setReplicateMode(boolean replicateMode) {
+    setValue(Segment.Realtime.REPLICATE_MODE, replicateMode);
+  }
+
   /* FOR PARALLEL PUSH PROTECTION */
 
   public long getSegmentUploadStartTime() {

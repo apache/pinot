@@ -1227,6 +1227,34 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testReplicateModeValidation() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+    StreamIngestionConfig streamConfig = new StreamIngestionConfig(List.of(getStreamConfigs()));
+    streamConfig.setReplicateMode(true);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(streamConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setIngestionConfig(ingestionConfig).build();
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    tableConfig.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
+    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateIngestionConfig(tableConfig, schema));
+    tableConfig.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.PARTIAL));
+    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateIngestionConfig(tableConfig, schema));
+    tableConfig.setUpsertConfig(null);
+    tableConfig.setDedupConfig(new DedupConfig());
+    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validateIngestionConfig(tableConfig, schema));
+
+    streamConfig.setReplicateMode(false);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIngestionConfig(ingestionConfig).build();
+    streamConfig.setReplicateMode(true);
+    expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateIngestionConfig(offlineTableConfig, schema));
+  }
+
+  @Test
   public void ingestionBatchConfigsTest() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
 

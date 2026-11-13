@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
+import org.apache.pinot.common.assignment.ReplicateModeAssignmentUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
@@ -75,7 +77,58 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 ///   well. Upsert and dedup rely on this to serve all segments of a partition from the same instance, so these tables
 ///   cannot relocate COMPLETED segments, must include CONSUMING segments in the rebalance, and upsert tables cannot
 ///   use tiers.
+/// - Replicate-mode CONSUMING segments are assigned through [#assignConsumingSegment]: the complete replica set is
+///   retained in auxiliary IdealState fields, but only its stable consumption leader is assigned to the segment.
 public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
+
+  @Override
+  public List<String> assignConsumingSegment(SegmentZKMetadata segmentZKMetadata, IdealState idealState,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+    if (!segmentZKMetadata.isReplicateMode()) {
+      return assignSegment(segmentZKMetadata.getSegmentName(), idealState, instancePartitionsMap);
+    }
+    Preconditions.checkState(instancePartitionsMap.size() == 1
+            && instancePartitionsMap.containsKey(InstancePartitionsType.CONSUMING),
+        "A replicate-mode consuming segment requires CONSUMING instance partitions");
+    Preconditions.checkState(!segmentZKMetadata.getStatus().isCompleted(),
+        "Cannot assign completed segment: %s as a consuming segment", segmentZKMetadata.getSegmentName());
+    int partitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
+
+    // A single consuming replica cannot be used to bootstrap a partition-pinned table's full replica set, e.g. when
+    // strict replica-group routing is enabled after replicate mode. Restore the recorded candidates first.
+    if (_partitionPinned && CollectionUtils.isEmpty(PartitionAssignmentUtils.getInstances(idealState, partitionId))) {
+      List<String> recordedReplicas = ReplicateModeAssignmentUtils.getReplicas(idealState, partitionId);
+      if (!recordedReplicas.isEmpty()) {
+        PartitionAssignmentUtils.setInstances(idealState, partitionId, recordedReplicas);
+      }
+    }
+    List<String> replicas = assignSegment(segmentZKMetadata.getSegmentName(), idealState, instancePartitionsMap);
+    Preconditions.checkState(!replicas.isEmpty(), "No replica candidates for partition: %s", partitionId);
+    String leader = ReplicateModeAssignmentUtils.getLeader(idealState, partitionId);
+    if (leader == null || !replicas.contains(leader)) {
+      Map<String, Integer> leaderCounts = new HashMap<>();
+      ReplicateModeAssignmentUtils.getLeaders(idealState).forEach((id, instance) -> {
+        if (id != partitionId) {
+          leaderCounts.merge(instance, 1, Integer::sum);
+        }
+      });
+      // Rotate the tie-breaking order across partitions so replica groups are not always led by the first group.
+      int startIndex = Math.floorMod(partitionId, replicas.size());
+      int minCount = Integer.MAX_VALUE;
+      for (int i = 0; i < replicas.size(); i++) {
+        String candidate = replicas.get((startIndex + i) % replicas.size());
+        int count = leaderCounts.getOrDefault(candidate, 0);
+        if (count < minCount) {
+          leader = candidate;
+          minCount = count;
+        }
+      }
+    }
+    ReplicateModeAssignmentUtils.setAssignment(idealState, partitionId, leader, replicas);
+    _logger.info("Assigned consumption leader: {} with replica candidates: {} for partition: {} of table: {}", leader,
+        replicas, partitionId, _tableNameWithType);
+    return List.of(leader);
+  }
 
   @Override
   public List<String> assignSegment(String segmentName, IdealState idealState,

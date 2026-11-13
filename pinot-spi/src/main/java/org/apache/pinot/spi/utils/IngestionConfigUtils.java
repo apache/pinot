@@ -33,6 +33,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -56,6 +57,16 @@ public final class IngestionConfigUtils {
   // For partition from different topics, we pad then with an offset to avoid collision. The offset is far higher
   // than the normal max number of partitions on stream (e.g. 512).
   public static final int PARTITION_PADDING_OFFSET = 10000;
+
+  /// Returns whether new consuming segments should use a single consumption leader. Existing segments retain the
+  /// mode recorded in their segment metadata, independently of subsequent table configuration changes.
+  public static boolean isReplicateModeEnabled(TableConfig tableConfig) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    StreamIngestionConfig streamIngestionConfig =
+        ingestionConfig != null ? ingestionConfig.getStreamIngestionConfig() : null;
+    return tableConfig.getTableType() == TableType.REALTIME && streamIngestionConfig != null
+        && streamIngestionConfig.isReplicateMode();
+  }
 
   /// Fetches the streamConfig from the given realtime table.
   /// First, the ingestionConfigs->stream->streamConfigs will be checked.

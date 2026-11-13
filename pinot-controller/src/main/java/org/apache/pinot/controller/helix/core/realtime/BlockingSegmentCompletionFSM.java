@@ -113,7 +113,8 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _segmentName = segmentName;
     _rawTableName = _segmentName.getTableName();
     _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
-    _numReplicas = segmentMetadata.getNumReplicas();
+    // Followers only load the committed artifact; they never report consumption offsets to this FSM.
+    _numReplicas = segmentMetadata.isReplicateMode() ? 1 : segmentMetadata.getNumReplicas();
     _segmentManager = segmentManager;
     _commitStateMap = new HashMap<>(HashUtil.getHashMapCapacity(_numReplicas));
     _excludedServerStateMap = new HashSet<>(_numReplicas);

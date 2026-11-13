@@ -34,9 +34,26 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentZKMetadataTest {
+
+  @Test
+  public void testReplicateModeMetadataRoundTrip()
+      throws IOException {
+    SegmentZKMetadata metadata = new SegmentZKMetadata("testTable__0__0__20261106T0000Z");
+    metadata.setNumReplicas(3);
+    assertFalse(metadata.isReplicateMode());
+    for (boolean replicateMode : new boolean[]{true, false}) {
+      metadata.setReplicateMode(replicateMode);
+      SegmentZKMetadata restored = SegmentZKMetadata.fromJsonString(metadata.toJsonString());
+      assertEquals(restored.isReplicateMode(), replicateMode);
+      assertEquals(restored.getNumReplicas(), 3);
+      assertTrue(restored.getSimpleFields().containsKey(CommonConstants.Segment.Realtime.REPLICATE_MODE));
+    }
+  }
 
   @Test
   public void realtimeSegmentZKMetadataConversionTest()

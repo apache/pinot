@@ -131,6 +131,23 @@ public class SegmentCompletionTest {
   }
 
   @Test
+  public void testReplicateModeCommitsWithoutWaitingForFollowers() {
+    _segmentManager._segmentMetadata.setReplicateMode(true);
+    Request.Params params = new Request.Params().withInstanceId(S_1)
+        .withStreamPartitionMsgOffset(_s1Offset.toString()).withSegmentName(_segmentNameStr)
+        .withReason(SegmentCompletionProtocol.REASON_TIME_LIMIT);
+    // A time-limit flush must commit immediately, without waiting for reports from the two non-consuming followers.
+    assertEquals(_segmentCompletionMgr.segmentConsumed(params).getStatus(), ControllerResponseStatus.COMMIT);
+    assertEquals(_segmentManager._segmentMetadata.getNumReplicas(), 3);
+    assertEquals(_segmentCompletionMgr.segmentCommitStart(params).getStatus(),
+        ControllerResponseStatus.COMMIT_CONTINUE);
+    params.withSegmentLocation("location");
+    assertEquals(_segmentCompletionMgr.segmentCommitEnd(params,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params)).getStatus(),
+        ControllerResponseStatus.COMMIT_SUCCESS);
+  }
+
+  @Test
   public void testStoppedConsumeDuringCompletion() {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
