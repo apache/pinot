@@ -44,8 +44,11 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.frequencies.FrequentItemsSketch;
 import org.apache.datasketches.frequencies.FrequentLongsSketch;
@@ -82,9 +85,18 @@ import org.apache.pinot.core.query.aggregation.function.array.ListAggDistinctFun
 import org.apache.pinot.core.query.aggregation.function.array.ListAggFunction;
 import org.apache.pinot.core.query.aggregation.function.array.SumArrayDoubleAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.array.SumArrayLongAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.distinct.BaseOffHeapSet;
+import org.apache.pinot.core.query.aggregation.function.distinct.OffHeap128BitSet;
+import org.apache.pinot.core.query.aggregation.function.distinct.OffHeap32BitSet;
+import org.apache.pinot.core.query.aggregation.function.distinct.OffHeap64BitSet;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEventWithExtraFields;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelCompleteCountAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelEventsFunctionEvalAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMatchStepAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMaxStepAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelStepDurationStatsAggregationFunction;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxMeasuringValSetWrapper;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxProjectionValSetWrapper;
@@ -102,8 +114,14 @@ import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.segment.local.customobject.SerializedCPCSketch;
 import org.apache.pinot.segment.local.customobject.SerializedFrequentLongsSketch;
 import org.apache.pinot.segment.local.customobject.SerializedFrequentStringsSketch;
+import org.apache.pinot.segment.local.customobject.SerializedHLL;
+import org.apache.pinot.segment.local.customobject.SerializedHLLPlus;
+import org.apache.pinot.segment.local.customobject.SerializedKLL;
+import org.apache.pinot.segment.local.customobject.SerializedQuantileDigest;
+import org.apache.pinot.segment.local.customobject.SerializedULL;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
@@ -112,6 +130,7 @@ import org.apache.pinot.segment.local.customobject.tdigest.NonFiniteAwareTDigest
 import org.apache.pinot.segment.local.customobject.tdigest.SerializedTDigest;
 import org.apache.pinot.segment.local.customobject.tdigest.TDigest;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -121,13 +140,18 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 /// Checks that the serialized intermediate result of an aggregation function has the wire type value mixed-version
 /// servers and brokers exchange, writes the payload of its [SerializedResult#getBytes] into a heap or direct buffer
 /// and into a paged output stream, filling exactly [SerializedResult#getSize] bytes, and that the payload deserializes
 /// to a result with the same final result, which keeps no reference to the buffer it was read from.
+///
+/// Every [AggregationFunctionType] is either the type of a function checked here or listed in [#EXCLUDED_TYPES] with
+/// the reason it is not, so a new function type cannot go unchecked.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class IntermediateResultByteBufferSerDeTest {
   private static final ExpressionContext COLUMN = ExpressionContext.forIdentifier("column");
@@ -137,6 +161,37 @@ public class IntermediateResultByteBufferSerDeTest {
       ExpressionContext.forLiteral(Literal.stringValue("threshold=1"));
   private static final int PADDING = 4;
   private static final byte PADDING_BYTE = 0x5a;
+
+  /// The aggregation function types that no function in [#intermediateResults] has, mapped to the reason.
+  private static final Map<AggregationFunctionType, String> EXCLUDED_TYPES = Map.ofEntries(
+      Map.entry(AggregationFunctionType.COUNT, "LONG intermediate result"),
+      Map.entry(AggregationFunctionType.MIN, "DOUBLE intermediate result"),
+      Map.entry(AggregationFunctionType.MAX, "DOUBLE intermediate result"),
+      Map.entry(AggregationFunctionType.MINSTRING, "STRING intermediate result"),
+      Map.entry(AggregationFunctionType.MAXSTRING, "STRING intermediate result"),
+      Map.entry(AggregationFunctionType.MINLONG, "LONG intermediate result"),
+      Map.entry(AggregationFunctionType.MAXLONG, "LONG intermediate result"),
+      Map.entry(AggregationFunctionType.SUM, "DOUBLE intermediate result"),
+      Map.entry(AggregationFunctionType.SUM0, "DOUBLE intermediate result"),
+      Map.entry(AggregationFunctionType.SUMINT, "LONG intermediate result"),
+      Map.entry(AggregationFunctionType.SUMLONG, "LONG intermediate result"),
+      Map.entry(AggregationFunctionType.DISTINCTCOUNTOFFHEAP, "checked by testDistinctCountOffHeap"),
+      Map.entry(AggregationFunctionType.SEGMENTPARTITIONEDDISTINCTCOUNT, "LONG intermediate result"),
+      Map.entry(AggregationFunctionType.FOURTHMOMENT, "no final result; same function class as KURTOSIS and SKEWNESS"),
+      Map.entry(AggregationFunctionType.BOOLAND, "INT intermediate result"),
+      Map.entry(AggregationFunctionType.BOOLOR, "INT intermediate result"),
+      Map.entry(AggregationFunctionType.EXPRMIN, "rewritten into PINOTPARENTAGGEXPRMIN and PINOTCHILDAGGEXPRMIN"),
+      Map.entry(AggregationFunctionType.EXPRMAX, "rewritten into PINOTPARENTAGGEXPRMAX and PINOTCHILDAGGEXPRMAX"),
+      Map.entry(AggregationFunctionType.PINOTPARENTAGGEXPRMIN, "checked by testParentExprMinMax"),
+      Map.entry(AggregationFunctionType.PINOTPARENTAGGEXPRMAX, "checked by testParentExprMinMax"),
+      Map.entry(AggregationFunctionType.PINOTCHILDAGGEXPRMIN, "LONG intermediate result"),
+      Map.entry(AggregationFunctionType.PINOTCHILDAGGEXPRMAX, "LONG intermediate result"),
+      Map.entry(AggregationFunctionType.COUNTMV, "LONG intermediate result"),
+      Map.entry(AggregationFunctionType.MINMV, "DOUBLE intermediate result"),
+      Map.entry(AggregationFunctionType.MAXMV, "DOUBLE intermediate result"),
+      Map.entry(AggregationFunctionType.SUMMV, "DOUBLE intermediate result"),
+      Map.entry(AggregationFunctionType.TIMESERIESAGGREGATE, "time series engine only, which never serializes it")
+  );
 
   private static final HistogramAggregationFunction HISTOGRAM = new HistogramAggregationFunction(
       List.of(COLUMN, ExpressionContext.forLiteral(Literal.doubleValue(0)),
@@ -164,12 +219,28 @@ public class IntermediateResultByteBufferSerDeTest {
       List.of(COLUMN, ExpressionContext.forLiteral(Literal.stringValue("MIN")),
           ExpressionContext.forLiteral(Literal.stringValue("STRING"))), false);
   private static final AnyValueAggregationFunction ANY_VALUE = new AnyValueAggregationFunction(List.of(COLUMN), false);
-  private static final FunnelMaxStepAggregationFunction FUNNEL_MAX_STEP = new FunnelMaxStepAggregationFunction(
-      List.of(TIME_COLUMN, ExpressionContext.forLiteral(Literal.longValue(1000L)),
-          ExpressionContext.forLiteral(Literal.intValue(2)), ExpressionContext.forIdentifier("step0"),
-          ExpressionContext.forIdentifier("step1")), false);
+  private static final FunnelMaxStepAggregationFunction FUNNEL_MAX_STEP =
+      new FunnelMaxStepAggregationFunction(funnelWindowArguments(), false);
+  private static final FunnelStepDurationStatsAggregationFunction FUNNEL_STEP_DURATION_STATS =
+      new FunnelStepDurationStatsAggregationFunction(funnelWindowArguments(
+          ExpressionContext.forLiteral(Literal.stringValue("durationFunctions=avg"))), false);
+  private static final FunnelEventsFunctionEvalAggregationFunction FUNNEL_EVENTS_FUNCTION_EVAL =
+      new FunnelEventsFunctionEvalAggregationFunction(funnelWindowArguments(
+          ExpressionContext.forLiteral(Literal.intValue(1)), ExpressionContext.forIdentifier("extra")), false);
   private static final AggregationFunction FUNNEL_COUNT = funnelCount();
   private static final AggregationFunction FUNNEL_COUNT_SET = funnelCount("set");
+  private static final List<ExpressionContext> PERCENTILE_KLL_ARGUMENTS =
+      List.of(COLUMN, ExpressionContext.forLiteral(Literal.doubleValue(50)));
+
+  /// Returns the arguments of a two-step funnel window function over a 1000 time unit window, followed by
+  /// `extraArguments`.
+  private static List<ExpressionContext> funnelWindowArguments(ExpressionContext... extraArguments) {
+    List<ExpressionContext> arguments = new ArrayList<>(List.of(TIME_COLUMN,
+        ExpressionContext.forLiteral(Literal.longValue(1000L)), ExpressionContext.forLiteral(Literal.intValue(2)),
+        ExpressionContext.forIdentifier("step0"), ExpressionContext.forIdentifier("step1")));
+    arguments.addAll(List.of(extraArguments));
+    return arguments;
+  }
 
   private static AggregationFunction funnelCount(String... settings) {
     List<ExpressionContext> arguments = new ArrayList<>(List.of(
@@ -290,6 +361,10 @@ public class IntermediateResultByteBufferSerDeTest {
     idSet.add(2);
     PriorityQueue<FunnelStepEvent> funnelStepEvents =
         new PriorityQueue<>(List.of(new FunnelStepEvent(1L, 0), new FunnelStepEvent(2L, 1)));
+    PriorityQueue<FunnelStepEventWithExtraFields> funnelStepEventsWithExtraFields = new PriorityQueue<>(List.of(
+        new FunnelStepEventWithExtraFields(new FunnelStepEvent(1L, 0), List.of("a")),
+        new FunnelStepEventWithExtraFields(new FunnelStepEvent(2L, 1), List.of("b"))
+    ));
     return new Object[][]{
         {new ArrayAggIntFunction(COLUMN, DataType.INT, false), new IntArrayList(new int[]{1, -2, 7}), 42},
         {new ArrayAggBigDecimalFunction(COLUMN, false),
@@ -315,8 +390,11 @@ public class IntermediateResultByteBufferSerDeTest {
         {new SumArrayDoubleAggregationFunction(List.of(COLUMN), false), new double[]{0.25, 8}, 3},
         {HISTOGRAM, new double[]{1, 2}, 3},
         {new PercentileAggregationFunction(COLUMN, 50, false), new DoubleArrayList(new double[]{-3.5, 0, 7}), 3},
+        {new PercentileMVAggregationFunction(COLUMN, 50, false), new DoubleArrayList(new double[]{-3.5, 0, 7}), 3},
         {PERCENTILE_TDIGEST, tDigest, 10},
+        {new PercentileTDigestMVAggregationFunction(COLUMN, 50, false), tDigest, 10},
         {PERCENTILE_RAW_TDIGEST, tDigest, 10},
+        {new PercentileRawTDigestMVAggregationFunction(COLUMN, 50, false), tDigest, 10},
         {PERCENTILE_SMART_TDIGEST, new DoubleArrayList(new double[]{1, 2}), 3},
         {PERCENTILE_SMART_TDIGEST, tDigest, 10},
         {DISTINCT_COUNT, new IntOpenHashSet(new int[]{1, 2}), 9},
@@ -327,16 +405,29 @@ public class IntermediateResultByteBufferSerDeTest {
         {DISTINCT_COUNT, new ObjectOpenHashSet<>(new String[]{"a", "b"}), 18},
         {DISTINCT_COUNT, new ObjectOpenHashSet<>(new ByteArray[]{new ByteArray(new byte[]{1})}), 19},
         {DISTINCT_COUNT, new IntOpenHashSet(), 9},
+        {new DistinctCountMVAggregationFunction(List.of(COLUMN), false), new IntOpenHashSet(new int[]{1, 2}), 9},
+        {new DistinctSumAggregationFunction(List.of(COLUMN), false), new IntOpenHashSet(new int[]{1, 2}), 9},
+        {new DistinctSumMVAggregationFunction(List.of(COLUMN), false), new DoubleOpenHashSet(new double[]{2.5}), 17},
+        {new DistinctAvgAggregationFunction(List.of(COLUMN), false), new LongOpenHashSet(new long[]{1, 2}), 15},
+        {new DistinctAvgMVAggregationFunction(List.of(COLUMN), false), new FloatOpenHashSet(new float[]{1.5f}), 16},
         {DISTINCT_COUNT_BITMAP, sparseBitmap, 14},
         {DISTINCT_COUNT_BITMAP, denseBitmap, 14},
+        {new DistinctCountBitmapMVAggregationFunction(List.of(COLUMN), false), sparseBitmap, 14},
         {new DistinctCountHLLAggregationFunction(List.of(COLUMN), false), hyperLogLog, 6},
+        {new DistinctCountHLLMVAggregationFunction(List.of(COLUMN), false), hyperLogLog, 6},
+        {new DistinctCountRawHLLAggregationFunction(List.of(COLUMN), false), hyperLogLog, 6},
+        {new DistinctCountRawHLLMVAggregationFunction(List.of(COLUMN), false), hyperLogLog, 6},
         {new FastHLLAggregationFunction(List.of(COLUMN), false), hyperLogLog, 6},
         {new DistinctCountHLLPlusAggregationFunction(List.of(COLUMN), false), hyperLogLogPlus, 40},
+        {new DistinctCountHLLPlusMVAggregationFunction(List.of(COLUMN), false), hyperLogLogPlus, 40},
+        {new DistinctCountRawHLLPlusAggregationFunction(List.of(COLUMN), false), hyperLogLogPlus, 40},
+        {new DistinctCountRawHLLPlusMVAggregationFunction(List.of(COLUMN), false), hyperLogLogPlus, 40},
         {DISTINCT_COUNT_SMART_HLL, hyperLogLog, 6},
         {DISTINCT_COUNT_SMART_HLL, new IntOpenHashSet(new int[]{1, 2}), 9},
         {DISTINCT_COUNT_SMART_HLL_PLUS, hyperLogLogPlus, 40},
         {DISTINCT_COUNT_SMART_HLL_PLUS, new LongOpenHashSet(new long[]{1, 2}), 15},
         {new DistinctCountULLAggregationFunction(List.of(COLUMN), false), ultraLogLog, 46},
+        {new DistinctCountRawULLAggregationFunction(List.of(COLUMN), false), ultraLogLog, 46},
         {DISTINCT_COUNT_SMART_ULL, ultraLogLog, 46},
         {DISTINCT_COUNT_SMART_ULL, new IntOpenHashSet(new int[]{1, 2}), 9},
         {MODE, int2LongMap, 23},
@@ -358,9 +449,15 @@ public class IntermediateResultByteBufferSerDeTest {
         {funnelCount("partitioned", "sorted"), LongArrayList.wrap(new long[]{2, 1}), 43},
         {funnelCount("partitioned", "sorted"), List.of(0L, 0L), 21},
         {FUNNEL_MAX_STEP, funnelStepEvents, 51},
+        {new FunnelCompleteCountAggregationFunction(funnelWindowArguments(), false), funnelStepEvents, 51},
+        {new FunnelMatchStepAggregationFunction(funnelWindowArguments(), false), funnelStepEvents, 51},
+        {FUNNEL_STEP_DURATION_STATS, funnelStepEvents, 51},
+        {FUNNEL_EVENTS_FUNCTION_EVAL, funnelStepEventsWithExtraFields, 0},
         // Serialized eagerly into its payload bytes
         {new AvgAggregationFunction(List.of(COLUMN), false), new AvgPair(3.0, 2L), 4},
+        {new AvgMVAggregationFunction(List.of(COLUMN), false), new AvgPair(3.0, 2L), 4},
         {new MinMaxRangeAggregationFunction(List.of(COLUMN), false), new MinMaxRangePair(1.5, 2.5), 5},
+        {new MinMaxRangeMVAggregationFunction(List.of(COLUMN), false), new MinMaxRangePair(1.5, 2.5), 5},
         {new SumPrecisionAggregationFunction(List.of(COLUMN), false), new BigDecimal("1.5"), 22},
         {new StUnionAggregationFunction(List.of(COLUMN), false),
             GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(1, 2)), 13},
@@ -388,18 +485,40 @@ public class IntermediateResultByteBufferSerDeTest {
             new BytesLongPair(new ByteArray(new byte[]{1, 2}), 2L), 56},
         {new CovarianceAggregationFunction(List.of(COLUMN, COLUMN_2), false, false),
             new CovarianceTuple(1.0, 2.0, 3.0, 4L), 32},
+        {new CovarianceAggregationFunction(List.of(COLUMN, COLUMN_2), true, false),
+            new CovarianceTuple(1.0, 2.0, 3.0, 4L), 32},
         {new VarianceAggregationFunction(List.of(COLUMN), false, false, false), new VarianceTuple(4L, 2.0, 1.0), 33},
+        {new VarianceAggregationFunction(List.of(COLUMN), true, false, false), new VarianceTuple(4L, 2.0, 1.0), 33},
+        {new VarianceAggregationFunction(List.of(COLUMN), false, true, false), new VarianceTuple(4L, 2.0, 1.0), 33},
+        {new VarianceAggregationFunction(List.of(COLUMN), true, true, false), new VarianceTuple(4L, 2.0, 1.0), 33},
         {new FourthMomentAggregationFunction(List.of(COLUMN), FourthMomentAggregationFunction.Type.KURTOSIS, false),
             fourthMoment(), 34},
+        {new FourthMomentAggregationFunction(List.of(COLUMN), FourthMomentAggregationFunction.Type.SKEWNESS, false),
+            fourthMoment(), 34},
         {new PercentileEstAggregationFunction(COLUMN, 50, false), quantileDigest(), 7},
-        {new PercentileKLLAggregationFunction(List.of(COLUMN, ExpressionContext.forLiteral(Literal.doubleValue(50))),
-            false), kllSketch(), 36},
+        {new PercentileEstMVAggregationFunction(COLUMN, 50, false), quantileDigest(), 7},
+        {new PercentileRawEstAggregationFunction(COLUMN, 50, false), quantileDigest(), 7},
+        {new PercentileRawEstMVAggregationFunction(COLUMN, 50, false), quantileDigest(), 7},
+        {new PercentileKLLAggregationFunction(PERCENTILE_KLL_ARGUMENTS, false), kllSketch(), 36},
+        {new PercentileKLLMVAggregationFunction(PERCENTILE_KLL_ARGUMENTS, false), kllSketch(), 36},
+        {new PercentileRawKLLAggregationFunction(PERCENTILE_KLL_ARGUMENTS, false), kllSketch(), 36},
+        {new PercentileRawKLLMVAggregationFunction(PERCENTILE_KLL_ARGUMENTS, false), kllSketch(), 36},
         {new FrequentLongsSketchAggregationFunction(List.of(COLUMN), false), frequentLongsSketch(), 39},
         {new FrequentStringsSketchAggregationFunction(List.of(COLUMN), false), frequentStringsSketch(), 38},
         {new DistinctCountCPCSketchAggregationFunction(List.of(COLUMN), false), cpcSketchAccumulator(), 49},
+        {new DistinctCountRawCPCSketchAggregationFunction(List.of(COLUMN), false), cpcSketchAccumulator(), 49},
         {new IntegerTupleSketchAggregationFunction(List.of(COLUMN), IntegerSummary.Mode.Sum, false),
             tupleIntSketchAccumulator(), 48},
-        {new DistinctCountThetaSketchAggregationFunction(List.of(COLUMN), false), List.of(thetaSketchAccumulator()), 21}
+        {new DistinctCountIntegerTupleSketchAggregationFunction(List.of(COLUMN), IntegerSummary.Mode.Sum, false),
+            tupleIntSketchAccumulator(), 48},
+        {new SumValuesIntegerTupleSketchAggregationFunction(List.of(COLUMN), IntegerSummary.Mode.Sum, false),
+            tupleIntSketchAccumulator(), 48},
+        {new AvgValueIntegerTupleSketchAggregationFunction(List.of(COLUMN), IntegerSummary.Mode.Sum, false),
+            tupleIntSketchAccumulator(), 48},
+        {new DistinctCountThetaSketchAggregationFunction(List.of(COLUMN), false),
+            List.of(thetaSketchAccumulator()), 21},
+        {new DistinctCountRawThetaSketchAggregationFunction(List.of(COLUMN), false),
+            List.of(thetaSketchAccumulator()), 21}
     };
   }
 
@@ -452,6 +571,28 @@ public class IntermediateResultByteBufferSerDeTest {
     assertEquals(comparableForm(function.extractFinalResult(deserializedFromOffset)), expectedFinalResult);
   }
 
+  /// Every aggregation function type is the type of a function in [#intermediateResults] or has a reason in
+  /// [#EXCLUDED_TYPES], and not both.
+  @Test
+  public void testEveryTypeIsCheckedOrExcluded() {
+    Set<AggregationFunctionType> checkedTypes = EnumSet.noneOf(AggregationFunctionType.class);
+    for (Object[] row : intermediateResults()) {
+      checkedTypes.add(((AggregationFunction) row[0]).getType());
+    }
+    List<AggregationFunctionType> uncheckedTypes = new ArrayList<>();
+    for (AggregationFunctionType type : AggregationFunctionType.values()) {
+      if (!checkedTypes.contains(type) && !EXCLUDED_TYPES.containsKey(type)) {
+        uncheckedTypes.add(type);
+      }
+    }
+    assertTrue(uncheckedTypes.isEmpty(),
+        "Types with neither a function in intermediateResults nor a reason in EXCLUDED_TYPES: " + uncheckedTypes);
+    for (Map.Entry<AggregationFunctionType, String> entry : EXCLUDED_TYPES.entrySet()) {
+      assertFalse(checkedTypes.contains(entry.getKey()),
+          entry.getKey() + " has a function in intermediateResults and is excluded as: " + entry.getValue());
+    }
+  }
+
   /// The parent `EXPRMIN` / `EXPRMAX` function, checked on its bytes since [ExprMinMaxObject] has no value equality:
   /// its wire type value, and a deserialized object that serializes to the same bytes after its source buffer is
   /// overwritten.
@@ -487,12 +628,57 @@ public class IntermediateResultByteBufferSerDeTest {
     assertEquals(function.serializeIntermediateResult(deserialized).getBytes(), expectedBytes);
   }
 
+  @DataProvider
+  public static Object[][] offHeapSets() {
+    OffHeap32BitSet set32 = new OffHeap32BitSet(4);
+    OffHeap64BitSet set64 = new OffHeap64BitSet(4);
+    OffHeap128BitSet set128 = new OffHeap128BitSet(4);
+    int numValues = 3;
+    // Includes zero, which the sets hold outside their hash tables
+    for (int value = 0; value < numValues; value++) {
+      set32.add(value);
+      set64.add(value);
+      set128.add(value, -value);
+    }
+    // The payload is the number of values followed by the values
+    return new Object[][]{
+        {set32, 0, Integer.BYTES + numValues * Integer.BYTES},
+        {set64, 1, Integer.BYTES + numValues * Long.BYTES},
+        {set128, 2, Integer.BYTES + numValues * 2 * Long.BYTES}
+    };
+  }
+
+  /// The `DISTINCTCOUNTOFFHEAP` function, checked on one serialization of each set, since serializing a set frees its
+  /// memory: its wire type value, the payload size, and a payload that deserializes to a set with the same final
+  /// result after its source buffer is overwritten.
+  @Test(dataProvider = "offHeapSets")
+  public void testDistinctCountOffHeap(BaseOffHeapSet set, int expectedType, int expectedSize) {
+    DistinctCountOffHeapAggregationFunction function =
+        new DistinctCountOffHeapAggregationFunction(List.of(COLUMN), false);
+    int expectedFinalResult = set.size();
+    SerializedResult serialized = function.serializeIntermediateResult(set);
+    assertEquals(serialized.getType(), expectedType);
+    assertEquals(serialized.getSize(), expectedSize);
+    byte[] bytes = serialized.getBytes();
+    assertEquals(bytes.length, expectedSize);
+    BaseOffHeapSet deserialized =
+        function.deserializeIntermediateResult(new CustomObject(expectedType, ByteBuffer.wrap(bytes)));
+    Arrays.fill(bytes, PADDING_BYTE);
+    assertEquals(function.extractFinalResult(deserialized).intValue(), expectedFinalResult);
+  }
+
   /// Returns a final result in a form that compares by value. The serialized sketches have no `equals`, so they
   /// compare by their string form, which is what the broker returns.
   private static Object comparableForm(Object finalResult) {
     if (finalResult instanceof SerializedTDigest
         || finalResult instanceof SerializedFrequentLongsSketch
-        || finalResult instanceof SerializedFrequentStringsSketch) {
+        || finalResult instanceof SerializedFrequentStringsSketch
+        || finalResult instanceof SerializedHLL
+        || finalResult instanceof SerializedHLLPlus
+        || finalResult instanceof SerializedULL
+        || finalResult instanceof SerializedCPCSketch
+        || finalResult instanceof SerializedQuantileDigest
+        || finalResult instanceof SerializedKLL) {
       return finalResult.toString();
     }
     return finalResult;
