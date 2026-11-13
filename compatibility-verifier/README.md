@@ -61,6 +61,8 @@ upgrade, or rollback. HTTP errors do not count as ready. The wait fails if the p
 ready within 600 seconds (configurable with `SERVER_READY_TIMEOUT_SECONDS`).
 
 Each server start writes its application and Helix logs under `<workingDir>/logs/server.<N>/` (or `server2.<N>/`).
+Verifier servers use synchronous logging with immediate flushing so the last diagnostic messages survive forced
+termination during upgrades, rollbacks, and failure cleanup.
 On a readiness or test failure, the verifier captures a thread dump before stopping the cluster. `-k` keeps the cluster
 running for inspection while still collecting diagnostics. The pull-request compatibility jobs upload the logs
 as artifacts retained for three days, including on failure.

@@ -17,6 +17,9 @@
 # under the License.
 #
 
+# Resolve this before compCheck.sh changes directory to a distribution's bin directory.
+COMPAT_SERVER_LOG4J_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/server-log4j2.xml"
+
 # Shared by compCheck.sh and the readiness regression tests. Each server start gets its own
 # log directory, including both servers in the MSE suite.
 function startServerWithLogs() {
@@ -27,8 +30,9 @@ function startServerWithLogs() {
   mkdir -p "$serverLogDir" || exit 1
   echo "$serverLogDir" > "${PID_DIR}/${serviceName}.logdir"
   (
-    # The default logging configuration includes both server and Helix logs. Preserve the working
-    # directory so relative paths in a custom server config still refer to the same data on restart.
+    # Flush server and Helix logs before stopService kills the JVM. Use an environment variable
+    # so configuration paths with spaces work without changing the launcher's JAVA_OPTS.
+    export LOG4J_CONFIGURATION_FILE="$COMPAT_SERVER_LOG4J_CONFIG"
     export LOG_ROOT="$serverLogDir"
     export PINOT_COMPONENT="$serviceName"
     if [ -f "$configFile" ]; then

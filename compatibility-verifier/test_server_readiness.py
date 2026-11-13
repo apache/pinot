@@ -22,6 +22,7 @@
 import http.server
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -182,14 +183,26 @@ function stopServices() {
 
     def test_each_start_has_its_own_logs_and_preserves_the_working_directory(self):
         launcher = self.write_script("launcher", 'pwd > "$LOG_ROOT/working-directory.txt"\n'
+                                     'echo "$LOG4J_CONFIGURATION_FILE" > "$LOG_ROOT/logging-config.txt"\n'
+                                     'echo "$JAVA_OPTS" > "$LOG_ROOT/java-options.txt"\n'
                                      'echo server-and-helix > "$LOG_ROOT/pinot-$PINOT_COMPONENT.log"\n'
                                      'exec sleep 60')
+        helper_dir = self.root / "helper with spaces"
+        helper_dir.mkdir()
+        copied_helper = helper_dir / HELPER.name
+        shutil.copyfile(HELPER, copied_helper)
+        copied_config = helper_dir / "server-log4j2.xml"
+        shutil.copyfile(HELPER.with_name(copied_config.name), copied_config)
+        launch_dir = self.root / "distribution-bin"
+        launch_dir.mkdir()
+        java_options = "-Xmx256m -DServerAdminPort=8097"
         result = self.run_shell(r'''
+cd "$LAUNCH_DIR"
 logCount=1
 startServerWithLogs server "$LAUNCHER" missing-config
 logCount=2
 startServerWithLogs server2 "$LAUNCHER" missing-config
-''', LAUNCHER=str(launcher))
+''', LAUNCHER=str(launcher), HELPER=str(copied_helper), LAUNCH_DIR=str(launch_dir), JAVA_OPTS=java_options)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for name, number in (("server", 1), ("server2", 2)):
             directory = self.logs / (name + "." + str(number))
@@ -197,7 +210,9 @@ startServerWithLogs server2 "$LAUNCHER" missing-config
             deadline = time.monotonic() + 2
             while not log_file.exists() and time.monotonic() < deadline:
                 time.sleep(0.01)
-            self.assertEqual((directory / "working-directory.txt").read_text().strip(), str(self.root))
+            self.assertEqual((directory / "working-directory.txt").read_text().strip(), str(launch_dir))
+            self.assertEqual((directory / "logging-config.txt").read_text().strip(), str(copied_config))
+            self.assertEqual((directory / "java-options.txt").read_text().strip(), java_options)
             self.assertEqual(log_file.read_text().strip(), "server-and-helix")
 
 
