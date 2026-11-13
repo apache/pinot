@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.tpch;
 
+import com.google.common.primitives.Doubles;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumReader;
@@ -109,6 +111,8 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       "supplier", List.of("s_suppkey", "s_nationkey"));
 
   // Both forms of a query compare with the same H2 result, so each H2 query runs once.
+  private static final double RELATIVE_TOLERANCE = 1e-9;
+  private static final double ABSOLUTE_TOLERANCE = 1e-12;
   private final Map<Integer, List<String[]>> _h2Results = new ConcurrentHashMap<>();
 
   @BeforeClass
@@ -263,12 +267,29 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       Assert.assertEquals(numColumns, h2Row.length, "Q" + queryNumber + ": number of columns");
       for (int c = 0; c < numColumns; c++) {
         String pinotValue = pinotResultSet.getString(r, c);
-        if (ClusterIntegrationTestUtils.fuzzyCompare(h2Row[c], pinotValue, pinotValue)) {
+        if (!valuesMatch(h2Row[c], pinotValue)) {
           Assert.fail(String.format("Q%d: value mismatch at row %d, column %d. H2: %s, Pinot: %s", queryNumber, r, c,
               h2Row[c], pinotValue));
         }
       }
     }
+  }
+
+  /// Compares one value of the H2 result with the Pinot value. Numbers match when the relative difference is at most
+  /// [#RELATIVE_TOLERANCE], plus [#ABSOLUTE_TOLERANCE] for values near zero. Other values must be equal.
+  private static boolean valuesMatch(@Nullable String h2Value, @Nullable String pinotValue) {
+    boolean h2Null = h2Value == null || "null".equals(h2Value);
+    boolean pinotNull = pinotValue == null || "null".equals(pinotValue);
+    if (h2Null || pinotNull) {
+      return h2Null && pinotNull;
+    }
+    Double h2Number = Doubles.tryParse(h2Value);
+    Double pinotNumber = Doubles.tryParse(pinotValue);
+    if (h2Number == null || pinotNumber == null) {
+      return h2Value.equals(pinotValue);
+    }
+    double tolerance = Math.max(Math.abs(h2Number), Math.abs(pinotNumber)) * RELATIVE_TOLERANCE + ABSOLUTE_TOLERANCE;
+    return Math.abs(h2Number - pinotNumber) <= tolerance;
   }
 
   /// Runs the specification text of the query on H2 and returns the rows. The result is computed once per query.
