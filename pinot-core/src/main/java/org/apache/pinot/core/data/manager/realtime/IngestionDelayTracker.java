@@ -21,7 +21,6 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -120,6 +119,8 @@ public class IngestionDelayTracker {
   private static final long PARTITION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
   // Delay scheduled executor service for this amount of time after starting service
   private static final int INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS = 100;
+  // Bounds how long table shutdown waits for an in-flight upstream offset fetch to stop
+  private static final long TRACKING_SHUTDOWN_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(10);
   // Cache expire time for ignored segment if there is no update from the segment.
   private static final int IGNORED_SEGMENT_CACHE_TIME_MINUTES = 10;
   // Timeout after 5 seconds while fetching the latest stream offset.
@@ -148,6 +149,8 @@ public class IngestionDelayTracker {
   private final ScheduledExecutorService _ingestionDelayTrackingScheduler;
 
   private Clock _clock = Clock.systemUTC();
+  // Set when the table is shutting down, so the fetch that shutdown interrupts is not reported as an error
+  private volatile boolean _shuttingDown;
 
   protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
   protected volatile ConcurrentHashMap<Integer, Boolean> _partitionsHostedByThisServer = new ConcurrentHashMap<>();
@@ -300,6 +303,11 @@ public class IngestionDelayTracker {
             _partitionIdToLatestOffset.putAll(streamPartitionIdToLatestOffset);
           }
         } catch (Exception e) {
+          if (_shuttingDown) {
+            // Shutdown interrupts the in-flight fetch on purpose; a routine table delete is not a fetch error
+            LOGGER.debug("Stopped fetching latest stream offsets for partitions: {} on shutdown", streamPartitionIds);
+            return;
+          }
           _serverMetrics.addMeteredTableValue(_realTimeTableDataManager.getTableName(),
               ServerMeter.INGESTION_DELAY_LATEST_OFFSET_FETCH_ERRORS, 1);
           LOGGER.error("Failed to update latest stream offsets for partitions: {}", streamPartitionIds, e);
@@ -642,18 +650,29 @@ public class IngestionDelayTracker {
     return ((LongMsgOffset) latestOffset).getOffset();
   }
 
-  /// We use this method to clean up when a table is being removed. No updates are expected at this time as all
-  /// RealtimeSegmentManagers should be down now.
+  /// We use this method to clean up when a table is being removed. It does not throw, so the caller can go on to stop
+  /// the table's consumers.
   public void shutdown() {
+    _shuttingDown = true;
     // Now that segments can't report metric, destroy metric for this table
     _metricsRemovalScheduler.shutdown(); // ScheduledExecutor is installed in constructor so must always be cancelled
     if (_ingestionDelayTrackingScheduler != null) {
-      _ingestionDelayTrackingScheduler.shutdown();
+      // Stop the tracking task before closing the stream metadata providers it fetches through: a stream consumer
+      // such as Kafka's is not safe for concurrent use, so closing it under an in-flight fetch throws.
+      _ingestionDelayTrackingScheduler.shutdownNow();
+      try {
+        if (!_ingestionDelayTrackingScheduler.awaitTermination(TRACKING_SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+          LOGGER.warn("Ingestion delay tracking task for table: {} did not stop within {}ms", _tableNameWithType,
+              TRACKING_SHUTDOWN_TIMEOUT_MS);
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
     for (StreamMetadataProvider streamMetadataProvider : _streamConfigIndexToStreamMetadataProvider.values()) {
       try {
         streamMetadataProvider.close();
-      } catch (IOException e) {
+      } catch (Exception e) {
         LOGGER.error("Failed to close streamMetadataProvider", e);
       }
     }
