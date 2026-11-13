@@ -411,6 +411,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
 
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
+    newSegmentManager.markPartitionMetadataInitialized();
     SegmentDataManager oldSegmentManager = registerSegment(segmentName, newSegmentManager);
     if (oldSegmentManager == null) {
       _logger.info("Added new immutable segment: {}", segmentName);
@@ -1037,6 +1038,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // Register segment after it is preloaded and has initialized its validDocIds. The order of preloading and
       // registering segment doesn't matter much as preloading happens before the table partition is ready for queries.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
+      newSegmentManager.markPartitionMetadataInitialized();
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
       _logger.info("Preloaded immutable segment: {} with upsert enabled", segmentName);
       return;
@@ -1050,6 +1052,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
       partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
       partitionUpsertMetadataManager.addSegment(immutableSegment);
+      newSegmentManager.markPartitionMetadataInitialized();
       _logger.info("Added new immutable segment: {} with upsert enabled", segmentName);
     } else {
       replaceUpsertSegment(segmentName, oldSegmentManager, newSegmentManager, partitionUpsertMetadataManager);
@@ -1061,21 +1064,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
     IndexSegment oldSegment = oldSegmentManager.getSegment();
     ImmutableSegment immutableSegment = newSegmentManager.getSegment();
     UpsertConfig.ConsistencyMode consistencyMode = _tableUpsertMetadataManager.getContext().getConsistencyMode();
-    if (consistencyMode == UpsertConfig.ConsistencyMode.NONE) {
-      // When replacing a segment, register the new segment *after* replaceSegment() finishes filling its validDocIds
-      // bitmap. Otherwise queries lose access to valid docs in the old segment before the new bitmap is ready.
-      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
-      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
-    } else {
+    if (consistencyMode != UpsertConfig.ConsistencyMode.NONE) {
       // For consistency modes, keep both old and new segments visible to queries during replacement so that queries
       // can see the new updates in the new segment while the old segment's validDocIds are still being updated.
       // Register the new segment to the upsert metadata manager before making it visible to queries so the upsert
       // view is updated before any query can access it.
       SegmentDataManager duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
       registerSegment(segmentName, duoSegmentDataManager, partitionUpsertMetadataManager);
-      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
-      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
     }
+    // Publish the replacement on its own only after its validDocIds and partition metadata are initialized, preserving
+    // access to the old segment's valid docs during replacement. Mark completion before offload releases the permit.
+    partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+    newSegmentManager.markPartitionMetadataInitialized();
+    registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
     _logger.info("Replaced {} segment: {} with upsert enabled and consistency mode: {}",
         oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, consistencyMode);
     oldSegmentManager.offload();
