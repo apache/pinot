@@ -45,6 +45,7 @@ import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
+import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.BaseDefaultColumnHandler;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -2759,6 +2760,73 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertEquals(secondLink.getMinValue(), sourceMin + 2);
     assertEquals(secondLink.getMaxValue(), sourceMax + 2);
     assertEquals(secondLink.getCardinality(), sourceMetadata.getCardinality());
+  }
+
+  /// A derived column whose transform function changes is rebuilt on the next reload, together with the derived column
+  /// chained on it, and the segment records the transform it was built with. Before this, a reload compared only the
+  /// type and default value of an existing derived column and kept serving the old values.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testChangedTransformFunctionRebuildsDerivedColumnAndItsDependents(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
+            new TransformConfig(NEW_INT_METRIC_COLUMN_NAME, "plus(newIntSVDimension, 1)")));
+    runPreProcessor(_newColumnsSchema1);
+    int sourceMin = (Integer) new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN1_NAME).getMinValue();
+    assertDerivedMinValues(sourceMin + 1, sourceMin + 2);
+
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 10)"),
+            new TransformConfig(NEW_INT_METRIC_COLUMN_NAME, "plus(newIntSVDimension, 1)")));
+    assertTrue(needProcess(_newColumnsSchema1), "a changed transform function must trigger a reload");
+    runPreProcessor(_newColumnsSchema1);
+    assertDerivedMinValues(sourceMin + 10, sourceMin + 11);
+    assertEquals(new SegmentMetadataImpl(INDEX_DIR).getCustomMap()
+            .get(BaseDefaultColumnHandler.DERIVED_COLUMN_TRANSFORM_KEY_PREFIX + NEW_INT_SV_DIMENSION_COLUMN_NAME),
+        BaseDefaultColumnHandler.transformFingerprint("plus(column1, 10)"));
+
+    // Nothing to do once the segment matches the config
+    assertFalse(needProcess(_newColumnsSchema1));
+  }
+
+  /// A derived column materialised before transform functions were recorded keeps its values on reload, so an upgrade
+  /// does not rebuild every derived column of every segment.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testDerivedColumnWithoutRecordedTransformIsNotRebuilt(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")));
+    runPreProcessor(_newColumnsSchema1);
+    int sourceMin = (Integer) new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN1_NAME).getMinValue();
+    PropertiesConfiguration properties = SegmentMetadataUtils.getPropertiesConfiguration(INDEX_DIR);
+    properties.clearProperty(V1Constants.MetadataKeys.Segment.CUSTOM_SUBSET + "."
+        + BaseDefaultColumnHandler.DERIVED_COLUMN_TRANSFORM_KEY_PREFIX + NEW_INT_SV_DIMENSION_COLUMN_NAME);
+    SegmentMetadataUtils.savePropertiesConfiguration(properties, INDEX_DIR);
+
+    _ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 10)")));
+    assertFalse(needProcess(_newColumnsSchema1));
+    runPreProcessor(_newColumnsSchema1);
+    assertEquals(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME)
+        .getMinValue(), sourceMin + 1);
+  }
+
+  private void assertDerivedMinValues(int expectedDimensionMin, int expectedMetricMin)
+      throws Exception {
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME).getMinValue(),
+        expectedDimensionMin);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_INT_METRIC_COLUMN_NAME).getMinValue(), expectedMetricMin);
+  }
+
+  private boolean needProcess(Schema schema)
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, createIndexLoadingConfig(schema))) {
+      return processor.needProcess();
+    }
   }
 
   /// A derived column whose argument is a plain default column added in the same reload. Before dependency
