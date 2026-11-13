@@ -19,11 +19,13 @@
 package org.apache.pinot.controller.validation;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.config.QuotaConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -60,16 +62,26 @@ public class StorageQuotaChecker {
   }
 
   /// Resolves the effective storage quota enforcement mode for a table: DISABLED if the controller-wide storage quota
-  /// check is turned off, otherwise the table's own mode, defaulting to ENFORCED when the table does not set one.
+  /// check is turned off, otherwise the table's own mode (falling back to its server tenant's default), defaulting to
+  /// ENFORCED when neither sets one.
   public QuotaEnforcementMode getEnforcementMode(TableConfig tableConfig) {
-    if (!_isEnabled) {
-      return QuotaEnforcementMode.DISABLED;
-    }
-    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    return _isEnabled ? getEnforcementMode(getEffectiveQuotaConfig(tableConfig)) : QuotaEnforcementMode.DISABLED;
+  }
+
+  /// Returns the enforcement mode set in the given effective quota config, assuming the controller-wide storage quota
+  /// check is enabled.
+  private static QuotaEnforcementMode getEnforcementMode(@Nullable QuotaConfig quotaConfig) {
     if (quotaConfig != null && quotaConfig.getStorageQuotaEnforcementMode() != null) {
       return quotaConfig.getStorageQuotaEnforcementMode();
     }
     return QuotaEnforcementMode.ENFORCED;
+  }
+
+  /// Returns the table's quota config with the storage quota resolved against its server tenant's quota defaults.
+  @Nullable
+  private QuotaConfig getEffectiveQuotaConfig(TableConfig tableConfig) {
+    return QuotaConfigUtils.getEffectiveStorageQuotaConfig(tableConfig,
+        _pinotHelixResourceManager::getTenantQuotaConfig);
   }
 
   public static class QuotaCheckerResponse {
@@ -96,16 +108,17 @@ public class StorageQuotaChecker {
   public QuotaCheckerResponse isSegmentStorageWithinQuota(TableConfig tableConfig, String segmentName,
       long tarSegmentSizeInBytes, long untarredSegmentSizeInBytes)
       throws InvalidConfigException {
-    QuotaEnforcementMode enforcementMode = getEnforcementMode(tableConfig);
-    if (enforcementMode == QuotaEnforcementMode.DISABLED) {
+    if (!_isEnabled) {
       return success("Storage quota check is disabled, skipping the check");
     }
-
-    // 1. Read table config
+    // 1. Read table config, with the storage quota resolved against the server tenant quota defaults
     // 2. read table size from all the servers
     // 3. update predicted segment sizes
     // 4. is the updated size within quota
-    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    QuotaConfig quotaConfig = getEffectiveQuotaConfig(tableConfig);
+    if (getEnforcementMode(quotaConfig) == QuotaEnforcementMode.DISABLED) {
+      return success("Storage quota check is disabled, skipping the check");
+    }
     int numReplicas = _pinotHelixResourceManager.getNumReplicas(tableConfig);
 
     final String tableNameWithType = tableConfig.getTableName();

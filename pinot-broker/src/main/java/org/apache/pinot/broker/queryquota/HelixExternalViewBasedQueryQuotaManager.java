@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.SetUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -43,6 +44,7 @@ import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.config.QuotaConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -206,9 +208,38 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Initializing rate limiter for table {}", tableNameWithType);
 
-    // Create rate limiter if query quota config is specified.
+    // Create rate limiter if query quota config is specified, by the table or its broker tenant.
     Stat stat = _propertyStore.getStat(constructTableConfigPath(tableNameWithType), AccessOption.PERSISTENT);
-    createOrUpdateRateLimiter(tableNameWithType, brokerResourceEV, tableConfig.getQuotaConfig(), stat);
+    createOrUpdateRateLimiter(tableNameWithType, brokerResourceEV, getEffectiveQuotaConfig(tableConfig), stat);
+  }
+
+  /// Rebuilds the rate limiters of the tables on the given broker tenant served by this broker, after the quota
+  /// defaults of the tenant changed. Tenant quota defaults do not change the table config stat version, so this must be
+  /// triggered explicitly (by a tenant config refresh message).
+  /// @param tenantName name of the tenant whose quota defaults changed.
+  public void refreshTenantQueryQuotas(String tenantName) {
+    ExternalView brokerResourceEV = getBrokerResource();
+    int numRefreshed = 0;
+    for (String physicalOrLogicalTableName : new ArrayList<>(_rateLimiterMap.keySet())) {
+      if (TableNameBuilder.getTableTypeFromTableName(physicalOrLogicalTableName) == null) {
+        // Logical tables do not inherit tenant quota defaults
+        continue;
+      }
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, physicalOrLogicalTableName);
+      if (tableConfig != null && QuotaConfigUtils.getBrokerTenantName(tableConfig).equals(tenantName)) {
+        initOrUpdateTableQueryQuota(tableConfig, brokerResourceEV);
+        numRefreshed++;
+      }
+    }
+    LOGGER.info("Refreshed query rate limiters of {} tables after quota defaults of tenant: {} changed", numRefreshed,
+        tenantName);
+  }
+
+  /// Returns the table's quota config with the query quota resolved against its broker tenant's quota defaults.
+  @Nullable
+  private QuotaConfig getEffectiveQuotaConfig(TableConfig tableConfig) {
+    return QuotaConfigUtils.getEffectiveQueryQuotaConfig(tableConfig,
+        tenantName -> ZKMetadataProvider.getTenantQuotaConfig(_propertyStore, tenantName));
   }
 
   /// Drop table query quota.
@@ -233,7 +264,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     if (tableConfig == null) {
       return null;
     }
-    return tableConfig.getQuotaConfig();
+    return getEffectiveQuotaConfig(tableConfig);
   }
 
   @Override
