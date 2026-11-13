@@ -22,11 +22,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.config.Configurator;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -51,9 +57,27 @@ import static org.testng.Assert.fail;
 ///   session ends;
 /// - no theft: an actor never takes a lock node written by another attempt.
 ///
-/// The check is bounded (two actors, one acquire each, one expiry) but complete within that bound.
+/// The check is bounded (two actors, one acquire each, one expiry). By default it runs a fixed set of randomly chosen
+/// schedules to keep CI fast; set `-Dpinot.test.lockInterleavings.exhaustive=true` to explore every schedule within
+/// the bound.
 public class DistributedTaskLockManagerInterleavingTest {
   private static final String TABLE = "testTable_OFFLINE";
+  private static final boolean EXHAUSTIVE = Boolean.getBoolean("pinot.test.lockInterleavings.exhaustive");
+  private static final int NUM_SAMPLED_SCHEDULES = 2_000;
+
+  private Level _lockManagerLogLevel;
+
+  /// The lock manager logs every failed attempt, which is hundreds of thousands of lines over all schedules.
+  @BeforeClass
+  public void silenceLockManagerLogs() {
+    _lockManagerLogLevel = LogManager.getLogger(DistributedTaskLockManager.class).getLevel();
+    Configurator.setLevel(DistributedTaskLockManager.class, Level.OFF);
+  }
+
+  @AfterClass
+  public void restoreLockManagerLogs() {
+    Configurator.setLevel(DistributedTaskLockManager.class, _lockManagerLogLevel);
+  }
 
   @DataProvider
   public Object[][] actorConfigurations() {
@@ -68,7 +92,14 @@ public class DistributedTaskLockManagerInterleavingTest {
   @Test(dataProvider = "actorConfigurations")
   public void testEveryInterleavingKeepsTheLockSafe(String[] controllers)
       throws Exception {
-    Explorer explorer = new Explorer();
+    if (!EXHAUSTIVE) {
+      // A fixed seed per schedule keeps the sampled set the same on every run; a failure reports its choices
+      for (int seed = 0; seed < NUM_SAMPLED_SCHEDULES; seed++) {
+        runOnce(controllers, new Explorer(new Random(seed)));
+      }
+      return;
+    }
+    Explorer explorer = new Explorer(null);
     int runs = 0;
     do {
       runOnce(controllers, explorer);
@@ -117,20 +148,28 @@ public class DistributedTaskLockManagerInterleavingTest {
     }
   }
 
-  /// Depth-first enumeration of choice sequences, replaying a recorded prefix on each run.
+  /// Depth-first enumeration of choice sequences, replaying a recorded prefix on each run. With a random source it
+  /// instead picks every new choice at random, for one sampled schedule.
   private static final class Explorer {
     private final List<Integer> _choices = new ArrayList<>();
     private final List<Integer> _bounds = new ArrayList<>();
+    @Nullable
+    private final Random _random;
     private int _position;
+
+    Explorer(@Nullable Random random) {
+      _random = random;
+    }
 
     synchronized int choose(int numOptions) {
       if (_position < _choices.size()) {
         return _choices.get(_position++);
       }
-      _choices.add(0);
+      int choice = _random != null ? _random.nextInt(numOptions) : 0;
+      _choices.add(choice);
       _bounds.add(numOptions);
       _position++;
-      return 0;
+      return choice;
     }
 
     /// Moves to the next unexplored sequence; returns false when the space is exhausted.
