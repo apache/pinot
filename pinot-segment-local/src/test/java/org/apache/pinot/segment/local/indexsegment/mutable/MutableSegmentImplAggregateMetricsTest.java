@@ -21,11 +21,13 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -37,6 +39,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class MutableSegmentImplAggregateMetricsTest {
@@ -125,9 +129,9 @@ public class MutableSegmentImplAggregateMetricsTest {
   @Test
   public void testMultiValueDimensionDisablesAggregation()
       throws Exception {
-    // A multi-value dimension cannot be used as an aggregation key (issue #3867), so aggregation stays disabled and no
-    // rollup happens even though aggregateMetrics is set. This guards against over-broadening the aggregation-enabling
-    // and dictionary-forcing logic to columns that cannot support it.
+    // A multi-value dimension cannot be used as an aggregation key (issue #3867), so aggregation stays disabled and
+    // no rollup happens whether configured via aggregateMetrics or ingestionAggregationConfigs. This guards against
+    // over-broadening the aggregation-enabling and dictionary-forcing logic to columns that cannot support it.
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
         .addMultiValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
@@ -136,10 +140,24 @@ public class MutableSegmentImplAggregateMetricsTest {
         .addDateTime(TIME_COLUMN1, FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
         .addDateTime(TIME_COLUMN2, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS")
         .build();
-    MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Set.of(METRIC, METRIC_2), Set.of(), Set.of(),
-            true);
+    Set<String> noDictionaryColumns = Set.of(DIMENSION_1, METRIC, METRIC_2);
 
+    MutableSegmentImpl mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, noDictionaryColumns, Set.of(), Set.of(), true);
+    assertMultiValueDimensionDisablesAggregation(mutableSegmentImpl);
+    mutableSegmentImpl.destroy();
+
+    List<AggregationConfig> aggregationConfigs =
+        List.of(new AggregationConfig(METRIC, "SUM(metric)"), new AggregationConfig(METRIC_2, "SUM(metric2)"));
+    mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, noDictionaryColumns, Set.of(), Set.of(),
+            aggregationConfigs);
+    assertMultiValueDimensionDisablesAggregation(mutableSegmentImpl);
+    mutableSegmentImpl.destroy();
+  }
+
+  private void assertMultiValueDimensionDisablesAggregation(MutableSegmentImpl mutableSegmentImpl)
+      throws Exception {
     Random random = new Random();
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
@@ -152,9 +170,10 @@ public class MutableSegmentImplAggregateMetricsTest {
       mutableSegmentImpl.index(row, METADATA);
     }
 
-    // Aggregation is disabled, so every row is stored as its own document (no rollup).
-    Assert.assertEquals(mutableSegmentImpl.getNumDocsIndexed(), NUM_ROWS);
-    mutableSegmentImpl.destroy();
+    // Aggregation is disabled, so every row is stored as its own document (no rollup) and no-dictionary key columns
+    // stay no-dictionary.
+    assertEquals(mutableSegmentImpl.getNumDocsIndexed(), NUM_ROWS);
+    assertNull(mutableSegmentImpl.getDataSourceNullable(DIMENSION_1).getDictionary());
   }
 
   private void testAggregateMetrics(MutableSegmentImpl mutableSegmentImpl)
