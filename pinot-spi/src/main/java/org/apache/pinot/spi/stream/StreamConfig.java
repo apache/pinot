@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.stream;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +26,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -443,6 +445,17 @@ public class StreamConfig {
     return _streamConfigMap;
   }
 
+  /// Returns a copy of the given config map with the values of sensitive keys masked (see [Obfuscator]), suitable
+  /// for logging. The original map is left untouched because its values are handed to the stream consumers.
+  private static Map<String, String> redactSensitiveValues(Map<String, String> configMap) {
+    JsonNode masked = Obfuscator.DEFAULT.toJson(configMap);
+    Map<String, String> redacted = new HashMap<>();
+    for (String key : configMap.keySet()) {
+      redacted.put(key, masked.get(key).asText());
+    }
+    return redacted;
+  }
+
   @Override
   public String toString() {
     return "StreamConfig{"
@@ -451,7 +464,7 @@ public class StreamConfig {
         + ", _tableNameWithType='" + _tableNameWithType + '\''
         + ", _consumerFactoryClassName='" + _consumerFactoryClassName + '\''
         + ", _decoderClass='" + _decoderClass + '\''
-        + ", _decoderProperties=" + _decoderProperties
+        + ", _decoderProperties=" + redactSensitiveValues(_decoderProperties)
         + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis
         + ", _fetchTimeoutMillis=" + _fetchTimeoutMillis
         + ", _idleTimeoutMillis=" + _idleTimeoutMillis
@@ -467,7 +480,7 @@ public class StreamConfig {
         + ", _offsetAutoResetOffsetThreshold=" + _offsetAutoResetOffsetThreshold
         + ", _offsetAutoResetTimeSecThreshold=" + _offsetAutoResetTimeSecThreshold
         + ", _backfillTopic=" + _backfillTopic
-        + ", _streamConfigMap=" + _streamConfigMap
+        + ", _streamConfigMap=" + redactSensitiveValues(_streamConfigMap)
         + ", _offsetCriteria=" + _offsetCriteria
         + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore
         + '}';
