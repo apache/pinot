@@ -82,6 +82,13 @@ public class PartialUpsertHandlerTest {
   }
 
   @Test
+  public void testForceOverwriteAsDefaultStrategy() {
+    // field2 has no per-column strategy, so it takes FORCE_OVERWRITE from the default strategy
+    testMerge(UpsertConfig.Strategy.FORCE_OVERWRITE, false, 3, true, 0L, "field2", 0L, true);
+    testMerge(UpsertConfig.Strategy.FORCE_OVERWRITE, false, 3, false, 5, "field2", 5, false);
+  }
+
+  @Test
   public void testNonOverwrite() {
     testMerge(true, 2, true, 2, "field2", 2, true);
     testMerge(true, 2, false, 8, "field2", 8, false);
@@ -185,6 +192,12 @@ public class PartialUpsertHandlerTest {
 
   public void testMerge(boolean isPreviousNull, Object previousValue, boolean isNewNull, Object newValue,
       String columnName, Object expectedValue, boolean isExpectedNull) {
+    testMerge(UpsertConfig.Strategy.IGNORE, isPreviousNull, previousValue, isNewNull, newValue, columnName,
+        expectedValue, isExpectedNull);
+  }
+
+  private void testMerge(UpsertConfig.Strategy defaultStrategy, boolean isPreviousNull, Object previousValue,
+      boolean isNewNull, Object newValue, String columnName, Object expectedValue, boolean isExpectedNull) {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
         .addMetric("field4", FieldSpec.DataType.LONG)
@@ -205,7 +218,7 @@ public class PartialUpsertHandlerTest {
         })) {
       UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
       upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
-      upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.IGNORE);
+      upsertConfig.setDefaultPartialUpsertStrategy(defaultStrategy);
       TableConfig tableConfig = createTableConfig(schema, upsertConfig);
       PartialUpsertHandler handler =
           spy(new PartialUpsertHandler(tableConfig, schema, List.of("hoursSinceEpoch"),
