@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -101,7 +102,9 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -135,6 +138,7 @@ import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasks
 import static org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager.COMMITTING_SEGMENTS;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
 
@@ -1458,6 +1462,236 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertFalse(segmentFile.exists());
     assertFalse(extraSegmentFile.exists());
     assertTrue(otherSegmentFile.exists());
+  }
+
+  private CommittingSegmentDescriptor commitSegmentWithMetadataTar(String segmentName, File segmentFile,
+      File tableDir, String metadataTarLocation)
+      throws Exception {
+    FileUtils.write(segmentFile, "temporary file contents");
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    CommittingSegmentDescriptor descriptor = new CommittingSegmentDescriptor(segmentName,
+        PARTITION_OFFSET.toString(), 0, SCHEME + tableDir + "/" + segmentFile.getName());
+    descriptor.setMetadataTarLocation(metadataTarLocation);
+    segmentManager.commitSegmentFile(REALTIME_TABLE_NAME, descriptor);
+    return descriptor;
+  }
+
+  @Test
+  public void testCommitSegmentFileMovesMetadataTar()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    File metadataTmp = new File(tableDir,
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT));
+    FileUtils.write(metadataTmp, "metadata tar contents");
+
+    File finalSidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    try {
+      commitSegmentWithMetadataTar(segmentName, segmentFile, tableDir, SCHEME + metadataTmp.getPath());
+
+      assertFalse(metadataTmp.exists());
+      assertTrue(finalSidecar.exists());
+      Assert.assertEquals(FileUtils.readFileToString(finalSidecar, "UTF-8"), "metadata tar contents");
+    } finally {
+      // Tests share the table dir; do not leak files into other tests
+      FileUtils.deleteQuietly(metadataTmp);
+      FileUtils.deleteQuietly(finalSidecar);
+    }
+  }
+
+  @Test
+  public void testCommitSegmentFileDeletesStaleMetadataTarTmpFiles()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    String otherSegmentName = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    File staleTmp = new File(tableDir,
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT));
+    File otherTmp = new File(tableDir,
+        SegmentCompletionUtils.generateTmpSegmentFileName(otherSegmentName + Constants.METADATA_TAR_GZ_FILE_EXT));
+    FileUtils.write(staleTmp, "stale contents");
+    FileUtils.write(otherTmp, "other segment contents");
+
+    try {
+      commitSegmentWithMetadataTar(segmentName, segmentFile, tableDir, null);
+
+      assertFalse(staleTmp.exists());
+      assertTrue(otherTmp.exists());
+    } finally {
+      FileUtils.deleteQuietly(staleTmp);
+      FileUtils.deleteQuietly(otherTmp);
+    }
+  }
+
+  @Test
+  public void testCommitSegmentFileSucceedsWhenMetadataTarIsMissing()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    String missingTmp = SCHEME + tableDir + "/"
+        + SegmentCompletionUtils.generateTmpSegmentFileName(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+
+    CommittingSegmentDescriptor descriptor =
+        commitSegmentWithMetadataTar(segmentName, segmentFile, tableDir, missingTmp);
+
+    Assert.assertEquals(descriptor.getSegmentLocation(),
+        URIUtils.getUri(tableDir.toString(), URIUtils.encode(segmentName)).toString());
+    assertFalse(new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT).exists());
+  }
+
+  @Test
+  public void testCommitSegmentFileDropsPreviousMetadataTarWhenNoneUploaded()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    // Left by an earlier attempt that published its files and then failed the ZK metadata commit.
+    File previousSidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    FileUtils.write(previousSidecar, "previous build metadata");
+    try {
+      commitSegmentWithMetadataTar(segmentName, segmentFile, tableDir, null);
+
+      assertFalse(previousSidecar.exists());
+    } finally {
+      FileUtils.deleteQuietly(previousSidecar);
+    }
+  }
+
+  @Test
+  public void testCommitSegmentFileDropsPreviousMetadataTarWhenMoveFails()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    File previousSidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    FileUtils.write(previousSidecar, "previous build metadata");
+    String missingTmp = SCHEME + tableDir + "/"
+        + SegmentCompletionUtils.generateTmpSegmentFileName(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    try {
+      commitSegmentWithMetadataTar(segmentName, segmentFile, tableDir, missingTmp);
+
+      assertFalse(previousSidecar.exists());
+    } finally {
+      FileUtils.deleteQuietly(previousSidecar);
+    }
+  }
+
+  @Test
+  public void testCommitSegmentFileReplacesPreviousMetadataTar()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    File finalSidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    FileUtils.write(finalSidecar, "previous build metadata");
+    File metadataTmp = new File(tableDir,
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT));
+    FileUtils.write(metadataTmp, "new build metadata");
+    try {
+      commitSegmentWithMetadataTar(segmentName, segmentFile, tableDir, SCHEME + metadataTmp.getPath());
+
+      Assert.assertEquals(FileUtils.readFileToString(finalSidecar, "UTF-8"), "new build metadata");
+    } finally {
+      FileUtils.deleteQuietly(metadataTmp);
+      FileUtils.deleteQuietly(finalSidecar);
+    }
+  }
+
+  @Test
+  public void testMoveSegmentFileDropsPreviousMetadataTar()
+      throws Exception {
+    PinotFSFactory.init(new PinotConfiguration());
+    File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+    File segmentFile = new File(tableDir, SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+    FileUtils.write(segmentFile, "segment contents");
+    // The deep store repair path (uploadToDeepStoreIfMissing) replaces the segment file through moveSegmentFile without
+    // going through commitSegmentFile, so the previous sidecar must be dropped there too.
+    File previousSidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+    FileUtils.write(previousSidecar, "previous build metadata");
+    try {
+      FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+      segmentManager.moveSegmentFile(RAW_TABLE_NAME, segmentName, SCHEME + segmentFile.getPath(),
+          PinotFSFactory.create("file"));
+
+      assertFalse(previousSidecar.exists());
+      assertTrue(new File(tableDir, segmentName).exists());
+    } finally {
+      FileUtils.deleteQuietly(segmentFile);
+      FileUtils.deleteQuietly(previousSidecar);
+    }
+  }
+
+  @Test
+  public void testMoveSegmentFileFailsWhenSidecarExistsCheckThrows()
+      throws Exception {
+    PinotFS pinotFS = mock(PinotFS.class);
+    when(pinotFS.exists(any(URI.class))).thenThrow(new IOException("exists failed"));
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mock(PinotHelixResourceManager.class), controllerMetrics);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+
+    IOException e = Assert.expectThrows(IOException.class,
+        () -> segmentManager.moveSegmentFile(RAW_TABLE_NAME, segmentName, SCHEME + "/tmp/tmpSegment", pinotFS));
+
+    // The segment file must not be replaced while the previous sidecar could not be ruled out.
+    verify(pinotFS, never()).move(any(URI.class), any(URI.class), anyBoolean());
+    assertTrue(e.getMessage().contains(segmentName));
+    assertEquals(e.getCause().getMessage(), "exists failed");
+    verify(controllerMetrics).addMeteredTableValue(REALTIME_TABLE_NAME,
+        ControllerMeter.REALTIME_METADATA_TAR_INVALIDATE_FAILURE, 1L);
+  }
+
+  @Test
+  public void testMoveSegmentFileFailsWhenSidecarDeleteReturnsFalse()
+      throws Exception {
+    PinotFS pinotFS = mock(PinotFS.class);
+    when(pinotFS.exists(any(URI.class))).thenReturn(true);
+    when(pinotFS.delete(any(URI.class), anyBoolean())).thenReturn(false);
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mock(PinotHelixResourceManager.class), controllerMetrics);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+
+    IOException e = Assert.expectThrows(IOException.class,
+        () -> segmentManager.moveSegmentFile(RAW_TABLE_NAME, segmentName, SCHEME + "/tmp/tmpSegment", pinotFS));
+
+    verify(pinotFS, never()).move(any(URI.class), any(URI.class), anyBoolean());
+    verify(pinotFS).delete(any(URI.class), eq(true));
+    assertTrue(e.getMessage().contains(segmentName));
+    verify(controllerMetrics).addMeteredTableValue(REALTIME_TABLE_NAME,
+        ControllerMeter.REALTIME_METADATA_TAR_INVALIDATE_FAILURE, 1L);
+  }
+
+  @Test
+  public void testMoveSegmentFileFailsWhenSidecarDeleteThrows()
+      throws Exception {
+    PinotFS pinotFS = mock(PinotFS.class);
+    when(pinotFS.exists(any(URI.class))).thenReturn(true);
+    when(pinotFS.delete(any(URI.class), anyBoolean())).thenThrow(new IOException("delete failed"));
+    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mock(PinotHelixResourceManager.class), controllerMetrics);
+    String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+
+    IOException e = Assert.expectThrows(IOException.class,
+        () -> segmentManager.moveSegmentFile(RAW_TABLE_NAME, segmentName, SCHEME + "/tmp/tmpSegment", pinotFS));
+
+    verify(pinotFS, never()).move(any(URI.class), any(URI.class), anyBoolean());
+    assertTrue(e.getMessage().contains(segmentName));
+    assertEquals(e.getCause().getMessage(), "delete failed");
+    verify(controllerMetrics).addMeteredTableValue(REALTIME_TABLE_NAME,
+        ControllerMeter.REALTIME_METADATA_TAR_INVALIDATE_FAILURE, 1L);
   }
 
   @Test

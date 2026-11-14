@@ -283,6 +283,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON_CODE) Integer stopReasonCode,
+      @QueryParam(SegmentCompletionProtocol.PARAM_METADATA_TAR_LOCATION) String metadataTarLocation,
       FormDataMultiPart metadataFiles) {
     if (instanceId == null || segmentName == null || segmentLocation == null || metadataFiles == null
         || streamPartitionMsgOffset == null) {
@@ -296,6 +297,7 @@ public class LLCSegmentCompletionHandlers {
         .withInstanceId(instanceId)
         .withSegmentName(segmentName)
         .withSegmentLocation(segmentLocation)
+        .withMetadataTarLocation(metadataTarLocation)
         .withStreamPartitionMsgOffset(streamPartitionMsgOffset)
         .withSegmentSizeBytes(segmentSizeBytes)
         .withBuildTimeMillis(buildTimeMillis)

@@ -770,12 +770,25 @@ public class SegmentPushUtils implements Serializable {
   /// segment directory, named `<segmentName>.metadata.tar.gz`, so the segment tar never has to be downloaded back.
   public static File generateSegmentMetadataFile(File segmentDir, File outputDir, String segmentName)
       throws IOException {
+    File metadataFile = SegmentDirectoryPaths.findMetadataFile(segmentDir);
+    File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(segmentDir);
+    return generateSegmentMetadataFile(
+        Map.of(metadataFile.getName(), metadataFile, creationMetaFile.getName(), creationMetaFile), outputDir,
+        segmentName);
+  }
+
+  /// Same tar from already collected metadata files, keyed by their name inside the archive. The archive holds one
+  /// top-level directory, as `DefaultMetadataExtractor` expects. Files are copied byte for byte (`creation.meta` is
+  /// binary). The caller owns `outputDir` and the returned tar.
+  public static File generateSegmentMetadataFile(Map<String, File> metadataFiles, File outputDir, String segmentName)
+      throws IOException {
     File metadataDir = new File(outputDir, segmentName + "-metadata");
     File metadataTarFile = new File(outputDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
     try {
       FileUtils.forceMkdir(metadataDir);
-      FileUtils.copyFileToDirectory(SegmentDirectoryPaths.findMetadataFile(segmentDir), metadataDir);
-      FileUtils.copyFileToDirectory(SegmentDirectoryPaths.findCreationMetaFile(segmentDir), metadataDir);
+      for (Map.Entry<String, File> entry : metadataFiles.entrySet()) {
+        FileUtils.copyFile(entry.getValue(), new File(metadataDir, entry.getKey()));
+      }
       TarCompressionUtils.createCompressedTarFile(metadataDir, metadataTarFile);
       return metadataTarFile;
     } finally {
