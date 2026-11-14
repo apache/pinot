@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing.manager;
 
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,7 @@ import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionInfo;
@@ -63,6 +65,7 @@ import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -280,6 +283,47 @@ public class BrokerRoutingManagerTest {
 
     // Server should be re-enabled in the map
     assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+  }
+
+  @Test
+  public void testMinServerCapabilityRevisionFollowsInstanceConfigs() {
+    InstanceCapability capability = new InstanceCapability("TEST_CAPABILITY", InstanceType.SERVER, 1);
+    // Before the first instance config change, no capability is supported.
+    assertEquals(_routingManager.getMinServerCapabilityRevision(capability), 0);
+
+    String otherServer = "Server_otherhost_8000";
+    ZNRecord server1 = createServerZNRecordWithCapability(SERVER_INSTANCE_ID, "2");
+    ZNRecord server2 = createServerZNRecordWithCapability(otherServer, "1");
+    // A broker without the capability does not count.
+    ZNRecord broker = new ZNRecord("Broker_localhost_8099");
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(),
+        anyInt())).thenReturn(List.of(server1, server2, broker));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertEquals(_routingManager.getMinServerCapabilityRevision(capability), 1);
+
+    // A disabled server still counts.
+    server2.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name(), "false");
+    server2.getMapField(Helix.Instance.CAPABILITIES_KEY).remove("TEST_CAPABILITY");
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertEquals(_routingManager.getMinServerCapabilityRevision(capability), 0);
+
+    // The server is removed.
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(),
+        anyInt())).thenReturn(List.of(server1, broker));
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertEquals(_routingManager.getMinServerCapabilityRevision(capability), 2);
+
+    // A failed fetch supports nothing: a server can restart under the same id on an older build.
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(),
+        anyInt())).thenThrow(new RuntimeException("ZooKeeper is not reachable"));
+    expectThrows(RuntimeException.class, () -> _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG));
+    assertEquals(_routingManager.getMinServerCapabilityRevision(capability), 0);
+
+    // The next successful fetch restores the minimum, also when the instance configs did not change.
+    doReturn(List.of(server1, broker)).when(_zkDataAccessor)
+        .getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt());
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+    assertEquals(_routingManager.getMinServerCapabilityRevision(capability), 2);
   }
 
   @Test
@@ -1087,6 +1131,15 @@ public class BrokerRoutingManagerTest {
     assertEquals(_routingManager.getPartitionPruningPreparationThreshold(),
         DEFAULT_PARTITION_PRUNING_PREPARATION_THRESHOLD);
     verify(_routingManager, never()).buildRouting(TEST_TABLE);
+  }
+
+  /// Creates an enabled server instance that advertises `TEST_CAPABILITY` with the given revision.
+  private ZNRecord createServerZNRecordWithCapability(String instanceId, String revision) {
+    ZNRecord record = createEnabledServerZNRecord(instanceId);
+    record.setSimpleField(Helix.Instance.PINOT_VERSION_KEY, "1.0.0");
+    record.setMapField(Helix.Instance.CAPABILITIES_KEY, new HashMap<>(
+        Map.of("TEST_CAPABILITY", revision, Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, "1.0.0")));
+    return record;
   }
 
   /// Creates a ZNRecord representing a disabled server instance.

@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils.helix;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,7 +38,6 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.HelixProperty;
-import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -53,6 +53,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.tls.ZooKeeperSslContextSupplier;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.common.workload.WorkloadChangeListener;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
@@ -84,8 +85,8 @@ public class HelixHelper {
 
   /// Creates a ZooKeeper-backed manager with Pinot's TLS bootstrap policy applied before construction.
   /// Callers retain responsibility for the manager's connect/disconnect lifecycle.
-  public static HelixManager createZkHelixManager(String clusterName, String instanceName, InstanceType instanceType,
-      String zkAddress) {
+  public static HelixManager createZkHelixManager(String clusterName, String instanceName,
+      org.apache.helix.InstanceType instanceType, String zkAddress) {
     ZooKeeperSslContextSupplier.initialize();
     return HelixManagerFactory.getZKHelixManager(clusterName, instanceName, instanceType, zkAddress);
   }
@@ -717,6 +718,33 @@ public class HelixHelper {
       return true;
     }
     return false;
+  }
+
+  /// Writes the capabilities that an instance of the given type advertises in this version
+  /// ([InstanceCapability#values()]) to the map field `capabilities` of the instance config, together with the
+  /// reserved entry `pinotVersion` ([CommonConstants.Helix.Instance#CAPABILITIES_PINOT_VERSION_KEY]) set to the Pinot
+  /// version of this build. It also writes the simple field `pinotVersion` with [#updatePinotVersion], so one call
+  /// leaves a record that readers trust: readers ignore the capabilities when the two values differ. The call replaces
+  /// the whole map, so a capability that this build does not advertise disappears. Any instance type can call it.
+  /// Returns whether the instance config changed.
+  public static boolean updateCapabilities(InstanceConfig instanceConfig, InstanceType instanceType) {
+    return updateCapabilities(instanceConfig, instanceType, InstanceCapability.values());
+  }
+
+  /// Same as [#updateCapabilities(InstanceConfig, InstanceType)] with the given capabilities instead of
+  /// [InstanceCapability#values()]. An extension passes the capabilities of Pinot together with its own, see
+  /// [InstanceCapability]. Fails, before it changes the instance config, when two capabilities have the same name.
+  public static boolean updateCapabilities(InstanceConfig instanceConfig, InstanceType instanceType,
+      Collection<InstanceCapability> capabilities) {
+    Map<String, String> currentCapabilities = InstanceCapability.toMapField(capabilities, instanceType);
+    currentCapabilities.put(CommonConstants.Helix.Instance.CAPABILITIES_PINOT_VERSION_KEY, PinotVersion.VERSION);
+    boolean updated = updatePinotVersion(instanceConfig);
+    ZNRecord record = instanceConfig.getRecord();
+    if (!currentCapabilities.equals(record.getMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY))) {
+      record.setMapField(CommonConstants.Helix.Instance.CAPABILITIES_KEY, currentCapabilities);
+      updated = true;
+    }
+    return updated;
   }
 
   public static boolean updateMaxConcurrentTasksPerInstance(InstanceConfig instanceConfig, int maxConcurrentTasks) {

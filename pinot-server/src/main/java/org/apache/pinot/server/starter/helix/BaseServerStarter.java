@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -44,7 +45,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -77,6 +77,7 @@ import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.InstanceCapability;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
@@ -123,6 +124,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -295,8 +297,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
-    _helixManager =
-        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
+    _helixManager = HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId,
+        org.apache.helix.InstanceType.PARTICIPANT, _zkAddress);
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     initTransitionThreadPoolManager();
@@ -480,6 +482,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     return consumingSegments;
   }
 
+  /// The capabilities that this server advertises in its instance config at startup, see [InstanceCapability]. A
+  /// distribution or a plugin built on Pinot overrides it to add its own capabilities to [InstanceCapability#values()].
+  protected Collection<InstanceCapability> getInstanceCapabilities() {
+    return InstanceCapability.values();
+  }
+
   private void updateInstanceConfigIfNeeded(ServerConf serverConf) {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
 
@@ -529,7 +537,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       updated |= updatePortIfNeeded(simpleFields, Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
           serverConf.getMultiStageMailboxPort());
     }
-    updated |= HelixHelper.updatePinotVersion(instanceConfig);
+    // Also writes the simple field pinotVersion.
+    updated |= HelixHelper.updateCapabilities(instanceConfig, InstanceType.SERVER, getInstanceCapabilities());
 
     // Update environment properties
     if (_pinotEnvironmentProvider != null) {
@@ -764,11 +773,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Initialize workload budget manager and thread accountant. Workload budget manager must be initialized first
     // because it might be used by the accountant.
-    PinotConfiguration accountingConfig = ThreadAccountantUtils.extractAccountingConfig(_serverConf,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    PinotConfiguration accountingConfig =
+        ThreadAccountantUtils.extractAccountingConfig(_serverConf, InstanceType.SERVER);
     WorkloadBudgetManagerFactory.register(accountingConfig);
-    _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId, InstanceType.SERVER);
 
     // Initialize scan-based query killing
     PinotConfiguration schedulerConfig = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
