@@ -858,6 +858,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _serverIngestionOomProtectionManager = serverIngestionOomProtectionManager;
   }
 
+  @VisibleForTesting
+  void waitBeforeReadinessCheck()
+      throws InterruptedException {
+    //noinspection BusyWait
+    Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+  }
+
   public class PartitionConsumer implements Runnable {
     public void run() {
       long initialConsumptionEnd = 0L;
@@ -867,8 +874,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       try {
         if (!_isReadyToConsumeData.getAsBoolean()) {
           do {
-            //noinspection BusyWait
-            Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+            waitBeforeReadinessCheck();
           } while (!_shouldStop && !_isReadyToConsumeData.getAsBoolean());
         }
 

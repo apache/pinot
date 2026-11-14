@@ -133,6 +133,13 @@ public class RexExpressionSerDeTest {
   }
 
   @Test
+  public void testFloatArrayLiteralPreservesEmptyAndIndexedValues() {
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.FLOAT_ARRAY, new float[0]));
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.FLOAT_ARRAY,
+        new float[]{1.25f, -0.0f, Float.NaN, Float.POSITIVE_INFINITY}));
+  }
+
+  @Test
   public void testDoubleArrayLiteral() {
     double[] values = new double[RANDOM.nextInt(10)];
     for (int i = 0; i < values.length; i++) {
@@ -166,6 +173,13 @@ public class RexExpressionSerDeTest {
       values[i] = RandomStringUtils.secure().next(RANDOM.nextInt(10));
     }
     verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.STRING_ARRAY, values));
+  }
+
+  @Test
+  public void testStringArrayLiteralPreservesEmptyAndIndexedValues() {
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.STRING_ARRAY, new String[0]));
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.STRING_ARRAY,
+        new String[]{"", "pinot", "\u03c0 \u4e2d \uD83D\uDE80"}));
   }
 
   @Test

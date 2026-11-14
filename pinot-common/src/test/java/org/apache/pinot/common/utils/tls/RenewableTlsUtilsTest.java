@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.common.utils.tls;
 
+import com.google.common.base.Supplier;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -40,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -55,10 +58,14 @@ import nl.altindag.ssl.trustmanager.UnsafeX509ExtendedTrustManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.spi.utils.retry.FixedDelayRetryPolicy;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.mockito.MockedStatic;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mockStatic;
 import static org.testng.Assert.*;
 
 
@@ -165,6 +172,60 @@ public class RenewableTlsUtilsTest {
     assertEquals(x509TrustManager1.getAcceptedIssuers().length, x509TrustManager2.getAcceptedIssuers().length);
     assertEquals(x509TrustManager1.getAcceptedIssuers().length, 1);
     assertEquals(x509TrustManager1.getAcceptedIssuers()[0], x509TrustManager2.getAcceptedIssuers()[0]);
+  }
+
+  @Test
+  public void reloadSslFactoryPreservesMaterialAfterFailedRetries()
+      throws Exception {
+    SSLFactory sslFactory = RenewableTlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD,
+        TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", null, true, false);
+    SSLContext sslContext = sslFactory.getSslContext();
+    X509ExtendedKeyManager keyManager = sslFactory.getKeyManager().orElseThrow();
+    X509ExtendedTrustManager trustManager = sslFactory.getTrustManager().orElseThrow();
+    PrivateKey privateKey = keyManager.getPrivateKey(KEY_NAME_ALIAS);
+    Certificate certificate = keyManager.getCertificateChain(KEY_NAME_ALIAS)[0];
+    X509Certificate acceptedIssuer = trustManager.getAcceptedIssuers()[0];
+    AtomicInteger attempts = new AtomicInteger();
+    Supplier<Boolean> insecureModeSupplier = () -> {
+      attempts.incrementAndGet();
+      return false;
+    };
+
+    // Keep the real retry loop and TLS loading, but eliminate its delays and invoke renewal synchronously.
+    try (MockedStatic<RetryPolicies> retryPolicies = mockStatic(RetryPolicies.class)) {
+      retryPolicies.when(() -> RetryPolicies.fixedDelayRetryPolicy(3, 1000))
+          .thenReturn(new FixedDelayRetryPolicy(3, 0));
+      reloadSslFactory(sslFactory, "incorrect-password", insecureModeSupplier);
+
+      assertEquals(attempts.get(), 3, "Invalid credentials must exhaust the configured attempts");
+      assertSame(sslFactory.getSslContext(), sslContext);
+      assertSame(sslFactory.getKeyManager().orElseThrow(), keyManager);
+      assertSame(sslFactory.getTrustManager().orElseThrow(), trustManager);
+      assertEquals(keyManager.getPrivateKey(KEY_NAME_ALIAS), privateKey);
+      assertEquals(keyManager.getCertificateChain(KEY_NAME_ALIAS)[0], certificate);
+      assertEquals(trustManager.getAcceptedIssuers()[0], acceptedIssuer);
+
+      copyResourceFilesToTempFolder(
+          Map.of(TLS_KEYSTORE_UPDATED_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_UPDATED_FILE, TLS_TRUSTSTORE_FILE));
+      reloadSslFactory(sslFactory, PASSWORD, insecureModeSupplier);
+
+      assertEquals(attempts.get(), 4, "Renewal must succeed on its first attempt after credentials are corrected");
+      assertSame(sslFactory.getSslContext(), sslContext);
+      assertNotEquals(keyManager.getPrivateKey(KEY_NAME_ALIAS), privateKey);
+      assertNotEquals(keyManager.getCertificateChain(KEY_NAME_ALIAS)[0], certificate);
+      assertNotEquals(trustManager.getAcceptedIssuers()[0], acceptedIssuer);
+    }
+  }
+
+  private static void reloadSslFactory(SSLFactory sslFactory, String keyStorePassword,
+      Supplier<Boolean> insecureModeSupplier)
+      throws Exception {
+    Method reload = RenewableTlsUtils.class.getDeclaredMethod("reloadSslFactory", SSLFactory.class,
+        String.class, String.class, String.class, String.class, String.class, String.class,
+        String.class, SecureRandom.class, Supplier.class);
+    reload.setAccessible(true);
+    reload.invoke(null, sslFactory, KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, keyStorePassword,
+        TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", null, insecureModeSupplier);
   }
 
   @Test

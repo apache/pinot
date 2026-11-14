@@ -29,6 +29,9 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.testng.Assert.assertEquals;
 
 
@@ -38,6 +41,15 @@ public class AndDocIdSetTest {
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
   private static final int NUM_DOCS = 100000;
+
+  @Test
+  public void testReleaseReachesAChildThroughNegation() {
+    BlockDocIdSet child = mock(BlockDocIdSet.class);
+    AndDocIdSet parent = new AndDocIdSet(List.of(new NotDocIdSet(child, 10)), null);
+    parent.release();
+    verify(child).release();
+    verifyNoMoreInteractions(child);
+  }
 
   @Test
   public void testBitmapOnlyIntersection() {

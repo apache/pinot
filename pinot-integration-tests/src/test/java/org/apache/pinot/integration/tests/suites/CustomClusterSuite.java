@@ -18,17 +18,22 @@
  */
 package org.apache.pinot.integration.tests.suites;
 
+import org.apache.pinot.integration.tests.DimensionTableIntegrationTest;
+import org.apache.pinot.integration.tests.SegmentWriterUploaderIntegrationTest;
 import org.junit.platform.suite.api.IncludeClassNamePatterns;
 import org.junit.platform.suite.api.IncludeEngines;
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.SelectPackages;
 import org.junit.platform.suite.api.Suite;
 
 
 /// Runs the custom-data scenarios with one shared cluster.
+/// The two explicit classes retain their original names for direct test selection.
 /// Stateless suite definition; the selected tests run sequentially in one fork.
 @Suite
 @IncludeEngines("testng")
 @SelectPackages("org.apache.pinot.integration.tests.custom")
+@SelectClasses({DimensionTableIntegrationTest.class, SegmentWriterUploaderIntegrationTest.class})
 @IncludeClassNamePatterns(".*")
 public class CustomClusterSuite {
 }

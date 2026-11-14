@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
@@ -44,6 +45,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 /// Verifies that [DistinctTable#mergeDistinctTable] reports resource usage to the query accountant *while* the
@@ -57,6 +59,50 @@ import static org.testng.Assert.assertThrows;
 /// Every concrete [DistinctTable] subclass has three merge branches (unbounded, limited without order-by, limited
 /// with order-by) and each carries its own hand-written sampling call, so all 24 are covered here.
 public class DistinctTableMergeAccountingTest {
+  @Test
+  public void testLimitedFloatMergeStopsWhenSatisfied() {
+    DataSchema schema = singleColumnSchema(ColumnDataType.FLOAT);
+    FloatDistinctTable source = new FloatDistinctTable(schema, Integer.MAX_VALUE, false, null);
+    source.addUnbounded(1.25f);
+    source.addUnbounded(2.5f);
+    source.addUnbounded(3.75f);
+    FloatDistinctTable destination = new FloatDistinctTable(schema, 1, false, null);
+    TrackingAccountant accountant = new TrackingAccountant();
+    try (QueryThreadContext ignored = QueryThreadContext.open(QueryExecutionContext.forSseTest(), accountant)) {
+      destination.mergeDistinctTable(source);
+    }
+    assertEquals(destination.size(), 1);
+    assertTrue(destination.isSatisfied());
+    assertTrue(Set.of(1.25f, 2.5f, 3.75f).contains(destination.getRows().get(0)[0]));
+    assertEquals(accountant.getSampleUsageCount(), 1);
+  }
+
+  @Test
+  public void testLimitedIntAndStringDataTableMergesStopWhenSatisfied()
+      throws Exception {
+    DataSchema intSchema = singleColumnSchema(ColumnDataType.INT);
+    IntDistinctTable ints = new IntDistinctTable(intSchema, Integer.MAX_VALUE, false, null);
+    ints.addUnbounded(1);
+    ints.addUnbounded(2);
+    ints.addUnbounded(3);
+    IntDistinctTable limitedInts = new IntDistinctTable(intSchema, 1, false, null);
+    assertTrue(limitedInts.mergeDataTable(ints.toDataTable()));
+    assertEquals(limitedInts.size(), 1);
+    assertTrue(limitedInts.isSatisfied());
+    assertTrue(Set.of(1, 2, 3).contains(limitedInts.getRows().get(0)[0]));
+
+    DataSchema stringSchema = singleColumnSchema(ColumnDataType.STRING);
+    StringDistinctTable strings = new StringDistinctTable(stringSchema, Integer.MAX_VALUE, false, null);
+    strings.addUnbounded("first");
+    strings.addUnbounded("second");
+    strings.addUnbounded("third");
+    StringDistinctTable limitedStrings = new StringDistinctTable(stringSchema, 1, false, null);
+    assertTrue(limitedStrings.mergeDataTable(strings.toDataTable()));
+    assertEquals(limitedStrings.size(), 1);
+    assertTrue(limitedStrings.isSatisfied());
+    assertTrue(Set.of("first", "second", "third").contains(limitedStrings.getRows().get(0)[0]));
+  }
+
   private static final int SAMPLE_INTERVAL = QueryThreadContext.CHECK_TERMINATION_AND_SAMPLE_USAGE_RECORD_MASK + 1;
 
   /// Number of values merged per case. Chosen to cross [#SAMPLE_INTERVAL] exactly twice, so the merge loop is expected
@@ -66,6 +112,41 @@ public class DistinctTableMergeAccountingTest {
 
   /// Limit used by the two limited branches. High enough that the merge never satisfies the limit and returns early.
   private static final int LIMIT = NUM_VALUES + 1;
+
+  @Test
+  public void testFloatDataTableRoundTripWithoutNullHandling()
+      throws Exception {
+    DataSchema schema = singleColumnSchema(ColumnDataType.FLOAT);
+    FloatDistinctTable source = new FloatDistinctTable(schema, 10, false, null);
+    source.addUnbounded(2.5f);
+    source.addUnbounded(1.25f);
+    source.addUnbounded(2.5f);
+    FloatDistinctTable restored = new FloatDistinctTable(schema, 10, false, null, source.toDataTable());
+    List<Float> values = new ArrayList<>();
+    for (Object[] row : restored.getRows()) {
+      values.add((Float) row[0]);
+    }
+    values.sort(Float::compare);
+    assertEquals(values, List.of(1.25f, 2.5f));
+    assertEquals(restored.size(), 2);
+  }
+
+  @Test
+  public void testStringMergeStopsAtTheRequestedLimit() {
+    DataSchema schema = singleColumnSchema(ColumnDataType.STRING);
+    StringDistinctTable source = new StringDistinctTable(schema, Integer.MAX_VALUE, false, null);
+    source.addUnbounded("first");
+    source.addUnbounded("second");
+    source.addUnbounded("third");
+    StringDistinctTable destination = new StringDistinctTable(schema, 1, false, null);
+    try (QueryThreadContext ignored = QueryThreadContext.open(QueryExecutionContext.forSseTest(),
+        new TrackingAccountant())) {
+      destination.mergeDistinctTable(source);
+    }
+    assertEquals(destination.size(), 1);
+    assertTrue(destination.isSatisfied());
+    assertTrue(Set.of("first", "second", "third").contains(destination.getRows().get(0)[0]));
+  }
 
   /// Builds a populated merge source plus the (empty) destination it is merged into.
   @FunctionalInterface

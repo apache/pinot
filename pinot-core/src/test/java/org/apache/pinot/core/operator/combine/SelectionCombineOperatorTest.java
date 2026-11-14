@@ -59,6 +59,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -219,6 +220,44 @@ public class SelectionCombineOperatorTest {
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
     assertEquals(combineResult.getNumSegmentsMatched(), NUM_SEGMENTS);
     assertEquals(combineResult.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+  }
+
+  @Test
+  public void testSingleThreadMinMaxPruningSkipsTheRemainingSegments() {
+    SelectionResultsBlock result = getSingleThreadCombineResult(
+        "SET allowReverseOrder=false; SELECT * FROM testTable ORDER BY intColumn LIMIT 1", _indexSegments);
+    assertEquals(result.getRows().size(), 1);
+    assertEquals(result.getRows().get(0)[0], 0);
+    assertTrue(result.getNumSegmentsMatched() > 0);
+    assertTrue(result.getNumSegmentsMatched() < NUM_SEGMENTS);
+    assertEquals(result.getNumTotalDocs(), NUM_SEGMENTS * NUM_RECORDS_PER_SEGMENT);
+  }
+
+  @Test
+  public void testMinMaxWorkerDoesNotClaimSegmentsAfterAnotherWorkerFails()
+      throws Exception {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SET allowReverseOrder=false; SELECT intColumn FROM testTable ORDER BY intColumn LIMIT 1");
+    queryContext.setMaxExecutionThreads(1);
+    queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    List<PlanNode> planNodes = new ArrayList<>(_indexSegments.size());
+    for (IndexSegment indexSegment : _indexSegments) {
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext));
+    }
+    MinMaxValueBasedSelectionOrderByCombineOperator combine =
+        (MinMaxValueBasedSelectionOrderByCombineOperator) new CombinePlanNode(planNodes, queryContext, EXECUTOR, null)
+            .run();
+    IllegalStateException failure = new IllegalStateException("first worker failed");
+    combine.onProcessSegmentsException(failure);
+
+    combine.processSegments();
+    assertEquals(combine._nextOperatorId.get(), 0);
+    assertSame(combine._processingException.get(), failure);
+    assertEquals(combine._blockingQueue.size(), 1);
+    var merged = combine.mergeResults();
+    assertEquals(merged.getErrorMessages().size(), 1);
+    assertEquals(merged.getErrorMessages().get(0).getUsrMsg(), "first worker failed");
+    assertTrue(combine._blockingQueue.isEmpty());
   }
 
   @Test
