@@ -76,6 +76,7 @@ import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -3050,8 +3051,87 @@ public class PinotLLCRealtimeSegmentManagerTest {
         pinotLLCRealtimeSegmentManager.shouldRepairErrorSegmentsForPartialUpsertOrDedup(DisasterRecoveryMode.ALWAYS));
   }
 
-  @Test
-  public void testRepairSegmentsInErrorStateResetsCommittedSegmentsOnPauselessDedupTable()
+  @DataProvider
+  public Object[][] pauselessDedupAndPartialUpsertTableConfigs() {
+    return new Object[][]{
+        {createPauselessTableConfig(new DedupConfig(), null)},
+        {createPauselessTableConfig(null, new UpsertConfig(UpsertConfig.Mode.PARTIAL))}
+    };
+  }
+
+  @Test(dataProvider = "pauselessDedupAndPartialUpsertTableConfigs")
+  public void testRepairSegmentsInErrorStateSkipsResetsOnPauselessDedupAndPartialUpsertTables(TableConfig tableConfig)
+      throws InvalidConfigException {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager, mockControllerMetrics);
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 0, Status.COMMITTING,
+        SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 1, Status.COMMITTING,
+        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    // The next segment of the partition whose COMMITTING segment stays in ERROR
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 2, Status.IN_PROGRESS,
+        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1, 0, Status.DONE,
+        SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1, 1, Status.DONE,
+        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1, 2, Status.IN_PROGRESS,
+        SegmentStateModel.CONSUMING, SegmentStateModel.ERROR);
+    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 2, 0, Status.UPLOADED,
+        SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
+    segmentManager._idealState = idealState;
+    when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+
+    segmentManager.repairSegmentsInErrorState(tableConfig, false);
+
+    // Without the override nothing is repaired: re-ingestion and re-consuming are unsafe on these tables, and so is
+    // reloading a committed segment, since the server may have consumed the later segments without its keys
+    verify(mockHelixResourceManager, never()).resetErrorReplicas(any(), any());
+    verify(mockHelixResourceManager, never()).resetSegment(any(), any(), any());
+    verify(mockHelixResourceManager, never()).getDataInstanceAdminEndpoints(any());
+    // The error count keeps counting segments with every replica in ERROR. Every segment left unrepaired is
+    // unrecoverable, including the IN_PROGRESS segment with a healthy replica, whose ERROR replica its commit will not
+    // let a reset repair either.
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, 3L);
+    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 7L);
+  }
+
+  @DataProvider
+  public Object[][] tableConfigsAllowingResets() {
+    TableConfig pauselessDedupTableConfigWithDisasterRecovery = createPauselessTableConfig(new DedupConfig(), null);
+    pauselessDedupTableConfigWithDisasterRecovery.getIngestionConfig().getStreamIngestionConfig()
+        .setDisasterRecoveryMode(DisasterRecoveryMode.ALWAYS);
+    TableConfig pauselessPartialUpsertTableConfigWithDisasterRecovery =
+        createPauselessTableConfig(null, new UpsertConfig(UpsertConfig.Mode.PARTIAL));
+    pauselessPartialUpsertTableConfigWithDisasterRecovery.getIngestionConfig().getStreamIngestionConfig()
+        .setDisasterRecoveryMode(DisasterRecoveryMode.ALWAYS);
+    TableConfig nonPauselessDedupTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(2)
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+        .setDedupConfig(new DedupConfig())
+        .build();
+    return new Object[][]{
+        // Opted in for one run
+        {createPauselessTableConfig(new DedupConfig(), null), true},
+        {createPauselessTableConfig(null, new UpsertConfig(UpsertConfig.Mode.PARTIAL)), true},
+        // Opted in for the table
+        {pauselessDedupTableConfigWithDisasterRecovery, false},
+        {pauselessPartialUpsertTableConfigWithDisasterRecovery, false},
+        // Not gated
+        {createPauselessTableConfig(null, new UpsertConfig(UpsertConfig.Mode.FULL)), false},
+        {nonPauselessDedupTableConfig, false}
+    };
+  }
+
+  @Test(dataProvider = "tableConfigsAllowingResets")
+  public void testRepairSegmentsInErrorStateResetsErrorReplicasOfCommittedSegments(TableConfig tableConfig,
+      boolean repairErrorSegmentsForPartialUpsertOrDedup)
       throws InvalidConfigException {
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
     ControllerMetrics mockControllerMetrics = mock(ControllerMetrics.class);
@@ -3061,35 +3141,26 @@ public class PinotLLCRealtimeSegmentManagerTest {
     ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
     String committingPartialErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState,
         externalView, 0, 0, Status.COMMITTING, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
-    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 1, Status.COMMITTING,
-        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
-    // The next segment of the partition whose COMMITTING segment stays in ERROR
-    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 0, 2, Status.IN_PROGRESS,
-        SegmentStateModel.ERROR, SegmentStateModel.ERROR);
     String donePartialErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1,
         0, Status.DONE, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
-    String doneAllErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1, 1,
+    String doneAllErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 2, 0,
         Status.DONE, SegmentStateModel.ERROR, SegmentStateModel.ERROR);
-    addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView, 1, 2, Status.IN_PROGRESS,
-        SegmentStateModel.CONSUMING, SegmentStateModel.ERROR);
+    String uploadedPartialErrorSegment = addSegmentForErrorRepair(mockHelixResourceManager, idealState, externalView,
+        3, 0, Status.UPLOADED, SegmentStateModel.ONLINE, SegmentStateModel.ERROR);
     segmentManager._idealState = idealState;
     when(mockHelixResourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
 
-    segmentManager.repairSegmentsInErrorState(createPauselessTableConfig(new DedupConfig(), null), false);
+    segmentManager.repairSegmentsInErrorState(tableConfig, repairErrorSegmentsForPartialUpsertOrDedup);
 
-    // Only the committed segments are reset: their ERROR replicas reload from a peer or the deep store. Resetting an
-    // IN_PROGRESS segment would re-consume it, and the COMMITTING segment with every replica in ERROR needs
-    // re-ingestion, both of which stay disallowed on a dedup table without the override.
+    // Only the ERROR replicas are reset, so they reload from the ONLINE replica or the deep store
     verify(mockHelixResourceManager).resetErrorReplicas(REALTIME_TABLE_NAME,
-        Set.of(committingPartialErrorSegment, donePartialErrorSegment, doneAllErrorSegment));
+        Set.of(committingPartialErrorSegment, donePartialErrorSegment, doneAllErrorSegment,
+            uploadedPartialErrorSegment));
     verify(mockHelixResourceManager, never()).resetSegment(any(), any(), any());
-    verify(mockHelixResourceManager, never()).getDataInstanceAdminEndpoints(any());
-    // The error count keeps counting segments with every replica in ERROR. The two left unrepaired are unrecoverable;
-    // the IN_PROGRESS segment with a healthy replica is not, since its ERROR replica is reset once it commits.
-    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
-        ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, 3L);
-    verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
-        ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 2L);
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      verify(mockControllerMetrics).setOrUpdateTableGauge(REALTIME_TABLE_NAME,
+          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 0L);
+    }
   }
 
   @Test
