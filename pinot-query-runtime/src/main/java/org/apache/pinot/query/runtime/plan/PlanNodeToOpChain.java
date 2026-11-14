@@ -35,6 +35,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -50,6 +51,7 @@ import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.MatchOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.RepeatOperator;
@@ -423,6 +425,18 @@ public class PlanNodeToOpChain {
     public MultiStageOperator visitExplained(ExplainedNode node, OpChainExecutionContext context) {
       return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION,
           "Plan node of type ExplainedNode is not supported in OpChain execution.");
+    }
+
+    @Override
+    public MultiStageOperator visitMatch(MatchNode node, OpChainExecutionContext context) {
+      MultiStageOperator child = null;
+      try {
+        PlanNode input = node.getInputs().get(0);
+        child = visit(input, context);
+        return new MatchOperator(context, child, input.getDataSchema(), node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
     }
 
     @Override

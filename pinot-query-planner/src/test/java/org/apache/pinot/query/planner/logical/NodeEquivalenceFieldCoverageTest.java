@@ -34,9 +34,12 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MatchNode;
+import org.apache.pinot.query.planner.plannode.PatternSymbol;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.RowPattern;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -90,6 +93,16 @@ public class NodeEquivalenceFieldCoverageTest {
           "_collations", "_sort", "_sortedOnSender", "_sender")),
       Map.entry(MailboxSendNode.class, List.of("_receiverStages", "_exchangeType", "_distributionType", "_keys",
           "_prePartitioned", "_collations", "_sort", "_hashFunction")),
+      Map.entry(MatchNode.class, List.of("_patternSymbols", "_pattern", "_measures", "_partitionKeys", "_collations",
+          "_afterMatchSkipMode", "_afterMatchSkipToSymbolOrdinal", "_rowsPerMatchMode")),
+      Map.entry(MatchNode.Measure.class, List.of("_name", "_expression")),
+      Map.entry(PatternSymbol.class, List.of("_name", "_definition")),
+      Map.entry(RowPattern.Symbol.class, List.of("_symbolOrdinal")),
+      Map.entry(RowPattern.Concat.class, List.of("_children")),
+      Map.entry(RowPattern.Alternate.class, List.of("_children")),
+      Map.entry(RowPattern.Quantifier.class, List.of("_child", "_minRepeat", "_maxRepeat", "_greedy")),
+      Map.entry(RowPattern.AnchorStart.class, List.of()),
+      Map.entry(RowPattern.AnchorEnd.class, List.of()),
       Map.entry(ProjectNode.class, List.of("_projects")),
       Map.entry(SetOpNode.class, List.of("_setOpType", "_all")),
       Map.entry(SortNode.class, List.of("_collations", "_fetch", "_offset")),
@@ -101,6 +114,7 @@ public class NodeEquivalenceFieldCoverageTest {
       Map.entry(WindowNode.class, List.of("_keys", "_collations", "_aggCalls", "_windowFrameType", "_lowerBound",
           "_upperBound", "_exclude", "_constants")),
       Map.entry(RexExpression.InputRef.class, List.of("_index")),
+      Map.entry(RexExpression.PatternFieldRef.class, List.of("_index", "_symbolOrdinal", "_alpha")),
       Map.entry(RexExpression.Literal.class, List.of("_dataType", "_value")),
       Map.entry(RexExpression.FunctionCall.class, List.of("_dataType", "_functionName", "_functionOperands",
           "_isDistinct", "_ignoreNulls")));
