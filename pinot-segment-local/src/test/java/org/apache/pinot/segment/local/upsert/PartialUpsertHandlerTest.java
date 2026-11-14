@@ -49,6 +49,7 @@ import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class PartialUpsertHandlerTest {
@@ -86,6 +87,35 @@ public class PartialUpsertHandlerTest {
     // field2 has no per-column strategy, so it takes FORCE_OVERWRITE from the default strategy
     testMerge(UpsertConfig.Strategy.FORCE_OVERWRITE, false, 3, true, 0L, "field2", 0L, true);
     testMerge(UpsertConfig.Strategy.FORCE_OVERWRITE, false, 3, false, 5, "field2", 5, false);
+  }
+
+  @Test
+  public void testForceOverwriteKeepsNormalizedTimePlaceholder() {
+    // The comparison column is not the time column, so the time column takes FORCE_OVERWRITE from the default
+    // strategy. For a missing time value, realtime ingestion puts a valid timestamp in the row and marks it null;
+    // the merge must keep both instead of replacing the timestamp with the schema default ("null").
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("pk", FieldSpec.DataType.STRING).addMetric("version", FieldSpec.DataType.LONG)
+        .addDateTime("day", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS")
+        .setPrimaryKeyColumns(List.of("pk")).build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.FORCE_OVERWRITE);
+    upsertConfig.setComparisonColumns(List.of("version"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+        .setTimeColumnName("day").setNullHandlingEnabled(true).setUpsertConfig(upsertConfig).build();
+    PartialUpsertHandler handler = new PartialUpsertHandler(tableConfig, schema, List.of("version"), upsertConfig);
+    LazyRow prevRecord = mockLazyRow(mock(LazyRow.class), Map.of("pk", "pk1", "version", 1L, "day", "20261101"));
+
+    GenericRow missingDay = initGenericRow(new GenericRow(), Map.of("pk", "pk1", "version", 2L));
+    missingDay.putDefaultNullValue("day", "20261113");
+    handler.merge(prevRecord, missingDay, new HashMap<>());
+    assertEquals(missingDay.getValue("day"), "20261113");
+    assertTrue(missingDay.isNullValue("day"));
+
+    GenericRow newDay = initGenericRow(new GenericRow(), Map.of("pk", "pk1", "version", 2L, "day", "20261112"));
+    handler.merge(prevRecord, newDay, new HashMap<>());
+    assertEquals(newDay.getValue("day"), "20261112");
+    assertFalse(newDay.isNullValue("day"));
   }
 
   @Test

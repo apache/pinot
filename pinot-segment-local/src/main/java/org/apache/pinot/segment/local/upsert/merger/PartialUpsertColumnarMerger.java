@@ -70,15 +70,11 @@ public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
       PartialUpsertColumnMerger merger = _column2Mergers.getOrDefault(column, _defaultColumnValueMerger);
       if (merger instanceof ForceOverwriteMerger) {
         // Force Overwrite mergers
-        // If the merge strategy is Force Overwrite merger and prevValue is always overwritten by newValue.
-        // A null newValue is stored in the row as the column's default value, so put null here to keep the
-        // column null instead of turning the default value into a real value.
-        if (newRow.isNullValue(column)) {
-          resultHolder.put(column, null);
-        } else {
-          Object prevValue = previousRow.getValue(column);
-          resultHolder.put(column, merger.merge(prevValue, newRow.getValue(column)));
-        }
+        // The new row already holds the result: the new value, or for a null value the placeholder that ingestion
+        // put in the row together with its null marker. Leave the column untouched so both are kept; putting a
+        // value in the result holder would clear the null marker or replace an ingestion-normalized placeholder
+        // (e.g. a time column's default) with the schema default.
+        continue;
       } else if (!(merger instanceof OverwriteMerger)) {
         // Non-overwrite mergers
         // (1) If the value of the previous is null value, skip merging and use the new value
