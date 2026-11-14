@@ -40,7 +40,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
     super(numDocs, queryContext.isNullHandlingEnabled());
     _queryContext = queryContext;
     _dataSource = dataSource;
-    _nullBitmap = _nullHandlingEnabled ? FilterOperatorUtils.getNullBitmap(dataSource) : null;
+    _nullBitmap = _nullHandlingEnabled ? FilterOperatorUtils.getNullBitmap(dataSource, numDocs) : null;
   }
 
   protected abstract BlockDocIdSet getNextBlockWithoutNullHandling();

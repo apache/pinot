@@ -125,6 +125,22 @@ public class InvertedIndexFilterOperatorTest {
     assertEquals(operator.getNumMatchingDocs(), NUM_DOCS - 8);
   }
 
+  // On a consuming segment, the null vector can hold null rows ingested after numDocs was read, which are ignored
+  @Test
+  public void testNullRowsAtOrAboveNumDocsAreIgnored() {
+    ImmutableRoaringBitmap b0 = bitmap(0, 1, 2, 3);
+    ImmutableRoaringBitmap b1 = bitmap(4, 5, 6);
+    ImmutableRoaringBitmap nullBitmap = bitmap(3, 100, NUM_DOCS, NUM_DOCS + 1);
+    InvertedIndexFilterOperator operator =
+        newOperator(true, true, new int[]{0, 1}, new ImmutableRoaringBitmap[]{b0, b1}, nullBitmap);
+    assertEquals(operator.getNumMatchingDocs(), NUM_DOCS - 8);
+    assertEquals(operator.getBitmaps().getCardinality(), NUM_DOCS - 8);
+
+    operator = newOperator(true, true, new int[]{0, 1}, new ImmutableRoaringBitmap[]{b0, b1}, bitmap(NUM_DOCS));
+    assertFalse(operator.mayHaveNulls());
+    assertEquals(operator.getNumMatchingDocs(), NUM_DOCS - 7);
+  }
+
   // An empty null vector leaves the two-valued shortcuts in place
   @Test
   public void testEmptyNullBitmapIsIgnored() {
