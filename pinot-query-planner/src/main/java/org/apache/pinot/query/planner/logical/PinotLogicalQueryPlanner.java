@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -27,6 +30,7 @@ import it.unimi.dsi.fastutil.ints.IntListIterator;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
@@ -34,6 +38,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
@@ -46,22 +52,27 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// PinotLogicalQueryPlanner walks top-down from [RelRoot] and construct a forest of trees with [PlanNode].
 public class PinotLogicalQueryPlanner {
+  /// The key of the [CommonConstants.Broker.Request.QueryOptionKey#SPOOLS_FEEDBACK] entry in the response metadata.
+  public static final String SPOOLS_RESPONSE_METADATA_KEY = "spools";
+
   private PinotLogicalQueryPlanner() {
   }
 
   /// Converts a Calcite [RelRoot] into a Pinot [SubPlan].
   public static SubPlan makePlan(RelRoot relRoot,
-      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
-      String hashFunction, boolean pruneUnnestColumns) {
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, SpoolMode spoolMode,
+      boolean spoolsFeedback, String hashFunction, boolean pruneUnnestColumns) {
     PlanNode rootNode = new RelToPlanNodeConverter(tracker, hashFunction,
         !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE, pruneUnnestColumns).toPlanNode(relRoot.rel);
 
-    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools, hashFunction);
+    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, spoolMode, spoolsFeedback, hashFunction);
     return new SubPlan(rootFragment,
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
 
@@ -106,16 +117,19 @@ public class PinotLogicalQueryPlanner {
   }
 
   private static PlanFragment planNodeToPlanFragment(
-      PlanNode node, @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools,
-      String hashFunction) {
+      PlanNode node, @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, SpoolMode spoolMode,
+      boolean spoolsFeedback, String hashFunction) {
     PlanFragmenter fragmenter = new PlanFragmenter();
     PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
     node = node.visit(fragmenter, fragmenterContext);
 
-    if (useSpools) {
+    List<SpoolSubstitution> substitutions = List.of();
+    if (spoolMode.isEnabled()) {
       GroupedStages equivalentStages = EquivalentStagesFinder.findEquivalentStages(node);
-      EquivalentStagesReplacer.replaceEquivalentStages(node, equivalentStages, fragmenter);
+      substitutions = EquivalentStagesReplacer.replaceEquivalentStages(node, equivalentStages, fragmenter,
+          spoolMode.isGuarded());
     }
+    reportSpools(spoolMode, spoolsFeedback, substitutions);
 
     Int2ObjectOpenHashMap<PlanFragment> planFragmentMap = fragmenter.getPlanFragmentMap();
     Int2ObjectOpenHashMap<IntList> childPlanFragmentIdsMap = fragmenter.getChildPlanFragmentIdsMap();
@@ -160,5 +174,50 @@ public class PinotLogicalQueryPlanner {
     }
 
     return new PlanFragment(0, rootReceiveNode, List.of(planFragment1));
+  }
+
+  /// Emits the spool meters and, when `spoolsFeedback` is set, attaches a `spools` entry to the response metadata.
+  ///
+  /// The entry is attached even when spools are off, so that a user who asks why nothing was shared learns the mode.
+  private static void reportSpools(SpoolMode spoolMode, boolean spoolsFeedback,
+      List<SpoolSubstitution> substitutions) {
+    int applied = 0;
+    int rejectedByGuard = 0;
+    for (SpoolSubstitution substitution : substitutions) {
+      if (substitution.outcome() == SpoolSubstitution.Outcome.APPLIED) {
+        applied++;
+      } else if (substitution.outcome() == SpoolSubstitution.Outcome.REJECTED_BY_GUARD) {
+        rejectedByGuard++;
+      }
+    }
+    BrokerMetrics brokerMetrics = BrokerMetrics.get();
+    if (applied > 0) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.SPOOLS_APPLIED, applied);
+    }
+    if (rejectedByGuard > 0) {
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.SPOOLS_REJECTED_BY_GUARD, rejectedByGuard);
+    }
+    if (spoolsFeedback) {
+      QueryThreadContext.addResponseBrokerMetadata(SPOOLS_RESPONSE_METADATA_KEY,
+          toFeedback(spoolMode, substitutions));
+    }
+  }
+
+  @VisibleForTesting
+  static ObjectNode toFeedback(SpoolMode spoolMode, List<SpoolSubstitution> substitutions) {
+    ObjectNode feedback = JsonUtils.newObjectNode();
+    feedback.put("mode", spoolMode.name().toLowerCase(Locale.ROOT));
+    ArrayNode entries = feedback.putArray("substitutions");
+    for (SpoolSubstitution substitution : substitutions) {
+      ObjectNode entry = entries.addObject();
+      entry.put("receiverStage", substitution.receiverStageId());
+      entry.put("replacedStage", substitution.replacedStageId());
+      entry.put("leaderStage", substitution.leaderStageId());
+      entry.put("outcome", substitution.outcome().name());
+      if (substitution.reason() != null) {
+        entry.put("reason", substitution.reason());
+      }
+    }
+    return feedback;
   }
 }

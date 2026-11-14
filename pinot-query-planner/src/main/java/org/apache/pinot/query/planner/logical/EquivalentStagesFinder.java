@@ -77,6 +77,13 @@ public class EquivalentStagesFinder {
       // from O(n^3) to O(n^2).
       visitChildren(node, context);
 
+      // A stage that calls a volatile function must draw its own values, so it is never equivalent to another stage.
+      // The stages above it are not equivalent either, because their receives read from different groups.
+      if (VolatileFunctions.callsVolatileFunction(node)) {
+        _equivalentStages.addNewGroup(node);
+        return null;
+      }
+
       // first try to find if the current node/stage is equivalent to an already equivalent stages.
       for (MailboxSendNode uniqueStage : _equivalentStages.getLeaders()) {
         if (_nodeEquivalence.areEquivalent(node, uniqueStage)) {

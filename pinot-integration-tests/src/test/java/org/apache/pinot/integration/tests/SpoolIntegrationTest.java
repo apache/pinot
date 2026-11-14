@@ -127,6 +127,80 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     checkSpoolSame(parsed, 4, 3, 7);
   }
 
+  /// The query of [#intermediateSpool()] spools stage 4 into the probe input of the join and, through an aggregate,
+  /// into its build input. The join reads the probe input only after the build input finishes, so with a full probe
+  /// mailbox the shared stage stops and the build input never finishes. `auto` must refuse that spool.
+  @Test
+  public void autoRejectsSpoolThatCanBlock()
+      throws Exception {
+    JsonNode jsonNode = postQuery("SET useSpools = 'auto';\n"
+        + "SET spoolsFeedback = true;\n"
+        + "WITH group_and_sum AS (\n"
+        + "  SELECT ArrTimeBlk, Dest, SUM(ArrTime) AS ArrTime\n"
+        + "  FROM mytable\n"
+        + "  GROUP BY ArrTimeBlk, Dest\n"
+        + "  limit 1000\n"
+        + "),\n"
+        + "aggregated_data AS (\n"
+        + "  SELECT Dest, SUM(ArrTime) AS ArrTime\n"
+        + "  FROM group_and_sum\n"
+        + "  GROUP BY Dest\n"
+        + ")\n"
+        + "SELECT s.Dest, s.ArrTime, o.ArrTime AS ArrTime2\n"
+        + "FROM group_and_sum s\n"
+        + "JOIN aggregated_data o\n"
+        + "ON s.Dest = o.Dest\n"
+        + "LIMIT 1");
+    assertNoError(jsonNode);
+    JsonNode spools = jsonNode.get("responseMetadata").get("spools");
+    Assert.assertEquals(spools.get("mode").asText(), "auto", spools.toString());
+    // The shared intermediate stage is refused. The leaf stage below it can still be shared, because both of its
+    // consumers aggregate it, so this test does not assert that no spool is applied.
+    Assert.assertTrue(hasOutcome(spools, "REJECTED_BY_GUARD"), spools.toString());
+  }
+
+  /// Both consumers of the shared stage aggregate it, so each consumer reads the whole shared stage before the join
+  /// waits for any input. `auto` must apply that spool, and the result must not change.
+  @Test
+  public void autoAppliesSpoolWhenConsumersAggregate()
+      throws Exception {
+    // The ORDER BY makes g deterministic. Without it, each copy of g can keep a different set of 1000 groups when
+    // spools are off, so the results differ for a reason that has nothing to do with spools.
+    String query = "WITH g AS (\n"
+        + "  SELECT ArrTimeBlk, Dest, SUM(ArrTime) AS ArrTime\n"
+        + "  FROM mytable\n"
+        + "  GROUP BY ArrTimeBlk, Dest\n"
+        + "  ORDER BY ArrTimeBlk, Dest\n"
+        + "  LIMIT 1000\n"
+        + ")\n"
+        + "SELECT a.Dest, a.s, b.m\n"
+        // Both consumers read the same columns of g. Otherwise the planner prunes each copy of g to different columns,
+        // and the two copies are not equivalent.
+        + "FROM (SELECT Dest, SUM(ArrTime) AS s FROM g GROUP BY Dest) a\n"
+        + "JOIN (SELECT Dest, MAX(ArrTime) AS m FROM g GROUP BY Dest) b\n"
+        + "ON a.Dest = b.Dest\n"
+        + "ORDER BY a.Dest\n"
+        + "LIMIT 10000";
+    JsonNode withSpools = postQuery("SET useSpools = 'auto';\nSET spoolsFeedback = true;\n" + query);
+    assertNoError(withSpools);
+    JsonNode spools = withSpools.get("responseMetadata").get("spools");
+    Assert.assertTrue(hasOutcome(spools, "APPLIED"), spools.toString());
+    Assert.assertFalse(hasOutcome(spools, "REJECTED_BY_GUARD"), spools.toString());
+
+    JsonNode withoutSpools = postQuery("SET useSpools = 'off';\n" + query);
+    assertNoError(withoutSpools);
+    Assert.assertEquals(withSpools.get("resultTable").get("rows"), withoutSpools.get("resultTable").get("rows"));
+  }
+
+  private static boolean hasOutcome(JsonNode spools, String outcome) {
+    for (JsonNode substitution : spools.get("substitutions")) {
+      if (substitution.get("outcome").asText().equals(outcome)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Test a complex with nested spools.
   ///
   /// Don't try to understand the query, just check that the spools are correct.
