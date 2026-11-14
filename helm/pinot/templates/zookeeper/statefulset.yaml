@@ -84,9 +84,9 @@ spec:
             value: {{ .Values.zookeeper.syncLimit | quote }}
           - name: ZOO_MAX_CLIENT_CNXNS
             value: {{ .Values.zookeeper.maxClientCnxns | quote }}
-          - name: ZOO_AUTOPURGE_PURGE_INTERVAL
+          - name: ZOO_AUTOPURGE_PURGEINTERVAL
             value: {{ .Values.zookeeper.autopurge.purgeInterval | quote }}
-          - name: ZOO_AUTOPURGE_SNAP_RETAIN_COUNT
+          - name: ZOO_AUTOPURGE_SNAPRETAINCOUNT
             value: {{ .Values.zookeeper.autopurge.snapRetainCount | quote }}
           - name: JVMFLAGS
             value: "-Xmx{{ .Values.zookeeper.heapSize }}m -Xms{{ .Values.zookeeper.heapSize }}m {{ .Values.zookeeper.jvmFlags }}"
