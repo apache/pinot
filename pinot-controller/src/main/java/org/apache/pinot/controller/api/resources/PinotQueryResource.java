@@ -86,6 +86,7 @@ import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
+import org.apache.pinot.query.validate.GroupByAliasShadowedByColumnException;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -642,10 +643,23 @@ public class PinotQueryResource {
   private List<String> getTableNames(String query, SqlNodeAndOptions sqlNodeAndOptions, String database) {
     QueryEnvironment queryEnvironment =
         new QueryEnvironment(database, _pinotHelixResourceManager.getTableCache(), null);
-    List<String> tableNames;
-
-    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query, sqlNodeAndOptions)) {
-      tableNames = new ArrayList<>(compiledQuery.getTableNames());
+    try {
+      try {
+        return compileTableNames(queryEnvironment, query, sqlNodeAndOptions);
+      } catch (GroupByAliasShadowedByColumnException e) {
+        if (sqlNodeAndOptions.getOptions().containsKey(QueryOptionKey.PREFER_SELECT_ALIAS_IN_GROUP_BY)) {
+          throw e;
+        }
+        // The controller does not read the broker config CONFIG_OF_PREFER_SELECT_ALIAS_IN_GROUP_BY, so a query that
+        // is valid on the broker can fail here. Table names do not depend on how GROUP BY names resolve, so retry
+        // with the option set and let the broker validate the query with its own config.
+        try {
+          return compileTableNames(queryEnvironment, query, preferSelectAliasInGroupBy(query, sqlNodeAndOptions));
+        } catch (Exception retryException) {
+          e.addSuppressed(retryException);
+          throw e;
+        }
+      }
     } catch (QueryException e) {
       if (e.getErrorCode() != QueryErrorCode.UNKNOWN) {
         throw e;
@@ -655,7 +669,24 @@ public class PinotQueryResource {
     } catch (Exception e) {
       throw QueryErrorCode.SQL_PARSING.asException("Unable to find table for this query", e);
     }
-    return tableNames;
+  }
+
+  /// Returns the query parsed again, with the options of `sqlNodeAndOptions`, which include the options of the request,
+  /// and with [QueryOptionKey#PREFER_SELECT_ALIAS_IN_GROUP_BY] set. The query is parsed again because the validation
+  /// modifies the parsed query.
+  @VisibleForTesting
+  static SqlNodeAndOptions preferSelectAliasInGroupBy(String query, SqlNodeAndOptions sqlNodeAndOptions) {
+    Map<String, String> options = new HashMap<>(sqlNodeAndOptions.getOptions());
+    options.put(QueryOptionKey.PREFER_SELECT_ALIAS_IN_GROUP_BY, "true");
+    SqlNodeAndOptions reparsed = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+    return new SqlNodeAndOptions(reparsed.getSqlNode(), reparsed.getSqlType(), options);
+  }
+
+  private static List<String> compileTableNames(QueryEnvironment queryEnvironment, String query,
+      SqlNodeAndOptions sqlNodeAndOptions) {
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query, sqlNodeAndOptions)) {
+      return new ArrayList<>(compiledQuery.getTableNames());
+    }
   }
 
   private List<String> getInstanceIds(String query, List<String> tableNames, String database) {

@@ -392,6 +392,131 @@
           "\n              PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
+      },
+      {
+        "description": "Group by a name that is both a column and a select alias resolves to the column by default",
+        "sql": "EXPLAIN PLAN FOR SELECT CASE WHEN col1 = 'foo' THEN 'bar' ELSE col1 END AS col1, COUNT(*) FROM a GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[CASE(=($0, _UTF-8'foo'), _UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\", $0)], EXPR$1=[$1])",
+          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by a name that is both a column and a select alias resolves to the alias with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT CASE WHEN col1 = 'foo' THEN 'bar' ELSE col1 END AS col1, COUNT(*) FROM a GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalProject(col1=[CASE(=($0, _UTF-8'foo'), _UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\", $0)])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Having on a grouped select alias resolves to the alias with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT CASE WHEN col1 = 'foo' THEN 'bar' ELSE col1 END AS col1, COUNT(*) FROM a GROUP BY col1 HAVING col1 <> 'bar'",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      LogicalProject(col1=[CASE(=($0, _UTF-8'foo'), _UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\", $0)])",
+          "\n        LogicalFilter(condition=[SEARCH($0, Sarg[(-∞.._UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'bar':VARCHAR CHARACTER SET \"UTF-8\".._UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"), (_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"..+∞)]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by a column whose name is the alias of another column fails by default",
+        "sql": "EXPLAIN PLAN FOR SELECT col2 AS col1, COUNT(*) FROM a GROUP BY col1",
+        "expectedException": ".*Expression 'col2' is not being grouped.*"
+      },
+      {
+        "description": "Group by the alias of another column groups by that column with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT col2 AS col1, COUNT(*) FROM a GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{1}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by rollup of a name that is both a column and a select alias resolves to the column by default",
+        "sql": "EXPLAIN PLAN FOR SELECT UPPER(col1) AS col1, COUNT(*) FROM a GROUP BY ROLLUP(col1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[UPPER($0)], EXPR$1=[$1])",
+          "\n  LogicalProject(col1=[$0], EXPR$1=[$2])",
+          "\n    PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n        PinotLogicalAggregate(group=[{0}], groups=[[{0}, {}]], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by rollup of a name that is both a column and a select alias resolves to the alias with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT UPPER(col1) AS col1, COUNT(*) FROM a GROUP BY ROLLUP(col1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2])",
+          "\n  PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n      PinotLogicalAggregate(group=[{0}], groups=[[{0}, {}]], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n        LogicalProject(col1=[UPPER($0)])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by cube of a select alias resolves to the alias with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT UPPER(col1) AS col1, col2, COUNT(*) FROM a GROUP BY CUBE(col1, col2)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$1], EXPR$2=[$3])",
+          "\n  PinotLogicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT($3)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1, 2]])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], groups=[[{0, 1}, {0}, {1}, {}]], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n        LogicalProject(col1=[UPPER($0)], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by grouping sets with a row of a select alias resolves to the alias with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT UPPER(col1) AS col1, col2, COUNT(*) FROM a GROUP BY GROUPING SETS ((col1, col2), col2, ())",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$1], EXPR$2=[$3])",
+          "\n  PinotLogicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT($3)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1, 2]])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], groups=[[{0, 1}, {1}, {}]], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n        LogicalProject(col1=[UPPER($0)], col2=[$1])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Group by a column aliased to its own name is unchanged with preferSelectAliasInGroupBy",
+        "sql": "SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT col1 AS col1, COUNT(*) FROM a GROUP BY col1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
       }
     ]
   }
