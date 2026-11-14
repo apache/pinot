@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.expectThrows;
 
@@ -128,8 +129,8 @@ public class SingleTableExecutionInfoTest {
     assertSame(indexSegments.get(1), seg2);
   }
 
-  /// [SingleTableExecutionInfo#create] throws [TableNotFoundException] when the requested table
-  /// is not registered with the instance data manager.
+  /// [SingleTableExecutionInfo#create] throws [TableNotFoundException] when the requested table is not registered with
+  /// the instance data manager and the query has a segment the server must have.
   @Test
   public void testCreateThrowsTableNotFoundWhenTableMissing() {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
@@ -137,7 +138,19 @@ public class SingleTableExecutionInfoTest {
 
     expectThrows(TableNotFoundException.class,
         () -> SingleTableExecutionInfo.create(instanceDataManager, TABLE_NAME_WITH_TYPE,
-            List.of(), null, mock(QueryContext.class)));
+            List.of("seg01"), List.of("seg02"), mock(QueryContext.class)));
+  }
+
+  /// [SingleTableExecutionInfo#create] returns `null` when the requested table is not registered with the instance
+  /// data manager and all the segments to query are optional.
+  @Test
+  public void testCreateReturnsNullWhenTableMissingAndAllSegmentsOptional()
+      throws TableNotFoundException {
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    when(instanceDataManager.getTableDataManager(TABLE_NAME_WITH_TYPE)).thenReturn(null);
+
+    assertNull(SingleTableExecutionInfo.create(instanceDataManager, TABLE_NAME_WITH_TYPE, List.of(), List.of("seg01"),
+        mock(QueryContext.class)));
   }
 
   private static InstanceDataManager mockInstanceDataManager(List<SegmentDataManager> acquired,

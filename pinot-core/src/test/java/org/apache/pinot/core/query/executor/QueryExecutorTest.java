@@ -245,6 +245,24 @@ public class QueryExecutorTest {
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
   }
 
+  /// A server sets up a table when it adds the first segment of it. Until then it has no optional segment of the table
+  /// to query, and a segment it must have is missing along with the table.
+  @Test
+  public void testTableNotOnServer() {
+    String query = "SELECT COUNT(*) FROM otherTable_OFFLINE";
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(List.of());
+    instanceRequest.setOptionalSegments(List.of("newSegment"));
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
+    assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
+    assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0L);
+    assertEquals(instanceResponse.getResponseMetadata().get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()), "0");
+
+    String error = executeExpectingFailure(query, null);
+    assertTrue(error.contains("Failed to find table: otherTable_OFFLINE"), error);
+  }
+
   /// The broker rejects IN_PARTITIONED_SUBQUERY for a principal with row filters. A server behind an older broker,
   /// which stamps the row filters in the query options but lets the function through, fails the query instead: the
   /// subquery reaches it as a string literal the filters do not cover, so it would build its ID_SET from every row.
