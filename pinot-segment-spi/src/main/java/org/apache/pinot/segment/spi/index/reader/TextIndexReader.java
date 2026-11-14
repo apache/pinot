@@ -28,6 +28,21 @@ public interface TextIndexReader extends IndexReader {
   /// Returns the matching dictionary ids for the given search query (optional).
   ImmutableRoaringBitmap getDictIds(String searchQuery);
 
+  /// Returns matching dictionary ids using the same query options as [#getDocIds(String, String)].
+  default ImmutableRoaringBitmap getDictIds(String searchQuery, @Nullable String optionsString) {
+    if (optionsString != null) {
+      throw new UnsupportedOperationException("Dictionary text query options are not supported by this reader");
+    }
+    return getDictIds(searchQuery);
+  }
+
+  /// Dictionary-id counterpart of [#getDocIds(String, String, QueryScopedCache)].
+  /// Only parsed queries may be shared across readers. Matching dictionary ids remain segment-specific.
+  default ImmutableRoaringBitmap getDictIds(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
+    return getDictIds(searchQuery, optionsString);
+  }
+
   /// Returns the matching document ids for the given search query.
   /// This is the legacy entry point retained for backward compatibility.
   MutableRoaringBitmap getDocIds(String searchQuery);
@@ -82,6 +97,13 @@ public interface TextIndexReader extends IndexReader {
 
   /// Marker method that allows to differentiate between single-column and multi-column text index reader .
   default boolean isMultiColumn() {
+    return false;
+  }
+
+  /// Whether this text index was built over the column dictionary (one entry per distinct value) rather than per row.
+  /// When true, [#getDictIds(String, String)] returns matching dictionary ids, which dictionary-based filter operators
+  /// resolve to docIds, and [#getDocIds(String)] is not used. Defaults to false (per-row index).
+  default boolean isBuildOnDictionary() {
     return false;
   }
 

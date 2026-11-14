@@ -18,16 +18,19 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /*
@@ -38,6 +41,10 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
   private String _predicate;
   private String _options;
   private TextIndexReader _textIndexReader;
+  private TransformFunction _columnArg;
+  private Dictionary _dictionary;
+  private Set<String> _matchingRawValues;
+  private ImmutableRoaringBitmap _matchingDictIds;
   private String _column;
 
   @Override
@@ -76,7 +83,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
 
     // Verify that the second parameter is actually a string literal
     LiteralTransformFunction literalPredicate = (LiteralTransformFunction) predicate;
-    if (literalPredicate.getResultMetadata().getDataType() != FieldSpec.DataType.STRING) {
+    if (literalPredicate.getResultMetadata().getDataType() != DataType.STRING) {
       throw new IllegalArgumentException(
           "The second argument of TEXT_MATCH transform function must be a string literal, got: "
               + literalPredicate.getResultMetadata().getDataType());
@@ -94,7 +101,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
 
       // Verify that the third parameter is actually a string literal
       LiteralTransformFunction literalOptions = (LiteralTransformFunction) options;
-      if (literalOptions.getResultMetadata().getDataType() != FieldSpec.DataType.STRING) {
+      if (literalOptions.getResultMetadata().getDataType() != DataType.STRING) {
         throw new IllegalArgumentException(
             "The third argument of TEXT_MATCH transform function must be a string literal, got: "
                 + literalOptions.getResultMetadata().getDataType());
@@ -106,19 +113,49 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     }
 
     _textIndexReader = indexReader;
+    _columnArg = columnArg;
+    _dictionary = dataSource.getDictionary();
+    _matchingRawValues = null;
+    _matchingDictIds = null;
   }
 
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initZeroFillingIntValuesSV(length);
 
-    int[] docIds = valueBlock.getDocIds();
-    MutableRoaringBitmap indexDocIds = _textIndexReader.isMultiColumn()
-        ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate, _options)
-        : _textIndexReader.getDocIds(_predicate, _options);
+    int[] ids;
+    ImmutableRoaringBitmap matchingIds;
+    if (_textIndexReader.isBuildOnDictionary()) {
+      if (_matchingDictIds == null) {
+        _matchingDictIds = _textIndexReader.getDictIds(_predicate, _options);
+      }
+      matchingIds = _matchingDictIds;
+      if (_columnArg.getDictionary() == null) {
+        // A standalone dictionary can coexist with a raw forward index.
+        if (_matchingRawValues == null) {
+          _matchingRawValues = new ObjectOpenHashSet<>(matchingIds.getCardinality());
+          for (int dictId : matchingIds.toArray()) {
+            _matchingRawValues.add(_dictionary.getStringValue(dictId));
+          }
+        }
+        String[] values = _columnArg.transformToStringValuesSV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          if (_matchingRawValues.contains(values[i])) {
+            _intValuesSV[i] = 1;
+          }
+        }
+        return _intValuesSV;
+      }
+      ids = _columnArg.transformToDictIdsSV(valueBlock);
+    } else {
+      ids = valueBlock.getDocIds();
+      matchingIds = _textIndexReader.isMultiColumn()
+          ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate, _options)
+          : _textIndexReader.getDocIds(_predicate, _options);
+    }
 
     for (int i = 0; i < length; i++) {
-      if (indexDocIds.contains(docIds[i])) {
+      if (matchingIds.contains(ids[i])) {
         _intValuesSV[i] = 1;
       }
     }

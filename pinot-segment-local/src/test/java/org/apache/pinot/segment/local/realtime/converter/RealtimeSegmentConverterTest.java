@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -58,6 +59,8 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
@@ -69,6 +72,7 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -76,6 +80,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -858,6 +863,105 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       if (segmentFile != null) {
         segmentFile.destroy();
       }
+    }
+  }
+
+  @DataProvider
+  public Object[][] dictionaryTextConversionParams() {
+    return new Object[][]{
+        {false, "none"}, {true, "none"}, {false, "native"}, {true, "native"}, {false, "legacy"}, {true, "legacy"}
+    };
+  }
+
+  @Test(dataProvider = "dictionaryTextConversionParams")
+  public void testDictionaryBasedTextIndexConversion(boolean compacted, String rawValueConfig)
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "dictionaryText_" + compacted + "_" + rawValueConfig);
+    Map<String, String> properties = new HashMap<>(Map.of(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, "true",
+        FieldConfig.TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX, "true"));
+    FieldConfig.Builder fieldConfig = new FieldConfig.Builder(STRING_COLUMN1)
+        .withEncodingType(FieldConfig.EncodingType.DICTIONARY).withIndexTypes(List.of(FieldConfig.IndexType.TEXT))
+        .withProperties(properties);
+    if (rawValueConfig.equals("native")) {
+      fieldConfig.withIndexTypes(List.of()).withProperties(null).withIndexes(JsonUtils.stringToJsonNode(
+          "{\"text\":{\"buildOnDictionary\":true,\"reuseMutableIndex\":true,\"rawValue\":\"n\"}}"));
+    } else if (rawValueConfig.equals("legacy")) {
+      properties.put(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true");
+      properties.put(FieldConfig.TEXT_INDEX_RAW_VALUE, "n");
+    }
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+        .setTimeColumnName(DATE_TIME_COLUMN).setColumnMajorSegmentBuilderEnabled(false)
+        .setFieldConfigList(List.of(fieldConfig.build())).build();
+    if (compacted) {
+      UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+      upsertConfig.setEnableCommitTimeCompaction(true);
+      tableConfig.setUpsertConfig(upsertConfig);
+    }
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension(STRING_COLUMN1, DataType.STRING)
+        .addDateTime(DATE_TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+    String segmentName = "testTable__0__0__123456";
+    RealtimeSegmentConfig config = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(tableConfig.getTableName()).setSegmentName(segmentName)
+        .setStreamName(tableConfig.getTableName()).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN)
+        .setCapacity(10).setIndex(Set.of(STRING_COLUMN1), StandardIndexes.text(),
+            StandardIndexes.text().getConfig(tableConfig, schema).get(STRING_COLUMN1))
+        .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
+        .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath()).build();
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+    for (int docId : new int[]{0, 1, 2, 5}) {
+      validDocIds.add(docId);
+    }
+    RealtimeLuceneTextIndexSearcherPool.init(1);
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
+    MutableSegmentImpl mutableSegment = new MutableSegmentImpl(config, null) {
+      @Override
+      public ThreadSafeMutableRoaringBitmap getValidDocIds() {
+        // Supply the upsert snapshot to exercise CompactedColumnStatistics without testing metadata management.
+        return compacted ? validDocIds : super.getValidDocIds();
+      }
+    };
+    try {
+      String[] values = {"beta", "alpha", "alpha", "gamma", "alpha", "beta"};
+      for (int i = 0; i < values.length; i++) {
+        GenericRow row = new GenericRow();
+        row.putValue(STRING_COLUMN1, values[i]);
+        row.putValue(DATE_TIME_COLUMN, 1697814309L + i);
+        mutableSegment.index(row, null);
+      }
+      RealtimeLuceneTextIndex consumingIndex =
+          (RealtimeLuceneTextIndex) mutableSegment.getDataSource(STRING_COLUMN1).getTextIndex();
+      consumingIndex.getSearcherManager().maybeRefreshBlocking();
+      assertFalse(consumingIndex.isBuildOnDictionary());
+      assertEquals(consumingIndex.getDocIds("alpha").toArray(), new int[]{1, 2, 4});
+
+      File outputDir = new File(tmpDir, "outputDir");
+      new RealtimeSegmentConverter(mutableSegment, new SegmentZKPropsConfig(), outputDir.getAbsolutePath(), schema,
+          tableConfig.getTableName(), tableConfig, segmentName, false).build(SegmentVersion.v3);
+      ImmutableSegment sealedSegment = ImmutableSegmentLoader.load(new File(outputDir, segmentName),
+          new IndexLoadingConfig(tableConfig, schema), false);
+      try {
+        TextIndexReader sealedIndex = sealedSegment.getIndex(STRING_COLUMN1, StandardIndexes.text());
+        assertTrue(sealedIndex.isBuildOnDictionary());
+        Dictionary dictionary = sealedSegment.getDataSource(STRING_COLUMN1).getDictionary();
+        ImmutableRoaringBitmap matchingDictIds = sealedIndex.getDictIds("alpha");
+        assertEquals(matchingDictIds.toArray(), new int[]{dictionary.indexOf("alpha")});
+        assertEquals(sealedSegment.getSegmentMetadata().getTotalDocs(), compacted ? 4 : 6);
+        List<Integer> matchingDocIds = new ArrayList<>();
+        for (int docId = 0; docId < sealedSegment.getSegmentMetadata().getTotalDocs(); docId++) {
+          if (matchingDictIds.contains(dictionary.indexOf((String) sealedSegment.getValue(docId, STRING_COLUMN1)))) {
+            matchingDocIds.add(docId);
+          }
+        }
+        assertEquals(matchingDocIds, compacted ? List.of(1, 2) : List.of(1, 2, 4));
+        assertEquals(sealedIndex.getDictIds("gamma").isEmpty(), compacted);
+      } finally {
+        sealedSegment.destroy();
+      }
+    } finally {
+      mutableSegment.destroy();
     }
   }
 
