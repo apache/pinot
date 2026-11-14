@@ -811,8 +811,9 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     // Compute data crc only if no column has fwd index disabled
     boolean hasForwardIndexDisabledCols = hasAnyColumnWithForwardIndexDisabled();
     long dataCrc = Long.MIN_VALUE;
+    int dataCrcVersion = CrcUtils.getDefaultDataCrcVersion();
     if (!hasForwardIndexDisabledCols) {
-      dataCrc = CrcUtils.computeDataCrc(_indexDir);
+      dataCrc = CrcUtils.computeDataCrc(_indexDir, dataCrcVersion);
     }
     // Format conversion
     convertFormatIfNecessary(_indexDir);
@@ -826,7 +827,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
 
     // Persist creation metadata
-    persistCreationMeta(_indexDir, dataCrc);
+    persistCreationMeta(_indexDir, dataCrc, dataCrcVersion);
 
     LOGGER.info("Successfully created segment: {} in {}", _segmentName, _indexDir);
   }
@@ -1016,7 +1017,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   ///
   /// @param indexDir Segment index directory
   /// @throws IOException If writing metadata fails
-  private void persistCreationMeta(File indexDir, long dataCrc)
+  private void persistCreationMeta(File indexDir, long dataCrc, int dataCrcVersion)
       throws IOException {
     long crc = CrcUtils.computeCrc(indexDir);
     long creationTime;
@@ -1040,6 +1041,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       // disabled
       if (dataCrc >= 0) {
         output.writeLong(dataCrc);
+        // Version 1 is not written, so those segments keep the same bytes as before data CRC versioning
+        if (dataCrcVersion != V1Constants.DataCrc.VERSION_1) {
+          output.writeInt(dataCrcVersion);
+        }
       }
     }
   }

@@ -65,6 +65,12 @@ public interface SegmentMetadata {
   /// data CRC recorded.
   long getDataCrc();
 
+  /// Returns the version of the algorithm that computed [#getDataCrc()]. Segments built before data CRC versioning
+  /// carry version 1.
+  default int getDataCrcVersion() {
+    return V1Constants.DataCrc.VERSION_1;
+  }
+
   SegmentVersion getVersion();
 
   Schema getSchema();
