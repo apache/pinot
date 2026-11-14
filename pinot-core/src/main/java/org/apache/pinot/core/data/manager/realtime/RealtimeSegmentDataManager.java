@@ -2288,6 +2288,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     long maxConsumeTimeMillis = _streamConfig.getFlushThresholdTimeMillis();
     _consumeEndTime = segmentZKMetadata.getCreationTime() + maxConsumeTimeMillis;
 
+    // For pauseless tables, keep the end time from ZK while it is in the future so that all replicas stop together.
+    // A replica that consumes past the end offset fixed at commit start can only download the committed segment.
+    if (_consumeEndTime > now && PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
+      return;
+    }
+
     // When we restart a server, the consuming segments retain their creationTime (derived from segment
     // metadata), but a couple of corner cases can happen:
     // (1) The server was down for a very long time, and the consuming segment is not yet completed.
