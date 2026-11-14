@@ -141,13 +141,13 @@ public class ObjectFunctions {
     return objs.length % 2 == 0 ? null : objs[objs.length - 1];
   }
 
+  /// Returns `null` when the two values are not distinct (see [#isNotDistinctFrom]), so numbers of different
+  /// types or scales (e.g. a `BigDecimal` `1.50` decoded from JSON and a `Double` `1.5`) compare equal.
+  /// Comparing with [Object#equals] would treat them as different. Semantics for non-covered number types
+  /// (`Byte`/`Short`/`BigInteger`) and arrays such as `byte[]` are inherited from `isNotDistinctFrom`.
   @Nullable
   @ScalarFunction(nullableParameters = true)
   public static Object nullIf(@Nullable Object obj1, @Nullable Object obj2) {
-    if (obj1 == null) {
-      return null;
-    } else {
-      return obj1.equals(obj2) ? null : obj1;
-    }
+    return isNotDistinctFrom(obj1, obj2) ? null : obj1;
   }
 }

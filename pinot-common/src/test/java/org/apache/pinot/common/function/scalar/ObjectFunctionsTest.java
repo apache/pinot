@@ -114,4 +114,13 @@ public class ObjectFunctionsTest {
     assertEquals(ObjectFunctions.isNotDistinctFrom(value1, value2), !expected);
     assertEquals(ObjectFunctions.isNotDistinctFrom(value2, value1), !expected);
   }
+
+  /// nullIf must compare like IS NOT DISTINCT FROM, not with equals(): JSON floats decoded as BigDecimal
+  /// (e.g. 1.50) must match the same value as Double (1.5), and pinned distinctions such as 1.1f vs 1.1
+  /// or -0.0 vs 0 must be kept. Reuses every distinctFromCases row so the two cannot drift apart.
+  @Test(dataProvider = "distinctFromCases")
+  public void testNullIf(Object value1, Object value2, boolean distinct) {
+    assertEquals(ObjectFunctions.nullIf(value1, value2), distinct ? value1 : null);
+    assertEquals(ObjectFunctions.nullIf(value2, value1), distinct ? value2 : null);
+  }
 }
