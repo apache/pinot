@@ -122,10 +122,22 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return;
     }
 
+    processTable(tableConfig, new TableRunContext(tableNameWithType));
+  }
+
+  /// Runs the per-table work of one run. `context` memoizes the segment ZK metadata list and the deep-store directory
+  /// listing used by time retention and the untracked-segment sweep. A subclass that adds per-table work overrides
+  /// this method and reads through the same context before calling `super`: it then shares the reads those steps
+  /// make, and reads on its own only where they skip one (a non-APPEND OFFLINE table, a table without retention,
+  /// untracked-segment deletion off). Hybrid-strategy and size-based retention read ZK themselves. The context is
+  /// released after time retention, which can delete segments, so a read after `super` sees fresh state.
+  protected void processTable(TableConfig tableConfig, TableRunContext context) {
     // Manage normal table retention except segment lineage cleanup.
     // The reason of separating the logic is that REFRESH only table will be skipped in the first part,
     // whereas the segment lineage cleanup needs to be handled.
-    manageRetentionForTable(tableConfig);
+    manageRetentionForTable(tableConfig, context);
+    // The memoized reads predate the deletes above, and the steps below read what they need themselves.
+    context.release();
 
     // Delete segments based on segment lineage and clean up segment lineage metadata.
     manageSegmentLineageCleanupForTable(tableConfig);
@@ -330,7 +342,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         .removeAgedDeletedSegments(_leadControllerManager, _agedSegmentsDeletionBatchSize);
   }
 
-  private void manageRetentionForTable(TableConfig tableConfig) {
+  private void manageRetentionForTable(TableConfig tableConfig, TableRunContext context) {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Start managing retention for table: {}", tableNameWithType);
 
@@ -359,7 +371,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         LOGGER.warn("hybridTableRetentionStrategy is only applicable to realtime tables, "
             + "ignoring it for offline table: {}", tableNameWithType);
       }
-      manageRetentionForOfflineTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize,
+      manageRetentionForOfflineTable(context, retentionStrategy, untrackedSegmentsDeletionBatchSize,
           untrackedSegmentsRetentionStrategy);
     } else {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -369,7 +381,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         // TODO: handle the orphan segment deletion for hybrid table
         manageRetentionForHybridTable(tableConfig, offlineTableConfig);
       } else {
-        manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize,
+        manageRetentionForRealtimeTable(context, retentionStrategy, untrackedSegmentsDeletionBatchSize,
             untrackedSegmentsRetentionStrategy);
       }
     }
@@ -386,14 +398,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         .isEnabled(_isHybridTableRetentionStrategyEnabled);
   }
 
-  private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy,
+  private void manageRetentionForOfflineTable(TableRunContext context, RetentionStrategy retentionStrategy,
       int untrackedSegmentsDeletionBatchSize, RetentionStrategy untrackedSegmentsRetentionStrategy) {
-    List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
+    String offlineTableName = context.getTableNameWithType();
+    List<SegmentZKMetadata> segmentZKMetadataList = context.getSegmentsZKMetadata();
 
     // fetch those segments that are beyond the retention period and don't have an entry in ZK i.e.
     // SegmentZkMetadata is missing for those segments
     List<String> segmentsToDelete =
-        getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segmentZKMetadataList,
+        getSegmentsToDeleteFromDeepstore(context, retentionStrategy, segmentZKMetadataList,
             untrackedSegmentsDeletionBatchSize, untrackedSegmentsRetentionStrategy);
 
     for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
@@ -409,14 +422,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   @VisibleForTesting
-  void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy,
+  void manageRetentionForRealtimeTable(TableRunContext context, RetentionStrategy retentionStrategy,
       int untrackedSegmentsDeletionBatchSize, RetentionStrategy untrackedSegmentsRetentionStrategy) {
-    List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    String realtimeTableName = context.getTableNameWithType();
+    List<SegmentZKMetadata> segmentZKMetadataList = context.getSegmentsZKMetadata();
 
     // fetch those segments that are beyond the retention period and don't have an entry in ZK i.e.
     // SegmentZkMetadata is missing for those segments
     List<String> segmentsToDelete =
-        getSegmentsToDeleteFromDeepstore(realtimeTableName, retentionStrategy, segmentZKMetadataList,
+        getSegmentsToDeleteFromDeepstore(context, retentionStrategy, segmentZKMetadataList,
             untrackedSegmentsDeletionBatchSize, untrackedSegmentsRetentionStrategy);
 
     IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
@@ -541,11 +555,12 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     return _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false);
   }
 
-  private List<String> getSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
+  private List<String> getSegmentsToDeleteFromDeepstore(TableRunContext context, RetentionStrategy retentionStrategy,
       List<SegmentZKMetadata> segmentZKMetadataList, int untrackedSegmentsDeletionBatchSize,
       RetentionStrategy untrackedSegmentsRetentionStrategy) {
     List<String> segmentsToDelete = new ArrayList<>();
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    String tableNameWithType = context.getTableNameWithType();
+    String rawTableName = context.getRawTableName();
     boolean isHybridTable = _pinotHelixResourceManager.hasOfflineTable(rawTableName)
         && _pinotHelixResourceManager.hasRealtimeTable(rawTableName);
     if (isHybridTable && TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
@@ -584,7 +599,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Fetch segments present in deep store that are beyond retention period for table: {}",
           tableNameWithType);
       segmentsToDelete =
-          findUntrackedSegmentsToDeleteFromDeepstore(tableNameWithType, retentionStrategy, segmentsPresentInZK,
+          findUntrackedSegmentsToDeleteFromDeepstore(context, retentionStrategy, segmentsPresentInZK,
               untrackedSegmentsRetentionStrategy);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.UNTRACKED_SEGMENTS_COUNT,
           segmentsToDelete.size());
@@ -609,36 +624,27 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   /// The lastModified time of the file in deepstore is used to determine whether the segment
   /// should be retained or purged.
   ///
-  /// @param tableNameWithType   Name of the offline table
+  /// @param context            Per-table run context that holds the deep-store listing
   /// @param retentionStrategy  Strategy to determine if a segment should be purged
   /// @param segmentsToExclude  Set of segment names that should be excluded from deletion
   /// @return List of segment names that should be deleted from deepstore
   /// @throws IOException If there's an error accessing the filesystem
   @VisibleForTesting
-  List<String> findUntrackedSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
+  List<String> findUntrackedSegmentsToDeleteFromDeepstore(TableRunContext context, RetentionStrategy retentionStrategy,
       Set<String> segmentsToExclude, RetentionStrategy untrackedSegmentsRetentionStrategy)
       throws IOException {
 
     List<String> segmentsToDelete = new ArrayList<>();
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    URI tableDataUri = URIUtils.getUri(_pinotHelixResourceManager.getDataDir(), rawTableName);
-    PinotFS pinotFS = PinotFSFactory.create(tableDataUri.getScheme());
-
-    // The data dir is created when the first segment is pushed, so it is legitimately absent for a table that has
-    // never had a segment in deep store. Such a table has no untracked segments to delete, and listing a
-    // non-existent directory fails on most file systems.
-    if (!pinotFS.exists(tableDataUri)) {
-      LOGGER.info("Skipping deep store scan for untracked segments for table: {} as data dir: {} does not exist",
-          tableNameWithType, tableDataUri);
-      return segmentsToDelete;
-    }
-
+    String tableNameWithType = context.getTableNameWithType();
     long startTimeMs = System.currentTimeMillis();
 
-    List<FileMetadata> deepstoreFiles = pinotFS.listFilesWithMetadata(tableDataUri, false);
-    long listEndTimeMs = System.currentTimeMillis();
-    LOGGER.info("Found: {} segments in deepstore for table: {}. Time taken to list segments: {} ms",
-        deepstoreFiles.size(), tableNameWithType, listEndTimeMs - startTimeMs);
+    List<FileMetadata> deepstoreFiles = context.getDeepStoreFiles();
+    if (deepstoreFiles == null) {
+      // A table that has never had a segment in deep store has no untracked segments to delete.
+      LOGGER.info("Skipping deep store scan for untracked segments for table: {} as data dir: {} does not exist",
+          tableNameWithType, context.getTableDataUri());
+      return segmentsToDelete;
+    }
 
     for (FileMetadata fileMetadata : deepstoreFiles) {
       if (fileMetadata.isDirectory()) {
@@ -679,6 +685,87 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       segmentName = segmentName.substring(0, segmentName.length() - TarCompressionUtils.TAR_GZ_FILE_EXTENSION.length());
     }
     return segmentName;
+  }
+
+  /// Lists the table data dir (`<dataDir>/<rawTableName>/`) without recursion. Returns null when the directory does
+  /// not exist: the data dir is created when the first segment is pushed, so it is legitimately absent for a table
+  /// that has never had a segment in deep store, and listing a non-existent directory fails on most file systems.
+  @Nullable
+  protected List<FileMetadata> listDeepStoreTableDir(URI tableDataUri)
+      throws IOException {
+    PinotFS pinotFS = PinotFSFactory.create(tableDataUri.getScheme());
+    if (!pinotFS.exists(tableDataUri)) {
+      return null;
+    }
+    long startTimeMs = System.currentTimeMillis();
+    List<FileMetadata> deepstoreFiles = pinotFS.listFilesWithMetadata(tableDataUri, false);
+    LOGGER.info("Found: {} segments in deepstore dir: {}. Time taken to list segments: {} ms", deepstoreFiles.size(),
+        tableDataUri, System.currentTimeMillis() - startTimeMs);
+    return deepstoreFiles;
+  }
+
+  /// Per-table state of one run. Memoizes the segment ZK metadata list and the deep-store directory listing, the two
+  /// reads that dominate the cost on a large table, so every consumer before the release sees one snapshot and pays
+  /// for each read once. The base releases the reads after time retention, and a context lives for one `processTable`
+  /// call only. Not thread-safe: the task processes tables sequentially under its run lock.
+  public final class TableRunContext {
+    private final String _tableNameWithType;
+    private final String _rawTableName;
+    @Nullable
+    private URI _tableDataUri;
+    @Nullable
+    private List<SegmentZKMetadata> _segmentsZKMetadata;
+    private boolean _deepStoreListed;
+    @Nullable
+    private List<FileMetadata> _deepStoreFiles;
+
+    TableRunContext(String tableNameWithType) {
+      _tableNameWithType = tableNameWithType;
+      _rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    }
+
+    public String getTableNameWithType() {
+      return _tableNameWithType;
+    }
+
+    public String getRawTableName() {
+      return _rawTableName;
+    }
+
+    /// `<dataDir>/<rawTableName>`, the directory that holds the deep-store copies of the table's segments.
+    public URI getTableDataUri() {
+      if (_tableDataUri == null) {
+        _tableDataUri = URIUtils.getUri(_pinotHelixResourceManager.getDataDir(), _rawTableName);
+      }
+      return _tableDataUri;
+    }
+
+    /// Segment ZK metadata of the typed table, read on the first call and reused afterwards.
+    public List<SegmentZKMetadata> getSegmentsZKMetadata() {
+      if (_segmentsZKMetadata == null) {
+        _segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(_tableNameWithType);
+      }
+      return _segmentsZKMetadata;
+    }
+
+    /// Non-recursive listing of [#getTableDataUri], read on the first call and reused afterwards. Null when the
+    /// directory does not exist. A failed listing is not memoized, so the next consumer retries it.
+    @Nullable
+    public List<FileMetadata> getDeepStoreFiles()
+        throws IOException {
+      if (!_deepStoreListed) {
+        _deepStoreFiles = listDeepStoreTableDir(getTableDataUri());
+        _deepStoreListed = true;
+      }
+      return _deepStoreFiles;
+    }
+
+    /// Drops the memoized reads, so the next call to a getter reads again.
+    private void release() {
+      _segmentsZKMetadata = null;
+      _deepStoreFiles = null;
+      _deepStoreListed = false;
+    }
   }
 
   /// Strips out any segments that participate in a live segment lineage entry from the retention-driven
