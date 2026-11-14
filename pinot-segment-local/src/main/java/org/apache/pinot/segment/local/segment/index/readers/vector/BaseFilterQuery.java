@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers.vector;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.ConstantScoreScorer;
 import org.apache.lucene.search.ConstantScoreWeight;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
@@ -28,6 +29,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryVisitor;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.ScorerSupplier;
 import org.apache.lucene.search.Weight;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -71,32 +73,22 @@ public abstract class BaseFilterQuery extends Query {
     return new ConstantScoreWeight(this, boost) {
       @Override
       @Nullable
-      public Scorer scorer(LeafReaderContext context)
+      public ScorerSupplier scorerSupplier(LeafReaderContext context)
           throws IOException {
         DocIdSetIterator iterator = createLeafIterator(context);
         if (iterator == null) {
           return null;
         }
         float constScore = score();
-        return new Scorer(this) {
+        return new ScorerSupplier() {
           @Override
-          public DocIdSetIterator iterator() {
-            return iterator;
+          public Scorer get(long leadCost) {
+            return new ConstantScoreScorer(constScore, scoreMode, iterator);
           }
 
           @Override
-          public float getMaxScore(int upTo) {
-            return constScore;
-          }
-
-          @Override
-          public float score() {
-            return constScore;
-          }
-
-          @Override
-          public int docID() {
-            return iterator.docID();
+          public long cost() {
+            return iterator.cost();
           }
         };
       }

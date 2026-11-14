@@ -224,20 +224,20 @@ public class MatchQueryParser extends QueryParserBase {
     BooleanQuery.Builder builder = new BooleanQuery.Builder();
 
     for (BooleanClause clause : booleanQuery.clauses()) {
-      Query processedQuery = clause.getQuery();
+      Query processedQuery = clause.query();
 
       // Recursively apply minimum_should_match if this clause's query is another BooleanQuery
       if (processedQuery instanceof BooleanQuery) {
         processedQuery = applyMinimumShouldMatch((BooleanQuery) processedQuery, visitedQueries);
       }
 
-      builder.add(processedQuery, clause.getOccur());
+      builder.add(processedQuery, clause.occur());
     }
 
     // After processing clauses, apply minimum_should_match at this level if there are SHOULD clauses
     int shouldClauseCount = 0;
     for (BooleanClause clause : builder.build().clauses()) {
-      if (clause.getOccur() == BooleanClause.Occur.SHOULD) {
+      if (clause.occur() == BooleanClause.Occur.SHOULD) {
         shouldClauseCount++;
       }
     }

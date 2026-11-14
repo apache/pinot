@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.util.Version;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -57,6 +58,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -265,6 +267,9 @@ public class HnswIndexRollbackTest implements PinotBuffersAfterClassCheckRule {
 
   private static void installNewerIndex(File tempDir, File segmentDir, SegmentVersion version, String layout)
       throws Exception {
+    if (Version.LATEST.major != 9) {
+      throw new SkipException("Lucene 10 fixture exercises rollback recovery on Lucene 9 only");
+    }
     File fixtures = LuceneIndexTestUtils.extractLucene10Fixtures(new File(tempDir, "lucene10-hnsw"));
     File fixture = new File(fixtures, "hnsw");
     assertTrue(LuceneIndexCompatibilityUtils.isIncompatible(fixture));

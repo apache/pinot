@@ -56,7 +56,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -68,10 +67,16 @@ public class LuceneTextIndexCompatibleTest {
   @Test
   public void testLucene80IndexReader()
       throws IOException {
-    File indexPath =
+    File fixturePath =
         new File(LuceneTextIndexCompatibleTest.class.getClassLoader().getResource("data/lucene_80_index").getPath());
-    try (LuceneTextIndexReader lucene80Index = new LuceneTextIndexReader("Text", indexPath, 1000, Map.of())) {
-      assertNotNull(lucene80Index);
+    File indexPath = Files.createTempDirectory("lucene80-compatibility").toFile();
+    try {
+      FileUtils.copyDirectory(fixturePath, indexPath);
+      try (LuceneTextIndexReader reader = new LuceneTextIndexReader("Text", indexPath, 1000, Map.of())) {
+        assertEquals(reader.getDocIds("1", null).getCardinality(), 35);
+      }
+    } finally {
+      FileUtils.deleteDirectory(indexPath);
     }
   }
 

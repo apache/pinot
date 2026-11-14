@@ -33,11 +33,13 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LogByteSizeMergePolicy;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -138,6 +140,10 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable {
       indexWriterConfig.setRAMBufferSizeMB(config.getLuceneMaxBufferSizeMB());
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
+      // Preserve merge I/O throttling, which Lucene 10 disables by default.
+      ConcurrentMergeScheduler mergeScheduler = new ConcurrentMergeScheduler();
+      mergeScheduler.enableAutoIOThrottle();
+      indexWriterConfig.setMergeScheduler(mergeScheduler);
 
       // Also, for the realtime segment, we set the OpenMode to CREATE to ensure that any existing artifacts
       // will be overwritten. This is necessary because the realtime segment can be created multiple times
@@ -256,11 +262,12 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable {
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length,
         ByteOrder.LITTLE_ENDIAN, desc)) {
       try {
+        StoredFields storedFields = indexSearcher.storedFields();
         // If immutableToMutableIdMap is null, then docIds should not change between the mutable and immutable segments.
         // Therefore, the mapping file can be built without doing an additional docId conversion
         if (immutableToMutableIdMap == null) {
           for (int i = 0; i < numDocs; i++) {
-            Document document = indexSearcher.doc(i);
+            Document document = storedFields.document(i);
             int pinotDocId =
                 Integer.parseInt(document.get(MultiColumnLuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
             buffer.putInt(i * Integer.BYTES, pinotDocId);
@@ -269,7 +276,7 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable {
         }
 
         for (int i = 0; i < numDocs; i++) {
-          Document document = indexSearcher.doc(i);
+          Document document = storedFields.document(i);
           int mutablePinotDocId =
               Integer.parseInt(document.get(MultiColumnLuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
           int immutablePinotDocId = immutableToMutableIdMap[mutablePinotDocId];
