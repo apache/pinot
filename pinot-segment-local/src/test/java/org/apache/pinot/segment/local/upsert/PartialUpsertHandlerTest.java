@@ -49,6 +49,7 @@ import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class PartialUpsertHandlerTest {
@@ -63,10 +64,58 @@ public class PartialUpsertHandlerTest {
 
   @Test
   public void testForceOverwrite() {
-    testMerge(true, 0, true, 0, "field4", 0, true);
+    testMerge(true, 0, true, 0L, "field4", 0L, true);
     testMerge(true, 0, false, 1, "field4", 1, false);
-    testMerge(false, 0, true, 1, "field4", 1, true);
+    // A null new value stays null (with the schema default) instead of overwriting with the default value
+    testMerge(false, 3, true, 0L, "field4", 0L, true);
     testMerge(false, 3, false, 5, "field4", 5, false);
+  }
+
+  @Test
+  public void testForceOverwriteStringAndMultiValue() {
+    // STRING: a null new value keeps the column null with the "null" default
+    testMerge(false, "a", true, "null", "field5", "null", true);
+    testMerge(false, "a", false, "b", "field5", "b", false);
+    // Multi-value: a null new value keeps the column null with the Object[]{default} default
+    testMerge(false, new Object[]{1}, true, new Object[]{Integer.MIN_VALUE}, "field6",
+        new Object[]{Integer.MIN_VALUE}, true);
+    testMerge(false, new Object[]{1}, false, new Object[]{2}, "field6", new Object[]{2}, false);
+  }
+
+  @Test
+  public void testForceOverwriteAsDefaultStrategy() {
+    // field2 has no per-column strategy, so it takes FORCE_OVERWRITE from the default strategy
+    testMerge(UpsertConfig.Strategy.FORCE_OVERWRITE, false, 3, true, 0L, "field2", 0L, true);
+    testMerge(UpsertConfig.Strategy.FORCE_OVERWRITE, false, 3, false, 5, "field2", 5, false);
+  }
+
+  @Test
+  public void testForceOverwriteKeepsNormalizedTimePlaceholder() {
+    // The comparison column is not the time column, so the time column takes FORCE_OVERWRITE from the default
+    // strategy. For a missing time value, realtime ingestion puts a valid timestamp in the row and marks it null;
+    // the merge must keep both instead of replacing the timestamp with the schema default ("null").
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("pk", FieldSpec.DataType.STRING).addMetric("version", FieldSpec.DataType.LONG)
+        .addDateTime("day", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS")
+        .setPrimaryKeyColumns(List.of("pk")).build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.FORCE_OVERWRITE);
+    upsertConfig.setComparisonColumns(List.of("version"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+        .setTimeColumnName("day").setNullHandlingEnabled(true).setUpsertConfig(upsertConfig).build();
+    PartialUpsertHandler handler = new PartialUpsertHandler(tableConfig, schema, List.of("version"), upsertConfig);
+    LazyRow prevRecord = mockLazyRow(mock(LazyRow.class), Map.of("pk", "pk1", "version", 1L, "day", "20261101"));
+
+    GenericRow missingDay = initGenericRow(new GenericRow(), Map.of("pk", "pk1", "version", 2L));
+    missingDay.putDefaultNullValue("day", "20261113");
+    handler.merge(prevRecord, missingDay, new HashMap<>());
+    assertEquals(missingDay.getValue("day"), "20261113");
+    assertTrue(missingDay.isNullValue("day"));
+
+    GenericRow newDay = initGenericRow(new GenericRow(), Map.of("pk", "pk1", "version", 2L, "day", "20261112"));
+    handler.merge(prevRecord, newDay, new HashMap<>());
+    assertEquals(newDay.getValue("day"), "20261112");
+    assertFalse(newDay.isNullValue("day"));
   }
 
   @Test
@@ -173,13 +222,24 @@ public class PartialUpsertHandlerTest {
 
   public void testMerge(boolean isPreviousNull, Object previousValue, boolean isNewNull, Object newValue,
       String columnName, Object expectedValue, boolean isExpectedNull) {
+    testMerge(UpsertConfig.Strategy.IGNORE, isPreviousNull, previousValue, isNewNull, newValue, columnName,
+        expectedValue, isExpectedNull);
+  }
+
+  private void testMerge(UpsertConfig.Strategy defaultStrategy, boolean isPreviousNull, Object previousValue,
+      boolean isNewNull, Object newValue, String columnName, Object expectedValue, boolean isExpectedNull) {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
+        .addMetric("field4", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("field5", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("field6", FieldSpec.DataType.INT)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.OVERWRITE);
     partialUpsertStrategies.put("field4", UpsertConfig.Strategy.FORCE_OVERWRITE);
+    partialUpsertStrategies.put("field5", UpsertConfig.Strategy.FORCE_OVERWRITE);
+    partialUpsertStrategies.put("field6", UpsertConfig.Strategy.FORCE_OVERWRITE);
 
     try (MockedConstruction<PinotSegmentColumnReader> reader = mockConstruction(PinotSegmentColumnReader.class,
         (mockReader, context) -> {
@@ -188,14 +248,15 @@ public class PartialUpsertHandlerTest {
         })) {
       UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
       upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
-      upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.IGNORE);
+      upsertConfig.setDefaultPartialUpsertStrategy(defaultStrategy);
       TableConfig tableConfig = createTableConfig(schema, upsertConfig);
       PartialUpsertHandler handler =
           spy(new PartialUpsertHandler(tableConfig, schema, List.of("hoursSinceEpoch"),
               upsertConfig));
 
       ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
-      when(segment.getColumnNames()).thenReturn(Sets.newSet("field1", "field2", "hoursSinceEpoch"));
+      when(segment.getColumnNames()).thenReturn(
+          Sets.newSet("field1", "field2", "field4", "field5", "field6", "hoursSinceEpoch"));
       LazyRow prevRecord = new LazyRow();
       prevRecord.init(segment, 1);
 
