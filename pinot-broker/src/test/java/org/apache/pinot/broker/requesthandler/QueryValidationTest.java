@@ -26,6 +26,7 @@ import org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.utils.rewriter.ParentAggregationResultRewriter;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -33,7 +34,9 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -122,6 +125,21 @@ public class QueryValidationTest {
             + "'arg0 + arg1', MAX(colA), MIN(colB)) = 'foobarval'", true);
 
     testValidateGroovyQuery("SELECT foo FROM bar", false);
+  }
+
+  @Test
+  public void testQueryGroovyPolicyIsIndependentOfIngestion() {
+    PinotQuery query = CalciteSqlParser.compileToPinotQuery(
+        "SELECT groovy('{\"returnType\":\"INT\",\"isSingleValue\":true}', 'arg0 + 1', colA) FROM foo");
+    GroovyFunctionEvaluator.setIngestionGroovyDisabled(true);
+    try {
+      BaseSingleStageBrokerRequestHandler.validateGroovyScript(query, false);
+      assertEquals(expectThrows(BadQueryRequestException.class,
+          () -> BaseSingleStageBrokerRequestHandler.validateGroovyScript(query, true)).getMessage(),
+          "Groovy transform functions are disabled for queries");
+    } finally {
+      GroovyFunctionEvaluator.setIngestionGroovyDisabled(false);
+    }
   }
 
   @Test
