@@ -43,6 +43,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -87,6 +88,23 @@ public class SslContextProviderTest {
     SSLEngine engine = engineFactory.newSslEngine(config, "localhost", 443);
     assertTrue(engine.getUseClientMode());
     assertEquals(engine.getEnabledProtocols(), new String[] {protocol});
+    assertEquals(engine.getSSLParameters().getEndpointIdentificationAlgorithm(), "HTTPS");
+  }
+
+  @Test
+  public void testDefaultProviderHonorsDisabledHostnameVerification()
+      throws Exception {
+    DefaultAsyncHttpClientConfig.Builder builder = Dsl.config().setDisableHttpsEndpointIdentificationAlgorithm(true);
+
+    SSLContext sslContext = SSLContext.getInstance("TLS");
+    sslContext.init(null, null, null);
+
+    SslContextProvider provider = new DefaultSslContextProvider();
+    provider.configure(builder, sslContext, tlsProtocolsWith(selectSupportedProtocol(sslContext)));
+
+    DefaultAsyncHttpClientConfig config = builder.build();
+    SSLEngine engine = config.getSslEngineFactory().newSslEngine(config, "localhost", 443);
+    assertNull(engine.getSSLParameters().getEndpointIdentificationAlgorithm());
   }
 
   @Test
