@@ -60,11 +60,23 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
   private final List<String> _optionalSegments;
   private final List<String> _notAcquiredSegments;
 
+  /// Creates the execution info of the given table, acquiring the segments to query.
+  ///
+  /// Returns `null` when the table is not set up on the server yet and the query has no segment the server must have,
+  /// i.e. all of its segments are optional. A server sets up a table when it adds the first segment of it, so it has
+  /// not loaded any of them and there is nothing to query.
+  ///
+  /// @throws TableNotFoundException when the table is not set up on the server and the query has a segment the server
+  ///                                must have
+  @Nullable
   public static SingleTableExecutionInfo create(InstanceDataManager instanceDataManager, String tableNameWithType,
       List<String> segmentsToQuery, List<String> optionalSegments, QueryContext queryContext)
       throws TableNotFoundException {
     TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
+      if (segmentsToQuery.isEmpty()) {
+        return null;
+      }
       throw new TableNotFoundException(tableNameWithType);
     }
 

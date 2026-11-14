@@ -36,7 +36,8 @@ import org.apache.pinot.spi.data.Schema;
 
 public interface TableExecutionInfo {
 
-  /// Returns the latest [Schema] for the table.
+  /// Returns the latest [Schema] for the table, or `null` when the table is not set up on the server.
+  @Nullable
   Schema getSchema();
 
   /// Check if consuming segments are being queried.
