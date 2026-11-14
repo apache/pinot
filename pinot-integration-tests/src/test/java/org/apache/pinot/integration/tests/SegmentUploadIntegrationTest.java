@@ -66,8 +66,27 @@ import static org.testng.Assert.expectThrows;
 /// Test for advanced push types.
 /// Currently only tests METADATA push type.
 /// todo: add test for URI push
-public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class SegmentUploadIntegrationTest extends SharedOfflineUploadIntegrationTestSuite {
   private static String _tableNameSuffix;
+  private Boolean _originalRejectOutOfRetention;
+
+  @Override
+  @BeforeClass
+  public void setUp() {
+    ControllerConf controllerConf = getSharedControllerStarter().getConfig();
+    _originalRejectOutOfRetention = controllerConf.isSegmentUploadRejectOutOfRetention();
+    // Scope the policy to this class without changing the other shared-suite participants.
+    controllerConf.setSegmentUploadRejectOutOfRetention(true);
+  }
+
+  @Override
+  @AfterClass(alwaysRun = true)
+  public void tearDown() {
+    if (_originalRejectOutOfRetention != null) {
+      getSharedControllerStarter().getConfig().setSegmentUploadRejectOutOfRetention(_originalRejectOutOfRetention);
+    }
+  }
 
   @Override
   protected Map<String, String> getStreamConfigs() {
@@ -104,25 +123,6 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
       throws IOException {
     _tableNameSuffix = RandomStringUtils.secure().nextAlphabetic(12);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-  }
-
-  @Override
-  protected void overrideControllerConf(Map<String, Object> properties) {
-    super.overrideControllerConf(properties);
-    // Applies to every test in this class: any APPEND table configured with a retention window is checked on upload.
-    properties.put(ControllerConf.SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION, true);
-  }
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    // Start Zk and Kafka
-    startZk();
-
-    // Start the Pinot cluster
-    startController();
-    startBroker();
-    startServer();
   }
 
   @Test
@@ -445,6 +445,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     assertEquals(getSegmentsList().size(), 1);
     assertEquals(getOutOfRetentionRejectedCount(), rejectedBefore);
+    // Table deletion targets servers in the external view, so wait for the accepted segment to appear there.
+    waitForNumSegmentsInDesiredStateInEV(getTableName(), "ONLINE", getNumReplicas(), TableType.OFFLINE);
   }
 
   private File createTableAndBuildSegment(String retentionDays)
@@ -466,7 +468,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   private long getOutOfRetentionRejectedCount() {
-    PinotMeter meter = _controllerStarter.getControllerMetrics()
+    PinotMeter meter = getSharedControllerStarter().getControllerMetrics()
         .getMeteredValue(ControllerMeter.OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED);
     return meter != null ? meter.count() : 0L;
   }
@@ -509,14 +511,5 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
       throws IOException {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     dropOfflineTable(offlineTableName);
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
   }
 }
