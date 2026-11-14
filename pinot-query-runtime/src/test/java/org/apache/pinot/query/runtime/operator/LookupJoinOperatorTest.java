@@ -28,8 +28,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
 
@@ -41,7 +44,8 @@ import static org.testng.Assert.expectThrows;
 
 
 /// Tests [LookupJoinOperator#compileKeyPlan], which decides where each value of the dimension table lookup key comes
-/// from.
+/// from, and [LookupJoinOperator#resolveDimensionColumns], which names the dimension table columns that the lookup
+/// reads.
 ///
 /// The dimension table is a hash map keyed by the primary key values, so a key is only usable when it holds one value
 /// per primary key column, in the order the dimension table schema declares them, and with the type of each column.
@@ -208,6 +212,79 @@ public class LookupJoinOperatorTest {
     assertTrue(exception.getMessage().contains("Failed to find primary key columns"), exception.getMessage());
   }
 
+  @Test
+  public void testDimensionColumnsOfTableScan() {
+    assertEquals(LookupJoinOperator.resolveDimensionColumns(tableScan(), TABLE_NAME),
+        new String[]{"currency", "rate", "rate_start_date"});
+  }
+
+  @Test
+  public void testDimensionColumnsFollowProjectInputRefsNotOutputNames() {
+    // SELECT currency AS rate, rate AS currency, rate_start_date, rate_start_date AS rate_start_date0
+    DataSchema projectSchema =
+        new DataSchema(new String[]{"rate", "currency", "rate_start_date", "rate_start_date0"}, new ColumnDataType[]{
+            ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.LONG
+        });
+    ProjectNode project = new ProjectNode(0, projectSchema, PlanNode.NodeHint.EMPTY, List.of(tableScan()),
+        List.of(new RexExpression.InputRef(DIM_CURRENCY), new RexExpression.InputRef(DIM_RATE),
+            new RexExpression.InputRef(DIM_RATE_START_DATE), new RexExpression.InputRef(DIM_RATE_START_DATE)));
+    assertEquals(LookupJoinOperator.resolveDimensionColumns(project, TABLE_NAME),
+        new String[]{"currency", "rate", "rate_start_date", "rate_start_date"});
+  }
+
+  @Test
+  public void testDimensionColumnsRejectComputedProject() {
+    DataSchema projectSchema = new DataSchema(new String[]{"literal"}, new ColumnDataType[]{ColumnDataType.INT});
+    ProjectNode project = new ProjectNode(0, projectSchema, PlanNode.NodeHint.EMPTY, List.of(tableScan()),
+        List.of(new RexExpression.Literal(ColumnDataType.INT, 1)));
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> LookupJoinOperator.resolveDimensionColumns(project, TABLE_NAME));
+    assertTrue(exception.getMessage().contains("must project columns only"), exception.getMessage());
+  }
+
+  @Test
+  public void testDimensionColumnsRejectProjectOverFilter() {
+    FilterNode filter = new FilterNode(0, DIM_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(tableScan()),
+        new RexExpression.Literal(ColumnDataType.BOOLEAN, 1));
+    ProjectNode project = new ProjectNode(0, DIM_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(filter),
+        List.of(new RexExpression.InputRef(DIM_CURRENCY), new RexExpression.InputRef(DIM_RATE),
+            new RexExpression.InputRef(DIM_RATE_START_DATE)));
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> LookupJoinOperator.resolveDimensionColumns(project, TABLE_NAME));
+    assertTrue(exception.getMessage().contains("must be a Project over a TableScan"), exception.getMessage());
+  }
+
+  @Test
+  public void testKeyBindsTheTableColumnBehindAnAlias() {
+    // SELECT currency AS rate, rate AS currency, rate_start_date FROM dim_tbl, joined
+    // ON dim.rate = fact.currency AND dim.rate_start_date = fact.rate_start_date. The output name "rate" is the table
+    // column "currency", so matching output names against the primary key would reject the condition.
+    DataSchema aliasedSchema = new DataSchema(new String[]{"rate", "currency", "rate_start_date"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG});
+    JoinNode node = new JoinNode(0, aliasedSchema, PlanNode.NodeHint.EMPTY, List.of(), JoinRelType.INNER,
+        List.of(FACT_CURRENCY, FACT_RATE_START_DATE), List.of(0, 2), List.of(), JoinNode.JoinStrategy.LOOKUP);
+    LookupJoinOperator.KeyPlan keyPlan = LookupJoinOperator.compileKeyPlan(node, TABLE_NAME, PRIMARY_KEY_COLUMNS,
+        aliasedSchema, DIM_SCHEMA.getColumnNames(), LEFT_COLUMN_SIZE);
+    assertEquals(keyPlan._sources[KEY_CURRENCY], FACT_CURRENCY);
+    assertEquals(keyPlan._sources[KEY_RATE_START_DATE], FACT_RATE_START_DATE);
+  }
+
+  @Test
+  public void testDimensionColumnsMustMatchRightSchema() {
+    JoinNode node = new JoinNode(0, DIM_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), JoinRelType.INNER,
+        List.of(FACT_CURRENCY), List.of(DIM_CURRENCY), List.of(), JoinNode.JoinStrategy.LOOKUP);
+    IllegalStateException exception = expectThrows(IllegalStateException.class,
+        () -> LookupJoinOperator.compileKeyPlan(node, TABLE_NAME, PRIMARY_KEY_COLUMNS, DIM_SCHEMA,
+            new String[]{"currency"}, LEFT_COLUMN_SIZE));
+    assertTrue(exception.getMessage().contains("resolved 1 dimension columns for a right input of 3 columns"),
+        exception.getMessage());
+  }
+
+  private static TableScanNode tableScan() {
+    return new TableScanNode(0, DIM_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), "dim_tbl",
+        List.of(DIM_SCHEMA.getColumnNames()));
+  }
+
   private static final DataSchema DECIMAL_DIM_SCHEMA =
       new DataSchema(new String[]{"amount"}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL});
   private static final DataSchema BYTES_DIM_SCHEMA =
@@ -234,7 +311,8 @@ public class LookupJoinOperatorTest {
     JoinNode node =
         new JoinNode(0, dimSchema, PlanNode.NodeHint.EMPTY, List.of(), JoinRelType.INNER, leftKeys, rightKeys,
             nonEquiConditions, JoinNode.JoinStrategy.LOOKUP);
-    return LookupJoinOperator.compileKeyPlan(node, TABLE_NAME, primaryKeyColumns, dimSchema, LEFT_COLUMN_SIZE);
+    return LookupJoinOperator.compileKeyPlan(node, TABLE_NAME, primaryKeyColumns, dimSchema, dimSchema.getColumnNames(),
+        LEFT_COLUMN_SIZE);
   }
 
   /// Builds a `dim_column = constant` condition. Non-equi conditions index the joined row, so the dimension table
