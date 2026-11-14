@@ -154,6 +154,61 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     }
   }
 
+  /// Evaluates the expression on the given document ids with one projection, like [#applyAnd], but without consuming
+  /// this iterator. The projection reads its document ids through `_docIdBuffer`, never through the thread-local
+  /// buffer of the outer [org.apache.pinot.core.operator.DocIdSetOperator].
+  @Override
+  public int matchDocIds(int[] docIds, int limit) {
+    if (limit == 0) {
+      return 0;
+    }
+    RoaringBitmap matchingDocIds = new RoaringBitmap();
+    try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
+        new BitmapDocIdSetOperator(new ArrayIntIterator(docIds, limit), _docIdBuffer,
+            DocIdOrderedOperator.DocIdOrder.ASC), _queryContext)) {
+      ProjectionBlock projectionBlock;
+      while ((projectionBlock = projectionOperator.nextBlock()) != null) {
+        processProjectionBlock(projectionBlock, matchingDocIds);
+      }
+    }
+    // The matching document ids are a subset of the input, so they fit in the array
+    int numMatchingDocIds = 0;
+    PeekableIntIterator matchingDocIdIterator = matchingDocIds.getIntIterator();
+    while (matchingDocIdIterator.hasNext()) {
+      docIds[numMatchingDocIds++] = matchingDocIdIterator.next();
+    }
+    return numMatchingDocIds;
+  }
+
+  /// Iterates over the first `length` values of an array.
+  private static final class ArrayIntIterator implements IntIterator {
+    private final int[] _values;
+    private final int _length;
+    private int _index;
+
+    private ArrayIntIterator(int[] values, int length) {
+      _values = values;
+      _length = length;
+    }
+
+    @Override
+    public boolean hasNext() {
+      return _index < _length;
+    }
+
+    @Override
+    public int next() {
+      return _values[_index++];
+    }
+
+    @Override
+    public IntIterator clone() {
+      ArrayIntIterator clone = new ArrayIntIterator(_values, _length);
+      clone._index = _index;
+      return clone;
+    }
+  }
+
   private void processProjectionBlock(ProjectionBlock projectionBlock, BitmapDataProvider matchingDocIds) {
     int numDocs = projectionBlock.getNumDocs();
     // Read the docIds from the projection block being processed instead of _docIdBuffer: a pluggable projection

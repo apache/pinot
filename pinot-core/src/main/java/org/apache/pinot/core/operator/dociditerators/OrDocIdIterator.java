@@ -107,6 +107,16 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     }
   }
 
+  /// Closes the children that are not exhausted yet, for a consumer that stops before the end. The exhausted ones are
+  /// already closed.
+  @Override
+  public void close() {
+    for (int i = 0; i < _numNotExhaustedIterators; i++) {
+      _docIdIterators[i].close();
+    }
+    _numNotExhaustedIterators = 0;
+  }
+
   /// Helper method to remove exhausted iterators.
   ///
   /// Whenever we find an exhausted iterator, we replace it with the last one, and update number of not exhausted

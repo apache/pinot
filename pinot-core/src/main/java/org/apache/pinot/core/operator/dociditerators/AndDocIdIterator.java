@@ -72,6 +72,12 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
     return next();
   }
 
+  /// Closes every child, for a consumer that stops before the end.
+  @Override
+  public void close() {
+    closeIterators();
+  }
+
   private void closeIterators() {
     for (BlockDocIdIterator it : _docIdIterators) {
       it.close();

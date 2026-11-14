@@ -33,6 +33,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.operator.dociditerators.RestrictedScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.RowLevelSecurityFilterOperator;
@@ -210,6 +211,8 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
   /// - Each case also runs with `andRestrictionPushdownMode=NEVER` and the inverted index on `tenant` skipped.
   /// - Each case also runs with null handling, which derives the NULL documents of an AND or an OR with one more
   ///   AND.
+  /// - Each case also runs with `andRestrictionPushdownMode=STREAMING`, which evaluates the user filter lazily on the
+  ///   rows of the RLS filter, also for the aggregations. By default, a selection with a LIMIT streams too.
   @DataProvider
   public static Object[][] userFilters() {
     IntPredicate castAbove50 = i -> payload(i) > 50;
@@ -227,7 +230,8 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
         "default options", Map.of(),
         "pushdown NEVER and skipIndexes on tenant", Map.of(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, "never",
             QueryOptionKey.SKIP_INDEXES, "tenant=inverted"),
-        "null handling", Map.of(QueryOptionKey.ENABLE_NULL_HANDLING, "true"));
+        "null handling", Map.of(QueryOptionKey.ENABLE_NULL_HANDLING, "true"),
+        "pushdown STREAMING", Map.of(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, "streaming"));
     List<Object[]> cases = new ArrayList<>();
     for (Object[] filter : filters) {
       for (boolean invertedIndex : new boolean[]{false, true}) {
@@ -493,6 +497,47 @@ public class RowLevelSecurityScanQueriesTest extends BaseQueriesTest {
     assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
     long numTenantRows = NUM_ROWS / 2;
     assertEquals(response.getNumEntriesScannedInFilter(), numTenantRows * NUM_SEGMENT_COPIES);
+  }
+
+  /// A selection with a LIMIT under RLS streams the user filter: it only evaluates the first chunk of the RLS rows of
+  /// each segment, not all of them, which the eager push-down does.
+  @Test(dataProvider = "segmentVariants")
+  public void testSelectionWithLimitOnlyScansWhatItReads(boolean invertedIndex) {
+    useSegment(invertedIndex);
+    String query = "SELECT id FROM testTable";
+    String userFilter = "CAST(payload AS INT) > 50 LIMIT 10";
+    BrokerResponseNative streaming = getRlsBrokerResponse(query, userFilter, Map.of());
+    BrokerResponseNative eager =
+        getRlsBrokerResponse(query, userFilter, Map.of(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, "always"));
+    assertTrue(streaming.getExceptions().isEmpty(), streaming.getExceptions().toString());
+    assertEquals(streaming.getResultTable().getRows().size(), 10);
+    long numTenantRows = NUM_ROWS / 2;
+    // Without an index on tenant, the WHERE clause also scans tenant = 'A' on the RLS rows
+    long numScansPerRow = invertedIndex ? 1 : 2;
+    // A selection can stop before it reaches every segment, so only bound the eager cost from below: one segment
+    assertTrue(eager.getNumEntriesScannedInFilter() >= numScansPerRow * numTenantRows,
+        "The eager push-down evaluates every RLS row of a segment, but scanned "
+            + eager.getNumEntriesScannedInFilter());
+    assertTrue(streaming.getNumEntriesScannedInFilter()
+            <= numScansPerRow * RestrictedScanDocIdIterator.MIN_CHUNK_SIZE * NUM_SEGMENT_COPIES,
+        "The streaming push-down must only scan the first chunk of each segment, but scanned "
+            + streaming.getNumEntriesScannedInFilter());
+  }
+
+  /// The queries that read every matching row keep the eager push-down under RLS: a selection with ORDER BY, and a
+  /// selection whose LIMIT is above the number of RLS rows, with an OR that the eager push-down evaluates faster.
+  @Test(dataProvider = "segmentVariants")
+  public void testQueriesThatReadEveryRowStayEager(boolean invertedIndex) {
+    useSegment(invertedIndex);
+    Map<String, String> eager = Map.of(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, "always");
+    String userFilter = "(CAST(payload AS INT) > 50 OR id < 100)";
+    for (String suffix : new String[]{" ORDER BY id LIMIT 10", " LIMIT 100000"}) {
+      BrokerResponseNative byDefault = getRlsBrokerResponse("SELECT id FROM testTable", userFilter + suffix, Map.of());
+      BrokerResponseNative always = getRlsBrokerResponse("SELECT id FROM testTable", userFilter + suffix, eager);
+      assertTrue(byDefault.getExceptions().isEmpty(), byDefault.getExceptions().toString());
+      assertEquals(byDefault.getNumEntriesScannedInFilter(), always.getNumEntriesScannedInFilter(), suffix);
+      assertEquals(byDefault.getResultTable().getRows().size(), always.getResultTable().getRows().size(), suffix);
+    }
   }
 
   /// A star-tree with the RLS column as a dimension. The star-tree filter holds the RLS predicate, because the

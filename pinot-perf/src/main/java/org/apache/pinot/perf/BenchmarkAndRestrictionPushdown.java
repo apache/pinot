@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.perf;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +29,7 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.SVScanDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
@@ -63,11 +66,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 ///   [issue 19339](https://github.com/apache/pinot/issues/19339)) or is entirely index-based (`INDEXED_OR`, where
 ///   there is nothing to gain and the question is only how much the machinery costs). `SCAN_ONLY_OR` is the third
 ///   case: scans directly under the OR with no index-based sibling, so the OR is already lazy today and a LIMIT
-///   really does stop early -- the shape the AUTO mode exists to protect.
+///   really does stop early -- the shape the AUTO mode exists to protect. `SINGLE_SCAN` is a bitmap AND one scan, the
+///   shape of a row-level security filter with a single scan predicate in the WHERE. `INDEXED_OR` has no scan.
 /// - `_consume`: whether the consumer drains the filter, as an aggregation does, or stops at a LIMIT, as a
 ///   selection does. The push-down materializes, so this is where it can lose.
 /// - `_candidateSelectivity`: how much the enclosing AND narrows things before the OR is reached.
-/// - `_pushdown`: the feature itself, off versus on.
+/// - `_strategy`: no push-down (`OFF`), the materializing push-down (`EAGER`) or the streaming one (`STREAMING`).
 ///
 /// Run with `-prof gc` to get `gc.alloc.rate.norm` (bytes per operation) alongside the timings.
 @State(Scope.Benchmark)
@@ -82,10 +86,12 @@ public class BenchmarkAndRestrictionPushdown {
   private static final int LIMIT = 10;
   private static final int NUM_DICT_IDS = 1024;
 
-  @Param({"false", "true"})
-  private boolean _pushdown;
+  /// OFF is master's behaviour without the push-down; EAGER materializes every step; STREAMING evaluates the scans on
+  /// the candidate set a chunk at a time, so nothing is materialized.
+  @Param({"OFF", "EAGER", "STREAMING"})
+  private String _strategy;
 
-  @Param({"SCAN_IN_OR", "SCAN_ONLY_OR", "INDEXED_OR"})
+  @Param({"SINGLE_SCAN", "SCAN_IN_OR", "SCAN_ONLY_OR", "INDEXED_OR"})
   private String _shape;
 
   @Param({"DRAIN", "LIMIT"})
@@ -131,6 +137,37 @@ public class BenchmarkAndRestrictionPushdown {
     _candidateDocIds = randomBitmap(random, _candidateSelectivity);
     _firstBranchDocIds = randomBitmap(random, 0.3);
     _secondBranchDocIds = randomBitmap(random, 0.2);
+
+    verifyStrategiesAgree();
+  }
+
+  /// A timing comparison between strategies only means something if they return the same documents.
+  private void verifyStrategiesAgree() {
+    String strategy = _strategy;
+    try {
+      _strategy = "OFF";
+      int[] off = drain(buildFilter().iterator());
+      _strategy = "EAGER";
+      int[] eager = drain(buildFilter().iterator());
+      _strategy = "STREAMING";
+      int[] streaming = drain(buildFilter().iterator());
+      if (!Arrays.equals(off, eager) || !Arrays.equals(off, streaming)) {
+        throw new IllegalStateException(
+            String.format("Strategies disagree for shape %s: off=%d, eager=%d, streaming=%d", _shape, off.length,
+                eager.length, streaming.length));
+      }
+    } finally {
+      _strategy = strategy;
+    }
+  }
+
+  private static int[] drain(BlockDocIdIterator docIdIterator) {
+    IntArrayList docIds = new IntArrayList();
+    int docId;
+    while ((docId = docIdIterator.next()) != Constants.EOF) {
+      docIds.add(docId);
+    }
+    return docIds.toIntArray();
   }
 
   @TearDown(Level.Trial)
@@ -155,8 +192,13 @@ public class BenchmarkAndRestrictionPushdown {
     return numDocs;
   }
 
-  /// `AND(candidates, OR(...))`, rebuilt on every invocation because a DocIdSet is single-use.
+  /// `AND(candidates, OR(...))`, or `AND(candidates, scan)` for `SINGLE_SCAN`, rebuilt on every invocation because a
+  /// DocIdSet is single-use.
   private BlockDocIdSet buildFilter() {
+    if ("SINGLE_SCAN".equals(_shape)) {
+      return new AndDocIdSet(List.of(BitmapDocIdSet.create(_candidateDocIds, NUM_DOCS), newScanDocIdSet()), null,
+          getPushdown());
+    }
     BlockDocIdSet orDocIdSet;
     if ("INDEXED_OR".equals(_shape)) {
       orDocIdSet = new OrDocIdSet(List.of(BitmapDocIdSet.create(_firstBranchDocIds, NUM_DOCS),
@@ -168,11 +210,26 @@ public class BenchmarkAndRestrictionPushdown {
     } else {
       // The reported shape: a scan sits next to an index-based predicate inside an OR branch
       BlockDocIdSet branch = new AndDocIdSet(
-          List.of(BitmapDocIdSet.create(_firstBranchDocIds, NUM_DOCS), newScanDocIdSet()), null, _pushdown);
+          List.of(BitmapDocIdSet.create(_firstBranchDocIds, NUM_DOCS), newScanDocIdSet()), null, getPushdown());
       orDocIdSet =
           new OrDocIdSet(List.of(branch, BitmapDocIdSet.create(_secondBranchDocIds, NUM_DOCS)), NUM_DOCS);
     }
-    return new AndDocIdSet(List.of(BitmapDocIdSet.create(_candidateDocIds, NUM_DOCS), orDocIdSet), null, _pushdown);
+    return new AndDocIdSet(List.of(BitmapDocIdSet.create(_candidateDocIds, NUM_DOCS), orDocIdSet), null, getPushdown());
+  }
+
+  /// STREAMING passes [#LIMIT] as the documents to read in both consume modes, so that the AND streams even when the
+  /// benchmark drains the filter: DRAIN then measures the worst case of streaming.
+  private AndRestrictionPushdown getPushdown() {
+    switch (_strategy) {
+      case "OFF":
+        return AndRestrictionPushdown.OFF;
+      case "EAGER":
+        return AndRestrictionPushdown.EAGER;
+      case "STREAMING":
+        return AndRestrictionPushdown.streaming(LIMIT);
+      default:
+        throw new IllegalStateException("Unknown strategy: " + _strategy);
+    }
   }
 
   private BlockDocIdSet newScanDocIdSet() {
