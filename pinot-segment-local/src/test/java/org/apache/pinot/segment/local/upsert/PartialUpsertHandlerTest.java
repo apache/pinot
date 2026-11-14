@@ -71,6 +71,17 @@ public class PartialUpsertHandlerTest {
   }
 
   @Test
+  public void testForceOverwriteStringAndMultiValue() {
+    // STRING: a null new value keeps the column null with the "null" default
+    testMerge(false, "a", true, "null", "field5", "null", true);
+    testMerge(false, "a", false, "b", "field5", "b", false);
+    // Multi-value: a null new value keeps the column null with the Object[]{default} default
+    testMerge(false, new Object[]{1}, true, new Object[]{Integer.MIN_VALUE}, "field6",
+        new Object[]{Integer.MIN_VALUE}, true);
+    testMerge(false, new Object[]{1}, false, new Object[]{2}, "field6", new Object[]{2}, false);
+  }
+
+  @Test
   public void testNonOverwrite() {
     testMerge(true, 2, true, 2, "field2", 2, true);
     testMerge(true, 2, false, 8, "field2", 8, false);
@@ -177,11 +188,15 @@ public class PartialUpsertHandlerTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
         .addMetric("field4", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("field5", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("field6", FieldSpec.DataType.INT)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.OVERWRITE);
     partialUpsertStrategies.put("field4", UpsertConfig.Strategy.FORCE_OVERWRITE);
+    partialUpsertStrategies.put("field5", UpsertConfig.Strategy.FORCE_OVERWRITE);
+    partialUpsertStrategies.put("field6", UpsertConfig.Strategy.FORCE_OVERWRITE);
 
     try (MockedConstruction<PinotSegmentColumnReader> reader = mockConstruction(PinotSegmentColumnReader.class,
         (mockReader, context) -> {
@@ -197,7 +212,8 @@ public class PartialUpsertHandlerTest {
               upsertConfig));
 
       ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
-      when(segment.getColumnNames()).thenReturn(Sets.newSet("field1", "field2", "field4", "hoursSinceEpoch"));
+      when(segment.getColumnNames()).thenReturn(
+          Sets.newSet("field1", "field2", "field4", "field5", "field6", "hoursSinceEpoch"));
       LazyRow prevRecord = new LazyRow();
       prevRecord.init(segment, 1);
 
