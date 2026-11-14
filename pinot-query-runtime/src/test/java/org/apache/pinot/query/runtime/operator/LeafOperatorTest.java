@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -32,10 +33,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -55,6 +58,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -63,6 +67,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -70,11 +75,15 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -698,8 +707,8 @@ public class LeafOperatorTest {
     QueryContext queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT strCol, COUNT(*) FROM tbl GROUP BY strCol");
     DataSchema schema = new DataSchema(new String[]{"strCol", "count(*)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG});
-    List<Record> records = Arrays.asList(new Record(new Object[]{"a", 3L}), new Record(new Object[]{"b", 5L}));
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.LONG});
+    List<Record> records = Arrays.asList(new Record(new Object[]{"a", 3L}), new Record(new Object[]{null, 5L}));
     Table table = mock(Table.class);
     when(table.getDataSchema()).thenReturn(schema);
     when(table.size()).thenReturn(records.size());
@@ -717,10 +726,24 @@ public class LeafOperatorTest {
     MseBlock resultBlock = operator.nextBlock();
 
     // Then:
-    List<Object[]> rows = ((MseBlock.Data) resultBlock).asRowHeap().getRows();
+    RowHeapDataBlock rowBlock = ((MseBlock.Data) resultBlock).asRowHeap();
+    assertTrue(rowBlock.isTableBacked());
+    assertEquals(rowBlock.getNumRows(), 2);
+    verify(table, never()).iterator();
+    Iterator<Object[]> iterator = rowBlock.getRowIterator();
+    assertSame(iterator.next(), records.get(0).getValues());
+    assertSame(iterator.next(), records.get(1).getValues());
+    assertFalse(iterator.hasNext());
+    assertSame(rowBlock.getRowIterator().next(), records.get(0).getValues());
+    List<Object[]> rows = rowBlock.getRows();
+    assertFalse(rowBlock.isTableBacked());
     assertEquals(rows.size(), 2);
     assertEquals(rows.get(0), new Object[]{"a", 3L});
-    assertEquals(rows.get(1), new Object[]{"b", 5L});
+    assertEquals(rows.get(1), new Object[]{null, 5L});
+    assertSame(rows.get(0), records.get(0).getValues());
+    assertSame(rowBlock.getRows(), rows);
+    assertSame(rowBlock.getRowIterator().next(), rows.get(0));
+    verify(table, times(3)).iterator();
     assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the group-by block");
 
     operator.close();
@@ -788,6 +811,112 @@ public class LeafOperatorTest {
     assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the aggregation block");
 
     operator.close();
+  }
+
+  @Test
+  public void shouldSerializeTableBackedGroupByRawSketchFinalResult() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT strCol, DISTINCTCOUNTRAWHLL(intCol) FROM tbl GROUP BY strCol");
+    queryContext.setServerReturnFinalResult(true);
+    HyperLogLog hyperLogLog = new HyperLogLog(12);
+    hyperLogLog.offer(1);
+    Object finalResult = queryContext.getAggregationFunctions()[0].extractFinalResult(hyperLogLog);
+    DataSchema schema = new DataSchema(new String[]{"strCol", "distinctcountrawhll(intCol)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
+    List<Record> records = List.of(new Record(new Object[]{"a", finalResult}), new Record(new Object[]{null, null}));
+    Table table = mock(Table.class);
+    when(table.getDataSchema()).thenReturn(schema);
+    when(table.size()).thenReturn(records.size());
+    when(table.iterator()).thenAnswer(inv -> records.iterator());
+    List<ServerQueryRequest> requests = mockQueryRequests(1);
+    when(requests.get(0).getQueryContext()).thenReturn(queryContext);
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(new GroupByResultsBlock(table, queryContext)),
+        new InstanceResponseBlock(new MetadataResultsBlock()));
+    try (LeafOperator operator = new LeafOperator(OperatorTestUtil.getTracingContext(), requests, schema, queryExecutor,
+        _executorService)) {
+      _operatorRef.set(operator);
+      RowHeapDataBlock rowBlock = ((MseBlock.Data) operator.nextBlock()).asRowHeap();
+      assertFalse(rowBlock.isTableBacked());
+      List<Object[]> rows = rowBlock.asSerialized().asRowHeap().getRows();
+      assertEquals(rows.get(0), new Object[]{"a", finalResult.toString()});
+      assertEquals(rows.get(1), new Object[]{null, null});
+      assertTrue(operator.nextBlock().isEos());
+    }
+  }
+
+  @Test
+  public void shouldConvertTableBackedGroupByResultsToDesiredSchema() {
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT strCol, COUNT(*) FROM tbl GROUP BY strCol");
+    DataSchema inputSchema = new DataSchema(new String[]{"strCol", "count(*)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
+    DataSchema outputSchema = new DataSchema(new String[]{"strCol", "count(*)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.LONG});
+    List<Record> records = List.of(new Record(new Object[]{"a", 3}), new Record(new Object[]{null, null}));
+    Table table = mock(Table.class);
+    when(table.getDataSchema()).thenReturn(inputSchema);
+    when(table.size()).thenReturn(records.size());
+    when(table.iterator()).thenAnswer(inv -> records.iterator());
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(new GroupByResultsBlock(table, queryContext)),
+        new InstanceResponseBlock(new MetadataResultsBlock()));
+    try (LeafOperator operator = new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1),
+        outputSchema, queryExecutor, _executorService)) {
+      _operatorRef.set(operator);
+      RowHeapDataBlock rowBlock = ((MseBlock.Data) operator.nextBlock()).asRowHeap();
+      assertFalse(rowBlock.isTableBacked());
+      verify(table).iterator();
+      List<Object[]> rows = rowBlock.getRows();
+      assertEquals(rows.get(0), new Object[]{"a", 3L});
+      assertEquals(rows.get(1), new Object[]{null, null});
+      assertSame(rows.get(0), records.get(0).getValues());
+      assertEquals(rowBlock.getDataSchema(), outputSchema);
+      assertTrue(operator.nextBlock().isEos());
+    }
+  }
+
+  @Test
+  @SuppressWarnings({"rawtypes", "unchecked", "deprecation"})
+  public void shouldPreserveOwnedGroupByIntermediateResults() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT strCol, DISTINCTCOUNTBITMAP(intCol) FROM tbl GROUP BY strCol");
+    AggregationFunction[] aggFunctions = queryContext.getAggregationFunctions();
+    DataSchema schema = new DataSchema(new String[]{"strCol", "distinctcountbitmap(intCol)"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.OBJECT});
+    RoaringBitmap bitmap = RoaringBitmap.bitmapOf(1, 2);
+    List<Record> records = List.of(new Record(new Object[]{"a", bitmap}), new Record(new Object[]{null, null}));
+    Table table = mock(Table.class);
+    when(table.getDataSchema()).thenReturn(schema);
+    when(table.size()).thenReturn(records.size());
+    when(table.iterator()).thenAnswer(inv -> records.iterator());
+    List<ServerQueryRequest> requests = mockQueryRequests(1);
+    when(requests.get(0).getQueryContext()).thenReturn(queryContext);
+    QueryExecutor queryExecutor = mockQueryExecutor(List.of(new GroupByResultsBlock(table, queryContext)),
+        new InstanceResponseBlock(new MetadataResultsBlock()));
+    try (LeafOperator operator = new LeafOperator(OperatorTestUtil.getTracingContext(), requests, schema, queryExecutor,
+        _executorService)) {
+      _operatorRef.set(operator);
+      RowHeapDataBlock rowBlock = ((MseBlock.Data) operator.nextBlock()).asRowHeap();
+      verify(table, never()).iterator();
+      // Hash exchange still relies on the deprecated aggregation-function attachment for intermediate-result serde.
+      assertSame(rowBlock.getAggFunctions(), aggFunctions);
+      assertSame(rowBlock.getRowIterator().next()[1], bitmap);
+      RowHeapDataBlock copy = rowBlock.copyObjectColumns();
+      assertTrue(rowBlock.isTableBacked());
+      Object[] copiedRow = copy.getRows().get(0);
+      assertNotSame(copiedRow, records.get(0).getValues());
+      assertNotSame(copiedRow[1], bitmap);
+      assertEquals(copiedRow[1], bitmap);
+      bitmap.add(3);
+      assertEquals(copiedRow[1], RoaringBitmap.bitmapOf(1, 2));
+      assertEquals(copy.getRows().get(1), new Object[]{null, null});
+      DataBlock serialized = rowBlock.asSerialized().getDataBlock();
+      assertFalse(rowBlock.isTableBacked());
+      assertEquals(serialized.getNumberOfRows(), 2);
+      assertEquals(aggFunctions[0].deserializeIntermediateResult(serialized.getCustomObject(0, 1)), bitmap);
+      assertTrue(serialized.getNullRowIds(0).contains(1));
+      assertNull(serialized.getCustomObject(1, 1));
+      assertTrue(operator.nextBlock().isEos());
+    }
   }
 
   @Test
