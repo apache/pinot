@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -44,6 +45,8 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -628,10 +631,15 @@ public class PinotQueryResourceTest {
   /// Installs the controller's basic auth, as an operator configures it, with a single principal scoped to table `t`
   /// (`BASIC_AUTH_PRINCIPAL` with `BASIC_AUTH_PASSWORD`) and the given comma-separated permissions.
   private void tableScopedBasicAuth(String permissions) {
+    tableScopedBasicAuth(permissions, "t");
+  }
+
+  /// Installs basic auth with the given comma-separated permissions and table grants.
+  private void tableScopedBasicAuth(String permissions, String tables) {
     String principal = BASIC_AUTH_PRINCIPALS_PREFIX + "." + BASIC_AUTH_PRINCIPAL;
     BasicAuthAccessControlFactory factory = new BasicAuthAccessControlFactory();
     factory.init(new PinotConfiguration(Map.of(BASIC_AUTH_PRINCIPALS_PREFIX, BASIC_AUTH_PRINCIPAL,
-        principal + ".password", BASIC_AUTH_PASSWORD, principal + ".tables", "t",
+        principal + ".password", BASIC_AUTH_PASSWORD, principal + ".tables", tables,
         principal + ".permissions", permissions)));
     when(_accessControlFactory.create()).thenReturn(factory.create());
   }
@@ -776,6 +784,146 @@ public class PinotQueryResourceTest {
             "sqlOptionsMode=reject", null));
     Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.QUERY_VALIDATION.getId())), response);
     Assert.assertTrue(response.contains("useMultistageEngine"), response);
+  }
+
+  @DataProvider
+  public Object[][] logicalTablePhysicalTables() {
+    return new Object[][]{
+        {Map.of("t_OFFLINE", new PhysicalTableConfig())},
+        {Map.of("t_REALTIME", new PhysicalTableConfig())},
+        {Map.of("t_OFFLINE", new PhysicalTableConfig(), "t_REALTIME", new PhysicalTableConfig())}
+    };
+  }
+
+  @Test(dataProvider = "logicalTablePhysicalTables")
+  public void testLogicalQueryAllowsReadAccessToPhysicalTables(Map<String, PhysicalTableConfig> physicalTables) {
+    tableScopedBasicAuth("read");
+    mockLogicalTable("lt", physicalTables);
+
+    String response = postSql("SELECT COUNT(*) FROM lt", null, basicAuthHeaders(BASIC_AUTH_PASSWORD));
+
+    // No broker is registered by this unit test. Reaching broker selection proves that the physical-table grant
+    // passed authorization even though the principal is not granted the logical name.
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.BROKER_RESOURCE_MISSING.getId())), response);
+    verify(_resourceManager).getBrokerInstancesFor("lt");
+  }
+
+  @DataProvider
+  public Object[][] multiTableLogicalQueryPermissions() {
+    Object[][] permissionCases = {
+        {"table1,table2", true},
+        {"table1", false},
+        {"table2", false},
+        {"unrelated", false},
+        {"lt", false},
+        {"lt,table1", false},
+        {"lt,table2", false}
+    };
+    List<Object[]> cases = new ArrayList<>();
+    for (Map<String, PhysicalTableConfig> physicalTables : List.of(
+        Map.of("table1_OFFLINE", new PhysicalTableConfig(), "table2_OFFLINE", new PhysicalTableConfig()),
+        Map.of("table1_REALTIME", new PhysicalTableConfig(), "table2_REALTIME", new PhysicalTableConfig()),
+        Map.of("table1_OFFLINE", new PhysicalTableConfig(), "table2_REALTIME", new PhysicalTableConfig()))) {
+      for (Object[] permissionCase : permissionCases) {
+        cases.add(new Object[]{physicalTables, permissionCase[0], permissionCase[1]});
+      }
+    }
+
+    // Keep the order stable to test denials at the first, middle, and last physical table.
+    Map<String, PhysicalTableConfig> threePhysicalTables = new LinkedHashMap<>();
+    threePhysicalTables.put("table1_OFFLINE", new PhysicalTableConfig());
+    threePhysicalTables.put("table2_OFFLINE", new PhysicalTableConfig());
+    threePhysicalTables.put("table3_OFFLINE", new PhysicalTableConfig());
+    cases.add(new Object[]{threePhysicalTables, "table1,table2,table3", true});
+    cases.add(new Object[]{threePhysicalTables, "table2,table3", false});
+    cases.add(new Object[]{threePhysicalTables, "table1,table3", false});
+    cases.add(new Object[]{threePhysicalTables, "table1,table2", false});
+    return cases.toArray(Object[][]::new);
+  }
+
+  @Test(dataProvider = "multiTableLogicalQueryPermissions")
+  public void testLogicalQueryRequiresReadAccessToAllPhysicalTables(Map<String, PhysicalTableConfig> physicalTables,
+      String grantedTables, boolean allowed)
+      throws Exception {
+    tableScopedBasicAuth("read", grantedTables);
+    mockLogicalTable("lt", physicalTables);
+
+    String response = postSql("SELECT COUNT(*) FROM lt", null, basicAuthHeaders(BASIC_AUTH_PASSWORD));
+
+    BrokerResponseNative brokerResponse = JsonUtils.stringToObject(response, BrokerResponseNative.class);
+    assertEquals(brokerResponse.getExceptions().size(), 1, response);
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(),
+        (allowed ? QueryErrorCode.BROKER_RESOURCE_MISSING : QueryErrorCode.ACCESS_DENIED).getId(), response);
+    if (allowed) {
+      // Authorization passed if the query reaches broker selection; this unit test has no registered broker.
+      verify(_resourceManager).getBrokerInstancesFor("lt");
+    } else {
+      verify(_resourceManager, never()).getBrokerInstancesFor(any());
+    }
+  }
+
+  @Test
+  public void testLogicalQueryRequiresAccessToEveryPhysicalTableNotOnlyTheReferenceTable() {
+    tableScopedBasicAuth("read");
+    LogicalTableConfig logicalTable = mockLogicalTable("lt",
+        Map.of("t_REALTIME", new PhysicalTableConfig(), "secret_REALTIME", new PhysicalTableConfig()));
+    logicalTable.setRefRealtimeTableName("t_REALTIME");
+
+    String response = postSql("SELECT COUNT(*) FROM lt", null, basicAuthHeaders(BASIC_AUTH_PASSWORD));
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
+    verify(_resourceManager, never()).getBrokerInstancesFor(any());
+  }
+
+  @Test
+  public void testLogicalQueryDoesNotGrantAccessToPhysicalTablesThroughTheLogicalName() {
+    tableScopedBasicAuth("read");
+    mockLogicalTable("t", Map.of("secret_REALTIME", new PhysicalTableConfig()));
+
+    String response = postSql("SELECT COUNT(*) FROM t", null, basicAuthHeaders(BASIC_AUTH_PASSWORD));
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
+    verify(_resourceManager, never()).getBrokerInstancesFor(any());
+  }
+
+  @Test
+  public void testPhysicalQueryStillRequiresReadAccessToThePhysicalTable() {
+    tableScopedBasicAuth("read");
+    when(_resourceManager.getActualTableName("secret_REALTIME", CommonConstants.DEFAULT_DATABASE))
+        .thenReturn("secret_REALTIME");
+
+    String response = postSql("SELECT COUNT(*) FROM secret_REALTIME", null, basicAuthHeaders(BASIC_AUTH_PASSWORD));
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.ACCESS_DENIED.getId())), response);
+    verify(_resourceManager, never()).getBrokerInstancesFor(any());
+  }
+
+  @Test
+  public void testLogicalQueryResolvesDatabaseAndCaseForAuthorizationAndBrokerSelection() {
+    when(_resourceManager.getActualTableName("LT", "db1")).thenReturn("db1.lt");
+    when(_tableCache.getActualLogicalTableName("db1.lt")).thenReturn("db1.LogicalTable");
+    LogicalTableConfig logicalTable = new LogicalTableConfig();
+    logicalTable.setPhysicalTableConfigMap(Map.of("db1.PhysicalTable_REALTIME", new PhysicalTableConfig()));
+    when(_tableCache.getLogicalTableConfig("db1.LogicalTable")).thenReturn(logicalTable);
+    AccessControl accessControl = mock(AccessControl.class);
+    when(accessControl.hasAccess(eq("db1.PhysicalTable"), eq(AccessType.READ), any(), eq(Actions.Table.QUERY)))
+        .thenReturn(true);
+    when(_accessControlFactory.create()).thenReturn(accessControl);
+
+    String response = postSql("SELECT COUNT(*) FROM LT", "db1");
+
+    assertTrue(response.contains(String.valueOf(QueryErrorCode.BROKER_RESOURCE_MISSING.getId())), response);
+    verify(accessControl).hasAccess(eq("db1.PhysicalTable"), eq(AccessType.READ), any(), eq(Actions.Table.QUERY));
+    verify(_resourceManager).getBrokerInstancesFor("db1.LogicalTable");
+  }
+
+  private LogicalTableConfig mockLogicalTable(String tableName, Map<String, PhysicalTableConfig> physicalTables) {
+    when(_resourceManager.getActualTableName(tableName, CommonConstants.DEFAULT_DATABASE)).thenReturn(tableName);
+    when(_tableCache.getActualLogicalTableName(tableName)).thenReturn(tableName);
+    LogicalTableConfig logicalTable = new LogicalTableConfig();
+    logicalTable.setPhysicalTableConfigMap(physicalTables);
+    when(_tableCache.getLogicalTableConfig(tableName)).thenReturn(logicalTable);
+    return logicalTable;
   }
 
   /// Lets a single-stage query get as far as broker selection, which fails with BROKER_RESOURCE_MISSING because no
