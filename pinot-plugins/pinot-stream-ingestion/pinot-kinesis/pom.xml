@@ -38,6 +38,11 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
+      <!-- Pinot's own modules are always present where a plugin is loaded, from lib/pinot-all.jar or
+           the parent realm, so bundling them into the plugin would ship a second copy of them and of
+           their dependency tree - here fastutil, calcite-core and grpc-netty-shaded, none of which
+           this plugin uses directly -->
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
@@ -46,6 +51,12 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>kinesis</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>third-party-jackson-core</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
@@ -59,6 +70,12 @@
     <dependency>
       <groupId>cloud.localstack</groupId>
       <artifactId>localstack-utils</artifactId>
+    </dependency>
+    <!-- third-party-jackson-core embeds an old jackson-core. The dependencies that bring it in
+         exclude it, and this patched copy replaces it; see pinot-dependency-patches/pom.xml. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-patched-third-party-jackson-core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
@@ -77,7 +94,7 @@
         </property>
       </activation>
       <properties>
-        <shade.phase.prop>package</shade.phase.prop>
+        <shade.phase.prop>${plugin.shade.phase}</shade.phase.prop>
       </properties>
     </profile>
     <profile>

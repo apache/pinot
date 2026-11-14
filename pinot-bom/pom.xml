@@ -439,6 +439,38 @@
         <version>${project.version}</version>
       </dependency>
 
+      <!-- Patched third-party jars, see pinot-dependency-patches/pom.xml -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-third-party-jackson-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-hadoop-shaded-guava</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-curator-client</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-parquet-jackson</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-pulsar-client-all</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-patched-reactor-netty-http</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
       <!-- Pinot Test Jars -->
       <dependency>
         <groupId>org.apache.pinot</groupId>

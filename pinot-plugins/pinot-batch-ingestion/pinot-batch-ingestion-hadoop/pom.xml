@@ -32,7 +32,14 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
+    <!-- This jar runs inside a JVM Pinot does not control, so it relocates its libraries in every
+         build mode, including thin-plugins. See shade.jackson.prefix in the root pom. -->
+    <shade.jackson.prefix>${shade.prefix}.com.fasterxml.jackson</shade.jackson.prefix>
+    <shade.guava.prefix>${shade.prefix}.com.google.common</shade.guava.prefix>
+    <shade.scala.prefix>${shade.prefix}.org.scala-lang</shade.scala.prefix>
     <shade.phase.prop>package</shade.phase.prop>
+    <!-- Stays a fat jar under thin-plugins: it is shipped to Spark / Hadoop executors. -->
+    <plugin.libs.skip>true</plugin.libs.skip>
   </properties>
   <dependencies>
     <dependency>
