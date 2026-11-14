@@ -63,9 +63,10 @@ public class PartialUpsertHandlerTest {
 
   @Test
   public void testForceOverwrite() {
-    testMerge(true, 0, true, 0, "field4", 0, true);
+    testMerge(true, 0, true, 0L, "field4", 0L, true);
     testMerge(true, 0, false, 1, "field4", 1, false);
-    testMerge(false, 0, true, 1, "field4", 1, true);
+    // A null new value stays null (with the schema default) instead of overwriting with the default value
+    testMerge(false, 3, true, 0L, "field4", 0L, true);
     testMerge(false, 3, false, 5, "field4", 5, false);
   }
 
@@ -175,6 +176,7 @@ public class PartialUpsertHandlerTest {
       String columnName, Object expectedValue, boolean isExpectedNull) {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
+        .addMetric("field4", FieldSpec.DataType.LONG)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
@@ -195,7 +197,7 @@ public class PartialUpsertHandlerTest {
               upsertConfig));
 
       ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
-      when(segment.getColumnNames()).thenReturn(Sets.newSet("field1", "field2", "hoursSinceEpoch"));
+      when(segment.getColumnNames()).thenReturn(Sets.newSet("field1", "field2", "field4", "hoursSinceEpoch"));
       LazyRow prevRecord = new LazyRow();
       prevRecord.init(segment, 1);
 
