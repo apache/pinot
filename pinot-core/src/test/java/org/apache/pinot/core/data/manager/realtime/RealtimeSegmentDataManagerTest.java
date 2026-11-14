@@ -24,11 +24,14 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -81,9 +84,11 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamMessage;
+import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -131,6 +136,8 @@ public class RealtimeSegmentDataManagerTest {
   private static final String SEGMENT_NAME_STR = SEGMENT_NAME.getSegmentName();
   private static final long START_OFFSET_VALUE = 198L;
   private static final LongMsgOffset START_OFFSET = new LongMsgOffset(START_OFFSET_VALUE);
+  private static final int OFFSET_STREAM_BATCH_SIZE = 10;
+  private static final int OFFSET_STREAM_SEGMENT_ROWS = 20;
 
   private final Map<Integer, ConsumerCoordinator> _partitionGroupIdToConsumerCoordinatorMap =
       new ConcurrentHashMap<>();
@@ -2007,6 +2014,60 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
+  public void testFilteredAndDroppedRowsInOneBatchAreCountedOnTheirOwnMeters()
+      throws Exception {
+    OffsetPayloadDecoder.reset();
+    // A filtered row before the dropped one in the same batch: a shared meter local would count the drop as filtered
+    OffsetPayloadDecoder.FILTERED_OFFSETS.add(START_OFFSET_VALUE + 1);
+    OffsetPayloadDecoder.DROPPED_OFFSETS.add(START_OFFSET_VALUE + 2);
+    OffsetPayloadDecoder.FILTERED_OFFSETS.add(START_OFFSET_VALUE + 4);
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createOffsetPayloadSegmentManager(serverMetrics)) {
+      // The registry is shared across tests, so compare deltas
+      long droppedBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED);
+      long filteredBefore = getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_ROWS_FILTERED);
+
+      consumeToRowLimitAndCommit(segmentDataManager);
+
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.INVALID_REALTIME_ROWS_DROPPED) - droppedBefore,
+          1);
+      Assert.assertEquals(
+          getMeterCount(serverMetrics, segmentDataManager, ServerMeter.REALTIME_ROWS_FILTERED) - filteredBefore, 2);
+      Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(), OFFSET_STREAM_SEGMENT_ROWS);
+      Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
+          START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS + 3);
+    }
+  }
+
+  private FakeRealtimeSegmentDataManager createOffsetPayloadSegmentManager(ServerMetrics serverMetrics)
+      throws Exception {
+    TableConfig tableConfig = Fixtures.createTableConfig(OffsetPayloadConsumerFactory.class.getName(),
+        OffsetPayloadDecoder.class.getName());
+    return createFakeSegmentManager(true, new TimeSupplier(), String.valueOf(OFFSET_STREAM_SEGMENT_ROWS), "10m",
+        tableConfig, serverMetrics);
+  }
+
+  /// Runs the real consume loop until the row limit ends the segment, then commits it.
+  private static void consumeToRowLimitAndCommit(FakeRealtimeSegmentDataManager segmentDataManager)
+      throws Exception {
+    segmentDataManager._stubConsumeLoop = false;
+    segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+    LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + OFFSET_STREAM_SEGMENT_ROWS);
+    segmentDataManager._consumeOffsets.add(endOffset);
+    segmentDataManager._responses.add(new SegmentCompletionProtocol.Response(
+        new SegmentCompletionProtocol.Response.Params().withStatus(
+            SegmentCompletionProtocol.ControllerResponseStatus.COMMIT).withStreamPartitionMsgOffset(
+            endOffset.toString())));
+    segmentDataManager.createPartitionConsumer().run();
+  }
+
+  private static long getMeterCount(ServerMetrics serverMetrics, FakeRealtimeSegmentDataManager segmentDataManager,
+      ServerMeter meter) {
+    return serverMetrics.getMeteredTableValue(segmentDataManager._clientId, meter).count();
+  }
+
+  @Test
   public void testCompletionModeDownloadWithUrlValidation()
       throws Exception {
     // Test the new validation logic for CompletionMode.DOWNLOAD
@@ -2174,6 +2235,86 @@ public class RealtimeSegmentDataManagerTest {
 
     public void add(long millis) {
       _timeNow += millis;
+    }
+  }
+
+  /// Endless stream whose message at offset `n` has payload `n`.
+  public static class OffsetPayloadConsumerFactory extends FakeStreamConsumerFactory {
+    @Override
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+      return new PartitionGroupConsumer() {
+        @Override
+        public MessageBatch<byte[]> fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+          long start = ((LongMsgOffset) startOffset).getOffset();
+          List<BytesStreamMessage> messages = new ArrayList<>(OFFSET_STREAM_BATCH_SIZE);
+          for (long offset = start; offset < start + OFFSET_STREAM_BATCH_SIZE; offset++) {
+            messages.add(new BytesStreamMessage(Long.toString(offset).getBytes(StandardCharsets.UTF_8),
+                new StreamMessageMetadata.Builder().setOffset(new LongMsgOffset(offset), new LongMsgOffset(offset + 1))
+                    .build()));
+          }
+          return new MessageBatch<>() {
+            @Override
+            public int getMessageCount() {
+              return messages.size();
+            }
+
+            @Override
+            public BytesStreamMessage getStreamMessage(int index) {
+              return messages.get(index);
+            }
+
+            @Override
+            public StreamPartitionMsgOffset getOffsetOfNextBatch() {
+              return new LongMsgOffset(start + OFFSET_STREAM_BATCH_SIZE);
+            }
+
+            @Override
+            public long getSizeInBytes() {
+              return messages.stream().mapToLong(message -> message.getLength()).sum();
+            }
+          };
+        }
+
+        @Override
+        public void close() {
+        }
+      };
+    }
+  }
+
+  /// Drops [#DROPPED_OFFSETS] (returns `null`) and marks [#FILTERED_OFFSETS] to be filtered out.
+  public static class OffsetPayloadDecoder implements StreamMessageDecoder<byte[]> {
+    static final Set<Long> DROPPED_OFFSETS = ConcurrentHashMap.newKeySet();
+    static final Set<Long> FILTERED_OFFSETS = ConcurrentHashMap.newKeySet();
+
+    static void reset() {
+      DROPPED_OFFSETS.clear();
+      FILTERED_OFFSETS.clear();
+    }
+
+    @Override
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
+    }
+
+    @Nullable
+    @Override
+    public GenericRow decode(byte[] payload, GenericRow destination) {
+      long offset = Long.parseLong(new String(payload, StandardCharsets.UTF_8));
+      if (DROPPED_OFFSETS.contains(offset)) {
+        return null;
+      }
+      destination.init(Fixtures.createSingleRow(offset));
+      if (FILTERED_OFFSETS.contains(offset)) {
+        destination.putValue(GenericRow.SKIP_RECORD_KEY, true);
+      }
+      return destination;
+    }
+
+    @Nullable
+    @Override
+    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+      return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
     }
   }
 
