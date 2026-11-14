@@ -57,6 +57,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -119,6 +120,27 @@ public class MailboxReceiveOperatorTest {
       Map<QueryErrorCode, String> errorMessages = ((ErrorMseBlock) block).getErrorMessages();
       assertTrue(errorMessages.containsKey(QueryErrorCode.EXECUTION_TIMEOUT),
           "Error messages " + errorMessages + " should contain " + QueryErrorCode.EXECUTION_TIMEOUT);
+    }
+  }
+
+  /// A timeout names the senders whose end of stream never arrived, so that one lost stream (for example sent to the
+  /// wrong server) can be traced to its sender instead of to the whole child stage.
+  @Test
+  public void shouldNameMissingSendersOnTimeout() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.getId()).thenReturn(MAILBOX_ID_1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    when(_mailbox2.getId()).thenReturn(MAILBOX_ID_2);
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.eosWithEmptyStats());
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED,
+        System.currentTimeMillis() + 100L)) {
+      MseBlock block = operator.nextBlock();
+      assertTrue(block.isError());
+      String errorMessage = ((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.EXECUTION_TIMEOUT);
+      assertNotNull(errorMessage);
+      assertTrue(errorMessage.endsWith(
+          "waiting for data from child stage 1 (no end of stream from 1 of 2 senders: worker 0 on localhost:1234)"),
+          errorMessage);
     }
   }
 
