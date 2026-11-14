@@ -20,6 +20,7 @@
 package org.apache.pinot.core.transport;
 
 import java.lang.reflect.Constructor;
+import javax.annotation.Nullable;
 
 /// Represents an instance of Netty, allowing access to certain static properties via reflection, with support for
 /// shaded Netty versions.
@@ -66,6 +67,13 @@ public abstract class NettyInstance {
 
   public abstract boolean isExplicitTryReflectionSetAccessible();
 
+  /// Returns whether this Netty instance uses `sun.misc.Unsafe`.
+  public abstract boolean hasUnsafe();
+
+  /// Returns why `sun.misc.Unsafe` is not available to this Netty instance, or `null` if it is available.
+  @Nullable
+  public abstract Throwable getUnsafeUnavailabilityCause();
+
   public abstract long getUsedDirectMemory();
 
   public abstract long getMaxDirectMemory();
@@ -84,6 +92,17 @@ public abstract class NettyInstance {
     @Override
     public boolean isExplicitTryReflectionSetAccessible() {
       return io.netty.util.internal.ReflectionUtil.trySetAccessible(CONSTRUCTOR, true) == null;
+    }
+
+    @Override
+    public boolean hasUnsafe() {
+      return io.netty.util.internal.PlatformDependent.hasUnsafe();
+    }
+
+    @Nullable
+    @Override
+    public Throwable getUnsafeUnavailabilityCause() {
+      return io.netty.util.internal.PlatformDependent.getUnsafeUnavailabilityCause();
     }
 
     @Override
@@ -111,6 +130,17 @@ public abstract class NettyInstance {
     @Override
     public boolean isExplicitTryReflectionSetAccessible() {
       return io.grpc.netty.shaded.io.netty.util.internal.ReflectionUtil.trySetAccessible(CONSTRUCTOR, true) == null;
+    }
+
+    @Override
+    public boolean hasUnsafe() {
+      return io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.hasUnsafe();
+    }
+
+    @Nullable
+    @Override
+    public Throwable getUnsafeUnavailabilityCause() {
+      return io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.getUnsafeUnavailabilityCause();
     }
 
     @Override
