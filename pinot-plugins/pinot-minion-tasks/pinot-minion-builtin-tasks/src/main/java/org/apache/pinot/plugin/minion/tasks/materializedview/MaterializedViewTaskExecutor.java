@@ -194,8 +194,8 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
     LOGGER.info("MaterializedViewTask for table: {}, window: [{}, {}), SQL: {}",
         tableName, windowStartMs, windowEndMs, definedSQL);
 
-    TableConfig tableConfig = getTableConfig(tableName);
     Schema schema = getSchema(tableName);
+    TableConfig tableConfig = getTableConfig(tableName);
 
     eventObserver.notifyProgress(pinotTaskConfig, "Executing query for MV table: " + tableName);
     AuthProvider authProvider = resolveAuthProvider(configs);
