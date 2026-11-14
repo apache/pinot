@@ -127,6 +127,17 @@ public class StreamConfigProperties {
   /// Config used to indicate whether the topic is a temporary topic for offset auto reset backfilling
   public static final String BACKFILL_TOPIC = "realtime.segment.isBackfillTopic";
 
+  /// Cap, in milliseconds, of the backoff before a message whose decoder threw [RetriableDecodeException] is fetched
+  /// again. The backoff starts at [StreamConfig#INITIAL_DECODE_RETRY_BACKOFF_MILLIS] and doubles up to the cap.
+  /// Defaults to [StreamConfig#DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS] (10 seconds).
+  public static final String DECODE_RETRY_MAX_BACKOFF_MILLIS = "decodeRetryMaxBackoffMillis";
+
+  /// How long, in milliseconds, retriable decode failures are retried during an outage of a decoder dependency. An
+  /// outage lasts while a message is being retried or retriable failures keep happening less than this apart; once it
+  /// has lasted this long, its failures are handled like any other decode failure. No limit by default; `0` disables
+  /// retries.
+  public static final String DECODE_RETRY_MAX_DURATION_MILLIS = "decodeRetryMaxDurationMillis";
+
   /// Helper method to create a stream specific property
   public static String constructStreamProperty(String streamType, String property) {
     return Joiner.on(DOT_SEPARATOR).join(STREAM_PREFIX, streamType, property);
