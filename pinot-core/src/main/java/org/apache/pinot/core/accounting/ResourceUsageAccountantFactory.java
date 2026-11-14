@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.spi.accounting.ExternalExecutionSampler;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
@@ -138,6 +139,16 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     @Override
     public boolean waitIfPaused() {
       return _queryResourceAggregator.waitIfPaused();
+    }
+
+    @Override
+    public ExternalExecutionSampler captureExternalExecutionSampler() {
+      // Subclasses may change sampling or pause policies; they must explicitly opt into external execution.
+      if (getClass() != ResourceUsageAccountant.class) {
+        return null;
+      }
+      return _threadLocalEntry.get().captureExternalExecutionSampler(_cpuSamplingEnabled, _memorySamplingEnabled,
+          _queryResourceAggregator::isPauseActive);
     }
 
     @Override

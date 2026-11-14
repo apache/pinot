@@ -47,6 +47,25 @@ public class ThreadResourceSnapshot {
     return ThreadResourceUsageProvider.getCurrentThreadAllocatedBytes() - _startAllocatedBytes;
   }
 
+  /// Reads the original task's cumulative CPU delta from a control thread. The supplied id must identify the same
+  /// platform thread that called reset; the owner must remain alive and keep this snapshot until sampling is drained.
+  public long getCpuTimeNs(long threadId) {
+    long cpuTime = ThreadResourceUsageProvider.getThreadCpuTime(threadId);
+    if (cpuTime < _startCpuTime) {
+      throw new IllegalStateException("Query thread CPU sampling became unavailable");
+    }
+    return cpuTime - _startCpuTime;
+  }
+
+  /// Reads the original task's cumulative Java heap-allocation delta from a control thread.
+  public long getAllocatedBytes(long threadId) {
+    long allocatedBytes = ThreadResourceUsageProvider.getThreadAllocatedBytes(threadId);
+    if (allocatedBytes < _startAllocatedBytes) {
+      throw new IllegalStateException("Query thread heap-allocation sampling became unavailable");
+    }
+    return allocatedBytes - _startAllocatedBytes;
+  }
+
   @Override
   public String toString() {
     return "ThreadResourceSnapshot{" + "cpuTime=" + (getCpuTimeNs()) + ", allocatedBytes="
