@@ -220,7 +220,8 @@ public class QueryRunner {
 
     _opChainScheduler = new OpChainSchedulerService(instanceId, _executorService, serverConf);
     if (_mailboxService == null) {
-      _mailboxService = new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig);
+      _mailboxService =
+          new MailboxService(hostname, port, InstanceType.SERVER, serverConf, tlsConfig, null, instanceId);
     }
 
     if (instanceDataManager != null) {

@@ -19,6 +19,8 @@
 
 package org.apache.pinot.query.routing;
 
+import com.google.common.hash.Hashing;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import org.apache.pinot.core.transport.ServerInstance;
 
@@ -32,6 +34,7 @@ public class QueryServerInstance {
   private final String _hostname;
   private final int _queryServicePort;
   private final int _queryMailboxPort;
+  private final long _instanceIdHash;
 
   public QueryServerInstance(ServerInstance server) {
     this(server.getInstanceId(), server.getHostname(), server.getQueryServicePort(), server.getQueryMailboxPort());
@@ -42,6 +45,18 @@ public class QueryServerInstance {
     _hostname = hostName;
     _queryServicePort = servicePort;
     _queryMailboxPort = mailboxPort;
+    _instanceIdHash = hashInstanceId(instanceId);
+  }
+
+  /// Hashes an instance id into the value that mailbox plans and streams carry to say which instance they are meant
+  /// for. Plans carry the hash rather than the id because a plan repeats the receivers of a stage for every sender
+  /// worker, and an id is about as long as a hostname.
+  ///
+  /// Brokers and servers of different versions compare hashes, so the function must never change: it is FarmHash
+  /// Fingerprint64, which Guava guarantees to be stable. Never returns 0, which stands for an unknown instance.
+  public static long hashInstanceId(String instanceId) {
+    long hash = Hashing.farmHashFingerprint64().hashString(instanceId, StandardCharsets.UTF_8).asLong();
+    return hash != 0 ? hash : 1;
   }
 
   public String getInstanceId() {
@@ -58,6 +73,11 @@ public class QueryServerInstance {
 
   public int getQueryServicePort() {
     return _queryServicePort;
+  }
+
+  /// Returns the hash of the instance id. See [#hashInstanceId(String)].
+  public long getInstanceIdHash() {
+    return _instanceIdHash;
   }
 
   @Override
