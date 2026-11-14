@@ -864,7 +864,8 @@ public class PinotTableRestletResource {
         throw new SchemaNotFoundException("Failed to find schema for table: " + tableNameWithType);
       }
       TableConfigUtils.validate(tableConfig, schema, skipTypes,
-          _pinotHelixResourceManager.getTableConfig(tableNameWithType));
+          _pinotHelixResourceManager.getTableConfig(tableNameWithType),
+          _controllerConf.isAutoMigrateLegacyFieldConfigsEnabled());
       TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, skipTypes);
       TableConfigValidatorRegistry.validate(tableConfig, schema);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();

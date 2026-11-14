@@ -256,20 +256,17 @@ public class CodecPipelineRealtimeIntegrationTest extends CustomDataQueryCluster
     List<FieldConfig> fieldConfigs = new ArrayList<>(COLUMNS.size());
     for (RealtimeColumn column : COLUMNS) {
       ObjectNode forward = JsonUtils.newObjectNode();
+      forward.put("encodingType", FieldConfig.EncodingType.RAW.name());
       // Keep chunks well below the flush size so committed segments hold several chunks.
       forward.put("targetDocsPerChunk", V7_TARGET_DOCS_PER_CHUNK);
       if (column.isCodecPipeline()) {
         forward.put("codecSpec", column._codecSpec);
+      } else if (column._compressionCodec != null) {
+        forward.put("compressionCodec", column._compressionCodec.name());
       }
       ObjectNode indexes = JsonUtils.newObjectNode();
       indexes.set("forward", forward);
-      FieldConfig.Builder builder = new FieldConfig.Builder(column._column)
-          .withEncodingType(FieldConfig.EncodingType.RAW)
-          .withIndexes(indexes);
-      if (!column.isCodecPipeline()) {
-        builder.withCompressionCodec(column._compressionCodec);
-      }
-      fieldConfigs.add(builder.build());
+      fieldConfigs.add(new FieldConfig.Builder(column._column).withIndexes(indexes).build());
     }
     return fieldConfigs;
   }
