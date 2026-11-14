@@ -26,12 +26,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -86,8 +88,10 @@ public class NodeEquivalenceFieldCoverageTest {
       // fields stay in scope until that method goes away.
       Map.entry(EnrichedJoinNode.class, List.of("_filterProjectRexes", "_joinResultSchema", "_projectResultSchema",
           "_fetch", "_offset")),
-      Map.entry(MailboxReceiveNode.class, List.of("_senderStageId", "_exchangeType", "_distributionType", "_keys",
-          "_collations", "_sort", "_sortedOnSender", "_sender")),
+      Map.entry(BaseMailboxReceiveNode.class, List.of("_senderStageId", "_exchangeType", "_distributionType", "_keys",
+          "_sender")),
+      Map.entry(MailboxReceiveNode.class, List.of("_collations", "_sort", "_sortedOnSender")),
+      Map.entry(MailboxMergeReceiveNode.class, List.of("_collations")),
       Map.entry(MailboxSendNode.class, List.of("_receiverStages", "_exchangeType", "_distributionType", "_keys",
           "_prePartitioned", "_collations", "_sort", "_hashFunction")),
       Map.entry(ProjectNode.class, List.of("_projects")),
@@ -113,7 +117,7 @@ public class NodeEquivalenceFieldCoverageTest {
   private static final Map<Class<?>, Map<String, String>> NOT_COMPARED = Map.of(
       BasePlanNode.class, Map.of(
           "_stageId", "Equivalence is asked across stages, so the ids always differ"),
-      MailboxReceiveNode.class, Map.of(
+      BaseMailboxReceiveNode.class, Map.of(
           "_senderStageId", "The senders themselves are compared for equivalence instead"),
       MailboxSendNode.class, Map.of(
           "_receiverStages", "Who reads a stage does not change what the stage computes",

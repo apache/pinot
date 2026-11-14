@@ -47,6 +47,8 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitMailboxReceive(MailboxReceiveNode node, C context);
 
+  T visitMailboxMergeReceive(MailboxMergeReceiveNode node, C context);
+
   T visitMailboxSend(MailboxSendNode node, C context);
 
   T visitProject(ProjectNode node, C context);
@@ -163,6 +165,16 @@ public interface PlanNodeVisitor<T, C> {
 
     @Override
     public T visitMailboxReceive(MailboxReceiveNode node, C context) {
+      preChildren(node, context);
+      visitChildren(node, context);
+      if (traverseStageBoundary()) {
+        node.getSender().visit(this, context);
+      }
+      return postChildren(node, context);
+    }
+
+    @Override
+    public T visitMailboxMergeReceive(MailboxMergeReceiveNode node, C context) {
       preChildren(node, context);
       visitChildren(node, context);
       if (traverseStageBoundary()) {
