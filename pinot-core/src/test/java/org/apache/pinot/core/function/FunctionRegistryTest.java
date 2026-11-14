@@ -20,10 +20,12 @@ package org.apache.pinot.core.function;
 
 import java.math.BigDecimal;
 import java.util.EnumSet;
+import java.util.Locale;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.sql.FilterKind;
 import org.testng.annotations.Test;
@@ -79,6 +81,22 @@ public class FunctionRegistryTest {
       }
       assertTrue(FunctionRegistry.contains(FunctionRegistry.canonicalize(filterKind.name())),
           "Unable to find filter function signature for: " + filterKind);
+    }
+  }
+
+  @Test
+  public void testFunctionCanonicalizationIsLocaleIndependent() {
+    synchronized (Locale.class) {
+      Locale previousLocale = Locale.getDefault();
+      try {
+        Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+        assertEquals(FunctionRegistry.canonicalize("VARIANT_GET"), "variantget");
+        assertEquals(TransformFunctionFactory.canonicalize("VARIANT_GET"), "variantget");
+        assertTrue(TransformFunctionType.requiresNullHandling("VARIANT_GET"));
+        assertTrue(TransformFunctionFactory.getAllFunctions().containsKey("variantget"));
+      } finally {
+        Locale.setDefault(previousLocale);
+      }
     }
   }
 
