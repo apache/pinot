@@ -25,6 +25,8 @@ import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -239,6 +241,18 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public static URI getUploadSegmentURI(URI controllerURI)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
+  }
+
+  /// Returns the URI for updating the ZK metadata custom map of a segment.
+  public static URI getUpdateSegmentZKMetadataURI(URI controllerURI, String tableNameWithType, String segmentName)
+      throws URISyntaxException {
+    String rawPath = OLD_SEGMENT_PATH + "/" + encodePathSegment(tableNameWithType) + "/"
+        + encodePathSegment(segmentName) + "/metadata";
+    return new URI(controllerURI.getScheme() + "://" + controllerURI.getRawAuthority() + rawPath);
+  }
+
+  private static String encodePathSegment(String pathSegment) {
+    return URLEncoder.encode(pathSegment, StandardCharsets.UTF_8).replace("+", "%20");
   }
 
   public static URI getReingestedSegmentUploadURI(URI controllerURI)
@@ -908,6 +922,18 @@ public class FileUploadDownloadClient implements AutoCloseable {
       throws IOException, HttpErrorStatusException {
     return HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(getSendSegmentJsonRequest(uri, jsonString, headers, parameters), socketTimeoutMs));
+  }
+
+  /// Updates the ZK metadata custom map of a segment without uploading the segment.
+  public SimpleHttpResponse updateSegmentZKMetadata(URI uri, String customMapModifierJson,
+      @Nullable List<Header> headers, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1)
+        .setEntity(new StringEntity(customMapModifierJson, ContentType.APPLICATION_JSON));
+    if (headers != null) {
+      headers.forEach(requestBuilder::addHeader);
+    }
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build(), socketTimeoutMs));
   }
 
   /// Start replace segments with default settings.
