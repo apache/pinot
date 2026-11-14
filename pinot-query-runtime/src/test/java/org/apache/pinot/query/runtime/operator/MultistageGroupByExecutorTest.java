@@ -145,7 +145,8 @@ public class MultistageGroupByExecutorTest {
     AvgAggregationFunction function =
         new AvgAggregationFunction(List.of(ExpressionContext.forIdentifier("$1")), true);
     MultistageGroupByExecutor executor = new MultistageGroupByExecutor(new int[]{0},
-        new AggregationFunction[]{function}, new int[]{-1}, -1, AggType.INTERMEDIATE, false, schema, Map.of(), null);
+        new AggregationFunction[]{function}, new int[]{-1}, -1, AggType.INTERMEDIATE, false, schema, schema, Map.of(),
+        null);
     Double[] averages = {null, 10.0, 0.0, 30.0, 5.0, 30.0, null, 20.0, 40.0, 1.0, 40.0, 0.0};
     AvgPair[] pairs = new AvgPair[averages.length];
     Object[][] rows = new Object[averages.length][];
@@ -197,7 +198,7 @@ public class MultistageGroupByExecutorTest {
     AggregationFunction<?, ?>[] functions = {
         new CountAggregationFunction(List.of(ExpressionContext.forIdentifier("$1")), true)};
     return new MultistageGroupByExecutor(groupKeys, functions, new int[]{filterArgId}, filterArgId,
-        filterArgId < 0 ? AggType.FINAL : AggType.DIRECT, leafReturnFinalResult, resultSchema,
+        filterArgId < 0 ? AggType.FINAL : AggType.DIRECT, leafReturnFinalResult, INPUT_SCHEMA, resultSchema,
         Map.of(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(groupLimit),
             QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS, Boolean.toString(skipEmptyGroups)), null);
   }
