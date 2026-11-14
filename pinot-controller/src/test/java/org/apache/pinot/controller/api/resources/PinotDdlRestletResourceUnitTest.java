@@ -29,12 +29,17 @@ import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.resources.ddl.DdlExecutionRequest;
+import org.apache.pinot.controller.api.resources.ddl.DdlExecutionResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigRedactionUtils;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -58,6 +63,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -70,6 +76,145 @@ import static org.testng.Assert.expectThrows;
 /// differences in schema-level metadata a DDL column list cannot express (primary keys, tags,
 /// null-handling) and reject differences in per-column attributes that the DDL does control.
 public class PinotDdlRestletResourceUnitTest {
+
+  @Test
+  public void createTableRejectsRedactionMarkerBeforePersistence() {
+    PinotDdlRestletResource resource = new PinotDdlRestletResource();
+    resource._pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    resource._accessControlFactory = mock(AccessControlFactory.class);
+    when(resource._accessControlFactory.create()).thenReturn(new AccessControl() {
+    });
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder("http://localhost/sql/ddl"));
+    String ddl = "CREATE TABLE marker_create (id INT DIMENSION) TABLE_TYPE = OFFLINE "
+        + "PROPERTIES ('provider.password' = '*****')";
+
+    ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
+        () -> resource.executeDdl(new DdlExecutionRequest(ddl), false, mock(HttpHeaders.class), request));
+
+    assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+  }
+
+  @Test
+  public void createTableIfNotExistsAllowsMaskedWriteFreeNoOp()
+      throws Exception {
+    PinotDdlRestletResource resource = new PinotDdlRestletResource();
+    resource._pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    resource._accessControlFactory = mock(AccessControlFactory.class);
+    when(resource._accessControlFactory.create()).thenReturn(new AccessControl() {
+    });
+    when(resource._pinotHelixResourceManager.hasTable("marker_noop_OFFLINE")).thenReturn(true);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder("http://localhost/sql/ddl"));
+    String ddl = "CREATE TABLE IF NOT EXISTS marker_noop (id INT DIMENSION) TABLE_TYPE = OFFLINE "
+        + "PROPERTIES ('provider.password' = '*****')";
+
+    Response response = resource.executeDdl(
+        new DdlExecutionRequest(ddl), false, mock(HttpHeaders.class), request);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    verify(resource._pinotHelixResourceManager, never()).addTable(Mockito.any(TableConfig.class));
+  }
+
+  /// SHOW CREATE is a display surface, not a privileged configuration export. A caller granted
+  /// only ordinary table READ + GetTableConfig must receive the unresolved stored shape with
+  /// literal credentials masked. In particular, this test uses accessKey and JAAS/URI content
+  /// that cannot be covered by password-suffix matching alone.
+  @Test
+  public void showCreateTableRedactsStoredCredentialsAndPreservesPlaceholders() {
+    String rawTableName = "credential_display";
+    String tableNameWithType = rawTableName + "_REALTIME";
+    String plainPassword = "plain-password-literal";
+    String jaasPassword = "jaas-password-literal";
+    String accessKey = "access-key-literal";
+    String uriUser = "uri-user-literal";
+    String uriPassword = "uri-password-literal";
+    String uriToken = "uri-token-literal";
+    String placeholderName = "PINOT_SHOW_CREATE_REDACTION_TEST_PASSWORD";
+    String passwordPlaceholder = "${" + placeholderName + "}";
+    String resolvedPlaceholderValue = "resolved-placeholder-value";
+    String benignTopic = "events-topic";
+
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("stream.kafka.consumer.prop.ssl.keystore.password", plainPassword);
+    streamConfigs.put("stream.kafka.consumer.prop.ssl.truststore.password", passwordPlaceholder);
+    streamConfigs.put("stream.kafka.consumer.prop.sasl.jaas.config",
+        "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"jaas-user\" password=\""
+            + jaasPassword + "\";");
+    streamConfigs.put("stream.kinesis.accessKey", accessKey);
+    streamConfigs.put("stream.kafka.schema.registry.url",
+        "https://" + uriUser + ":" + uriPassword
+            + "@registry.example.test/schemas?access_token=" + uriToken + "&region=us-west-2");
+    streamConfigs.put("stream.kafka.topic.name", benignTopic);
+
+    TableConfig storedConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(tableNameWithType)
+        .setStreamConfigs(streamConfigs)
+        .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(rawTableName)
+        .addSingleValueDimension("id", DataType.INT)
+        .build();
+
+    PinotDdlRestletResource resource = new PinotDdlRestletResource();
+    resource._pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    resource._accessControlFactory = mock(AccessControlFactory.class);
+    when(resource._accessControlFactory.create()).thenReturn(new AccessControl() {
+      @Override
+      public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders headers,
+          String endpointUrl) {
+        return rawTableName.equals(tableName) && accessType == AccessType.READ;
+      }
+
+      @Override
+      public boolean hasAccess(HttpHeaders headers, TargetType targetType, String targetId,
+          String action) {
+        return targetType == TargetType.TABLE && tableNameWithType.equals(targetId)
+            && Actions.Table.GET_TABLE_CONFIG.equals(action);
+      }
+    });
+    when(resource._pinotHelixResourceManager.hasTable(tableNameWithType)).thenReturn(true);
+    when(resource._pinotHelixResourceManager.getRealtimeTableConfig(rawTableName, false, false))
+        .thenReturn(storedConfig);
+    when(resource._pinotHelixResourceManager.getTableSchema(tableNameWithType)).thenReturn(schema);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder("http://localhost/sql/ddl"));
+
+    String previousPlaceholderValue = System.getProperty(placeholderName);
+    Response response;
+    try {
+      System.setProperty(placeholderName, resolvedPlaceholderValue);
+      response = resource.executeDdl(
+          new DdlExecutionRequest("SHOW CREATE TABLE " + rawTableName + " TYPE REALTIME"),
+          false, mock(HttpHeaders.class), request);
+    } finally {
+      if (previousPlaceholderValue == null) {
+        System.clearProperty(placeholderName);
+      } else {
+        System.setProperty(placeholderName, previousPlaceholderValue);
+      }
+    }
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    DdlExecutionResponse body = (DdlExecutionResponse) response.getEntity();
+    String ddl = body.getDdl();
+    assertNotNull(ddl);
+    assertFalse(ddl.contains(plainPassword), "SHOW CREATE returned a literal password");
+    assertFalse(ddl.contains(jaasPassword), "SHOW CREATE returned a literal JAAS password");
+    assertFalse(ddl.contains(accessKey), "SHOW CREATE returned a literal access key");
+    assertFalse(ddl.contains(uriUser), "SHOW CREATE returned literal URI user-info");
+    assertFalse(ddl.contains(uriPassword), "SHOW CREATE returned a literal URI password");
+    assertFalse(ddl.contains(uriToken), "SHOW CREATE returned a literal URI token");
+    assertFalse(ddl.contains(resolvedPlaceholderValue), "SHOW CREATE resolved a credential placeholder");
+    assertTrue(ddl.contains(TableConfigRedactionUtils.REDACTION_MARKER));
+    assertTrue(ddl.contains(passwordPlaceholder));
+    assertTrue(ddl.contains(benignTopic));
+    assertTrue(ddl.contains("registry.example.test/schemas"));
+    assertTrue(ddl.contains("region=us-west-2"));
+    verify(resource._pinotHelixResourceManager)
+        .getRealtimeTableConfig(rawTableName, false, false);
+    verify(resource._pinotHelixResourceManager, never()).getTableConfig(tableNameWithType);
+  }
 
   /// A dry-run DROP must fail on the same non-mutating logical-table reference guard as a live
   /// DROP. Otherwise dry-run can promise a deletion that the real request will later reject.
@@ -124,7 +269,7 @@ public class PinotDdlRestletResourceUnitTest {
         .setTableName("events")
         .setTaskConfig(new TableTaskConfig(taskConfigs))
         .build();
-    when(resource._pinotHelixResourceManager.getTableConfig("events_OFFLINE")).thenReturn(tableConfig);
+    when(resource._pinotHelixResourceManager.getOfflineTableConfig("events", false, false)).thenReturn(tableConfig);
 
     PinotHelixTaskResourceManager.TaskCount taskCount = mock(PinotHelixTaskResourceManager.TaskCount.class);
     when(taskCount.getRunning()).thenReturn(1);
@@ -149,6 +294,7 @@ public class PinotDdlRestletResourceUnitTest {
 
     verify(resource._pinotHelixResourceManager, never()).updateTableConfig(tableConfig);
     verify(resource._pinotHelixResourceManager, never()).deleteTable("events", TableType.OFFLINE, null);
+    verify(resource._pinotHelixResourceManager, never()).getTableConfig("events_OFFLINE");
     assertEquals(tableConfig.getTaskConfig().getTaskTypeConfigsMap()
         .get("SegmentRefreshTask").get(PinotTaskManager.SCHEDULE_KEY), "0 0 * * * ?");
   }

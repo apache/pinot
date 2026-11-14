@@ -20,6 +20,7 @@ package org.apache.pinot.sql.ddl.reverse;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
@@ -419,6 +420,27 @@ public class CanonicalDdlEmitterTest {
       org.testng.Assert.fail("Expected IllegalArgumentException for shadowing streamType key");
     } catch (IllegalArgumentException expected) {
       assertTrue(expected.getMessage().contains("streamType"), expected.getMessage());
+    }
+  }
+
+  @Test
+  public void commaBearingValueIsNotIncludedInErrorMessage() {
+    String valueContainingSecret = "team,do-not-log-this-value";
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("t")
+        .addSingleValueDimension("id", DataType.INT)
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("t")
+        .setTags(List.of(valueContainingSecret))
+        .build();
+
+    try {
+      CanonicalDdlEmitter.emit(schema, config);
+      org.testng.Assert.fail("Expected IllegalArgumentException for comma-bearing tag");
+    } catch (IllegalArgumentException expected) {
+      assertFalse(expected.getMessage().contains(valueContainingSecret), "Error message contained the property value");
+      assertTrue(expected.getMessage().contains("tags"));
     }
   }
 

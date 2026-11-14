@@ -43,7 +43,6 @@ import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
-import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -136,9 +135,10 @@ public class TaskFactoryRegistry {
               String tableName = pinotTaskConfig.getTableName();
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);
+              // Task configs can contain opaque values (for example SQL literals) that cannot be safely identified
+              // by key-name redaction. Log only stable task identity fields.
               if (LOGGER.isInfoEnabled()) {
-                LOGGER.info("Start running {}: {} with configs: {}", pinotTaskConfig.getTaskType(), _taskConfig.getId(),
-                    Obfuscator.DEFAULT.toJsonString(pinotTaskConfig.getConfigs()));
+                LOGGER.info("{}", safeTaskStartDiagnostic(pinotTaskConfig, _taskConfig.getId()));
               }
 
               try {
@@ -158,7 +158,8 @@ public class TaskFactoryRegistry {
                   _minionMetrics.addMeteredTableValue(tableName, taskType,
                       MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
                 }
-                LOGGER.info("Task: {} got cancelled", _taskConfig.getId(), e);
+                LOGGER.info("Task: {} got cancelled (exception type: {})", _taskConfig.getId(),
+                    safeExceptionType(e));
                 return new TaskResult(TaskResult.Status.CANCELED, extractAndTrimRootCauseMessage(e));
               } catch (FatalException e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
@@ -167,7 +168,8 @@ public class TaskFactoryRegistry {
                   _minionMetrics.addMeteredTableValue(tableName, taskType,
                       MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
                 }
-                LOGGER.error("Caught fatal exception while executing task: {}", _taskConfig.getId(), e);
+                LOGGER.error("Caught fatal exception while executing task: {} (exception type: {})",
+                    _taskConfig.getId(), safeExceptionType(e));
                 return new TaskResult(TaskResult.Status.FATAL_FAILED, extractAndTrimRootCauseMessage(e));
               } catch (Exception e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
@@ -176,7 +178,8 @@ public class TaskFactoryRegistry {
                   _minionMetrics.addMeteredTableValue(tableName, taskType,
                       MinionMeter.NUMBER_TASKS_FAILED, 1L);
                 }
-                LOGGER.error("Caught exception while executing task: {}", _taskConfig.getId(), e);
+                LOGGER.error("Caught exception while executing task: {} (exception type: {})", _taskConfig.getId(),
+                    safeExceptionType(e));
                 return new TaskResult(TaskResult.Status.FAILED, extractAndTrimRootCauseMessage(e));
               } finally {
                 _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
@@ -193,7 +196,7 @@ public class TaskFactoryRegistry {
             }
           };
         } catch (Exception e) {
-          LOGGER.error("Caught exception while creating new task", e);
+          LOGGER.error("Caught exception while creating new task (exception type: {})", safeExceptionType(e));
           throw new RuntimeException("Caught exception while creating new task", e);
         }
       };
@@ -207,6 +210,14 @@ public class TaskFactoryRegistry {
       return rootCauseMessage.substring(0, MAX_TASK_RESULT_INFO_LEN);
     }
     return rootCauseMessage;
+  }
+
+  static String safeExceptionType(Throwable throwable) {
+    return throwable.getClass().getName();
+  }
+
+  static String safeTaskStartDiagnostic(PinotTaskConfig pinotTaskConfig, String taskId) {
+    return "Start running " + pinotTaskConfig.getTaskType() + ": " + taskId;
   }
 
   /// Returns the task factory registry.

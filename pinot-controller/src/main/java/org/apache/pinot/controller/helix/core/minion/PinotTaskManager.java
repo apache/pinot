@@ -20,8 +20,6 @@ package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -280,7 +278,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
               .computeIfAbsent(MinionConstants.TRIGGERED_BY, k -> triggeredBy));
           addDefaultsToTaskConfig(pinotTaskConfigs);
-          LOGGER.info("Submitting ad-hoc task for task type: {} with task configs: {}", taskType, pinotTaskConfigs);
+          LOGGER.info("Submitting {} ad-hoc task(s) for task type: {}, table: {}", pinotTaskConfigs.size(), taskType,
+              tableNameWithType);
           String minionInstanceTag =
               taskConfigs.getOrDefault(MINION_INSTANCE_TAG_CONFIG, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
           _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_ADHOC_TASKS_SUBMITTED, 1);
@@ -327,7 +326,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         pinotTaskConfigs.clear();
         // If the task is user-triggered, we throw an exception to notify the user
         // This is to ensure that the user is aware of the task generation limit
-        throw new RuntimeException(message);
+        throw new TooManyTasksException(message);
       }
       // For scheduled tasks, we log a warning and limit the number of tasks
       LOGGER.warn(message + "Only the first {} tasks will be scheduled", maxNumberOfSubTasks);
@@ -979,21 +978,18 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           response.addGenerationError(message);
         }
       } catch (Exception e) {
-        StringWriter errors = new StringWriter();
-        try (PrintWriter pw = new PrintWriter(errors)) {
-          e.printStackTrace(pw);
-        }
+        String errors = safeTaskGenerationError(e);
         response.addGenerationError("Failed to generate tasks for task type " + taskType + " for table " + tableName
             + "\n Reason : " + errors);
         long failureRunTimestamp = System.currentTimeMillis();
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableName, taskType,
             taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addErrorRunMessage(failureRunTimestamp,
-                errors.toString()));
+                errors));
         // before the first task schedule, the follow gauge metric will be empty
         // TODO: find a better way to report task generation information
         _controllerMetrics.setOrUpdateTableGauge(tableName, taskType,
             ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR, 1L);
-        LOGGER.error("Failed to generate tasks for task type {} for table {}", taskType, tableName, e);
+        LOGGER.error("Failed to generate tasks for task type {} for table {}: {}", taskType, tableName, errors);
       } finally {
         MDC.remove(GEN_ID_KEY);
       }
@@ -1009,21 +1005,21 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       try {
         if (numTasks > 0) {
           if (_pinotHelixResourceManager.getInstancesWithTag(minionInstanceTag).isEmpty()) {
-            LOGGER.error("Skipping {} tasks for task type: {} with task configs: {} to invalid minionInstanceTag: {}",
-                numTasks, taskType, pinotTaskConfigs, minionInstanceTag);
+            LOGGER.error("Skipping {} tasks for task type: {} due to invalid minionInstanceTag: {}",
+                numTasks, taskType, minionInstanceTag);
             throw new IllegalArgumentException("No valid minion instance found for tag: " + minionInstanceTag);
           }
           addDefaultsToTaskConfig(pinotTaskConfigs);
-          // This might lead to lot of logs, maybe sum it up and move outside the loop
-          LOGGER.info("Submitting {} tasks for task type: {} to minionInstance: {} with task configs: {}", numTasks,
-              taskType, minionInstanceTag, pinotTaskConfigs);
+          LOGGER.info("Submitting {} tasks for task type: {} to minionInstance: {}", numTasks, taskType,
+              minionInstanceTag);
           submittedTaskNames.add(submitTasks(null, pinotTaskConfigs, taskGenerator, triggeredBy, minionInstanceTag));
         }
       } catch (Exception e) {
         numErrorTasksScheduled++;
-        LOGGER.error("Failed to schedule task type {} on minion instance {} with task configs: {}", taskType,
-            minionInstanceTag, pinotTaskConfigs, e);
-        response.addSchedulingError(e.getMessage());
+        LOGGER.error("Failed to schedule task type {} on minion instance {} ({})", taskType, minionInstanceTag,
+            e.getClass().getSimpleName());
+        response.addSchedulingError("Failed to schedule task type " + taskType + " on minion instance "
+            + minionInstanceTag + " (" + e.getClass().getSimpleName() + ")");
       }
     }
     if (numErrorTasksScheduled > 0) {
@@ -1044,6 +1040,23 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   protected static String getGenerationId(String taskType, String tableName) {
     return taskType + "-" + tableName + "-" + System.currentTimeMillis();
+  }
+
+  @VisibleForTesting
+  static String safeTaskGenerationError(Exception exception) {
+    String message = exception.getMessage();
+    if (exception instanceof TooManyTasksException && message != null) {
+      return message;
+    }
+    return exception.getClass().getName();
+  }
+
+  private static final class TooManyTasksException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    private TooManyTasksException(String message) {
+      super(message);
+    }
   }
 
   protected String submitTasks(@Nullable String parentTaskName, List<PinotTaskConfig> pinotTaskConfigs,

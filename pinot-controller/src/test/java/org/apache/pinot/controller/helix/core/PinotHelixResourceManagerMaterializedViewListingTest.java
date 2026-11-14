@@ -75,13 +75,13 @@ public class PinotHelixResourceManagerMaterializedViewListingTest {
         .build();
 
     try (MockedStatic<ZKMetadataProvider> staticZk = Mockito.mockStatic(ZKMetadataProvider.class)) {
-      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "mv_orders_OFFLINE"))
+      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "mv_orders_OFFLINE", false, false))
           .thenReturn(mvConfig);
-      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "plain_orders_OFFLINE"))
+      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "plain_orders_OFFLINE", false, false))
           .thenReturn(plainConfig);
       // `ghost_OFFLINE`: TableConfig fetch returns null (corruption). The helper must silently
       // drop it rather than throw — a single broken znode must not blank the entire listing.
-      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "ghost_OFFLINE"))
+      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "ghost_OFFLINE", false, false))
           .thenReturn(null);
 
       List<String> result = prm.getAllRawMaterializedViewNames(null);
@@ -92,7 +92,8 @@ public class PinotHelixResourceManagerMaterializedViewListingTest {
               + "result is reusable as input to SHOW CREATE / DROP MATERIALIZED VIEW.");
       // Critical: the REALTIME resource must NEVER trigger a TableConfig fetch — that would
       // be a wasted ZK round-trip on every realtime table in the cluster.
-      staticZk.verify(() -> ZKMetadataProvider.getTableConfig(propertyStore, "mv_orders_REALTIME"),
+      staticZk.verify(() -> ZKMetadataProvider.getTableConfig(
+              propertyStore, "mv_orders_REALTIME", false, false),
           Mockito.never());
     }
   }
@@ -116,8 +117,8 @@ public class PinotHelixResourceManagerMaterializedViewListingTest {
         .build();
 
     try (MockedStatic<ZKMetadataProvider> staticZk = Mockito.mockStatic(ZKMetadataProvider.class)) {
-      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore,
-          "analytics.mv_revenue_OFFLINE")).thenReturn(analyticsMv);
+      staticZk.when(() -> ZKMetadataProvider.getTableConfig(
+          propertyStore, "analytics.mv_revenue_OFFLINE", false, false)).thenReturn(analyticsMv);
       // marketing.mv_funnel is filtered by the database predicate BEFORE we hit ZK, so no stub
       // is needed; if the database filter regresses this test will fail with an
       // `UnnecessaryStubbingException`-equivalent (an unstubbed call returning null) which
@@ -136,10 +137,11 @@ public class PinotHelixResourceManagerMaterializedViewListingTest {
       // The default-database MV must NOT have been read either — a regression in the database
       // filter that lets default-db resources through would also let a header substitution
       // attack discover MVs the caller cannot read.
-      staticZk.verify(() -> ZKMetadataProvider.getTableConfig(propertyStore, "mv_global_OFFLINE"),
+      staticZk.verify(() -> ZKMetadataProvider.getTableConfig(
+              propertyStore, "mv_global_OFFLINE", false, false),
           Mockito.never());
-      staticZk.verify(() -> ZKMetadataProvider.getTableConfig(propertyStore,
-          "marketing.mv_funnel_OFFLINE"), Mockito.never());
+      staticZk.verify(() -> ZKMetadataProvider.getTableConfig(
+          propertyStore, "marketing.mv_funnel_OFFLINE", false, false), Mockito.never());
     }
   }
 
@@ -164,9 +166,9 @@ public class PinotHelixResourceManagerMaterializedViewListingTest {
         .build();
 
     try (MockedStatic<ZKMetadataProvider> staticZk = Mockito.mockStatic(ZKMetadataProvider.class)) {
-      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "mv_healthy_OFFLINE"))
+      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "mv_healthy_OFFLINE", false, false))
           .thenReturn(healthy);
-      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "mv_broken_OFFLINE"))
+      staticZk.when(() -> ZKMetadataProvider.getTableConfig(propertyStore, "mv_broken_OFFLINE", false, false))
           .thenThrow(new RuntimeException("Simulated ZK read failure on broken znode"));
 
       List<String> result = prm.getAllRawMaterializedViewNames(null);

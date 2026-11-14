@@ -30,6 +30,7 @@ import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.common.restlet.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.common.restlet.resources.TableView;
 import org.apache.pinot.common.utils.PinotAppConfigs;
+import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -112,14 +113,50 @@ public class PinotAdminClientTest {
   @Test
   public void testGetTableConfig()
       throws Exception {
-    String jsonResponse = "{\"tableName\":\"tbl1_OFFLINE\"}";
+    TableConfig expectedTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("tbl1").build();
+    String jsonResponse = redactedTableConfigEnvelope(expectedTableConfig);
     JsonNode mockResponse = new ObjectMapper().readTree(jsonResponse);
     lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
         .thenReturn(mockResponse);
 
     String cfg = _adminClient.getTableClient().getTableConfig("tbl1_OFFLINE");
     assertNotNull(cfg);
-    assertEquals(new ObjectMapper().readTree(cfg).get("tableName").asText(), "tbl1_OFFLINE");
+    JsonNode response = new ObjectMapper().readTree(cfg);
+    assertEquals(response.get("responseType").asText(), "redactedTableConfig");
+    assertEquals(response.get("tableName").get("raw").asText(), "tbl1");
+    assertEquals(response.get("configs").get("OFFLINE").get("tableName").asText(), "tbl1_OFFLINE");
+  }
+
+  @Test
+  public void testGetTableConfigObjectFromRedactedSingleEnvelope()
+      throws Exception {
+    TableConfig expectedTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("tbl1").build();
+    JsonNode mockResponse = new ObjectMapper().readTree(redactedTableConfigEnvelope(expectedTableConfig));
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(mockResponse);
+
+    TableConfig tableConfig = _adminClient.getTableClient().getTableConfigObject("tbl1_OFFLINE");
+
+    assertEquals(tableConfig.getTableName(), "tbl1_OFFLINE");
+    assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
+  }
+
+  @Test
+  public void testGetTableConfigObjectFromRedactedCombinedEnvelope()
+      throws Exception {
+    TableConfig offline = new TableConfigBuilder(TableType.OFFLINE).setTableName("tbl1").build();
+    TableConfig realtime = new TableConfigBuilder(TableType.REALTIME).setTableName("tbl1").build();
+    String jsonResponse = "{\"responseType\":\"redactedTableConfig\",\"responseVersion\":1,"
+        + "\"tableName\":{\"raw\":\"tbl1\"},\"baseVersions\":{\"OFFLINE\":3,\"REALTIME\":5},"
+        + "\"configs\":{\"OFFLINE\":" + JsonUtils.objectToString(offline) + ",\"REALTIME\":"
+        + JsonUtils.objectToString(realtime) + "}}";
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(new ObjectMapper().readTree(jsonResponse));
+
+    TableConfig tableConfig = _adminClient.getTableClient().getTableConfigObject("tbl1", "REALTIME");
+
+    assertEquals(tableConfig.getTableName(), "tbl1_REALTIME");
+    assertEquals(tableConfig.getTableType(), TableType.REALTIME);
   }
 
   @Test
@@ -154,6 +191,50 @@ public class PinotAdminClientTest {
     assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
     verify(_mockTransport).executeGet(eq(CONTROLLER_ADDRESS), eq("/tables/tbl1"), eq(Map.of("type", "OFFLINE")),
         eq(HEADERS));
+  }
+
+  @Test
+  public void testGetTableConfigsPreservesEnvelopeAndTypedGetterUnwrapsIt()
+      throws Exception {
+    TableConfig offline = new TableConfigBuilder(TableType.OFFLINE).setTableName("tbl1").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("tbl1").build();
+    TableConfigs expectedTableConfigs = new TableConfigs("tbl1", schema, offline, null);
+    String jsonResponse = "{\"responseType\":\"redactedTableConfigs\",\"responseVersion\":1,"
+        + "\"tableName\":{\"raw\":\"tbl1\"},\"baseVersions\":{\"offline\":3},\"configs\":"
+        + JsonUtils.objectToString(expectedTableConfigs) + "}";
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(new ObjectMapper().readTree(jsonResponse));
+
+    String rawResponse = _adminClient.getTableClient().getTableConfigs("tbl1");
+    TableConfigs tableConfigs = _adminClient.getTableClient().getTableConfigsObject("tbl1");
+
+    assertEquals(new ObjectMapper().readTree(rawResponse).get("responseType").asText(), "redactedTableConfigs");
+    assertEquals(tableConfigs.getTableName(), "tbl1");
+    assertEquals(tableConfigs.getSchema().getSchemaName(), "tbl1");
+    assertEquals(tableConfigs.getOffline().getTableName(), "tbl1_OFFLINE");
+  }
+
+  @Test
+  public void testGetTableConfigsObjectRetainsLegacyResponseSupport()
+      throws Exception {
+    TableConfig offline = new TableConfigBuilder(TableType.OFFLINE).setTableName("tbl1").build();
+    TableConfigs expectedTableConfigs =
+        new TableConfigs("tbl1", new Schema.SchemaBuilder().setSchemaName("tbl1").build(), offline, null);
+    lenient().when(_mockTransport.executeGet(anyString(), anyString(), any(), any()))
+        .thenReturn(new ObjectMapper().readTree(JsonUtils.objectToString(expectedTableConfigs)));
+
+    TableConfigs tableConfigs = _adminClient.getTableClient().getTableConfigsObject("tbl1");
+
+    assertEquals(tableConfigs.getTableName(), "tbl1");
+    assertEquals(tableConfigs.getOffline().getTableType(), TableType.OFFLINE);
+  }
+
+  private static String redactedTableConfigEnvelope(TableConfig tableConfig)
+      throws Exception {
+    String type = tableConfig.getTableType().name();
+    return "{\"responseType\":\"redactedTableConfig\",\"responseVersion\":1,"
+        + "\"tableName\":{\"raw\":\"tbl1\",\"type\":\"" + type + "\"},\"baseVersions\":{\"" + type
+        + "\":3},\"configs\":{\"" + type + "\":" + JsonUtils.objectToString(tableConfig) + "}}";
   }
 
   @Test

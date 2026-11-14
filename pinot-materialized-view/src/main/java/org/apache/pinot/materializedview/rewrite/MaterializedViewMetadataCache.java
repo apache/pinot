@@ -332,8 +332,8 @@ public class MaterializedViewMetadataCache {
         /// every match attempt returns null without logging. Operators must be alerted at
         /// ingestion time. The cache entry is still stored (with compiledQuery=null) so the
         /// controller-facing definition listing remains visible; only rewrite is disabled.
-        LOGGER.error("Failed to compile definedSql for MV {}; rewrite disabled until the SQL is "
-            + "fixed and the definition znode is updated. SQL: {}", viewTableNameWithType, definedSql, e);
+        LOGGER.error("Failed to compile definedSql for MV {}; rewrite disabled until the SQL is fixed and the "
+            + "definition znode is updated ({})", viewTableNameWithType, e.getClass().getSimpleName());
       }
     }
 

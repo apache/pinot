@@ -48,6 +48,10 @@ import org.slf4j.LoggerFactory;
 /// Provides methods to create, update, delete, and manage Pinot tables.
 public class TableAdminClient extends BaseServiceAdminClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableAdminClient.class);
+  private static final String RESPONSE_TYPE = "responseType";
+  private static final String CONFIGS = "configs";
+  private static final String REDACTED_TABLE_CONFIG_RESPONSE_TYPE = "redactedTableConfig";
+  private static final String REDACTED_TABLE_CONFIGS_RESPONSE_TYPE = "redactedTableConfigs";
 
   public TableAdminClient(PinotAdminTransport transport, String controllerAddress,
       Map<String, String> headers) {
@@ -125,7 +129,7 @@ public class TableAdminClient extends BaseServiceAdminClient {
   /// Gets the configuration for a specific table as a typed object.
   public TableConfig getTableConfigObject(String tableName)
       throws PinotAdminException, IOException {
-    return JsonUtils.stringToObject(getTableConfig(tableName), TableConfig.class);
+    return getTableConfigObject(tableName, null);
   }
 
   /// Gets the configuration for a specific raw table and type as a typed object.
@@ -133,14 +137,52 @@ public class TableAdminClient extends BaseServiceAdminClient {
       throws PinotAdminException, IOException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tables/" + tableName,
         tableType != null ? Map.of("type", tableType) : null, _headers);
-    JsonNode tableConfigNode = response;
-    if (tableType != null) {
-      JsonNode typedNode = response.get(tableType.toUpperCase(Locale.ROOT));
-      if (typedNode != null) {
-        tableConfigNode = typedNode;
+    JsonNode tableConfigNode = getTableConfigNode(response, tableName, tableType);
+    return JsonUtils.jsonNodeToObject(tableConfigNode, TableConfig.class);
+  }
+
+  private static JsonNode getTableConfigNode(JsonNode response, String tableName, @Nullable String tableType)
+      throws PinotAdminException {
+    boolean isEnvelope = REDACTED_TABLE_CONFIG_RESPONSE_TYPE.equals(response.path(RESPONSE_TYPE).asText());
+    JsonNode configsNode = isEnvelope ? getEnvelopeConfigs(response, REDACTED_TABLE_CONFIG_RESPONSE_TYPE) : response;
+    String selectedType = tableType;
+    if (selectedType == null) {
+      TableType tableTypeFromName = TableNameBuilder.getTableTypeFromTableName(tableName);
+      if (tableTypeFromName != null) {
+        selectedType = tableTypeFromName.name();
       }
     }
-    return JsonUtils.jsonNodeToObject(tableConfigNode, TableConfig.class);
+    if (selectedType != null) {
+      JsonNode typedNode = configsNode.get(selectedType.toUpperCase(Locale.ROOT));
+      if (typedNode != null) {
+        return typedNode;
+      }
+      if (isEnvelope || isTypedTableConfigMap(configsNode)) {
+        throw new PinotAdminException("Table config response does not contain type: " + selectedType);
+      }
+    }
+    if (isEnvelope || isTypedTableConfigMap(configsNode)) {
+      JsonNode offline = configsNode.get(TableType.OFFLINE.name());
+      JsonNode realtime = configsNode.get(TableType.REALTIME.name());
+      if ((offline == null) != (realtime == null)) {
+        return offline != null ? offline : realtime;
+      }
+      throw new PinotAdminException("Table config response contains multiple types; specify a table type");
+    }
+    return configsNode;
+  }
+
+  private static boolean isTypedTableConfigMap(JsonNode node) {
+    return node.isObject() && (node.has(TableType.OFFLINE.name()) || node.has(TableType.REALTIME.name()));
+  }
+
+  private static JsonNode getEnvelopeConfigs(JsonNode response, String responseType)
+      throws PinotAdminException {
+    JsonNode configsNode = response.get(CONFIGS);
+    if (configsNode == null || !configsNode.isObject()) {
+      throw new PinotAdminException("Invalid " + responseType + " response: missing configs object");
+    }
+    return configsNode;
   }
 
   /// Gets a specific table view (idealstate/externalview) for a table.
@@ -868,8 +910,10 @@ public class TableAdminClient extends BaseServiceAdminClient {
   public TableConfigs getTableConfigsObject(String tableName)
       throws PinotAdminException {
     JsonNode response = _transport.executeGet(_controllerAddress, "/tableConfigs/" + tableName, null, _headers);
+    JsonNode tableConfigsNode = REDACTED_TABLE_CONFIGS_RESPONSE_TYPE.equals(response.path(RESPONSE_TYPE).asText())
+        ? getEnvelopeConfigs(response, REDACTED_TABLE_CONFIGS_RESPONSE_TYPE) : response;
     try {
-      return JsonUtils.jsonNodeToObject(response, TableConfigs.class);
+      return JsonUtils.jsonNodeToObject(tableConfigsNode, TableConfigs.class);
     } catch (IOException e) {
       throw new PinotAdminException("Failed to deserialize table configs for table: " + tableName, e);
     }
