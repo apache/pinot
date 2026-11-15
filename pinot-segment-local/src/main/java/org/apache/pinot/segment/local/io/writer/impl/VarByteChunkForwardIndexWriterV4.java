@@ -303,27 +303,34 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   @Override
   public void close()
       throws IOException {
-    flushChunk();
-    // write out where the chunks start into slot reserved at offset 12
-    _output.seek(3 * Integer.BYTES);
-    _output.writeInt(_metadataSize);
-    _output.seek(_metadataSize);
-    _dataChannel.truncate(_chunkOffset);
-    _output.setLength(_metadataSize + _chunkOffset);
-    long total = _chunkOffset;
-    long position = 0;
-    while (total > 0) {
-      long transferred = _dataChannel.transferTo(position, total, _output.getChannel());
-      total -= transferred;
-      position += transferred;
+    try {
+      flushChunk();
+      // write out where the chunks start into slot reserved at offset 12
+      _output.seek(3 * Integer.BYTES);
+      _output.writeInt(_metadataSize);
+      _output.seek(_metadataSize);
+      _dataChannel.truncate(_chunkOffset);
+      _output.setLength(_metadataSize + _chunkOffset);
+      long total = _chunkOffset;
+      long position = 0;
+      while (total > 0) {
+        long transferred = _dataChannel.transferTo(position, total, _output.getChannel());
+        total -= transferred;
+        position += transferred;
+      }
+      // _dataChannel is a scratch working file deleted below, so only _output needs forcing. Only sync on success.
+      _output.getChannel().force(true);
+    } finally {
+      // Always release resources, even if a write or sync failed: close the scratch channel before deleting its file,
+      // and close the compressor (gzip holds native memory).
+      try {
+        org.apache.pinot.common.utils.FileUtils.close(_dataChannel, _output, _chunkCompressor);
+      } finally {
+        CleanerUtil.cleanQuietly(_compressionBuffer);
+        CleanerUtil.cleanQuietly(_chunkBuffer);
+        FileUtils.deleteQuietly(_dataBuffer);
+      }
     }
-    // _dataChannel is a scratch working file deleted below, so only _output needs forcing.
-    _dataChannel.close();
-    org.apache.pinot.common.utils.FileUtils.syncAndClose(_output.getChannel());
-    CleanerUtil.cleanQuietly(_compressionBuffer);
-    CleanerUtil.cleanQuietly(_chunkBuffer);
-    FileUtils.deleteQuietly(_dataBuffer);
-    _chunkCompressor.close();
   }
 
   /// Returns the total uncompressed size of data written so far, or `-1` when tracking is disabled.

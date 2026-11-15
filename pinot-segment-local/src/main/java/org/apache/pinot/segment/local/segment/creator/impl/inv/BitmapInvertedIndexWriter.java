@@ -116,16 +116,19 @@ public final class BitmapInvertedIndexWriter implements Closeable {
 
   private void mapBitmapBuffer(long size)
       throws IOException {
-    cleanBitmapBuffer();
+    if (_bitmapBuffer != null) {
+      // Flush the previous window before unmapping it so its bitmaps are durable.
+      FileUtils.forceMappedBuffers(_bitmapBuffer);
+    }
+    unmapBitmapBuffer();
     _bitmapBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, _currentBufferPosition, size);
     _bitmapBuffer.order(ByteOrder.LITTLE_ENDIAN);
   }
 
-  private void cleanBitmapBuffer()
+  /// Unmaps the current bitmap buffer without flushing it. Callers are responsible for forcing it first when
+  /// durability is required.
+  private void unmapBitmapBuffer()
       throws IOException {
-    if (_bitmapBuffer != null) {
-      FileUtils.forceMappedBuffers(_bitmapBuffer);
-    }
     if (_bitmapBuffer != null && CleanerUtil.UNMAP_SUPPORTED) {
       CleanerUtil.getCleaner().freeBuffer(_bitmapBuffer);
     }
@@ -143,19 +146,18 @@ public final class BitmapInvertedIndexWriter implements Closeable {
     try {
       FileUtils.forceMappedBuffers(_offsetBuffer, _bitmapBuffer);
       _fileChannel.truncate(fileLength);
-      if (!_ownsChannel) {
-        _fileChannel.force(true);
-      }
+      _fileChannel.force(true);
     } finally {
       try {
         if (_ownsChannel) {
-          FileUtils.syncAndClose(_fileChannel);
+          _fileChannel.close();
         }
       } finally {
+        // Only unmap here: the buffers were already forced in the try block above, and forcing again in this
+        // finally would retry a failed flush and could mask the original exception and skip the unmap.
         if (CleanerUtil.UNMAP_SUPPORTED) {
-          CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
-          cleaner.freeBuffer(_offsetBuffer);
-          cleanBitmapBuffer();
+          CleanerUtil.getCleaner().freeBuffer(_offsetBuffer);
+          unmapBitmapBuffer();
         }
       }
     }

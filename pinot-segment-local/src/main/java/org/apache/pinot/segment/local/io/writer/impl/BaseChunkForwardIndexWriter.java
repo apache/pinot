@@ -99,16 +99,20 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   public void close()
       throws IOException {
 
-    // Write the chunk if it is non-empty.
-    if (_chunkBuffer.position() > 0) {
-      writeChunk();
-    }
+    try {
+      // Write the chunk if it is non-empty.
+      if (_chunkBuffer.position() > 0) {
+        writeChunk();
+      }
 
-    // Write the header and close the file.
-    _header.flip();
-    _dataFile.write(_header, 0);
-    FileUtils.syncAndClose(_dataFile);
-    _chunkCompressor.close();
+      // Write the header and make the file durable. Only sync on success; a failed write is not worth syncing.
+      _header.flip();
+      _dataFile.write(_header, 0);
+      _dataFile.force(true);
+    } finally {
+      // Always release the file handle and the compressor (gzip holds native memory), even if a write or sync failed.
+      FileUtils.close(_dataFile, _chunkCompressor);
+    }
   }
 
   /// Helper method to write header information.

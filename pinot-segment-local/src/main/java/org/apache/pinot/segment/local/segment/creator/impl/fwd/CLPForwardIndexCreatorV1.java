@@ -283,11 +283,14 @@ public class CLPForwardIndexCreatorV1 implements CompressionStatsTrackingForward
   public void close()
       throws IOException {
     try {
-      org.apache.pinot.common.utils.FileUtils.forceMappedBuffers(_fileBuffer);
+      try {
+        org.apache.pinot.common.utils.FileUtils.forceMappedBuffers(_fileBuffer);
+      } finally {
+        org.apache.pinot.common.utils.FileUtils.syncAndClose(_dataFile);
+      }
     } finally {
-      org.apache.pinot.common.utils.FileUtils.syncAndClose(_dataFile);
+      // Delete all temp files, even if the final sync failed
+      FileUtils.deleteQuietly(_intermediateFilesDir);
     }
-    // Delete all temp files
-    FileUtils.deleteDirectory(_intermediateFilesDir);
   }
 }
