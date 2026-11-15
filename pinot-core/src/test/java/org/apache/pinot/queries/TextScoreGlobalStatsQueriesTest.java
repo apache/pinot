@@ -181,6 +181,21 @@ public class TextScoreGlobalStatsQueriesTest extends BaseQueriesTest {
     }
   }
 
+  /// The fuzzy `hubb~1` matches only `hub` in A and nothing in B, so B's rewritten query has no terms; B's documents
+  /// must still count towards the corpus size and field length, which fuzzy scoring reads.
+  @Test
+  public void testFuzzyStatsCountSegmentsWithoutMatches() {
+    for (String column : TEXT_COLUMNS) {
+      TextScoreStats stats = TextScoreStats.fromJson(getStats(column, "hubb~1", null));
+      TextScoreStats.FieldStats fieldStats = stats.getField(column);
+      assertNotNull(fieldStats, stats.toJson());
+      assertEquals(fieldStats.getDocCount(), TITLES_A.length + TITLES_B.length);
+      assertEquals(fieldStats.getSumTotalTermFreq(), 12 + 22);
+      assertEquals(fieldStats.getTermStats("hub"), new long[]{1, 1});
+      assertEquals(stats, unionStats(column, "hubb~1", null));
+    }
+  }
+
   @Test
   public void testStatsAreSummedAcrossSegmentsAndInstances() {
     for (String column : TEXT_COLUMNS) {

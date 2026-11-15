@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers.text;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.CollectionStatistics;
@@ -28,6 +29,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryVisitor;
 import org.apache.lucene.search.TermStatistics;
+import org.apache.lucene.util.automaton.ByteRunAutomaton;
 import org.apache.pinot.segment.spi.index.reader.TextScoreStats;
 
 
@@ -55,17 +57,33 @@ public final class LuceneTextScoreStatsUtils {
       throws IOException {
     Set<Term> terms = new HashSet<>();
     searcher.rewrite(query).visit(QueryVisitor.termCollector(terms));
+    // A wildcard, prefix or fuzzy term that matches nothing in this index rewrites to a query without terms, so the
+    // fields are also taken from the original query: the index's documents still count towards the corpus.
+    Set<String> fields = new HashSet<>();
+    query.visit(new QueryVisitor() {
+      @Override
+      public void consumeTerms(Query termQuery, Term... queryTerms) {
+        for (Term term : queryTerms) {
+          fields.add(term.field());
+        }
+      }
+
+      @Override
+      public void consumeTermsMatching(Query termQuery, String field, Supplier<ByteRunAutomaton> automaton) {
+        fields.add(field);
+      }
+    });
     IndexReader reader = searcher.getIndexReader();
     TextScoreStats stats = new TextScoreStats();
     for (Term term : terms) {
-      String field = term.field();
-      TextScoreStats.FieldStats fieldStats = stats.getField(field);
-      if (fieldStats == null) {
-        fieldStats = stats.getOrCreateField(field);
-        fieldStats.addCollectionStats(reader.maxDoc(), reader.getDocCount(field), reader.getSumTotalTermFreq(field),
-            reader.getSumDocFreq(field));
-      }
-      fieldStats.addTermStats(term.text(), reader.docFreq(term), reader.totalTermFreq(term));
+      fields.add(term.field());
+    }
+    for (String field : fields) {
+      stats.getOrCreateField(field).addCollectionStats(reader.maxDoc(), reader.getDocCount(field),
+          reader.getSumTotalTermFreq(field), reader.getSumDocFreq(field));
+    }
+    for (Term term : terms) {
+      stats.getField(term.field()).addTermStats(term.text(), reader.docFreq(term), reader.totalTermFreq(term));
     }
     return stats;
   }
