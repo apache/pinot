@@ -216,6 +216,14 @@ public class IngestionDelayTracker {
 
       assert streamMetadataProvider != null;
       _streamConfigIndexToStreamMetadataProvider.put(streamConfigIndex, streamMetadataProvider);
+      // A create still running when shutdown() gave up waiting can finish after the providers were closed. Whichever
+      // side removes the entry closes the provider, so it is closed exactly once.
+      if (_shuttingDown) {
+        if (_streamConfigIndexToStreamMetadataProvider.remove(streamConfigIndex, streamMetadataProvider)) {
+          closeStreamMetadataProvider(streamMetadataProvider);
+        }
+        return;
+      }
 
       if ((streamMetadataProvider.supportsOffsetLag()) && (_partitionIdToLatestOffset == null)) {
         _partitionIdToLatestOffset = new ConcurrentHashMap<>();
@@ -650,6 +658,14 @@ public class IngestionDelayTracker {
     return ((LongMsgOffset) latestOffset).getOffset();
   }
 
+  private static void closeStreamMetadataProvider(StreamMetadataProvider streamMetadataProvider) {
+    try {
+      streamMetadataProvider.close();
+    } catch (Exception e) {
+      LOGGER.error("Failed to close streamMetadataProvider", e);
+    }
+  }
+
   /// We use this method to clean up when a table is being removed. It does not throw, so the caller can go on to stop
   /// the table's consumers.
   public void shutdown() {
@@ -669,11 +685,9 @@ public class IngestionDelayTracker {
         Thread.currentThread().interrupt();
       }
     }
-    for (StreamMetadataProvider streamMetadataProvider : _streamConfigIndexToStreamMetadataProvider.values()) {
-      try {
-        streamMetadataProvider.close();
-      } catch (Exception e) {
-        LOGGER.error("Failed to close streamMetadataProvider", e);
+    for (Map.Entry<Integer, StreamMetadataProvider> entry : _streamConfigIndexToStreamMetadataProvider.entrySet()) {
+      if (_streamConfigIndexToStreamMetadataProvider.remove(entry.getKey(), entry.getValue())) {
+        closeStreamMetadataProvider(entry.getValue());
       }
     }
     if (!_isServerReadyToServeQueries.getAsBoolean()) {
