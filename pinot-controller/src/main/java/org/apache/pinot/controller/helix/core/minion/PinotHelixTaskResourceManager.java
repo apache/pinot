@@ -511,7 +511,8 @@ public class PinotHelixTaskResourceManager {
 
   /// This method returns a map of table name to count of sub-tasks in various states, given the top-level task name.
   /// It also collects waiting times for subtasks with null state and running times for subtasks in RUNNING state, and
-  /// for tables with waiting subtasks, the time since any subtask of the job last started or finished (queue stall).
+  /// for tables with waiting subtasks, the time since the job last made progress (queue stall): 0 while a subtask is
+  /// running, otherwise the time since a subtask last started or finished.
   ///
   /// @param taskName in the form "Task\_<taskType>\_<uuid>\_<timestamp>"
   /// @return a map of table name to [TaskStatusSummary]
@@ -544,8 +545,14 @@ public class PinotHelixTaskResourceManager {
       if (partition != null) {
         state = jobContext.getPartitionState(partition);
         executionStartTime = jobContext.getPartitionStartTime(partition);
-        lastProgressTime =
-            Math.max(lastProgressTime, Math.max(executionStartTime, jobContext.getPartitionFinishTime(partition)));
+        if (state == TaskPartitionState.RUNNING || state == TaskPartitionState.INIT) {
+          // A subtask in flight is progress: a long one must not read as a stuck queue (MAX_SUBTASK_RUNNING_TIME_MS
+          // catches one that hangs)
+          lastProgressTime = currentTime;
+        } else {
+          lastProgressTime =
+              Math.max(lastProgressTime, Math.max(executionStartTime, jobContext.getPartitionFinishTime(partition)));
+        }
       }
       TaskConfig taskConfig = entry.getValue();
       String tableName = taskConfig.getConfigMap().getOrDefault(MinionConstants.TABLE_NAME_KEY, UNKNOWN_TABLE_NAME);
@@ -1828,7 +1835,7 @@ public class PinotHelixTaskResourceManager {
     private TaskCount _taskCount = new TaskCount();
     private Map<String, Long> _subtaskWaitingTimes = new HashMap<>(); // subtask ID -> waiting time in milliseconds
     private Map<String, Long> _subtaskRunningTimes = new HashMap<>(); // subtask ID -> running time in milliseconds
-    // Time since a subtask of the job last started or finished; left at 0 unless the table has a waiting subtask
+    // Time since the job last made progress (0 while a subtask runs); left at 0 unless the table has a waiting subtask
     private long _queueStallTimeMs;
 
     public TaskCount getTaskCount() {

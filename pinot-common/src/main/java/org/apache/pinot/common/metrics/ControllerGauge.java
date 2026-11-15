@@ -70,8 +70,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
   MAX_SUBTASK_WAIT_TIME_MS("MaxSubtaskWaitTimeMs", false),
-  // Time since a subtask of the job last started or finished, while the table still has subtasks waiting. Unlike
-  // MAX_SUBTASK_WAIT_TIME_MS (the age of the job), it stays low while a long job keeps draining.
+  // Time since the job last made progress, while the table still has subtasks waiting: 0 while a subtask runs,
+  // otherwise the time since a subtask last started or finished. Unlike MAX_SUBTASK_WAIT_TIME_MS (the age of the job),
+  // it stays low while a long job keeps draining.
   MAX_SUBTASK_QUEUE_STALL_TIME_MS("MaxSubtaskQueueStallTimeMs", false),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
   MAX_SUBTASK_RUNNING_TIME_MS("MaxSubtaskRunningTimeMs", false),
