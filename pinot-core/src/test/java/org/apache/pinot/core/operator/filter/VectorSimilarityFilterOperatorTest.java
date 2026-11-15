@@ -654,6 +654,28 @@ public class VectorSimilarityFilterOperatorTest {
     verify(reader, never()).getDocIds(any(float[].class), anyInt());
   }
 
+  /// Exact rerank selects rows by the exact forward-index distance, so the index's approximate distances are not handed
+  /// over: the projection computes the exact ones.
+  @Test
+  public void testDoesNotHandOverDistancesWithExactRerank() {
+    float[] queryVector = {1.0f, 0.0f};
+    VectorIndexReader reader = mock(VectorIndexReader.class);
+    when(reader.getDocIds(Mockito.eq(queryVector), Mockito.anyInt())).thenReturn(MutableRoaringBitmap.bitmapOf(0, 1));
+    VectorSearchDistances searchDistances = new VectorSearchDistances();
+    VectorSearchDistances.Request request = searchDistances.request(reader, queryVector.clone());
+    ForwardIndexReader<?> forward = createMockForwardIndexReader(new float[][]{{0.9f, 0.1f}, {0.0f, 1.0f}});
+    VectorSearchParams params = new VectorSearchParams(null, true, null, null, null, null, null);
+
+    VectorSimilarityFilterOperator operator = new VectorSimilarityFilterOperator(reader,
+        new VectorSimilarityPredicate(ExpressionContext.forIdentifier("embedding"), queryVector, 1), 10, params,
+        forward);
+    operator.setSearchDistances(searchDistances);
+
+    Assert.assertEquals(operator.getBitmaps().reduce().toArray(), new int[]{0});
+    Assert.assertNull(request.getDistances());
+    verify(reader, never()).getDocDistances(any(float[].class), anyInt());
+  }
+
   /// Without a request, a search collects only doc ids, so queries that do not project cosineDistance pay nothing.
   @Test
   public void testDoesNotAskForDistancesWithoutRequest() {
