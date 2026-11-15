@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
@@ -39,39 +40,33 @@ import static org.testng.Assert.expectThrows;
 public class SegmentUriPushJobRunnerTest {
 
   @Test
-  public void testPushSegmentsWithoutArchiveExtensionSelectedByPattern()
+  public void testPushSegmentsWithoutArchiveExtension()
       throws Exception {
     File outputDir = Files.createTempDirectory("segmentUriPush").toFile();
     try {
-      // Segments copied from the deep store (e.g. committed REALTIME segments) have no archive extension
+      // Segments in the deep store (e.g. committed REALTIME segments) have no archive extension
       File subDir = new File(outputDir, "myTable_2026");
       assertTrue(subDir.mkdir());
-      File realtimeSegment = new File(outputDir, "myTable__0__0__20260601T1557Z");
-      File nestedRealtimeSegment = new File(subDir, "myTable__0__1__20260602T1557Z");
-      File tmpSegment = new File(outputDir, "myTable__0__0__20260601T1557Z.tmp." + UUID.randomUUID());
-      File offlineSegment = new File(outputDir, "myTable_offline.tar.gz");
-      File metadataFile = new File(outputDir, "myTable_offline.metadata.tar.gz");
-      File otherFile = new File(outputDir, "_SUCCESS");
-      for (File file : List.of(realtimeSegment, nestedRealtimeSegment, tmpSegment, offlineSegment, metadataFile,
-          otherFile)) {
+      for (File file : List.of(new File(outputDir, "myTable__0__0__20260601T1557Z"),
+          new File(subDir, "myTable__0__1__20260602T1557Z"), new File(outputDir, "myTable_offline.tar.gz"),
+          new File(outputDir, "myTable_offline.metadata.tar.gz"),
+          new File(outputDir, "myTable__0__0__20260601T1557Z.tmp." + UUID.randomUUID()),
+          new File(outputDir, "_SUCCESS"))) {
         assertTrue(file.createNewFile());
       }
 
-      PushJobSpec pushJobSpec = new PushJobSpec();
-      SegmentUriPushJobRunner runner = createRunner(outputDir, pushJobSpec);
-      // Without allowSegmentsWithoutArchiveExtension, only segment archives are selected even with a pattern
-      assertEquals(getFileNames(runner.getSegmentUriToTarPathMap()), List.of("myTable_offline.tar.gz"));
-      pushJobSpec.setPushFileNamePattern("glob:**/myTable*");
-      runner = createRunner(outputDir, pushJobSpec);
-      assertEquals(getFileNames(runner.getSegmentUriToTarPathMap()), List.of("myTable_offline.tar.gz"));
-
-      // Directories and temporary segment files are skipped even when matched by the pattern
-      pushJobSpec.setAllowSegmentsWithoutArchiveExtension(true);
-      runner = createRunner(outputDir, pushJobSpec);
-      Map<String, String> segmentUriToTarPathMap = runner.getSegmentUriToTarPathMap();
-      assertEquals(getFileNames(segmentUriToTarPathMap),
+      AtomicReference<Map<String, String>> uploaded = new AtomicReference<>();
+      SegmentUriPushJobRunner runner = new SegmentUriPushJobRunner(createSpec(outputDir)) {
+        @Override
+        public void uploadSegments(Map<String, String> segmentsUriToTarPathMap) {
+          uploaded.set(segmentsUriToTarPathMap);
+        }
+      };
+      runner.run();
+      // The sub directory is skipped although it has no dot in its name
+      assertEquals(uploaded.get().values().stream().map(path -> new File(path).getName()).sorted().toList(),
           List.of("myTable__0__0__20260601T1557Z", "myTable__0__1__20260602T1557Z", "myTable_offline.tar.gz"));
-      assertEquals(runner.getSegmentsToReplace(segmentUriToTarPathMap).stream().sorted().toList(),
+      assertEquals(runner.getSegmentsToReplace(uploaded.get()).stream().sorted().toList(),
           List.of("myTable__0__0__20260601T1557Z", "myTable__0__1__20260602T1557Z", "myTable_offline"));
     } finally {
       FileUtils.deleteQuietly(outputDir);
@@ -79,39 +74,25 @@ public class SegmentUriPushJobRunnerTest {
   }
 
   @Test
-  public void testCleanUpOutputDirRejectedWithoutArchiveExtension()
+  public void testCleanUpOutputDirRejectedForSegmentWithoutArchiveExtension()
       throws Exception {
     File outputDir = Files.createTempDirectory("segmentUriPush").toFile();
     try {
-      File realtimeSegment = new File(outputDir, "myTable__0__0__20260601T1557Z");
-      assertTrue(realtimeSegment.createNewFile());
-
-      PushJobSpec pushJobSpec = new PushJobSpec();
-      pushJobSpec.setPushFileNamePattern("glob:**/myTable*");
-      pushJobSpec.setAllowSegmentsWithoutArchiveExtension(true);
-      SegmentGenerationJobSpec spec = createSpec(outputDir, pushJobSpec);
+      File segment = new File(outputDir, "myTable__0__0__20260601T1557Z");
+      assertTrue(segment.createNewFile());
+      SegmentGenerationJobSpec spec = createSpec(outputDir);
       spec.setCleanUpOutputDir(true);
-      expectThrows(IllegalArgumentException.class, () -> new SegmentUriPushJobRunner(spec));
-      assertTrue(realtimeSegment.exists());
+      expectThrows(IllegalArgumentException.class, () -> new SegmentUriPushJobRunner(spec).run());
+      assertTrue(segment.exists());
     } finally {
       FileUtils.deleteQuietly(outputDir);
     }
   }
 
-  private static List<String> getFileNames(Map<String, String> segmentUriToTarPathMap) {
-    return segmentUriToTarPathMap.values().stream().map(path -> new File(path).getName()).sorted().toList();
-  }
-
-  private static SegmentUriPushJobRunner createRunner(File outputDir, PushJobSpec pushJobSpec) {
-    SegmentUriPushJobRunner runner = new SegmentUriPushJobRunner(createSpec(outputDir, pushJobSpec));
-    runner.initFileSys();
-    return runner;
-  }
-
-  private static SegmentGenerationJobSpec createSpec(File outputDir, PushJobSpec pushJobSpec) {
+  private static SegmentGenerationJobSpec createSpec(File outputDir) {
     SegmentGenerationJobSpec spec = new SegmentGenerationJobSpec();
     spec.setOutputDirURI(outputDir.toURI().toString());
-    spec.setPushJobSpec(pushJobSpec);
+    spec.setPushJobSpec(new PushJobSpec());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName("myTable");
     spec.setTableSpec(tableSpec);

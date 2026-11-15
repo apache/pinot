@@ -86,8 +86,6 @@ public class SegmentPushUtils implements Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPushUtils.class);
   private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
   private static final String HTTP_CLIENT_CONNECTION_TIMEOUT_CONFIG = "http.client.connectionTimeoutMs";
-  // Infix of the temporary segment files uploaded with split commit, see SegmentCompletionUtils in pinot-core
-  private static final String TMP_SEGMENT_FILE_INFIX = ".tmp.";
 
   @VisibleForTesting
   static FileUploadDownloadClient getOrCreateFileUploadDownloadClient(SegmentGenerationJobSpec spec) {
@@ -205,6 +203,7 @@ public class SegmentPushUtils implements Serializable {
     String tableName = spec.getTableSpec().getTableName();
     TableType tableType = tableName.endsWith("_" + TableType.REALTIME.name()) ? TableType.REALTIME : TableType.OFFLINE;
     boolean cleanUpOutputDir = spec.isCleanUpOutputDir();
+    checkCleanUpOutputDir(spec, tarFilePaths);
     LOGGER.info("Start pushing segments: {}... to locations: {} for table {}",
         Arrays.toString(tarFilePaths.subList(0, Math.min(5, tarFilePaths.size())).toArray()),
         Arrays.toString(spec.getPinotClusterSpecs()), tableName);
@@ -213,7 +212,7 @@ public class SegmentPushUtils implements Serializable {
     try {
       for (String tarFilePath : tarFilePaths) {
         URI tarFileURI = URI.create(tarFilePath);
-        String segmentName = getSegmentNameFromTarFile(tarFilePath);
+        String segmentName = getSegmentName(tarFilePath);
         for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
           URI controllerURI;
           try {
@@ -269,6 +268,7 @@ public class SegmentPushUtils implements Serializable {
       List<Header> headers, List<NameValuePair> parameters)
       throws RetriableOperationException, AttemptsExceededException {
     String tableName = spec.getTableSpec().getTableName();
+    checkCleanUpOutputDir(spec, segmentUris);
     LOGGER.info("Start sending table {} segment URIs: {} to locations: {}", tableName,
         Arrays.toString(segmentUris.subList(0, Math.min(5, segmentUris.size())).toArray()),
         Arrays.toString(spec.getPinotClusterSpecs()));
@@ -473,8 +473,7 @@ public class SegmentPushUtils implements Serializable {
     return segmentName;
   }
 
-  /// Resolves the segment name from a segment archive path. Segments stored in the deep store can omit the archive
-  /// extension, in which case the file name is the segment name.
+  /// Segments stored in the deep store can omit the archive extension.
   public static String getSegmentName(String tarFilePath) {
     String fileName = new File(tarFilePath).getName();
     if (Constants.isSegmentTarFile(fileName)) {
@@ -682,32 +681,15 @@ public class SegmentPushUtils implements Serializable {
     return allSegmentsMetadataTarFile;
   }
 
+  /// Returns the map from segment URI to segment file path for the files with a segment archive extension, and the
+  /// files without any dot in the name such as the segments in the deep store. Directories are not filtered here, use
+  /// [#listFiles(PinotFS, URI)] to list the files.
   public static Map<String, String> getSegmentUriToTarPathMap(URI outputDirURI, PushJobSpec pushSpec,
       String[] files) {
-    return getSegmentUriToTarPathMap(outputDirURI, pushSpec, files, false);
-  }
-
-  /// Returns the map from segment URI to segment file path for the segments to push.
-  ///
-  /// By default, only files with a segment archive extension are selected. For URI push (`uriPush` is true), when both
-  /// `allowSegmentsWithoutArchiveExtension` and `pushFileNamePattern` are configured, the files matched by the pattern
-  /// are selected even without a segment archive extension. This allows URI push for segments stored in the deep store,
-  /// e.g. committed REALTIME segments, which are stored without extension. Temporary segment files left by split commit
-  /// (`<segment>.tmp.<uuid>`) are skipped. Segment metadata files are always skipped.
-  public static Map<String, String> getSegmentUriToTarPathMap(URI outputDirURI, PushJobSpec pushSpec,
-      String[] files, boolean uriPush) {
     Map<String, String> segmentUriToTarPathMap = new HashMap<>();
     PathMatcher pushFilePathMatcher = null;
     if (pushSpec.getPushFileNamePattern() != null) {
       pushFilePathMatcher = FileSystems.getDefault().getPathMatcher(pushSpec.getPushFileNamePattern());
-    }
-    boolean allowSegmentsWithoutExtension = false;
-    if (uriPush && pushSpec.isAllowSegmentsWithoutArchiveExtension()) {
-      if (pushFilePathMatcher != null) {
-        allowSegmentsWithoutExtension = true;
-      } else {
-        LOGGER.warn("Ignoring allowSegmentsWithoutArchiveExtension because pushFileNamePattern is not configured");
-      }
     }
 
     for (String file : files) {
@@ -723,67 +705,56 @@ public class SegmentPushUtils implements Serializable {
         // Skip segment metadata tar gz files
         continue;
       }
-      if (!Constants.isSegmentTarFile(uri.getPath())) {
-        if (!allowSegmentsWithoutExtension) {
-          continue;
-        }
-        if (isTmpSegmentFile(new File(uri.getPath()).getName())) {
-          LOGGER.info("Skipping temporary segment file: {}", file);
-          continue;
-        }
+      if (Constants.isSegmentTarFile(uri.getPath()) || isSegmentFileWithoutExtension(uri.getPath())) {
+        URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri, pushSpec.getSegmentUriPrefix(),
+            pushSpec.getSegmentUriSuffix());
+        segmentUriToTarPathMap.put(updatedURI.toString(), file);
       }
-      URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri, pushSpec.getSegmentUriPrefix(),
-          pushSpec.getSegmentUriSuffix());
-      segmentUriToTarPathMap.put(updatedURI.toString(), file);
     }
     if (segmentUriToTarPathMap.isEmpty()) {
-      if (uriPush && !allowSegmentsWithoutExtension) {
-        LOGGER.warn("No segment archives selected under outputDirURI: {} with pushFileNamePattern: {}. To push "
-                + "segments without archive extension (e.g. segments in the deep store), configure both "
-                + "allowSegmentsWithoutArchiveExtension and pushFileNamePattern", outputDirURI,
-            pushSpec.getPushFileNamePattern());
-      } else {
-        LOGGER.warn("No segment archives selected under outputDirURI: {} with pushFileNamePattern: {}", outputDirURI,
-            pushSpec.getPushFileNamePattern());
-      }
+      LOGGER.warn("No segment archives selected under outputDirURI: {} with pushFileNamePattern: {}", outputDirURI,
+          pushSpec.getPushFileNamePattern());
     }
     return segmentUriToTarPathMap;
   }
 
-  /// Validates the job spec for URI push. `allowSegmentsWithoutArchiveExtension` is used to push segments already in
-  /// the deep store, so `cleanUpOutputDir` is rejected to avoid deleting the pushed segments from the deep store.
-  public static void validateUriPushJobSpec(SegmentGenerationJobSpec spec) {
-    Preconditions.checkArgument(
-        !spec.getPushJobSpec().isAllowSegmentsWithoutArchiveExtension() || !spec.isCleanUpOutputDir(),
-        "cleanUpOutputDir must be false when allowSegmentsWithoutArchiveExtension is enabled for URI push, otherwise "
-            + "the pushed segments are deleted from outputDirURI: %s", spec.getOutputDirURI());
+  /// Segments stored in the deep store, e.g. committed REALTIME segments, have no archive extension. The compression
+  /// format is detected from the content when the segment is decompressed.
+  private static boolean isSegmentFileWithoutExtension(String path) {
+    String fileName = new File(path).getName();
+    // Skip marker files such as _SUCCESS
+    return fileName.indexOf('.') < 0 && !fileName.startsWith("_");
   }
 
-  /// Lists the files under `outputDirURI` recursively for segment push. When `allowSegmentsWithoutArchiveExtension` is
-  /// enabled, directories are excluded because files are not filtered by the segment archive extension anymore.
-  public static String[] listFiles(PinotFS outputDirFS, URI outputDirURI, PushJobSpec pushSpec)
+  /// Segments without archive extension are usually the segments in the deep store of a table, which must not be
+  /// deleted after pushing.
+  @VisibleForTesting
+  static void checkCleanUpOutputDir(SegmentGenerationJobSpec spec, List<String> segmentPaths) {
+    if (spec.isCleanUpOutputDir()) {
+      for (String segmentPath : segmentPaths) {
+        Preconditions.checkArgument(!isSegmentFileWithoutExtension(URI.create(segmentPath).getPath()),
+            "cleanUpOutputDir is not supported for segment without archive extension: %s", segmentPath);
+      }
+    }
+  }
+
+  /// Lists the files under `outputDirURI` recursively for segment push. Directories are skipped because segment files
+  /// without archive extension are also selected for push.
+  public static String[] listFiles(PinotFS outputDirFS, URI outputDirURI)
       throws IOException {
-    if (!pushSpec.isAllowSegmentsWithoutArchiveExtension()) {
-      return outputDirFS.listFiles(outputDirURI, true);
-    }
-    return outputDirFS.listFilesWithMetadata(outputDirURI, true).stream()
-        .filter(fileMetadata -> !fileMetadata.isDirectory())
-        .map(FileMetadata::getFilePath)
-        .toArray(String[]::new);
-  }
-
-  /// Returns whether the file is a temporary segment file uploaded with split commit, which is named as
-  /// `<segment>.tmp.<uuid>` (see `SegmentCompletionUtils` in pinot-core).
-  private static boolean isTmpSegmentFile(String fileName) {
-    int index = fileName.lastIndexOf(TMP_SEGMENT_FILE_INFIX);
-    if (index < 0) {
-      return false;
-    }
     try {
-      UUID.fromString(fileName.substring(index + TMP_SEGMENT_FILE_INFIX.length()));
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
+      return outputDirFS.listFilesWithMetadata(outputDirURI, true).stream()
+          .filter(fileMetadata -> !fileMetadata.isDirectory())
+          .map(FileMetadata::getFilePath)
+          .toArray(String[]::new);
+    } catch (UnsupportedOperationException e) {
+      List<String> files = new ArrayList<>();
+      for (String file : outputDirFS.listFiles(outputDirURI, true)) {
+        if (!isSegmentFileWithoutExtension(file) || !outputDirFS.isDirectory(URI.create(file))) {
+          files.add(file);
+        }
+      }
+      return files.toArray(new String[0]);
     }
   }
 
