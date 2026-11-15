@@ -821,7 +821,7 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled; a task type that created "
-      + "no task is left out. If task type is missing, "
+      + "no task is left out. If the taskType param is omitted, "
       + "schedules all tasks. If table name is missing, schedules tasks for all tables in the database. If database "
       + "is missing in headers, uses default.")
   @ManagedAsync
