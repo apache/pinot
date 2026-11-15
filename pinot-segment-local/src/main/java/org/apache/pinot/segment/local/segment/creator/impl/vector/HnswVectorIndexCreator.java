@@ -32,6 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -204,8 +205,9 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
         partDirectories[t] = FSDirectory.open(partDirs[t].toPath());
         Directory partDirectory = partDirectories[t];
         futures.add(executor.submit(() -> {
+          // CREATE: a part directory left by a build that crashed before cleaning up must not add its documents
           try (IndexWriter partWriter = new IndexWriter(partDirectory,
-              VectorIndexUtils.getIndexWriterConfig(_vectorIndexConfig))) {
+              VectorIndexUtils.getIndexWriterConfig(_vectorIndexConfig).setOpenMode(OpenMode.CREATE))) {
             for (int docId = from; docId < to; docId++) {
               partWriter.addDocument(toDocument(_bufferedVectors.get(docId), docId));
             }

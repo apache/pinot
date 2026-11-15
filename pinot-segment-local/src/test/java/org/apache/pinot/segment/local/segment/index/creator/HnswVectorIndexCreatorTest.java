@@ -33,12 +33,17 @@ import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.hnsw.HnswGraphProvider;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsWriter;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.KnnFloatVectorField;
+import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.SegmentInfo;
 import org.apache.lucene.index.SegmentReader;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.store.ByteBuffersDirectory;
+import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.MergeInfo;
@@ -49,6 +54,7 @@ import org.apache.lucene.util.hnsw.HnswGraph;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -357,5 +363,53 @@ public class HnswVectorIndexCreatorTest {
     }
     String[] leftovers = indexDir.list((dir, name) -> name.contains(".hnsw.part"));
     Assert.assertEquals(leftovers.length, 0, "Per-thread build directories must be removed");
+  }
+
+  /// A part directory left by a build that crashed before cleaning up must not add its documents to the next build.
+  @Test
+  public void testParallelBuildIgnoresLeftoverPartDirectory()
+      throws IOException {
+    File indexDir = new File(INDEX_DIR, "leftover");
+    FileUtils.deleteQuietly(indexDir);
+    FileUtils.forceMkdir(indexDir);
+    Map<String, String> properties = new HashMap<>();
+    properties.put("vectorIndexType", "HNSW");
+    properties.put("vectorDimension", "8");
+    properties.put("buildThreads", "2");
+    VectorIndexConfig config = new VectorIndexConfig(properties);
+    // A committed part from an earlier, crashed build
+    try (Directory staleDirectory = FSDirectory.open(new File(indexDir, "bar.hnsw.part0").toPath());
+        IndexWriter staleWriter = new IndexWriter(staleDirectory, VectorIndexUtils.getIndexWriterConfig(config))) {
+      Random staleRandom = new Random(3);
+      for (int i = 0; i < 50; i++) {
+        float[] vector = new float[8];
+        for (int d = 0; d < 8; d++) {
+          vector[d] = staleRandom.nextFloat();
+        }
+        Document document = new Document();
+        document.add(new KnnFloatVectorField("bar", vector,
+            VectorIndexUtils.toSimilarityFunction(config.getVectorDistanceFunction())));
+        document.add(new StoredField(HnswVectorIndexCreator.VECTOR_INDEX_DOC_ID_COLUMN_NAME, i));
+        staleWriter.addDocument(document);
+      }
+      staleWriter.commit();
+    }
+    int numDocs = 200;
+    Random random = new Random(7);
+    try (HnswVectorIndexCreator creator = new HnswVectorIndexCreator("bar", indexDir, config)) {
+      for (int i = 0; i < numDocs; i++) {
+        float[] vector = new float[8];
+        for (int d = 0; d < 8; d++) {
+          vector[d] = random.nextFloat();
+        }
+        creator.add(vector);
+      }
+      creator.seal();
+    }
+    File indexFile = new File(indexDir, "bar" + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    try (Directory directory = FSDirectory.open(indexFile.toPath());
+        DirectoryReader reader = DirectoryReader.open(directory)) {
+      Assert.assertEquals(reader.numDocs(), numDocs);
+    }
   }
 }
