@@ -2790,6 +2790,39 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     assertFalse(needProcess(_newColumnsSchema1));
   }
 
+  /// Removing a derived column's transform rebuilds it with default values, and adding the transform back rebuilds it
+  /// with derived values again.
+  @Test(dataProvider = "bothV1AndV3")
+  public void testRemovedThenReaddedTransformRebuildsDerivedColumn(SegmentVersion segmentVersion)
+      throws Exception {
+    buildSegment(segmentVersion);
+    List<TransformConfig> transformConfigs =
+        List.of(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"));
+    _ingestionConfig.setTransformConfigs(transformConfigs);
+    runPreProcessor(_newColumnsSchema1);
+    int sourceMin = (Integer) new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN1_NAME).getMinValue();
+    assertEquals(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME)
+        .getMinValue(), sourceMin + 1);
+
+    _ingestionConfig.setTransformConfigs(List.of());
+    assertTrue(needProcess(_newColumnsSchema1), "a removed transform function must trigger a reload");
+    runPreProcessor(_newColumnsSchema1);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(segmentMetadata.getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME).getMinValue(),
+        _newColumnsSchema1.getFieldSpecFor(NEW_INT_SV_DIMENSION_COLUMN_NAME).getDefaultNullValue());
+    assertEquals(segmentMetadata.getCustomMap()
+            .get(BaseDefaultColumnHandler.DERIVED_COLUMN_TRANSFORM_KEY_PREFIX + NEW_INT_SV_DIMENSION_COLUMN_NAME),
+        BaseDefaultColumnHandler.NO_TRANSFORM_FINGERPRINT);
+    assertFalse(needProcess(_newColumnsSchema1));
+
+    _ingestionConfig.setTransformConfigs(transformConfigs);
+    assertTrue(needProcess(_newColumnsSchema1), "a transform added back must trigger a reload");
+    runPreProcessor(_newColumnsSchema1);
+    assertEquals(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(NEW_INT_SV_DIMENSION_COLUMN_NAME)
+        .getMinValue(), sourceMin + 1);
+    assertFalse(needProcess(_newColumnsSchema1));
+  }
+
   /// A derived column materialised before transform functions were recorded keeps its values on reload, so an upgrade
   /// does not rebuild every derived column of every segment.
   @Test(dataProvider = "bothV1AndV3")

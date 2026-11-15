@@ -149,6 +149,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   /// fingerprint. A reload compares it with the table config to rebuild a column whose definition changed. A column
   /// without it (materialised before this was recorded) keeps its values until its segment is rebuilt.
   public static final String DERIVED_COLUMN_TRANSFORM_KEY_PREFIX = "derivedColumnTransform.";
+  /// Recorded for a derived column whose transform was removed, so adding one back rebuilds it again. Not hex, so it
+  /// never equals a fingerprint.
+  public static final String NO_TRANSFORM_FINGERPRINT = "none";
 
   protected final File _indexDir;
   protected final SegmentMetadata _segmentMetadata;
@@ -437,7 +440,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       return false;
     }
     TransformConfig transformConfig = getTransformConfig(column);
-    return transformConfig == null || !recorded.equals(transformFingerprint(transformConfig.getTransformFunction()));
+    String current = transformConfig != null ? transformFingerprint(transformConfig.getTransformFunction())
+        : NO_TRANSFORM_FINGERPRINT;
+    return !recorded.equals(current);
   }
 
   /// Rebuilds every auto-generated derived column that reads a column being rebuilt in this run, transitively, so a
@@ -468,15 +473,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     } while (added);
   }
 
-  /// Records, in the segment custom map, the transform function a derived column was just built with; clears it for
-  /// a column that is removed or is no longer derived.
+  /// Records, in the segment custom map, the transform function a derived column was just built with. A derived
+  /// column whose transform was removed records [#NO_TRANSFORM_FINGERPRINT], so adding a transform back rebuilds it.
+  /// The entry is cleared for a removed column.
   private void recordTransformFunction(String column, DefaultColumnAction action) {
     String key = V1Constants.MetadataKeys.Segment.CUSTOM_SUBSET + "." + DERIVED_COLUMN_TRANSFORM_KEY_PREFIX + column;
-    TransformConfig transformConfig = action.isRemoveAction() ? null : getTransformConfig(column);
+    if (action.isRemoveAction()) {
+      _segmentProperties.clearProperty(key);
+      return;
+    }
+    TransformConfig transformConfig = getTransformConfig(column);
     if (transformConfig != null) {
       _segmentProperties.setProperty(key, transformFingerprint(transformConfig.getTransformFunction()));
-    } else {
-      _segmentProperties.clearProperty(key);
+    } else if (_segmentProperties.containsKey(key)) {
+      _segmentProperties.setProperty(key, NO_TRANSFORM_FINGERPRINT);
     }
   }
 
