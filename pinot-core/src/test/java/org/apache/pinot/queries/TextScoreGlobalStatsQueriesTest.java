@@ -293,6 +293,14 @@ public class TextScoreGlobalStatsQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testStatsRejectFilterClause() {
+    // The statistics describe the whole segment, so a FILTER clause is rejected instead of being ignored
+    RuntimeException e = expectThrows(RuntimeException.class,
+        () -> getBrokerResponse("SELECT TEXT_SCORE_STATS(title, 'usb') FILTER (WHERE id = 0) FROM products"));
+    assertTrue(e.getMessage().contains("TEXT_SCORE_STATS does not support a FILTER clause"), e.getMessage());
+  }
+
+  @Test
   public void testStatsCannotBeCombinedWithOtherAggregations() {
     // Rejected while planning the segment query
     RuntimeException e = expectThrows(RuntimeException.class,

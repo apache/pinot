@@ -265,8 +265,12 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
   @Override
   public Int2FloatMap getDocScores(String column, String searchQuery, @Nullable String optionsString,
       @Nullable TextScoreStats globalStats) {
-    return runOnSearcherPool(() -> executeScoring(column, searchQuery, optionsString, globalStats), "scoring",
-        column, searchQuery);
+    // Created here so an interrupted query thread can cancel the search it stops waiting for
+    Int2FloatOpenHashMap luceneScores = new Int2FloatOpenHashMap();
+    LuceneDocScoreCollector collector = new LuceneDocScoreCollector(luceneScores, IntUnaryOperator.identity());
+    return runOnSearcherPool(
+        () -> executeScoring(column, searchQuery, optionsString, globalStats, luceneScores, collector), "scoring",
+        column, searchQuery, collector::markShouldCancel);
   }
 
   @Override
@@ -279,17 +283,21 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
       } finally {
         releaseSearcher(indexSearcher);
       }
-    }, "collecting text score statistics on", column, searchQuery);
+    }, "collecting text score statistics on", column, searchQuery, null);
   }
 
   /// Runs a Lucene task on the searcher pool, like getDocIds: avoids interrupting a Lucene search on the query thread
   /// (see getDocIdsWithOptions).
-  private <T> T runOnSearcherPool(Callable<T> task, String action, String column, String searchQuery) {
+  private <T> T runOnSearcherPool(Callable<T> task, String action, String column, String searchQuery,
+      @Nullable Runnable onInterrupt) {
     Future<T> searchFuture = SEARCHER_POOL.getExecutorService().submit(task);
     try {
       return searchFuture.get();
     } catch (InterruptedException e) {
       searchFuture.cancel(false);
+      if (onInterrupt != null) {
+        onInterrupt.run();
+      }
       throw new RuntimeException("TEXT_SCORE interrupted while querying the consuming segment " + _segmentName
           + " for column " + column + " with search query: " + searchQuery, e);
     } catch (Exception e) {
@@ -299,7 +307,7 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
   }
 
   private Int2FloatMap executeScoring(String column, String searchQuery, @Nullable String optionsString,
-      @Nullable TextScoreStats globalStats)
+      @Nullable TextScoreStats globalStats, Int2FloatOpenHashMap luceneScores, LuceneDocScoreCollector collector)
       throws Exception {
     Query query = parseQuery(column, searchQuery, optionsString);
     IndexSearcher acquiredSearcher = _searcherManager.acquire();
@@ -307,8 +315,7 @@ public class MultiColumnRealtimeLuceneTextIndex implements MultiColumnTextIndexR
       IndexSearcher indexSearcher = globalStats != null
           ? LuceneTextScoreStatsUtils.newGlobalStatsSearcher(acquiredSearcher.getIndexReader(), globalStats)
           : acquiredSearcher;
-      Int2FloatOpenHashMap luceneScores = new Int2FloatOpenHashMap();
-      indexSearcher.search(query, new LuceneDocScoreCollector(luceneScores, IntUnaryOperator.identity()));
+      indexSearcher.search(query, collector);
       // Consuming segments have no pre-built doc id mapping; translate through the stored Pinot doc id field
       Int2FloatOpenHashMap pinotScores = new Int2FloatOpenHashMap(luceneScores.size());
       for (Int2FloatMap.Entry entry : luceneScores.int2FloatEntrySet()) {

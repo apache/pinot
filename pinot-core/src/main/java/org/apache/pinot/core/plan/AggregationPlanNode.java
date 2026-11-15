@@ -120,6 +120,9 @@ public class AggregationPlanNode implements PlanNode {
     }
     Preconditions.checkArgument(numTextScoreStats == aggregationFunctions.length,
         "TEXT_SCORE_STATS cannot be combined with other aggregation functions");
+    // The statistics describe the whole segment, so a FILTER clause would be silently ignored
+    Preconditions.checkArgument(!_queryContext.hasFilteredAggregations(),
+        "TEXT_SCORE_STATS does not support a FILTER clause");
     DataSource[] dataSources = new DataSource[aggregationFunctions.length];
     for (int i = 0; i < aggregationFunctions.length; i++) {
       dataSources[i] = getDataSourceForAggregationFunction(aggregationFunctions[i]);

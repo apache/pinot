@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index.reader;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -38,6 +39,9 @@ public class TextScoreStatsTest {
     assertEquals(TextScoreStats.fromJson(json).toJson(), json);
     assertTrue(json.startsWith("{\"fields\":{\"title\":{\"maxDoc\":10,\"docCount\":9,\"sumTotalTermFreq\":42,"
         + "\"sumDocFreq\":37,\"terms\":{"), json);
+    // Pasted into a SQL string literal as TEXT_SCORE's 4th argument without escaping
+    assertFalse(json.contains("'"), json);
+    assertEquals(TextScoreStats.fromJson(json).getField("title").getTermStats("o'neil \"quoted\""), new long[]{1, 1});
   }
 
   @Test

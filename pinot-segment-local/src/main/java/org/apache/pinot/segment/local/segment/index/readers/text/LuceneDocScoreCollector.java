@@ -44,6 +44,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 public class LuceneDocScoreCollector implements Collector {
   private final Int2FloatMap _scores;
   private final IntUnaryOperator _docIdMapper;
+  private volatile boolean _shouldCancel;
 
   public LuceneDocScoreCollector(Int2FloatMap scores, IntUnaryOperator docIdMapper) {
     _scores = scores;
@@ -70,6 +71,9 @@ public class LuceneDocScoreCollector implements Collector {
       @Override
       public void collect(int doc)
           throws IOException {
+        if (_shouldCancel) {
+          throw new CollectionTerminatedException();
+        }
         try {
           QueryThreadContext.checkTerminationAndSampleUsagePeriodically(_numDocsCollected++,
               "LuceneDocScoreCollector");
@@ -81,5 +85,11 @@ public class LuceneDocScoreCollector implements Collector {
         _scores.put(_docIdMapper.applyAsInt(docBase + doc), _scorer.score());
       }
     };
+  }
+
+  /// Stops the search at the next collected document, for a query thread that stopped waiting for it (see the
+  /// realtime text indexes, which search on a separate pool).
+  public void markShouldCancel() {
+    _shouldCancel = true;
   }
 }

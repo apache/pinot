@@ -96,7 +96,9 @@ public final class TextScoreStats {
     }
     ObjectNode root = JsonUtils.newObjectNode();
     root.set(FIELDS, fieldsNode);
-    return root.toString();
+    // `'` only occurs inside JSON strings, where `\u0027` is equivalent: the output can be pasted into a SQL string
+    // literal (TEXT_SCORE's 4th argument) without escaping a term such as `o'neil`
+    return root.toString().replace("'", "\\u0027");
   }
 
   /// Parses the output of [#toJson].
