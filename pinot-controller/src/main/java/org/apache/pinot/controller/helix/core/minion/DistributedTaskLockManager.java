@@ -44,8 +44,7 @@ import org.slf4j.LoggerFactory;
 /// - Every lock is created at the table level with the name: {tableName}-Lock, under the base path
 ///   MINION_TASK_METADATA within the PROPERTYSTORE.
 /// - If the propertyStore::create() call returns true, that means the lock node was successfully created and the
-///   lock belongs to the current controller, otherwise it was not. If the lock node already exists, this will return
-///   false. No clean-up of the lock node is needed if the propertyStore::create() call returns false.
+///   lock belongs to the current controller. If the lock node already exists, this will return false.
 /// - Each attempt writes a random lock id into the node. If create() reports a failure or throws, the node is read
 ///   back and the lock is taken when it carries this attempt's id: a create retried after a ZK ConnectionLoss can
 ///   report NODE_EXISTS for the node its own first try created, which would otherwise hold the lock until the

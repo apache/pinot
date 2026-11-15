@@ -98,6 +98,22 @@ public class DistributedTaskLockManagerTest {
   }
 
   @Test
+  public void testLockNotTakenWhenTheNodeHasNoLockId() {
+    // A node written by a controller from before lock ids, e.g. during a rolling upgrade
+    AtomicReference<ZNRecord> node = new AtomicReference<>();
+    ZkHelixPropertyStore<ZNRecord> store = mock(ZkHelixPropertyStore.class);
+    when(store.get(anyString(), any(), eq(AccessOption.EPHEMERAL))).thenAnswer(invocation -> node.get());
+    when(store.create(anyString(), any(ZNRecord.class), eq(AccessOption.EPHEMERAL))).thenAnswer(invocation -> {
+      ZNRecord older = new ZNRecord("controller1");
+      older.setSimpleField("lockOwner", "controller1");
+      node.set(older);
+      return false;
+    });
+    DistributedTaskLockManager lockManager = new DistributedTaskLockManager(store, "controller1");
+    Assert.assertNull(lockManager.tryAcquireSessionBasedLock("testTable"));
+  }
+
+  @Test
   public void testEphemeralLockAcquisitionAndRelease() {
     // Mock the property store and data accessor
     ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
