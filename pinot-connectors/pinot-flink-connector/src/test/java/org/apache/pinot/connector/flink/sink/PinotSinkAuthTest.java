@@ -37,8 +37,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class PinotSinkAuthTest {
@@ -46,20 +46,33 @@ public class PinotSinkAuthTest {
   private static final String AUTH_TOKEN = "Basic dXNlcjpwYXNz";
 
   @Test
-  public void testCreateAuthProviderWithToken() {
+  public void testCreateAuthProviderWithExplicitToken() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
+
+    assertAuthHeader(PinotSink.createAuthProvider(tableConfig, AUTH_TOKEN), AUTH_TOKEN);
+  }
+
+  @Test
+  public void testCreateAuthProviderExplicitTokenOverridesBatchConfigToken() {
+    TableConfig tableConfig =
+        tableConfigWithBatchConfig(Map.of(BatchConfigProperties.AUTH_TOKEN, "Basic b2xkOm9sZA=="));
+
+    assertAuthHeader(PinotSink.createAuthProvider(tableConfig, AUTH_TOKEN), AUTH_TOKEN);
+  }
+
+  @Test
+  public void testCreateAuthProviderFallsBackToBatchConfigToken() {
     TableConfig tableConfig = tableConfigWithBatchConfig(Map.of(BatchConfigProperties.AUTH_TOKEN, AUTH_TOKEN));
 
-    AuthProvider authProvider = PinotSink.createAuthProvider(tableConfig);
-
-    assertNotNull(authProvider);
-    assertEquals(authProvider.getRequestHeaders().get("Authorization"), AUTH_TOKEN);
+    assertAuthHeader(PinotSink.createAuthProvider(tableConfig, null), AUTH_TOKEN);
+    assertAuthHeader(PinotSink.createAuthProvider(tableConfig, "  "), AUTH_TOKEN);
   }
 
   @Test
   public void testCreateAuthProviderWithoutIngestionConfig() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
 
-    assertNull(PinotSink.createAuthProvider(tableConfig));
+    assertNoAuthHeaders(PinotSink.createAuthProvider(tableConfig, null));
   }
 
   @Test
@@ -68,7 +81,7 @@ public class PinotSinkAuthTest {
         .setIngestionConfig(new IngestionConfig())
         .build();
 
-    assertNull(PinotSink.createAuthProvider(tableConfig));
+    assertNoAuthHeaders(PinotSink.createAuthProvider(tableConfig, null));
   }
 
   @Test
@@ -76,40 +89,14 @@ public class PinotSinkAuthTest {
     TableConfig tableConfig = tableConfigWithBatchConfig(
         Map.of(BatchConfigProperties.PUSH_CONTROLLER_URI, "http://localhost:9000"));
 
-    assertNull(PinotSink.createAuthProvider(tableConfig));
+    assertNoAuthHeaders(PinotSink.createAuthProvider(tableConfig, null));
   }
 
   @Test
   public void testCreateAuthProviderWithBlankToken() {
     TableConfig tableConfig = tableConfigWithBatchConfig(Map.of(BatchConfigProperties.AUTH_TOKEN, "  "));
 
-    assertNull(PinotSink.createAuthProvider(tableConfig));
-  }
-
-  @Test
-  public void testPrepareTableConfigForSinkAddsAuthTokenWithoutIngestionConfig() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-
-    TableConfig result = PinotSink.prepareTableConfigForSink(tableConfig, "http://localhost:9000", AUTH_TOKEN);
-
-    Map<String, String> batchConfigMap =
-        result.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0);
-    assertEquals(batchConfigMap.get(BatchConfigProperties.AUTH_TOKEN), AUTH_TOKEN);
-    assertNotNull(PinotSink.createAuthProvider(result));
-  }
-
-  @Test
-  public void testPrepareTableConfigForSinkMergesAuthTokenIntoExistingBatchConfig() {
-    TableConfig tableConfig =
-        tableConfigWithBatchConfig(Map.of("existing", "value", BatchConfigProperties.AUTH_TOKEN, "Basic b2xkOm9sZA=="));
-
-    TableConfig result = PinotSink.prepareTableConfigForSink(tableConfig, "http://localhost:9000", AUTH_TOKEN);
-
-    Map<String, String> batchConfigMap =
-        result.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0);
-    assertEquals(batchConfigMap.get("existing"), "value");
-    // The explicit token overrides the one already in the batch config
-    assertEquals(batchConfigMap.get(BatchConfigProperties.AUTH_TOKEN), AUTH_TOKEN);
+    assertNoAuthHeaders(PinotSink.createAuthProvider(tableConfig, "  "));
   }
 
   @Test
@@ -133,6 +120,14 @@ public class PinotSinkAuthTest {
     assertFalse(tableConfig.toJsonString().contains(AUTH_TOKEN));
   }
 
+  private static void assertAuthHeader(AuthProvider authProvider, String expectedToken) {
+    assertEquals(authProvider.getRequestHeaders(), Map.of("Authorization", expectedToken));
+  }
+
+  private static void assertNoAuthHeaders(AuthProvider authProvider) {
+    assertTrue(authProvider.getRequestHeaders().isEmpty());
+  }
+
   private static FlinkRowGenericRowConverter createConverter() {
     return new FlinkRowGenericRowConverter(
         new RowTypeInfo(new TypeInformation[]{Types.INT}, new String[]{"a"}));
@@ -141,18 +136,6 @@ public class PinotSinkAuthTest {
   private static Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName("myTable")
         .addSingleValueDimension("a", FieldSpec.DataType.INT).build();
-  }
-
-  @Test
-  public void testPrepareTableConfigForSinkWithoutAuthToken() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
-
-    TableConfig result = PinotSink.prepareTableConfigForSink(tableConfig, "http://localhost:9000", null);
-
-    Map<String, String> batchConfigMap =
-        result.getIngestionConfig().getBatchIngestionConfig().getBatchConfigMaps().get(0);
-    assertFalse(batchConfigMap.containsKey(BatchConfigProperties.AUTH_TOKEN));
-    assertNull(PinotSink.createAuthProvider(result));
   }
 
   private static TableConfig tableConfigWithBatchConfig(Map<String, String> batchConfigMap) {
