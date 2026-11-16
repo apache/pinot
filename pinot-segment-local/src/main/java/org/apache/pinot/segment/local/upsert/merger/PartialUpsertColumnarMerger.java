@@ -19,11 +19,13 @@
 package org.apache.pinot.segment.local.upsert.merger;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
-import org.apache.pinot.segment.local.upsert.merger.columnar.ForceOverwriteMerger;
 import org.apache.pinot.segment.local.upsert.merger.columnar.OverwriteMerger;
 import org.apache.pinot.segment.local.upsert.merger.columnar.PartialUpsertColumnMerger;
 import org.apache.pinot.segment.local.upsert.merger.columnar.PartialUpsertColumnMergerFactory;
@@ -35,18 +37,26 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /// PartialUpsertColumnarMerger iterates over each column and merges them based on the defined strategy per column in
 /// table config.
 public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
+  /// Null when the default strategy is FORCE_OVERWRITE, which has no column merger.
+  @Nullable
   private final PartialUpsertColumnMerger _defaultColumnValueMerger;
   private final Map<String, PartialUpsertColumnMerger> _column2Mergers = new HashMap<>();
+  private final Set<String> _forceOverwriteColumns = new HashSet<>();
 
   public PartialUpsertColumnarMerger(List<String> primaryKeyColumns, List<String> comparisonColumns,
       UpsertConfig upsertConfig) {
     super(primaryKeyColumns, comparisonColumns, upsertConfig);
-    _defaultColumnValueMerger =
-        PartialUpsertColumnMergerFactory.getMerger(upsertConfig.getDefaultPartialUpsertStrategy());
+    UpsertConfig.Strategy defaultStrategy = upsertConfig.getDefaultPartialUpsertStrategy();
+    _defaultColumnValueMerger = defaultStrategy == UpsertConfig.Strategy.FORCE_OVERWRITE ? null
+        : PartialUpsertColumnMergerFactory.getMerger(defaultStrategy);
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
     if (MapUtils.isNotEmpty(partialUpsertStrategies)) {
       for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
-        _column2Mergers.put(entry.getKey(), PartialUpsertColumnMergerFactory.getMerger(entry.getValue()));
+        if (entry.getValue() == UpsertConfig.Strategy.FORCE_OVERWRITE) {
+          _forceOverwriteColumns.add(entry.getKey());
+        } else {
+          _column2Mergers.put(entry.getKey(), PartialUpsertColumnMergerFactory.getMerger(entry.getValue()));
+        }
       }
     }
   }
@@ -68,8 +78,8 @@ public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
         continue;
       }
       PartialUpsertColumnMerger merger = _column2Mergers.getOrDefault(column, _defaultColumnValueMerger);
-      if (merger instanceof ForceOverwriteMerger) {
-        // Force Overwrite mergers
+      if (merger == null || _forceOverwriteColumns.contains(column)) {
+        // Force Overwrite
         // The new row already holds the result: the new value, or for a null value the placeholder that ingestion
         // put in the row together with its null marker. Leave the column untouched so both are kept; putting a
         // value in the result holder would clear the null marker or replace an ingestion-normalized placeholder

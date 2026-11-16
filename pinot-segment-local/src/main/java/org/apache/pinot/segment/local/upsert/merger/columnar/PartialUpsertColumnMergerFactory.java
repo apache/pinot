@@ -29,7 +29,6 @@ public class PartialUpsertColumnMergerFactory {
   private static final IncrementMerger INCREMENT_MERGER = new IncrementMerger();
   private static final IgnoreMerger IGNORE_MERGER = new IgnoreMerger();
   private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
-  private static final ForceOverwriteMerger FORCE_OVERWRITE_MERGER = new ForceOverwriteMerger();
   private static final MaxMerger MAX_MERGER = new MaxMerger();
   private static final MinMerger MIN_MERGER = new MinMerger();
   private static final UnionMerger UNION_MERGER = new UnionMerger();
@@ -49,7 +48,8 @@ public class PartialUpsertColumnMergerFactory {
       case OVERWRITE:
         return OVERWRITE_MERGER;
       case FORCE_OVERWRITE:
-        return FORCE_OVERWRITE_MERGER;
+        // The new value is always kept as is, so there is nothing to merge
+        throw new IllegalArgumentException("FORCE_OVERWRITE has no column merger");
       case UNION:
         return UNION_MERGER;
       default:
