@@ -282,9 +282,11 @@ public class TarCompressionUtils {
             if (maxStreamRateInByte != NO_DISK_WRITE_RATE_LIMIT) {
               copyWithRateLimiter(tarIn, out, maxStreamRateInByte);
             } else {
-              try (OutputStream bufferedOut = new BufferedOutputStream(out)) {
-                IOUtils.copy(tarIn, bufferedOut);
-              }
+              // Flush, don't close: closing the wrapper would close `out`, which must stay open for the fsync below
+              // (and is closed by the enclosing try-with-resources).
+              OutputStream bufferedOut = new BufferedOutputStream(out);
+              IOUtils.copy(tarIn, bufferedOut);
+              bufferedOut.flush();
             }
             if (syncExtractedFiles) {
               try {
