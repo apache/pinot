@@ -67,6 +67,8 @@ import org.apache.pinot.sql.parsers.SqlCompilationException;
 /// The function gets each literal as the Java value that the runtime passes for it, so that the result is the same as
 /// the result of the call at runtime.
 public class PinotEvaluateLiteralRule {
+  private static final BigDecimal MIN_INT = BigDecimal.valueOf(Integer.MIN_VALUE);
+  private static final BigDecimal MAX_INT = BigDecimal.valueOf(Integer.MAX_VALUE);
 
   public static class Project extends RelOptRule {
     public static final Project INSTANCE = new Project(PinotRuleUtils.PINOT_REL_FACTORY, null);
@@ -190,9 +192,11 @@ public class PinotEvaluateLiteralRule {
         return rexCall;
       }
       argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexNode.getType());
-      if (TransformFunctionType.isJsonExtractScalar(canonicalName) && i == 3) {
-        argumentTypes[i] = RexExpressionUtils.fromJsonExtractScalarDefaultLiteral((RexLiteral) rexNode).getDataType();
-      }
+    }
+    widenIntArgumentTypes(operands, argumentTypes);
+    if (TransformFunctionType.isJsonExtractScalar(canonicalName) && numArguments > 3) {
+      argumentTypes[3] =
+          RexExpressionUtils.fromJsonExtractScalarDefaultLiteral((RexLiteral) operands.get(3)).getDataType();
     }
 
     if (isDatetimeIntervalArithmetic(rexCall)) {
@@ -201,13 +205,13 @@ public class PinotEvaluateLiteralRule {
     if (isIntervalArithmetic(rexCall)) {
       return evaluateIntervalArithmetic(rexCall, rexBuilder);
     }
-    String castTargetType = null;
+    ColumnDataType castTargetType = null;
     if (rexCall.getKind() == SqlKind.CAST) {
       // Handle separately because the CAST operator only has one operand (the value to be cast) and the type to be cast
       // to is determined by the operator's return type. Pinot's CAST function implementation requires two arguments:
       // the value to be cast and the target type.
       argumentTypes = new ColumnDataType[]{argumentTypes[0], ColumnDataType.STRING};
-      castTargetType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()).name();
+      castTargetType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType());
     }
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null || !functionInfo.isDeterministic()) {
@@ -227,7 +231,11 @@ public class PinotEvaluateLiteralRule {
       }
     }
     if (castTargetType != null) {
-      arguments[1] = castTargetType;
+      arguments[0] = getCastValue(arguments[0], castTargetType);
+      arguments[1] = castTargetType.name();
+    }
+    if (rexCall.getKind() == SqlKind.ARRAY_VALUE_CONSTRUCTOR) {
+      keepExactArrayElements(operands, arguments);
     }
     RelDataType rexNodeType = rexCall.getType();
     if (rexNodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
@@ -426,6 +434,71 @@ public class PinotEvaluateLiteralRule {
     }
   }
 
+  /// Makes the INT arguments of a call LONG if one of them is an integer literal beyond the INT range.
+  ///
+  /// This rule makes such a literal. Calcite gives INT arithmetic the type INTEGER, but Pinot evaluates it as LONG, so
+  /// the literal for `3600000 * 100000` has the type INTEGER and the value 360000000000. A call on that literal (for
+  /// example `NOW() - 3600000 * 100000`) must get the full value, not the value that wraps around as an INT. All the
+  /// INT arguments change, so that the arguments of one type (for example the elements of an array) keep one Java
+  /// class.
+  private static void widenIntArgumentTypes(List<RexNode> operands, ColumnDataType[] argumentTypes) {
+    int numArguments = argumentTypes.length;
+    boolean beyondIntRange = false;
+    for (int i = 0; i < numArguments; i++) {
+      if (isIntegerLiteral((RexLiteral) operands.get(i), argumentTypes[i])) {
+        BigDecimal value = (BigDecimal) ((RexLiteral) operands.get(i)).getValue();
+        if (value.compareTo(MIN_INT) < 0 || value.compareTo(MAX_INT) > 0) {
+          beyondIntRange = true;
+          break;
+        }
+      }
+    }
+    if (!beyondIntRange) {
+      return;
+    }
+    for (int i = 0; i < numArguments; i++) {
+      if (isIntegerLiteral((RexLiteral) operands.get(i), argumentTypes[i])) {
+        argumentTypes[i] = ColumnDataType.LONG;
+      }
+    }
+  }
+
+  /// Returns whether the literal is a number with an integer type (for example INTEGER or SMALLINT) that the planner
+  /// maps to INT. A DECIMAL is not an integer type here, see [#canExceedArgumentType]. A NULL literal is not a number.
+  /// A literal that is not a value (for example the Sarg of a SEARCH on INTEGER values) is not a number.
+  private static boolean isIntegerLiteral(RexLiteral rexLiteral, ColumnDataType literalType) {
+    return literalType == ColumnDataType.INT && rexLiteral.getValue() instanceof BigDecimal
+        && SqlTypeName.INT_TYPES.contains(rexLiteral.getType().getSqlTypeName());
+  }
+
+  /// Gives the number elements of an array constructor their exact values (the `BigDecimal` that Calcite stores) if
+  /// one element is NULL or if the elements do not have one Java class.
+  ///
+  /// The array constructor makes a primitive array from the class of its first element, so it cannot take a NULL
+  /// element or an element of a different class. Elements of one array type can have different classes: this rule
+  /// gives the literal that it makes for a DECIMAL(20, 0) call the type BIGINT (a `Long`), but a DECIMAL(20, 0)
+  /// literal from Calcite keeps its exact value (see [#canExceedArgumentType]).
+  private static void keepExactArrayElements(List<RexNode> operands, Object[] arguments) {
+    Class<?> elementClass = null;
+    boolean oneClass = true;
+    for (Object argument : arguments) {
+      if (argument == null || (elementClass != null && argument.getClass() != elementClass)) {
+        oneClass = false;
+        break;
+      }
+      elementClass = argument.getClass();
+    }
+    if (oneClass) {
+      return;
+    }
+    for (int i = 0; i < arguments.length; i++) {
+      Object value = ((RexLiteral) operands.get(i)).getValue();
+      if (value instanceof BigDecimal) {
+        arguments[i] = value;
+      }
+    }
+  }
+
   /// Returns the value that the runtime passes to a function for the literal (see `FunctionOperand`): the value from
   /// [RexExpressionUtils#fromRexLiteral], converted with [ColumnDataType#toExternal]. For example, an INTEGER literal
   /// becomes an `Integer` (Calcite stores a `BigDecimal`), and a TIMESTAMP literal becomes a `Timestamp`.
@@ -435,6 +508,12 @@ public class PinotEvaluateLiteralRule {
       // The runtime cannot represent this literal (for example an INTERVAL), so keep the value that Calcite stores
       return rexLiteral.getValue();
     }
+    if (argumentType == ColumnDataType.LONG && isIntegerLiteral(rexLiteral,
+        RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType()))) {
+      // See widenIntArgumentTypes(). The value comes from an INT literal or from a LONG result, so it is in the LONG
+      // range.
+      return ((BigDecimal) rexLiteral.getValue()).longValue();
+    }
     if (canExceedArgumentType(rexLiteral, argumentType)) {
       // Keep the exact value, which the conversion to INT or LONG can wrap around. A value that fits (for example
       // CAST(5 AS DECIMAL(10, 0))) then stays a BigDecimal, unlike at runtime, but no value wraps around.
@@ -443,6 +522,27 @@ public class PinotEvaluateLiteralRule {
     RexExpression.Literal literal = RexExpressionUtils.fromRexLiteral(rexLiteral);
     Object value = literal.getValue();
     return value != null ? literal.getDataType().toExternal(value) : null;
+  }
+
+  /// Returns the value to pass to the CAST function for a CAST to the given type.
+  ///
+  /// The CAST function cannot convert between TIMESTAMP and INT or FLOAT (the leaf stage can). For such a CAST, returns
+  /// the same value with a type that the function can convert: a LONG for an INT or a TIMESTAMP, and a DOUBLE for a
+  /// FLOAT.
+  @Nullable
+  private static Object getCastValue(@Nullable Object value, ColumnDataType targetType) {
+    if (targetType == ColumnDataType.TIMESTAMP) {
+      if (value instanceof Integer) {
+        return ((Integer) value).longValue();
+      }
+      if (value instanceof Float) {
+        return ((Float) value).doubleValue();
+      }
+    } else if (value instanceof Timestamp && (targetType == ColumnDataType.INT
+        || targetType == ColumnDataType.FLOAT)) {
+      return ((Timestamp) value).getTime();
+    }
+    return value;
   }
 
   /// Returns whether the literal is a DECIMAL whose type can hold numbers beyond the range of its INT or LONG argument
