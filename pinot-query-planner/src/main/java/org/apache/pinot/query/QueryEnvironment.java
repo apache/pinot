@@ -1109,7 +1109,8 @@ public class QueryEnvironment {
     }
 
     /// The MV aggregate fallback: when the plan without the MV aggregate fails the `ARRAY_TO_MV` validation, plans the
-    /// query again with the MV aggregate on and replaces [#_relRoot]. Rethrows `e` when the fallback does not apply.
+    /// query again with the MV aggregate on and replaces [#_relRoot]. Rethrows `e` when the fallback does not apply. If
+    /// the second plan fails, its error is thrown with `e` as a suppressed exception.
     ///
     /// The second plan starts from the SQL: it validates [#_mvAggregateFallbackQueryNode] with the validator of
     /// [PlannerContext#enableMvAggregateFallback()], where `ARRAY_TO_MV` has a nullable type, then converts and
@@ -1123,8 +1124,13 @@ public class QueryEnvironment {
       // The validation changes the copy, so it can be used only once
       _mvAggregateFallbackQueryNode = null;
       _plannerContext.enableMvAggregateFallback();
-      RelRoot unoptimizedRelRoot = toRelation(validate(queryNode, _plannerContext), _plannerContext);
-      _relRoot = unoptimizedRelRoot.withRel(optimizeAndConvert(unoptimizedRelRoot, _plannerContext));
+      try {
+        RelRoot unoptimizedRelRoot = toRelation(validate(queryNode, _plannerContext), _plannerContext);
+        _relRoot = unoptimizedRelRoot.withRel(optimizeAndConvert(unoptimizedRelRoot, _plannerContext));
+      } catch (RuntimeException e2) {
+        e2.addSuppressed(e);
+        throw e2;
+      }
     }
 
     /// Whether [#replanWithMvAggregate] can plan this query again with the MV aggregate: only once, and only for a
