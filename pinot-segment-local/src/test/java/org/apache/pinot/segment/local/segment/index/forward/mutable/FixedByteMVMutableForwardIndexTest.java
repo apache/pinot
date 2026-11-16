@@ -32,6 +32,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
 
 public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClassCheckRule {
   private PinotDataBufferMemoryManager _memoryManager;
@@ -101,6 +104,22 @@ public class FixedByteMVMutableForwardIndexTest implements PinotBuffersAfterClas
       Assert.assertEquals(readerWriter.getIntMV(0), values);
     } finally {
       readerWriter.close();
+    }
+  }
+
+  @Test
+  public void testLargeLimitDoesNotPreallocateLargeBuffer()
+      throws IOException {
+    int maxNumMultiValues = 4096;
+    try (PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("largeLimit");
+        FixedByteMVMutableForwardIndex index =
+            new FixedByteMVMutableForwardIndex(maxNumMultiValues, 2, 10, Integer.BYTES, memoryManager, "largeLimit",
+                false, FieldSpec.DataType.INT)) {
+      assertTrue(memoryManager.getTotalAllocatedBytes() < (long) maxNumMultiValues * Integer.BYTES);
+      int[] values = new int[maxNumMultiValues];
+      Arrays.fill(values, 42);
+      index.setIntMV(0, values);
+      assertEquals(index.getIntMV(0), values);
     }
   }
 

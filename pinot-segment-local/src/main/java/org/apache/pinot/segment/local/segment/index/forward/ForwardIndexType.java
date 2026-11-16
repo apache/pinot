@@ -299,6 +299,18 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             if ((innerCodecNode == null || innerCodecNode.isNull()) && fcCodec != null) {
               configNode.put("compressionCodec", fcCodec.name());
             }
+            // Honor the legacy limit alongside an existing forward block unless that block declares its own limit.
+            JsonNode maxNumMultiValues = configNode.get(ForwardIndexConfig.MAX_NUM_MULTI_VALUES);
+            if (maxNumMultiValues == null || maxNumMultiValues.isNull()) {
+              String legacyMax =
+                  properties != null ? properties.get(ForwardIndexConfig.MAX_NUM_MULTI_VALUES) : null;
+              if (legacyMax != null) {
+                configNode.put(ForwardIndexConfig.MAX_NUM_MULTI_VALUES, Integer.parseInt(legacyMax));
+              }
+            } else {
+              Preconditions.checkArgument(maxNumMultiValues.isIntegralNumber() && maxNumMultiValues.canConvertToInt(),
+                  "%s must be an integer for column: %s", ForwardIndexConfig.MAX_NUM_MULTI_VALUES, column);
+            }
             try {
               result.put(column, JsonUtils.jsonNodeToObject(configNode, ForwardIndexConfig.class));
             } catch (IOException e) {
