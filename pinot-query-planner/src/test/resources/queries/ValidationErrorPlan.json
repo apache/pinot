@@ -7,11 +7,6 @@
         "expectedException": ".*Use ARRAY_TO_MV\\(\\) to group by multi-value column.*ARRAY_TO_MV is supported only.*"
       },
       {
-        "description": "arrayToMV validation error 2 (MV aggregate off)",
-        "sql": "SET useMvAggregate=false; EXPLAIN PLAN FOR SELECT SUM(a.col3) as sumCol3, arrayToMv(e.mcol1), a.col2  FROM a JOIN e on a.col1=e.col1 GROUP BY arrayToMv(e.mcol1), a.col2",
-        "expectedException": ".*ARRAY_TO_MV is supported only.*"
-      },
-      {
         "description": "arrayToMV validation error 2 (physical optimizer)",
         "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT SUM(a.col3) as sumCol3, arrayToMv(e.mcol1), a.col2  FROM a JOIN e on a.col1=e.col1 GROUP BY arrayToMv(e.mcol1), a.col2",
         "expectedException": ".*ARRAY_TO_MV is supported only.*"

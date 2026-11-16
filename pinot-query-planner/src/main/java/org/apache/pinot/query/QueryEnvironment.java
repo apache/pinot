@@ -49,11 +49,13 @@ import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.runtime.CalciteContextException;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
@@ -70,6 +72,7 @@ import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rex.PinotRexExecutor;
 import org.apache.pinot.calcite.rex.SearchSealer;
+import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
@@ -103,10 +106,10 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
+import org.apache.pinot.query.validate.SqlNodeCopier;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.MvAggregateMode;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -222,9 +225,6 @@ public class QueryEnvironment {
             inferAnyValueType);
       }
     }
-    // Rejects an invalid useMvAggregate value with QUERY_VALIDATION before planning. The planner rule reads it again,
-    // and an error thrown there would surface as QUERY_PLANNING.
-    QueryOptionsUtils.getMvAggregateMode(options, _envConfig.defaultMvAggregateMode());
     int sortExchangeCopyLimit = QueryOptionsUtils.getSortExchangeCopyThreshold(options,
         _envConfig.defaultSortExchangeCopyLimit());
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(options,
@@ -333,10 +333,13 @@ public class QueryEnvironment {
       } else {
         queryNode = sqlNode;
       }
+      // The MV aggregate fallback validates the query again, and the validation changes the tree. So keep a copy.
+      SqlNode mvAggregateFallbackQueryNode =
+          !plannerContext.isUsePhysicalOptimizer() && callsArrayToMv(queryNode) ? SqlNodeCopier.copy(queryNode) : null;
       RelRoot unoptimizedRelRoot = toRelation(validate(queryNode, plannerContext), plannerContext);
       RelRoot relRoot = unoptimizedRelRoot.withRel(optimizeAndConvert(unoptimizedRelRoot, plannerContext));
-      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, unoptimizedRelRoot, plannerContext,
-          sqlNodeAndOptions);
+      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, unoptimizedRelRoot,
+          mvAggregateFallbackQueryNode, plannerContext, sqlNodeAndOptions);
     } catch (QueryException e) {
       throw e;
     } catch (Throwable t) {
@@ -585,6 +588,28 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
   // utils
   // --------------------------------------------------------------------------
+
+  /// Returns whether the parsed query `node` calls `ARRAY_TO_MV`. Only such a query can plan with the MV aggregate.
+  private static boolean callsArrayToMv(SqlNode node) {
+    if (node instanceof SqlCall) {
+      SqlCall call = (SqlCall) node;
+      if (ArrayToMvFunctionName.matches(call.getOperator().getName())) {
+        return true;
+      }
+      for (SqlNode operand : call.getOperandList()) {
+        if (operand != null && callsArrayToMv(operand)) {
+          return true;
+        }
+      }
+    } else if (node instanceof SqlNodeList) {
+      for (SqlNode element : (SqlNodeList) node) {
+        if (element != null && callsArrayToMv(element)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
   /// Returns whether `node` or one of its inputs is an aggregate that groups by `ARRAY_TO_MV(expr)` (see
   /// [ArrayToMvGroupKeys#detect]). Only such a query can plan with the MV aggregate.
@@ -900,17 +925,6 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER;
     }
 
-    /// How to plan `GROUP BY ARRAY_TO_MV(col)` by default, see [MvAggregateMode].
-    ///
-    /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
-    /// configuration ([CommonConstants.Broker#CONFIG_OF_USE_MV_AGGREGATE]).
-    /// This default value can be always overridden at query level by the query option
-    /// [CommonConstants.Broker.Request.QueryOptionKey#USE_MV_AGGREGATE].
-    @Value.Default
-    default MvAggregateMode defaultMvAggregateMode() {
-      return MvAggregateMode.fromString(CommonConstants.Broker.DEFAULT_USE_MV_AGGREGATE);
-    }
-
     /// Whether to use lite mode by default.
     ///
     /// This is treated as the default value for the broker and it is expected to be obtained from a Pinot
@@ -1034,18 +1048,24 @@ public class QueryEnvironment {
     private final String _textQuery;
     // The optimized plan. The MV aggregate fallback replaces it, see #replanWithMvAggregate
     private RelRoot _relRoot;
-    // The plan before optimization, which the MV aggregate fallback optimizes again
+    // The plan before optimization
     private final RelRoot _unoptimizedRelRoot;
+    // A copy of the query before validation, which the MV aggregate fallback validates again. Null when the query does
+    // not call ARRAY_TO_MV.
+    @Nullable
+    private SqlNode _mvAggregateFallbackQueryNode;
     private final PlannerContext _plannerContext;
     private final SqlNodeAndOptions _sqlNodeAndOptions;
     private final Set<String> _tableNames;
 
     private CompiledQuery(String database, String textQuery, RelRoot relRoot, RelRoot unoptimizedRelRoot,
-        PlannerContext plannerContext, SqlNodeAndOptions sqlNodeAndOptions) {
+        @Nullable SqlNode mvAggregateFallbackQueryNode, PlannerContext plannerContext,
+        SqlNodeAndOptions sqlNodeAndOptions) {
       _database = database;
       _textQuery = textQuery;
       _relRoot = relRoot;
       _unoptimizedRelRoot = unoptimizedRelRoot;
+      _mvAggregateFallbackQueryNode = mvAggregateFallbackQueryNode;
       _plannerContext = plannerContext;
       _sqlNodeAndOptions = sqlNodeAndOptions;
       // Important & tricky: RelToPlanNodeConverter uses thread local. Therefore we need to get the table names here
@@ -1065,8 +1085,8 @@ public class QueryEnvironment {
       return _plannerContext;
     }
 
-    /// Builds the dispatchable plan. In the auto mode of the MV aggregate, a plan that fails the `ARRAY_TO_MV`
-    /// validation is optimized again with the MV aggregate (see [#replanWithMvAggregate]).
+    /// Builds the dispatchable plan. A plan that fails the `ARRAY_TO_MV` validation is planned again with the MV
+    /// aggregate (see [#replanWithMvAggregate]).
     private DispatchableSubPlan toDispatchableSubPlanWithMvAggregateFallback() {
       return withMvAggregateFallback(() -> toDispatchableSubPlan(_relRoot, _plannerContext));
     }
@@ -1088,30 +1108,35 @@ public class QueryEnvironment {
       }
     }
 
-    /// The [MvAggregateMode#AUTO] mode of the MV aggregate: when the plan without the MV aggregate fails the
-    /// `ARRAY_TO_MV` validation, optimizes the unoptimized plan again with the MV aggregate on and replaces
-    /// [#_relRoot]. Rethrows `e` when the fallback does not apply.
+    /// The MV aggregate fallback: when the plan without the MV aggregate fails the `ARRAY_TO_MV` validation, plans the
+    /// query again with the MV aggregate on and replaces [#_relRoot]. Rethrows `e` when the fallback does not apply.
     ///
-    /// Only a query that fails without the MV aggregate changes. A query that passes the validation keeps the plan of
-    /// a broker that predates the MV aggregate, so servers that predate it can run it.
+    /// The second plan starts from the SQL: it validates [#_mvAggregateFallbackQueryNode] with the validator of
+    /// [PlannerContext#enableMvAggregateFallback()], where `ARRAY_TO_MV` has a nullable type, then converts and
+    /// optimizes it. Only a query that fails without the MV aggregate changes. A query that passes the validation keeps
+    /// the plan and the types of a broker that predates the MV aggregate, so servers that predate it can run it.
     private void replanWithMvAggregate(QueryException e) {
       if (!(e instanceof ArrayToMvValidationVisitor.ArrayToMvValidationException) || !canFallBackToMvAggregate()) {
         throw e;
       }
+      SqlNode queryNode = _mvAggregateFallbackQueryNode;
+      // The validation changes the copy, so it can be used only once
+      _mvAggregateFallbackQueryNode = null;
       _plannerContext.enableMvAggregateFallback();
-      _relRoot = _unoptimizedRelRoot.withRel(optimizeAndConvert(_unoptimizedRelRoot, _plannerContext));
+      RelRoot unoptimizedRelRoot = toRelation(validate(queryNode, _plannerContext), _plannerContext);
+      _relRoot = unoptimizedRelRoot.withRel(optimizeAndConvert(unoptimizedRelRoot, _plannerContext));
     }
 
-    /// Whether [#replanWithMvAggregate] can plan this query again with the MV aggregate: only in the
-    /// [MvAggregateMode#AUTO] mode, and only for a query that groups by `ARRAY_TO_MV(expr)`. Other `ARRAY_TO_MV`
-    /// errors, such as a plain `GROUP BY mvCol` or `ARRAY_TO_MV` in the SELECT list, fail once, without a second plan.
-    /// The physical optimizer does not support the MV aggregate.
+    /// Whether [#replanWithMvAggregate] can plan this query again with the MV aggregate: only once, and only for a
+    /// query that groups by `ARRAY_TO_MV(expr)`. Other `ARRAY_TO_MV` errors, such as a plain `GROUP BY mvCol` or
+    /// `ARRAY_TO_MV` in the SELECT list, fail once, without a second plan. The physical optimizer does not support the
+    /// MV aggregate.
     private boolean canFallBackToMvAggregate() {
-      return _plannerContext.getMvAggregateMode() == MvAggregateMode.AUTO && !_plannerContext.isUseMvAggregate()
+      return _mvAggregateFallbackQueryNode != null && !_plannerContext.isUseMvAggregate()
           && !_plannerContext.isUsePhysicalOptimizer() && groupsByArrayToMv(_unoptimizedRelRoot.rel);
     }
 
-    /// The [MvAggregateMode#AUTO] mode for `EXPLAIN PLAN WITHOUT IMPLEMENTATION`, which builds no dispatchable plan:
+    /// The MV aggregate fallback for `EXPLAIN PLAN WITHOUT IMPLEMENTATION`, which builds no dispatchable plan:
     /// validates the plan fragments without worker assignment, and plans the query again with the MV aggregate when
     /// they fail the `ARRAY_TO_MV` validation. So the explained plan is the plan that the query runs. Any other error
     /// of this check is ignored: the query asked for the logical plan only, and it renders as it is.

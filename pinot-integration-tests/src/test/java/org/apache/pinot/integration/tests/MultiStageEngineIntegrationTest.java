@@ -1132,30 +1132,33 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(results.get(10).asText(), "hello!");
   }
 
-  @DataProvider(name = "useMvAggregate")
-  public Object[][] useMvAggregate() {
-    return new Object[][]{{true}, {false}};
+  /// The hint that a leaf-only `GROUP BY ARRAY_TO_MV(col)` uses to plan the MV aggregate: the plan without it fails,
+  /// so the planner plans the MV aggregate, which ignores the hint and runs inside the leaf stage. Without a hint, the
+  /// query keeps the plain leaf aggregate.
+  @DataProvider(name = "mvAggregateHint")
+  public Object[][] mvAggregateHint() {
+    return new Object[][]{{""}, {"/*+ aggOptions(is_skip_leaf_stage_group_by='true') */ "}};
   }
 
-  @Test(dataProvider = "useMvAggregate")
-  public void testMultiValueColumnGroupBy(boolean useMvAggregate)
+  @Test(dataProvider = "mvAggregateHint")
+  public void testMultiValueColumnGroupBy(String hint)
       throws Exception {
-    String pinotQuery = "SET useMvAggregate=" + useMvAggregate + "; "
-        + "SELECT count(*), ARRAY_TO_MV(RandomAirports) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)";
+    String pinotQuery =
+        "SELECT " + hint + "count(*), ARRAY_TO_MV(RandomAirports) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }
 
   /// A leaf-stage `GROUP BY ARRAY_TO_MV(col)` returns the same groups and counts as the single-stage
-  /// `GROUP BY col`, with the MV aggregate on and off.
-  @Test(dataProvider = "useMvAggregate")
-  public void testMultiValueColumnGroupByMatchesSingleStageEngine(boolean useMvAggregate)
+  /// `GROUP BY col`, with the plain aggregate and with the MV aggregate.
+  @Test(dataProvider = "mvAggregateHint")
+  public void testMultiValueColumnGroupByMatchesSingleStageEngine(String hint)
       throws Exception {
     JsonNode singleStage = postQuery("SELECT RandomAirports, count(*) FROM mytable GROUP BY RandomAirports LIMIT 1000",
         getBrokerQueryApiUrl(getBrokerBaseApiUrl(), false), null, getExtraQueryProperties());
     assertNoError(singleStage);
-    JsonNode multiStage = postQuery("SET useMvAggregate=" + useMvAggregate + "; "
-        + "SELECT ARRAY_TO_MV(RandomAirports), count(*) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)");
+    JsonNode multiStage = postQuery(
+        "SELECT " + hint + "ARRAY_TO_MV(RandomAirports), count(*) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)");
     assertNoError(multiStage);
     List<List<String>> expectedRows = sortedRows(singleStage.get("resultTable").get("rows"));
     assertEquals(expectedRows.size(), 154);
@@ -1175,12 +1178,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
             Assertions.assertThat(message).contains("Use ARRAY_TO_MV() to group by multi-value column"));
   }
 
-  @Test(dataProvider = "useMvAggregate")
-  public void testVariadicFunction(boolean useMvAggregate)
+  @Test(dataProvider = "mvAggregateHint")
+  public void testVariadicFunction(String hint)
       throws Exception {
-    String sqlQuery = "SET useMvAggregate=" + useMvAggregate + "; "
-        + "SELECT ARRAY_TO_MV(VALUE_IN(RandomAirports, 'MFR', 'SUN', 'GTR')) as airport, count(*) "
-        + "FROM mytable WHERE ARRAY_TO_MV(RandomAirports) IN ('MFR', 'SUN', 'GTR') GROUP BY airport";
+    String sqlQuery = "SELECT " + hint + "ARRAY_TO_MV(VALUE_IN(RandomAirports, 'MFR', 'SUN', 'GTR')) as airport, "
+        + "count(*) FROM mytable WHERE ARRAY_TO_MV(RandomAirports) IN ('MFR', 'SUN', 'GTR') GROUP BY airport";
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
@@ -1305,60 +1307,27 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertNotEquals(jsonNode.get("resultTable").get("rows").size(), 0);
   }
 
-  @Test(dataProvider = "useMvAggregate")
-  public void testMultiValueColumnGroupByOrderBy(boolean useMvAggregate)
+  @Test(dataProvider = "mvAggregateHint")
+  public void testMultiValueColumnGroupByOrderBy(String hint)
       throws Exception {
-    String pinotQuery = "SET useMvAggregate=" + useMvAggregate + "; "
-        + "SELECT count(*), ARRAY_TO_MV(RandomAirports) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports) "
+    String pinotQuery = "SELECT " + hint + "count(*), ARRAY_TO_MV(RandomAirports) FROM mytable "
+        + "GROUP BY ARRAY_TO_MV(RandomAirports) "
         + "ORDER BY ARRAY_TO_MV(RandomAirports) DESC";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }
 
-  /// With the gate on, the plan of `GROUP BY ARRAY_TO_MV(col)` holds the MV aggregate. With the gate off it does not.
+  /// A leaf-only `GROUP BY ARRAY_TO_MV(col)` keeps the plain aggregate. With the hint, the plan without the MV
+  /// aggregate fails, so the planner plans the MV aggregate.
   @Test
-  public void testMvAggregateGateChangesPlan()
+  public void testMvAggregateOnlyWhenThePlainPlanFails()
       throws Exception {
-    String query = "SELECT ARRAY_TO_MV(RandomAirports), COUNT(*) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)";
-    Assertions.assertThat(explainPlan("SET useMvAggregate=true; EXPLAIN PLAN FOR " + query))
-        .contains("PinotLogicalMvAggregate");
-    Assertions.assertThat(explainPlan("SET useMvAggregate=false; EXPLAIN PLAN FOR " + query))
+    String query = "ARRAY_TO_MV(RandomAirports), COUNT(*) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)";
+    Assertions.assertThat(explainPlan("EXPLAIN PLAN FOR SELECT " + query))
         .doesNotContain("PinotLogicalMvAggregate");
-  }
-
-  /// The broker config `pinot.broker.multistage.use.mv.aggregate` is `auto` by default, which keeps the plain plan of a
-  /// leaf-only aggregate. Setting `true` in the cluster config turns the MV aggregate on for the next queries without
-  /// a broker restart, and removing it restores `auto`.
-  @Test
-  public void testMvAggregateClusterConfigAppliesWithoutRestart()
-      throws Exception {
-    String query = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(RandomAirports), COUNT(*) FROM mytable "
-        + "GROUP BY ARRAY_TO_MV(RandomAirports)";
-    waitForPlan(query, false, "The broker plans the MV aggregate for a leaf-only aggregate by default");
-    try {
-      updateClusterConfig(Map.of(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE, "true"));
-      waitForPlan(query, true, "The broker does not plan the MV aggregate after the cluster config change");
-    } finally {
-      deleteClusterConfig(CommonConstants.Broker.CONFIG_OF_USE_MV_AGGREGATE);
-    }
-    waitForPlan(query, false, "The broker still plans the MV aggregate after the cluster config removal");
-  }
-
-  /// Waits until the plan of the leaf-only `GROUP BY ARRAY_TO_MV` query has the MV aggregate, or the plain LEAF
-  /// aggregate with `ARRAY_TO_MV` in the Project. The broker learns the cluster config through a Helix callback.
-  private void waitForPlan(String explainQuery, boolean expectMvAggregate, String errorMessage) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        String plan = explainPlan(explainQuery);
-        if (expectMvAggregate) {
-          return plan.contains("PinotLogicalMvAggregate");
-        }
-        return !plan.contains("PinotLogicalMvAggregate") && plan.contains("aggType=[LEAF]")
-            && plan.contains("ARRAY_TO_MV");
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 10_000L, errorMessage);
+    Assertions.assertThat(
+            explainPlan("EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ " + query))
+        .contains("PinotLogicalMvAggregate");
   }
 
   /// Above a self-join the MV aggregate runs in an intermediate stage. It gives the same rows as
@@ -1368,9 +1337,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     String join = "FROM mytable a JOIN mytable b ON a.FlightNum = b.FlightNum AND a.DaysSinceEpoch = b.DaysSinceEpoch ";
     String query = "SELECT ARRAY_TO_MV(a.RandomAirports), COUNT(*) " + join + "GROUP BY ARRAY_TO_MV(a.RandomAirports)";
-    Assertions.assertThat(explainPlan("SET useMvAggregate=true; EXPLAIN PLAN FOR " + query))
-        .contains("PinotLogicalMvAggregate");
-    JsonNode mvAggregate = postQuery("SET useMvAggregate=true; " + query);
+    // The planner plans the MV aggregate because the query fails without it.
+    Assertions.assertThat(explainPlan("EXPLAIN PLAN FOR " + query)).contains("PinotLogicalMvAggregate");
+    JsonNode mvAggregate = postQuery(query);
     assertNoError(mvAggregate);
     JsonNode unnest = postQuery("SELECT u.e, COUNT(*) FROM (SELECT a.RandomAirports AS airports " + join
         + ") t CROSS JOIN UNNEST(t.airports) AS u(e) GROUP BY u.e");
@@ -1378,11 +1347,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<List<String>> expectedRows = sortedRows(unnest.get("resultTable").get("rows"));
     assertFalse(expectedRows.isEmpty());
     assertEquals(sortedRows(mvAggregate.get("resultTable").get("rows")), expectedRows);
-    // The default mode, auto, plans the MV aggregate because the query fails without it.
-    Assertions.assertThat(explainPlan("EXPLAIN PLAN FOR " + query)).contains("PinotLogicalMvAggregate");
-    JsonNode auto = postQuery(query);
-    assertNoError(auto);
-    assertEquals(sortedRows(auto.get("resultTable").get("rows")), expectedRows);
   }
 
   /// Above a hash join and above a lookup join with the dimension table, the MV aggregate gives the same rows as the
@@ -1399,7 +1363,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     }
     JsonNode singleStage = postSingleStageQuery("SELECT RandomAirports, COUNT(*) FROM mytable WHERE DayOfWeek IN ("
         + String.join(", ", dayIdList) + ") GROUP BY RandomAirports LIMIT 100000");
-    JsonNode multiStage = postQuery("SET useMvAggregate=true; SELECT " + hint + " ARRAY_TO_MV(RandomAirports), "
+    JsonNode multiStage = postQuery("SELECT " + hint + " ARRAY_TO_MV(RandomAirports), "
         + "COUNT(*) FROM mytable JOIN daysOfWeek ON DayOfWeek = dayId GROUP BY ARRAY_TO_MV(RandomAirports)");
     assertNoError(multiStage);
     List<List<String>> expectedRows = sortedRows(singleStage.get("resultTable").get("rows"));
@@ -1412,16 +1376,16 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     return new Object[][]{{""}, {"/*+ joinOptions(join_strategy='lookup') */"}};
   }
 
-  /// The hint `is_skip_leaf_stage_group_by` does not apply to an MV aggregate: the result equals the query without
-  /// the hint.
+  /// With the hint `is_skip_leaf_stage_group_by`, the plan without the MV aggregate fails, so the planner plans the MV
+  /// aggregate, which ignores the hint. The result equals the plain aggregate of the query without the hint.
   @Test
   public void testMvAggregateSkipLeafHint()
       throws Exception {
     String query = " ARRAY_TO_MV(RandomAirports), COUNT(*) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)";
     JsonNode hinted = postQuery(
-        "SET useMvAggregate=true; SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */" + query);
+        "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */" + query);
     assertNoError(hinted);
-    JsonNode plain = postQuery("SET useMvAggregate=true; SELECT" + query);
+    JsonNode plain = postQuery("SELECT" + query);
     assertNoError(plain);
     List<List<String>> expectedRows = sortedRows(plain.get("resultTable").get("rows"));
     assertEquals(expectedRows.size(), 154);
@@ -1431,11 +1395,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   /// Two MV keys give the cartesian product per row, as in the single-stage engine, on a scan (leaf stage) and above
   /// a join (intermediate stage).
   @Test(dataProvider = "mvAggregateFromClauses")
-  public void testMvAggregateCartesian(String from)
+  public void testMvAggregateCartesian(String hint, String from)
       throws Exception {
     JsonNode singleStage = postSingleStageQuery("SELECT RandomAirports, DivAirports, COUNT(*) FROM mytable "
         + "GROUP BY RandomAirports, DivAirports LIMIT 1000000");
-    JsonNode multiStage = postQuery("SET useMvAggregate=true; SELECT ARRAY_TO_MV(RandomAirports), "
+    JsonNode multiStage = postQuery("SELECT " + hint + "ARRAY_TO_MV(RandomAirports), "
         + "ARRAY_TO_MV(DivAirports), COUNT(*) " + from + " GROUP BY ARRAY_TO_MV(RandomAirports), "
         + "ARRAY_TO_MV(DivAirports)");
     assertNoError(multiStage);
@@ -1447,11 +1411,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   /// A key over `filterMv` gives an empty array for the rows without a match. Such a row contributes to no group, as
   /// in the single-stage engine, on a scan (leaf stage) and above a join (intermediate stage).
   @Test(dataProvider = "mvAggregateFromClauses")
-  public void testMvAggregateEmptyArray(String from)
+  public void testMvAggregateEmptyArray(String hint, String from)
       throws Exception {
     String key = "filterMv(RandomAirports, 'v = ''SUN''')";
     JsonNode singleStage = postSingleStageQuery("SELECT " + key + ", COUNT(*) FROM mytable GROUP BY " + key);
-    JsonNode multiStage = postQuery("SET useMvAggregate=true; SELECT ARRAY_TO_MV(" + key + "), COUNT(*) " + from
+    JsonNode multiStage = postQuery("SELECT " + hint + "ARRAY_TO_MV(" + key + "), COUNT(*) " + from
         + " GROUP BY ARRAY_TO_MV(" + key + ")");
     assertNoError(multiStage);
     JsonNode totalRows = postQuery("SELECT COUNT(*) FROM mytable");
@@ -1463,11 +1427,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(sortedRows(multiStage.get("resultTable").get("rows")), expectedRows);
   }
 
+  /// On a scan, the hint makes the plan without the MV aggregate fail, so the planner plans the MV aggregate (see
+  /// [#mvAggregateHint]). Above a join, the plan without the MV aggregate fails anyway.
   @DataProvider(name = "mvAggregateFromClauses")
   public Object[][] mvAggregateFromClauses() {
     return new Object[][]{
-        {"FROM mytable"},
-        {"FROM mytable JOIN daysOfWeek ON DayOfWeek = dayId"}
+        {"/*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ", "FROM mytable"},
+        {"", "FROM mytable JOIN daysOfWeek ON DayOfWeek = dayId"}
     };
   }
 
@@ -1477,18 +1443,18 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testNestedArrayToMvOnLeaf()
       throws Exception {
-    JsonNode cast = postQuery("SET useMvAggregate=true; SELECT CAST(ARRAY_TO_MV(DivAirportIDs) AS VARCHAR), COUNT(*) "
+    JsonNode cast = postQuery("SELECT CAST(ARRAY_TO_MV(DivAirportIDs) AS VARCHAR), COUNT(*) "
         + "FROM mytable GROUP BY CAST(ARRAY_TO_MV(DivAirportIDs) AS VARCHAR)");
     assertNoError(cast);
     assertEquals(cast.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
-    JsonNode plain = postQuery("SET useMvAggregate=true; SELECT ARRAY_TO_MV(DivAirportIDs), COUNT(*) FROM mytable "
+    JsonNode plain = postQuery("SELECT ARRAY_TO_MV(DivAirportIDs), COUNT(*) FROM mytable "
         + "GROUP BY ARRAY_TO_MV(DivAirportIDs)");
     assertNoError(plain);
     List<List<String>> expectedRows = sortedRows(plain.get("resultTable").get("rows"));
     assertTrue(expectedRows.size() > 1, "Expected one group per element, got: " + expectedRows);
     assertEquals(sortedRows(cast.get("resultTable").get("rows")), expectedRows);
 
-    JsonNode add = postQuery("SET useMvAggregate=true; SELECT ARRAY_TO_MV(DivAirportIDs) + 1, COUNT(*) FROM mytable "
+    JsonNode add = postQuery("SELECT ARRAY_TO_MV(DivAirportIDs) + 1, COUNT(*) FROM mytable "
         + "GROUP BY ARRAY_TO_MV(DivAirportIDs) + 1");
     List<String> messages = JsonPath.parse(add.toString()).read("$.exceptions[*].message");
     Assertions.assertThat(messages).isNotEmpty();
@@ -1500,7 +1466,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test(dataProvider = "unsupportedArrayToMvQueries")
   public void testUnsupportedArrayToMv(String query)
       throws Exception {
-    JsonNode jsonNode = postQuery("SET useMvAggregate=true; " + query);
+    JsonNode jsonNode = postQuery(query);
     List<String> messages = JsonPath.parse(jsonNode.toString()).read("$.exceptions[*].message");
     Assertions.assertThat(messages).anySatisfy(
         message -> Assertions.assertThat(message).contains(ArrayToMvValidationVisitor.SUPPORTED_USES));

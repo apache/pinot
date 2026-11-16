@@ -45,8 +45,8 @@ message PlanNode {
     EnrichedJoinNode enrichedJoinNode = 17 [deprecated = true];
     UnnestNode unnestNode = 18;
     // Rolling upgrade: a server that predates this field reads it as NODE_NOT_SET and throws
-    // "Unsupported PlanNode type". The broker gate (query option useMvAggregate, broker config
-    // pinot.broker.multistage.use.mv.aggregate) controls whether a broker emits it.
+    // "Unsupported PlanNode type". A broker emits it only for a query that fails to plan without it, so
+    // every query that an old server runs today keeps its plan.
     MvAggregateNode mvAggregateNode = 19;
   }
 }

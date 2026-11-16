@@ -106,10 +106,11 @@ import org.slf4j.LoggerFactory;
 /// 3. [WithoutSort]:
 ///   Matches Aggregate node if there is no match of [SortProjectAggregate] or [SortAggregate].
 ///
-/// `GROUP BY ARRAY_TO_MV(col)`: when the MV aggregate is enabled (query option `useMvAggregate`, broker config
-/// `pinot.broker.multistage.use.mv.aggregate`), the group keys whose expression is exactly `ARRAY_TO_MV(expr)` are
-/// MV keys (see [ArrayToMvGroupKeys]). The aggregate is then split into a LEAF [PinotLogicalMvAggregate] over the
-/// array expressions, an EXCHANGE and a plain FINAL aggregate over the scalar elements, in every position of the plan.
+/// `GROUP BY ARRAY_TO_MV(col)`: when the MV aggregate is enabled (only in the second plan of a query that fails the
+/// `ARRAY_TO_MV` validation without it, see `QueryEnvironment.CompiledQuery`), the group keys whose expression is
+/// exactly `ARRAY_TO_MV(expr)` are MV keys (see [ArrayToMvGroupKeys]). The aggregate is then split into a LEAF
+/// [PinotLogicalMvAggregate] over the array expressions, an EXCHANGE and a plain FINAL aggregate over the scalar
+/// elements, in every position of the plan.
 /// An aggregate with grouping sets is never an MV aggregate.
 ///
 /// TODO:
