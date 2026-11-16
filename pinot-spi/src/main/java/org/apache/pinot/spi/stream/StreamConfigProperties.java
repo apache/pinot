@@ -135,7 +135,8 @@ public class StreamConfigProperties {
   /// How long, in milliseconds, retriable decode failures are retried during an outage of a decoder dependency. An
   /// outage lasts while a message is being retried or retriable failures keep happening less than this apart; once it
   /// has lasted this long, its failures are handled like any other decode failure. No limit by default; `0` disables
-  /// retries.
+  /// retries. The limit is per segment, not a hard cap: a new segment, pause, restart or rebalance starts a fresh
+  /// window.
   public static final String DECODE_RETRY_MAX_DURATION_MILLIS = "decodeRetryMaxDurationMillis";
 
   /// Helper method to create a stream specific property

@@ -65,6 +65,7 @@ import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
+import org.apache.pinot.segment.local.realtime.DecodeRetryTracker;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -250,8 +251,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
   private static final int CONSUMER_THREAD_INTERRUPT_INTERVAL_MS = 10000;
-  // Retriable decode failures are logged at WARN at most this often, see shouldRetryDecode()
-  private static final long DECODE_RETRY_WARN_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
 
   private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
@@ -290,15 +289,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile long _numBytesDropped = 0;
   private volatile int _consecutiveErrorCount = 0;
   private volatile boolean _firstDecodeErrorLogged = false;
-  // Decode retry state, only accessed by the consumer thread
-  private int _numDecodeRetries = 0;
-  private long _decodeRetryBackoffMs = 0;
-  // The ongoing decode outage, see shouldRetryDecode()
-  private boolean _inDecodeOutage = false;
-  private long _decodeOutageStartTimeMs = 0;
-  private long _decodeOutageLastFailureTimeMs = 0;
-  private long _decodeOutageLastWarnTimeMs = 0;
-  private boolean _decodeOutageRetryBudgetSpent = false;
+  // Decode retry state, used by the consumer thread, or by the Helix thread catching up in CONSUMING_TO_ONLINE after
+  // the consumer thread has stopped
+  private final DecodeRetryTracker _decodeRetryTracker;
 
   // Configuration constants
   private static final String STOP_ON_DECODE_ERROR_CONFIG = "stopOnDecodeError";
@@ -605,7 +598,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       MessageBatch messageBatch;
       // A batch fetched again to retry a decode is charged to the rate limiters and fetched rows meter after
       // processing, for the processed messages only: the rest are fetched again later
-      boolean decodeRetryFetch = _numDecodeRetries > 0;
+      boolean decodeRetryFetch = _decodeRetryTracker.isRetrying();
       try {
         messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, _streamConfig.getFetchTimeoutMillis());
         //track realtime rows fetched on a table level. This included valid + invalid rows
@@ -822,10 +815,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         decodeRetryNeeded = true;
         break;
       }
-      if (_numDecodeRetries > 0) {
+      int numDecodeRetries = _decodeRetryTracker.onMessageDone();
+      if (numDecodeRetries > 0) {
         _segmentLogger.info("Resumed decoding at offset: {} after {} retriable decode failures", offset,
-            _numDecodeRetries);
-        _numDecodeRetries = 0;
+            numDecodeRetries);
       }
       if (decodedRow.getException() != null) {
         String errorMessage = "Stopping consumption due to decode error at offset: " + offset;
@@ -978,54 +971,30 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  /// Returns whether to fetch and decode the message at `offset` again after a retriable decode failure; if not, it is
-  /// handled like any other decode failure. Retriable failures form an outage while a message is being retried or they
-  /// keep happening within [StreamConfig#getDecodeRetryMaxDurationMillis()] of each other, and are retried until the
-  /// outage has lasted that long.
+  /// Returns whether to fetch and decode the message at `offset` again after a retriable decode failure (see
+  /// [DecodeRetryTracker]); if not, it is handled like any other decode failure.
   private boolean shouldRetryDecode(StreamPartitionMsgOffset offset, Exception cause) {
     long nowMs = now();
-    long maxDurationMillis = _streamConfig.getDecodeRetryMaxDurationMillis();
-    long sinceLastFailureMs = _inDecodeOutage ? nowMs - _decodeOutageLastFailureTimeMs : Long.MAX_VALUE;
-    boolean outageStarts = !_inDecodeOutage || (_numDecodeRetries == 0 && sinceLastFailureMs >= maxDurationMillis);
-    if (outageStarts) {
-      _inDecodeOutage = true;
-      _decodeOutageStartTimeMs = nowMs;
-      _decodeOutageRetryBudgetSpent = false;
-    }
-    _decodeOutageLastFailureTimeMs = nowMs;
-    long outageDurationMs = nowMs - _decodeOutageStartTimeMs;
-    if (outageDurationMs >= maxDurationMillis) {
-      if (maxDurationMillis > 0 && !_decodeOutageRetryBudgetSpent) {
+    DecodeRetryTracker.Outcome outcome = _decodeRetryTracker.onRetriableFailure(nowMs);
+    if (!outcome.isRetry()) {
+      if (outcome == DecodeRetryTracker.Outcome.GIVE_UP_AND_REPORT) {
         _segmentLogger.warn("Retriable decode errors have lasted {}ms, giving up retrying the message at offset: {}. "
                 + "Until none happens for {}ms, retriable decode errors are handled like any other decode error",
-            outageDurationMs, offset, maxDurationMillis);
-        _decodeOutageRetryBudgetSpent = true;
+            _decodeRetryTracker.getOutageDurationMs(nowMs), offset, _decodeRetryTracker.getMaxDurationMs());
       }
-      _numDecodeRetries = 0;
       return false;
     }
-
-    // A failure that starts an outage or follows a quiet minute is reported with its cause and a segment error, even
-    // mid-outage, since with no retry limit an outage never ends. Other failures WARN at most once a minute.
     _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_DECODE_RETRIES, 1L);
-    boolean reportFailure =
-        outageStarts || (_numDecodeRetries == 0 && sinceLastFailureMs >= DECODE_RETRY_WARN_INTERVAL_MS);
-    if (_numDecodeRetries++ == 0) {
-      _decodeRetryBackoffMs = Math.min(StreamConfig.INITIAL_DECODE_RETRY_BACKOFF_MILLIS,
-          _streamConfig.getDecodeRetryMaxBackoffMillis());
-    }
-    if (reportFailure) {
-      _decodeOutageLastWarnTimeMs = nowMs;
+    if (outcome == DecodeRetryTracker.Outcome.RETRY_AND_REPORT) {
       String message = "Retriable decode error at offset: " + offset + ". Fetching and decoding it again";
       _segmentLogger.warn(message, cause);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(nowMs, message, cause));
-    } else if (nowMs - _decodeOutageLastWarnTimeMs >= DECODE_RETRY_WARN_INTERVAL_MS) {
-      _decodeOutageLastWarnTimeMs = nowMs;
+    } else if (outcome == DecodeRetryTracker.Outcome.RETRY_AND_REMIND) {
       _segmentLogger.warn("Still retrying: retriable decode error at offset: {}, {}ms into the outage", offset,
-          outageDurationMs, cause);
+          _decodeRetryTracker.getOutageDurationMs(nowMs), cause);
     } else if (_segmentLogger.isDebugEnabled()) {
       _segmentLogger.debug("Retriable decode error at offset: {} (failure {} of the message)", offset,
-          _numDecodeRetries, cause);
+          _decodeRetryTracker.getNumRetries(), cause);
     }
     return true;
   }
@@ -1038,8 +1007,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (_shouldStop || forceCommitEndsSegment()) {
       return;
     }
-    long backoffMs = _decodeRetryBackoffMs;
-    _decodeRetryBackoffMs = Math.min(backoffMs * 2, _streamConfig.getDecodeRetryMaxBackoffMillis());
+    long backoffMs = _decodeRetryTracker.nextBackoffMs();
     if (_state == State.INITIAL_CONSUMING || _state == State.CONSUMING_TO_ONLINE) {
       backoffMs = Math.min(backoffMs, Math.max(_consumeEndTime - now(), 0));
     }
@@ -2313,6 +2281,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _tableNameWithType);
       _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(index));
     }
+    _decodeRetryTracker = new DecodeRetryTracker(_streamConfig);
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _streamConfig.getTopicName();
