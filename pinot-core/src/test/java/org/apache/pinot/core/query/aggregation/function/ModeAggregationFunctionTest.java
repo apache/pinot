@@ -29,7 +29,7 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedIntermediateResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedResult;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -409,7 +409,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
   }
 
   private static Map<?, Long> roundTrip(ModeAggregationFunction function, Map<?, Long> intermediateResult) {
-    SerializedIntermediateResult serialized = function.serializeIntermediateResult(intermediateResult);
+    SerializedResult serialized = function.serializeIntermediateResult(intermediateResult);
     return function.deserializeIntermediateResult(
         new CustomObject(serialized.getType(), ByteBuffer.wrap(serialized.getBytes())));
   }

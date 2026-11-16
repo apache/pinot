@@ -45,6 +45,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -65,9 +66,11 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -332,11 +335,10 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     String tableNameWithType = tableConfig.getTableName();
     LOGGER.info("Start managing retention for table: {}", tableNameWithType);
 
-    // For offline tables, ensure that the segmentPushType is APPEND.
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    String segmentPushType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
-    if (tableConfig.getTableType() == TableType.OFFLINE && !"APPEND".equalsIgnoreCase(segmentPushType)) {
-      LOGGER.info("Segment push type is not APPEND for table: {}, skip managing retention", tableNameWithType);
+    if (!RetentionUtils.shouldManageTimeBasedDataRetention(tableConfig)) {
+      LOGGER.info("Skipping time-based retention for table: {} (offline tables require APPEND batch ingestion)",
+          tableNameWithType);
       return;
     }
     int untrackedSegmentsDeletionBatchSize =
@@ -354,13 +356,17 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // Scan all segment ZK metadata and purge segments if necessary
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      if (validationConfig.getHybridTableRetentionStrategy() != Enablement.DEFAULT) {
+        LOGGER.warn("hybridTableRetentionStrategy is only applicable to realtime tables, "
+            + "ignoring it for offline table: {}", tableNameWithType);
+      }
       manageRetentionForOfflineTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize,
           untrackedSegmentsRetentionStrategy);
     } else {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
       // hybrid table check should be performed before the realtime table check.
-      if (_isHybridTableRetentionStrategyEnabled && offlineTableConfig != null) {
+      if (offlineTableConfig != null && shouldEnableHybridTableRetentionStrategy(tableConfig, offlineTableConfig)) {
         // TODO: handle the orphan segment deletion for hybrid table
         manageRetentionForHybridTable(tableConfig, offlineTableConfig);
       } else {
@@ -368,6 +374,17 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             untrackedSegmentsRetentionStrategy);
       }
     }
+  }
+
+  /// Returns whether the hybrid table retention strategy should be applied to the given REALTIME table. Subclasses can
+  /// override this to decide per table.
+  ///
+  /// By default, the table-level `hybridTableRetentionStrategy` takes precedence; when it is `DEFAULT`, the value of
+  /// [ControllerConf#ENABLE_HYBRID_TABLE_RETENTION_STRATEGY] is used.
+  protected boolean shouldEnableHybridTableRetentionStrategy(TableConfig realtimeTableConfig,
+      TableConfig offlineTableConfig) {
+    return realtimeTableConfig.getValidationConfig().getHybridTableRetentionStrategy()
+        .isEnabled(_isHybridTableRetentionStrategyEnabled);
   }
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy,
@@ -392,7 +409,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy,
+  @VisibleForTesting
+  void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy,
       int untrackedSegmentsDeletionBatchSize, RetentionStrategy untrackedSegmentsRetentionStrategy) {
     List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
@@ -630,6 +648,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
       String segmentName = extractSegmentName(fileMetadata.getFilePath());
       if (Strings.isEmpty(segmentName) || segmentsToExclude.contains(segmentName)) {
+        continue;
+      }
+
+      // A metadata sidecar (<segment>.metadata.tar.gz) belongs to its segment: keep it while that segment is tracked.
+      // An orphaned one is cleaned up like any other untracked file.
+      String filePath = fileMetadata.getFilePath();
+      if (filePath.endsWith(Constants.METADATA_TAR_GZ_FILE_EXT) && segmentsToExclude.contains(
+          StringUtils.removeEnd(filePath.substring(filePath.lastIndexOf('/') + 1),
+              Constants.METADATA_TAR_GZ_FILE_EXT))) {
         continue;
       }
 

@@ -45,6 +45,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.broker.routing.instanceselector.SelectionResultTestUtils.getSegmentToInstanceMap;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
@@ -118,16 +119,16 @@ public class MultiStageReplicaGroupSelectorTest {
     // assigned to instance-1.
     Map<String, String> expectedSelectorResult = createExpectedAssignment(replicaGroup0, getSegments());
     InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // Using same requestId again should return the same selection
     selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // Using requestId=1 should select replica-group 1
     expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
     selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // Add a new LLC segment to the list of segments but don't update segment states. The selection result should
     // remain the same.
@@ -135,7 +136,7 @@ public class MultiStageReplicaGroupSelectorTest {
     LLCSegmentName newSegmentName = getLLCSegmentName(System.currentTimeMillis());
     segments.add(newSegmentName.getSegmentName());
     selectionResult = multiStageSelector.select(_brokerRequest, segments, 1);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // Test with an LLC segment that is older than the new segment expiration time.
     long delta = multiStageSelector._newSegmentExpirationTimeInSeconds * 1000 + 10_000;
@@ -185,7 +186,7 @@ public class MultiStageReplicaGroupSelectorTest {
         onlineSegments);
     Map<String, String> expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
     InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // If instance-2 also goes down, no replica-group is eligible
     enabledInstances.remove("instance-2");
@@ -241,7 +242,7 @@ public class MultiStageReplicaGroupSelectorTest {
       }
     }
     InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
-    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+    assertEquals(getSegmentToInstanceMap(selectionResult), expectedSelectorResult);
 
     // If instance-3 has an error segment as well, there is no replica group available to serve complete set of
     // segments.
@@ -283,10 +284,9 @@ public class MultiStageReplicaGroupSelectorTest {
 
     InstanceSelector.SelectionResult selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 0);
 
-    // Because instanceToPartitionMap is unaware of instances in IS/EV, segments get grouped under a null partition
-    // and are never considered in the [0..numPartitions) loop, resulting in dropped segments.
-    assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
-    assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
+    // Because the instances in IS/EV are not in the instance partitions, the segments are not queried in any instance
+    // partition, resulting in dropped segments.
+    assertTrue(selectionResult.getInstanceToSegmentsMap().isEmpty());
     // Old segments are available in IS/EV, so they should not be marked as unavailable; they are effectively dropped.
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
   }

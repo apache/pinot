@@ -24,7 +24,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction.SerializedResult;
 import org.apache.pinot.core.query.aggregation.function.PercentileAggregationFunction;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -45,7 +45,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 /// already holds `size` values:
 /// - `deserializeAndAddAll`: reads the incoming list one value at a time, then calls `merge` (`addAll`).
 /// - `mergeSerialized`: [PercentileAggregationFunction#mergeSerializedIntermediateResult], which reads the values
-///   straight into the merged list (in bulk from PrimitiveArrayOutput.MIN_BULK_VALUES values up).
+///   straight into the merged list (in bulk from PrimitiveArrays.MIN_BULK_VALUES values up).
 ///
 /// Each operation first truncates the merged list back to `size` values, so it never reallocates.
 @BenchmarkMode(Mode.AverageTime)
@@ -59,6 +59,7 @@ public class BenchmarkPercentileSerializedMerge {
   private int _size;
 
   private PercentileAggregationFunction _function;
+  private int _type;
   private ByteBuffer _serialized;
   private DoubleArrayList _merged;
 
@@ -66,7 +67,9 @@ public class BenchmarkPercentileSerializedMerge {
   public void setUp() {
     _function = new PercentileAggregationFunction(ExpressionContext.forIdentifier("col"), 50, false);
     double[] values = new Random(42).doubles(_size).toArray();
-    _serialized = ByteBuffer.wrap(ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize(new DoubleArrayList(values)));
+    SerializedResult serialized = _function.serializeIntermediateResult(new DoubleArrayList(values));
+    _type = serialized.getType();
+    _serialized = ByteBuffer.wrap(serialized.getBytes());
     _merged = new DoubleArrayList(2 * _size);
     _merged.addElements(0, values);
   }
@@ -86,8 +89,7 @@ public class BenchmarkPercentileSerializedMerge {
   @Benchmark
   public DoubleArrayList mergeSerialized() {
     _merged.size(_size);
-    CustomObject serialized =
-        new CustomObject(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(), _serialized.duplicate());
+    CustomObject serialized = new CustomObject(_type, _serialized.duplicate());
     return _function.mergeSerializedIntermediateResult(_merged, serialized);
   }
 

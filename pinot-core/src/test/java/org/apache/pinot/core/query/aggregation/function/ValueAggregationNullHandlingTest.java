@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -238,6 +237,56 @@ public class ValueAggregationNullHandlingTest {
     assertEquals(function.extractFinalResult(function.extractAggregationResult(holder)), new double[]{11.5d, 22.5d});
   }
 
+  /// Arrays of different lengths are added by position, so the sums are as long as the longest array. The rows go in
+  /// twice, so the second block also adds arrays shorter than the sums it finds.
+  @Test
+  public void testSumArrayLongAddsArraysOfDifferentLengths() {
+    Map<ExpressionContext, BlockValSet> block =
+        block(SyntheticBlockValSets.LongMV.create(null, new long[][]{{1L}, {10L, 20L, 30L}, {100L, 200L}}));
+    long[] expected = {222L, 440L, 60L};
+
+    SumArrayLongAggregationFunction function = new SumArrayLongAggregationFunction(List.of(COLUMN), true);
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    GroupByResultHolder svHolder = function.createGroupByResultHolder(1, 1);
+    GroupByResultHolder mvHolder = function.createGroupByResultHolder(2, 2);
+    for (int i = 0; i < 2; i++) {
+      function.aggregate(3, holder, block);
+      function.aggregateGroupBySV(3, new int[]{0, 0, 0}, svHolder, block);
+      function.aggregateGroupByMV(3, new int[][]{{0, 1}, {0, 1}, {0, 1}}, mvHolder, block);
+    }
+    assertEquals(function.extractAggregationResult(holder), expected);
+    assertEquals(function.extractGroupByResult(svHolder, 0), expected);
+    assertEquals(function.extractGroupByResult(mvHolder, 0), expected);
+    assertEquals(function.extractGroupByResult(mvHolder, 1), expected);
+
+    assertEquals(function.merge(new long[]{1L}, new long[]{10L, 20L, 30L}), new long[]{11L, 20L, 30L});
+    assertEquals(function.merge(new long[]{10L, 20L, 30L}, new long[]{1L}), new long[]{11L, 20L, 30L});
+  }
+
+  @Test
+  public void testSumArrayDoubleAddsArraysOfDifferentLengths() {
+    Map<ExpressionContext, BlockValSet> block =
+        block(SyntheticBlockValSets.DoubleMV.create(null, new double[][]{{1d}, {10d, 20d, 30d}, {100d, 200d}}));
+    double[] expected = {222d, 440d, 60d};
+
+    SumArrayDoubleAggregationFunction function = new SumArrayDoubleAggregationFunction(List.of(COLUMN), true);
+    AggregationResultHolder holder = function.createAggregationResultHolder();
+    GroupByResultHolder svHolder = function.createGroupByResultHolder(1, 1);
+    GroupByResultHolder mvHolder = function.createGroupByResultHolder(2, 2);
+    for (int i = 0; i < 2; i++) {
+      function.aggregate(3, holder, block);
+      function.aggregateGroupBySV(3, new int[]{0, 0, 0}, svHolder, block);
+      function.aggregateGroupByMV(3, new int[][]{{0, 1}, {0, 1}, {0, 1}}, mvHolder, block);
+    }
+    assertEquals(function.extractAggregationResult(holder), expected);
+    assertEquals(function.extractGroupByResult(svHolder, 0), expected);
+    assertEquals(function.extractGroupByResult(mvHolder, 0), expected);
+    assertEquals(function.extractGroupByResult(mvHolder, 1), expected);
+
+    assertEquals(function.merge(new double[]{1d}, new double[]{10d, 20d, 30d}), new double[]{11d, 20d, 30d});
+    assertEquals(function.merge(new double[]{10d, 20d, 30d}, new double[]{1d}), new double[]{11d, 20d, 30d});
+  }
+
   /// Unlike the others here, the sum of no arrays is NULL in both modes, which is why neither needs a mode-aware
   /// branch in extractFinalResult.
   @Test
@@ -317,6 +366,28 @@ public class ValueAggregationNullHandlingTest {
         new double[]{2.0d, 2.0d});
   }
 
+  /// Every block counts into the one histogram of the holder, and a block with no non-null row creates none.
+  @Test
+  public void testHistogramAcrossBlocks() {
+    HistogramAggregationFunction function = histogram(true);
+
+    double[] values = {1.0d, 7.0d, 6.0d};
+    AggregationResultHolder svHolder = function.createAggregationResultHolder();
+    function.aggregate(3, svHolder, block(SyntheticBlockValSets.Double.create(allNull(3), values)));
+    assertNull(function.extractAggregationResult(svHolder));
+    function.aggregate(3, svHolder, block(SyntheticBlockValSets.Double.create(ROW1_NULL, values)));
+    function.aggregate(3, svHolder, block(SyntheticBlockValSets.Double.create(ROW1_NULL, values)));
+    assertEquals(function.extractAggregationResult(svHolder), new double[]{2.0d, 2.0d});
+
+    double[][] rows = {{1.0d, 2.0d}, {7.0d}, {6.0d, 9.0d}};
+    AggregationResultHolder mvHolder = function.createAggregationResultHolder();
+    function.aggregate(3, mvHolder, block(SyntheticBlockValSets.DoubleMV.create(allNull(3), rows)));
+    assertNull(function.extractAggregationResult(mvHolder));
+    function.aggregate(3, mvHolder, block(SyntheticBlockValSets.DoubleMV.create(ROW1_NULL, rows)));
+    function.aggregate(3, mvHolder, block(SyntheticBlockValSets.DoubleMV.create(ROW1_NULL, rows)));
+    assertEquals(function.extractAggregationResult(mvHolder), new double[]{4.0d, 4.0d});
+  }
+
   /// BIG_DECIMAL is numeric and now lands in the same bins as the other numeric types, single- and multi-value.
   @Test
   public void testHistogramBigDecimalColumn() {
@@ -339,7 +410,7 @@ public class ValueAggregationNullHandlingTest {
     function.aggregateGroupBySV(3, new int[]{0, 1, 0}, holder,
         block(SyntheticBlockValSets.DoubleMV.create(ROW1_NULL, rows)));
 
-    assertEquals(function.extractGroupByResult(holder, 0), new DoubleArrayList(new double[]{2.0d, 1.0d}));
+    assertEquals(function.extractGroupByResult(holder, 0), new double[]{2.0d, 1.0d});
     assertNull(function.extractGroupByResult(holder, 1));
   }
 
@@ -353,8 +424,8 @@ public class ValueAggregationNullHandlingTest {
     function.aggregateGroupByMV(2, new int[][]{{0, 1}, {0, 1}}, holder,
         block(SyntheticBlockValSets.DoubleMV.create(ROW1_NULL, rows)));
 
-    assertEquals(function.extractGroupByResult(holder, 0), new DoubleArrayList(new double[]{2.0d, 0.0d}));
-    assertEquals(function.extractGroupByResult(holder, 1), new DoubleArrayList(new double[]{2.0d, 0.0d}));
+    assertEquals(function.extractGroupByResult(holder, 0), new double[]{2.0d, 0.0d});
+    assertEquals(function.extractGroupByResult(holder, 1), new double[]{2.0d, 0.0d});
   }
 
   // ---------- IDSET ----------

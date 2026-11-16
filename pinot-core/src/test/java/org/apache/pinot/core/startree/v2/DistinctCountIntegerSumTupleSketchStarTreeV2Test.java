@@ -24,7 +24,6 @@ import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.IntegerTupleSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -48,7 +47,7 @@ public class DistinctCountIntegerSumTupleSketchStarTreeV2Test extends BaseStarTr
   byte[] getRandomRawValue(Random random) {
     IntegerTupleSketch is = new IntegerTupleSketch(4, IntegerSummary.Mode.Sum);
     is.update(random.nextInt(100), random.nextInt(100));
-    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
+    return is.compact().toByteArray();
   }
 
   @Override

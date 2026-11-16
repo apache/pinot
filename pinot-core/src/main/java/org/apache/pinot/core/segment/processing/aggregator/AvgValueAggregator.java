@@ -19,7 +19,6 @@
 package org.apache.pinot.core.segment.processing.aggregator;
 
 import java.util.Map;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 
 
@@ -45,7 +44,7 @@ public class AvgValueAggregator implements ValueAggregator {
     // Treat empty byte arrays (default null value for BYTES columns) as missing values. When both sides are empty,
     // emit a valid serialized empty AvgPair rather than propagating an empty byte[] that cannot be deserialized.
     if (bytes1.length == 0 && bytes2.length == 0) {
-      return ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(new AvgPair());
+      return new AvgPair().toBytes();
     }
     if (bytes1.length == 0) {
       return bytes2;
@@ -54,9 +53,9 @@ public class AvgValueAggregator implements ValueAggregator {
       return bytes1;
     }
 
-    AvgPair first = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytes1);
-    AvgPair second = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytes2);
+    AvgPair first = AvgPair.fromBytes(bytes1);
+    AvgPair second = AvgPair.fromBytes(bytes2);
     first.apply(second);
-    return ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(first);
+    return first.toBytes();
   }
 }

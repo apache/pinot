@@ -27,11 +27,12 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.utils.HyperLogLogPlusUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -42,6 +43,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggregationFunction<HyperLogLogPlus, Long> {
+  private static final int HYPER_LOG_LOG_PLUS_TYPE = 40;
+
   // The parameter "p" determines the precision of the sparse list in HyperLogLogPlus.
   protected final int _p;
   // The "sp" parameter specifies the number of standard deviations that the sparse list's precision should be set to.
@@ -59,6 +62,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     } else if (arguments.size() == 3) {
       _p = arguments.get(1).getLiteral().getIntValue();
       _sp = arguments.get(2).getLiteral().getIntValue();
+      HyperLogLogPlusUtils.validateSp(_sp);
     } else {
       _p = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P;
       _sp = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_SP;
@@ -761,8 +765,8 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(HyperLogLogPlus hyperLogLogPlus) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.HyperLogLogPlus.getValue(),
+  public SerializedResult serializeIntermediateResult(HyperLogLogPlus hyperLogLogPlus) {
+    return new SerializedBytes(HYPER_LOG_LOG_PLUS_TYPE,
         ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus));
   }
 

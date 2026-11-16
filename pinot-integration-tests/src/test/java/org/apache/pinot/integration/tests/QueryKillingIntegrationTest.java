@@ -216,7 +216,8 @@ public class QueryKillingIntegrationTest extends BaseClusterIntegrationTest {
     long offlineResponseSerializationCpuTimeNs = queryResponse.get("offlineResponseSerializationCpuTimeNs").asLong();
     long offlineTotalCpuTimeNs = queryResponse.get("offlineTotalCpuTimeNs").asLong();
     assertTrue(offlineThreadCpuTimeNs > 0);
-    assertTrue(offlineSystemActivitiesCpuTimeNs > 0);
+    // System activities time is an estimate of unaccounted wall time and can be clamped to zero.
+    assertTrue(offlineSystemActivitiesCpuTimeNs >= 0);
     assertTrue(offlineResponseSerializationCpuTimeNs > 0);
     assertEquals(offlineThreadCpuTimeNs + offlineSystemActivitiesCpuTimeNs + offlineResponseSerializationCpuTimeNs,
         offlineTotalCpuTimeNs);
@@ -366,8 +367,9 @@ public class QueryKillingIntegrationTest extends BaseClusterIntegrationTest {
     long offlineTotalCpuTimeNs = queryResponse.get("offlineTotalCpuTimeNs").asLong();
     assertTrue(offlineThreadCpuTimeNs > 0,
         "offlineThreadCpuTimeNs should be > 0 after killing tests");
-    assertTrue(offlineSystemActivitiesCpuTimeNs > 0,
-        "offlineSystemActivitiesCpuTimeNs should be > 0 after killing tests");
+    // System activities time is an estimate of unaccounted wall time and can be clamped to zero.
+    assertTrue(offlineSystemActivitiesCpuTimeNs >= 0,
+        "offlineSystemActivitiesCpuTimeNs should be >= 0 after killing tests");
     assertTrue(offlineResponseSerializationCpuTimeNs > 0,
         "offlineResponseSerializationCpuTimeNs should be > 0 after killing tests");
     assertEquals(offlineThreadCpuTimeNs + offlineSystemActivitiesCpuTimeNs + offlineResponseSerializationCpuTimeNs,

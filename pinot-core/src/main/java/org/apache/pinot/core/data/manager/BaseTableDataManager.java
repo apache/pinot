@@ -1320,9 +1320,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // CRC-mismatched normal reload keeps the local segment (shouldDownload is false), so the local snapshot still
         // maps and the reload proceeds.
         UpsertContext upsertContext = isUpsertEnabled() ? _tableUpsertMetadataManager.getContext() : null;
-        boolean restoreValidDocIdsSnapshot = upsertContext != null && upsertContext.isSnapshotEnabled()
+        boolean restoreValidDocIdsOnDiskBitmap = upsertContext != null && upsertContext.isSnapshotEnabled()
             && (upsertContext.getMetadataTTL() > 0 || upsertContext.getDeletedKeysTTL() > 0);
-        if (restoreValidDocIdsSnapshot && !crcMatch && shouldDownload) {
+        if (restoreValidDocIdsOnDiskBitmap && !crcMatch && shouldDownload) {
           throw new IllegalStateException(String.format(
               "Failing reload for segment: %s of upsert table with metadata TTL: %s because the segment CRC has "
                   + "changed from: %s to: %s and the docId-based validDocIds snapshot cannot be guaranteed to map to "
@@ -1336,10 +1336,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
           // The validDocIds snapshot is a server-local file absent from the deep-store copy. createBackup moved it into
           // the backup dir; capture that path so it can be copied into the freshly downloaded segment dir below (the
           // non-download copyTo path already restores it via copyDirectory).
-          File backupValidDocIdsSnapshotFile = restoreValidDocIdsSnapshot ? new File(
+          File backupValidDocIdsOnDiskBitmapFile = restoreValidDocIdsOnDiskBitmap ? new File(
               SegmentDirectoryPaths.findSegmentDirectory(new File(indexDir.getParentFile(),
                   indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX)),
-              V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) : null;
+              V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME) : null;
           if (forceDownload) {
             _logger.info("Force downloading segment: {}", segmentName);
           } else {
@@ -1347,9 +1347,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
                 localMetadata.getCrc(), zkMetadata.getCrc());
           }
           indexDir = downloadSegment(zkMetadata);
-          if (backupValidDocIdsSnapshotFile != null && backupValidDocIdsSnapshotFile.exists()) {
-            FileUtils.copyFile(backupValidDocIdsSnapshotFile, new File(
-                SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+          if (backupValidDocIdsOnDiskBitmapFile != null && backupValidDocIdsOnDiskBitmapFile.exists()) {
+            FileUtils.copyFile(backupValidDocIdsOnDiskBitmapFile, new File(
+                SegmentDirectoryPaths.findSegmentDirectory(indexDir),
+                V1Constants.VALID_DOC_IDS_ON_DISK_BITMAP_FILE_NAME));
           }
         } else {
           _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
@@ -2196,7 +2197,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
     File indexDir =
         getSegmentDataDir(segmentName, indexLoadingConfig.getSegmentTier(), indexLoadingConfig.getTableConfig());
-    return segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
+    return segmentDirectoryLoader.load(indexDir.toURI(), indexLoadingConfig.isMappedSegmentMetadataEnabled()
+        ? loaderContext.withMappedMetadataEnabled() : loaderContext);
   }
 
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of

@@ -354,6 +354,10 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_ENABLE_INSTANCE_CHANGE_PROPAGATION =
       "controller.enable.instance.change.propagation";
   public static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
+  // When enabled, a segment's metadata sidecar (<segment>.metadata.tar.gz) is kept under
+  // Deleted_Segments_Metadata/<table>/ when the segment is deleted with retention > 0; otherwise (or when disabled) it
+  // is deleted with the segment.
+  public static final String DELETED_SEGMENTS_PRESERVE_METADATA = "controller.deleted.segments.preserveMetadata";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   public static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   public static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
@@ -370,6 +374,17 @@ public class ControllerConf extends PinotConfiguration {
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   public static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
+  /// If true, the controller may reject single-segment uploads with HTTP 403 when segment data end is past the table
+  /// data retention window (see {@link org.apache.pinot.controller.api.upload.SegmentValidationUtils}).
+  ///
+  /// This also applies to minion task uploads that push through `POST /segments`: always for Purge, UpsertCompaction
+  /// and RefreshSegment, and for RealtimeToOffline, MergeRollup and UpsertCompactMerge unless `batchSegmentUpload` is
+  /// on.
+  /// A rejected RealtimeToOffline upload does not advance its watermark, so the task retries the same window until the
+  /// source segments age out (indefinitely with the hybrid retention strategy, since the time boundary cannot advance).
+  /// Review task schedules and buffer periods against table retention before enabling.
+  public static final String SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION =
+      "controller.segment.upload.reject.out.of.retention";
   public static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
       "controller.realtime.segment.metadata.commit.numLocks";
   public static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
@@ -407,6 +422,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   public static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   public static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
+  public static final boolean DEFAULT_DELETED_SEGMENTS_PRESERVE_METADATA = false;
   public static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   public static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   public static final boolean DEFAULT_INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM = false;
@@ -419,6 +435,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DEFAULT_REBALANCE_PRE_CHECKER =
       "org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker";
   public static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
+  /// Default for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION}: disabled until explicitly enabled.
+  public static final boolean DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION = false;
   public static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
   public static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   public static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
@@ -1120,6 +1138,10 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, retentionInDays);
   }
 
+  public boolean isDeletedSegmentsPreserveMetadata() {
+    return getProperty(DELETED_SEGMENTS_PRESERVE_METADATA, DEFAULT_DELETED_SEGMENTS_PRESERVE_METADATA);
+  }
+
   public boolean isSkipLateCronSchedule() {
     return getProperty(ControllerPeriodicTasksConf.TASK_MANAGER_SKIP_LATE_CRON_SCHEDULE, false);
   }
@@ -1252,6 +1274,16 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setSegmentUploadTimeoutInMillis(long segmentUploadTimeoutInMillis) {
     setProperty(SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS, segmentUploadTimeoutInMillis);
+  }
+
+  /// @return whether out-of-retention single-segment upload rejection is enabled
+  public boolean isSegmentUploadRejectOutOfRetention() {
+    return getProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION, DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION);
+  }
+
+  /// @param rejectOutOfRetention value for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION}
+  public void setSegmentUploadRejectOutOfRetention(boolean rejectOutOfRetention) {
+    setProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION, rejectOutOfRetention);
   }
 
   public int getRealtimeSegmentMetadataCommitNumLocks() {

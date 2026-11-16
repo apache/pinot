@@ -81,6 +81,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
+import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -137,10 +138,11 @@ public class ControllerTest {
   /// Per-fork port offset so that concurrent surefire forks (forkCount > 1, reuseForks=false)
   /// allocate disjoint port ranges. surefire injects a 1-based `surefire.forkNumber` into each
   /// fork (so it is 1 even at forkCount=1, 1..N under parallel forks); it is 0 only outside a
-  /// surefire fork. The stride (5000) comfortably exceeds the ~3000-port span one ControllerTest
-  /// instance uses. Ports are still probed with findOpenPort, so the offset only separates the
-  /// per-fork starting points; no test depends on a literal base port.
-  private static final int FORK_PORT_OFFSET = forkNumber() * 5000;
+  /// surefire fork. Each fork has a 1000-port block with bounded component ranges below. With
+  /// the default base of 20000, the three CI forks use 21000-23999, below Linux's default
+  /// ephemeral range (32768-60999). Custom bases or additional forks must also avoid that range.
+  /// Probing a port does not reserve it until the listener binds.
+  private static final int FORK_PORT_OFFSET = forkNumber() * 1000;
 
   private static int forkNumber() {
     try {
@@ -172,12 +174,27 @@ public class ControllerTest {
   protected final String _clusterName = getClass().getSimpleName();
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
 
-  protected int _nextControllerPort = Integer.getInteger(TEST_PORT_BASE_PROPERTY, 20000) + FORK_PORT_OFFSET;
-  protected int _nextBrokerPort = _nextControllerPort + 1000;
-  protected int _nextBrokerGrpcPort = _nextBrokerPort + 500;
-  protected int _nextBrokerQueryRunnerPort = _nextBrokerGrpcPort + 250;
-  protected int _nextServerPort = _nextBrokerPort + 1000;
-  protected int _nextMinionPort = _nextServerPort + 1000;
+  private final int _testPortBase = Integer.getInteger(TEST_PORT_BASE_PROPERTY, 20000) + FORK_PORT_OFFSET;
+  protected final TestPortRange _controllerPortRange =
+      new TestPortRange("controller", _testPortBase, _testPortBase + 100);
+  protected final TestPortRange _brokerPortRange =
+      new TestPortRange("broker HTTP", _testPortBase + 100, _testPortBase + 200);
+  protected final TestPortRange _brokerGrpcPortRange =
+      new TestPortRange("broker gRPC", _testPortBase + 200, _testPortBase + 300);
+  protected final TestPortRange _brokerQueryRunnerPortRange =
+      new TestPortRange("broker query runner", _testPortBase + 300, _testPortBase + 400);
+  // Servers allocate five ports per configuration, with additional ports in TLS tests.
+  protected final TestPortRange _serverPortRange =
+      new TestPortRange("server", _testPortBase + 400, _testPortBase + 800);
+  protected final TestPortRange _minionPortRange =
+      new TestPortRange("minion", _testPortBase + 800, _testPortBase + 900);
+  // Offsets 900-999 are spare. Keep cursors separate so subclasses can reuse existing configurations on restart.
+  protected int _nextControllerPort = _controllerPortRange.getStart();
+  protected int _nextBrokerPort = _brokerPortRange.getStart();
+  protected int _nextBrokerGrpcPort = _brokerGrpcPortRange.getStart();
+  protected int _nextBrokerQueryRunnerPort = _brokerQueryRunnerPortRange.getStart();
+  protected int _nextServerPort = _serverPortRange.getStart();
+  protected int _nextMinionPort = _minionPortRange.getStart();
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
@@ -297,7 +314,7 @@ public class ControllerTest {
     properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
-    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    int controllerPort = _controllerPortRange.findOpenPort(_nextControllerPort);
     properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
     if (_controllerPort == 0) {
       _controllerPort = controllerPort;
@@ -313,6 +330,16 @@ public class ControllerTest {
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, true);
     overrideControllerConf(properties);
     return properties;
+  }
+
+  /// Returns the cluster configs to write to the Helix cluster before the controller starts. Can be overridden to set
+  /// cluster configs for the test.
+  ///
+  /// They are written only for keys not set in the cluster yet, the same way the controller writes its default cluster
+  /// configs. The controller then writes its defaults only for the keys still missing, so these configs take
+  /// precedence, and a key changed at runtime keeps its value across a controller restart.
+  protected Map<String, String> getInitialClusterConfigs() {
+    return Map.of();
   }
 
   /// Can be overridden to add more properties.
@@ -341,6 +368,10 @@ public class ControllerTest {
     runWithHelixMock(() -> {
       assertNull(_controllerStarter, "Controller is already started");
       assertTrue(_controllerPort > 0, "Controller port is not assigned");
+      Map<String, String> clusterConfigs = getInitialClusterConfigs();
+      if (!clusterConfigs.isEmpty()) {
+        HelixSetupUtils.setupHelixClusterWithDefaultConfigs(getZkUrl(), getHelixClusterName(), clusterConfigs);
+      }
       _controllerStarter = createControllerStarter();
       _controllerStarter.init(new PinotConfiguration(properties));
       _controllerStarter.start();
@@ -540,7 +571,7 @@ public class ControllerTest {
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
-    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    int adminPort = _serverPortRange.findOpenPort(_nextServerPort);
     helixAdmin.setConfig(configScope, Map.of(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
     _nextServerPort = adminPort + 1;
     _fakeInstanceHelixManagers.add(helixManager);
@@ -561,7 +592,7 @@ public class ControllerTest {
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
-    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    int adminPort = _serverPortRange.findOpenPort(_nextServerPort);
     helixAdmin.setConfig(configScope, Map.of(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
     _nextServerPort = adminPort + 1;
     _fakeInstanceHelixManagers.add(helixManager);

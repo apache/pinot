@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.customobject;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -37,6 +37,6 @@ public class SerializedHLLPlus implements Comparable<SerializedHLLPlus> {
 
   @Override
   public String toString() {
-    return BytesUtils.toHexString(CustomSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(_hyperLogLogPlus));
+    return BytesUtils.toHexString(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(_hyperLogLogPlus));
   }
 }

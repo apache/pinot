@@ -610,6 +610,26 @@ public class RequestUtils {
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
   }
 
+  /// Canonical names, see [#canonicalizeFunctionName(String)], of the functions that read rows from somewhere other
+  /// than the FROM clause of the query that calls them: `lookup()` joins a dimension table by primary key,
+  /// `IN_SUBQUERY` runs its quoted subquery as a request of its own and `IN_PARTITIONED_SUBQUERY` runs it on the
+  /// server. The access checks keyed on the FROM clause do not cover them, so the single-stage broker rejects them
+  /// under row-level security, see [#isCrossTableFunction(String)].
+  ///
+  /// Nothing derives this set from the function registries, so a function that reads another table or runs a nested
+  /// query must be added here when it is defined, and to `DeleteStatement#CROSS_TABLE_FUNCTIONS`, which keeps the
+  /// same list in its own fold: `lookup` is `TransformFunctionType#LOOKUP` (with `LookupTransformFunction` in
+  /// pinot-core), `insubquery` is rewritten by `BaseSingleStageBrokerRequestHandler#IN_SUBQUERY` in pinot-broker and
+  /// `inpartitionedsubquery` by `ServerQueryExecutorV1Impl#IN_PARTITIONED_SUBQUERY` in pinot-core.
+  private static final Set<String> CROSS_TABLE_FUNCTIONS = Set.of("lookup", "insubquery", "inpartitionedsubquery");
+
+  /// Returns whether `canonicalName` names a function that reads rows from somewhere other than the FROM clause, see
+  /// [#CROSS_TABLE_FUNCTIONS]. The name must already be canonical, see [#canonicalizeFunctionName(String)], as the
+  /// parser leaves the operator of every compiled function call; a name as written in a query is not matched.
+  public static boolean isCrossTableFunction(String canonicalName) {
+    return CROSS_TABLE_FUNCTIONS.contains(canonicalName);
+  }
+
   /// Returns true iff `expression` is an `AS`-wrapped function call
   /// (i.e. shaped like `expr AS alias` after Calcite parsing).
   ///
