@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.tsdb.planner.physical;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +38,8 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.TableRouteProvider;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
@@ -67,16 +71,66 @@ public class TableScanVisitor {
           compileBrokerRequest(sfpNode.getTableName(), filterExpression),
           context._requestId);
       Preconditions.checkNotNull(routingTable, "Failed to get routing table for table: " + sfpNode.getTableName());
+      routingTable = context._routingCustomizer.customize(sfpNode, routingTable, context._routingContext);
+      Preconditions.checkNotNull(routingTable, "Routing customizer returned no routing for table: "
+          + sfpNode.getTableName());
+      List<String> unavailableSegments = routingTable.getUnavailableSegments();
+      if (routingTable.getServerInstanceToSegmentsMap().isEmpty() && unavailableSegments != null
+          && !unavailableSegments.isEmpty()) {
+        // No data in range is an empty result; segments no server can serve are an outage, not an empty result.
+        throw new QueryException(QueryErrorCode.SERVER_SEGMENT_MISSING, String.format(
+            "No server can serve %d unavailable segment(s) of table: %s", unavailableSegments.size(),
+            sfpNode.getTableName()));
+      }
       for (var entry : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
         ServerInstance serverInstance = entry.getKey();
-        List<String> segments = entry.getValue().getSegments();
+        List<String> segments = entry.getValue().getSegments() == null ? List.of() : entry.getValue().getSegments();
+        List<String> optionalSegments = entry.getValue().getOptionalSegments() == null ? List.of()
+            : entry.getValue().getOptionalSegments();
+        // A server reads the leaf only if it has segments for it: it then sends exactly one block for the leaf, which
+        // is what the leaf's exchange counts on.
+        if (segments.isEmpty() && optionalSegments.isEmpty()) {
+          continue;
+        }
         context.getLeafIdToSegmentsByServer().computeIfAbsent(serverInstance, (x) -> new HashMap<>())
             .put(sfpNode.getId(), segments);
+        if (!optionalSegments.isEmpty()) {
+          context._leafIdToOptionalSegmentsByServer.computeIfAbsent(serverInstance, (x) -> new HashMap<>())
+              .put(sfpNode.getId(), optionalSegments);
+        }
       }
     }
     for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
       assignSegmentsToPlan(childNode, timeBuckets, context);
     }
+  }
+
+  /// Adds the query options the [TimeSeriesRoutingCustomizer] collected during [#assignSegmentsToPlan] to every leaf,
+  /// so the servers receive them. Returns the plan unchanged when there are none. A collected option replaces a leaf's
+  /// own option with the same key, so the servers read exactly what the leaf was routed for.
+  ///
+  /// @param planNode The [BaseTimeSeriesPlanNode] to process.
+  /// @param queryOptions The options collected for the query, from [Context#getRoutingQueryOptions()].
+  /// @return The plan with the options added to every leaf.
+  public BaseTimeSeriesPlanNode addQueryOptionsToPlan(BaseTimeSeriesPlanNode planNode,
+      Map<String, String> queryOptions) {
+    if (queryOptions.isEmpty()) {
+      return planNode;
+    }
+    if (planNode instanceof LeafTimeSeriesPlanNode) {
+      LeafTimeSeriesPlanNode leafNode = (LeafTimeSeriesPlanNode) planNode;
+      Map<String, String> leafQueryOptions = new HashMap<>();
+      if (leafNode.getQueryOptions() != null) {
+        leafQueryOptions.putAll(leafNode.getQueryOptions());
+      }
+      leafQueryOptions.putAll(queryOptions);
+      return leafNode.withQueryOptions(leafQueryOptions);
+    }
+    List<BaseTimeSeriesPlanNode> newInputs = new ArrayList<>();
+    for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
+      newInputs.add(addQueryOptionsToPlan(childNode, queryOptions));
+    }
+    return planNode.withInputs(newInputs);
   }
 
   /// Adds table type information (offline/realtime) to the plan node.
@@ -121,17 +175,43 @@ public class TableScanVisitor {
     return null;
   }
 
-  public static Context createContext(Long requestId) {
-    return new Context(requestId);
+  public static Context createContext(Long requestId, @Nullable Map<String, String> requestQueryOptions,
+      TimeSeriesRoutingCustomizer routingCustomizer) {
+    return new Context(requestId, requestQueryOptions, routingCustomizer);
   }
 
   public static class Context {
     private final Map<ServerInstance, Map<String, List<String>>> _leafIdToSegmentsByServer = new HashMap<>();
+    private final Map<ServerInstance, Map<String, List<String>>> _leafIdToOptionalSegmentsByServer = new HashMap<>();
     private final Long _requestId;
     private final List<String> _tableNames = new ArrayList<>();
+    private final Map<String, String> _requestQueryOptions;
+    private final Map<String, String> _routingQueryOptions = new HashMap<>();
+    private final TimeSeriesRoutingCustomizer _routingCustomizer;
+    // The customizer's view of this query, so it cannot reach the planner's own state through the context.
+    private final TimeSeriesRoutingContext _routingContext = new TimeSeriesRoutingContext() {
+      @Override
+      public Map<String, String> getRequestQueryOptions() {
+        return _requestQueryOptions;
+      }
 
-    public Context(Long requestId) {
+      @Override
+      public Map<String, String> getRoutingQueryOptions() {
+        return Collections.unmodifiableMap(_routingQueryOptions);
+      }
+
+      @Override
+      public void putRoutingQueryOption(String key, String value) {
+        _routingQueryOptions.put(key, value);
+      }
+    };
+
+    public Context(Long requestId, @Nullable Map<String, String> requestQueryOptions,
+        TimeSeriesRoutingCustomizer routingCustomizer) {
       _requestId = requestId;
+      _requestQueryOptions =
+          requestQueryOptions == null ? Map.of() : Collections.unmodifiableMap(new HashMap<>(requestQueryOptions));
+      _routingCustomizer = routingCustomizer;
     }
 
     public List<TimeSeriesQueryServerInstance> getQueryServers() {
@@ -140,8 +220,18 @@ public class TableScanVisitor {
     }
 
     public Map<String, Map<String, List<String>>> getLeafIdToSegmentsByInstanceId() {
+      return byInstanceId(_leafIdToSegmentsByServer);
+    }
+
+    /// Per server, the non-empty optional segments of each leaf: segments the server queries if it has them.
+    public Map<String, Map<String, List<String>>> getLeafIdToOptionalSegmentsByInstanceId() {
+      return byInstanceId(_leafIdToOptionalSegmentsByServer);
+    }
+
+    private static Map<String, Map<String, List<String>>> byInstanceId(
+        Map<ServerInstance, Map<String, List<String>>> byServer) {
       Map<String, Map<String, List<String>>> result = new HashMap<>();
-      for (var entry : _leafIdToSegmentsByServer.entrySet()) {
+      for (var entry : byServer.entrySet()) {
         result.put(entry.getKey().getInstanceId(), entry.getValue());
       }
       return result;
@@ -157,6 +247,23 @@ public class TableScanVisitor {
 
     public void addTableName(String tableName) {
       _tableNames.add(tableName);
+    }
+
+    /// The query options of the request, read-only.
+    @VisibleForTesting
+    Map<String, String> getRequestQueryOptions() {
+      return _requestQueryOptions;
+    }
+
+    /// Query options the [TimeSeriesRoutingCustomizer] added while routing the leaves of this query, read-only.
+    public Map<String, String> getRoutingQueryOptions() {
+      return Collections.unmodifiableMap(_routingQueryOptions);
+    }
+
+    /// What the [TimeSeriesRoutingCustomizer] sees of this query.
+    @VisibleForTesting
+    TimeSeriesRoutingContext getRoutingContext() {
+      return _routingContext;
     }
   }
 

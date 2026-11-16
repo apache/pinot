@@ -347,6 +347,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         serverRoutingStatsManager);
   }
 
+  /// Override to supply a custom [TimeSeriesRequestHandler], e.g. one built with a
+  /// `TimeSeriesRoutingCustomizer` that adjusts how each time-series leaf is routed.
+  /// The default implementation routes every leaf exactly as the routing manager chooses.
+  protected TimeSeriesRequestHandler createTimeSeriesRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, BrokerRoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
+    return new TimeSeriesRequestHandler(config, brokerId, requestIdGenerator, routingManager, accessControlFactory,
+        queryQuotaManager, tableCache, threadAccountant, multiClusterRoutingContext);
+  }
+
   private void setupHelixSystemProperties() {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
@@ -606,7 +617,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
       timeSeriesRequestHandler =
-          new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+          createTimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _threadAccountant,
               multiClusterRoutingContext);
     }

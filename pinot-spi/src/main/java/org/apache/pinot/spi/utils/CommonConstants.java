@@ -2775,6 +2775,24 @@ public class CommonConstants {
           public static String decodeSegmentListKey(String key) {
             return key.substring(SEGMENT_MAP_ENTRY_PREFIX.length());
           }
+
+          /// Optional segments of a plan: segments the routing manager lets a server skip if it does not have them
+          /// yet, e.g. newly pushed segments not yet ONLINE in the external view. A server that does not know the key
+          /// ignores it and queries only the required segments.
+          public static final String OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX = "$optionalSegmentMapEntry#";
+
+          public static boolean isKeyOptionalSegmentList(String key) {
+            return key.startsWith(OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX);
+          }
+
+          public static String encodeOptionalSegmentListKey(String planId) {
+            return OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX + planId;
+          }
+
+          /// Returns the plan-id corresponding to the encoded optional segment list key.
+          public static String decodeOptionalSegmentListKey(String key) {
+            return key.substring(OPTIONAL_SEGMENT_MAP_ENTRY_PREFIX.length());
+          }
         }
       }
 

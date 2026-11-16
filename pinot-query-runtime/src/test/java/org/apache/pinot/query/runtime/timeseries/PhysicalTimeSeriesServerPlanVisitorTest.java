@@ -25,8 +25,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
@@ -98,6 +100,24 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
       assertEquals(queryContext.getLimit(), RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT);
       assertEquals(queryContext.getQueryOptions().get("numGroupsLimit"), "1000");
     }
+  }
+
+  @Test
+  public void testLeafRequestCarriesOptionalSegments() {
+    PhysicalTimeSeriesServerPlanVisitor serverPlanVisitor = new PhysicalTimeSeriesServerPlanVisitor(
+        mock(QueryExecutor.class), mock(ExecutorService.class), mock(ServerMetrics.class));
+    LeafTimeSeriesPlanNode leafNode = new LeafTimeSeriesPlanNode("leaf", List.of(), "orderTable", "orderTime",
+        TimeUnit.SECONDS, 0L, "", "orderCount", new AggInfo("SUM", false, Map.of()), List.of(), SERIES_LIMIT,
+        QUERY_OPTIONS);
+    TimeSeriesExecutionContext context =
+        new TimeSeriesExecutionContext(LANGUAGE, TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
+            DUMMY_DEADLINE_MS, Map.of(MetadataKeys.REQUEST_ID, "1", MetadataKeys.BROKER_ID, "broker"),
+            Map.of("leaf", List.of("seg1")), Map.of("leaf", List.of("seg2")), Map.of());
+
+    ServerQueryRequest request = serverPlanVisitor.compileLeafServerQueryRequest(leafNode, context);
+
+    assertEquals(request.getSegmentsToQuery(), List.of("seg1"));
+    assertEquals(request.getOptionalSegments(), List.of("seg2"));
   }
 
   private boolean isNumber(String s) {
