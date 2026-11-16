@@ -54,6 +54,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -466,7 +467,7 @@ public class QueryRoutingTest {
     assertLatencyUpdate(serverId, latencyBefore, serverResponse.getResponseDelayMs());
   }
 
-  private void assertLatencyUpdate(String serverId, Double latencyBefore, long latencyMs) {
+  private void assertLatencyUpdate(String serverId, @Nullable Double latencyBefore, long latencyMs) {
     double previousAverage =
         latencyBefore != null ? latencyBefore : AdaptiveServerSelector.DEFAULT_AVG_INITIALIZATION_VAL;
     double alpha = AdaptiveServerSelector.DEFAULT_EWMA_ALPHA;
