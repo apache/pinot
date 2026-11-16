@@ -1321,8 +1321,6 @@ public class DistinctCountThetaSketchAggregationFunction
         mergedAccumulators.add(thetaSketchAccumulator1);
         continue;
       }
-      thetaSketchAccumulator1.setSetOperationBuilder(_setOperationBuilder);
-      thetaSketchAccumulator1.setThreshold(_accumulatorThreshold);
       thetaSketchAccumulator1.merge(thetaSketchAccumulator2);
       mergedAccumulators.add(thetaSketchAccumulator1);
     }
@@ -1381,9 +1379,8 @@ public class DistinctCountThetaSketchAggregationFunction
       int numBytes = buffer.getInt();
       ByteBuffer slice = buffer.slice();
       slice.limit(numBytes);
-      ThetaSketchAccumulator thetaSketchAccumulator = new ThetaSketchAccumulator();
-      thetaSketchAccumulator.apply(ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(slice));
-      thetaSketchAccumulators.add(thetaSketchAccumulator);
+      thetaSketchAccumulators.add(new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold,
+          ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(slice)));
       buffer.position(buffer.position() + numBytes);
     }
     return thetaSketchAccumulators;
@@ -1404,8 +1401,6 @@ public class DistinctCountThetaSketchAggregationFunction
 
     for (Object accumulatorObject : accumulators) {
       ThetaSketchAccumulator accumulator = convertSketchAccumulator(accumulatorObject);
-      accumulator.setThreshold(_accumulatorThreshold);
-      accumulator.setSetOperationBuilder(_setOperationBuilder);
       mergedSketches.add(accumulator.getResult());
     }
 

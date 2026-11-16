@@ -55,8 +55,6 @@ public class DistinctCountRawCPCSketchAggregationFunction extends DistinctCountC
     if (intermediateResult == null) {
       return null;
     }
-    intermediateResult.setLgNominalEntries(_lgNominalEntries);
-    intermediateResult.setThreshold(_accumulatorThreshold);
     return new SerializedCPCSketch(intermediateResult.getResult());
   }
 

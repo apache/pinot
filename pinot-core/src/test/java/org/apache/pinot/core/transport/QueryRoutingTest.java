@@ -35,6 +35,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.util.ReferenceCountUtil;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -63,6 +64,7 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
@@ -533,6 +535,86 @@ public class QueryRoutingTest {
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  /// The broker stamps each request with the time it stops waiting for it. With a zero clock-skew allowance, the
+  /// server caps the execution deadline at exactly that time, which makes the stamp visible.
+  @Test
+  public void testRequestCarriesBrokerDeadline()
+      throws Exception {
+    List<ServerQueryRequest> received = new CopyOnWriteArrayList<>();
+    _queryServer = QueryServerTestUtils.newQueryServer(0, zeroDeadlineAllowanceConfig(), queryRequest -> {
+      received.add(queryRequest);
+      return Futures.immediateFuture(emptyResponse(queryRequest.getRequestId()));
+    });
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try {
+      // BROKER_REQUEST carries no timeoutMs, so the server's own timeout (15s) is longer than the broker's wait
+      AsyncQueryResponse asyncQueryResponse =
+          queryRouter.submitQuery(1L, "testTable", BROKER_REQUEST, _routingTable, null, null, 5_000L);
+      asyncQueryResponse.getFinalResponses();
+
+      assertEquals(asyncQueryResponse.getStatus(), QueryResponse.Status.COMPLETED);
+      assertEquals(received.size(), 1);
+      assertEquals(received.get(0).toExecutionContext("testServer").getActiveDeadlineMs(),
+          asyncQueryResponse.getMaxEndTimeMs());
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
+  /// End to end over Netty: a request held up on its way to the server until after the broker stopped waiting for it
+  /// is not executed, while the requests around it are. The server's read is held up by the request ahead of it, as
+  /// a stalled connection would.
+  @Test
+  public void testRequestPastDeadlineIsNotExecuted()
+      throws Exception {
+    List<Long> executed = new CopyOnWriteArrayList<>();
+    _queryServer = QueryServerTestUtils.newQueryServer(0, zeroDeadlineAllowanceConfig(), queryRequest -> {
+      long requestId = queryRequest.getRequestId();
+      executed.add(requestId);
+      if (requestId == 1L) {
+        // Runs on the connection's event loop, so the requests behind this one are read only after it returns
+        Uninterruptibles.sleepUninterruptibly(1_500L, TimeUnit.MILLISECONDS);
+      }
+      return Futures.immediateFuture(emptyResponse(requestId));
+    });
+    initializeTestFixtures(startAndGetPort(_queryServer));
+    QueryRouter queryRouter = newIsolatedQueryRouter();
+    try {
+      AsyncQueryResponse first =
+          queryRouter.submitQuery(1L, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+      AsyncQueryResponse late =
+          queryRouter.submitQuery(2L, "testTable", BROKER_REQUEST, _routingTable, null, null, 100L);
+      AsyncQueryResponse last =
+          queryRouter.submitQuery(3L, "testTable", BROKER_REQUEST, _routingTable, null, null, 10_000L);
+
+      late.getFinalResponses();
+      assertEquals(late.getStatus(), QueryResponse.Status.TIMED_OUT);
+      first.getFinalResponses();
+      last.getFinalResponses();
+      assertEquals(first.getStatus(), QueryResponse.Status.COMPLETED);
+      assertEquals(last.getStatus(), QueryResponse.Status.COMPLETED);
+      // The server reads the requests of a connection in order, so the second one was handled before the third
+      assertEquals(executed, List.of(1L, 3L));
+    } finally {
+      queryRouter.shutDown();
+    }
+  }
+
+  private static PinotConfiguration zeroDeadlineAllowanceConfig() {
+    return new PinotConfiguration(Map.of(CommonConstants.Server.CONFIG_OF_REQUEST_DEADLINE_CLOCK_SKEW_MS, "0"));
+  }
+
+  private static DataBuffer emptyResponse(long requestId) {
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    try {
+      return dataTable.toDataBuffer();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   @Test

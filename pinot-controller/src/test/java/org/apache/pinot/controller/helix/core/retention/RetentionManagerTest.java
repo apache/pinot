@@ -56,6 +56,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -69,6 +70,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -607,8 +609,11 @@ public class RetentionManagerTest {
     ControllerConf conf = new ControllerConf();
     conf.setProperty(ControllerConf.ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, clusterLevel);
 
-    RetentionManager retentionManager = spy(createSizeRetentionManager(realtimeTableConfig, List.of(), resourceManager,
-        mock(ControllerMetrics.class), conf, mock(BrokerServiceHelper.class)));
+    // Spy a plain RetentionManager rather than going through createRetentionManager(...), so the package-private
+    // methods stubbed below stay interceptable when a subclass suite overrides that factory
+    stubSizeRetentionResourceManager(realtimeTableConfig, List.of(), resourceManager, conf);
+    RetentionManager retentionManager = spy(new RetentionManager(resourceManager, mock(LeadControllerManager.class),
+        conf, mock(ControllerMetrics.class), mock(BrokerServiceHelper.class)));
 
     // Only the retention strategy selection is under test, so stub out both branches
     doNothing().when(retentionManager).manageRetentionForHybridTable(any(), any());
@@ -2096,5 +2101,37 @@ public class RetentionManagerTest {
         return super.listDeepStoreTableDir(tableDataUri);
       }
     };
+  }
+
+  @DataProvider
+  public Object[][] tableNamesWithType() {
+    return new Object[][]{{OFFLINE_TABLE_NAME}, {REALTIME_TABLE_NAME}};
+  }
+
+  @Test(dataProvider = "tableNamesWithType")
+  public void testUntrackedScanKeepsSidecarOfTrackedSegment(String tableNameWithType)
+      throws Exception {
+    long thirtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30);
+    for (String fileName : List.of("tracked", "tracked" + Constants.METADATA_TAR_GZ_FILE_EXT,
+        "orphan" + Constants.METADATA_TAR_GZ_FILE_EXT)) {
+      File file = new File(_tableDir, fileName);
+      createFileWithContent(file, fileName);
+      setFileModificationTime(file, thirtyDaysAgo);
+    }
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getDataDir()).thenReturn(_tempDir.toString());
+    RetentionStrategy purgeAll = mock(RetentionStrategy.class);
+    when(purgeAll.isPurgeable(anyString(), anyString(), anyLong())).thenReturn(true);
+    ControllerConf conf = new ControllerConf();
+    RetentionManager retentionManager = createRetentionManager(resourceManager, mock(LeadControllerManager.class),
+        conf, new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
+        new BrokerServiceHelper(resourceManager, conf, null, null));
+
+    List<String> toDelete = retentionManager.findUntrackedSegmentsToDeleteFromDeepstore(
+        retentionManager.new TableRunContext(tableNameWithType), purgeAll, Set.of("tracked"), purgeAll);
+
+    // The aged sidecar of the tracked segment survives; the orphan is still cleaned up (resolved by the deletion path
+    // through its .tar.gz fallback).
+    assertEquals(toDelete, List.of("orphan.metadata"));
   }
 }

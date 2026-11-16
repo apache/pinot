@@ -64,6 +64,8 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // are not counted.
   LLC_ERROR_SEGMENT_REPAIR_FAILURES("failures", false),
   DELETED_TMP_SEGMENT_COUNT("DeletedTmpSegmentCount", false),
+  REALTIME_METADATA_TAR_MOVE_FAILURE("RealtimeMetadataTarMoveFailure", false),
+  REALTIME_METADATA_TAR_INVALIDATE_FAILURE("RealtimeMetadataTarInvalidateFailure", false),
   TABLE_REBALANCE_FAILURE_DETECTED("TableRebalanceFailureDetected", false),
   TABLE_REBALANCE_RETRY("TableRebalanceRetry", false),
   TABLE_REBALANCE_RETRY_TOO_MANY_TIMES("TableRebalanceRetryTooManyTimes", false),
@@ -102,7 +104,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
   LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false),
   // Storage quota breach detected for a table whose enforcement mode is ENFORCED or SHADOW (not DISABLED)
-  STORAGE_QUOTA_EXCEEDED("StorageQuotaExceeded", false);
+  STORAGE_QUOTA_EXCEEDED("StorageQuotaExceeded", false),
+  // Segment uploads rejected for being outside the table retention window.
+  OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED("OutOfRetentionSegmentUploadRejected", true);
 
   private final String _brokerMeterName;
   private final String _unit;

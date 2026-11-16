@@ -667,6 +667,15 @@ public class RealtimeSegmentDataManagerTest {
         _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
   }
 
+  @Test
+  public void testGetDecoderClassName()
+      throws Exception {
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      // Reports the actual instantiated decoder class, not the one configured on the table
+      assertEquals(segmentDataManager.getDecoderClassName(), FakeStreamMessageDecoder.class.getName());
+    }
+  }
+
   @BeforeClass
   public void setUp() {
     ServerMetrics.register(mock(ServerMetrics.class));

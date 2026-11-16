@@ -33,6 +33,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SECONDARY_QUERIES("queries", false),
   NUM_SECONDARY_QUERIES_SCHEDULED("queries", false),
   SERVER_OUT_OF_CAPACITY_EXCEPTIONS("exceptions", false),
+  /// Requests that reached the server after the broker's deadline plus the clock-skew allowance and were answered with
+  /// a timeout error instead of being executed.
+  QUERIES_EXPIRED_ON_ARRIVAL("queries", true),
 
   QUERY_EXECUTION_EXCEPTIONS("exceptions", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
@@ -109,6 +112,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_UPLOAD_SUCCESS("segments", false),
   // Emitted only by Server to Deep-store segment uploader.
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
+  METADATA_TAR_UPLOAD_FAILURE("segments", false),
+  METADATA_TAR_UPLOAD_SUCCESS("segments", false),
+  // Emitted only by the Server to Deep-store metadata tar uploader.
+  METADATA_TAR_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   RESIZE_TIME_MS("resizeTimeMs", false),
   STAR_TREE_INDEX_BUILD_FAILURES("segments", false),
