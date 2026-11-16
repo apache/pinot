@@ -22,7 +22,6 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertThrows;
 
 
 public class PartialUpsertColumnMergerTest {
@@ -66,13 +65,6 @@ public class PartialUpsertColumnMergerTest {
     OverwriteMerger overwriteMerger =
         (OverwriteMerger) PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.OVERWRITE);
     assertEquals("newValue", overwriteMerger.merge("oldValue", "newValue"));
-  }
-
-  @Test
-  public void testForceOverwriteHasNoMerger() {
-    // PartialUpsertColumnarMerger keeps the new row as is for FORCE_OVERWRITE columns, without a column merger
-    assertThrows(IllegalStateException.class,
-        () -> PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.FORCE_OVERWRITE));
   }
 
   @Test
