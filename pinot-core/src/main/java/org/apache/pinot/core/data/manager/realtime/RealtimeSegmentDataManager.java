@@ -37,7 +37,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.ex.ConfigurationException;
@@ -318,8 +320,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile boolean _hasMessagesFetched = false;
   private volatile boolean _endOfPartitionGroup = false;
   private volatile boolean _forceCommitMessageReceived = false;
-  // Notified by forceCommit() to wake a decode retry backoff, so the segment ends without waiting it out
-  private final Object _decodeRetryBackoffLock = new Object();
+  // Signalled by forceCommit() to wake a decode retry backoff, so the segment ends without waiting it out
+  private final Lock _decodeRetryBackoffLock = new ReentrantLock();
+  private final Condition _forceCommitReceived = _decodeRetryBackoffLock.newCondition();
   private volatile StreamPartitionMsgOffset _finalOffset; // Exclusive, used when we want to catch up to this one
   private volatile boolean _shouldStop = false;
 
@@ -1048,16 +1051,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   void sleepBeforeDecodeRetry(long backoffMs)
       throws InterruptedException {
-    long timeoutNs = TimeUnit.MILLISECONDS.toNanos(backoffMs);
-    long startNs = System.nanoTime();
-    synchronized (_decodeRetryBackoffLock) {
-      while (!forceCommitEndsSegment()) {
-        long remainingNs = timeoutNs - (System.nanoTime() - startNs);
-        if (remainingNs <= 0) {
-          return;
-        }
-        TimeUnit.NANOSECONDS.timedWait(_decodeRetryBackoffLock, remainingNs);
+    long remainingNs = TimeUnit.MILLISECONDS.toNanos(backoffMs);
+    _decodeRetryBackoffLock.lock();
+    try {
+      while (remainingNs > 0 && !forceCommitEndsSegment()) {
+        remainingNs = _forceCommitReceived.awaitNanos(remainingNs);
       }
+    } finally {
+      _decodeRetryBackoffLock.unlock();
     }
   }
 
@@ -2729,8 +2730,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public void forceCommit() {
     _forceCommitMessageReceived = true;
-    synchronized (_decodeRetryBackoffLock) {
-      _decodeRetryBackoffLock.notifyAll();
+    _decodeRetryBackoffLock.lock();
+    try {
+      _forceCommitReceived.signalAll();
+    } finally {
+      _decodeRetryBackoffLock.unlock();
     }
   }
 
