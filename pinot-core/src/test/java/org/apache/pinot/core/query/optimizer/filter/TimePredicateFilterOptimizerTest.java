@@ -206,6 +206,24 @@ public class TimePredicateFilterOptimizerTest {
     testInvalidFilterOptimizer("453630 = datetrunc('DAY', col)");
   }
 
+  @Test
+  public void testDateTruncOptimizerDefaultOutputUnit() {
+    // Without the output unit argument, DATETRUNC returns values in the input unit, so the literal is in the input unit
+    testDateTrunc("datetrunc('DAY', col, 'MICROSECONDS') >= 1620777600000000",
+        new Range("1620777600000000", true, Long.MAX_VALUE, true));
+    testDateTrunc("datetrunc('DAY', col, 'MICROSECONDS') < 1620777600000000",
+        new Range(Long.MIN_VALUE, true, "1620777600000000", false));
+    testDateTrunc("datetrunc('DAY', col, 'SECONDS') = 1620777600", new Range("1620777600", true, "1620863999", true));
+    testDateTrunc("datetrunc('DAY', col, 'SECONDS') BETWEEN 1620777600 AND 1620863999",
+        new Range("1620777600", true, "1620863999", true));
+
+    // Same with the time zone argument
+    testDateTrunc("datetrunc('DAY', col, 'MICROSECONDS', 'UTC') >= 1620777600000000",
+        new Range("1620777600000000", true, Long.MAX_VALUE, true));
+    testDateTrunc("datetrunc('DAY', col, 'SECONDS', 'UTC') = 1620777600",
+        new Range("1620777600", true, "1620863999", true));
+  }
+
   /// Helper method to test optimizing DATE_TRUNC on the given filter.
   private void testDateTrunc(String filterString, Range expectedRange) {
     Expression originalExpression = CalciteSqlParser.compileToExpression(filterString);

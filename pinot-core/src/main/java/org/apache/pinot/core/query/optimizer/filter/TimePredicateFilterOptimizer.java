@@ -441,8 +441,9 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       }
     }
     ISOChronology chronology = ISOChronology.getInstanceUTC();
+    // Same default as DateTruncTransformFunction: the output unit is the input unit when unspecified
     String outputTimeUnit = (dateTruncOperands.size() == 5) ? dateTruncOperands.get(4).getLiteral().getStringValue()
-        : TimeUnit.MILLISECONDS.name();
+        : inputTimeUnit;
 
     switch (filterKind) {
       case EQUALS: {
