@@ -47,9 +47,6 @@ public class PartialUpsertColumnMergerFactory {
         return MIN_MERGER;
       case OVERWRITE:
         return OVERWRITE_MERGER;
-      case FORCE_OVERWRITE:
-        // The new value is always kept as is, so there is nothing to merge
-        throw new IllegalArgumentException("FORCE_OVERWRITE has no column merger");
       case UNION:
         return UNION_MERGER;
       default:

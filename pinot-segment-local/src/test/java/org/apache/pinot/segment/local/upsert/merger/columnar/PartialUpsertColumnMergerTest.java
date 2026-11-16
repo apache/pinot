@@ -71,7 +71,7 @@ public class PartialUpsertColumnMergerTest {
   @Test
   public void testForceOverwriteHasNoMerger() {
     // PartialUpsertColumnarMerger keeps the new row as is for FORCE_OVERWRITE columns, without a column merger
-    assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalStateException.class,
         () -> PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.FORCE_OVERWRITE));
   }
 
