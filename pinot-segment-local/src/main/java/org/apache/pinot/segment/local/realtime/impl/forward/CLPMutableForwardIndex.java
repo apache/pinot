@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
-import com.google.common.base.Utf8;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageDecoder;
@@ -32,6 +31,7 @@ import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 public class CLPMutableForwardIndex implements MutableForwardIndex {
@@ -116,7 +116,7 @@ public class CLPMutableForwardIndex implements MutableForwardIndex {
     String[] dictVars;
     Long[] encodedVars;
 
-    int length = Utf8.encodedLength(value);
+    int length = Utf8Utils.encodedLength(value);
     _lengthOfShortestElement = Math.min(_lengthOfShortestElement, length);
     _lengthOfLongestElement = Math.max(_lengthOfLongestElement, length);
     if (_isAscii) {

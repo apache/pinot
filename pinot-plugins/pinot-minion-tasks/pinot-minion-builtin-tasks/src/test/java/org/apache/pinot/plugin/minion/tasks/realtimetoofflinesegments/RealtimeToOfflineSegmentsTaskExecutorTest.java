@@ -31,7 +31,6 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
@@ -414,7 +413,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     for (int v = start; v < end; v++) {
       avgPair.apply(v);
     }
-    return ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair);
+    return avgPair.toBytes();
   }
 
   private static AvgPair readAvgPair(File segmentDir)
@@ -424,7 +423,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     try {
       Assert.assertTrue(reader.hasNext());
       GenericRow row = reader.next();
-      return ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize((byte[]) row.getValue(M_AVG));
+      return AvgPair.fromBytes((byte[]) row.getValue(M_AVG));
     } finally {
       reader.close();
     }

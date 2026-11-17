@@ -135,6 +135,9 @@ if [ -z "$PLUGINS_CLASSPATH" ] ; then
         fi
         export IFS=';'
         for PLUGIN_JAR in $PLUGINS_INCLUDE; do
+            case "$PLUGIN_JAR" in
+              pinot-kafka-2.0|pinot-kafka-3.0) PLUGIN_JAR=pinot-kafka-4.0 ;;
+            esac
             PLUGIN_JAR_PATH=$(find "$DIR" -path \*/"$PLUGIN_JAR"/"$PLUGIN_JAR"-\*.jar)
             if [ -n "$PLUGINS_CLASSPATH" ] ; then
               PLUGINS_CLASSPATH=$PLUGINS_CLASSPATH:$PLUGIN_JAR_PATH

@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -31,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
@@ -44,6 +46,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.routing.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.SegmentsToQuery;
@@ -52,13 +55,13 @@ import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.QueryServerTestUtils;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
-import org.mockito.stubbing.Answer;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -111,10 +114,15 @@ public class SingleConnectionBrokerRequestHandlerFailureDetectorTest {
   /// are recorded, mirroring the wiring `BaseBrokerStarter` performs in production. Without `pingOnTimeout` the
   /// default applies.
   private void startBroker(boolean pingOnTimeout, long retryInitialDelayMs) {
+    startBroker(pingOnTimeout, retryInitialDelayMs, Map.of());
+  }
+
+  /// As above, with extra broker settings on top.
+  private void startBroker(boolean pingOnTimeout, long retryInitialDelayMs, Map<String, Object> extraConfig) {
     // BrokerMetrics is a JVM-wide singleton, so the gauge carries over from whatever ran before in this fork.
     BrokerMetrics.get().setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, 0);
 
-    PinotConfiguration config = new PinotConfiguration();
+    PinotConfiguration config = new PinotConfiguration(new HashMap<>(extraConfig));
     config.setProperty(Broker.FailureDetector.CONFIG_OF_TYPE, Broker.FailureDetector.Type.CONNECTION.name());
     if (pingOnTimeout) {
       config.setProperty(Broker.FailureDetector.CONFIG_OF_ENABLE_PING_ON_TIMEOUT, true);
@@ -192,24 +200,25 @@ public class SingleConnectionBrokerRequestHandlerFailureDetectorTest {
   /// Starts a server whose JVM is alive but whose query engine never finishes anything -- stuck, or so busy that every
   /// query times out. Its network thread still answers pings, because they do not go through the query engine.
   private ServerInstance startStuckQueryEngineServer() {
-    return startQueryServer(0, invocation -> SettableFuture.<byte[]>create());
+    return startQueryServer(0, queryRequest -> SettableFuture.create());
   }
 
   /// Starts a server that answers queries straight away.
   private ServerInstance startRespondingServer(int port) {
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(REQUEST_ID));
-    byte[] responseBytes;
+    DataBuffer response;
     try {
-      responseBytes = dataTable.toBytes();
+      response = dataTable.toDataBuffer();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    return startQueryServer(port, invocation -> Futures.immediateFuture(responseBytes));
+    return startQueryServer(port, queryRequest -> Futures.immediateFuture(response));
   }
 
-  private ServerInstance startQueryServer(int port, Answer<?> submitAnswer) {
-    QueryServer queryServer = QueryServerTestUtils.newQueryServer(port, submitAnswer);
+  private ServerInstance startQueryServer(int port,
+      Function<ServerQueryRequest, ListenableFuture<DataBuffer>> responder) {
+    QueryServer queryServer = QueryServerTestUtils.newQueryServer(port, responder);
     _queryServers.add(queryServer);
     return enable(QueryServerTestUtils.serverInstance("localhost", QueryServerTestUtils.startAndGetPort(queryServer)));
   }
@@ -374,6 +383,36 @@ public class SingleConnectionBrokerRequestHandlerFailureDetectorTest {
     assertEquals(numLookups.get(), 0);
     assertEquals(_failureDetector.getUnhealthyServers(), Set.of());
     assertEquals(_excludedServers, List.of());
+  }
+
+  /// With pings off, a server that leaves the threshold of queries unanswered on its channel is reported to the failure
+  /// detector only when the operator opted in. By default only its channel is replaced, so a healthy server whose
+  /// heavy queries overrun their timeout is never taken out of routing for it.
+  @Test(dataProvider = "reportUnanswered")
+  public void testUnansweredServerIsReportedOnlyWhenEnabled(boolean report)
+      throws Exception {
+    stopBroker();
+    startBroker(false, RETRIES_OFF_MS, Map.of(
+        Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD, 1,
+        Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERY_GRACE_MS, 100L,
+        Broker.FailureDetector.CONFIG_OF_REPORT_UNANSWERED_SERVERS, report));
+    ServerInstance frozenServer = startFrozenServer();
+
+    assertTrue(scatter(offlineRouteTo(frozenServer)).isTimedOut());
+    if (report) {
+      awaitUnhealthyServers(frozenServer);
+      assertEquals(_excludedServers, List.of(frozenServer.getInstanceId()));
+    } else {
+      // The judgment runs a grace period after the timeout; give it far longer than that before concluding none ran
+      Thread.sleep(1_000L);
+      assertEquals(_failureDetector.getUnhealthyServers(), Set.of());
+      assertEquals(_excludedServers, List.of());
+    }
+  }
+
+  @DataProvider(name = "reportUnanswered")
+  public Object[][] reportUnanswered() {
+    return new Object[][]{{false}, {true}};
   }
 
   /// With pings off, retries connect to the server, as before this change, rather than ping it. A connect succeeds

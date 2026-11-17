@@ -51,9 +51,6 @@ public class DistinctCountIntegerTupleSketchAggregationFunction extends IntegerT
     if (accumulator == null) {
       return 0L;
     }
-    accumulator.setNominalEntries(_nominalEntries);
-    accumulator.setSetOperations(_setOps);
-    accumulator.setThreshold(_accumulatorThreshold);
     return Double.valueOf(accumulator.getResult().getEstimate()).longValue();
   }
 

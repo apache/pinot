@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -30,7 +30,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils.SizedObjectSerDe;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.memory.PinotOutputStream;
 
 
 /// Interface for aggregation functions.
@@ -124,10 +126,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 ///   is not actually per-query everywhere.
 ///
 /// @param <IntermediateResult> Intermediate result generated from segment
-/// @param <FinalResult> Final result used in broker response
+/// @param <FinalResult> Final result, in the stored form of [#getFinalResultColumnType()], see [#extractFinalResult]
 @ThreadSafe
-@SuppressWarnings("rawtypes")
-public interface AggregationFunction<IntermediateResult, FinalResult extends Comparable> {
+public interface AggregationFunction<IntermediateResult, FinalResult> {
 
   /// Returns the type of the aggregation function.
   AggregationFunctionType getType();
@@ -207,6 +208,7 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// The default deserializes `serialized` and merges it with [#merge]. Override it when the function can read the
   /// serialized form straight into `intermediateResult`, to skip a full-size copy of the incoming value. This matters
   /// for large intermediate results, such as the value list of an exact percentile, which are humongous objects for G1.
+  /// As for [#deserializeIntermediateResult], the returned result must not reference the buffer of `serialized`.
   ///
   /// Call [AggregationFunctionUtils#mergeSerialized] instead of calling this directly: it settles a `null` serialized
   /// value.
@@ -228,60 +230,129 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// This column data type is used for transferring data in data table.
   ColumnDataType getIntermediateResultColumnType();
 
-  /// Serializes the intermediate result into a custom object. This method should be implemented if the intermediate
-  /// result type is OBJECT.
-  default SerializedIntermediateResult serializeIntermediateResult(IntermediateResult intermediateResult) {
+  /// Serializes the intermediate result. This method should be implemented if the intermediate result type is OBJECT.
+  default SerializedResult serializeIntermediateResult(IntermediateResult intermediateResult) {
     throw new UnsupportedOperationException("Cannot serialize intermediate result for function: " + getType());
   }
 
-  /// Serialized intermediate result. Type can be used to identify the intermediate result type when deserializing it.
+  /// An intermediate result in its serialized form: the wire type value, the payload size, and the payload, written to
+  /// either kind of destination. The type is a value the aggregation function declares as its own constant to tell
+  /// apart the payload formats it produces, so values only need to be distinct within one function. A function
+  /// deserializes only the types it serializes.
   ///
-  /// Data table and data block builders write the value with [#getSize()] and [#writeTo(DataOutput)], and do not call
-  /// [#getBytes()]. A subclass can therefore write a large intermediate result straight into the destination, without
-  /// building the full byte array first. Such a subclass reads the intermediate result when it is written, so it must
-  /// be written before the intermediate result changes. A caller that keeps the object for later must take a snapshot
-  /// instead: `new SerializedIntermediateResult(serialized.getType(), serialized.getBytes())`.
-  class SerializedIntermediateResult {
+  /// Data table and data block builders write the payload into their paged streams with [#getSize()] and
+  /// [#writeTo(PinotOutputStream)]. A destination that holds one contiguous buffer, such as an Arrow vector, reserves
+  /// [#getSize()] bytes and fills them with [#writeTo(ByteBuffer)]. An implementation may read the intermediate result
+  /// when the payload is written, so the payload must be written before the intermediate result changes. A caller that
+  /// keeps the serialized form for later takes a snapshot instead: `new SerializedBytes(serialized.getType(),
+  /// serialized.getBytes())`.
+  interface SerializedResult {
+
+    /// Returns the wire type value of the intermediate result.
+    int getType();
+
+    /// Returns the number of payload bytes.
+    int getSize();
+
+    /// Returns the payload.
+    byte[] getBytes();
+
+    /// Writes the payload at the current position of the big-endian `buffer`, which has at least [#getSize()] bytes
+    /// remaining, and advances the position by the payload size. Only the position changes, and the buffer is not
+    /// retained.
+    void writeTo(ByteBuffer buffer);
+
+    /// Writes the payload to `output`.
+    void writeTo(PinotOutputStream output)
+        throws IOException;
+  }
+
+  /// Serialized intermediate result backed by its payload bytes.
+  final class SerializedBytes implements SerializedResult {
     private final int _type;
     private final byte[] _bytes;
 
-    public SerializedIntermediateResult(int type, byte[] buffer) {
+    public SerializedBytes(int type, byte[] bytes) {
       _type = type;
-      _bytes = buffer;
+      _bytes = bytes;
     }
 
-    /// Constructor for subclasses that serialize on demand. They must override [#getBytes()], [#getSize()] and
-    /// [#writeTo(DataOutput)].
-    protected SerializedIntermediateResult(int type) {
-      _type = type;
-      _bytes = null;
-    }
-
+    @Override
     public int getType() {
       return _type;
     }
 
+    @Override
+    public int getSize() {
+      return _bytes.length;
+    }
+
+    @Override
     public byte[] getBytes() {
       return _bytes;
     }
 
-    /// Returns the number of bytes [#writeTo(DataOutput)] writes, which is the length of [#getBytes()].
-    public int getSize() {
-      if (_bytes == null) {
-        throw new IllegalStateException(getClass().getName() + " serializes on demand and must override getSize()");
-      }
-      return _bytes.length;
+    @Override
+    public void writeTo(ByteBuffer buffer) {
+      buffer.put(_bytes);
     }
 
-    /// Writes the bytes of [#getBytes()] to `output`.
-    public void writeTo(DataOutput output)
+    @Override
+    public void writeTo(PinotOutputStream output)
         throws IOException {
       output.write(_bytes);
     }
   }
 
+  /// Serialized intermediate result that serializes its value on demand through a [SizedObjectSerDe]: the size comes
+  /// from the codec without serializing, and the payload is written straight into a buffer or an output stream. The
+  /// value must not change until the payload is written.
+  ///
+  /// @param <T> Type of the value
+  final class SerializedValue<T> implements SerializedResult {
+    private final int _type;
+    private final T _value;
+    private final SizedObjectSerDe<T> _serDe;
+
+    public SerializedValue(int type, T value, SizedObjectSerDe<T> serDe) {
+      _type = type;
+      _value = value;
+      _serDe = serDe;
+    }
+
+    @Override
+    public int getType() {
+      return _type;
+    }
+
+    @Override
+    public int getSize() {
+      return _serDe.getSerializedSize(_value);
+    }
+
+    @Override
+    public byte[] getBytes() {
+      return _serDe.serialize(_value);
+    }
+
+    @Override
+    public void writeTo(ByteBuffer buffer) {
+      _serDe.serialize(_value, buffer);
+    }
+
+    @Override
+    public void writeTo(PinotOutputStream output)
+        throws IOException {
+      _serDe.serialize(_value, output);
+    }
+  }
+
   /// Deserializes the intermediate result from the custom object. This method should be implemented if the intermediate
   /// result type is OBJECT.
+  ///
+  /// The returned result must not reference the buffer of `customObject` or any view of it: the caller may reuse or
+  /// release that memory, which can be off-heap, as soon as this method returns. A result that reads lazily from its
+  /// serialized form has to read from a heap copy of the bytes.
   default IntermediateResult deserializeIntermediateResult(CustomObject customObject) {
     throw new UnsupportedOperationException("Cannot deserialize intermediate result for function: " + getType());
   }
@@ -291,9 +362,25 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /// This column data type is used for constructing the result table
   ColumnDataType getFinalResultColumnType();
 
+  // TODO: Make final results behave the same in SSE and MSE, and before and after transport. Each change below alters
+  //   the types on the wire or in MSE plans, so it needs a rollout gate for mixed-version clusters.
+  //   - Raw sketch functions order their STRING final results by the sketch estimate where the object is compared (SSE
+  //     group trim and reduce of intermediate results, MSE group trim), but by the serialized sketch after transport
+  //     (SSE reduce of final results, MSE sort). Return a custom object that keeps the estimate order everywhere.
+  //   - SUMPRECISION returns a STRING final result in SSE but BIG_DECIMAL in MSE, so SSE orders it as a string after
+  //     transport and cannot merge the final results of several servers. Return BIG_DECIMAL in SSE as well.
+  //   - OBJECT final results have no serialization of their own: an aggregation cannot return them from servers, and a
+  //     group-by serializes them as intermediate results.
   /// Extracts the final result used in the broker response from the given intermediate result.
   /// When final results are extracted for group-by sorting, preserve the intermediate information needed for
   /// subsequent merging and final extraction.
+  ///
+  /// The final result is the value a column of [#getFinalResultColumnType()] stores, e.g. `int[]` for `INT_ARRAY` and
+  /// `int` for `BOOLEAN`, so it can be transported, sorted and merged without conversion. Sorting compares it in the
+  /// order of the column type, see [org.apache.pinot.spi.utils.StoredValueComparator]. A `STRING` final result may
+  /// instead be an object that is stored as its [Object#toString()] and orders by its own [Comparable] implementation,
+  /// e.g. the serialized sketch of a raw sketch function, which orders by the estimate of the sketch. An `OBJECT` final
+  /// result is a custom object, which must implement [Comparable] to be sorted.
   ///
   /// A `null` intermediate result means nothing was aggregated, and this method decides what that means for this
   /// particular aggregation. It is the only place where that per-function answer is expressed, so it must never
@@ -307,9 +394,16 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   @Nullable
   FinalResult extractFinalResult(@Nullable IntermediateResult intermediateResult);
 
-  /// Merges two final results, neither of which is `null`. This can be used to optimized certain functions (e.g.
+  /// Merges two final results, neither of which is `null`. This can be used to optimize certain functions (e.g.
   /// DISTINCT_COUNT) when data is partitioned on each server, where we may directly request servers to return final
-  /// result and merge them on broker.
+  /// result and merge them on broker. Final results are only merged across partitions of the aggregated values, so no
+  /// value is aggregated into both final results.
+  ///
+  /// Final results are merged in the form they are transported in, the value their column stores: a `STRING` final
+  /// result is a string even where [#extractFinalResult] returns an object stored as its string, e.g. the serialized
+  /// sketch of a raw sketch function. The merged result takes the same form. Like other column values, a final result
+  /// can be shared, e.g. when the multi-stage engine broadcasts a block to several stages, so the merge must not modify
+  /// either final result. It may return one of them unchanged.
   ///
   /// Call [AggregationFunctionUtils#mergeFinalResult] instead of calling this directly, on the same terms as [#merge].
   default FinalResult mergeFinalResult(FinalResult finalResult1, FinalResult finalResult2) {

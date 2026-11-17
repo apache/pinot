@@ -86,7 +86,7 @@ public class EmptyIndexSegment implements ImmutableSegment {
 
   @Override
   public Set<String> getPhysicalColumnNames() {
-    return _segmentMetadata.getSchema().getPhysicalColumnNames();
+    return _segmentMetadata.getPhysicalColumnNames();
   }
 
   @Override
@@ -119,6 +119,12 @@ public class EmptyIndexSegment implements ImmutableSegment {
       } catch (Exception e) {
         LOGGER.warn("Failed to close segment directory for empty segment: {}. Continuing with error.",
             getSegmentName(), e);
+      }
+    } else {
+      try {
+        _segmentMetadata.close();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to close metadata for empty segment: {}. Continuing with error.", getSegmentName(), e);
       }
     }
   }

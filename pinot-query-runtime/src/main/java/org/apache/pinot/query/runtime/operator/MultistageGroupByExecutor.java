@@ -305,7 +305,7 @@ public class MultistageGroupByExecutor {
       @Nullable AggregationFunction aggFunction) {
     if (row._sortKeys[sortIndex] == UNINITIALIZED_SORT_VALUE) {
       Object value = row._row[columnIndex];
-      // Like SSE, compare native final objects before output conversion (e.g. BigDecimal, SerializedHLL, lists).
+      // Like SSE, compare native final objects before output conversion (e.g. BigDecimal, SerializedHLL).
       // Extract lazily and retain the intermediate row for merging. Cache null results as well as non-null results.
       row._sortKeys[sortIndex] = aggFunction != null ? aggFunction.extractFinalResult(value) : value;
     }
@@ -484,16 +484,16 @@ public class MultistageGroupByExecutor {
         if (groupByKey == GroupKeyGenerator.INVALID_ID) {
           continue;
         }
-        Comparable[] mergedResults;
+        Object[] mergedResults;
         if (_mergeResultHolder.size() == groupByKey) {
-          mergedResults = new Comparable[numFunctions];
+          mergedResults = new Object[numFunctions];
           _mergeResultHolder.add(mergedResults);
         } else {
-          mergedResults = (Comparable[]) _mergeResultHolder.get(groupByKey);
+          mergedResults = _mergeResultHolder.get(groupByKey);
         }
         for (int j = 0; j < numFunctions; j++) {
-          Comparable finalResult = (Comparable) intermediateResults[j][i];
-          mergedResults[j] = AggregationFunctionUtils.mergeFinalResult(_aggFunctions[j], mergedResults[j], finalResult);
+          mergedResults[j] =
+              AggregationFunctionUtils.mergeFinalResult(_aggFunctions[j], mergedResults[j], intermediateResults[j][i]);
         }
       }
     } else {

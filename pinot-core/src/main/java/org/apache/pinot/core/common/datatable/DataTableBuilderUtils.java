@@ -18,14 +18,8 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.floats.FloatArrayList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
-import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -66,57 +60,25 @@ public class DataTableBuilderUtils {
         dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
         break;
       case INT_ARRAY:
-        if (value instanceof IntArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toIntArray((IntArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (int[]) value);
-        }
+        dataTableBuilder.setColumn(columnIndex, (int[]) value);
         break;
       case LONG_ARRAY:
-        if (value instanceof LongArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toLongArray((LongArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (long[]) value);
-        }
+        dataTableBuilder.setColumn(columnIndex, (long[]) value);
         break;
       case FLOAT_ARRAY:
-        if (value instanceof FloatArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toFloatArray((FloatArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (float[]) value);
-        }
+        dataTableBuilder.setColumn(columnIndex, (float[]) value);
         break;
       case DOUBLE_ARRAY:
-        if (value instanceof DoubleArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toDoubleArray((DoubleArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (double[]) value);
-        }
+        dataTableBuilder.setColumn(columnIndex, (double[]) value);
         break;
       case BIG_DECIMAL_ARRAY:
-        if (value instanceof ObjectArrayList) {
-          //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex,
-              ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (BigDecimal[]) value);
-        }
+        dataTableBuilder.setColumn(columnIndex, (BigDecimal[]) value);
         break;
       case STRING_ARRAY:
-        if (value instanceof ObjectArrayList) {
-          //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toStringArray((ObjectArrayList<String>) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (String[]) value);
-        }
+        dataTableBuilder.setColumn(columnIndex, (String[]) value);
         break;
       case BYTES_ARRAY:
-        if (value instanceof ObjectArrayList) {
-          //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (ByteArray[]) value);
-        }
+        dataTableBuilder.setColumn(columnIndex, (ByteArray[]) value);
         break;
       default:
         throw new IllegalStateException("Unsupported stored type: " + storedColumnDataType);

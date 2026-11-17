@@ -75,6 +75,10 @@ public class ServerQueryRequest {
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
 
+  // Upper bound on the execution deadline, which otherwise runs the query timeout from arrival. Set before the request
+  // is handed to the scheduler.
+  private long _maxDeadlineMs = Long.MAX_VALUE;
+
   /// This is called from the Netty server to create a ServerQueryRequest from the InstanceRequest
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
     this(instanceRequest, serverMetrics, queryArrivalTimeMs, false);
@@ -261,6 +265,12 @@ public class ServerQueryRequest {
     return _timerContext;
   }
 
+  /// Caps the execution deadline at `maxDeadlineMs`, for a request that arrived late, so that it does not get a full
+  /// timeout measured from its arrival.
+  public void setMaxDeadlineMs(long maxDeadlineMs) {
+    _maxDeadlineMs = maxDeadlineMs;
+  }
+
   public QueryExecutionContext toExecutionContext(String instanceId) {
     Map<String, String> queryOptions = _queryContext.getQueryOptions();
     long startTimeMs = _timerContext.getQueryArrivalTimeMs();
@@ -273,6 +283,7 @@ public class ServerQueryRequest {
       //       timeout for test environment.
       deadlineMs = startTimeMs + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
     }
+    deadlineMs = Math.min(deadlineMs, _maxDeadlineMs);
     // NOTE: Add table type suffix to the cid to make it unique when querying a hybrid table.
     // TODO: Revisit the handling for logical table when multiple tables are queries with the same cid.
     String cid = QueryIdUtils.withTypeSuffix(_cid, _tableType);

@@ -18,22 +18,21 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleCollection;
 import it.unimi.dsi.fastutil.doubles.DoubleIterator;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.startree.StarTreePreAggregatedBlockValSet;
 import org.apache.pinot.segment.local.aggregator.ArrayAggDistinctValueAggregator.ElementType;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseArrayAggDoubleFunction<I extends DoubleCollection>
-    extends BaseArrayAggFunction<I, DoubleArrayList> {
+    extends BaseArrayAggFunction<I, double[]> {
   public BaseArrayAggDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, DataType.DOUBLE, nullHandlingEnabled);
   }
@@ -143,10 +142,10 @@ public abstract class BaseArrayAggDoubleFunction<I extends DoubleCollection>
   }
 
   @Override
-  public DoubleArrayList extractFinalResult(I doubles) {
+  public double[] extractFinalResult(I doubles) {
     if (doubles == null) {
-      return new DoubleArrayList();
+      return new double[0];
     }
-    return new DoubleArrayList(doubles);
+    return doubles.toDoubleArray();
   }
 }

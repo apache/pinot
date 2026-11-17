@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Utf8;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
@@ -32,6 +31,7 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 
@@ -73,7 +73,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         if (_clpStatsCollector != null) {
           _clpStatsCollector.collect(value);
         }
-        int length = Utf8.encodedLength(value);
+        int length = Utf8Utils.encodedLength(value);
         if (_values.add(value)) {
           _minLength = Math.min(_minLength, length);
           _maxLength = Math.max(_maxLength, length);
@@ -96,7 +96,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         if (isPartitionEnabled()) {
           updatePartition(value);
         }
-        int length = Utf8.encodedLength(value);
+        int length = Utf8Utils.encodedLength(value);
         if (_isAscii) {
           _isAscii = length == value.length();
         }

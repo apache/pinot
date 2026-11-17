@@ -490,7 +490,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
         _totalUncompressedValueSizeInBytes += BigDecimalUtils.byteSize((BigDecimal) value);
         break;
       case STRING:
-        _totalUncompressedValueSizeInBytes += Utf8Utils.encodedLengthWithReplacement((String) value);
+        _totalUncompressedValueSizeInBytes += Utf8Utils.encodedLength((String) value);
         break;
       case BYTES:
         _totalUncompressedValueSizeInBytes += ((ByteArray) value).getBytes().length;

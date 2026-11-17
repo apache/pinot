@@ -42,6 +42,8 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.QuotaEnforcementMode;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -283,6 +285,31 @@ public class TableConfigUtilsTest {
         .build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true).build();
     TableConfigUtils.validate(tableConfig, schema);
+  }
+
+  @Test
+  public void ensureStorageQuotaConstraintsKeepsEnforcementModesOfDimensionTable() {
+    // No storage quota: the default is filled in, the QPS quota and both enforcement modes are kept
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setQuotaConfig(new QuotaConfig(null, "5", QuotaEnforcementMode.DISABLED, QuotaEnforcementMode.SHADOW))
+        .build();
+    TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, "200M");
+    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    assertNotNull(quotaConfig);
+    assertEquals(quotaConfig.getStorage(), "200M");
+    assertEquals(quotaConfig.getMaxQPS(), 5.0);
+    assertEquals(quotaConfig.getStorageQuotaEnforcementMode(), QuotaEnforcementMode.DISABLED);
+    assertEquals(quotaConfig.getQueryQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
+
+    // Storage quota already set: the quota config is left untouched
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
+        .setQuotaConfig(new QuotaConfig("100M", "5", QuotaEnforcementMode.SHADOW, QuotaEnforcementMode.SHADOW)).build();
+    TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, "200M");
+    quotaConfig = tableConfig.getQuotaConfig();
+    assertNotNull(quotaConfig);
+    assertEquals(quotaConfig.getStorage(), "100M");
+    assertEquals(quotaConfig.getStorageQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
+    assertEquals(quotaConfig.getQueryQuotaEnforcementMode(), QuotaEnforcementMode.SHADOW);
   }
 
   @Test
@@ -813,6 +840,40 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       fail("Should not fail due to valid aggregation function", e);
+    }
+
+    // distinctcounthllplus, expect sp above 25 to not validate
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", DataType.BYTES).build();
+
+    aggregationConfigs = List.of(new AggregationConfig("d1", "DISTINCTCOUNTHLLPLUS(s1, 12, 26)"));
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME")
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig)
+        .setNoDictionaryColumns(List.of("d1"))
+        .build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      fail("Should fail due to sp above 25");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // distinctcounthllplus, expect sp above 0 to not validate because the aggregated value is not of fixed size
+    aggregationConfigs = List.of(new AggregationConfig("d1", "DISTINCTCOUNTHLLPLUS(s1, 12, 20)"));
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME")
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig)
+        .setNoDictionaryColumns(List.of("d1"))
+        .build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      fail("Should fail due to sp above 0");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("must have fixed size aggregated value"), e.getMessage());
     }
 
     // distinctcounthll, expect not specified log2m argument to default to 8
@@ -2543,6 +2604,31 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateStarTreeIndexFunctionParameters() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", DataType.STRING)
+        .build();
+
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol"), null, null, List.of(
+        new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLLPLUS",
+            Map.of(Constants.HLLPLUS_ULL_P_KEY, 12, Constants.HLLPLUS_SP_KEY, 25), null, null, null, null, null)), 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol"), null, null, List.of(
+        new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLLPLUS",
+            Map.of(Constants.HLLPLUS_ULL_P_KEY, 12, Constants.HLLPLUS_SP_KEY, 26), null, null, null, null, null)), 1);
+    TableConfig invalidSpTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    IllegalStateException e =
+        expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(invalidSpTableConfig, schema));
+    assertTrue(e.getMessage().contains("Invalid function parameters in StarTreeIndex config"));
+  }
+
+  @Test
   public void testValidateRetentionConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", DataType.STRING)
@@ -2769,6 +2855,30 @@ public class TableConfigUtilsTest {
       assertTrue(e.getMessage().endsWith("Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS"), e.getMessage());
     } finally {
       consistencyModeListener.reset();
+    }
+  }
+
+  @Test
+  public void testConsumptionPolicyMatrix() {
+    ConsumingSegmentConsistencyModeListener listener = ConsumingSegmentConsistencyModeListener.getInstance();
+    try {
+      for (boolean protectedMode : new boolean[]{false, true}) {
+        listener.setMode(protectedMode ? ConsumingSegmentConsistencyModeListener.Mode.PROTECTED
+            : ConsumingSegmentConsistencyModeListener.Mode.RESTRICTED);
+        for (UpsertConfig.Mode mode : new UpsertConfig.Mode[]{UpsertConfig.Mode.FULL, UpsertConfig.Mode.PARTIAL}) {
+          for (boolean drop : new boolean[]{false, true}) {
+            UpsertConfig config = new UpsertConfig(mode);
+            config.setDropOutOfOrderRecord(drop);
+            for (ParallelSegmentConsumptionPolicy policy : ParallelSegmentConsumptionPolicy.values()) {
+              boolean rejects = protectedMode && (mode == UpsertConfig.Mode.PARTIAL || drop)
+                  && policy != ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS;
+              checkConsumptionDuringUpsertRevert(config, policy, rejects);
+            }
+          }
+        }
+      }
+    } finally {
+      listener.reset();
     }
   }
 
@@ -4784,6 +4894,14 @@ public class TableConfigUtilsTest {
     assertEquals(TableConfigUtils.getPartitionColumn(tableConfig), "legacyCol");
     tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig("", 1));
     assertNull(TableConfigUtils.getPartitionColumn(tableConfig));
+  }
+
+  @Test
+  public void testUnknownSkipTokenCannotBypassValidation() {
+    for (String value : List.of("ACTIVE_TASKS", "TASK,ACTIVE_TASKS", "ALL,ACTIVE_TASKS", "active_tasks")) {
+      expectThrows(IllegalArgumentException.class, () -> TableConfigUtils.parseTypesToSkipString(value));
+    }
+    assertEquals(TableConfigUtils.parseTypesToSkipString(" task , TASK "), EnumSet.of(ValidationType.TASK));
   }
 
   @Test

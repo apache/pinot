@@ -24,6 +24,10 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 
 
+/// Instances are created per lookup by TimeBoundaryStrategyService.
+/// Implementations should keep their public no-argument constructor inexpensive.
+/// Logical-table-specific state should be initialized in init().
+/// Any shared caches or resources must be thread-safe.
 public interface TimeBoundaryStrategy {
 
   /// Returns the time boundary strategy name.

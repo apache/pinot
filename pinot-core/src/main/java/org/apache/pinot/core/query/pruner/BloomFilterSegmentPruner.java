@@ -89,11 +89,12 @@ public class BloomFilterSegmentPruner extends ValueBasedSegmentPruner {
     int numSegments = segments.size();
     FetchContext[] fetchContexts = new FetchContext[numSegments];
     try {
-      // Prefetch bloom filter for columns within the EQ/IN predicate if exists
+      // Prefetch bloom filter for columns within the EQ/IN predicate if exists. The planner returns null for a segment
+      // that needs no fetch, which is then pruned without the fetch lifecycle.
       for (int i = 0; i < numSegments; i++) {
         IndexSegment segment = segments.get(i);
         FetchContext fetchContext = _fetchPlanner.planFetchForPruning(segment, query);
-        if (!fetchContext.isEmpty()) {
+        if (fetchContext != null && !fetchContext.isEmpty()) {
           segment.prefetch(fetchContext);
           fetchContexts[i] = fetchContext;
         }

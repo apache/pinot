@@ -135,6 +135,32 @@ public class LuceneTextIndexQueryCacheTest {
   }
 
   @Test
+  public void testDictionaryQueriesShareParsingWithSegmentSpecificMatches()
+      throws Exception {
+    TextIndexConfig config = new TextIndexConfigBuilder().withBuildOnDictionary(true).build();
+    File firstDir = new File(TEMP_DIR, "firstDictionary");
+    File secondDir = new File(TEMP_DIR, "secondDictionary");
+    for (File indexDir : List.of(firstDir, secondDir)) {
+      FileUtils.forceMkdir(indexDir);
+      try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator(COLUMN, indexDir, true, false, null, null,
+          config)) {
+        for (int i = 0; i < DOCS.length; i++) {
+          creator.add(DOCS[indexDir.equals(firstDir) ? i : DOCS.length - 1 - i]);
+        }
+        creator.seal();
+      }
+    }
+    CountingCache cache = new CountingCache();
+    try (LuceneTextIndexReader first = new LuceneTextIndexReader(COLUMN, firstDir, DOCS.length, config);
+        LuceneTextIndexReader second = new LuceneTextIndexReader(COLUMN, secondDir, DOCS.length, config)) {
+      assertEquals(first.getDictIds("alice", null, cache).toArray(), new int[]{0});
+      assertEquals(second.getDictIds("alice", null, cache).toArray(), new int[]{3});
+      assertEquals(cache.computeCount(), 1);
+      assertEquals(first.getDictIds("alice", null).toArray(), new int[]{0});
+    }
+  }
+
+  @Test
   public void testNoCacheMeansNoSharing()
       throws Exception {
     try (LuceneTextIndexReader reader = reader(configWithProperties(Map.of()))) {

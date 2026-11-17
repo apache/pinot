@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 
 
@@ -80,7 +81,13 @@ final class SegmentCompressionStatsReader {
         includeColumnCompressionStats ? new HashMap<>() : null;
     IndexService indexService = includeColumnCompressionStats ? IndexService.getInstance() : null;
 
-    for (ColumnMetadata columnMetadata : segmentMetadata.getColumnMetadataMap().values()) {
+    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata instanceof SegmentMetadataImpl
+        ? null : segmentMetadata.getColumnMetadataMap();
+    Set<String> columns = columnMetadataMap == null
+        ? ((SegmentMetadataImpl) segmentMetadata).getPhysicalColumnNames() : columnMetadataMap.keySet();
+    for (String column : columns) {
+      ColumnMetadata columnMetadata = columnMetadataMap == null
+          ? segmentMetadata.getColumnMetadataFor(column) : columnMetadataMap.get(column);
       long forwardIndexSize = getIndexSize(segmentMetadata, columnMetadata, StandardIndexes.forward());
       if (forwardIndexSize < 0) {
         continue;

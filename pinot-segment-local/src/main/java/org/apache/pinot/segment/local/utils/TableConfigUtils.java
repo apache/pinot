@@ -53,6 +53,7 @@ import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -2320,6 +2321,18 @@ public final class TableConfigUtils {
             LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
                 columnPair, storedType);
           }
+          // Create the value aggregator the same way the star-tree builder does, so that invalid function parameters
+          // fail the config validation instead of the segment creation
+          AggregationFunctionType storedFunctionType = storedType.getFunctionType();
+          Map<String, Object> functionParameters = aggregationConfig.getFunctionParameters();
+          try {
+            ValueAggregatorFactory.getValueAggregator(storedFunctionType,
+                StarTreeBuilderUtils.expressionContextFromFunctionParameters(storedFunctionType,
+                    functionParameters != null ? functionParameters : Map.of()));
+          } catch (Exception e) {
+            throw new IllegalStateException("Invalid function parameters in StarTreeIndex config: " + aggregationConfig,
+                e);
+          }
           String column = columnPair.getColumn();
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
             aggregatedColumns.add(column);
@@ -2404,8 +2417,9 @@ public final class TableConfigUtils {
             tableConfig.getTableName());
       } else {
         if (quotaConfig.getStorage() == null) {
-          // set a default storage quota and keep the RPS value
-          tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond()));
+          // set a default storage quota and keep the RPS value and the enforcement modes
+          tableConfig.setQuotaConfig(new QuotaConfig(maxAllowedSize, quotaConfig.getMaxQueriesPerSecond(),
+              quotaConfig.getStorageQuotaEnforcementMode(), quotaConfig.getQueryQuotaEnforcementMode()));
           LOGGER.info("Assigning default storage quota ({}) for dimension table: {}", maxAllowedSize,
               tableConfig.getTableName());
         } else {

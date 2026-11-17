@@ -285,7 +285,7 @@ public class PinotHelixTaskResourceManagerTest {
       // Notice that for testing purpose, we map subtask names to empty strings. In reality, subtask names will be
       // mapped to jsonized org.apache.pinot.minion.event.MinionEventObserver
       httpResp._httpResponses.put(
-          String.format("%s/tasks/subtask/state/progress?subTaskState=IN_PROGRESS", workerEndpoint),
+          String.format("%s/tasks/subtask/state/progress?subTaskState=IN_PROGRESS__1", workerEndpoint),
           JsonUtils.objectToString(Map.of(subtaskIds[2 * i], "", subtaskIds[2 * i + 1], "")));
     }
     httpResp._failedResponseCount = 1;

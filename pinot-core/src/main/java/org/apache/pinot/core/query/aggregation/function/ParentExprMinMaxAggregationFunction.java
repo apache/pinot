@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils.BatchConsumer;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -43,6 +43,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class ParentExprMinMaxAggregationFunction extends ParentAggregationFunction<ExprMinMaxObject, ExprMinMaxObject> {
+  private static final int EXPR_MIN_MAX_OBJECT_TYPE = 35;
 
   // list of columns that we do min/max on
   private final List<ExpressionContext> _measuringColumns;
@@ -343,28 +344,27 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ExprMinMaxObject exprMinMaxObject) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.ExprMinMaxObject.getValue(),
-        ObjectSerDeUtils.ARG_MIN_MAX_OBJECT_SER_DE.serialize(exprMinMaxObject));
+  public SerializedResult serializeIntermediateResult(ExprMinMaxObject exprMinMaxObject) {
+    try {
+      return new SerializedBytes(EXPR_MIN_MAX_OBJECT_TYPE, exprMinMaxObject.toBytes());
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while serializing ExprMinMaxObject", e);
+    }
   }
 
   @Override
   public ExprMinMaxObject deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.ARG_MIN_MAX_OBJECT_SER_DE.deserialize(customObject.getBuffer());
+    try {
+      return new ExprMinMaxObject(customObject.getBuffer());
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while deserializing ExprMinMaxObject", e);
+    }
   }
 
   @Nullable
   @Override
   public ExprMinMaxObject extractFinalResult(@Nullable ExprMinMaxObject exprMinMaxObject) {
     return exprMinMaxObject;
-  }
-
-  /// ExprMinMaxObject deserializes into an immutable form whose subsequent merge/serialization is not supported,
-  /// so the grouping-sets base-aggregation derive (which clones intermediates via a serde round-trip and merges
-  /// them across groups) must not be used for this function.
-  @Override
-  public boolean canMergeIntermediatesAcrossGroups() {
-    return false;
   }
 
   /// Service registration for the ExprMin parent aggregation.

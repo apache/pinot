@@ -212,7 +212,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   abstract Record getStarTreeRecord(int docId)
       throws IOException;
 
-  /// Serializes metrics whose [ValueAggregator#getMaxAggregatedValueByteSize] is derived during serialization before
+  /// Serializes metrics whose [ValueAggregator#isMaxAggregatedValueByteSizeDerivedFromSerialization] is true before
   /// the forward indexes are sized. Returns, per metric, whether [#getStarTreeRecord] now holds the serialized
   /// `byte[]` in place of the aggregated value. A builder that already serialized every record when it was appended
   /// (the off-heap builder) has nothing to do and returns all `false`.

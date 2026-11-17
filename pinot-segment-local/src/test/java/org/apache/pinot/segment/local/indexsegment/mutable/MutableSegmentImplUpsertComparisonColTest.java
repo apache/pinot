@@ -28,6 +28,7 @@ import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -195,6 +196,13 @@ public class MutableSegmentImplUpsertComparisonColTest implements PinotBuffersAf
       assertFalse(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(1, outOfOrderRecordColumn)));
       assertFalse(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(2, outOfOrderRecordColumn)));
       assertTrue(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(3, outOfOrderRecordColumn)));
+      // The flag is a real value, not null: with null handling, a query must read it as true/false
+      NullValueVectorReader nullValueVector =
+          _mutableSegmentImpl.getDataSource(outOfOrderRecordColumn).getNullValueVector();
+      assertNotNull(nullValueVector);
+      for (int docId = 0; docId < 4; docId++) {
+        assertFalse(nullValueVector.isNull(docId), "Out-of-order flag of doc " + docId + " reads as null");
+      }
     } finally {
       tearDown();
     }

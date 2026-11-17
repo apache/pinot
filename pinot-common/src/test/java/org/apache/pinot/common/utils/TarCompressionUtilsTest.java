@@ -271,6 +271,27 @@ public class TarCompressionUtilsTest {
   }
 
   @Test
+  public void testFilteredDirectory()
+      throws IOException {
+    File dir = new File(DATA_DIR, "dir");
+    File excludedFile = new File(dir, "segment_metadata.bin");
+    File nestedFile = new File(new File(dir, "nested"), "segment_metadata.bin");
+    FileUtils.write(excludedFile, "local", StandardCharsets.UTF_8);
+    FileUtils.write(new File(dir, "metadata.properties"), "canonical", StandardCharsets.UTF_8);
+    FileUtils.write(nestedFile, "nested", StandardCharsets.UTF_8);
+
+    File compressedTarFile = new File(TAR_DIR, "filtered.tar.gz");
+    TarCompressionUtils.createFilteredCompressedTarFile(dir, compressedTarFile, file -> !file.equals(excludedFile));
+    TarCompressionUtils.untar(compressedTarFile, UNTAR_DIR);
+
+    File untarredDir = new File(UNTAR_DIR, "dir");
+    assertTrue(untarredDir.isDirectory());
+    assertFalse(new File(untarredDir, excludedFile.getName()).exists());
+    assertTrue(new File(untarredDir, "metadata.properties").isFile());
+    assertTrue(new File(new File(untarredDir, "nested"), nestedFile.getName()).isFile());
+  }
+
+  @Test
   public void testSubDirectories()
       throws IOException, CompressorException {
     for (String compressedTarFileExtension : TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {

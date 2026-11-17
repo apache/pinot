@@ -455,6 +455,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
         this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
       }});
+    when(segmentMetadata.getColumnMetadataFor(DEDUP_TIME_COLUMN_NAME)).thenReturn(columnMetadata);
     doReturn(10000.0).when(columnMetadata).getMaxValue();
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
 
@@ -480,6 +481,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
         this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
       }});
+    when(segmentMetadata.getColumnMetadataFor(DEDUP_TIME_COLUMN_NAME)).thenReturn(columnMetadata);
     doReturn(System.currentTimeMillis()).when(columnMetadata).getMaxValue();
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     // throws when not stopped
