@@ -19,11 +19,12 @@
 package org.apache.pinot.integration.tests.custom;
 
 import java.io.File;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.helix.model.ExternalView;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -45,9 +46,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
@@ -73,7 +72,6 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
   private static final String PRIMARY_KEY_COL = "playerId";
   private static final String TIME_COL_NAME = "timestampInEpoch";
   private static final int NUM_PARTITIONS = 1;
-  private static final int NUM_REPLICAS = 2;
   private static final int TOTAL_RAW_RECORDS = 6;
   private static final int UNIQUE_PRIMARY_KEYS = 3;
 
@@ -114,14 +112,14 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
     InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig(
         TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME), false, 0, null);
     InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 0, NUM_PARTITIONS, 1, false, null);
+        new InstanceReplicaGroupPartitionConfig(true, 0, 2, 0, NUM_PARTITIONS, 1, false, null);
     InstanceAssignmentConfig instanceAssignmentConfig =
         new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false);
 
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COL_NAME)
-        .setNumReplicas(NUM_REPLICAS)
+        .setNumReplicas(2)
         .setUpsertConfig(upsertConfig)
         .setRoutingConfig(new RoutingConfig(null, null,
             RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
@@ -147,7 +145,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
   @Override
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForSegmentsLoaded(3, TOTAL_RAW_RECORDS, timeoutMs);
+    waitForAllDocsLoaded(TOTAL_RAW_RECORDS, timeoutMs);
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
   }
 
@@ -197,7 +195,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
     buildSegment(tableConfig, schema, "segment_update_0", rows, newSegmentDir, newTarDir);
     uploadSegments(TABLE_NAME, newTarDir);
 
-    waitForSegmentsLoaded(4, TOTAL_RAW_RECORDS + 1, 600_000L);
+    waitForAllDocsLoaded(TOTAL_RAW_RECORDS + 1, 600_000L);
 
     assertEquals(getCurrentCountStarResult(), UNIQUE_PRIMARY_KEYS);
 
@@ -207,29 +205,22 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
     assertEquals(rs.getFloat(0, 0), 9999.0f, 0.01f);
   }
 
-  private void waitForSegmentsLoaded(int expectedSegments, int expectedRawRecords, long timeoutMs) {
+  private void waitForAllDocsLoaded(int expectedRawRecords, long timeoutMs) {
+    int numServers = getSharedServerStarters().size();
+    AtomicInteger consecutiveSuccesses = new AtomicInteger();
     TestUtils.waitForCondition(() -> {
-      ExternalView externalView = getSharedHelixResourceManager().getTableExternalView(
-          TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
-      if (externalView == null || externalView.getPartitionSet().size() != expectedSegments) {
-        return false;
-      }
-      // ONLINE is published after segment loading and upsert metadata initialization complete on each replica.
-      for (String segment : externalView.getPartitionSet()) {
-        Map<String, String> stateMap = externalView.getStateMap(segment);
-        if (stateMap.size() != NUM_REPLICAS
-            || !stateMap.values().stream().allMatch(SegmentStateModel.ONLINE::equals)) {
-          return false;
-        }
-      }
-      // The broker can lag behind the external view. Query both replica groups before asserting upsert results.
-      for (int i = 0; i < NUM_REPLICAS; i++) {
+      try {
         if (queryCountStarWithoutUpsert() != expectedRawRecords) {
+          consecutiveSuccesses.set(0);
           return false;
         }
+        return consecutiveSuccesses.incrementAndGet() >= numServers;
+      } catch (Exception e) {
+        consecutiveSuccesses.set(0);
+        throw e;
       }
-      return true;
-    }, 100L, timeoutMs, "Failed to load " + expectedSegments + " segments on all replicas", null);
+    }, 100L, timeoutMs, "Failed to load " + expectedRawRecords + " documents on all servers",
+        Duration.ofMillis(timeoutMs / 10));
   }
 
   private void buildAndUploadTestSegments(TableConfig tableConfig, Schema schema)
