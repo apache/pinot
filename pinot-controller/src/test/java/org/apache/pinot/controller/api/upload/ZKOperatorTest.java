@@ -428,29 +428,35 @@ public class ZKOperatorTest {
   }
 
   @Test
-  public void testRefreshWithMetadataPushKeepsSidecarGeneratedByTheSameJob()
+  public void testRefreshWithMetadataPushDeletesSidecarOfPreviousBuildStagedInTheSameDirectory()
       throws Exception {
     PinotFSFactory.init(new PinotConfiguration());
     ZKOperator zkOperator = new ZKOperator(_resourceManager, mock(ControllerConf.class), mock(ControllerMetrics.class));
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
     File tableDir = new File(DATA_DIR, OFFLINE_TABLE_NAME);
-    String segmentName = "sidecarMetadataPushSameJobSegment";
-    // The batch job staged the segment tar and its fresh sidecar next to each other in the table dir.
+    String segmentName = "sidecarMetadataPushSameDirSegment";
+    // The tar and the sidecar of the previous build are staged next to each other in the table dir.
     File sourceTar = new File(tableDir, segmentName + ".tar.gz");
     FileUtils.write(sourceTar, "segment bytes", "UTF-8");
     File sidecar = new File(tableDir, segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
-    FileUtils.write(sidecar, "current metadata", "UTF-8");
+    FileUtils.write(sidecar, "old metadata", "UTF-8");
     URI finalLocation = new File(tableDir, segmentName).toURI();
 
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, mockSegmentMetadata(segmentName, 1L),
         FileUploadType.METADATA, finalLocation, null, sourceTar.toURI().toString(), finalLocation.toString(),
         "crypter", 10, true, true, httpHeaders);
+    // A first push has no previous segment, so nothing is invalidated.
+    assertTrue(sidecar.exists());
+
+    // The tar is replaced by a changed build while the sidecar is not, and the request carries fresh metadata
+    // (a push with preferMetadataTarGz=false extracts it from the tar rather than reading the sidecar).
+    FileUtils.write(sourceTar, "changed segment bytes", "UTF-8");
     zkOperator.completeSegmentOperations(OFFLINE_TABLE_CONFIG, mockSegmentMetadata(segmentName, 2L),
         FileUploadType.METADATA, finalLocation, null, sourceTar.toURI().toString(), finalLocation.toString(),
         "crypter", 10, true, true, httpHeaders);
 
-    assertEquals(FileUtils.readFileToString(sidecar, "UTF-8"), "current metadata");
-    assertEquals(FileUtils.readFileToString(new File(tableDir, segmentName), "UTF-8"), "segment bytes");
+    assertFalse(sidecar.exists());
+    assertEquals(FileUtils.readFileToString(new File(tableDir, segmentName), "UTF-8"), "changed segment bytes");
   }
 
   @Test
