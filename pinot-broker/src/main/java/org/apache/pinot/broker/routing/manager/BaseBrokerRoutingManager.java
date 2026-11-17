@@ -80,7 +80,6 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -1331,6 +1330,18 @@ public abstract class BaseBrokerRoutingManager
   @Nullable
   @Override
   public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
+    return getRoutingTable(brokerRequest, tableNameWithType, requestId, false);
+  }
+
+  @Nullable
+  @Override
+  public RoutingTable getRoutingTableIncludingOptionalOnlyServers(BrokerRequest brokerRequest, long requestId) {
+    return getRoutingTable(brokerRequest, brokerRequest.getQuerySource().getTableName(), requestId, true);
+  }
+
+  @Nullable
+  private RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId,
+      boolean routeServersWithOnlyOptionalSegments) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     if (routingEntry == null) {
       return null;
@@ -1339,15 +1350,8 @@ public abstract class BaseBrokerRoutingManager
     InstanceSelector.SelectionResult selectionResult =
         routingEntry.calculateRouting(brokerRequest, requestId, samplerName);
     return new RoutingTable(getServerInstanceToSegmentsMap(tableNameWithType, selectionResult,
-        routesServersWithOnlyOptionalSegments(brokerRequest)), selectionResult.getUnavailableSegments(),
+        routeServersWithOnlyOptionalSegments), selectionResult.getUnavailableSegments(),
         selectionResult.getNumPrunedSegments());
-  }
-
-  private static boolean routesServersWithOnlyOptionalSegments(BrokerRequest brokerRequest) {
-    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
-    Map<String, String> queryOptions = pinotQuery != null ? pinotQuery.getQueryOptions() : null;
-    return queryOptions != null
-        && Boolean.parseBoolean(queryOptions.get(RoutingManager.ROUTE_SERVERS_WITH_ONLY_OPTIONAL_SEGMENTS));
   }
 
   private Map<ServerInstance, SegmentsToQuery> getServerInstanceToSegmentsMap(String tableNameWithType,
@@ -1358,9 +1362,7 @@ public abstract class BaseBrokerRoutingManager
     for (Map.Entry<String, SegmentsToQuery> entry : instanceToSegmentsMap.entrySet()) {
       SegmentsToQuery segmentsToQuery = entry.getValue();
       int numSegments = segmentsToQuery.getSegments().size();
-      // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
-      // to process, to be backward compatible, unless the request asks to keep them.
-      // TODO: allow servers only with optional segments
+      // Keep optional-only servers only for engines that opt in to running queries without required segments.
       if (numSegments == 0 && (!routeServersWithOnlyOptionalSegments || segmentsToQuery.getOptionalSegments() == null
           || segmentsToQuery.getOptionalSegments().isEmpty())) {
         continue;

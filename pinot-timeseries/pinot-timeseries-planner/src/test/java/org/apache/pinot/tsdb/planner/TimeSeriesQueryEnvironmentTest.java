@@ -51,14 +51,13 @@ import org.apache.pinot.tsdb.spi.TimeSeriesMetadata;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
-import org.mockito.ArgumentCaptor;
 import org.testng.annotations.AfterMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
@@ -88,7 +87,7 @@ public class TimeSeriesQueryEnvironmentTest {
     when(routingManager.routingExists(TABLE)).thenReturn(true);
     Map<ServerInstance, SegmentsToQuery> routed = new HashMap<>();
     routed.put(server, new SegmentsToQuery(List.of("seg1", "seg2"), List.of()));
-    when(routingManager.getRoutingTable(any(BrokerRequest.class), anyLong()))
+    when(routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
         .thenReturn(new RoutingTable(routed, List.of(), 0));
     TableCache tableCache = mock(TableCache.class);
     when(tableCache.getTableConfig(TABLE))
@@ -196,22 +195,6 @@ public class TimeSeriesQueryEnvironmentTest {
   }
 
   @Test
-  public void testRoutingKeepsServersWithOnlyOptionalSegments() {
-    RoutingManager routingManager = routingManagerWith(Map.of(mockServer("Server_1"), List.of("seg1")));
-    TimeSeriesQueryEnvironment environment =
-        newEnvironment(routingManager, tableCache(), TimeSeriesRoutingCustomizer.NO_OP);
-
-    environment.buildPhysicalPlan(request(), requestContext(),
-        new TimeSeriesLogicalPlanResult(leaf("leaf", "myTable"), TIME_BUCKETS), tableNames -> { });
-
-    // The servers query optional segments, so a server with only optional segments must reach the plan.
-    ArgumentCaptor<BrokerRequest> routed = ArgumentCaptor.forClass(BrokerRequest.class);
-    verify(routingManager).getRoutingTable(routed.capture(), anyLong());
-    assertEquals(routed.getValue().getPinotQuery().getQueryOptions(),
-        Map.of(RoutingManager.ROUTE_SERVERS_WITH_ONLY_OPTIONAL_SEGMENTS, "true"));
-  }
-
-  @Test
   public void testServerWithOnlyOptionalSegmentsReadsTheLeaf() {
     ServerInstance serverOne = mockServer("Server_1");
     ServerInstance serverTwo = mockServer("Server_2");
@@ -220,7 +203,7 @@ public class TimeSeriesQueryEnvironmentTest {
     Map<ServerInstance, SegmentsToQuery> routed = new HashMap<>();
     routed.put(serverOne, new SegmentsToQuery(List.of("seg1"), List.of()));
     routed.put(serverTwo, new SegmentsToQuery(List.of(), List.of("seg2")));
-    when(routingManager.getRoutingTable(any(BrokerRequest.class), anyLong()))
+    when(routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
         .thenReturn(new RoutingTable(routed, List.of(), 0));
     TimeSeriesQueryEnvironment environment =
         newEnvironment(routingManager, tableCache(), TimeSeriesRoutingCustomizer.NO_OP);
@@ -264,7 +247,7 @@ public class TimeSeriesQueryEnvironmentTest {
     // No server can serve the leaf's segments: an outage, which must not read as a range without data.
     RoutingManager routingManager = mock(RoutingManager.class);
     when(routingManager.routingExists(TABLE)).thenReturn(true);
-    when(routingManager.getRoutingTable(any(BrokerRequest.class), anyLong()))
+    when(routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
         .thenReturn(new RoutingTable(Map.of(), List.of("seg1", "seg2"), 0));
     TimeSeriesQueryEnvironment environment =
         newEnvironment(routingManager, tableCache(), TimeSeriesRoutingCustomizer.NO_OP);
@@ -274,14 +257,19 @@ public class TimeSeriesQueryEnvironmentTest {
     assertEquals(e.getErrorCode(), QueryErrorCode.SERVER_SEGMENT_MISSING);
   }
 
-  @Test
-  public void testServerEntriesWithoutSegmentsDoNotHideUnavailableSegments() {
+  @DataProvider
+  public Object[][] optionalSegments() {
+    return new Object[][]{{List.of()}, {List.of("optional")}};
+  }
+
+  @Test(dataProvider = "optionalSegments")
+  public void testServerEntriesWithoutRequiredSegmentsDoNotHideUnavailableSegments(List<String> optionalSegments) {
     ServerInstance server = mockServer("Server_1");
     RoutingManager routingManager = routingManagerWith(Map.of(server, List.of("seg1")));
-    // The customizer keeps the server but clears its segments, and seg2 has no server.
+    // The customizer keeps the server but clears its required segments, and seg2 has no server.
     TimeSeriesQueryEnvironment environment = newEnvironment(routingManager, tableCache(),
         (leaf, routingTable, context) -> new RoutingTable(
-            Map.of(server, new SegmentsToQuery(List.of(), List.of())), List.of("seg2"), 1));
+            Map.of(server, new SegmentsToQuery(List.of(), optionalSegments)), List.of("seg2"), 1));
 
     QueryException e = expectThrows(QueryException.class, () -> environment.buildPhysicalPlan(request(),
         requestContext(), new TimeSeriesLogicalPlanResult(leaf("leaf", "myTable"), TIME_BUCKETS), tableNames -> { }));
@@ -304,7 +292,7 @@ public class TimeSeriesQueryEnvironmentTest {
     when(routingManager.routingExists(TABLE)).thenReturn(true);
     Map<ServerInstance, SegmentsToQuery> routed = new HashMap<>();
     segmentsByServer.forEach((server, segments) -> routed.put(server, new SegmentsToQuery(segments, List.of())));
-    when(routingManager.getRoutingTable(any(BrokerRequest.class), anyLong()))
+    when(routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
         .thenReturn(new RoutingTable(routed, List.of(), 0));
     return routingManager;
   }

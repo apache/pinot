@@ -69,7 +69,7 @@ public class TableScanVisitorTest {
     Map<ServerInstance, SegmentsToQuery> routed = new HashMap<>();
     routed.put(_serverOne, new SegmentsToQuery(List.of("seg1", "seg2"), List.of()));
     routed.put(_serverTwo, new SegmentsToQuery(List.of("seg3"), List.of()));
-    when(_routingManager.getRoutingTable(any(BrokerRequest.class), anyLong()))
+    when(_routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
         .thenReturn(new RoutingTable(routed, List.of(), 0));
   }
 
@@ -158,7 +158,7 @@ public class TableScanVisitorTest {
     // Newly pushed segments, not yet ONLINE in the external view: only optional.
     routed.put(_serverTwo, new SegmentsToQuery(List.of(), List.of("seg2")));
     routed.put(serverThree, new SegmentsToQuery(List.of(), List.of()));
-    when(_routingManager.getRoutingTable(any(BrokerRequest.class), anyLong()))
+    when(_routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
         .thenReturn(new RoutingTable(routed, List.of(), 0));
     TableScanVisitor.INSTANCE.init(_routingManager, mock(TableRouteProvider.class), mock(TableCache.class));
     TableScanVisitor.Context context = TableScanVisitor.createContext(1L, Map.of(), TimeSeriesRoutingCustomizer.NO_OP);

@@ -21,12 +21,17 @@ package org.apache.pinot.query.runtime.timeseries;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.tsdb.spi.AggInfo;
@@ -34,11 +39,16 @@ import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -118,6 +128,45 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
 
     assertEquals(request.getSegmentsToQuery(), List.of("seg1"));
     assertEquals(request.getOptionalSegments(), List.of("seg2"));
+  }
+
+  @DataProvider
+  public Object[][] missingTableCases() {
+    return new Object[][]{
+        {List.of(), List.of("optional"), false, Set.of()},
+        {List.of("required"), List.of("optional"), false, Set.of(QueryErrorCode.SERVER_TABLE_MISSING)},
+        {List.of(), List.of(), false, Set.of(QueryErrorCode.SERVER_TABLE_MISSING)},
+        {List.of(), List.of("optional"), true,
+            Set.of(QueryErrorCode.SERVER_TABLE_MISSING, QueryErrorCode.QUERY_EXECUTION)}
+    };
+  }
+
+  @Test(dataProvider = "missingTableCases")
+  public void testMissingTableOnLeaf(List<String> required, List<String> optional, boolean otherError,
+      Set<QueryErrorCode> expectedErrors) {
+    LeafTimeSeriesPlanNode leafNode = new LeafTimeSeriesPlanNode("leaf", List.of(), "orderTable", "orderTime",
+        TimeUnit.SECONDS, 0L, "", "orderCount", new AggInfo("SUM", false, Map.of()), List.of(), SERIES_LIMIT,
+        QUERY_OPTIONS);
+    TimeBuckets buckets = TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100);
+    TimeSeriesExecutionContext context = new TimeSeriesExecutionContext(LANGUAGE, buckets, DUMMY_DEADLINE_MS,
+        Map.of(MetadataKeys.REQUEST_ID, "1", MetadataKeys.BROKER_ID, "broker"), Map.of("leaf", required),
+        optional.isEmpty() ? Map.of() : Map.of("leaf", optional), Map.of());
+    InstanceResponseBlock response = new InstanceResponseBlock();
+    response.addException(QueryErrorCode.SERVER_TABLE_MISSING, "Local table has not loaded");
+    if (otherError) {
+      response.addException(QueryErrorCode.QUERY_EXECUTION, "Additional query error");
+    }
+    QueryExecutor queryExecutor = mock(QueryExecutor.class);
+    ExecutorService executorService = mock(ExecutorService.class);
+    when(queryExecutor.execute(any(ServerQueryRequest.class), eq(executorService))).thenReturn(response);
+    PhysicalTimeSeriesServerPlanVisitor visitor =
+        new PhysicalTimeSeriesServerPlanVisitor(queryExecutor, executorService, mock(ServerMetrics.class));
+
+    TimeSeriesBlock block = visitor.compile(leafNode, context).nextBlock();
+    assertEquals(block.getTimeBuckets(), buckets);
+    assertTrue(block.getSeriesMap().isEmpty());
+    assertEquals(block.getExceptions().stream().map(QueryException::getErrorCode).collect(Collectors.toSet()),
+        expectedErrors);
   }
 
   private boolean isNumber(String s) {

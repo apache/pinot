@@ -57,7 +57,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
-import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionInfo;
@@ -278,16 +277,16 @@ public class BrokerRoutingManagerTest {
         List.of(), instanceSelector));
     clearInvocations(_brokerMetrics);
 
-    // By default the server is left out, as before.
-    assertTrue(_routingManager.getRoutingTable(brokerRequest(TEST_TABLE), 0).getServerInstanceToSegmentsMap()
-        .isEmpty());
-
-    BrokerRequest keepOptionalOnly = brokerRequest(TEST_TABLE);
+    // SQL callers cannot opt in by supplying a query option.
+    BrokerRequest request = brokerRequest(TEST_TABLE);
     PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setQueryOptions(Map.of(RoutingManager.ROUTE_SERVERS_WITH_ONLY_OPTIONAL_SEGMENTS, "true"));
-    keepOptionalOnly.setPinotQuery(pinotQuery);
+    pinotQuery.setQueryOptions(Map.of("routeServersWithOnlyOptionalSegments", "true"));
+    request.setPinotQuery(pinotQuery);
+    assertTrue(_routingManager.getRoutingTable(request, 0).getServerInstanceToSegmentsMap().isEmpty());
+
     Map<ServerInstance, SegmentsToQuery> serverSegments =
-        _routingManager.getRoutingTable(keepOptionalOnly, 0).getServerInstanceToSegmentsMap();
+        _routingManager.getRoutingTableIncludingOptionalOnlyServers(brokerRequest(TEST_TABLE), 0)
+            .getServerInstanceToSegmentsMap();
 
     // Only the server with optional segments is kept; a server with none is still left out.
     assertEquals(serverSegments.keySet(), Set.of(optionalOnlyServer));

@@ -37,8 +37,8 @@ public interface TimeSeriesRoutingCustomizer {
   /// Routes every leaf exactly as the routing manager chose and adds no query options.
   TimeSeriesRoutingCustomizer NO_OP = (leaf, routingTable, context) -> routingTable;
 
-  /// A leaf narrowed to no segments on any server yields no data, as a leaf the routing manager found no segments for
-  /// does, unless the returned routing reports unavailable segments, which fails the query.
+  /// A leaf with no segments assigned to any server yields no data. If the returned routing reports unavailable
+  /// segments and no required segments are assigned, the query fails even if optional segments are assigned.
   ///
   /// @param leaf the leaf being routed; its table name carries the table type
   /// @param routingTable the routing the routing manager chose for the leaf

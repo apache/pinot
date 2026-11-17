@@ -38,12 +38,6 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface RoutingManager {
-  /// Query option of the routing broker request: when `true`, the routing table also keeps the servers that hold
-  /// only optional segments of the query, which are otherwise left out. Set by engines whose servers query optional
-  /// segments without any required one, such as the time-series engine.
-  String ROUTE_SERVERS_WITH_ONLY_OPTIONAL_SEGMENTS = "routeServersWithOnlyOptionalSegments";
-
-
   /// Get all enabled server instances in the cluster.
   ///
   /// @return all currently enabled server instances.
@@ -73,6 +67,13 @@ public interface RoutingManager {
   /// @return the route table.
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
+
+  /// Get the routing table including servers selected only for optional segments, for engines that can execute
+  /// optional-only requests. Implementations without this capability fall back to regular routing.
+  @Nullable
+  default RoutingTable getRoutingTableIncludingOptionalOnlyServers(BrokerRequest brokerRequest, long requestId) {
+    return getRoutingTable(brokerRequest, requestId);
+  }
 
   /// Get the [RoutingTable] for a specific broker request.
   /// @param brokerRequest the broker request constructed from a query.

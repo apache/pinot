@@ -19,9 +19,11 @@
 package org.apache.pinot.query.runtime.timeseries;
 
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
@@ -57,7 +59,14 @@ public class LeafTimeSeriesOperator extends BaseTimeSeriesOperator {
   public TimeSeriesBlock getNextBlock() {
     Preconditions.checkNotNull(_queryExecutor, "Leaf time series operator has not been initialized");
     InstanceResponseBlock instanceResponseBlock = _queryExecutor.execute(_request, _executorService);
-    if (MapUtils.isNotEmpty(instanceResponseBlock.getExceptions())) {
+    Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
+    if (MapUtils.isNotEmpty(exceptions)) {
+      if (exceptions.size() == 1 && exceptions.containsKey(QueryErrorCode.SERVER_TABLE_MISSING.getId())
+          && !_request.hasSegmentsToQuery() && CollectionUtils.isNotEmpty(_request.getOptionalSegments())) {
+        // A server can receive an optional assignment before its first segment creates the local table.
+        return new TimeSeriesBlock(_context.getInitialTimeBuckets(), new HashMap<>(),
+            instanceResponseBlock.getResponseMetadata());
+      }
       return buildErrorBlock(instanceResponseBlock, "Error running time-series query");
     }
     assert instanceResponseBlock.getResultsBlock() instanceof GroupByResultsBlock;
@@ -79,7 +88,7 @@ public class LeafTimeSeriesOperator extends BaseTimeSeriesOperator {
   }
 
   private TimeSeriesBlock buildErrorBlock(InstanceResponseBlock instanceResponseBlock, String baseMessage) {
-    TimeSeriesBlock errorBlock = new TimeSeriesBlock(_context.getInitialTimeBuckets(), new java.util.HashMap<>(),
+    TimeSeriesBlock errorBlock = new TimeSeriesBlock(_context.getInitialTimeBuckets(), new HashMap<>(),
         instanceResponseBlock.getResponseMetadata());
     if (MapUtils.isNotEmpty(instanceResponseBlock.getExceptions())) {
       for (Map.Entry<Integer, String> entry : instanceResponseBlock.getExceptions().entrySet()) {
