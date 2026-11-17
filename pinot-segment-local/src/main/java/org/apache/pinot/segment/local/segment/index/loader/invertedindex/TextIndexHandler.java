@@ -51,6 +51,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -158,7 +159,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         validateDictionaryMigrationSource(segmentWriter, column, interrupted);
         boolean recovery = interrupted || isIncompatible(column, segmentWriter);
         if (recovery) {
-          validateRecoverySource(segmentWriter, column);
+          validateRecoverySource(segmentWriter, column, false);
         }
         if (recovery || hasTextIndexConfigurationChanged(column, segmentWriter)) {
           LOGGER.info("Rebuilding text index for segment: {}, column: {}, recovering Lucene index: {}", segmentName,
@@ -187,7 +188,7 @@ public class TextIndexHandler extends BaseIndexHandler {
       boolean interrupted = isBuildInProgress(column);
       validateDictionaryMigrationSource(segmentReader, column, interrupted);
       if (interrupted || isIncompatible(column, segmentReader)) {
-        validateRecoverySource(segmentReader, column);
+        validateRecoverySource(segmentReader, column, true);
       }
     }
   }
@@ -210,9 +211,11 @@ public class TextIndexHandler extends BaseIndexHandler {
     return columns;
   }
 
-  private void validateRecoverySource(SegmentDirectory.Reader segmentReader, String column) {
+  private void validateRecoverySource(SegmentDirectory.Reader segmentReader, String column,
+      boolean beforeForwardUpdate) {
     if (_fieldIndexConfigs.get(column).getConfig(StandardIndexes.text()).isBuildOnDictionary()) {
-      if (!segmentReader.hasIndexFor(column, StandardIndexes.dictionary())) {
+      if (!segmentReader.hasIndexFor(column, StandardIndexes.dictionary())
+          && !(beforeForwardUpdate && canBuildDictionaryFromRawForwardIndex(segmentReader, column))) {
         throw new IllegalStateException("Cannot rebuild Lucene text index for column: " + column
             + ". Original dictionary must be retained; restore a compatible segment or refresh it from source data");
       }
@@ -220,6 +223,17 @@ public class TextIndexHandler extends BaseIndexHandler {
       throw new IllegalStateException("Cannot rebuild Lucene text index for column: " + column
           + ". Original forward index must be retained; restore a compatible segment or refresh it from source data");
     }
+  }
+
+  /// The forward index handler can build a missing dictionary from retained raw values before the text index runs.
+  private boolean canBuildDictionaryFromRawForwardIndex(SegmentDirectory.Reader segmentReader, String column) {
+    ColumnMetadata metadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+    return _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3 && _schema.hasColumn(column)
+        && metadata != null && metadata.getDataType() == DataType.STRING && metadata.isSingleValue()
+        && metadata.getForwardIndexEncoding() == EncodingType.RAW
+        && segmentReader.hasIndexFor(column, StandardIndexes.forward())
+        // The forward index handler skips all changes when asked to disable a sorted column's forward index.
+        && (!metadata.isSorted() || _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).isEnabled());
   }
 
   private void validateDictionaryMigrationSource(SegmentDirectory.Reader segmentReader, String column,

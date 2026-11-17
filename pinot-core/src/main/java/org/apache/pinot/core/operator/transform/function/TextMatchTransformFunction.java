@@ -19,15 +19,19 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.QueryScopedCache;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.IntIterator;
@@ -46,11 +50,21 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
   private Dictionary _dictionary;
   private Set<String> _matchingRawValues;
   private ImmutableRoaringBitmap _matchingDictIds;
+  private int _numMatchingValues;
+  @Nullable
+  private QueryScopedCache _queryScopedCache;
   private String _column;
 
   @Override
   public String getName() {
     return FUNCTION_NAME;
+  }
+
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      QueryContext queryContext) {
+    super.init(arguments, columnContextMap, queryContext.isNullHandlingEnabled());
+    _queryScopedCache = queryContext;
   }
 
   @Override
@@ -118,23 +132,29 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     _dictionary = dataSource.getDictionary();
     _matchingRawValues = null;
     _matchingDictIds = null;
+    _queryScopedCache = null;
   }
 
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
-    initZeroFillingIntValuesSV(length);
+    initIntValuesSV(length);
 
     int[] ids;
     ImmutableRoaringBitmap matchingIds;
     if (_textIndexReader.isBuildOnDictionary()) {
       if (_matchingDictIds == null) {
-        _matchingDictIds = _textIndexReader.getDictIds(_predicate, _options);
+        _matchingDictIds = _textIndexReader.getDictIds(_predicate, _options, _queryScopedCache);
+        _numMatchingValues = _matchingDictIds.getCardinality();
+      }
+      if (_numMatchingValues == 0 || _numMatchingValues == _dictionary.length()) {
+        Arrays.fill(_intValuesSV, 0, length, _numMatchingValues == 0 ? 0 : 1);
+        return _intValuesSV;
       }
       matchingIds = _matchingDictIds;
       if (_columnArg.getDictionary() == null) {
         // A standalone dictionary can coexist with a raw forward index.
         if (_matchingRawValues == null) {
-          _matchingRawValues = new ObjectOpenHashSet<>(matchingIds.getCardinality());
+          _matchingRawValues = new ObjectOpenHashSet<>(_numMatchingValues);
           IntIterator iterator = matchingIds.getIntIterator();
           while (iterator.hasNext()) {
             _matchingRawValues.add(_dictionary.getStringValue(iterator.next()));
@@ -142,9 +162,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
         }
         String[] values = _columnArg.transformToStringValuesSV(valueBlock);
         for (int i = 0; i < length; i++) {
-          if (_matchingRawValues.contains(values[i])) {
-            _intValuesSV[i] = 1;
-          }
+          _intValuesSV[i] = _matchingRawValues.contains(values[i]) ? 1 : 0;
         }
         return _intValuesSV;
       }
@@ -157,9 +175,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     }
 
     for (int i = 0; i < length; i++) {
-      if (matchingIds.contains(ids[i])) {
-        _intValuesSV[i] = 1;
-      }
+      _intValuesSV[i] = matchingIds.contains(ids[i]) ? 1 : 0;
     }
 
     return _intValuesSV;

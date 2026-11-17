@@ -223,6 +223,11 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
                 "inverted=" + invertedIndex + ", dictionary=" + buildOnDictionary
                 + ": " + query);
           }
+          if (buildOnDictionary) {
+            String prefix = "SET enableNullHandling = true; SELECT SUM(TEXT_MATCH(" + SV_COL;
+            assertEquals(count(prefix + ", '*:*')) FROM " + TABLE_NAME), 3L);
+            assertEquals(count(prefix + ", 'missing')) FROM " + TABLE_NAME), 0L);
+          }
           SelectionResultsBlock result = (SelectionResultsBlock) getOperator("SET enableNullHandling = true; SELECT "
               + INT_COL + " FROM " + TABLE_NAME + " WHERE NOT TEXT_MATCH(SV_TEXT, 'apple') ORDER BY " + INT_COL)
               .nextBlock();

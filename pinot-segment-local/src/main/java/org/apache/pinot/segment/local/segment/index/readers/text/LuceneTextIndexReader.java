@@ -240,7 +240,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       @Nullable QueryScopedCache queryScopedCache) {
     if (_buildOnDictionary) {
       // The translator resolves Lucene document IDs to the original dictionary IDs, including after merges.
-      return getDocIds(searchQuery, optionsString, queryScopedCache);
+      return getMatchingIds(searchQuery, optionsString, queryScopedCache);
     }
     throw new UnsupportedOperationException(
         "getDictIds is only supported when the text index is built on the dictionary for column: " + _column);
@@ -259,6 +259,12 @@ public class LuceneTextIndexReader implements TextIndexReader {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString,
+      @Nullable QueryScopedCache queryScopedCache) {
+    requirePerRowIndex();
+    return getMatchingIds(searchQuery, optionsString, queryScopedCache);
+  }
+
+  private MutableRoaringBitmap getMatchingIds(String searchQuery, @Nullable String optionsString,
       @Nullable QueryScopedCache queryScopedCache) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
@@ -358,6 +364,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   @Override
   public int getNumMatchingDocs(String searchQuery, @Nullable String optionsString,
       @Nullable QueryScopedCache queryScopedCache) {
+    requirePerRowIndex();
     try {
       validateDocCount();
       return LuceneTextIndexUtils.countWithoutMaterializing(_indexSearcher,
@@ -370,6 +377,13 @@ public class LuceneTextIndexReader implements TextIndexReader {
       throw new RuntimeException(
           "Caught exception while counting matches in the text index for column:" + _column + " search query:"
               + searchQuery, e);
+    }
+  }
+
+  private void requirePerRowIndex() {
+    if (_buildOnDictionary) {
+      throw new UnsupportedOperationException(
+          "Document IDs and counts require a per-row text index for column: " + _column);
     }
   }
 

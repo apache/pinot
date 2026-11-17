@@ -101,8 +101,8 @@ public interface TextIndexReader extends IndexReader {
   }
 
   /// Whether this text index was built over the column dictionary (one entry per distinct value) rather than per row.
-  /// When true, [#getDictIds(String, String)] returns matching dictionary ids, which dictionary-based filter operators
-  /// resolve to docIds, and [#getDocIds(String)] is not used. Defaults to false (per-row index).
+  /// When true, [#getDictIds(String, String)] returns matching dictionary ids, which callers resolve to rows.
+  /// [#getDocIds(String)] and [#getNumMatchingDocs(String, String)] are only supported for per-row indexes.
   default boolean isBuildOnDictionary() {
     return false;
   }

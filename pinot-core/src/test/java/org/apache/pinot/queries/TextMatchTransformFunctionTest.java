@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.transform.function.IdentifierTransformFunc
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TextMatchTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -104,9 +105,12 @@ public class TextMatchTransformFunctionTest {
     for (boolean rawForward : new boolean[]{false, true}) {
       TextIndexReader reader = mock(TextIndexReader.class);
       when(reader.isBuildOnDictionary()).thenReturn(true);
-      when(reader.getDictIds("alpha", null)).thenReturn(MutableRoaringBitmap.bitmapOf(0),
-          MutableRoaringBitmap.bitmapOf(1));
+      QueryContext queryContext = mock(QueryContext.class);
+      when(reader.getDictIds("alpha", null, queryContext)).thenReturn(MutableRoaringBitmap.bitmapOf(0));
+      when(reader.getDictIds("alpha", null, null)).thenReturn(MutableRoaringBitmap.bitmapOf(1),
+          MutableRoaringBitmap.bitmapOf(0, 1), new MutableRoaringBitmap());
       Dictionary dictionary = mock(Dictionary.class);
+      when(dictionary.length()).thenReturn(2);
       when(dictionary.getStringValue(0)).thenReturn("alpha");
       when(dictionary.getStringValue(1)).thenReturn("beta");
       DataSource dataSource = mock(DataSource.class);
@@ -129,13 +133,20 @@ public class TextMatchTransformFunctionTest {
       List<TransformFunction> arguments = List.of(column, predicate);
       Map<String, ColumnContext> contexts = Map.of("skills", columnContext);
       TextMatchTransformFunction function = new TextMatchTransformFunction();
-      function.init(arguments, contexts);
+      function.init(arguments, contexts, queryContext);
       assertEquals(function.transformToIntValuesSV(block), new int[]{1, 0});
       assertEquals(function.transformToIntValuesSV(block), new int[]{1, 0});
-      verify(reader).getDictIds("alpha", null);
+      verify(reader).getDictIds("alpha", null, queryContext);
       function.init(arguments, contexts);
       assertEquals(function.transformToIntValuesSV(block), new int[]{0, 1});
-      verify(reader, times(2)).getDictIds("alpha", null);
+      function.init(arguments, contexts);
+      assertEquals(function.transformToIntValuesSV(block), new int[]{1, 1});
+      function.init(arguments, contexts);
+      assertEquals(function.transformToIntValuesSV(block), new int[]{0, 0});
+      verify(reader, times(3)).getDictIds("alpha", null, null);
+      // The all/none results do not need either representation of the forward values.
+      verify(column, times(rawForward ? 0 : 3)).transformToDictIdsSV(block);
+      verify(column, times(rawForward ? 3 : 0)).transformToStringValuesSV(block);
     }
   }
 
