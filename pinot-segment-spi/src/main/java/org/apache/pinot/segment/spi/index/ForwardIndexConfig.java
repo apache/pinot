@@ -46,7 +46,7 @@ public class ForwardIndexConfig extends IndexConfig {
   /// Default maximum number of values in a single multi-value entry of the mutable forward index.
   public static final int DEFAULT_MAX_NUM_MULTI_VALUES = 1000;
 
-  // Keep the default V2/V3 raw forward-index chunk under its 2 GiB limit even with 16-byte values.
+  // Bound one fixed-width raw entry to about 1 MiB even with 16-byte values.
   private static final int MAX_SUPPORTED_NUM_MULTI_VALUES = 65_536;
 
   private static int _defaultRawIndexWriterVersion = 4;
@@ -312,11 +312,12 @@ public class ForwardIndexConfig extends IndexConfig {
     return _targetDocsPerChunk;
   }
 
-  /// Optional per-row limit (1–65,536) for a realtime multi-value column.
-  /// Vector columns use their configured dimension.
+  /// Optional per-row limit (1–65,536) for a multi-value column. Vector indexes use their configured dimension.
+  /// If omitted, realtime ingestion uses [#DEFAULT_MAX_NUM_MULTI_VALUES] and batch builds have no limit from
+  /// this setting.
   /// Set a string in `fieldConfigList[].properties.maxNumMultiValues` or an integer in
   /// `fieldConfigList[].indexes.forward.maxNumMultiValues`. Pinot reads the limit when creating a consuming segment.
-  /// Upgrade every consuming replica to a build that supports this setting before enabling it.
+  /// Upgrade consuming replicas and batch builders to a build that supports this setting before enabling it.
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
   public Integer getMaxNumMultiValues() {
@@ -465,6 +466,11 @@ public class ForwardIndexConfig extends IndexConfig {
       return this;
     }
 
+    public Builder withMaxNumMultiValues(@Nullable Integer maxNumMultiValues) {
+      _maxNumMultiValues = maxNumMultiValues;
+      return this;
+    }
+
     @Deprecated
     public Builder withCompressionType(ChunkCompressionType chunkCompressionType) {
       if (chunkCompressionType == null) {
@@ -521,10 +527,6 @@ public class ForwardIndexConfig extends IndexConfig {
       String newRawIndexVersion = properties.get(FieldConfig.RAW_INDEX_WRITER_VERSION);
       if (newRawIndexVersion != null) {
         withRawIndexWriterVersion(Integer.parseInt(newRawIndexVersion));
-      }
-      String maxNumMultiValues = properties.get(MAX_NUM_MULTI_VALUES);
-      if (maxNumMultiValues != null) {
-        _maxNumMultiValues = Integer.parseInt(maxNumMultiValues);
       }
       return this;
     }
