@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlFunction;
@@ -74,12 +75,23 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 @SuppressWarnings("unused") // unused fields are accessed by reflection
 public class PinotOperatorTable implements SqlOperatorTable {
   private static final Supplier<PinotOperatorTable> WITH_NULL_HANDLING =
-      Suppliers.memoize(() -> new PinotOperatorTable(true));
+      Suppliers.memoize(() -> new PinotOperatorTable(true, false));
   private static final Supplier<PinotOperatorTable> WITHOUT_NULL_HANDLING =
-      Suppliers.memoize(() -> new PinotOperatorTable(false));
+      Suppliers.memoize(() -> new PinotOperatorTable(false, false));
+  private static final Supplier<PinotOperatorTable> WITH_NULL_HANDLING_NULLABLE_ARRAY_TO_MV =
+      Suppliers.memoize(() -> new PinotOperatorTable(true, true));
+  private static final Supplier<PinotOperatorTable> WITHOUT_NULL_HANDLING_NULLABLE_ARRAY_TO_MV =
+      Suppliers.memoize(() -> new PinotOperatorTable(false, true));
 
   public static PinotOperatorTable instance(boolean nullHandlingEnabled) {
     return nullHandlingEnabled ? WITH_NULL_HANDLING.get() : WITHOUT_NULL_HANDLING.get();
+  }
+
+  /// The same as [#instance], but `ARRAY_TO_MV` is [#NULLABLE_ARRAY_TO_MV]. The planner validates a query again with
+  /// this table when it plans the query with the MV aggregate.
+  public static PinotOperatorTable withNullableArrayToMv(boolean nullHandlingEnabled) {
+    return nullHandlingEnabled ? WITH_NULL_HANDLING_NULLABLE_ARRAY_TO_MV.get()
+        : WITHOUT_NULL_HANDLING_NULLABLE_ARRAY_TO_MV.get();
   }
 
   // The standard Calcite + and - operators don't support operations on TIMESTAMP types. However, Pinot supports these
@@ -141,8 +153,35 @@ public class PinotOperatorTable implements SqlOperatorTable {
   /// [org.apache.pinot.calcite.rel.rules.PinotRuleUtils#isRelocatable] ignores this flag, so ARRAY_TO_MV filters are
   /// still pushed below joins.
   public static final PinotSqlFunction ARRAY_TO_MV =
-      new PinotSqlFunction("ARRAY_TO_MV", opBinding -> opBinding.getOperandType(0).getComponentType(),
+      new PinotSqlFunction(ArrayToMvFunctionName.NAME, opBinding -> opBinding.getOperandType(0).getComponentType(),
           OperandTypes.ARRAY, false);
+
+  /// The `ARRAY_TO_MV` of the plan with the MV aggregate. It differs from [#ARRAY_TO_MV] only in its type, see
+  /// [#arrayToMvReturnType]. Only the operator table of [#withNullableArrayToMv] has it.
+  ///
+  /// The planner uses it only for a query that fails the `ARRAY_TO_MV` validation without the MV aggregate. Such a
+  /// query fails on a broker that predates the MV aggregate. So the type of [#ARRAY_TO_MV], and every simplification
+  /// that Calcite makes because of it, stays the same for every query that runs today.
+  public static final PinotSqlFunction NULLABLE_ARRAY_TO_MV =
+      new PinotSqlFunction(ArrayToMvFunctionName.NAME,
+          opBinding -> arrayToMvReturnType(opBinding.getTypeFactory(), opBinding.getOperandType(0)),
+          OperandTypes.ARRAY, false);
+
+  /// The type of [#NULLABLE_ARRAY_TO_MV]: the component type of `arrayType`. The type is nullable when the array type
+  /// or the component type is nullable. The MV aggregate gives its MV keys the same type, so that it can replace a
+  /// plain aggregate over `ARRAY_TO_MV(array)` without changing the row type.
+  ///
+  /// A null array goes into the null group at runtime, as in the single-stage engine. The type factory applies the
+  /// nullability of an array to the array only, so a nullable array (for example, from an outer join or a column with
+  /// null handling) usually has a NOT NULL component type. [#ARRAY_TO_MV] has this NOT NULL type. With it, Calcite
+  /// removes `COALESCE` and folds `IS NULL` on the key, and the null group gives wrong results.
+  public static RelDataType arrayToMvReturnType(RelDataTypeFactory typeFactory, RelDataType arrayType) {
+    RelDataType componentType = arrayType.getComponentType();
+    Preconditions.checkArgument(componentType != null, "ARRAY_TO_MV requires an array, got: %s",
+        arrayType.getFullTypeString());
+    return typeFactory.createTypeWithNullability(componentType,
+        arrayType.isNullable() || componentType.isNullable());
+  }
 
   /// This list includes the supported standard [SqlOperator]s defined in [SqlStdOperatorTable].
   /// NOTE: The operator order follows the same order as defined in [SqlStdOperatorTable] for easier search.
@@ -350,7 +389,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
   private final Map<String, List<SqlOperator>> _operatorMap;
   private final List<SqlOperator> _operatorList;
 
-  private PinotOperatorTable(boolean nullHandlingEnabled) {
+  private PinotOperatorTable(boolean nullHandlingEnabled, boolean nullableArrayToMv) {
     Map<String, List<SqlOperator>> operatorMap = new HashMap<>();
 
     // Register standard operators
@@ -386,6 +425,9 @@ public class PinotOperatorTable implements SqlOperatorTable {
     registerAggregateFunctions(operatorMap);
     registerTransformFunctions(operatorMap);
     registerScalarFunctions(operatorMap);
+    if (nullableArrayToMv) {
+      registerOverride(FunctionRegistry.canonicalize(ArrayToMvFunctionName.NAME), NULLABLE_ARRAY_TO_MV, operatorMap);
+    }
 
     Map<String, List<SqlOperator>> immutableMap = new HashMap<>(operatorMap.size());
     List<SqlOperator> allOperators = new ArrayList<>();

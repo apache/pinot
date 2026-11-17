@@ -68,6 +68,9 @@ public class PinotDispatchPlanner {
         resolveActualTableNames(subPlan.getSubPlanMetadata().getTableNames()));
     PlanFragment rootFragment = subPlan.getSubPlanRoot();
     PlanNode rootNode = rootFragment.getFragmentRoot();
+    // 0. Run validations. They need no worker assignment, so a plan that fails them, such as a plan that the MV
+    // aggregate fallback replaces, does not pay for routing and worker assignment.
+    ArrayToMvValidationVisitor.validateFragments(rootFragment);
     // 1. start by visiting the sub plan fragment root.
     rootNode.visit(new DispatchablePlanVisitor(_tableCache, routingContext), context);
     // 2. add a special stage for the global mailbox receive, this runs on the dispatcher.
@@ -76,9 +79,7 @@ public class PinotDispatchPlanner {
     context.getWorkerManager().assignWorkers(rootFragment, context);
     // 4. compute the mailbox assignment for each stage.
     rootNode.visit(MailboxAssignmentVisitor.INSTANCE, context);
-    // 5. Run validations
-    runValidations(rootFragment, context);
-    // 6. convert it into query plan.
+    // 5. convert it into query plan.
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 
@@ -155,9 +156,9 @@ public class PinotDispatchPlanner {
   /// Run validations on the plan. Since there is only one validator right now, don't try to over-engineer it.
   private void runValidations(PlanFragment planFragment, DispatchablePlanContext context) {
     PlanNode rootPlanNode = planFragment.getFragmentRoot();
-    boolean isIntermediateStage =
-        context.getDispatchablePlanMetadataMap().get(rootPlanNode.getStageId()).getScannedTables().isEmpty();
-    rootPlanNode.visit(ArrayToMvValidationVisitor.INSTANCE, isIntermediateStage);
+    boolean scansTables =
+        !context.getDispatchablePlanMetadataMap().get(rootPlanNode.getStageId()).getScannedTables().isEmpty();
+    ArrayToMvValidationVisitor.validate(rootPlanNode, scansTables);
     for (PlanFragment child : planFragment.getChildren()) {
       runValidations(child, context);
     }

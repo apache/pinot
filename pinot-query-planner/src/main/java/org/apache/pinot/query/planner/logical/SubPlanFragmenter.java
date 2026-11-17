@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -153,6 +154,11 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
 
   @Override
   public PlanNode visitUnnest(UnnestNode node, Context context) {
+    return process(node, context);
+  }
+
+  @Override
+  public PlanNode visitMvAggregate(MvAggregateNode node, Context context) {
     return process(node, context);
   }
 

@@ -47,7 +47,7 @@ public class QueryEnvironmentTestBase {
   protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       Map.of("a_REALTIME", List.of("a1", "a2"), "b_REALTIME", List.of("b1"), "c_OFFLINE",
-          List.of("c1"), "d_OFFLINE", List.of("d1"), "e_OFFLINE", List.of("e1"));
+          List.of("c1"), "d_OFFLINE", List.of("d1"), "e_OFFLINE", List.of("e1"), "f_OFFLINE", List.of("f1"));
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
       Map.of("a_REALTIME", List.of("a3"), "c_OFFLINE", List.of("c2", "c3"),
           "d_REALTIME", List.of("d2"), "d_OFFLINE", List.of("d3"), "e_REALTIME",
@@ -79,6 +79,11 @@ public class QueryEnvironmentTestBase {
     TABLE_SCHEMAS.put("e", getSchemaBuilder("e")
         .addMultiValueDimension("mcol1", FieldSpec.DataType.STRING)
         .addMultiValueDimension("mcol2", FieldSpec.DataType.LONG)
+        .build());
+    // Column-based null handling: every column, including the multi-value one, is nullable.
+    TABLE_SCHEMAS.put("f_OFFLINE", getSchemaBuilder("f")
+        .addMultiValueDimension("mcol1", FieldSpec.DataType.STRING)
+        .setEnableColumnBasedNullHandling(true)
         .build());
   }
 

@@ -42,6 +42,12 @@ public class OperatorTypeRegistryTest {
   }
 
   @Test
+  public void testMvAggregateType() {
+    Assert.assertSame(OperatorTypeRegistry.fromId(17), MultiStageOperator.Type.MV_AGGREGATE);
+    Assert.assertEquals(MultiStageOperator.Type.MV_AGGREGATE.getStatKeyClass(), AggregateOperator.StatKey.class);
+  }
+
+  @Test
   public void testFromIdUnknownReturnsNull() {
     // Pick an id well outside the current built-in range
     Assert.assertNull(OperatorTypeRegistry.fromId(9999));
