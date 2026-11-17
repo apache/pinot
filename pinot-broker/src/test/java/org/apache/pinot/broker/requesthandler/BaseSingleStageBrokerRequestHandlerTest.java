@@ -1038,6 +1038,93 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     };
   }
 
+  /// A GROUP BY without ORDER BY is ordered on its group keys before the materialized view rewrite, which sees the
+  /// ordering as if the user had written it, and goes to the servers that way; the reduce reads the same query. The
+  /// rewrite reads the options of the query.
+  @Test
+  public void testGroupByWithoutOrderByIsOrderedOnGroupKeys()
+      throws Exception {
+    String tableName = "baseTable_OFFLINE";
+    TableCache tableCache = mock(TableCache.class);
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCache.getActualTableName(anyString())).thenReturn(tableName);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts", "revenue", "revenue"));
+    when(tableCfg.getTenantConfig()).thenReturn(new TenantConfig("tier_BROKER", "tier_SERVER", null));
+    when(tableCache.getTableConfig(tableName)).thenReturn(tableCfg);
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(tableName)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("Server_localhost_9000")),
+            new SegmentsToQuery(List.of("segment01"), List.of())));
+    when(routingManager.getRoutingTable(any(), anyLong())).thenReturn(rt);
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
+    AtomicReference<PinotQuery> querySeenByMaterializedViewRewrite = new AtomicReference<>();
+    MaterializedViewQueryRewriteEngine materializedViewEngine = mock(MaterializedViewQueryRewriteEngine.class);
+    when(materializedViewEngine.tryRewrite(any(PinotQuery.class), anyString())).thenAnswer(invocation -> {
+      querySeenByMaterializedViewRewrite.set(((PinotQuery) invocation.getArgument(0)).deepCopy());
+      return null;
+    });
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+    AtomicReference<BrokerRequest> serverRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
+            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null,
+            new DefaultMaterializedViewHandler(materializedViewEngine)) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+              BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            serverRequest.set(serverBrokerRequest);
+            return BrokerResponseNative.empty();
+          }
+
+          @Override
+          protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+              long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+              TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            throw new UnsupportedOperationException("Not implemented in test");
+          }
+        };
+
+    BrokerResponseNative response =
+        (BrokerResponseNative) handler.handleRequest("SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts LIMIT 100");
+    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    List<Expression> orderByKeys = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts ORDER BY ts LIMIT 100").getOrderByList();
+    assertEquals(querySeenByMaterializedViewRewrite.get().getOrderByList(), orderByKeys);
+    assertEquals(serverRequest.get().getPinotQuery().getOrderByList(), orderByKeys);
+
+    // A written ORDER BY is kept
+    String orderedQuery = "SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts ORDER BY SUM(revenue) DESC LIMIT 100";
+    response = (BrokerResponseNative) handler.handleRequest(orderedQuery);
+    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    assertEquals(serverRequest.get().getPinotQuery().getOrderByList(),
+        CalciteSqlParser.compileToPinotQuery(orderedQuery).getOrderByList());
+
+    // At this sortAggregateLimitThreshold the servers would not take the sorted combine, so the query goes as written
+    response = (BrokerResponseNative) handler.handleRequest(
+        "SET sortAggregateLimitThreshold = 100; SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts LIMIT 100");
+    assertTrue(response.getExceptions().isEmpty(), response.getExceptions().toString());
+    assertEquals(serverRequest.get().getPinotQuery().getOrderByListSize(), 0);
+  }
+
   /// A query with an RLS filter skips the MV rewrite: the broker looks up the RLS filter of the base table
   /// "baseTable_OFFLINE", and the query runs on the base table with that filter in its options.
   @Test

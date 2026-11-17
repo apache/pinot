@@ -584,7 +584,8 @@ public final class GroupByUtils {
         resultSize = trimSize;
       } else {
         // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
-        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
+        //       without ordering. The single-stage broker orders such a query on its group-by columns when its LIMIT
+        //       is below the sort aggregate limit threshold (OrderByGroupKeysRewriter). Consider a larger LIMIT too.
         resultSize = limit;
       }
       int initialCapacity = getIndexedTableInitialCapacity(resultSize, numGroups, minInitialIndexedTableCapacity);

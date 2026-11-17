@@ -200,7 +200,7 @@ public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegration
   public void testGroupBySse() {
     setUseMultiStageQueryEngine(false);
     explainSse("SELECT count(*) FROM mytable group by datetrunc('SECOND', ts)",
-        "[BROKER_REDUCE(limit:10), 1, 0]",
+        "[BROKER_REDUCE(sort:[datetrunc('SECOND',ts) ASC],limit:10), 1, 0]",
         "[COMBINE_GROUP_BY, 2, 1]",
         "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]",
         "[GROUP_BY(groupKeys:$ts$SECOND, aggregations:count(*)), 3, 2]",
