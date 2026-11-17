@@ -58,6 +58,7 @@ import org.apache.pinot.materializedview.consistency.MaterializedViewConsistency
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -319,6 +320,13 @@ public class SegmentDeletionManager {
 
     PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_dataDir).getScheme());
 
+    boolean preserveMetadata = _preserveDeletedSegmentMetadata && retentionMs > 0;
+    if (preserveMetadata && isRootNameOfLiveTable(DELETED_SEGMENTS_METADATA)) {
+      LOGGER.warn("A live table is named {}, so that directory cannot also be the segment metadata archive root; "
+          + "deleting the metadata of table: {} instead of archiving it", DELETED_SEGMENTS_METADATA, rawTableName);
+      preserveMetadata = false;
+    }
+
     for (String segmentId : segments) {
       URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
       if (fileToDeleteURI == null) {
@@ -327,12 +335,13 @@ public class SegmentDeletionManager {
       if (retentionMs <= 0) {
         filesToDelete.add(fileToDeleteURI);
       } else {
-        moveSegmentsToDeletedDir(segmentId, deletedSegmentsRetentionMs, rawTableName, pinotFS, fileToDeleteURI);
+        moveSegmentsToDeletedDir(segmentId, deletedSegmentsRetentionMs, rawTableName, pinotFS, fileToDeleteURI,
+            preserveMetadata);
       }
       // Segment metadata in deep store is an optimization, to avoid downloading the segment to parse its metadata.
       // With retention > 0 and preservation enabled it is kept together with the segment (see
       // moveSegmentsToDeletedDir); otherwise it is deleted.
-      if (retentionMs <= 0 || !_preserveDeletedSegmentMetadata) {
+      if (!preserveMetadata) {
         try {
           metadataFilesToDelete.add(SegmentPushUtils.generateSegmentMetadataURI(fileToDeleteURI.toString(), segmentId));
         } catch (URISyntaxException e) {
@@ -357,7 +366,7 @@ public class SegmentDeletionManager {
 
   private void moveSegmentsToDeletedDir(String segmentId, Long deletedSegmentsRetentionMs, String rawTableName,
       PinotFS pinotFS,
-      URI fileToDeleteURI) {
+      URI fileToDeleteURI, boolean preserveMetadata) {
     // move the segment file to deleted segments first and let retention manager handler the deletion
     // The retention suffix is computed once (it is minute granular) so the segment and its metadata expire in the same
     // sweep. No suffix when deletedSegmentsRetentionMs is null: expiry then falls back to lastModified.
@@ -384,7 +393,7 @@ public class SegmentDeletionManager {
       LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
           deletedSegmentMoveDestURI.toString(), e);
     }
-    if (_preserveDeletedSegmentMetadata) {
+    if (preserveMetadata) {
       // Even if the segment object vanished after it was located, so no orphan sidecar is left in the live directory.
       moveSegmentMetadataToDeletedDir(pinotFS, fileToDeleteURI, segmentId, rawTableName, retentionSuffix);
     }
@@ -490,6 +499,12 @@ public class SegmentDeletionManager {
         return;
       }
 
+      // A live table named like the root owns this directory: its entries are live segments, not archived tables.
+      if (isRootNameOfLiveTable(rootName)) {
+        LOGGER.warn("A live table is named {}, skipping the sweep of {}", rootName, deletedDirURI);
+        return;
+      }
+
       String[] tableNameDirs = pinotFS.listFiles(deletedDirURI, false);
       if (tableNameDirs == null) {
         LOGGER.warn("Failed to list files from the deleted segments directory: {}", deletedDirURI);
@@ -510,6 +525,11 @@ public class SegmentDeletionManager {
           // A failure on one table must not skip the tables after it.
           try {
             URI tableNameURI = URIUtils.getUri(deletedDirURI.toString(), URIUtils.encode(tableName));
+            // Object stores list a plain file as an empty directory, which the empty-directory cleanup would delete.
+            if (!pinotFS.isDirectory(tableNameURI)) {
+              LOGGER.warn("Skipping non-directory entry: {} under: {}", tableNameURI, deletedDirURI);
+              continue;
+            }
             removeAgedFiles(pinotFS, tableNameURI, tableName, agedSegmentsDeletionBatchSize, true);
           } catch (Exception e) {
             LOGGER.error("Failed to remove aged deleted segments for table: {}", tableName, e);
@@ -518,6 +538,24 @@ public class SegmentDeletionManager {
       }
     } catch (IOException e) {
       LOGGER.error("Had trouble deleting directories: {}", deletedDirURI.toString(), e);
+    }
+  }
+
+  /// Whether a live table's raw name equals `rootName`, which makes that archive root the table's own deep-store
+  /// directory. Assumes a collision when the table config cannot be read, so nothing is swept or archived on a guess.
+  private boolean isRootNameOfLiveTable(String rootName) {
+    try {
+      for (TableType tableType : TableType.values()) {
+        String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rootName);
+        if (_propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType), null,
+            AccessOption.PERSISTENT) != null) {
+          return true;
+        }
+      }
+      return false;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to check whether a live table is named {}, assuming it is", rootName, e);
+      return true;
     }
   }
 

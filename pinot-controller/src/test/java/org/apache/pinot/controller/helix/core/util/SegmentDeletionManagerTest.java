@@ -69,10 +69,13 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForResourceConfig;
 import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForSegment;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -895,6 +898,104 @@ public class SegmentDeletionManagerTest {
         "Unable to verify that a segment named metadata is swept like any other aged file");
   }
 
+  @DataProvider(name = "archiveRoots")
+  public Object[][] archiveRoots() {
+    return new Object[][]{{SegmentDeletionManager.DELETED_SEGMENTS}, {METADATA_ROOT}};
+  }
+
+  private ZkHelixPropertyStore<ZNRecord> makePropertyStoreWithLiveTable(String rawTableName) {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
+    String offlineTableName = rawTableName + "_OFFLINE";
+    when(propertyStore.get(eq(constructPropertyStorePathForResourceConfig(offlineTableName)), isNull(),
+        eq(AccessOption.PERSISTENT))).thenReturn(new ZNRecord(offlineTableName));
+    return propertyStore;
+  }
+
+  private FakeDeletionManager newSweeperWithObjectStoreFs(File dataDir,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    PinotFSFactory.register(PinotFSFactory.LOCAL_PINOT_FS_SCHEME, ObjectStoreLikeFs.class.getName(), null);
+    return new FakeDeletionManager(dataDir.getAbsolutePath(), makeHelixAdmin(), propertyStore, 7);
+  }
+
+  private static void restoreLocalFs() {
+    PinotFSFactory.register(PinotFSFactory.LOCAL_PINOT_FS_SCHEME, LocalPinotFS.class.getName(), null);
+  }
+
+  // A raw table named like an archive root has that root as its own live deep-store directory, so the sweep must not
+  // treat the live segment files in it as archived files.
+  @Test(dataProvider = "archiveRoots")
+  public void testSweeperDoesNotDeleteSegmentsOfLiveTableNamedAsArchiveRoot(String root)
+      throws Exception {
+    File dataDir = Files.createTempDirectory("pinot-test-").toFile();
+    dataDir.deleteOnExit();
+    File liveTableDir = new File(dataDir, root);
+    liveTableDir.mkdirs();
+    File seg1 = new File(liveTableDir, "seg1");
+    File seg2 = new File(liveTableDir, "seg2");
+    // Old enough to be expired under the 7 day default retention if they were mistaken for archived files.
+    createTestFileWithAge(seg1.getAbsolutePath(), 30);
+    createTestFileWithAge(seg2.getAbsolutePath(), 30);
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+
+    try {
+      newSweeperWithObjectStoreFs(dataDir, makePropertyStoreWithLiveTable(root)).removeAgedDeletedSegments(
+          leadControllerManager);
+    } finally {
+      restoreLocalFs();
+    }
+
+    Assert.assertTrue(seg1.exists());
+    Assert.assertTrue(seg2.exists());
+  }
+
+  // Even with no live table of that name, a plain file directly under an archive root is not a table directory. On an
+  // object store, listing it as a directory is empty, which must not lead to deleting the file.
+  @Test(dataProvider = "archiveRoots")
+  public void testSweeperSkipsNonDirectoryEntriesUnderArchiveRoot(String root)
+      throws Exception {
+    File dataDir = Files.createTempDirectory("pinot-test-").toFile();
+    dataDir.deleteOnExit();
+    File rootDir = new File(dataDir, root);
+    rootDir.mkdirs();
+    File strayFile = new File(rootDir, "stray");
+    createTestFileWithAge(strayFile.getAbsolutePath(), 30);
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+
+    try {
+      newSweeperWithObjectStoreFs(dataDir, makePropertyStore()).removeAgedDeletedSegments(leadControllerManager);
+    } finally {
+      restoreLocalFs();
+    }
+
+    Assert.assertTrue(strayFile.exists());
+  }
+
+  @Test
+  public void testPreservationDoesNotArchiveSidecarIntoLiveTableNamedAsMetadataRoot()
+      throws Exception {
+    File dataDir = Files.createTempDirectory("pinot-test-").toFile();
+    dataDir.deleteOnExit();
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(new PinotConfiguration(properties));
+    SegmentDeletionManager manager =
+        new SegmentDeletionManager(dataDir.getAbsolutePath(), makeHelixAdmin(), CLUSTER_NAME,
+            makePropertyStoreWithLiveTable(METADATA_ROOT), 7, true);
+    createLiveSegment(dataDir, "seg1", true, true);
+
+    manager.removeSegmentsFromStoreInBatch(TABLE_NAME, Collections.singletonList("seg1"), TimeUnit.DAYS.toMillis(1));
+
+    // The segment is archived as usual.
+    File deletedTableDir = new File(dataDir, SegmentDeletionManager.DELETED_SEGMENTS + File.separator + TABLE_NAME);
+    Assert.assertEquals(sortedNames(deletedTableDir).size(), 1);
+    // The sidecar is neither archived into the live table's directory nor left orphaned in the table's live directory.
+    Assert.assertFalse(new File(dataDir, METADATA_ROOT + File.separator + TABLE_NAME).exists());
+    Assert.assertFalse(new File(dataDir, TABLE_NAME + File.separator + "seg1" + METADATA_TAR_GZ_EXT).exists());
+  }
+
   public void createTableAndSegmentFiles(File tempDir, List<String> segmentIds)
       throws Exception {
     File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
@@ -964,6 +1065,22 @@ public class SegmentDeletionManagerTest {
     public void removeSegmentsFromStoreInBatch(String tableNameWithType, Collection<String> segments,
         @Nullable Long deletedSegmentsRetentionMs) {
       _segmentsRemovedFromStore.addAll(segments);
+    }
+  }
+
+  /// Like S3 and GCS, listing a plain file as a directory returns an empty listing instead of failing.
+  public static class ObjectStoreLikeFs extends LocalPinotFS {
+
+    @Override
+    public String[] listFiles(URI fileUri, boolean recursive)
+        throws IOException {
+      return isDirectory(fileUri) ? super.listFiles(fileUri, recursive) : new String[0];
+    }
+
+    @Override
+    public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
+        throws IOException {
+      return isDirectory(fileUri) ? super.listFilesWithMetadata(fileUri, recursive) : List.of();
     }
   }
 
