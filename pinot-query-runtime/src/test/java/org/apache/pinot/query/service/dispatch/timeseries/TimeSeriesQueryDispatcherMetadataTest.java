@@ -38,7 +38,7 @@ public class TimeSeriesQueryDispatcherMetadataTest {
   @Test
   public void testSegmentListsInServerMetadata() {
     // Server_1 reads leafA from required segments and leafB only from optional (not yet ONLINE) segments.
-    TimeSeriesDispatchablePlan plan = new TimeSeriesDispatchablePlan("m3ql", List.of(), null, List.of(),
+    TimeSeriesDispatchablePlan plan = new TimeSeriesDispatchablePlan("m3ql", List.of(), null, List.of(), false,
         TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 6),
         Map.of("Server_1", Map.of("leafA", List.of("seg1", "seg2"), "leafB", List.of())),
         Map.of("Server_1", Map.of("leafB", List.of("seg3"))), Map.of(), List.of());

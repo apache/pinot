@@ -121,17 +121,21 @@ public class TimeSeriesQueryEnvironment {
     logicalPlan = new TimeSeriesLogicalPlanResult(TableScanVisitor.INSTANCE.addQueryOptionsToPlan(
         logicalPlan.getPlanNode(), scanVisitorContext.getRoutingQueryOptions()), logicalPlan.getTimeBuckets());
     List<TimeSeriesQueryServerInstance> serverInstances = scanVisitorContext.getQueryServers();
-    // Step-2: Create plan fragments.
+    Map<String, Map<String, List<String>>> leafIdToSegmentsByInstanceId =
+        scanVisitorContext.getLeafIdToSegmentsByInstanceId();
+    // Step-2: Create plan fragments. One server runs the whole plan only when it holds segments for every leaf: a
+    // leaf it holds none for must not run there, since its table may not be on that server, and must read nothing.
+    boolean wholePlanOnOneServer = serverInstances.size() == 1 && leafIdToSegmentsByInstanceId.get(
+        serverInstances.get(0).getInstanceId()).keySet().containsAll(leafIds(logicalPlan.getPlanNode()));
     List<BaseTimeSeriesPlanNode> fragments = TimeSeriesPlanFragmenter.getFragments(
-        logicalPlan.getPlanNode(), serverInstances.size() == 1);
+        logicalPlan.getPlanNode(), wholePlanOnOneServer);
     // Step-3: Compute number of servers each exchange node will receive data from.
-    Map<String, Integer> numServersForExchangePlanNode = computeNumServersForExchangePlanNode(serverInstances,
-        fragments, scanVisitorContext.getLeafIdToSegmentsByInstanceId());
+    Map<String, Integer> numServersForExchangePlanNode = computeNumServersForExchangePlanNode(wholePlanOnOneServer,
+        fragments, leafIdToSegmentsByInstanceId);
     return new TimeSeriesDispatchablePlan(timeSeriesRequest.getLanguage(), serverInstances, fragments.get(0),
-        fragments.subList(1, fragments.size()), logicalPlan.getTimeBuckets(),
-        scanVisitorContext.getLeafIdToSegmentsByInstanceId(),
-        scanVisitorContext.getLeafIdToOptionalSegmentsByInstanceId(), numServersForExchangePlanNode,
-      scanVisitorContext.getTableNames());
+        fragments.subList(1, fragments.size()), wholePlanOnOneServer, logicalPlan.getTimeBuckets(),
+        leafIdToSegmentsByInstanceId, scanVisitorContext.getLeafIdToOptionalSegmentsByInstanceId(),
+        numServersForExchangePlanNode, scanVisitorContext.getTableNames());
   }
 
   /// The distinct tables the plan's leaves scan, in plan order.
@@ -139,6 +143,21 @@ public class TimeSeriesQueryEnvironment {
     Set<String> tableNames = new LinkedHashSet<>();
     collectLeafTableNames(planNode, tableNames);
     return new ArrayList<>(tableNames);
+  }
+
+  private static Set<String> leafIds(BaseTimeSeriesPlanNode planNode) {
+    Set<String> leafIds = new HashSet<>();
+    collectLeafIds(planNode, leafIds);
+    return leafIds;
+  }
+
+  private static void collectLeafIds(BaseTimeSeriesPlanNode planNode, Set<String> leafIds) {
+    if (planNode instanceof LeafTimeSeriesPlanNode) {
+      leafIds.add(planNode.getId());
+    }
+    for (BaseTimeSeriesPlanNode input : planNode.getInputs()) {
+      collectLeafIds(input, leafIds);
+    }
   }
 
   private static void collectLeafTableNames(BaseTimeSeriesPlanNode planNode, Set<String> tableNames) {
@@ -150,14 +169,14 @@ public class TimeSeriesQueryEnvironment {
     }
   }
 
-  private Map<String, Integer> computeNumServersForExchangePlanNode(List<TimeSeriesQueryServerInstance> serverInstances,
+  private Map<String, Integer> computeNumServersForExchangePlanNode(boolean wholePlanOnOneServer,
       List<BaseTimeSeriesPlanNode> planNodes, Map<String, Map<String, List<String>>> leafIdToSegmentsByInstanceId) {
-    if (serverInstances.size() == 1) {
+    if (wholePlanOnOneServer) {
       // For single-server case, the broker fragment consists only of the TimeSeriesExchangeNode.
       return Map.of(planNodes.get(0).getId(), 1);
     }
-    // For the multi-server case, the leafIdToSegmentsByInstanceId map already has the information we need, but we
-    // just need to restructure it so that we can get number of servers by planId.
+    // Otherwise each leaf is its own fragment. The leafIdToSegmentsByInstanceId map already has the information we
+    // need, but we just need to restructure it so that we can get number of servers by planId.
     Map<String, Set<String>> planIdToServers = new HashMap<>();
     for (var entry : leafIdToSegmentsByInstanceId.entrySet()) {
       String instanceId = entry.getKey();

@@ -32,6 +32,7 @@ public class TimeSeriesDispatchablePlan {
   private final String _language;
   private final BaseTimeSeriesPlanNode _brokerFragment;
   private final List<BaseTimeSeriesPlanNode> _serverFragments;
+  private final boolean _wholePlanOnOneServer;
   private final TimeBuckets _timeBuckets;
   private final Map<String, Map<String, List<String>>> _leafIdToSegmentsByInstanceId;
   private final Map<String, Map<String, List<String>>> _leafIdToOptionalSegmentsByInstanceId;
@@ -39,18 +40,22 @@ public class TimeSeriesDispatchablePlan {
   private final List<String> _serializedServerFragments;
   private final List<String> _tableNames;
 
+  /// @param wholePlanOnOneServer whether the query's one server runs the whole plan, which needs it to hold segments
+  ///     for every leaf; the server fragments are then the whole plan rather than one fragment per leaf
   /// @param leafIdToSegmentsByInstanceId per server, the required segments of each leaf it reads; a server reads a
   ///     leaf when it has required or optional segments for it, so a list may be empty
   /// @param leafIdToOptionalSegmentsByInstanceId per server, the non-empty optional segments of each leaf
   public TimeSeriesDispatchablePlan(String language, List<TimeSeriesQueryServerInstance> queryServerInstances,
       BaseTimeSeriesPlanNode brokerFragment, List<BaseTimeSeriesPlanNode> serverFragments,
-      TimeBuckets initialTimeBuckets, Map<String, Map<String, List<String>>> leafIdToSegmentsByInstanceId,
+      boolean wholePlanOnOneServer, TimeBuckets initialTimeBuckets,
+      Map<String, Map<String, List<String>>> leafIdToSegmentsByInstanceId,
       Map<String, Map<String, List<String>>> leafIdToOptionalSegmentsByInstanceId,
       Map<String, Integer> numInputServersForExchangePlanNode, List<String> tableNames) {
     _language = language;
     _queryServerInstances = queryServerInstances;
     _brokerFragment = brokerFragment;
     _serverFragments = serverFragments;
+    _wholePlanOnOneServer = wholePlanOnOneServer;
     _timeBuckets = initialTimeBuckets;
     _leafIdToSegmentsByInstanceId = leafIdToSegmentsByInstanceId;
     _leafIdToOptionalSegmentsByInstanceId = leafIdToOptionalSegmentsByInstanceId;
@@ -76,12 +81,12 @@ public class TimeSeriesDispatchablePlan {
     return _serverFragments;
   }
 
-  /// The serialized fragments a server runs: all of them when one server runs the whole plan, else the fragments of
-  /// the leaves it holds segments for. A server sends one block per fragment it runs, and each exchange waits for one
-  /// block from each server holding its leaf, so a server that ran a leaf it holds no segments for would send an extra
-  /// block that the exchange could take in place of a server's real data.
+  /// The serialized fragments a server runs: the whole plan when the query's one server holds segments for every leaf,
+  /// else the fragments of the leaves it holds segments for. A server sends one block per fragment it runs, and each
+  /// exchange waits for one block from each server holding its leaf, so a server that ran a leaf it holds no segments
+  /// for would send an extra block that the exchange could take in place of a server's real data.
   public List<String> getSerializedServerFragments(String instanceId) {
-    if (_queryServerInstances.size() == 1) {
+    if (_wholePlanOnOneServer) {
       return _serializedServerFragments;
     }
     Map<String, List<String>> segmentsByLeafId = _leafIdToSegmentsByInstanceId.getOrDefault(instanceId, Map.of());

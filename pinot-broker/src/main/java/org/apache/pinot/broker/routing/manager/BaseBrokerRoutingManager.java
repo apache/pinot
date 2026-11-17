@@ -80,6 +80,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -1337,12 +1338,20 @@ public abstract class BaseBrokerRoutingManager
     String samplerName = extractSamplerName(brokerRequest);
     InstanceSelector.SelectionResult selectionResult =
         routingEntry.calculateRouting(brokerRequest, requestId, samplerName);
-    return new RoutingTable(getServerInstanceToSegmentsMap(tableNameWithType, selectionResult),
-        selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
+    return new RoutingTable(getServerInstanceToSegmentsMap(tableNameWithType, selectionResult,
+        routesServersWithOnlyOptionalSegments(brokerRequest)), selectionResult.getUnavailableSegments(),
+        selectionResult.getNumPrunedSegments());
+  }
+
+  private static boolean routesServersWithOnlyOptionalSegments(BrokerRequest brokerRequest) {
+    PinotQuery pinotQuery = brokerRequest.getPinotQuery();
+    Map<String, String> queryOptions = pinotQuery != null ? pinotQuery.getQueryOptions() : null;
+    return queryOptions != null
+        && Boolean.parseBoolean(queryOptions.get(RoutingManager.ROUTE_SERVERS_WITH_ONLY_OPTIONAL_SEGMENTS));
   }
 
   private Map<ServerInstance, SegmentsToQuery> getServerInstanceToSegmentsMap(String tableNameWithType,
-      InstanceSelector.SelectionResult selectionResult) {
+      InstanceSelector.SelectionResult selectionResult, boolean routeServersWithOnlyOptionalSegments) {
     Map<String, SegmentsToQuery> instanceToSegmentsMap = selectionResult.getInstanceToSegmentsMap();
     Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
         Maps.newHashMapWithExpectedSize(instanceToSegmentsMap.size());
@@ -1350,9 +1359,10 @@ public abstract class BaseBrokerRoutingManager
       SegmentsToQuery segmentsToQuery = entry.getValue();
       int numSegments = segmentsToQuery.getSegments().size();
       // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
-      // to process, to be backward compatible.
+      // to process, to be backward compatible, unless the request asks to keep them.
       // TODO: allow servers only with optional segments
-      if (numSegments == 0) {
+      if (numSegments == 0 && (!routeServersWithOnlyOptionalSegments || segmentsToQuery.getOptionalSegments() == null
+          || segmentsToQuery.getOptionalSegments().isEmpty())) {
         continue;
       }
       // The server instance is looked up per query, because an instance config change replaces it
@@ -1361,7 +1371,9 @@ public abstract class BaseBrokerRoutingManager
         serverInstanceToSegmentsMap.put(serverInstance, segmentsToQuery);
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
-        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, numSegments);
+        if (numSegments > 0) {
+          _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, numSegments);
+        }
         // TODO: Report missing server metrics for optional segments when we allow servers only with optional segments.
       }
     }

@@ -74,14 +74,7 @@ public class TableScanVisitor {
       routingTable = context._routingCustomizer.customize(sfpNode, routingTable, context._routingContext);
       Preconditions.checkNotNull(routingTable, "Routing customizer returned no routing for table: "
           + sfpNode.getTableName());
-      List<String> unavailableSegments = routingTable.getUnavailableSegments();
-      if (routingTable.getServerInstanceToSegmentsMap().isEmpty() && unavailableSegments != null
-          && !unavailableSegments.isEmpty()) {
-        // No data in range is an empty result; segments no server can serve are an outage, not an empty result.
-        throw new QueryException(QueryErrorCode.SERVER_SEGMENT_MISSING, String.format(
-            "No server can serve %d unavailable segment(s) of table: %s", unavailableSegments.size(),
-            sfpNode.getTableName()));
-      }
+      boolean routed = false;
       for (var entry : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
         ServerInstance serverInstance = entry.getKey();
         List<String> segments = entry.getValue().getSegments() == null ? List.of() : entry.getValue().getSegments();
@@ -92,12 +85,20 @@ public class TableScanVisitor {
         if (segments.isEmpty() && optionalSegments.isEmpty()) {
           continue;
         }
+        routed = true;
         context.getLeafIdToSegmentsByServer().computeIfAbsent(serverInstance, (x) -> new HashMap<>())
             .put(sfpNode.getId(), segments);
         if (!optionalSegments.isEmpty()) {
           context._leafIdToOptionalSegmentsByServer.computeIfAbsent(serverInstance, (x) -> new HashMap<>())
               .put(sfpNode.getId(), optionalSegments);
         }
+      }
+      List<String> unavailableSegments = routingTable.getUnavailableSegments();
+      if (!routed && unavailableSegments != null && !unavailableSegments.isEmpty()) {
+        // No data in range is an empty result; segments no server can serve are an outage, not an empty result.
+        throw new QueryException(QueryErrorCode.SERVER_SEGMENT_MISSING, String.format(
+            "No server can serve %d unavailable segment(s) of table: %s", unavailableSegments.size(),
+            sfpNode.getTableName()));
       }
     }
     for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
@@ -273,6 +274,11 @@ public class TableScanVisitor {
     PinotQuery pinotQuery = new PinotQuery();
     pinotQuery.setDataSource(dataSource);
     pinotQuery.setFilterExpression(filterExpression);
+    // Time-series servers query optional segments, so a server that holds only optional segments of a leaf still
+    // reads it, for example a segment it has loaded while the external view lags.
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put(RoutingManager.ROUTE_SERVERS_WITH_ONLY_OPTIONAL_SEGMENTS, "true");
+    pinotQuery.setQueryOptions(queryOptions);
     QuerySource querySource = new QuerySource();
     querySource.setTableName(tableName);
     BrokerRequest dummyRequest = new BrokerRequest();

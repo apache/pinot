@@ -54,8 +54,10 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
+import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionInfo;
@@ -251,6 +253,47 @@ public class BrokerRoutingManagerTest {
     verify(_brokerMetrics, atLeastOnce()).addMeteredTableValue(eq(TEST_TABLE),
         eq(BrokerMeter.SERVER_MISSING_FOR_ROUTING), increments.capture());
     assertEquals(increments.getAllValues().stream().mapToLong(Long::longValue).sum(), 2L);
+    verifyNoMoreInteractions(_brokerMetrics);
+  }
+
+  @Test
+  public void testRoutingTableKeepsOptionalOnlyServersWhenAsked()
+      throws Exception {
+    String optionalOnlyInstanceId = "Server_optional_8000";
+    ServerInstance requiredServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    ServerInstance optionalOnlyServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(optionalOnlyInstanceId)));
+    _routingManager.getEnabledServerInstanceMap().put(SERVER_INSTANCE_ID, requiredServer);
+    _routingManager.getEnabledServerInstanceMap().put(optionalOnlyInstanceId, optionalOnlyServer);
+    // A segment the server has loaded while the external view lags is optional, and the only one in range.
+    Map<String, SegmentsToQuery> instanceToSegmentsMap = Map.of(
+        SERVER_INSTANCE_ID, segmentsToQuery(List.of(), List.of()),
+        optionalOnlyInstanceId, segmentsToQuery(List.of(), List.of("optionalOnly")),
+        "Server_missing_optional_8000", segmentsToQuery(List.of(), List.of("missingOptional")));
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    when(instanceSelector.select(any(), any(), anyLong())).thenReturn(
+        new InstanceSelector.SelectionResult(instanceToSegmentsMap, List.of(), 0));
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE, selectorOf("optionalOnly", "missingOptional"),
+        List.of(), instanceSelector));
+    clearInvocations(_brokerMetrics);
+
+    // By default the server is left out, as before.
+    assertTrue(_routingManager.getRoutingTable(brokerRequest(TEST_TABLE), 0).getServerInstanceToSegmentsMap()
+        .isEmpty());
+
+    BrokerRequest keepOptionalOnly = brokerRequest(TEST_TABLE);
+    PinotQuery pinotQuery = new PinotQuery();
+    pinotQuery.setQueryOptions(Map.of(RoutingManager.ROUTE_SERVERS_WITH_ONLY_OPTIONAL_SEGMENTS, "true"));
+    keepOptionalOnly.setPinotQuery(pinotQuery);
+    Map<ServerInstance, SegmentsToQuery> serverSegments =
+        _routingManager.getRoutingTable(keepOptionalOnly, 0).getServerInstanceToSegmentsMap();
+
+    // Only the server with optional segments is kept; a server with none is still left out.
+    assertEquals(serverSegments.keySet(), Set.of(optionalOnlyServer));
+    assertEquals(serverSegments.get(optionalOnlyServer).getSegments(), List.of());
+    assertEquals(serverSegments.get(optionalOnlyServer).getOptionalSegments(), List.of("optionalOnly"));
+    // A missing server with no required segments meters nothing, as before.
     verifyNoMoreInteractions(_brokerMetrics);
   }
 

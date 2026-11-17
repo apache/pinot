@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.tsdb.planner;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,6 +37,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesRoutingCustomizer;
@@ -48,13 +51,14 @@ import org.apache.pinot.tsdb.spi.TimeSeriesMetadata;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.serde.TimeSeriesPlanSerde;
+import org.mockito.ArgumentCaptor;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
@@ -169,6 +173,45 @@ public class TimeSeriesQueryEnvironmentTest {
   }
 
   @Test
+  public void testOneServerRunsTheWholePlanOnlyWhenItHoldsEveryLeaf() {
+    RoutingManager routingManager = routingManagerWith(Map.of(mockServer("Server_1"), List.of("seg1")));
+    BaseTimeSeriesPlanNode root =
+        new TestPlanNode("root", List.of(leaf("left", "myTable"), leaf("right", "myTable")));
+
+    // Both leaves route to Server_1, so it runs the whole plan.
+    TimeSeriesDispatchablePlan wholePlan =
+        newEnvironment(routingManager, tableCache(), TimeSeriesRoutingCustomizer.NO_OP).buildPhysicalPlan(
+            request(), requestContext(), new TimeSeriesLogicalPlanResult(root, TIME_BUCKETS), tableNames -> { });
+    assertEquals(fragmentIds(wholePlan.getSerializedServerFragments("Server_1")), List.of("root"));
+
+    // The right leaf is narrowed to nothing: Server_1 runs only the left leaf, and the right leaf reads nothing
+    // rather than whatever Server_1 holds of its table.
+    TimeSeriesQueryEnvironment environment = newEnvironment(routingManager, tableCache(),
+        (leaf, routingTable, context) -> leaf.getId().equals("right") ? new RoutingTable(Map.of(), List.of(), 1)
+            : routingTable);
+    TimeSeriesDispatchablePlan plan = environment.buildPhysicalPlan(request(), requestContext(),
+        new TimeSeriesLogicalPlanResult(root, TIME_BUCKETS), tableNames -> { });
+    assertEquals(fragmentIds(plan.getSerializedServerFragments("Server_1")), List.of("left"));
+    assertEquals(plan.getNumInputServersForExchangePlanNode(), Map.of("left", 1, "right", 0));
+  }
+
+  @Test
+  public void testRoutingKeepsServersWithOnlyOptionalSegments() {
+    RoutingManager routingManager = routingManagerWith(Map.of(mockServer("Server_1"), List.of("seg1")));
+    TimeSeriesQueryEnvironment environment =
+        newEnvironment(routingManager, tableCache(), TimeSeriesRoutingCustomizer.NO_OP);
+
+    environment.buildPhysicalPlan(request(), requestContext(),
+        new TimeSeriesLogicalPlanResult(leaf("leaf", "myTable"), TIME_BUCKETS), tableNames -> { });
+
+    // The servers query optional segments, so a server with only optional segments must reach the plan.
+    ArgumentCaptor<BrokerRequest> routed = ArgumentCaptor.forClass(BrokerRequest.class);
+    verify(routingManager).getRoutingTable(routed.capture(), anyLong());
+    assertEquals(routed.getValue().getPinotQuery().getQueryOptions(),
+        Map.of(RoutingManager.ROUTE_SERVERS_WITH_ONLY_OPTIONAL_SEGMENTS, "true"));
+  }
+
+  @Test
   public void testServerWithOnlyOptionalSegmentsReadsTheLeaf() {
     ServerInstance serverOne = mockServer("Server_1");
     ServerInstance serverTwo = mockServer("Server_2");
@@ -231,8 +274,29 @@ public class TimeSeriesQueryEnvironmentTest {
     assertEquals(e.getErrorCode(), QueryErrorCode.SERVER_SEGMENT_MISSING);
   }
 
+  @Test
+  public void testServerEntriesWithoutSegmentsDoNotHideUnavailableSegments() {
+    ServerInstance server = mockServer("Server_1");
+    RoutingManager routingManager = routingManagerWith(Map.of(server, List.of("seg1")));
+    // The customizer keeps the server but clears its segments, and seg2 has no server.
+    TimeSeriesQueryEnvironment environment = newEnvironment(routingManager, tableCache(),
+        (leaf, routingTable, context) -> new RoutingTable(
+            Map.of(server, new SegmentsToQuery(List.of(), List.of())), List.of("seg2"), 1));
+
+    QueryException e = expectThrows(QueryException.class, () -> environment.buildPhysicalPlan(request(),
+        requestContext(), new TimeSeriesLogicalPlanResult(leaf("leaf", "myTable"), TIME_BUCKETS), tableNames -> { }));
+    assertEquals(e.getErrorCode(), QueryErrorCode.SERVER_SEGMENT_MISSING);
+  }
+
+  /// The ids of the serialized fragments' root nodes; reads the JSON, since a [TestPlanNode] does not deserialize.
   private static List<String> fragmentIds(List<String> serializedFragments) {
-    return serializedFragments.stream().map(fragment -> TimeSeriesPlanSerde.deserialize(fragment).getId()).toList();
+    return serializedFragments.stream().map(fragment -> {
+      try {
+        return JsonUtils.stringToJsonNode(fragment).get("id").asText();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }).toList();
   }
 
   private static RoutingManager routingManagerWith(Map<ServerInstance, List<String>> segmentsByServer) {
