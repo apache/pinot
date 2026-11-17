@@ -566,6 +566,57 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     }
   }
 
+  @Test
+  public void testLegacyRawMultiValueChunkFitsWhenSealing()
+      throws Exception {
+    String tableName = "legacyRawMultiValueChunk";
+    String segmentName = tableName + "__0__0__123456";
+    File tmpDir = new File(TMP_DIR, tableName);
+    FileUtils.forceMkdir(tmpDir);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+        .addMultiValueDimension("values", DataType.LONG)
+        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    int maxNumMultiValues = 65_536;
+    FieldConfig fieldConfig = new FieldConfig.Builder("values").withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(JsonUtils.objectToJsonNode(Map.of("forward", Map.of("rawIndexWriterVersion", 3,
+            "targetDocsPerChunk", 4096, "maxNumMultiValues", maxNumMultiValues))))
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
+        .setTimeColumnName("ts").setFieldConfigList(List.of(fieldConfig)).build();
+    RealtimeSegmentConfig segmentConfig = new RealtimeSegmentConfig.Builder(tableConfig, schema)
+        .setTableNameWithType(tableConfig.getTableName()).setSegmentName(segmentName).setStreamName(tableName)
+        .setSchema(schema).setTimeColumnName("ts").setCapacity(10).setAvgNumMultiValues(2)
+        .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
+        .setConsumerDir(new File(tmpDir, "consumer").getAbsolutePath())
+        .build();
+    MutableSegmentImpl mutableSegment = new MutableSegmentImpl(segmentConfig, null);
+    try {
+      Long[] values = new Long[maxNumMultiValues];
+      Arrays.setAll(values, i -> (long) i);
+      GenericRow row = new GenericRow();
+      row.putValue("ts", 1793750400000L);
+      row.putValue("values", values);
+      mutableSegment.index(row, null);
+
+      File outputDir = new File(tmpDir, "output");
+      RealtimeSegmentConverter converter = new RealtimeSegmentConverter(mutableSegment, new SegmentZKPropsConfig(),
+          outputDir.getAbsolutePath(), schema, tableConfig.getTableName(), tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3);
+      ImmutableSegment immutable = ImmutableSegmentLoader.load(new File(outputDir, segmentName),
+          new IndexLoadingConfig(tableConfig, schema));
+      try {
+        assertEquals((Object[]) immutable.getRecord(0, new GenericRow()).getValue("values"), values);
+      } finally {
+        immutable.destroy();
+      }
+    } finally {
+      mutableSegment.destroy();
+    }
+  }
+
   private void testSegment(List<GenericRow> rows, File indexDir,
       TableConfig tableConfig, SegmentMetadataImpl segmentMetadata)
       throws IOException, ConfigurationException {

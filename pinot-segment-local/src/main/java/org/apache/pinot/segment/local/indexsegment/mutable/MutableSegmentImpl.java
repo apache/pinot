@@ -348,6 +348,11 @@ public class MutableSegmentImpl implements MutableSegment {
       if (vectorIndexConfig.isEnabled()) {
         // A vector column holds one value per dimension, which may exceed the default cap
         contextBuilder.withMaxNumMultiValues(vectorIndexConfig.getVectorDimension());
+      } else if (!fieldSpec.isSingleValueField()) {
+        Integer maxNumMultiValues = indexConfigs.getConfig(StandardIndexes.forward()).getMaxNumMultiValues();
+        if (maxNumMultiValues != null) {
+          contextBuilder.withMaxNumMultiValues(maxNumMultiValues);
+        }
       }
       MutableIndexContext context = contextBuilder.build();
 

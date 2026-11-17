@@ -18,25 +18,36 @@
  */
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.partition.function.ModuloPartitionFunction;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.dedup.DedupContext;
 import org.apache.pinot.segment.local.dedup.DedupRecordInfo;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -45,6 +56,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.BeforeClass;
@@ -103,6 +115,65 @@ public class MutableSegmentImplNumMultiValuesValidationTest implements PinotBuff
       assertValues(dataSource, forwardIndex, 1, valuesAtLimit);
     } finally {
       mutableSegment.destroy();
+    }
+  }
+
+  @DataProvider(name = "multiValueLimitConfigFormats")
+  private static Object[][] multiValueLimitConfigFormats() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "multiValueLimitConfigFormats")
+  public void testConfiguredMultiValueLimit(boolean convertConfig)
+      throws Exception {
+    int configuredLimit = 4096;
+    String tableName = "configuredNumMultiValues";
+    String segmentName = tableName + "__0__0__123456";
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+        .addMultiValueDimension(MV_COLUMN, DataType.STRING)
+        .build();
+    FieldConfig fieldConfig = new FieldConfig.Builder(MV_COLUMN)
+        .withProperties(Map.of("maxNumMultiValues", Integer.toString(configuredLimit)))
+        .withIndexes(JsonUtils.objectToJsonNode(Map.of("forward", Map.of("encodingType", "DICTIONARY"))))
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
+        .setFieldConfigList(new ArrayList<>(List.of(fieldConfig)))
+        .build();
+    if (convertConfig) {
+      tableConfig = TableConfigUtils.createTableConfigFromOldFormat(tableConfig, schema);
+    }
+    File tempDir = Files.createTempDirectory(tableName).toFile();
+    try {
+      RealtimeSegmentConfig segmentConfig = new RealtimeSegmentConfig.Builder(tableConfig, schema)
+          .setTableNameWithType(tableConfig.getTableName())
+          .setSegmentName(segmentName)
+          .setStreamName(tableName)
+          .setSchema(schema)
+          .setCapacity(10)
+          .setAvgNumMultiValues(2)
+          .setSegmentZKMetadata(new SegmentZKMetadata(segmentName))
+          .setMemoryManager(new DirectMemoryManager(segmentName))
+          .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tempDir, "stats")))
+          .setConsumerDir(tempDir.getAbsolutePath())
+          .build();
+      MutableSegmentImpl mutableSegment = new MutableSegmentImpl(segmentConfig, null);
+      try {
+        String[] valuesAtLimit = IntStream.range(0, configuredLimit).mapToObj(i -> "url-" + i).toArray(String[]::new);
+        mutableSegment.index(createRow(valuesAtLimit), null);
+        assertEquals((Object[]) mutableSegment.getValue(0, MV_COLUMN), valuesAtLimit);
+
+        String[] aboveLimit =
+            IntStream.rangeClosed(0, configuredLimit).mapToObj(i -> "cve-" + i).toArray(String[]::new);
+        IllegalStateException exception =
+            expectThrows(IllegalStateException.class, () -> mutableSegment.index(createRow(aboveLimit), null));
+        assertTrue(exception.getMessage().contains("exceeds the maximum allowed: " + configuredLimit),
+            exception.getMessage());
+        assertEquals(mutableSegment.getNumDocsIndexed(), 1);
+      } finally {
+        mutableSegment.destroy();
+      }
+    } finally {
+      FileUtils.deleteDirectory(tempDir);
     }
   }
 
