@@ -56,6 +56,13 @@ OPTIONAL:
 
 ### Server readiness and failure diagnostics
 
+Before starting each server, the verifier initializes Lucene's `IndexWriter` on the main thread in that server JVM.
+This also covers older releases during initial startup and rollback, avoiding Lucene 9.12.0's class initialization
+deadlock when Helix loads text indexes and creates realtime text indexes concurrently. A small bootstrap is compiled
+with `javac --release 11`; each distribution retains its own libraries, plugins, and launcher settings.
+This workaround remains necessary while compatibility baselines include releases affected by
+[Lucene issue #12419](https://github.com/apache/lucene/issues/12419).
+
 The verifier waits for each server's health endpoint to return success before running operations after startup,
 upgrade, or rollback. HTTP errors do not count as ready. The wait fails if the process exits or does not become
 ready within 600 seconds (configurable with `SERVER_READY_TIMEOUT_SECONDS`).
@@ -71,6 +78,7 @@ Run the standalone readiness regression tests without building Pinot:
 
 ```shell
 python3 compatibility-verifier/test_server_readiness.py
+python3 compatibility-verifier/test_server_startup.py
 ```
 
 ## T-digest accuracy baseline

@@ -82,6 +82,8 @@ jobs:
           java-version: 25
           distribution: 'temurin'
           cache: 'maven'
+      - name: Test compatibility server startup
+        run: python3 compatibility-verifier/test_server_startup.py
       # Step that does that actual cache save and restore
       - uses: actions/cache@v6
         env:
