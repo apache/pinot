@@ -31,7 +31,7 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
@@ -227,8 +227,8 @@ public class PinotDispatchPlanner {
     if (node instanceof TableScanNode) {
       return new ValueNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), List.of(), List.of());
     }
-    if (node instanceof MailboxReceiveNode) {
-      MailboxReceiveNode mailboxReceiveNode = (MailboxReceiveNode) node;
+    if (node instanceof BaseMailboxReceiveNode) {
+      BaseMailboxReceiveNode mailboxReceiveNode = (BaseMailboxReceiveNode) node;
       MailboxSendNode sender = mailboxReceiveNode.getSender();
       List<PlanNode> senderInputs = sender.getInputs();
       Preconditions.checkState(!senderInputs.isEmpty(),

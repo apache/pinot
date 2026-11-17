@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -63,6 +65,15 @@ public class EquivalentStagesReplacer {
 
     @Override
     public Void visitMailboxReceive(MailboxReceiveNode node, GroupedStages equivalenceGroups) {
+      return visitReceive(node, equivalenceGroups);
+    }
+
+    @Override
+    public Void visitMailboxMergeReceive(MailboxMergeReceiveNode node, GroupedStages equivalenceGroups) {
+      return visitReceive(node, equivalenceGroups);
+    }
+
+    private Void visitReceive(BaseMailboxReceiveNode node, GroupedStages equivalenceGroups) {
       MailboxSendNode sender = node.getSender();
       MailboxSendNode leader = equivalenceGroups.getGroup(sender).first();
       if (canSubstitute(sender, leader)) {

@@ -31,11 +31,13 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BaseMailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -261,10 +263,21 @@ class PlanNodeMerger {
     @Nullable
     @Override
     public PlanNode visitMailboxReceive(MailboxReceiveNode node, PlanNode context) {
-      if (context.getClass() != MailboxReceiveNode.class) {
+      if (!(context instanceof MailboxReceiveNode)) {
         return null;
       }
-      MailboxReceiveNode otherNode = (MailboxReceiveNode) context;
+      MailboxReceiveNode other = (MailboxReceiveNode) context;
+      return node.isSort() == other.isSort() && node.isSortedOnSender() == other.isSortedOnSender()
+          ? mergeReceives(node, other) : null;
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitMailboxMergeReceive(MailboxMergeReceiveNode node, PlanNode context) {
+      return context instanceof MailboxMergeReceiveNode ? mergeReceives(node, (MailboxMergeReceiveNode) context) : null;
+    }
+
+    private PlanNode mergeReceives(BaseMailboxReceiveNode node, BaseMailboxReceiveNode otherNode) {
       if (node.getSenderStageId() != otherNode.getSenderStageId()) {
         return null;
       }
@@ -280,13 +293,7 @@ class PlanNodeMerger {
       if (!node.getCollations().equals(otherNode.getCollations())) {
         return null;
       }
-      if (node.isSort() != otherNode.isSort()) {
-        return null;
-      }
-      if (node.isSortedOnSender() != otherNode.isSortedOnSender()) {
-        return null;
-      }
-      List<PlanNode> children = mergeChildren(node, context);
+      List<PlanNode> children = mergeChildren(node, otherNode);
       if (children == null) {
         return null;
       }
@@ -466,10 +473,13 @@ class PlanNodeMerger {
     @Nullable
     @Override
     public PlanNode visitExchange(ExchangeNode exchangeNode, PlanNode context) {
-      if (context.getClass() != ExchangeNode.class) {
+      if (context.getClass() != exchangeNode.getClass()) {
         return null;
       }
       ExchangeNode otherNode = (ExchangeNode) context;
+      if (exchangeNode.isKWayMerge() != otherNode.isKWayMerge()) {
+        return null;
+      }
       if (exchangeNode.getExchangeType() != otherNode.getExchangeType()) {
         return null;
       }

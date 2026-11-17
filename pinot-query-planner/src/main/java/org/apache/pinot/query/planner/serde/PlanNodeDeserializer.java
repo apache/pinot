@@ -38,6 +38,7 @@ import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -65,6 +66,8 @@ public class PlanNodeDeserializer {
         return deserializeFilterNode(protoNode);
       case JOINNODE:
         return deserializeJoinNode(protoNode);
+      case MAILBOXMERGERECEIVENODE:
+        return deserializeMailboxMergeReceiveNode(protoNode);
       case MAILBOXRECEIVENODE:
         return deserializeMailboxReceiveNode(protoNode);
       case MAILBOXSENDNODE:
@@ -148,6 +151,14 @@ public class PlanNodeDeserializer {
         protoEnrichedJoinNode.getFetch(),
         protoEnrichedJoinNode.getOffset()
     );
+  }
+
+  private static MailboxMergeReceiveNode deserializeMailboxMergeReceiveNode(Plan.PlanNode protoNode) {
+    Preconditions.checkState(protoNode.getInputsCount() == 0, "MailboxMergeReceiveNode should not have inputs");
+    Plan.MailboxMergeReceiveNode merge = protoNode.getMailboxMergeReceiveNode();
+    return new MailboxMergeReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode), merge.getSenderStageId(),
+        convertExchangeType(merge.getExchangeType()), convertDistributionType(merge.getDistributionType()),
+        merge.getKeysList(), convertCollations(merge.getCollationsList()), null);
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {

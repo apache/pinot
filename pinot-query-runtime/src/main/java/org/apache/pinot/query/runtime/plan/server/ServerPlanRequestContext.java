@@ -44,14 +44,27 @@ public class ServerPlanRequestContext {
   private final PinotQuery _pinotQuery;
   private PlanNode _leafStageBoundaryNode;
   private List<ServerQueryRequest> _serverQueryRequests;
+  // True when every worker of the leaf stage executes exactly one physical V1 request, so a V1 ORDER BY yields one
+  // sorted run for the whole worker.
+  private final boolean _singlePhysicalRequest;
+  // True when the query requests the streaming sorted-selection combine (sortedSelectionMergeMode is ON or AUTO).
+  private final boolean _sortedSelectionMergeRequested;
 
   public ServerPlanRequestContext(StagePlan stagePlan, QueryExecutor leafQueryExecutor,
       ExecutorService executorService, @Nullable PipelineBreakerResult pipelineBreakerResult) {
+    this(stagePlan, leafQueryExecutor, executorService, pipelineBreakerResult, false, false);
+  }
+
+  public ServerPlanRequestContext(StagePlan stagePlan, QueryExecutor leafQueryExecutor,
+      ExecutorService executorService, @Nullable PipelineBreakerResult pipelineBreakerResult,
+      boolean singlePhysicalRequest, boolean sortedSelectionMergeRequested) {
     _stagePlan = stagePlan;
     _leafQueryExecutor = leafQueryExecutor;
     _executorService = executorService;
     _pipelineBreakerResult = pipelineBreakerResult;
     _pinotQuery = new PinotQuery();
+    _singlePhysicalRequest = singlePhysicalRequest;
+    _sortedSelectionMergeRequested = sortedSelectionMergeRequested;
   }
 
   public StagePlan getStagePlan() {
@@ -89,5 +102,13 @@ public class ServerPlanRequestContext {
 
   public void setServerQueryRequests(List<ServerQueryRequest> serverQueryRequests) {
     _serverQueryRequests = serverQueryRequests;
+  }
+
+  public boolean isSinglePhysicalRequest() {
+    return _singlePhysicalRequest;
+  }
+
+  public boolean isSortedSelectionMergeRequested() {
+    return _sortedSelectionMergeRequested;
   }
 }

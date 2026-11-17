@@ -33,6 +33,7 @@ import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -54,6 +55,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.RepeatOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
+import org.apache.pinot.query.runtime.operator.SortedMailboxMergeReceiveOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.UnnestOperator;
@@ -193,6 +195,7 @@ public class PlanNodeToOpChain {
     @Override
     public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainExecutionContext context) {
       try {
+        // Legacy sort=true plans remain compatible; current plans express ordering in distinct nodes.
         if (node.isSort()) {
           return new SortedMailboxReceiveOperator(context, node);
         } else {
@@ -202,6 +205,16 @@ public class PlanNodeToOpChain {
         return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
       }
     }
+
+    @Override
+    public MultiStageOperator visitMailboxMergeReceive(MailboxMergeReceiveNode node, OpChainExecutionContext context) {
+      try {
+        return new SortedMailboxMergeReceiveOperator(context, node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+      }
+    }
+
 
     @Override
     public MultiStageOperator visitMailboxSend(MailboxSendNode node, OpChainExecutionContext context) {
