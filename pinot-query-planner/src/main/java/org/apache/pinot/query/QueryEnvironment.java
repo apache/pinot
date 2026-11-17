@@ -43,20 +43,24 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.runtime.CalciteContextException;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.rules.ArrayToMvGroupKeys;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotAggregateTypeArgumentRewriteRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
@@ -66,6 +70,7 @@ import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rex.PinotRexExecutor;
 import org.apache.pinot.calcite.rex.SearchSealer;
+import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
@@ -94,10 +99,12 @@ import org.apache.pinot.query.planner.physical.v2.RelToPRelConverter;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.rules.PinotRuleSet;
 import org.apache.pinot.query.planner.spi.Phase;
+import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.query.validate.RowExpressionValidationVisitor;
+import org.apache.pinot.query.validate.SqlNodeCopier;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -196,6 +203,14 @@ public class QueryEnvironment {
 
   /// Returns a planner context that can be used to either parse, explain or execute a query.
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
+    return getPlannerContext(sqlNodeAndOptions, false);
+  }
+
+  /// Returns a planner context that can be used to either parse, explain or execute a query.
+  ///
+  /// @param useMvAggregate whether the context plans `GROUP BY ARRAY_TO_MV(expr)` as an MV aggregate, see
+  ///                       [#compile(String, SqlNodeAndOptions)]
+  private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions, boolean useMvAggregate) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (Boolean.parseBoolean(options.get(QueryOptionKey.EXCLUDE_VIRTUAL_COLUMNS))) {
@@ -241,7 +256,7 @@ public class QueryEnvironment {
           _multiClusterRoutingContext);
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
-        sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
+        sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext, useMvAggregate);
   }
 
   /// @deprecated Use [#compile] and then [plan][CompiledQuery#planQuery(long)] the returned query instead
@@ -312,6 +327,17 @@ public class QueryEnvironment {
   /// @throws QueryException if the query cannot be compiled. Usual error types are QueryErrorCode.SQL_PARSING and
   /// QueryErrorCode.QUERY_VALIDATION. QueryErrorCode.QUERY_EXECUTION is also possible if there is an error when
   /// a function call is reduced into a constant.
+  ///
+  /// ## The MV aggregate fallback
+  ///
+  /// The query is first planned as on a broker that predates the MV aggregate. If that plan groups by
+  /// `ARRAY_TO_MV(expr)` and fails the `ARRAY_TO_MV` validation, the query is planned again from its SQL, with the MV
+  /// aggregate (see [PlannerContext#isUseMvAggregate()]). The returned query has only the plan that runs, so its
+  /// table names and everything that the broker reads from it describe that plan.
+  ///
+  /// A query that passes the validation keeps the plan of today, so servers that predate the MV aggregate can run it.
+  /// The validation changes the parsed query, so a copy of it is kept for the second plan, only when the query calls
+  /// `ARRAY_TO_MV`. The physical optimizer does not support the MV aggregate.
   public CompiledQuery compile(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     PlannerContext plannerContext = null;
     try {
@@ -324,7 +350,26 @@ public class QueryEnvironment {
       } else {
         queryNode = sqlNode;
       }
-      RelRoot relRoot = compileQuery(queryNode, plannerContext);
+      SqlNode mvAggregateQueryNode =
+          !plannerContext.isUsePhysicalOptimizer() && callsArrayToMv(queryNode) ? SqlNodeCopier.copy(queryNode) : null;
+      RelRoot unoptimizedRelRoot = toRelation(validate(queryNode, plannerContext), plannerContext);
+      boolean groupsByArrayToMv = mvAggregateQueryNode != null && groupsByArrayToMv(unoptimizedRelRoot.rel);
+      RelRoot relRoot = compileQuery(unoptimizedRelRoot, plannerContext);
+      ArrayToMvValidationVisitor.ArrayToMvValidationException validationError =
+          groupsByArrayToMv ? validateArrayToMv(relRoot, plannerContext) : null;
+      if (validationError != null) {
+        PlannerContext firstPlannerContext = plannerContext;
+        plannerContext = null;
+        firstPlannerContext.close();
+        plannerContext = getPlannerContext(sqlNodeAndOptions, true);
+        try {
+          relRoot = compileQuery(toRelation(validate(mvAggregateQueryNode, plannerContext), plannerContext),
+              plannerContext);
+        } catch (RuntimeException e) {
+          e.addSuppressed(validationError);
+          throw e;
+        }
+      }
       return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
     } catch (QueryException e) {
       throw e;
@@ -415,9 +460,7 @@ public class QueryEnvironment {
   // steps
   // --------------------------------------------------------------------------
 
-  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
-    SqlNode validated = validate(sqlNode, plannerContext);
-    RelRoot relation = toRelation(validated, plannerContext);
+  private RelRoot compileQuery(RelRoot relation, PlannerContext plannerContext) {
     RelNode optimized = optimize(relation, plannerContext);
     if (plannerContext.isUsePhysicalOptimizer()) {
       Preconditions.checkNotNull(plannerContext.getPhysicalPlannerContext(), "Physical planner context is null");
@@ -575,6 +618,66 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
   // utils
   // --------------------------------------------------------------------------
+
+  /// Returns whether the parsed query `node` calls `ARRAY_TO_MV`. Only such a query can plan with the MV aggregate.
+  private static boolean callsArrayToMv(SqlNode node) {
+    if (node instanceof SqlCall) {
+      SqlCall call = (SqlCall) node;
+      if (ArrayToMvFunctionName.matches(call.getOperator().getName())) {
+        return true;
+      }
+      for (SqlNode operand : call.getOperandList()) {
+        if (operand != null && callsArrayToMv(operand)) {
+          return true;
+        }
+      }
+    } else if (node instanceof SqlNodeList) {
+      for (SqlNode element : (SqlNodeList) node) {
+        if (element != null && callsArrayToMv(element)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Returns whether `node` or one of its inputs is an aggregate that groups by `ARRAY_TO_MV(expr)` (see
+  /// [ArrayToMvGroupKeys#detect]). Only such a query can plan with the MV aggregate. It reads the plan before
+  /// optimization, where no rule has moved the `ARRAY_TO_MV` call away from the aggregate yet.
+  private static boolean groupsByArrayToMv(RelNode node) {
+    if (node instanceof Aggregate && !ArrayToMvGroupKeys.detect((Aggregate) node).isEmpty()) {
+      return true;
+    }
+    for (RelNode input : node.getInputs()) {
+      if (groupsByArrayToMv(input)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Runs the `ARRAY_TO_MV` validation on the plan fragments of `relRoot`, which needs no routing or worker assignment.
+  /// Returns its error, or `null` when the plan passes it. Any other error of the plan fragmenting is left to
+  /// [CompiledQuery#planQuery], which throws it as before.
+  @Nullable
+  private ArrayToMvValidationVisitor.ArrayToMvValidationException validateArrayToMv(RelRoot relRoot,
+      PlannerContext plannerContext) {
+    Map<String, String> options = plannerContext.getOptions();
+    SubPlan plan;
+    try {
+      plan = PinotLogicalQueryPlanner.makePlan(relRoot, null, useSpools(options), _envConfig.defaultHashFunction(),
+          pruneUnnestColumns(options));
+    } catch (RuntimeException e) {
+      LOGGER.debug("Skipping the ARRAY_TO_MV validation of the MV aggregate fallback", e);
+      return null;
+    }
+    try {
+      ArrayToMvValidationVisitor.validateFragments(plan.getSubPlanRoot());
+      return null;
+    } catch (ArrayToMvValidationVisitor.ArrayToMvValidationException e) {
+      return e;
+    }
+  }
 
   /// Creates and returns a HepProgram that performs mostly logical transformations.
   /// It performs several phases of rule application over the parsed decorrelated trimmed plan:

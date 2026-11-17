@@ -25,7 +25,9 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.Contexts;
+import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
@@ -56,8 +58,9 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.Util;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
-import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
+import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
+import org.apache.pinot.query.context.PlannerContext;
 
 
 public class PinotRuleUtils {
@@ -176,7 +179,7 @@ public class PinotRuleUtils {
   ///   [PinotEvaluateLiteralRule] can still fold them once at plan time, which is precisely why
   ///   [SqlOperator#isDeterministic()] alone does not catch them.
   ///
-  /// [PinotOperatorTable#ARRAY_TO_MV] is the one exception. It is marked non-deterministic (and so volatile) only to
+  /// `ARRAY_TO_MV` is the one exception. It is marked non-deterministic (and so volatile) only to
   /// stop Calcite from simplifying MV predicates such as `ARRAY_TO_MV(col) = 'a' AND ARRAY_TO_MV(col) = 'b'` to
   /// `false`. Its value depends only on its row, so its own flags are ignored here. Its operands are still checked.
   ///
@@ -194,7 +197,7 @@ public class PinotRuleUtils {
           SqlOperator operator = call.getOperator();
           boolean isVariable = !operator.isDeterministic() || operator.isDynamicFunction()
               || (operator instanceof PinotSqlFunction && ((PinotSqlFunction) operator).isVolatile());
-          if (isVariable && operator != PinotOperatorTable.ARRAY_TO_MV) {
+          if (isVariable && !ArrayToMvFunctionName.matches(operator.getName())) {
             throw Util.FoundOne.NULL;
           }
           return super.visitCall(call);
@@ -205,6 +208,17 @@ public class PinotRuleUtils {
       Util.swallow(e, null);
       return false;
     }
+  }
+
+  /// Whether `GROUP BY ARRAY_TO_MV(col)` is planned as an MV aggregate in this planner run, see
+  /// [PlannerContext#isUseMvAggregate()]. Without a planner context, it is not planned.
+  public static boolean isMvAggregateEnabled(RelOptRuleCall call) {
+    Context genericContext = call.getPlanner().getContext();
+    if (genericContext == null) {
+      return false;
+    }
+    PlannerContext plannerContext = genericContext.unwrap(PlannerContext.class);
+    return plannerContext != null && plannerContext.isUseMvAggregate();
   }
 
   public static class WindowUtils {

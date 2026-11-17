@@ -35,6 +35,7 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.pinot.calcite.rex.SearchSealer;
+import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
@@ -64,12 +65,27 @@ public class PlannerContext implements AutoCloseable, Context {
   @Nullable
   private final PhysicalPlannerContext _physicalPlannerContext;
   private final SearchSealer _searchSealer;
+  private final boolean _useMvAggregate;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
       SqlExplainFormat sqlExplainFormat, @Nullable PhysicalPlannerContext physicalPlannerContext) {
+    this(config, catalogReader, typeFactory, optProgram, traitProgram, options, envConfig, sqlExplainFormat,
+        physicalPlannerContext, false);
+  }
+
+  /// @param useMvAggregate whether the planner plans `GROUP BY ARRAY_TO_MV(expr)` as an MV aggregate. When it is
+  ///                       set, the validator types `ARRAY_TO_MV` as nullable, see
+  ///                       [PinotOperatorTable#NULLABLE_ARRAY_TO_MV].
+  public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
+      HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
+      SqlExplainFormat sqlExplainFormat, @Nullable PhysicalPlannerContext physicalPlannerContext,
+      boolean useMvAggregate) {
     _planner = new PlannerImpl(config);
-    _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
+    _validator = new Validator(useMvAggregate
+        ? PinotOperatorTable.withNullableArrayToMv(envConfig.isNullHandlingEnabled()) : config.getOperatorTable(),
+        catalogReader, typeFactory);
+    _useMvAggregate = useMvAggregate;
     _options = options;
     _envConfig = envConfig;
     _relOptPlanner = new LogicalPlanner(optProgram, this, config.getTraitDefs());
@@ -93,6 +109,7 @@ public class PlannerContext implements AutoCloseable, Context {
   PlannerContext(Map<String, String> options, QueryEnvironment.Config envConfig) {
     _planner = null;
     _validator = null;
+    _useMvAggregate = false;
     _options = options;
     _envConfig = envConfig;
     HepProgram emptyProgram = new HepProgramBuilder().build();
@@ -175,5 +192,11 @@ public class PlannerContext implements AutoCloseable, Context {
 
   public boolean isUsePhysicalOptimizer() {
     return _physicalPlannerContext != null;
+  }
+
+  /// Whether the planner plans `GROUP BY ARRAY_TO_MV(expr)` as an MV aggregate. Only the second plan of the MV
+  /// aggregate fallback sets it, see `QueryEnvironment.compile`.
+  public boolean isUseMvAggregate() {
+    return _useMvAggregate;
   }
 }

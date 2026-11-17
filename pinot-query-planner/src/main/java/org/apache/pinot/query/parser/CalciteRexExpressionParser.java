@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
+import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
@@ -52,7 +53,6 @@ public class CalciteRexExpressionParser {
   private static final String NULLS_FIRST = "nullsfirst";
   private static final String NULLS_LAST = "nullslast";
   private static final String COUNT = "count";
-  private static final String ARRAY_TO_MV = "arraytomv";
 
   // --------------------------------------------------------------------------
   // Relational conversion Utils
@@ -170,7 +170,7 @@ public class CalciteRexExpressionParser {
     if (canonicalName.equals(COUNT) && childNodes.isEmpty()) {
       return RequestUtils.getFunctionExpression(COUNT, RequestUtils.getIdentifierExpression("*"));
     }
-    if (canonicalName.equals(ARRAY_TO_MV)) {
+    if (ArrayToMvFunctionName.matches(canonicalName)) {
       return toExpression(childNodes.get(0), selectList);
     }
     List<Expression> operands = convertRexNodes(childNodes, selectList);
