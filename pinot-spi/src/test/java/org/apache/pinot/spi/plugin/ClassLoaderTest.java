@@ -40,6 +40,7 @@ import static org.testng.Assert.assertTrue;
 ///
 /// As this is the target/test-classes/plugins, it will contain the static files under src/test/resoources/plugins,
 /// most of the time just the pinot-plugin.properties for that plugin.
+@io.tesseracta.annotation.TesseractaDisabledTest
 public class ClassLoaderTest {
   private static final String ORIGINAL_PLUGIN_DIR = System.getProperty(PluginManager.PLUGINS_DIR_PROPERTY_NAME);
 

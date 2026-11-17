@@ -135,7 +135,7 @@ import static java.util.Objects.requireNonNull;
 public abstract class BaseTableDataManager implements TableDataManager {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
-  protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
+  @io.tesseracta.annotation.TesseractaDoNotLog protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
   /// Admission barrier for immutable segment additions. One party belongs to shutdown. Additions register under the
   /// segment map monitor and finish without holding it, so metadata updates, lifecycle hooks and replacement cleanup
   /// complete before shutdown stops the partition managers and drains the map.

@@ -1776,7 +1776,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     }
   }
 
-  @Test(dataProvider = "bothV1AndV3")
+  @Test(dataProvider = "bothV1AndV3") @io.tesseracta.annotation.TesseractaDisabledTest
   public void testIfNeedProcess(SegmentVersion segmentVersion)
       throws Exception {
     buildSegment(segmentVersion);

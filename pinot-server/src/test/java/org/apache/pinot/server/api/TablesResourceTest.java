@@ -396,7 +396,7 @@ public class TablesResourceTest extends BaseResourceTest {
     assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDisabledTest
   public void testValidDocIdsMetadataPost()
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
@@ -443,7 +443,7 @@ public class TablesResourceTest extends BaseResourceTest {
     assertFalse(JsonUtils.stringToJsonNode(inMemoryResponse).get(0).has("snapshotPass"));
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDisabledTest
   public void testValidDocIdsMetadataPostForSnapshotWithDelete()
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);

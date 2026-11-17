@@ -81,6 +81,12 @@
       <artifactId>commons-lang3</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>io.tesseracta</groupId>
+      <artifactId>tesseracta-annotation</artifactId>
+      <version>0.1.3</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <profiles>

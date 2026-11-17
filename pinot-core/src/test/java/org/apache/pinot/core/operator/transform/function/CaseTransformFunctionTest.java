@@ -94,7 +94,7 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     assertEquals(expectedIntResults, intValues);
   }
 
-  @Test
+  @Test @io.tesseracta.annotation.TesseractaDoNotTrace
   public void testCaseTransformFunctionWithIntResults() {
     boolean[] predicateResults = new boolean[NUM_ROWS];
     Arrays.fill(predicateResults, true);

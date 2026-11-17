@@ -35,19 +35,61 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-materialized-view</artifactId>
+      <artifactId>pinot-spi</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-query-runtime</artifactId>
+      <artifactId>pinot-segment-spi</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-spi</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-core</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-planner</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-runtime</artifactId>
+      <version>1.7.0-SNAPSHOT</version>
+      <classifier>${dependency.classifier}</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-materialized-view</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -115,5 +157,82 @@
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>io.tesseracta</groupId>
+      <artifactId>tesseracta-annotation</artifactId>
+      <version>0.1.3</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
+  <profiles>
+    <profile>
+        <id>tesseracta-build</id>
+        <build>
+            <resources>
+                <resource>
+                    <targetPath>${project.build.directory}/test-classes-tesseracta</targetPath>
+                    <directory>src/test/resources</directory>
+                </resource>
+            </resources>
+            <plugins>
+                <plugin>
+                    <groupId>io.tesseracta</groupId>
+                    <artifactId>tesseracta-maven-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>tesseracta-compile</id>
+                            <configuration>
+                                <srcDirsModifiedDependencies>
+                                    <srcDir>../pinot-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-segment-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-segment-local/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-timeseries/pinot-timeseries-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-common/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-core/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-query-planner/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-timeseries/pinot-timeseries-planner/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-query-runtime/src/main/java/org/apache/pinot</srcDir>
+                                </srcDirsModifiedDependencies>
+                                <srcDirsActiveTracing>
+                                    <srcDir>src/main/java/org/apache/pinot</srcDir>
+                                </srcDirsActiveTracing>
+                                <entryMethods>
+                                    <entryMethod>org.apache.pinot.broker.api.resources.PinotClientRequest.processSqlQueryGet</entryMethod>
+                                    <entryMethod>org.apache.pinot.broker.api.resources.PinotClientRequest.processSqlQueryPost</entryMethod>
+                                    <entryMethod>org.apache.pinot.broker.api.resources.PinotClientRequest.processSqlWithMultiStageQueryEngineGet</entryMethod>
+                                    <entryMethod>org.apache.pinot.broker.api.resources.PinotClientRequest.processSqlWithMultiStageQueryEnginePost</entryMethod>
+                                    <entryMethod>org.apache.pinot.broker.api.resources.PinotClientRequest.processTimeSeriesQueryEngine</entryMethod>
+                                    <entryMethod>org.apache.pinot.broker.api.resources.PinotClientRequest.processTimeSeriesInstantQuery</entryMethod>
+                                    <entryMethod>org.apache.pinot.broker.api.resources.PinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults</entryMethod>
+                                    <entryMethod>org.apache.pinot.broker.api.resources.PinotClientRequest.cancelQuery</entryMethod>
+                                    <entryMethod>org.apache.pinot.broker.api.resources.PinotClientRequest.getRunningQueries</entryMethod>
+                                </entryMethods>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <id>tesseracta-testCompile</id>
+                            <configuration>
+                                <srcDirsModifiedDependencies>
+                                    <srcDir>../pinot-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-segment-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-segment-local/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-timeseries/pinot-timeseries-spi/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-common/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-core/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-query-planner/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-timeseries/pinot-timeseries-planner/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>../pinot-query-runtime/src/main/java/org/apache/pinot</srcDir>
+                                    <srcDir>src/main/java/org/apache/pinot</srcDir>
+                                </srcDirsModifiedDependencies>
+                                <srcDirsActiveTracing>
+                                    <srcDir>src/test/java/org/apache/pinot</srcDir>
+                                </srcDirsActiveTracing>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+  </profiles>
 </project>
