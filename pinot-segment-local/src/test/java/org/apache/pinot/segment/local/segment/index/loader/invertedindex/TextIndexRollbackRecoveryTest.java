@@ -50,6 +50,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -132,6 +133,46 @@ public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassChec
         assertEquals(segment.getDataSource("text").getTextIndex().getDocIds("\"value other\"", null).toArray(),
             new int[]{1});
       }
+    } finally {
+      segment.destroy();
+    }
+    assertStableReload(segmentDir, loadingConfig);
+  }
+
+  @DataProvider
+  public Object[][] dictionaryRecoveryCases() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "dictionaryRecoveryCases")
+  public void testRawRollbackToDictionaryTextIndex(boolean interrupted)
+      throws Exception {
+    Schema schema = schema(false);
+    File segmentDir = buildSegment(tableConfig(false, false, true), schema, SegmentVersion.v3, false);
+    try (SegmentDirectory directory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+        SegmentDirectory.Reader reader = directory.createReader()) {
+      assertTrue(reader.hasIndexFor("text", StandardIndexes.forward()));
+      assertFalse(reader.hasIndexFor("text", StandardIndexes.dictionary()));
+    }
+    if (interrupted) {
+      installInterruptedBuild(segmentDir, false);
+    } else {
+      installLucene10(segmentDir, SegmentVersion.v3, false, false);
+    }
+
+    TableConfig tableConfig = tableConfig(false, false, false);
+    tableConfig.setFieldConfigList(List.of(new FieldConfig("text", FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null, Map.of(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, "true"))));
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, loadingConfig, true);
+    try {
+      DataSource dataSource = segment.getDataSource("text");
+      assertTrue(dataSource.getTextIndex().isBuildOnDictionary());
+      assertEquals(dataSource.getTextIndex().getDictIds("\"hello world\"", null).toArray(),
+          new int[]{dataSource.getDictionary().indexOf("hello world")});
+      assertEquals(dataSource.getTextIndex().getDictIds("other", null).toArray(),
+          new int[]{dataSource.getDictionary().indexOf("other value")});
+      assertTrue(dataSource.getTextIndex().getDictIds("partial", null).isEmpty());
     } finally {
       segment.destroy();
     }
