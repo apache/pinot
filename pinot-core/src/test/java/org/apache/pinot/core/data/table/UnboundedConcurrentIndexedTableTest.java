@@ -101,7 +101,7 @@ public class UnboundedConcurrentIndexedTableTest {
         {"DISTINCTCOUNT(metric)", false, distinctInputs, 3, 0},
         {"DISTINCTCOUNT(metric)", true, finalDistinctInputs, 8, null},
         {"DISTINCTCOUNTHLL(metric)", false, hllInputs, 3L, 0L},
-        {"ARRAYAGG(metric, 'INT')", false, arrayInputs, new IntArrayList(new int[]{1, 2, 2, 3}), new IntArrayList()}
+        {"ARRAYAGG(metric, 'INT')", false, arrayInputs, new int[]{1, 2, 2, 3}, new int[0]}
     };
   }
 

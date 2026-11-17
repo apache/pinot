@@ -22,6 +22,7 @@ import org.apache.pinot.common.utils.OrderedTestNGSuite;
 import org.apache.pinot.integration.tests.DateTimeFieldSpecHybridClusterIntegrationTest;
 import org.apache.pinot.integration.tests.HybridClusterIntegrationTest;
 import org.apache.pinot.integration.tests.IngestionConfigHybridIntegrationTest;
+import org.apache.pinot.integration.tests.TenantRebalanceIntegrationTest;
 import org.junit.platform.suite.api.ConfigurationParameter;
 import org.junit.platform.suite.api.IncludeEngines;
 import org.junit.platform.suite.api.SelectClasses;
@@ -37,7 +38,8 @@ import org.junit.platform.suite.api.Suite;
 @SelectClasses({
     HybridClusterIntegrationTest.class,
     DateTimeFieldSpecHybridClusterIntegrationTest.class,
-    IngestionConfigHybridIntegrationTest.class
+    IngestionConfigHybridIntegrationTest.class,
+    TenantRebalanceIntegrationTest.class
 })
 public class SharedHybridSuite extends OrderedTestNGSuite {
 }

@@ -64,6 +64,20 @@ public class CalciteSqlParserTest {
   private static final String SINGLE_CHAR = "a";
   private static final String QUERY_TEMPLATE = "SELECT %s FROM %s";
 
+  @Test
+  public void testArrayAggDistinctPreservesNonBooleanOperands() {
+    for (String[] arguments : new String[][]{
+        {"intCol, UPPER('long')", "intCol, UPPER('long'), true"},
+        {"intCol, longCol", "intCol, longCol, true"},
+        {"intCol, 'INT', strCol", "intCol, 'INT', strCol"},
+        {"intCol ORDER BY intCol", "intCol, intCol, true"}
+    }) {
+      assertEquals(CalciteSqlParser.compileToPinotQuery("SELECT ARRAY_AGG(DISTINCT " + arguments[0] + ") FROM t")
+              .getSelectList(),
+          CalciteSqlParser.compileToPinotQuery("SELECT ARRAY_AGG(" + arguments[1] + ") FROM t").getSelectList());
+    }
+  }
+
   @AfterMethod
   public void resetLegacyUnescaping() {
     // Reset to default (false) after each test

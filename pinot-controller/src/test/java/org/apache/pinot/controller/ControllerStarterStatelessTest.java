@@ -24,7 +24,6 @@ import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.spi.utils.NetUtils;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.CONTROLLER_HOST;
@@ -47,7 +46,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
   @Test
   public void testHostnamePortOverride()
       throws Exception {
-    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    int controllerPort = _controllerPortRange.findOpenPort(_nextControllerPort);
     _configOverride.clear();
     _configOverride.put(CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
     _configOverride.put(CONTROLLER_HOST, "myHost");
@@ -71,7 +70,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
   @Test
   public void testInvalidInstanceId()
       throws Exception {
-    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    int controllerPort = _controllerPortRange.findOpenPort(_nextControllerPort);
     _configOverride.clear();
     _configOverride.put(CONFIG_OF_INSTANCE_ID, "myInstance");
     _configOverride.put(CONTROLLER_HOST, "myHost");
@@ -91,7 +90,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
   @Test
   public void testDefaultInstanceId()
       throws Exception {
-    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    int controllerPort = _controllerPortRange.findOpenPort(_nextControllerPort);
     _configOverride.clear();
     _configOverride.put(CONTROLLER_HOST, "myHost");
     _configOverride.put(CONTROLLER_PORT, controllerPort);

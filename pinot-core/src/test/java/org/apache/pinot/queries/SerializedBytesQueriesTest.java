@@ -27,7 +27,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
@@ -39,6 +38,7 @@ import org.apache.pinot.segment.local.customobject.tdigest.TDigestAccumulator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -157,7 +157,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       }
       AvgPair avgPair = new AvgPair(sum, numValues);
       _avgPairs[i] = avgPair;
-      row.putValue(AVG_COLUMN, ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair));
+      row.putValue(AVG_COLUMN, avgPair.toBytes());
 
       HyperLogLog hyperLogLog = new HyperLogLog(DISTINCT_COUNT_HLL_LOG2M);
       for (int value : values) {
@@ -178,14 +178,14 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       }
       MinMaxRangePair minMaxRangePair = new MinMaxRangePair(min, max);
       _minMaxRangePairs[i] = minMaxRangePair;
-      row.putValue(MIN_MAX_RANGE_COLUMN, ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair));
+      row.putValue(MIN_MAX_RANGE_COLUMN, minMaxRangePair.toBytes());
 
       QuantileDigest quantileDigest = new QuantileDigest(PERCENTILE_EST_MAX_ERROR);
       for (int value : values) {
         quantileDigest.add(value);
       }
       _quantileDigests[i] = quantileDigest;
-      row.putValue(PERCENTILE_EST_COLUMN, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
+      row.putValue(PERCENTILE_EST_COLUMN, quantileDigest.toBytes());
 
       TDigest tDigest = TDigestAccumulator.forLegacyAggregation(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : values) {
@@ -314,8 +314,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       avgPair2.apply(_avgPairs[i]);
     }
     avgPair1.apply(avgPair2);
-    avgPair1 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
-    avgPair2 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
+    avgPair1 = AvgPair.fromBytes(avgPair1.toBytes());
+    avgPair2 = AvgPair.fromBytes(avgPair1.toBytes());
     avgPair1.apply(avgPair2);
     double expectedAvgResult = avgPair1.getSum() / avgPair1.getCount();
 
@@ -348,10 +348,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       minMaxRangePair2.apply(_minMaxRangePairs[i]);
     }
     minMaxRangePair1.apply(minMaxRangePair2);
-    minMaxRangePair1 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
-        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
-    minMaxRangePair2 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
-        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
+    minMaxRangePair1 = MinMaxRangePair.fromBytes(minMaxRangePair1.toBytes());
+    minMaxRangePair2 = MinMaxRangePair.fromBytes(minMaxRangePair1.toBytes());
     minMaxRangePair1.apply(minMaxRangePair2);
     double expectedMinMaxRangeResult = minMaxRangePair1.getMax() - minMaxRangePair1.getMin();
 
@@ -367,10 +365,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       quantileDigest2.merge(_quantileDigests[i]);
     }
     quantileDigest1.merge(quantileDigest2);
-    quantileDigest1 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
-        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
-    quantileDigest2 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
-        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
+    quantileDigest1 = QuantileDigest.fromBytes(quantileDigest1.toBytes());
+    quantileDigest2 = QuantileDigest.fromBytes(quantileDigest1.toBytes());
     quantileDigest1.merge(quantileDigest2);
     long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
@@ -512,8 +508,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         avgPair2.apply(_avgPairs[i]);
       }
       avgPair1.apply(avgPair2);
-      avgPair1 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
-      avgPair2 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
+      avgPair1 = AvgPair.fromBytes(avgPair1.toBytes());
+      avgPair2 = AvgPair.fromBytes(avgPair1.toBytes());
       avgPair1.apply(avgPair2);
       double expectedAvgResult = avgPair1.getSum() / avgPair1.getCount();
 
@@ -546,10 +542,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         minMaxRangePair2.apply(_minMaxRangePairs[i]);
       }
       minMaxRangePair1.apply(minMaxRangePair2);
-      minMaxRangePair1 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
-          ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
-      minMaxRangePair2 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
-          ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
+      minMaxRangePair1 = MinMaxRangePair.fromBytes(minMaxRangePair1.toBytes());
+      minMaxRangePair2 = MinMaxRangePair.fromBytes(minMaxRangePair1.toBytes());
       minMaxRangePair1.apply(minMaxRangePair2);
       double expectedMinMaxRangeResult = minMaxRangePair1.getMax() - minMaxRangePair1.getMin();
 
@@ -565,10 +559,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         quantileDigest2.merge(_quantileDigests[i]);
       }
       quantileDigest1.merge(quantileDigest2);
-      quantileDigest1 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
-          ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
-      quantileDigest2 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
-          ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
+      quantileDigest1 = QuantileDigest.fromBytes(quantileDigest1.toBytes());
+      quantileDigest2 = QuantileDigest.fromBytes(quantileDigest1.toBytes());
       quantileDigest1.merge(quantileDigest2);
       long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 
@@ -739,8 +731,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       avgPair2.apply(_avgPairs[i]);
     }
     avgPair1.apply(avgPair2);
-    avgPair1 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
-    avgPair2 = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair1));
+    avgPair1 = AvgPair.fromBytes(avgPair1.toBytes());
+    avgPair2 = AvgPair.fromBytes(avgPair1.toBytes());
     avgPair1.apply(avgPair2);
     double expectedAvgResult = avgPair1.getSum() / avgPair1.getCount();
 
@@ -773,10 +765,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       minMaxRangePair2.apply(_minMaxRangePairs[i]);
     }
     minMaxRangePair1.apply(minMaxRangePair2);
-    minMaxRangePair1 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
-        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
-    minMaxRangePair2 = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(
-        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair1));
+    minMaxRangePair1 = MinMaxRangePair.fromBytes(minMaxRangePair1.toBytes());
+    minMaxRangePair2 = MinMaxRangePair.fromBytes(minMaxRangePair1.toBytes());
     minMaxRangePair1.apply(minMaxRangePair2);
     double expectedMinMaxRangeResult = minMaxRangePair1.getMax() - minMaxRangePair1.getMin();
 
@@ -792,10 +782,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       quantileDigest2.merge(_quantileDigests[i]);
     }
     quantileDigest1.merge(quantileDigest2);
-    quantileDigest1 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
-        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
-    quantileDigest2 = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(
-        ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest1));
+    quantileDigest1 = QuantileDigest.fromBytes(quantileDigest1.toBytes());
+    quantileDigest2 = QuantileDigest.fromBytes(quantileDigest1.toBytes());
     quantileDigest1.merge(quantileDigest2);
     long expectedPercentileEstResult = quantileDigest1.getQuantile(0.5);
 

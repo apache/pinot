@@ -18,13 +18,7 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.floats.FloatArrayList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -32,15 +26,14 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.utils.ByteArray;
 
 
 /// Results block for aggregation queries.
@@ -151,7 +144,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
         if (result == null) {
           dataTableBuilder.setNull(i);
         } else {
-          setFinalResult(dataTableBuilder, columnDataTypes, i, result);
+          DataTableBuilderUtils.setColumn(dataTableBuilder, columnDataTypes[i].getStoredType(), i, result);
         }
       }
     } else {
@@ -182,57 +175,5 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       }
     }
     return metadata;
-  }
-
-  private void setFinalResult(DataTableBuilder dataTableBuilder, ColumnDataType[] columnDataTypes, int index,
-      Object result)
-      throws IOException {
-    ColumnDataType columnDataType = columnDataTypes[index];
-    switch (columnDataType.getStoredType()) {
-      case INT:
-        dataTableBuilder.setColumn(index, (int) result);
-        break;
-      case LONG:
-        dataTableBuilder.setColumn(index, (long) result);
-        break;
-      case FLOAT:
-        dataTableBuilder.setColumn(index, (float) result);
-        break;
-      case DOUBLE:
-        dataTableBuilder.setColumn(index, (double) result);
-        break;
-      case BIG_DECIMAL:
-        dataTableBuilder.setColumn(index, (BigDecimal) result);
-        break;
-      case STRING:
-        dataTableBuilder.setColumn(index, result.toString());
-        break;
-      case BYTES:
-        dataTableBuilder.setColumn(index, (ByteArray) result);
-        break;
-      case INT_ARRAY:
-        dataTableBuilder.setColumn(index, ArrayListUtils.toIntArray((IntArrayList) result));
-        break;
-      case LONG_ARRAY:
-        dataTableBuilder.setColumn(index, ArrayListUtils.toLongArray((LongArrayList) result));
-        break;
-      case FLOAT_ARRAY:
-        dataTableBuilder.setColumn(index, ArrayListUtils.toFloatArray((FloatArrayList) result));
-        break;
-      case DOUBLE_ARRAY:
-        dataTableBuilder.setColumn(index, ArrayListUtils.toDoubleArray((DoubleArrayList) result));
-        break;
-      case BIG_DECIMAL_ARRAY:
-        dataTableBuilder.setColumn(index, ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) result));
-        break;
-      case STRING_ARRAY:
-        dataTableBuilder.setColumn(index, ArrayListUtils.toStringArray((ObjectArrayList<String>) result));
-        break;
-      case BYTES_ARRAY:
-        dataTableBuilder.setColumn(index, ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) result));
-        break;
-      default:
-        throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
-    }
   }
 }

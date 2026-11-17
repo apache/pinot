@@ -41,7 +41,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -470,8 +469,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
             httpHeaders, queryTimer)) {
       validatePhysicalTablesWithMultiClusterRouting(compiledQuery.getTableNames(), compiledQuery.getOptions());
-      AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
-      checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery, rlsFiltersApplied);
+      boolean rlsFiltersApplied = checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery);
 
       // Apply broker-default query options before branching to EXPLAIN/execute so both paths see the same options.
       applyBrokerDefaultQueryOptions(compiledQuery.getOptions());
@@ -481,7 +479,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return explain(compiledQuery, requestId, requestContext, queryTimer, idSetSubqueries);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied.get(), queryWasLogged, workloadName);
+            rlsFiltersApplied, queryWasLogged, workloadName);
       }
     }
   }
@@ -518,8 +516,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private void checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
-      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery, AtomicBoolean rlsFiltersApplied) {
+  private boolean checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
+      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery) {
     Set<String> tables = compiledQuery.getTableNames();
     if (tables != null && !tables.isEmpty()) {
       TableAuthorizationResult tableAuthorizationResult =
@@ -527,21 +525,30 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
       }
-      if (_enableRowColumnLevelAuth) {
-        AccessControl accessControl = _accessControlFactory.create();
-        for (String tableName : tables) {
-          accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
-              .ifPresent(rowFilters -> {
-                rlsFiltersApplied.set(true);
-                String combinedFilters =
-                    rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
-                String key = RlsUtils.buildRlsFilterKey(tableName);
-                compiledQuery.getOptions().put(key, combinedFilters);
-                _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
-              });
-        }
-      }
+      return _enableRowColumnLevelAuth && applyRlsFilters(requesterIdentity, tables, compiledQuery.getOptions());
     }
+    return false;
+  }
+
+  /// Returns `true` if an RLS filter was added for at least one table.
+  @VisibleForTesting
+  boolean applyRlsFilters(@Nullable RequesterIdentity requesterIdentity, Set<String> tables,
+      Map<String, String> queryOptions) {
+    AccessControl accessControl = _accessControlFactory.create();
+    boolean applied = false;
+    for (String tableName : tables) {
+      List<String> rowFilters = accessControl.getRowColFilters(requesterIdentity, tableName).getRLSFilters()
+          .orElse(null);
+      if (rowFilters == null || rowFilters.isEmpty()) {
+        continue;
+      }
+      String combinedFilters =
+          rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+      queryOptions.put(RlsUtils.buildRlsFilterKey(tableName), combinedFilters);
+      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
+      applied = true;
+    }
+    return applied;
   }
 
   private ImmutableQueryEnvironment.Config getQueryEnvConf(HttpHeaders httpHeaders, Map<String, String> queryOptions,
@@ -658,6 +665,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// [QueryEnvironment.CompiledQuery#getTableNames()] without re-parsing SQL.
   protected void prepareCompiledQueryForPlanning(QueryEnvironment.CompiledQuery compiledQuery, long requestId,
       RequestContext requestContext, HttpHeaders httpHeaders) {
+  }
+
+  /// Extension hook for preparing a stage right before the broker sends it to its workers, to run the query or to
+  /// explain it on the servers. To run the query, the broker calls it for every stage, including stage 0 (the broker
+  /// reduce). To explain the query on the servers, it calls it only for the leaf stages that have segments.
+  ///
+  /// Subclasses can add entries to the custom properties of the stage
+  /// ([DispatchablePlanFragment#getCustomProperties()]), which its workers get in their stage metadata. They must not
+  /// replace the existing entries, such as the table name and the time boundary that servers use for leaf stages.
+  protected void prepareStageForDispatch(DispatchablePlanFragment stage, Map<String, String> queryOptions) {
   }
 
   /// Estimates the total number of server query threads the given plan will consume; used to acquire permits from the
@@ -902,10 +919,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
     }
 
+    for (DispatchablePlanFragment stage : dispatchableSubPlan.getQueryStageMap().values()) {
+      prepareStageForDispatch(stage, query.getOptions());
+    }
+
     // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
     // run only the broker reduce stage locally. No server dispatch is attempted.
     boolean allLeafStagesEmpty = dispatchableSubPlan.isAllLeafStagesEmpty();
-    int estimatedNumQueryThreads = getEstimatedNumQueryThreads(dispatchableSubPlan);
+    // A query estimated above the throttler limit takes the whole limit, so it runs alone instead of never
+    int estimatedNumQueryThreads =
+        Math.min(getEstimatedNumQueryThreads(dispatchableSubPlan), _queryThrottler.getMaxPermits());
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.
@@ -1103,6 +1126,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
               QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null, workloadName),
           queryWasLogged);
+      if (rlsFiltersApplied) {
+        RlsResponseUtils.hideTableLayoutStats(brokerResponse);
+      }
 
       return brokerResponse;
     } finally {
@@ -1151,6 +1177,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,
       RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
     List<PlanNode> stagePlans;
+    prepareStageForDispatch(fragment, queryOptions);
     try {
       stagePlans = _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
     } catch (Exception e) {

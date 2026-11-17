@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -44,7 +45,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.kafka40.utils.MiniKafkaCluster;
+import org.apache.pinot.plugin.stream.kafka40.server.EmbeddedKafkaCluster;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -64,7 +65,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.kafka.common.record.RecordBatch.NO_TIMESTAMP;
+import static org.apache.kafka.clients.consumer.ConsumerRecord.NO_TIMESTAMP;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -84,15 +85,15 @@ public class KafkaPartitionLevelConsumerTest {
   private static final long TIMESTAMP = Instant.now().toEpochMilli();
   private static final Random RANDOM = new Random();
 
-  private MiniKafkaCluster _kafkaCluster;
+  private EmbeddedKafkaCluster _kafkaCluster;
   private String _kafkaBrokerAddress;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _kafkaCluster = new MiniKafkaCluster("0");
+    _kafkaCluster = new EmbeddedKafkaCluster();
     _kafkaCluster.start();
-    _kafkaBrokerAddress = _kafkaCluster.getKafkaServerAddress();
+    _kafkaBrokerAddress = _kafkaCluster.bootstrapServers();
     _kafkaCluster.createTopic(TEST_TOPIC_1, 1);
     _kafkaCluster.createTopic(TEST_TOPIC_2, 2);
     _kafkaCluster.createTopic(TEST_TOPIC_3, 1);
@@ -339,6 +340,42 @@ public class KafkaPartitionLevelConsumerTest {
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = createConsumer(clientId, streamConfig, partition);
     kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
+  }
+
+  @Test
+  public void testLegacyFactoriesResumeFromSavedOffset()
+      throws Exception {
+    Map<String, String> config = new HashMap<>(getStreamConfig(TEST_TOPIC_1).getStreamConfigsMap());
+    config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");
+    StreamPartitionMsgOffset savedOffset = new LongMsgOffset(0);
+    long expectedOffset = 0;
+    for (String factoryName : new String[]{null,
+        "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+        "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory"}) {
+      if (factoryName == null) {
+        config.remove("stream.kafka.consumer.factory.class.name");
+      } else {
+        config.put("stream.kafka.consumer.factory.class.name", factoryName);
+      }
+      StreamConsumerFactory factory = StreamConsumerFactoryProvider.create(new StreamConfig("table_REALTIME", config));
+      assertEquals(factory.getClass(), KafkaConsumerFactory.class);
+      PartitionGroupConsumptionStatus status =
+          new PartitionGroupConsumptionStatus(0, 0, savedOffset, null, "CONSUMING");
+      try (PartitionGroupConsumer consumer = factory.createPartitionGroupConsumer("legacy-factory-test", status)) {
+        MessageBatch<?> batch = consumer.fetchMessages(savedOffset, 10000);
+        assertTrue(batch.getMessageCount() > 0);
+        assertTrue(batch.getMessageCount() <= 100);
+        assertEquals(batch.getFirstMessageOffset().toString(), savedOffset.toString());
+        for (int i = 0; i < batch.getMessageCount(); i++) {
+          StreamMessage<?> message = batch.getStreamMessage(i);
+          assertEquals(message.getMetadata().getOffset().toString(), Long.toString(expectedOffset));
+          assertEquals(new String((byte[]) message.getValue(), StandardCharsets.UTF_8), "sample_msg_" + expectedOffset);
+          expectedOffset++;
+        }
+        savedOffset = batch.getOffsetOfNextBatch();
+        assertEquals(savedOffset.toString(), Long.toString(expectedOffset));
+      }
+    }
   }
 
   @Test

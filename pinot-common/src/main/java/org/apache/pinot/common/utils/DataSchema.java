@@ -22,11 +22,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.floats.FloatArrayList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -675,21 +670,21 @@ public class DataSchema {
         case UUID:
           return UuidUtils.toUUID((ByteArray) value);
         case INT_ARRAY:
-          return toIntArray(value);
+          return (int[]) value;
         case LONG_ARRAY:
           return toLongArray(value);
         case FLOAT_ARRAY:
-          return toFloatArray(value);
+          return (float[]) value;
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
         case BIG_DECIMAL_ARRAY:
-          return toBigDecimalArray(value);
+          return (BigDecimal[]) value;
         case BOOLEAN_ARRAY:
-          return toBooleanArray(toIntArray(value));
+          return toBooleanArray((int[]) value);
         case TIMESTAMP_ARRAY:
           return toTimestampArray(toLongArray(value));
         case STRING_ARRAY:
-          return toStringArray(value);
+          return (String[]) value;
         case BYTES_ARRAY:
           return toBytesArray(value);
         case UUID_ARRAY:
@@ -790,22 +785,9 @@ public class DataSchema {
       throw new IllegalStateException(String.format("Cannot convert: '%s' to Map", value));
     }
 
-    private static int[] toIntArray(Object value) {
-      if (value instanceof int[]) {
-        return (int[]) value;
-      } else if (value instanceof IntArrayList) {
-        // For ArrayAggregationFunction
-        return ArrayListUtils.toIntArray((IntArrayList) value);
-      }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to int[]", value));
-    }
-
     private static long[] toLongArray(Object value) {
       if (value instanceof long[]) {
         return (long[]) value;
-      } else if (value instanceof LongArrayList) {
-        // For FunnelCountAggregationFunction and ArrayAggregationFunction
-        return ArrayListUtils.toLongArray((LongArrayList) value);
       } else {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -817,22 +799,9 @@ public class DataSchema {
       }
     }
 
-    private static float[] toFloatArray(Object value) {
-      if (value instanceof float[]) {
-        return (float[]) value;
-      } else if (value instanceof FloatArrayList) {
-        // For ArrayAggregationFunction
-        return ArrayListUtils.toFloatArray((FloatArrayList) value);
-      }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to float[]", value));
-    }
-
     private static double[] toDoubleArray(Object value) {
       if (value instanceof double[]) {
         return (double[]) value;
-      } else if (value instanceof DoubleArrayList) {
-        // For HistogramAggregationFunction and ArrayAggregationFunction
-        return ArrayListUtils.toDoubleArray((DoubleArrayList) value);
       } else if (value instanceof int[]) {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -858,16 +827,6 @@ public class DataSchema {
         }
         return doubleValues;
       }
-    }
-
-    private static BigDecimal[] toBigDecimalArray(Object value) {
-      if (value instanceof BigDecimal[]) {
-        return (BigDecimal[]) value;
-      } else if (value instanceof ObjectArrayList) {
-        // For ArrayAggregationFunction
-        return ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) value);
-      }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to BigDecimal[]", value));
     }
 
     private static String[] formatBigDecimalArray(BigDecimal[] bigDecimalArray) {
@@ -933,32 +892,12 @@ public class DataSchema {
       return formattedTimestampArray;
     }
 
-    private static String[] toStringArray(Object value) {
-      if (value instanceof String[]) {
-        return (String[]) value;
-      } else if (value instanceof ObjectArrayList) {
-        // For ArrayAggregationFunction
-        return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
-      }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to String[]", value));
-    }
-
     private static byte[][] toBytesArray(Object value) {
       if (value instanceof ByteArray[]) {
         ByteArray[] wrapped = (ByteArray[]) value;
         byte[][] raw = new byte[wrapped.length][];
         for (int i = 0; i < wrapped.length; i++) {
           raw[i] = wrapped[i].getBytes();
-        }
-        return raw;
-      }
-      if (value instanceof ObjectArrayList) {
-        // For ArrayAggregationFunction
-        ObjectArrayList<ByteArray> list = (ObjectArrayList<ByteArray>) value;
-        int size = list.size();
-        byte[][] raw = new byte[size][];
-        for (int i = 0; i < size; i++) {
-          raw[i] = list.get(i).getBytes();
         }
         return raw;
       }
@@ -971,15 +910,6 @@ public class DataSchema {
     private static UUID[] toUuidArray(Object value) {
       if (value instanceof UUID[]) {
         return (UUID[]) value;
-      }
-      if (value instanceof ObjectArrayList) {
-        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
-        int size = list.size();
-        UUID[] uuidArray = new UUID[size];
-        for (int i = 0; i < size; i++) {
-          uuidArray[i] = UuidUtils.toUUID(list.get(i));
-        }
-        return uuidArray;
       }
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
@@ -994,15 +924,6 @@ public class DataSchema {
     private static ByteArray[] fromUuidArray(Object value) {
       if (value instanceof ByteArray[]) {
         return (ByteArray[]) value;
-      }
-      if (value instanceof ObjectArrayList) {
-        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
-        int size = list.size();
-        ByteArray[] wrapped = new ByteArray[size];
-        for (int i = 0; i < size; i++) {
-          wrapped[i] = new ByteArray(UuidUtils.toBytes(list.get(i)));
-        }
-        return wrapped;
       }
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
@@ -1035,15 +956,6 @@ public class DataSchema {
     /// dispatch is delegated to [#formatUuid], so `byte[][]`, [ByteArray]`[]`, `UUID[]` and `String[]` are all
     /// handled by the single `Object[]` branch.
     private static String[] formatUuidArray(Object value) {
-      if (value instanceof ObjectArrayList) {
-        ObjectArrayList<?> list = (ObjectArrayList<?>) value;
-        int size = list.size();
-        String[] formattedUuidArray = new String[size];
-        for (int i = 0; i < size; i++) {
-          formattedUuidArray[i] = formatUuid(list.get(i));
-        }
-        return formattedUuidArray;
-      }
       Object[] valueArray = (Object[]) value;
       int length = valueArray.length;
       String[] formattedUuidArray = new String[length];

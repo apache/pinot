@@ -483,6 +483,54 @@ public class AggregateOperatorTest {
   }
 
   @DataProvider
+  public Object[][] groupByCases() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  /// The leaves return array final results as arrays, in a row heap block as well as in a serialized one, and the
+  /// final stage merges them.
+  @Test(dataProvider = "groupByCases")
+  public void testLeafReturnFinalResultWithArrayResult(boolean groupBy) {
+    OpChainExecutionContext context = OperatorTestUtil.getContext(Map.of());
+    // The leaf input is ([group,] timestamp, step) and the leaf output is ([group,] funnel), so the first argument of
+    // the function call refers to the timestamp in the leaf and to the leaf result in the final stage.
+    int numKeys = groupBy ? 1 : 0;
+    DataSchema inputSchema = groupBy
+        ? new DataSchema(new String[]{"group", "timestamp", "step"},
+            new ColumnDataType[]{INT, ColumnDataType.LONG, BOOLEAN})
+        : new DataSchema(new String[]{"timestamp", "step"}, new ColumnDataType[]{ColumnDataType.LONG, BOOLEAN});
+    List<RexExpression.FunctionCall> aggCalls = List.of(new RexExpression.FunctionCall(ColumnDataType.INT_ARRAY,
+        "FUNNELMATCHSTEP", List.of(new RexExpression.InputRef(numKeys),
+            new RexExpression.Literal(ColumnDataType.LONG, 1000L), new RexExpression.Literal(INT, 1),
+            new RexExpression.InputRef(numKeys + 1))));
+    List<Integer> groupKeys = groupBy ? List.of(0) : List.of();
+    DataSchema resultSchema = groupBy
+        ? new DataSchema(new String[]{"group", "funnel"}, new ColumnDataType[]{INT, ColumnDataType.INT_ARRAY})
+        : new DataSchema(new String[]{"funnel"}, new ColumnDataType[]{ColumnDataType.INT_ARRAY});
+    BlockListMultiStageOperator.Builder leafResults = new BlockListMultiStageOperator.Builder(context, resultSchema);
+    // Only the event of the first leaf matches the step. The first leaf block stays a row heap, and the second one is
+    // serialized.
+    for (int step = 1; step >= 0; step--) {
+      Object[] row = groupBy ? new Object[]{1, 1L, step} : new Object[]{1L, step};
+      AggregateOperator leaf = new AggregateOperator(context,
+          new BlockListMultiStageOperator(context, OperatorTestUtil.block(inputSchema, row)),
+          new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), groupKeys,
+              AggType.LEAF, true, null, 0));
+      MseBlock.Data leafBlock = (MseBlock.Data) leaf.nextBlock();
+      leafResults.addBlock(step == 1 ? leafBlock : leafBlock.asSerialized());
+      assertTrue(leaf.nextBlock().isSuccess());
+    }
+    AggregateOperator result = new AggregateOperator(context, leafResults.buildWithEos(),
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, List.of(-1), groupKeys,
+            AggType.FINAL, true, null, 0));
+
+    List<Object[]> rows = ((MseBlock.Data) result.nextBlock()).asRowHeap().getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), groupBy ? new Object[]{1, new int[]{1}} : new Object[]{new int[]{1}});
+    assertTrue(result.nextBlock().isSuccess());
+  }
+
+  @DataProvider
   public Object[][] approximatedResultCases() {
     return new Object[][]{{true, 1, true}, {true, 10, false}, {false, 1, true}, {false, 10, false}};
   }
@@ -611,7 +659,7 @@ public class AggregateOperatorTest {
   }
 
   @Test
-  public void testOrderedHistogramGroupTrimUsesNativeLists() {
+  public void testOrderedHistogramGroupTrimComparesArrays() {
     OpChainExecutionContext context =
         OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "1"));
     DataSchema inputSchema = new DataSchema(new String[]{"group", "value"}, new ColumnDataType[]{INT, INT});

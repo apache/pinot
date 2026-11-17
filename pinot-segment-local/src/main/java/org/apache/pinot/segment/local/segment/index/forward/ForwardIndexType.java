@@ -250,13 +250,16 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
           JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
 
-          // `forwardIndexDisabled` short-circuits everything else.
+          // The ingestion limit still applies when forward-index creation is disabled.
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
             JsonNode codecSpecNode = forwardIndexNode != null ? forwardIndexNode.get("codecSpec") : null;
             Preconditions.checkState(codecSpecNode == null || codecSpecNode.isNull(),
                 "codecSpec cannot be configured when the forward index is disabled for column: %s", column);
-            result.put(column, ForwardIndexConfig.getDisabled());
+            result.put(column, new ForwardIndexConfig.Builder(FieldConfig.EncodingType.DICTIONARY)
+                .withDisabled(true)
+                .withMaxNumMultiValues(resolveMaxNumMultiValues(forwardIndexNode, properties, column))
+                .build());
             continue;
           }
 
@@ -299,6 +302,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             if ((innerCodecNode == null || innerCodecNode.isNull()) && fcCodec != null) {
               configNode.put("compressionCodec", fcCodec.name());
             }
+            Integer maxNumMultiValues = resolveMaxNumMultiValues(forwardIndexNode, properties, column);
+            if (maxNumMultiValues != null) {
+              configNode.put(ForwardIndexConfig.MAX_NUM_MULTI_VALUES, maxNumMultiValues);
+            }
             try {
               result.put(column, JsonUtils.jsonNodeToObject(configNode, ForwardIndexConfig.class));
             } catch (IOException e) {
@@ -324,13 +331,28 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         props.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
   }
 
+  @Nullable
+  private static Integer resolveMaxNumMultiValues(@Nullable JsonNode forwardIndexNode,
+      @Nullable Map<String, String> properties, String column) {
+    JsonNode maxNumMultiValues =
+        forwardIndexNode != null ? forwardIndexNode.get(ForwardIndexConfig.MAX_NUM_MULTI_VALUES) : null;
+    if (maxNumMultiValues != null && !maxNumMultiValues.isNull()) {
+      Preconditions.checkArgument(maxNumMultiValues.isIntegralNumber() && maxNumMultiValues.canConvertToInt(),
+          "%s must be an integer for column: %s", ForwardIndexConfig.MAX_NUM_MULTI_VALUES, column);
+      return maxNumMultiValues.intValue();
+    }
+    String legacyMax = properties != null ? properties.get(ForwardIndexConfig.MAX_NUM_MULTI_VALUES) : null;
+    return legacyMax != null ? Integer.valueOf(legacyMax) : null;
+  }
+
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig,
       FieldConfig.EncodingType resolvedEncodingType) {
     ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder(resolvedEncodingType)
         .withCompressionCodec(fieldConfig.getCompressionCodec());
     Map<String, String> properties = fieldConfig.getProperties();
     if (properties != null) {
-      builder.withLegacyProperties(properties);
+      builder.withLegacyProperties(properties)
+          .withMaxNumMultiValues(resolveMaxNumMultiValues(null, properties, fieldConfig.getName()));
     }
     return builder.build();
   }

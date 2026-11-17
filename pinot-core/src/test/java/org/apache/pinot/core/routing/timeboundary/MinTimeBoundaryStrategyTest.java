@@ -105,6 +105,20 @@ public class MinTimeBoundaryStrategyTest {
     assertSame(timeBoundaryInfo, timeBoundaryInfoMap.get(expectedTableName));
   }
 
+  @Test
+  public void testConfiguredViewsDoNotShareBoundaryTables() {
+    TimeBoundaryInfo firstBoundary = new TimeBoundaryInfo("timeColumn1", "1747134822000");
+    TimeBoundaryInfo secondBoundary = new TimeBoundaryInfo("timeColumn2", "1747134844000");
+    setupMocks(Map.of("table1_OFFLINE", firstBoundary, "table2_OFFLINE", secondBoundary));
+    TimeBoundaryStrategyService service = TimeBoundaryStrategyService.getInstance();
+    TimeBoundaryStrategy first = service.getTimeBoundaryStrategy("min");
+    first.init(createLogicalTableConfig(Map.of("includedTables", List.of("table1_OFFLINE"))), _mockTableCache);
+    TimeBoundaryStrategy second = service.getTimeBoundaryStrategy("min");
+    second.init(createLogicalTableConfig(Map.of("includedTables", List.of("table2_OFFLINE"))), _mockTableCache);
+    assertSame(first.computeTimeBoundary(_mockRoutingManager), firstBoundary);
+    assertSame(second.computeTimeBoundary(_mockRoutingManager), secondBoundary);
+  }
+
   @BeforeMethod
   public void setUp() {
     _mockTableCache = mock(TableCache.class);

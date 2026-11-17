@@ -232,6 +232,27 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "NETTY_CONNECTION_CHANNEL_ACTIVE", "nettyConnection", false);
   public static final BrokerMeter NETTY_CONNECTION_CHANNEL_INACTIVE = create(
       "NETTY_CONNECTION_CHANNEL_INACTIVE", "nettyConnection", false);
+  // The three meters below are tagged with the server's short name, like NETTY_CONNECTION_CHANNEL_INACTIVE.
+  // Queries rejected because the channel's outbound queue was above its high watermark, i.e. the send window to the
+  // server is closed (see NettyConfig.WRITE_BUFFER_HIGH_WATER_MARK_BYTES). Each one is a query failed fast instead of
+  // being queued in direct memory behind a stalled socket.
+  public static final BrokerMeter NETTY_CONNECTION_UNWRITABLE_REJECTIONS = create(
+      "NETTY_CONNECTION_UNWRITABLE_REJECTIONS", "nettyConnection", false);
+  // Connections closed after pending writes made no positive socket byte progress for NettyConfig.WRITE_TIMEOUT_MS.
+  // Progressing requests can take longer overall; a stalled or half-open socket can still report isActive().
+  public static final BrokerMeter NETTY_CONNECTION_WRITE_TIMEOUTS = create(
+      "NETTY_CONNECTION_WRITE_TIMEOUTS", "nettyConnection", false);
+  // Live cached channels closed and dropped because the routing manager enabled their server again, which usually
+  // means the server was restarted and the cached channel points at the old process, or because the server left the
+  // cluster or moved to another address. Entries whose channel had already closed are dropped without being counted.
+  public static final BrokerMeter NETTY_CONNECTION_CHANNEL_EVICTIONS = create(
+      "NETTY_CONNECTION_CHANNEL_EVICTIONS", "nettyConnection", false);
+  // Channels marked suspect because the server left the configured number of consecutive queries unanswered on them
+  // (see CommonConstants.Broker.FailureDetector.CONFIG_OF_UNANSWERED_QUERIES_THRESHOLD); the next query replaces each.
+  // With CONFIG_OF_REPORT_UNANSWERED_SERVERS on and pings off, each is also a report to the failure detector. Tagged
+  // with the server's short name.
+  public static final BrokerMeter NETTY_CONNECTION_SUSPECT_CHANNELS = create(
+      "NETTY_CONNECTION_SUSPECT_CHANNELS", "nettyConnection", false);
 
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
       "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);

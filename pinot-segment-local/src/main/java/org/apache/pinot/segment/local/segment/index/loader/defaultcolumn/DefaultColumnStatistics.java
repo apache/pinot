@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.defaultcolumn;
 
-import com.google.common.base.Utf8;
 import java.math.BigDecimal;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -28,6 +27,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 /// Column statistics for a default-value column.
@@ -68,7 +68,7 @@ public class DefaultColumnStatistics implements ColumnStatistics {
       case STRING:
         String stringValue = (String) value;
         _valueSet = new String[]{stringValue};
-        length = Utf8.encodedLength(stringValue);
+        length = Utf8Utils.encodedLength(stringValue);
         isAscii = length == stringValue.length();
         break;
       case BYTES:

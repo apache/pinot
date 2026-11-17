@@ -38,12 +38,21 @@ public class OrFilterOperator extends BaseFilterOperator {
 
   private final List<BaseFilterOperator> _filterOperators;
   private final Map<String, String> _queryOptions;
+  private final boolean _restrictionPushdownEnabled;
 
   public OrFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
       int numDocs, boolean nullHandlingEnabled) {
+    this(filterOperators, queryOptions, numDocs, nullHandlingEnabled, false);
+  }
+
+  /// @param restrictionPushdownEnabled whether the AND that derives the NULL documents may push its restriction into
+  ///                                   its composite children; see [BaseFilterOperator#deriveNulls(Map, boolean)]
+  public OrFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled, boolean restrictionPushdownEnabled) {
     super(numDocs, nullHandlingEnabled);
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
+    _restrictionPushdownEnabled = restrictionPushdownEnabled;
   }
 
   @Override
@@ -90,7 +99,7 @@ public class OrFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getNulls() {
-    return mayHaveNulls() ? deriveNulls(_queryOptions) : EmptyDocIdSet.unscanned();
+    return mayHaveNulls() ? deriveNulls(_queryOptions, _restrictionPushdownEnabled) : EmptyDocIdSet.unscanned();
   }
 
   @Override
