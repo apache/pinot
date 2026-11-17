@@ -366,8 +366,12 @@ public class QueryEnvironment {
           relRoot = compileQuery(toRelation(validate(mvAggregateQueryNode, plannerContext), plannerContext),
               plannerContext);
         } catch (RuntimeException e) {
-          e.addSuppressed(validationError);
-          throw e;
+          // The message has both errors: the ARRAY_TO_MV error of the first plan, which says what is supported, and
+          // the reason why the plan with the MV aggregate failed
+          plannerContext.close();
+          plannerContext = null;
+          throw QueryErrorCode.QUERY_PLANNING.asException(validationError.getMessage()
+              + " The query also failed with the MV aggregate: " + e.getMessage(), e);
         }
       }
       return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
@@ -668,6 +672,8 @@ public class QueryEnvironment {
       plan = PinotLogicalQueryPlanner.makePlan(relRoot, null, useSpools(options), _envConfig.defaultHashFunction(),
           pruneUnnestColumns(options));
     } catch (RuntimeException e) {
+      // CompiledQuery#planQuery and #explain run makePlan again and throw this error, so no query that fails here
+      // can run. The query fails as it fails on a broker that predates the MV aggregate.
       LOGGER.debug("Skipping the ARRAY_TO_MV validation of the MV aggregate fallback", e);
       return null;
     }

@@ -239,19 +239,13 @@ public class PlanNodeDeserializer {
     Plan.AggregateNode protoAggregateNode = protoMvAggregateNode.getAggregate();
     Preconditions.checkState(protoAggregateNode.getGroupingSetsCount() == 0,
         "Grouping sets are not supported in MvAggregateNode");
-    List<Integer> mvKeyIndexes = protoMvAggregateNode.getMvKeyIndexesList();
-    int previous = -1;
-    for (int mvKeyIndex : mvKeyIndexes) {
-      Preconditions.checkState(mvKeyIndex > previous && mvKeyIndex < protoAggregateNode.getGroupKeysCount(),
-          "MV key indexes must be ascending positions in the group keys, got: %s", mvKeyIndexes);
-      previous = mvKeyIndex;
-    }
+    // The MvAggregateNode constructor validates the MV key indexes
     return new MvAggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertFunctionCalls(protoAggregateNode.getAggCallsList()),
         protoAggregateNode.getFilterArgsList(), protoAggregateNode.getGroupKeysList(),
         convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult(),
         convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit(),
-        mvKeyIndexes);
+        protoMvAggregateNode.getMvKeyIndexesList());
   }
 
   private static UnnestNode deserializeUnnestNode(Plan.PlanNode protoNode) {

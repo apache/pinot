@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -54,6 +55,13 @@ public class MvAggregateNode extends BasePlanNode {
       AggregateNode.AggType aggType, boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations,
       int limit, List<Integer> mvKeyIndexes) {
     super(stageId, dataSchema, nodeHint, inputs);
+    Preconditions.checkArgument(!mvKeyIndexes.isEmpty(), "An MV aggregate needs at least one MV key");
+    int previous = -1;
+    for (int mvKeyIndex : mvKeyIndexes) {
+      Preconditions.checkArgument(mvKeyIndex > previous && mvKeyIndex < groupKeys.size(),
+          "MV key indexes must be ascending positions in the group keys %s, got: %s", groupKeys, mvKeyIndexes);
+      previous = mvKeyIndex;
+    }
     _aggCalls = aggCalls;
     _filterArgs = filterArgs;
     _groupKeys = groupKeys;

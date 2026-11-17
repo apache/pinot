@@ -51,7 +51,12 @@ public class SqlNodeCopierTest extends QueryEnvironmentTestBase {
         {"SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e CROSS JOIN UNNEST(e.mcol2) AS u(elem) "
             + "GROUP BY ARRAY_TO_MV(e.mcol1)"},
         {"SELECT col1 FROM a UNION ALL SELECT col1 FROM b"},
-        {"SELECT ts_timestamp + INTERVAL '1' DAY FROM a"}
+        {"SELECT ts_timestamp + INTERVAL '1' DAY FROM a"},
+        {"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e "
+            + "CROSS JOIN UNNEST(e.mcol2) AS u(elem) WHERE ARRAY_TO_MV(e.mcol1) = 'x' GROUP BY ARRAY_TO_MV(e.mcol1)"},
+        {"SELECT col1, ROW_NUMBER() OVER (PARTITION BY col2 ORDER BY col3 DESC) FROM a"},
+        {"SELECT CASE WHEN col3 IS NULL THEN 'none' WHEN col3 > 1 THEN col2 ELSE 'other' END, COUNT(*) FROM a "
+            + "GROUP BY 1"}
     };
   }
 

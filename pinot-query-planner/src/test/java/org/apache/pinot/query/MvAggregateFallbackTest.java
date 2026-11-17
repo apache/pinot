@@ -107,6 +107,26 @@ public class MvAggregateFallbackTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testErrorOfTheSecondPlanKeepsTheErrorOfTheFirstPlan() {
+    // The plan with the MV aggregate fails: the message says what is supported and why the second plan failed
+    QueryException e = expectThrows(QueryException.class, () -> explain("EXPLAIN PLAN FOR SELECT "
+        + "/*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ARRAY_TO_MV(mcol1), LISTAGG(col2, ',') "
+        + "WITHIN GROUP (ORDER BY col2) FROM e GROUP BY ARRAY_TO_MV(mcol1)"));
+    assertTrue(e.getMessage().contains(SUPPORTED_USES), e.getMessage());
+    assertTrue(e.getMessage().contains("is not supported with WITHIN GROUP"), e.getMessage());
+  }
+
+  @Test
+  public void testCoalesceInALeafFilterStaysInThePlanWithMvAggregate() {
+    // In the plan with the MV aggregate, ARRAY_TO_MV of the nullable column of f is nullable, so COALESCE in the leaf
+    // WHERE stays. The leaf stage cannot run it, see MvAggregate.json. The query fails on master too.
+    String plan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(f.mcol1), COUNT(*) FROM f JOIN a ON f.col1 = a.col1 "
+        + "WHERE COALESCE(ARRAY_TO_MV(f.mcol1), 'x') = 'a' GROUP BY ARRAY_TO_MV(f.mcol1)");
+    assertTrue(plan.contains(MV_AGGREGATE), plan);
+    assertTrue(plan.contains("COALESCE"), plan);
+  }
+
+  @Test
   public void testTableNamesAreTheTablesOfThePlanThatRuns() {
     // The broker reads the table names, for example to apply row-level security, so they must describe the second
     // plan when the query falls back. With the NOT NULL type of the first plan, the HAVING condition folds to false

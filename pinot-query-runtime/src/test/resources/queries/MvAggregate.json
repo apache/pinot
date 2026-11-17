@@ -324,6 +324,13 @@
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE CAST(COALESCE(ARRAY_TO_MV(intMv), 0) AS VARCHAR) = '1'",
         "outputs": [[1]],
         "ignoreV2Optimizer": true
+      },
+      {
+        "description": "In the plan with the MV aggregate, ARRAY_TO_MV of a nullable column is nullable, so COALESCE around it in a leaf WHERE stays. The leaf stage cannot run it, so the query fails when it runs. It fails on master too, at planning time",
+        "sql": "SET enableNullHandling=true; SELECT ARRAY_TO_MV(t1.strMv), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k WHERE COALESCE(ARRAY_TO_MV(t1.strMv), 'x') = 'a' GROUP BY ARRAY_TO_MV(t1.strMv)",
+        "outputs": [],
+        "expectedException": ".*Caught exception while doing operator.*",
+        "ignoreV2Optimizer": true
       }
     ]
   }
