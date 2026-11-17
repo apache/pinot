@@ -46,6 +46,11 @@ public class StreamConfig {
   public static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
   public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = 3 * 60 * 1000;
+  /// First decode retry backoff; it doubles on every retry up to [#getDecodeRetryMaxBackoffMillis()].
+  public static final long INITIAL_DECODE_RETRY_BACKOFF_MILLIS = 100;
+  public static final long DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS = 10_000;
+  /// No limit: a message is retried until it decodes.
+  public static final long DEFAULT_DECODE_RETRY_MAX_DURATION_MILLIS = Long.MAX_VALUE;
 
   public static final double CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED = -1;
 
@@ -60,6 +65,9 @@ public class StreamConfig {
   private final int _fetchTimeoutMillis;
 
   private final long _idleTimeoutMillis;
+
+  private final long _decodeRetryMaxBackoffMillis;
+  private final long _decodeRetryMaxDurationMillis;
 
   private final int _flushThresholdRows;
   private final int _flushThresholdSegmentRows;
@@ -170,6 +178,9 @@ public class StreamConfig {
     }
     _idleTimeoutMillis = idleTimeoutMillis;
 
+    _decodeRetryMaxBackoffMillis = extractDecodeRetryMaxBackoffMillis(streamConfigMap);
+    _decodeRetryMaxDurationMillis = extractDecodeRetryMaxDurationMillis(streamConfigMap);
+
     _flushThresholdRows = extractFlushThresholdRows(streamConfigMap);
     _flushThresholdSegmentRows = extractFlushThresholdSegmentRows(streamConfigMap);
     _flushThresholdTimeMillis = extractFlushThresholdTimeMillis(streamConfigMap);
@@ -212,6 +223,44 @@ public class StreamConfig {
   @Nullable
   public Boolean isServerUploadToDeepStore() {
     return _serverUploadToDeepStore;
+  }
+
+  public static long extractDecodeRetryMaxBackoffMillis(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.DECODE_RETRY_MAX_BACKOFF_MILLIS;
+    String value = streamConfigMap.get(key);
+    if (value == null) {
+      return DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS;
+    }
+    try {
+      long decodeRetryMaxBackoffMillis = Long.parseLong(value);
+      if (decodeRetryMaxBackoffMillis > 0) {
+        return decodeRetryMaxBackoffMillis;
+      }
+    } catch (NumberFormatException e) {
+      // Handled below
+    }
+    LOGGER.warn("Invalid config {}: {}, must be a positive number of milliseconds, defaulting to: {}", key, value,
+        DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS);
+    return DEFAULT_DECODE_RETRY_MAX_BACKOFF_MILLIS;
+  }
+
+  public static long extractDecodeRetryMaxDurationMillis(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.DECODE_RETRY_MAX_DURATION_MILLIS;
+    String value = streamConfigMap.get(key);
+    if (value == null) {
+      return DEFAULT_DECODE_RETRY_MAX_DURATION_MILLIS;
+    }
+    try {
+      long decodeRetryMaxDurationMillis = Long.parseLong(value);
+      if (decodeRetryMaxDurationMillis >= 0) {
+        return decodeRetryMaxDurationMillis;
+      }
+    } catch (NumberFormatException e) {
+      // Handled below
+    }
+    LOGGER.warn("Invalid config {}: {}, must be a non-negative number of milliseconds, defaulting to no limit", key,
+        value);
+    return DEFAULT_DECODE_RETRY_MAX_DURATION_MILLIS;
   }
 
   public static double extractFlushThresholdVarianceFraction(Map<String, String> streamConfigMap) {
@@ -385,6 +434,15 @@ public class StreamConfig {
     return _idleTimeoutMillis;
   }
 
+  public long getDecodeRetryMaxBackoffMillis() {
+    return _decodeRetryMaxBackoffMillis;
+  }
+
+  /// See [StreamConfigProperties#DECODE_RETRY_MAX_DURATION_MILLIS]; [Long#MAX_VALUE] means no limit.
+  public long getDecodeRetryMaxDurationMillis() {
+    return _decodeRetryMaxDurationMillis;
+  }
+
   public int getFlushThresholdRows() {
     return _flushThresholdRows;
   }
@@ -455,6 +513,8 @@ public class StreamConfig {
         + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis
         + ", _fetchTimeoutMillis=" + _fetchTimeoutMillis
         + ", _idleTimeoutMillis=" + _idleTimeoutMillis
+        + ", _decodeRetryMaxBackoffMillis=" + _decodeRetryMaxBackoffMillis
+        + ", _decodeRetryMaxDurationMillis=" + _decodeRetryMaxDurationMillis
         + ", _flushThresholdRows=" + _flushThresholdRows
         + ", _flushThresholdSegmentRows=" + _flushThresholdSegmentRows
         + ", _flushThresholdTimeMillis=" + _flushThresholdTimeMillis
@@ -491,6 +551,8 @@ public class StreamConfig {
         && _connectionTimeoutMillis == that._connectionTimeoutMillis
         && _fetchTimeoutMillis == that._fetchTimeoutMillis
         && _idleTimeoutMillis == that._idleTimeoutMillis
+        && _decodeRetryMaxBackoffMillis == that._decodeRetryMaxBackoffMillis
+        && _decodeRetryMaxDurationMillis == that._decodeRetryMaxDurationMillis
         && _flushThresholdRows == that._flushThresholdRows
         && _flushThresholdSegmentRows == that._flushThresholdSegmentRows
         && _flushThresholdTimeMillis == that._flushThresholdTimeMillis
@@ -511,8 +573,9 @@ public class StreamConfig {
   @Override
   public int hashCode() {
     return Objects.hash(_type, _topicName, _tableNameWithType, _consumerFactoryClassName, _decoderClass,
-        _decoderProperties, _connectionTimeoutMillis, _fetchTimeoutMillis, _idleTimeoutMillis, _flushThresholdRows,
-        _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
+        _decoderProperties, _connectionTimeoutMillis, _fetchTimeoutMillis, _idleTimeoutMillis,
+        _decodeRetryMaxBackoffMillis, _decodeRetryMaxDurationMillis, _flushThresholdRows, _flushThresholdSegmentRows,
+        _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
         _flushThresholdVarianceFraction, _flushAutotuneInitialRows, _partitionConsumptionRateLimit,
         _topicConsumptionRateLimit, _enableOffsetAutoReset, _offsetAutoResetOffsetThreshold,
         _offsetAutoResetTimeSecThreshold, _backfillTopic, _streamConfigMap, _offsetCriteria, _serverUploadToDeepStore);
