@@ -45,6 +45,7 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.TableSegmentsInfo;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -245,6 +246,55 @@ public class QueryExecutorTest {
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
   }
 
+  /// A server sets up a table when it adds the first segment of it. Until then it has no optional segment of the table
+  /// to query, and a segment it must have is missing along with the table.
+  @Test
+  public void testTableNotOnServer() {
+    String query = "SELECT COUNT(*) FROM otherTable_OFFLINE";
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(List.of());
+    instanceRequest.setOptionalSegments(List.of("newSegment"));
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
+    assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
+    assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0L);
+    assertEquals(instanceResponse.getResponseMetadata().get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()), "0");
+
+    String error = executeExpectingFailure(query, null);
+    assertTrue(error.contains("Failed to find table: otherTable_OFFLINE"), error);
+  }
+
+  /// A logical table leaves out a physical table the server has not set up when all the segments of that table are
+  /// optional, and fails the query when one of them is a segment the server must have.
+  @Test
+  public void testLogicalTableWithPhysicalTableNotOnServer() {
+    String query = "SELECT COUNT(*) FROM logicalTable_OFFLINE";
+    Object numRows = aggregate("SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME, null);
+    TableSegmentsInfo tableOnServer = newTableSegmentsInfo(OFFLINE_TABLE_NAME, _segmentNames, null);
+    TableSegmentsInfo tableNotOnServer = newTableSegmentsInfo("otherTable_OFFLINE", List.of(), List.of("newSegment"));
+    assertEquals(aggregate(newLogicalTableRequest(query, tableOnServer, tableNotOnServer)), numRows);
+    assertEquals(aggregate(newLogicalTableRequest(query, tableNotOnServer)), 0L);
+
+    tableNotOnServer.setSegments(List.of("segment"));
+    String error = executeExpectingFailure(newLogicalTableRequest(query, tableNotOnServer));
+    assertTrue(error.contains("Failed to find table: otherTable_OFFLINE"), error);
+  }
+
+  private static TableSegmentsInfo newTableSegmentsInfo(String tableNameWithType, List<String> segments,
+      @Nullable List<String> optionalSegments) {
+    TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();
+    tableSegmentsInfo.setTableName(tableNameWithType);
+    tableSegmentsInfo.setSegments(segments);
+    tableSegmentsInfo.setOptionalSegments(optionalSegments);
+    return tableSegmentsInfo;
+  }
+
+  private static InstanceRequest newLogicalTableRequest(String query, TableSegmentsInfo... tableSegmentsInfos) {
+    InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequest.setTableSegmentsInfoList(List.of(tableSegmentsInfos));
+    return instanceRequest;
+  }
+
   /// The broker rejects IN_PARTITIONED_SUBQUERY for a principal with row filters. A server behind an older broker,
   /// which stamps the row filters in the query options but lets the function through, fails the query instead: the
   /// subquery reaches it as a string literal the filters do not cover, so it would build its ID_SET from every row.
@@ -265,7 +315,11 @@ public class QueryExecutorTest {
   }
 
   private Object aggregate(String query, @Nullable Map<String, String> queryOptions) {
-    InstanceResponseBlock instanceResponse = execute(newInstanceRequest(query, queryOptions));
+    return aggregate(newInstanceRequest(query, queryOptions));
+  }
+
+  private Object aggregate(InstanceRequest instanceRequest) {
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertTrue(instanceResponse.getExceptions().isEmpty(), instanceResponse.getExceptions().toString());
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     return ((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0);
@@ -273,7 +327,12 @@ public class QueryExecutorTest {
 
   /// Runs the query and returns the text of the exceptions it fails with.
   private String executeExpectingFailure(String query, @Nullable Map<String, String> queryOptions) {
-    InstanceResponseBlock instanceResponse = execute(newInstanceRequest(query, queryOptions));
+    return executeExpectingFailure(newInstanceRequest(query, queryOptions));
+  }
+
+  /// Runs the request and returns the text of the exceptions it fails with.
+  private String executeExpectingFailure(InstanceRequest instanceRequest) {
+    InstanceResponseBlock instanceResponse = execute(instanceRequest);
     assertFalse(instanceResponse.getExceptions().isEmpty(), "Expected the query to fail");
     return String.join("\n", instanceResponse.getExceptions().values());
   }
