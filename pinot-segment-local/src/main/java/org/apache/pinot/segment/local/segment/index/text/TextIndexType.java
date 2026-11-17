@@ -133,8 +133,17 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
             context.getFieldSpec().getName(), context.getCardinality(), dictionaryValues.length);
         // BaseSegmentCreator builds the dictionary from this same sorted array, so array offsets are dictionary ids.
         LuceneTextIndexCreator creator = new LuceneTextIndexCreator(context, indexConfig);
-        for (String value : dictionaryValues) {
-          creator.add(value);
+        try {
+          for (String value : dictionaryValues) {
+            creator.add(value);
+          }
+        } catch (Throwable t) {
+          try {
+            creator.abort();
+          } catch (Throwable cleanupFailure) {
+            t.addSuppressed(cleanupFailure);
+          }
+          throw t;
         }
         return creator;
       }

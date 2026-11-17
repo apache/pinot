@@ -188,8 +188,12 @@ public class LuceneTextIndexConfigReloadTest {
       handler.postUpdateIndicesCleanup(writer);
     }
 
+    // Simulate interruption after Lucene writes a commit but before preprocessing clears the marker.
+    File buildMarker = new File(segmentDir, TEST_COLUMN + ".text.inprogress");
+    FileUtils.touch(buildMarker);
     ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, loadingConfig);
     try {
+      assertFalse(buildMarker.exists());
       DataSource dataSource = segment.getDataSource(TEST_COLUMN);
       assertTrue(dataSource.getTextIndex().isBuildOnDictionary());
       assertEquals(dataSource.getTextIndex().getDictIds("programming", null).getCardinality(), TEST_DOCUMENTS.length);

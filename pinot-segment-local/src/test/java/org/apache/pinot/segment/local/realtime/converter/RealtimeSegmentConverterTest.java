@@ -45,13 +45,16 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
+import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCombined;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -65,6 +68,7 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
@@ -869,22 +873,26 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
   @DataProvider
   public Object[][] dictionaryTextConversionParams() {
     return new Object[][]{
-        {false, "none"}, {true, "none"}, {false, "native"}, {true, "native"}, {false, "legacy"}, {true, "legacy"}
+        {false, "none", true}, {true, "none", true}, {false, "native", true}, {true, "native", true},
+        {false, "legacy", true}, {true, "legacy", true}, {false, "native", false}, {false, "legacy", false}
     };
   }
 
   @Test(dataProvider = "dictionaryTextConversionParams")
-  public void testDictionaryBasedTextIndexConversion(boolean compacted, String rawValueConfig)
+  public void testDictionaryBasedTextIndexConversion(boolean compacted, String rawValueConfig,
+      boolean buildOnDictionary)
       throws Exception {
-    File tmpDir = new File(TMP_DIR, "dictionaryText_" + compacted + "_" + rawValueConfig);
-    Map<String, String> properties = new HashMap<>(Map.of(FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, "true",
+    File tmpDir = new File(TMP_DIR, "dictionaryText_" + compacted + "_" + rawValueConfig + "_" + buildOnDictionary);
+    Map<String, String> properties = new HashMap<>(Map.of(
+        FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, Boolean.toString(buildOnDictionary),
         FieldConfig.TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX, "true"));
     FieldConfig.Builder fieldConfig = new FieldConfig.Builder(STRING_COLUMN1)
         .withEncodingType(FieldConfig.EncodingType.DICTIONARY).withIndexTypes(List.of(FieldConfig.IndexType.TEXT))
         .withProperties(properties);
     if (rawValueConfig.equals("native")) {
       fieldConfig.withIndexTypes(List.of()).withProperties(null).withIndexes(JsonUtils.stringToJsonNode(
-          "{\"text\":{\"buildOnDictionary\":true,\"reuseMutableIndex\":true,\"rawValue\":\"n\"}}"));
+          "{\"text\":{\"buildOnDictionary\":" + buildOnDictionary
+              + ",\"reuseMutableIndex\":true,\"rawValue\":\"n\"}}"));
     } else if (rawValueConfig.equals("legacy")) {
       properties.put(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true");
       properties.put(FieldConfig.TEXT_INDEX_RAW_VALUE, "n");
@@ -937,10 +945,15 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       assertFalse(consumingIndex.isBuildOnDictionary());
       assertEquals(consumingIndex.getDocIds("alpha").toArray(), new int[]{1, 2, 4});
 
-      File outputDir = new File(tmpDir, "outputDir");
+      File outputDir = new File(new File(tmpDir, segmentName), "tmp-" + segmentName + "-0");
       new RealtimeSegmentConverter(mutableSegment, new SegmentZKPropsConfig(), outputDir.getAbsolutePath(), schema,
           tableConfig.getTableName(), tableConfig, segmentName, false).build(SegmentVersion.v3);
-      ImmutableSegment sealedSegment = ImmutableSegmentLoader.load(new File(outputDir, segmentName),
+      File segmentDir = new File(outputDir, segmentName);
+      if (!buildOnDictionary) {
+        assertPlaceholderTextIndexMigrationRejected(segmentDir, tableConfig, schema, rawValueConfig.equals("legacy"));
+        return;
+      }
+      ImmutableSegment sealedSegment = ImmutableSegmentLoader.load(segmentDir,
           new IndexLoadingConfig(tableConfig, schema), false);
       try {
         TextIndexReader sealedIndex = sealedSegment.getIndex(STRING_COLUMN1, StandardIndexes.text());
@@ -962,6 +975,56 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       }
     } finally {
       mutableSegment.destroy();
+    }
+  }
+
+  private static void assertPlaceholderTextIndexMigrationRejected(File segmentDir, TableConfig oldConfig, Schema schema,
+      boolean interrupted)
+      throws Exception {
+    File marker = new File(segmentDir, STRING_COLUMN1 + ".text.inprogress");
+    if (interrupted) {
+      // An interrupted reload can leave the old packed entry and an uncommitted replacement directory.
+      File versionDir = SegmentDirectoryPaths.segmentDirectoryFor(segmentDir, SegmentVersion.v3);
+      File luceneDirectory = SegmentDirectoryPaths.findTextIndexIndexFile(segmentDir, STRING_COLUMN1);
+      File combined =
+          new File(versionDir, STRING_COLUMN1 + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+      LuceneTextIndexCombined.combineLuceneIndexFiles(luceneDirectory, combined.getAbsolutePath(), versionDir,
+          STRING_COLUMN1);
+      try (SegmentDirectory directory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+          SegmentDirectory.Writer writer = directory.createWriter()) {
+        LoaderUtils.writeIndexToV3Format(writer, STRING_COLUMN1, combined, StandardIndexes.text());
+      }
+      FileUtils.deleteDirectory(luceneDirectory);
+      FileUtils.forceMkdir(luceneDirectory);
+      FileUtils.touch(marker);
+      oldConfig.setFieldConfigList(List.of(new FieldConfig.Builder(STRING_COLUMN1)
+          .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+          .withIndexes(JsonUtils.stringToJsonNode("{\"text\":{\"storeInSegmentFile\":true}}")).build()));
+    }
+    TableConfig newConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+        .setTimeColumnName(DATE_TIME_COLUMN).setFieldConfigList(List.of(new FieldConfig.Builder(STRING_COLUMN1)
+            .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+            .withIndexes(JsonUtils.stringToJsonNode("{\"text\":{\"buildOnDictionary\":true}}")).build())).build();
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(newConfig, schema);
+    // The new config no longer declares a placeholder, but that cannot restore data from the sealed segment.
+    IllegalStateException failure = expectThrows(IllegalStateException.class, () -> {
+      ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, loadingConfig);
+      segment.destroy();
+    });
+    assertTrue(failure.getMessage().contains("refresh or reingest"), failure.getMessage());
+    assertEquals(marker.exists(), interrupted);
+
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, new IndexLoadingConfig(oldConfig, schema),
+        false);
+    try {
+      Dictionary dictionary = segment.getDataSource(STRING_COLUMN1).getDictionary();
+      assertEquals(dictionary.length(), 1);
+      assertEquals(dictionary.getStringValue(0), "n");
+      TextIndexReader textIndex = segment.getIndex(STRING_COLUMN1, StandardIndexes.text());
+      assertFalse(textIndex.isBuildOnDictionary());
+      assertEquals(textIndex.getDocIds("alpha").toArray(), new int[]{1, 2, 4});
+    } finally {
+      segment.destroy();
     }
   }
 

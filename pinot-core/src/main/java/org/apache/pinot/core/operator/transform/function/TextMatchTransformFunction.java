@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -134,8 +135,9 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
         // A standalone dictionary can coexist with a raw forward index.
         if (_matchingRawValues == null) {
           _matchingRawValues = new ObjectOpenHashSet<>(matchingIds.getCardinality());
-          for (int dictId : matchingIds.toArray()) {
-            _matchingRawValues.add(_dictionary.getStringValue(dictId));
+          IntIterator iterator = matchingIds.getIntIterator();
+          while (iterator.hasNext()) {
+            _matchingRawValues.add(_dictionary.getStringValue(iterator.next()));
           }
         }
         String[] values = _columnArg.transformToStringValuesSV(valueBlock);

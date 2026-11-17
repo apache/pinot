@@ -25,7 +25,11 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.index.IndexNotFoundException;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -149,8 +153,10 @@ public class TextIndexHandler extends BaseIndexHandler {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (columnMetadata != null) {
         // An interrupted build can contain a readable partial commit, or no commit at all. Its marker takes
-        // precedence over compatibility probes and requires a full restart from the original values.
-        boolean recovery = isBuildInProgress(column) || isIncompatible(column, segmentWriter);
+        // precedence over compatibility probes and requires a full restart from the source values.
+        boolean interrupted = isBuildInProgress(column);
+        validateDictionaryMigrationSource(segmentWriter, column, interrupted);
+        boolean recovery = interrupted || isIncompatible(column, segmentWriter);
         if (recovery) {
           validateRecoverySource(segmentWriter, column);
         }
@@ -171,12 +177,16 @@ public class TextIndexHandler extends BaseIndexHandler {
     }
   }
 
-  /// Verify original source values before any preprocessing handler can remove or regenerate them.
+  /// Verify rebuild sources before any preprocessing handler can remove or regenerate them.
   public void validateRecoverySources(SegmentDirectory.Reader segmentReader)
-      throws IOException {
+      throws IOException, ConfigurationException {
     for (String column : getExistingColumns(segmentReader)) {
-      if (_columnsToAddIdx.contains(column)
-          && (isBuildInProgress(column) || isIncompatible(column, segmentReader))) {
+      if (!_columnsToAddIdx.contains(column)) {
+        continue;
+      }
+      boolean interrupted = isBuildInProgress(column);
+      validateDictionaryMigrationSource(segmentReader, column, interrupted);
+      if (interrupted || isIncompatible(column, segmentReader)) {
         validateRecoverySource(segmentReader, column);
       }
     }
@@ -201,10 +211,38 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   private void validateRecoverySource(SegmentDirectory.Reader segmentReader, String column) {
-    if (!segmentReader.hasIndexFor(column, StandardIndexes.forward())) {
+    if (_fieldIndexConfigs.get(column).getConfig(StandardIndexes.text()).isBuildOnDictionary()) {
+      if (!segmentReader.hasIndexFor(column, StandardIndexes.dictionary())) {
+        throw new IllegalStateException("Cannot rebuild Lucene text index for column: " + column
+            + ". Original dictionary must be retained; restore a compatible segment or refresh it from source data");
+      }
+    } else if (!segmentReader.hasIndexFor(column, StandardIndexes.forward())) {
       throw new IllegalStateException("Cannot rebuild Lucene text index for column: " + column
           + ". Original forward index must be retained; restore a compatible segment or refresh it from source data");
     }
+  }
+
+  private void validateDictionaryMigrationSource(SegmentDirectory.Reader segmentReader, String column,
+      boolean interrupted)
+      throws IOException, ConfigurationException {
+    TextIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.text());
+    if (!config.isBuildOnDictionary()) {
+      return;
+    }
+    ColumnMetadata metadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+    // Realtime text-index reuse could replace every stored value with a placeholder. The old rawValue and
+    // reuseMutableIndex settings are not persisted, so a singleton source for a per-row index is ambiguous.
+    if (metadata == null || metadata.getCardinality() != 1) {
+      return;
+    }
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+    if (LLCSegmentName.of(segmentName) == null
+        || !Boolean.FALSE.equals(getStoredTextIndexBuildMode(column, segmentReader, interrupted))) {
+      return;
+    }
+    throw new IllegalStateException("Cannot convert Lucene text index to buildOnDictionary for column: " + column
+        + " in segment: " + segmentName + ". The stored value may be a text index placeholder; "
+        + "refresh or reingest the segment from source data with buildOnDictionary enabled");
   }
 
   private File getBuildMarker(String column) {
@@ -432,31 +470,50 @@ public class TextIndexHandler extends BaseIndexHandler {
     if (currentConfig.isStoreInSegmentFile() != currentFormat) {
       return true;
     }
+    return currentConfig.isBuildOnDictionary()
+        != Boolean.TRUE.equals(getStoredTextIndexBuildMode(columnName, segmentReader, false));
+  }
 
-    boolean buildOnDictionary = false;
-    if (currentFormat) {
-      File combined = new File(segmentDirectory,
-          columnName + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
-      if (combined.exists()) {
-        try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(combined, true, 0, combined.length(),
-            ByteOrder.BIG_ENDIAN, "Lucene text build-mode check")) {
-          buildOnDictionary = TextIndexUtils.isBuildOnDictionary(
-              TextIndexUtils.readTextIndexProperties(buffer, columnName));
-        }
-      } else {
-        PinotDataBuffer buffer = segmentReader.getIndexFor(columnName, StandardIndexes.text());
-        buildOnDictionary = TextIndexUtils.isBuildOnDictionary(
-            TextIndexUtils.readTextIndexProperties(buffer, columnName));
-      }
-    } else {
+  /// Returns the persisted build mode, or null if no text index has been written yet.
+  @Nullable
+  private Boolean getStoredTextIndexBuildMode(String columnName, SegmentDirectory.Reader segmentReader,
+      boolean interrupted)
+      throws IOException, ConfigurationException {
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    SegmentVersion version = _segmentDirectory.getSegmentMetadata().getVersion();
+    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, version);
+    if (TextIndexUtils.hasTextIndex(segmentDirectory, columnName)) {
       File luceneDirectory = SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, columnName);
       File propertiesFile = new File(luceneDirectory, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
-      if (propertiesFile.exists()) {
-        buildOnDictionary = TextIndexUtils.isBuildOnDictionary(TextIndexUtils.readTextIndexProperties(propertiesFile));
+      boolean buildOnDictionary = propertiesFile.exists()
+          && TextIndexUtils.isBuildOnDictionary(TextIndexUtils.readTextIndexProperties(propertiesFile));
+      if (!interrupted || buildOnDictionary) {
+        return buildOnDictionary;
+      }
+      // A marker can coexist with the old committed per-row directory. If the directory has no commit, an older
+      // packed index can still survive because v3 persists index-map removals when the writer closes.
+      try {
+        LuceneIndexCompatibilityUtils.isIncompatible(luceneDirectory);
+        return false;
+      } catch (IndexNotFoundException ignored) {
+        // Look for an existing combined or packed index.
       }
     }
-    // Older segments without the property were always built per row.
-    return currentConfig.isBuildOnDictionary() != buildOnDictionary;
+    File combined = new File(segmentDirectory,
+        columnName + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+    if (combined.exists()) {
+      try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(combined, true, 0, combined.length(),
+          ByteOrder.BIG_ENDIAN, "Lucene text build-mode check")) {
+        return TextIndexUtils.isBuildOnDictionary(TextIndexUtils.readTextIndexProperties(buffer, columnName));
+      }
+    }
+    if (version != SegmentVersion.v3) {
+      // Older segment versions only store text in the directory or combined file checked above.
+      return null;
+    }
+    PinotDataBuffer buffer = TextIndexUtils.getConsolidatedTextEntry(segmentReader, columnName);
+    return buffer == null ? null
+        : TextIndexUtils.isBuildOnDictionary(TextIndexUtils.readTextIndexProperties(buffer, columnName));
   }
 
   /// Convert text index to V3 combined format by merging into columns.psf.

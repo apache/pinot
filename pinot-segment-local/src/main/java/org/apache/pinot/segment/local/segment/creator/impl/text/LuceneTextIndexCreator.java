@@ -40,6 +40,7 @@ import org.apache.lucene.index.LogByteSizeMergePolicy;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.NRTCachingDirectory;
+import org.apache.lucene.util.IOUtils;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.LuceneNRTCachingMergePolicy;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
@@ -438,6 +439,14 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       } catch (IOException e) {
         LOGGER.warn("Failed to delete Lucene text index mapping file: {}", docIdMappingFile.getAbsolutePath(), e);
       }
+    }
+  }
+
+  /// Discards an incomplete build without committing the writer or publishing a combined index file.
+  public void abort()
+      throws IOException {
+    if (!_reuseMutableIndex) {
+      IOUtils.close(_indexWriter::rollback, _indexDirectory);
     }
   }
 

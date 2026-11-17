@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.queries;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -135,13 +136,12 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
   }
 
   private TableConfig tableConfig(boolean buildOnDictionary, boolean storeInSegmentFile) {
-    Map<String, String> props = Map.of(
-        FieldConfig.TEXT_INDEX_BUILD_ON_DICTIONARY, Boolean.toString(buildOnDictionary),
-        "storeInSegmentFile", Boolean.toString(storeInSegmentFile));
     List<FieldConfig> fieldConfigs = List.of(
-        new FieldConfig(SV_COL, EncodingType.DICTIONARY, List.of(IndexType.TEXT), null, props),
-        new FieldConfig(MV_COL, EncodingType.DICTIONARY, List.of(IndexType.TEXT), null,
-            Map.of("storeInSegmentFile", Boolean.toString(storeInSegmentFile))));
+        new FieldConfig.Builder(SV_COL).withEncodingType(EncodingType.DICTIONARY).withIndexes(
+            JsonUtils.objectToJsonNode(Map.of("text",
+                Map.of("buildOnDictionary", buildOnDictionary, "storeInSegmentFile", storeInSegmentFile)))).build(),
+        new FieldConfig.Builder(MV_COL).withEncodingType(EncodingType.DICTIONARY).withIndexes(
+            JsonUtils.objectToJsonNode(Map.of("text", Map.of("storeInSegmentFile", storeInSegmentFile)))).build());
     TableConfig config =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setFieldConfigList(fieldConfigs).build();
     if (buildOnDictionary) {
@@ -374,14 +374,18 @@ public class DictionaryBasedTextIndexQueriesTest extends BaseQueriesTest {
 
     TableConfig rawForwardConfig = tableConfig(true, storeInSegmentFile);
     List<FieldConfig> fields = new ArrayList<>(rawForwardConfig.getFieldConfigList());
-    fields.set(0, new FieldConfig.Builder(fields.get(0)).withEncodingType(EncodingType.RAW).withIndexes(
-        JsonUtils.stringToJsonNode("{\"forward\":{\"encodingType\":\"RAW\"},\"dictionary\":{}}")).build());
+    ObjectNode indexes = fields.get(0).getIndexes().deepCopy();
+    indexes.putObject("forward").put("encodingType", EncodingType.RAW.name());
+    indexes.putObject("dictionary");
+    fields.set(0,
+        new FieldConfig.Builder(fields.get(0)).withEncodingType(EncodingType.RAW).withIndexes(indexes).build());
     rawForwardConfig.setFieldConfigList(fields);
     ImmutableSegment rawForward =
         ImmutableSegmentLoader.load(segmentDir, new IndexLoadingConfig(rawForwardConfig, SCHEMA));
     _indexSegment = rawForward;
     _indexSegments = List.of(rawForward);
     try {
+      assertTrue(rawForward.getDataSource(SV_COL).getTextIndex().isBuildOnDictionary());
       assertFalse(rawForward.getDataSource(SV_COL).getForwardIndex().isDictionaryEncoded());
       assertEquals(count("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SV_COL + ", 'apple')"),
           NUM_ROWS / SV_TOKENS.length);

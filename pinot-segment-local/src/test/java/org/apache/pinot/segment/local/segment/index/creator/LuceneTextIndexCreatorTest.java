@@ -42,6 +42,7 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.Lock;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCombined;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexBufferReader;
@@ -278,6 +279,31 @@ public class LuceneTextIndexCreatorTest {
         () -> StandardIndexes.text().createIndexCreator(context, config));
     assertEquals(exception.getMessage(),
         "Dictionary cardinality mismatch for TEXT index on column: dictionary: expected 3 values, got 2");
+  }
+
+  @Test
+  public void testDictionaryTextIndexRollsBackFailedPopulation()
+      throws IOException {
+    String column = "dictionary";
+    ColumnStatistics statistics = mock(ColumnStatistics.class);
+    when(statistics.getUniqueValuesSet()).thenReturn(new String[]{"alpha", null});
+    IndexCreationContext context = mock(IndexCreationContext.class);
+    when(context.getFieldSpec()).thenReturn(new DimensionFieldSpec(column, DataType.STRING, true));
+    when(context.hasDictionary()).thenReturn(true);
+    when(context.getColumnStatistics()).thenReturn(statistics);
+    when(context.getCardinality()).thenReturn(2);
+    when(context.getIndexDir()).thenReturn(INDEX_DIR);
+    when(context.isTextCommitOnClose()).thenReturn(true);
+    TextIndexConfig config =
+        new TextIndexConfigBuilder().setStoreInSegmentFile(true).withBuildOnDictionary(true).build();
+    expectThrows(IllegalArgumentException.class, () -> StandardIndexes.text().createIndexCreator(context, config));
+    assertFalse(new File(INDEX_DIR, column + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION).exists());
+    File indexDir = new File(INDEX_DIR, column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
+    try (Directory directory = FSDirectory.open(indexDir.toPath());
+        Lock lock = directory.obtainLock(IndexWriter.WRITE_LOCK_NAME)) {
+      lock.ensureValid();
+      assertFalse(DirectoryReader.indexExists(directory));
+    }
   }
 
   @Test(dataProvider = "dictionaryMappingModes")
