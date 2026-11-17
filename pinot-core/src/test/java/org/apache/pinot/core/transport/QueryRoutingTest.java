@@ -54,6 +54,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -77,6 +78,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
 import org.apache.thrift.TDeserializer;
@@ -113,6 +115,8 @@ public class QueryRoutingTest {
   public void setUp() {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    // Keep the latency average stable between taking its snapshot and checking the update.
+    properties.put(AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, 0L);
     PinotConfiguration cfg = new PinotConfiguration(properties);
     _serverRoutingStatsManager = new ServerRoutingStatsManager(cfg, mock(BrokerMetrics.class));
     _serverRoutingStatsManager.init();
@@ -378,20 +382,7 @@ public class QueryRoutingTest {
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
-    Double latencyAfter = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
-
-    if (latencyBefore == null) {
-      // This means that no queries were run before this test. So we can just make sure that latencyAfter is equal to
-      //666.334.
-      // This corresponds to the EWMA value when a latency timeout value of 1000 is set. Latency set to timeout value
-      //when server side exception occurs.
-      double serverEWMALatency = 666.334;
-      // Leaving an error budget of 2%
-      double delta = 13.32;
-      assertEquals(latencyAfter, serverEWMALatency, delta);
-    } else {
-      assertTrue(latencyAfter > latencyBefore, latencyAfter + " should be greater than " + latencyBefore);
-    }
+    assertLatencyUpdate(serverId, latencyBefore, 1_000L);
   }
 
   @Test
@@ -419,17 +410,7 @@ public class QueryRoutingTest {
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
-
-    Double latencyAfter = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
-
-    if (latencyBefore == null) {
-      // Latency for the server with client side exception is assigned as serverResponse.getResponseDelayMs() and the
-      //calculated
-      // EWMLatency for the server will be less than serverResponse.getResponseDelayMs()
-      assertTrue(latencyAfter <= serverResponse.getResponseDelayMs());
-    } else {
-      assertTrue(latencyAfter < latencyBefore, latencyAfter + " should be lesser than " + latencyBefore);
-    }
+    assertLatencyUpdate(serverId, latencyBefore, serverResponse.getResponseDelayMs());
   }
 
   @Test
@@ -457,19 +438,7 @@ public class QueryRoutingTest {
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
-    Double latencyAfter = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
-
-    if (latencyBefore == null) {
-      // This means that no queries where run before this test. So we can just make sure that latencyAfter is equal
-      //to 666.334.
-      // This corresponds to the EWMA value when a latency timeout value of 1000 is set.
-      double serverEWMALatency = 666.334;
-      // Leaving an error budget of 2%
-      double delta = 13.32;
-      assertEquals(latencyAfter, serverEWMALatency, delta);
-    } else {
-      assertTrue(latencyAfter > latencyBefore, latencyAfter + " should be greater than " + latencyBefore);
-    }
+    assertLatencyUpdate(serverId, latencyBefore, 1_000L);
   }
 
   @Test
@@ -495,15 +464,20 @@ public class QueryRoutingTest {
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
-    Double latencyAfter = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+    assertLatencyUpdate(serverId, latencyBefore, serverResponse.getResponseDelayMs());
+  }
 
-    if (latencyBefore == null) {
-      // Latency for the server with no exceptions is assigned as serverResponse.getResponseDelayMs() and the calculated
-      // EWMLatency for the server will be less than serverResponse.getResponseDelayMs()
-      assertTrue(latencyAfter <= serverResponse.getResponseDelayMs());
-    } else {
-      assertTrue(latencyAfter < latencyBefore, latencyAfter + " should be lesser than " + latencyBefore);
-    }
+  private void assertLatencyUpdate(String serverId, @Nullable Double latencyBefore, long latencyMs) {
+    double previousAverage =
+        latencyBefore != null ? latencyBefore : AdaptiveServerSelector.DEFAULT_AVG_INITIALIZATION_VAL;
+    double alpha = AdaptiveServerSelector.DEFAULT_EWMA_ALPHA;
+    // Even a zero-millisecond response retains a contribution from the previous average.
+    double expectedAverage = latencyMs * alpha + previousAverage * (1 - alpha);
+    Double latencyAfter = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+    assertNotNull(latencyAfter, "No latency recorded for server " + serverId);
+    assertEquals(latencyAfter.doubleValue(), expectedAverage, 1e-6,
+        "Unexpected latency EWMA for server " + serverId + ": previous average=" + previousAverage + ", sample="
+            + latencyMs + "ms");
   }
 
   @Test
