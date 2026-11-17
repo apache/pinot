@@ -78,7 +78,6 @@ Run the standalone readiness regression tests without building Pinot:
 
 ```shell
 python3 compatibility-verifier/test_server_readiness.py
-python3 compatibility-verifier/test_server_startup.py
 ```
 
 ## T-digest accuracy baseline
