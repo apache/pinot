@@ -53,7 +53,12 @@ public class QueryServerTestUtils {
   /// Same as [#newQueryServer(Function)], on a given port -- for a test that brings a server back where it was.
   public static QueryServer newQueryServer(int port,
       Function<ServerQueryRequest, ListenableFuture<DataBuffer>> responder) {
-    PinotConfiguration config = new PinotConfiguration();
+    return newQueryServer(port, new PinotConfiguration(), responder);
+  }
+
+  /// Same as [#newQueryServer(int, Function)], with the given server config.
+  public static QueryServer newQueryServer(int port, PinotConfiguration config,
+      Function<ServerQueryRequest, ListenableFuture<DataBuffer>> responder) {
     // A subclass, not a mock: the scheduler sends both submit methods to the one overridden here, so the server gets
     // this answer whichever one it calls. A mock would answer null from the one not stubbed.
     QueryScheduler queryScheduler = new QueryScheduler(config, "testServer", mock(QueryExecutor.class),

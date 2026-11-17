@@ -21,24 +21,26 @@ package org.apache.pinot.segment.spi.memory;
 import java.nio.ByteBuffer;
 
 
-/// Bulk reads of primitive arrays from a [ByteBuffer] through its typed views, and the threshold below which one
-/// access per value beats a view. The class is stateless and thread-safe.
+/// Bulk reads of primitive arrays from a [ByteBuffer] through its typed views. The class is stateless and thread-safe.
+///
+/// On a little-endian CPU, a copy through a big-endian view (`asIntBuffer().get(int[])` and the like) swaps the bytes
+/// in a native call with a fixed cost of 20 to 40 ns, so a short read gets one value at a time instead. With JMH on
+/// JDK 25.0.5, reading from heap and direct buffers held in a field (as a deserializer gets them), the view was
+/// 1 to 16% faster than one value at a time at 96 longs or doubles on Intel Xeon 6973P-C, AMD EPYC 7763 and
+/// Neoverse N2 machines, and 39 to 46% slower on an Apple M3 Max, where it caught up at about 160. For ints and
+/// floats, one value at a time took several times as long in some JVM launches as in others on those three machines,
+/// so no threshold suits every launch; on the M3 the view caught up at 96 to 128.
 public final class PrimitiveArrays {
   private PrimitiveArrays() {
   }
 
-  // TODO: Retune this threshold. JMH runs on aarch64 (Apple M3 Max, JDK 25) put the crossover at about 110-200 values
-  //   for reads, 300-500 for int writes and beyond 4096 for double writes, so a single threshold may not fit them all.
-  /// Below this number of values, reads and writes through a big-endian typed view (`asIntBuffer().get(int[])` and
-  /// the like) are slower than one access per value. On a little-endian CPU the bulk copy swaps the bytes in a native
-  /// call with a fixed cost of about 10-40 ns, while a single-value access compiles to an inlined byte swap. Measured
-  /// with BenchmarkPrimitiveListDeserialize and BenchmarkPagedPinotOutputStream on aarch64 and x86_64.
-  public static final int MIN_BULK_VALUES = 64;
+  /// The `read*` methods read at least this many values through a typed view, and fewer one at a time.
+  public static final int MIN_BULK_READ_VALUES = 96;
 
   /// Reads `length` ints from the current position of `buffer`, in its byte order, into `values` from `offset`,
   /// and advances the position past them.
   public static void readInts(ByteBuffer buffer, int[] values, int offset, int length) {
-    if (length < MIN_BULK_VALUES) {
+    if (length < MIN_BULK_READ_VALUES) {
       for (int i = offset; i < offset + length; i++) {
         values[i] = buffer.getInt();
       }
@@ -51,7 +53,7 @@ public final class PrimitiveArrays {
   /// Reads `length` longs from the current position of `buffer`, in its byte order, into `values` from `offset`,
   /// and advances the position past them.
   public static void readLongs(ByteBuffer buffer, long[] values, int offset, int length) {
-    if (length < MIN_BULK_VALUES) {
+    if (length < MIN_BULK_READ_VALUES) {
       for (int i = offset; i < offset + length; i++) {
         values[i] = buffer.getLong();
       }
@@ -64,7 +66,7 @@ public final class PrimitiveArrays {
   /// Reads `length` floats from the current position of `buffer`, in its byte order, into `values` from `offset`,
   /// and advances the position past them.
   public static void readFloats(ByteBuffer buffer, float[] values, int offset, int length) {
-    if (length < MIN_BULK_VALUES) {
+    if (length < MIN_BULK_READ_VALUES) {
       for (int i = offset; i < offset + length; i++) {
         values[i] = buffer.getFloat();
       }
@@ -77,7 +79,7 @@ public final class PrimitiveArrays {
   /// Reads `length` doubles from the current position of `buffer`, in its byte order, into `values` from `offset`,
   /// and advances the position past them.
   public static void readDoubles(ByteBuffer buffer, double[] values, int offset, int length) {
-    if (length < MIN_BULK_VALUES) {
+    if (length < MIN_BULK_READ_VALUES) {
       for (int i = offset; i < offset + length; i++) {
         values[i] = buffer.getDouble();
       }

@@ -20,24 +20,32 @@ package org.apache.pinot.core.query.executor;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -97,6 +105,24 @@ import org.slf4j.LoggerFactory;
 
 @ThreadSafe
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
+  /// The response stats that a query with a row-level security filter does not return. See [#hideTableLayoutStats].
+  private static final List<MetadataKey> TABLE_LAYOUT_STATS = List.of(MetadataKey.TOTAL_DOCS,
+      MetadataKey.NUM_SEGMENTS_QUERIED, MetadataKey.NUM_SEGMENTS_PROCESSED, MetadataKey.NUM_SEGMENTS_MATCHED,
+      MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED, MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED,
+      MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED, MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
+      MetadataKey.NUM_SEGMENTS_PRUNED_INVALID, MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT,
+      MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
+  /// The table expression overrides for the RLS filter, parsed once per table config instead of once per query. An
+  /// empty map means that the table config has no override. The weak keys compare table configs by identity, so a
+  /// refreshed table config gets a new entry and the replaced one can be garbage collected. Queries share the cached
+  /// maps, so they are unmodifiable.
+  private static final LoadingCache<TableConfig, Map<Expression, Expression>> ROW_FILTER_EXPRESSION_OVERRIDE_MAPS =
+      CacheBuilder.newBuilder().weakKeys().build(CacheLoader.from(tableConfig -> {
+        Map<Expression, Expression> expressionOverrideMap =
+            TableCache.createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
+        return expressionOverrideMap != null ? Collections.unmodifiableMap(expressionOverrideMap) : Map.of();
+      }));
+
   public static final String ENABLE_PREFETCH = "enable.prefetch";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
@@ -292,6 +318,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     InstanceResponseBlock instanceResponse = null;
     try {
+      if (queryContext.getRowFilterExpression() != null && executionInfo instanceof SingleTableExecutionInfo
+          && !QueryOptionsUtils.isUseMultistageEngine(queryContext.getQueryOptions())) {
+        // SSE brokers apply physical table overrides to WHERE. Resolve the same map locally for the independent
+        // RLS policy, including requests from an older broker. MSE does not apply these table overrides to WHERE.
+        TableConfig tableConfig = ((SingleTableExecutionInfo) executionInfo).getTableDataManager()
+            .getCachedTableConfigAndSchema().getLeft();
+        queryContext.setRowFilterExpressionOverrideMap(getRowFilterExpressionOverrideMap(tableConfig));
+      }
       instanceResponse = executeInternal(executionInfo, queryContext, timerContext, executorService, streamer,
           queryRequest.isEnableStreaming(), planMakerOverride);
     } catch (Exception e) {
@@ -366,8 +400,38 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           consumingSegmentsInfo.getNumConsumingSegmentsQueried(), minConsumingFreshnessTimeMs);
     }
 
+    if (queryContext.getRowFilter() != null) {
+      hideTableLayoutStats(instanceResponse);
+      addRowFilterEntriesScanned(instanceResponse, queryContext.getRowFilterNumEntriesScanned());
+      _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.RLS_FILTER_TIME_MS,
+          queryContext.getRowFilterTimeNs(), TimeUnit.NANOSECONDS);
+    }
+
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     return instanceResponse;
+  }
+
+  /// Under row-level security, removes from the response the stats that show the layout of the whole table: the total
+  /// number of documents, and the number of segments queried, processed, matched and pruned. A table that holds only
+  /// the rows of the tenant has a different layout, so these values cannot be emulated. The server query log and
+  /// metrics still read them, see [InstanceResponseBlock#getServerMetadata()].
+  private static void hideTableLayoutStats(InstanceResponseBlock instanceResponse) {
+    for (MetadataKey key : TABLE_LAYOUT_STATS) {
+      instanceResponse.hideMetadata(key.getName());
+    }
+  }
+
+  /// Under row-level security, the response does not count the entries scanned to build the RLS bitmap (see
+  /// `RowLevelSecurityFilterOperator`). Adds them to the `numEntriesScannedInFilter` that the server query log and
+  /// metrics read.
+  private static void addRowFilterEntriesScanned(InstanceResponseBlock instanceResponse, long numEntriesScanned) {
+    if (numEntriesScanned == 0) {
+      return;
+    }
+    String key = MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER.getName();
+    String responseValue = instanceResponse.getResponseMetadata().get(key);
+    long numEntriesScannedInFilter = (responseValue != null ? Long.parseLong(responseValue) : 0) + numEntriesScanned;
+    instanceResponse.putServerOnlyMetadata(key, Long.toString(numEntriesScannedInFilter));
   }
 
   // NOTE: This method might change indexSegments. Do not use it after calling this method.
@@ -453,6 +517,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     return operatorDepthToRowDataMap;
+  }
+
+  /// Returns the table expression overrides to apply to the RLS filter, or `null` if the table config has none.
+  @VisibleForTesting
+  @Nullable
+  static Map<Expression, Expression> getRowFilterExpressionOverrideMap(TableConfig tableConfig) {
+    Map<Expression, Expression> expressionOverrideMap = ROW_FILTER_EXPRESSION_OVERRIDE_MAPS.getUnchecked(tableConfig);
+    return expressionOverrideMap.isEmpty() ? null : expressionOverrideMap;
   }
 
   @VisibleForTesting

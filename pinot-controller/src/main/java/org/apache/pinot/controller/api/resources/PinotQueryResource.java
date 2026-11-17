@@ -710,12 +710,23 @@ public class PinotQueryResource {
         throw QueryErrorCode.SQL_PARSING.asException(e);
       }
     }
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    TableCache tableCache = _pinotHelixResourceManager.getTableCache();
+    String logicalTableName = tableCache.getActualLogicalTableName(tableName);
+    LogicalTableConfig logicalTableConfig =
+        logicalTableName != null ? tableCache.getLogicalTableConfig(logicalTableName) : null;
+    String rawTableName = TableNameBuilder.extractRawTableName(
+        logicalTableConfig != null ? logicalTableName : tableName);
 
-    // Validate data access
+    // Authorize every physical table of a logical query, matching the broker's table-level check.
+    Set<String> tablesToAuthorize = logicalTableConfig != null
+        ? logicalTableConfig.getPhysicalTableConfigMap().keySet()
+        : Set.of(rawTableName);
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
-      throw QueryErrorCode.ACCESS_DENIED.asException();
+    for (String tableToAuthorize : tablesToAuthorize) {
+      if (!accessControl.hasAccess(TableNameBuilder.extractRawTableName(tableToAuthorize), AccessType.READ,
+          httpHeaders, Actions.Table.QUERY)) {
+        throw QueryErrorCode.ACCESS_DENIED.asException();
+      }
     }
 
     // Get brokers for the resource table.

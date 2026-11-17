@@ -56,13 +56,28 @@ class SetMergeStrategy implements MergeStrategy<List<Set>> {
 
   @Override
   public List<Set> merge(List<Set> intermediateResult1, List<Set> intermediateResult2) {
-    // TODO: Fix merging typed step sets into empty ones. A segment without rows contributes empty `ObjectOpenHashSet`s.
-    //   When those are the first operand, the int, long, float or double values of the other side are boxed into
-    //   them, `setType` maps the result to the string set type, and serialization throws `ClassCastException`.
+    // A segment without rows contributes empty string sets whatever the stored type of the correlation column. Take the
+    // other side as a whole when one side has no values, so that the step sets of one list keep a single set type.
+    if (hasNoValues(intermediateResult2)) {
+      return intermediateResult1;
+    }
+    if (hasNoValues(intermediateResult1)) {
+      return intermediateResult2;
+    }
     for (int i = 0; i < _numSteps; i++) {
       intermediateResult1.get(i).addAll(intermediateResult2.get(i));
     }
     return intermediateResult1;
+  }
+
+  /// Returns whether all step sets are empty, as they are for a segment without rows.
+  private static boolean hasNoValues(List<Set> stepsSets) {
+    for (Set stepSet : stepsSets) {
+      if (!stepSet.isEmpty()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
