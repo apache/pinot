@@ -42,6 +42,50 @@ public class SparseKeyDataSourceTest {
       "{\"other\":1}",
   };
 
+  /// One value per document for a key that a sample declared numeric, as later files can hold: only values that fit
+  /// the declared type are present; text, fractions in an integral key, objects and arrays read as absent, never as
+  /// the 0 or 1 a lenient JSON conversion produces.
+  private static final String[] MIXED = {
+      "{\"k\":5}", "{\"k\":\"abc\"}", "{\"k\":1.5}", "{\"k\":2.0}", "{\"k\":\"7\"}", "{\"k\":{\"x\":1}}",
+      "{\"k\":true}", "{\"k\":[1,2]}", "{\"k\":9223372036854775807}",
+  };
+
+  private static SparseKeyDataSource mixed(DataType declaredType) {
+    OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
+        new FakeStringForwardIndex(MIXED), FakeStringForwardIndex.nullVector(MIXED), MIXED.length);
+    return new SparseKeyDataSource(new DimensionFieldSpec("k", declaredType, true), blob, 0);
+  }
+
+  @Test
+  public void testDeclaredNumericKeyReadsOnlyValuesThatFit() {
+    SparseKeyDataSource longs = mixed(DataType.LONG);
+    ForwardIndexReader<?> fwd = longs.getForwardIndex();
+    long absent = (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG;
+    long[] expected = {5, absent, absent, 2, 7, absent, absent, absent, Long.MAX_VALUE};
+    for (int doc = 0; doc < MIXED.length; doc++) {
+      assertEquals(fwd.getLong(doc, null), expected[doc], MIXED[doc]);
+      assertEquals(longs.getNullValueVector().isNull(doc), expected[doc] == absent, MIXED[doc]);
+    }
+
+    SparseKeyDataSource doubles = mixed(DataType.DOUBLE);
+    assertEquals(doubles.getForwardIndex().getDouble(2, null), 1.5);
+    assertEquals(doubles.getForwardIndex().getDouble(4, null), 7.0);
+    assertTrue(doubles.getNullValueVector().isNull(1));
+    assertTrue(doubles.getNullValueVector().isNull(5));
+    assertFalse(doubles.getNullValueVector().isNull(2));
+
+    SparseKeyDataSource booleans = mixed(DataType.BOOLEAN);
+    assertEquals(booleans.getForwardIndex().getInt(6, null), 1);
+    assertTrue(booleans.getNullValueVector().isNull(0));
+    assertFalse(booleans.getNullValueVector().isNull(6));
+
+    // STRING still takes every value.
+    SparseKeyDataSource strings = mixed(DataType.STRING);
+    for (int doc = 0; doc < MIXED.length; doc++) {
+      assertFalse(strings.getNullValueVector().isNull(doc), MIXED[doc]);
+    }
+  }
+
   private static SparseKeyDataSource source(String key, DataType declaredType) {
     OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
         new FakeStringForwardIndex(BLOBS), FakeStringForwardIndex.nullVector(BLOBS), BLOBS.length);

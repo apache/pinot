@@ -58,7 +58,7 @@ public class SparseKeyDataSource extends BaseDataSource {
             StandardIndexes.forward(),
             new SparseKeyForwardIndexReader(resolvedChildSpec, blobReader),
             StandardIndexes.nullValueVector(),
-            new LazyPresenceNullVector(resolvedChildSpec.getName(), blobReader))));
+            new LazyPresenceNullVector(resolvedChildSpec, blobReader))));
     _fieldSpec = resolvedChildSpec;
   }
 
@@ -76,9 +76,10 @@ public class SparseKeyDataSource extends BaseDataSource {
     /// predicate names it -- so the two must agree, or a NOT_IN over a declared default can take the fast path and
     /// miss the documents that lack the key.
     private final Object _declaredDefault;
+    private final DataType _dataType;
 
     SparseKeyForwardIndexReader(FieldSpec fieldSpec, OpenStructSparseBlobReader blob) {
-      this(fieldSpec.getName(), fieldSpec.getDataType().getStoredType(), fieldSpec.isSingleValueField(), blob,
+      this(fieldSpec.getName(), fieldSpec.getDataType(), fieldSpec.isSingleValueField(), blob,
           fieldSpec.getDefaultNullValue());
     }
 
@@ -86,11 +87,12 @@ public class SparseKeyDataSource extends BaseDataSource {
       this(key, storedType, true, blob, null);
     }
 
-    private SparseKeyForwardIndexReader(String key, DataType storedType, boolean singleValue,
+    private SparseKeyForwardIndexReader(String key, DataType dataType, boolean singleValue,
         OpenStructSparseBlobReader blob, @Nullable Object declaredDefault) {
       _declaredDefault = declaredDefault;
       _key = key;
-      _storedType = storedType;
+      _dataType = dataType;
+      _storedType = dataType.getStoredType();
       _singleValue = singleValue;
       _blob = blob;
     }
@@ -118,7 +120,7 @@ public class SparseKeyDataSource extends BaseDataSource {
     @Nullable
     private JsonNode valueNode(int docId, ForwardIndexReaderContext context) {
       JsonNode node = _blob.getValue(docId, _key, context);
-      return node == null || node.isNull() ? null : node;
+      return node == null || node.isNull() || (_singleValue && !accepts(_dataType, node)) ? null : node;
     }
 
     private <T> T orDefault(int docId, ForwardIndexReaderContext context, Function<JsonNode, T> map, T defaultValue) {
@@ -135,8 +137,14 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public int getInt(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, JsonNode::asInt,
+      return orDefault(docId, context,
+          _dataType == DataType.BOOLEAN ? SparseKeyForwardIndexReader::booleanAsInt : JsonNode::asInt,
           declaredOr(Integer.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT));
+    }
+
+    /// BOOLEAN is stored as INT; Jackson's `asInt()` reads the text `"true"` as 0, so map booleans explicitly.
+    private static int booleanAsInt(JsonNode node) {
+      return (node.isBoolean() ? node.booleanValue() : "true".equalsIgnoreCase(node.asText().trim())) ? 1 : 0;
     }
 
     @Override
@@ -374,13 +382,64 @@ public class SparseKeyDataSource extends BaseDataSource {
     }
   }
 
+  /// Whether a single value fits `dataType` without losing its meaning. A value that does not -- text in a numeric
+  /// key, a fraction in an integral key, an object or array in a scalar key -- reads as absent (null, or the
+  /// default with null handling off) rather than as the `0` or `1` a lenient JSON conversion would invent, and the
+  /// null vector agrees. STRING, JSON and BYTES keys take any value.
+  static boolean accepts(DataType dataType, JsonNode node) {
+    switch (dataType) {
+      case INT:
+        return node.isIntegralNumber() ? node.canConvertToInt() : isWhole(node) ? fitsInt(node.doubleValue())
+            : node.isTextual() && parses(node.textValue(), Integer::parseInt);
+      case LONG:
+      case TIMESTAMP:
+        return node.isIntegralNumber() ? node.canConvertToLong() : isWhole(node) ? node.canConvertToLong()
+            : node.isTextual() && parses(node.textValue(), Long::parseLong);
+      case FLOAT:
+      case DOUBLE:
+        return node.isNumber() || (node.isTextual() && parses(node.textValue(), Double::parseDouble));
+      case BIG_DECIMAL:
+        return node.isNumber() || (node.isTextual() && parses(node.textValue(), BigDecimal::new));
+      case BOOLEAN:
+        return node.isBoolean() || (node.isTextual()
+            && ("true".equalsIgnoreCase(node.textValue()) || "false".equalsIgnoreCase(node.textValue())));
+      default:
+        return true;
+    }
+  }
+
+  private static boolean isWhole(JsonNode node) {
+    if (!node.isFloatingPointNumber()) {
+      return false;
+    }
+    double value = node.doubleValue();
+    return !Double.isInfinite(value) && value == Math.rint(value);
+  }
+
+  private static boolean fitsInt(double value) {
+    return value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE;
+  }
+
+  private static boolean parses(String text, Function<String, ?> parser) {
+    try {
+      parser.apply(text.trim());
+      return true;
+    } catch (RuntimeException e) {
+      return false;
+    }
+  }
+
   static class LazyPresenceNullVector implements NullValueVectorReader {
     private final String _key;
+    private final DataType _dataType;
+    private final boolean _singleValue;
     private final OpenStructSparseBlobReader _blob;
     private volatile ImmutableRoaringBitmap _nullBitmap;
 
-    LazyPresenceNullVector(String key, OpenStructSparseBlobReader blob) {
-      _key = key;
+    LazyPresenceNullVector(FieldSpec fieldSpec, OpenStructSparseBlobReader blob) {
+      _key = fieldSpec.getName();
+      _dataType = fieldSpec.getDataType();
+      _singleValue = fieldSpec.isSingleValueField();
       _blob = blob;
     }
 
@@ -388,7 +447,9 @@ public class SparseKeyDataSource extends BaseDataSource {
     public ImmutableRoaringBitmap getNullBitmap() {
       ImmutableRoaringBitmap bm = _nullBitmap;
       if (bm == null) {
-        ImmutableRoaringBitmap presence = _blob.computePresence(_key);
+        ImmutableRoaringBitmap presence = _singleValue
+            ? _blob.computePresence(_key, node -> accepts(_dataType, node))
+            : _blob.computePresence(_key);
         MutableRoaringBitmap nulls = new MutableRoaringBitmap();
         nulls.add(0L, _blob.getNumDocs());
         nulls.andNot(presence);

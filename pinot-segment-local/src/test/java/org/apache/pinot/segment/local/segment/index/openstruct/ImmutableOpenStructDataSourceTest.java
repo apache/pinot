@@ -322,28 +322,6 @@ public class ImmutableOpenStructDataSourceTest {
     return ds;
   }
 
-  /// The sparse manifest lists the keys a document carries, so a nested path such as `o.z` is never listed itself;
-  /// its leading key `o` is. A path under a listed key must reach the sparse blob, which walks it.
-  @Test
-  public void testDottedKeyUnderManifestKeyGetsSparseDataSource() {
-    String[] blobs = {"{\"o\":{\"z\":2},\"n\":5}", "{\"o\":{}}"};
-    ComplexFieldSpec spec = new ComplexFieldSpec("event", DataType.OPEN_STRUCT, true,
-        Map.of("o.z", new DimensionFieldSpec("o.z", DataType.INT, true)));
-
-    ImmutableOpenStructDataSource ds = new ImmutableOpenStructDataSource(spec, Map.of(),
-        mockSparseDataSource(blobs), blobs.length, List.of("o", "n"), null, null);
-
-    DataSource pathDs = ds.getDataSource("o.z");
-    assertTrue(pathDs instanceof SparseKeyDataSource);
-    // The declared child type is applied to the walked value.
-    assertEquals(pathDs.getDataSourceMetadata().getDataType(), DataType.INT);
-    assertEquals(pathDs.getForwardIndex().getInt(0, null), 2);
-    assertTrue(pathDs.getNullValueVector().isNull(1));
-    // No listed key leads the path: still definitively absent.
-    assertTrue(ds.getDataSource("nope.z") instanceof NullDataSource);
-    assertTrue(ds.getDataSource("o") instanceof SparseKeyDataSource);
-  }
-
   @Test
   public void testManifestKeyGetsVirtualSparseDataSource() {
     String[] blobs = {"{\"region\":\"us\"}", null};

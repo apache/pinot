@@ -43,7 +43,6 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -125,25 +124,12 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     if (ds != null) {
       return ds;
     }
-    if (_sparseBlobReader == null || (_sparseKeys != null && !_sparseKeys.contains(key)
-        && !hasListedPathPrefix(key))) {
-      // Definitively absent: no sparse blob, or the sparse manifest lists neither the key nor a key it is a path under
+    if (_sparseBlobReader == null || (_sparseKeys != null && !_sparseKeys.contains(key))) {
+      // Definitively absent: no sparse blob, or the sparse manifest does not list the key
       return new NullDataSource(getValueFieldSpec(key), getDataSourceMetadata().getNumDocs());
     }
     return _sparseKeyDataSourceCache.computeIfAbsent(key,
         k -> new SparseKeyDataSource(getValueFieldSpec(k), _sparseBlobReader, maxNumValues(k)));
-  }
-
-  /// Whether a dotted `key` lies under a key the sparse manifest lists, e.g. `o.z` under `o`. The manifest names the
-  /// keys documents carry, never the nested paths below them, and the sparse blob reader walks such a path.
-  private boolean hasListedPathPrefix(String key) {
-    for (int i = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR); i > 0;
-        i = key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR, i + 1)) {
-      if (_sparseKeys.contains(key.substring(0, i))) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /// Field spec for a key's values, with an undeclared sparse key's shape and type taken from the segment's

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -69,7 +70,10 @@ public class OpenStructSparseBlobReader {
   /// - a key the object carries literally wins at every level (`.` is an ordinary key character);
   /// - otherwise the key is walked through nested objects, taking the first match in document order when two
   ///   synthesized paths collide, as the flattener's first emission does;
-  /// - arrays are never indexed into, and a missing, null or scalar intermediate, or an empty segment, is absent.
+  /// - arrays are never indexed into, and a missing, null or scalar intermediate is absent;
+  /// - empty key segments are allowed, as the flattener emits them (`{"o": {"": 1}}` keys `o.` to `1`);
+  /// - unlike a flattened column, the walk has no depth limit. Native segments store a nested object that was not
+  ///   flattened as JSON text, which this does not parse, so the walk serves sparse blobs that hold real objects.
   @Nullable
   static JsonNode resolve(JsonNode node, String key) {
     JsonNode literal = node.get(key);
@@ -79,7 +83,7 @@ public class OpenStructSparseBlobReader {
     for (Map.Entry<String, JsonNode> field : node.properties()) {
       String name = field.getKey();
       JsonNode child = field.getValue();
-      if (child.isObject() && !name.isEmpty() && key.length() > name.length() + 1 && key.startsWith(name)
+      if (child.isObject() && key.length() > name.length() && key.startsWith(name)
           && key.charAt(name.length()) == OpenStructKeyFlattener.PATH_SEPARATOR) {
         JsonNode found = resolve(child, key.substring(name.length() + 1));
         if (found != null) {
@@ -108,13 +112,18 @@ public class OpenStructSparseBlobReader {
 
   /// Full scan for docs where `key` is present (explicit JSON null = absent). Callers memoize.
   public ImmutableRoaringBitmap computePresence(String key) {
+    return computePresence(key, node -> true);
+  }
+
+  /// Full scan for docs where `key` holds a non-null value that `accept` takes. Callers memoize.
+  public ImmutableRoaringBitmap computePresence(String key, Predicate<JsonNode> accept) {
     // TODO: the opt-in sparse JSON index already encodes this; deriving presence from it needs a
     // handle on the index, which only ImmutableOpenStructDataSource has.
     MutableRoaringBitmap present = new MutableRoaringBitmap();
     try (ForwardIndexReaderContext context = createBlobContext()) {
       for (int docId = 0; docId < _numDocs; docId++) {
         JsonNode val = getValue(docId, key, context);
-        if (val != null && !val.isNull()) {
+        if (val != null && !val.isNull() && accept.test(val)) {
           present.add(docId);
         }
       }
