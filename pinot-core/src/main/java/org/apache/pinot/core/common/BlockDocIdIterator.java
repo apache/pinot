@@ -45,7 +45,8 @@ public interface BlockDocIdIterator extends AutoCloseable {
   ///
   /// The default implementation preserves scalar iteration for existing implementations.
   default int nextBatch(int[] output, int maxDocs) {
-    checkArgument(maxDocs > 0 && maxDocs <= output.length);
+    checkArgument(maxDocs > 0 && maxDocs <= output.length,
+        "maxDocs (%s) must be between 1 and the output length (%s)", maxDocs, output.length);
     int size = 0;
     while (size < maxDocs) {
       int docId = next();

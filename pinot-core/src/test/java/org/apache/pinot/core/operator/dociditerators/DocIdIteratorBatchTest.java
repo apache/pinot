@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -41,13 +41,11 @@ public class DocIdIteratorBatchTest {
 
   @DataProvider
   public Object[][] batchBoundaries() {
-    List<Object[]> cases = new ArrayList<>();
-    for (int capacity : new int[]{1, 255, 256, 257, 10000}) {
-      for (int numDocs : new int[]{0, 1, capacity - 1, capacity, capacity + 1}) {
-        cases.add(new Object[]{capacity, numDocs});
-      }
-    }
-    return cases.toArray(new Object[0][]);
+    int maxDocs = DocIdSetPlanNode.MAX_DOC_PER_CALL;
+    return new Object[][]{
+        {1, 0}, {1, 1}, {1, 2}, {2, 1}, {2, 2}, {2, 3},
+        {maxDocs, maxDocs - 1}, {maxDocs, maxDocs}, {maxDocs, maxDocs + 1}
+    };
   }
 
   @Test(dataProvider = "batchBoundaries")

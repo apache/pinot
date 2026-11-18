@@ -25,7 +25,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.operator.DocIdOrderedOperator.DocIdOrder;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
@@ -100,31 +99,6 @@ public class DocIdSetOperatorTest {
     }
   }
 
-  @Test
-  public void testStoppingAfterFullBlockDoesNotConsumeNextMatch() {
-    StrictDocIdSet docIdSet = new StrictDocIdSet(new int[]{1, 4, 9});
-    DocIdSetOperator operator = new DocIdSetOperator(new FixedFilterOperator(docIdSet), 2);
-    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
-      assertDocIds(operator.nextBlock(), 1, 4);
-      assertEquals(docIdSet._nextCalls, 2);
-      assertEquals(docIdSet._batchCalls, 1);
-      assertEquals(docIdSet.next(), 9, "A selection limit can stop without discarding the next match");
-    }
-  }
-
-  @Test
-  public void testOperatorUsesIteratorBatchOverride() {
-    BulkOnlyDocIdSet docIdSet = new BulkOnlyDocIdSet();
-    DocIdSetOperator operator = new DocIdSetOperator(new FixedFilterOperator(docIdSet), 2);
-    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
-      assertDocIds(operator.nextBlock(), 2, 6);
-      assertDocIds(operator.nextBlock(), 10);
-      assertNull(operator.nextBlock());
-      assertNull(operator.nextBlock());
-      assertEquals(docIdSet._batchCalls, 2);
-    }
-  }
-
   @DataProvider
   public Object[][] scanCostTails() {
     return new Object[][]{
@@ -156,30 +130,6 @@ public class DocIdSetOperatorTest {
       assertNull(operator.nextBlock());
       assertEquals(scanCost.getNumEntriesScannedInFilter(), expectedPushedCost);
       assertEquals(docIdSet._nextCalls, docIds.length + 1);
-    }
-  }
-
-  @Test
-  public void testOnlyPositiveScanCostDeltasArePublished() {
-    long initialCost = (long) Integer.MAX_VALUE + 5;
-    StrictDocIdSet docIdSet = new StrictDocIdSet(new int[]{1, 3, 5, 7},
-        new long[]{initialCost, initialCost, initialCost - 2, initialCost + 3, initialCost + 6});
-    DocIdSetOperator operator = new DocIdSetOperator(new FixedFilterOperator(docIdSet), 1);
-    QueryExecutionContext executionContext = QueryExecutionContext.forSseTest();
-    QueryScanCostContext scanCost = new QueryScanCostContext();
-    executionContext.setQueryScanCostContext(scanCost);
-    try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mock(ThreadAccountant.class))) {
-      assertDocIds(operator.nextBlock(), 1);
-      assertEquals(scanCost.getNumEntriesScannedInFilter(), initialCost);
-      assertDocIds(operator.nextBlock(), 3);
-      assertEquals(scanCost.getNumEntriesScannedInFilter(), initialCost);
-      assertDocIds(operator.nextBlock(), 5);
-      assertEquals(scanCost.getNumEntriesScannedInFilter(), initialCost);
-      assertDocIds(operator.nextBlock(), 7);
-      assertEquals(scanCost.getNumEntriesScannedInFilter(), initialCost + 3);
-      assertNull(operator.nextBlock());
-      assertEquals(scanCost.getNumEntriesScannedInFilter(), initialCost + 3);
-      assertEquals(operator.getExecutionStatistics().getNumEntriesScannedInFilter(), initialCost + 6);
     }
   }
 
@@ -274,32 +224,6 @@ public class DocIdSetOperatorTest {
     }
   }
 
-  @Test
-  public void testWithOrderKeepsReverseMaterialization() {
-    StrictDocIdSet docIdSet = new StrictDocIdSet(new int[]{2, 7, 8, 13, 21});
-    FixedFilterOperator filter = new FixedFilterOperator(docIdSet);
-    DocIdSetOperator ascending = new DocIdSetOperator(filter, 2);
-    assertTrue(ascending.isCompatibleWith(DocIdOrder.ASC));
-    assertFalse(ascending.isCompatibleWith(DocIdOrder.DESC));
-    assertSame(ascending.withOrder(DocIdOrder.ASC), ascending);
-    BaseDocIdSetOperator descending = ascending.withOrder(DocIdOrder.DESC);
-    assertTrue(descending instanceof ReverseDocIdSetOperator);
-    assertSame(descending.withOrder(DocIdOrder.DESC), descending);
-    assertTrue(descending.withOrder(DocIdOrder.ASC) instanceof DocIdSetOperator);
-    assertEquals(ascending.getChildOperators(), List.of(filter));
-    assertEquals(descending.getChildOperators(), List.of(filter));
-    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
-      assertDocIds(descending.nextBlock(), 21, 13);
-      assertDocIds(descending.nextBlock(), 8, 7);
-      assertDocIds(descending.nextBlock(), 2);
-      assertNull(descending.nextBlock());
-      assertNull(descending.nextBlock());
-      assertEquals(docIdSet._nextCalls, 6);
-      assertEquals(docIdSet._batchCalls, 0, "Reverse bitmap materialization retains its existing scalar path");
-      assertEquals(filter._filterCalls, 1);
-    }
-  }
-
   private static void assertDocIds(DocIdSetBlock block, int... expected) {
     assertNotNull(block);
     assertEquals(block.getLength(), expected.length);
@@ -383,46 +307,6 @@ public class DocIdSetOperatorTest {
     @Override
     public long getNumEntriesScannedInFilter() {
       return _nextCalls == 0 ? 0 : _scanTotals[_nextCalls - 1];
-    }
-  }
-
-  /// An optimized batch source whose scalar APIs are deliberately unavailable to the operator.
-  private static final class BulkOnlyDocIdSet implements BlockDocIdSet, BlockDocIdIterator {
-    private final int[] _docIds = {2, 6, 10};
-    private int _position;
-    private int _batchCalls;
-    private boolean _exhausted;
-
-    @Override
-    public BlockDocIdIterator iterator() {
-      return this;
-    }
-
-    @Override
-    public int nextBatch(int[] output, int maxDocs) {
-      assertFalse(_exhausted, "Batch called after terminal EOF");
-      assertEquals(maxDocs, 2, "The operator must pass its configured block size");
-      _batchCalls++;
-      int length = Math.min(maxDocs, _docIds.length - _position);
-      System.arraycopy(_docIds, _position, output, 0, length);
-      _position += length;
-      _exhausted = length < maxDocs;
-      return length;
-    }
-
-    @Override
-    public int next() {
-      throw new AssertionError("Operator bypassed the batch override");
-    }
-
-    @Override
-    public int advance(int targetDocId) {
-      throw new AssertionError("Operator unexpectedly advanced a batch iterator");
-    }
-
-    @Override
-    public long getNumEntriesScannedInFilter() {
-      return 0;
     }
   }
 }

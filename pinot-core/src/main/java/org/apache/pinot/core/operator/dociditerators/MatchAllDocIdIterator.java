@@ -45,7 +45,8 @@ public final class MatchAllDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int nextBatch(int[] output, int maxDocs) {
-    checkArgument(maxDocs > 0 && maxDocs <= output.length);
+    checkArgument(maxDocs > 0 && maxDocs <= output.length,
+        "maxDocs (%s) must be between 1 and the output length (%s)", maxDocs, output.length);
     int nextDocId = _nextDocId;
     if (nextDocId >= _numDocs) {
       return 0;

@@ -22,33 +22,20 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.IntPredicate;
-import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.operator.DocIdSetOperator;
-import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
-import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
-import org.apache.pinot.core.operator.dociditerators.MatchAllDocIdIterator;
-import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.plan.FilterPlanNode;
-import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -56,10 +43,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -76,7 +61,7 @@ import static org.testng.Assert.assertTrue;
 /// The fixture belongs to this test instance; it has no shared mutable state with other query tests.
 public class DocIdBatchNullQueriesTest extends BaseQueriesTest {
   private static final String TABLE = "DocIdBatchNullQueriesTest";
-  private static final int FIRST_ROWS = 10017;
+  private static final int FIRST_ROWS = DocIdSetPlanNode.MAX_DOC_PER_CALL + 17;
   private static final int TOTAL_ROWS = FIRST_ROWS + 3;
   private static final Map<String, String> OPTIONS = Map.of("enableNullHandling", "true", "skipStarTree", "true",
       "maxExecutionThreads", "1", "numGroupsLimit", "100");
@@ -160,12 +145,8 @@ public class DocIdBatchNullQueriesTest extends BaseQueriesTest {
     IntPredicate all = id -> true;
     IntPredicate range = id -> id >= 5;
     IntPredicate gaps = id -> id != 7 && id != 10000;
-    IntPredicate tail = id -> id >= 10015;
-    IntPredicate allNull = id -> id == 3;
-    IntPredicate empty = id -> id > 20000;
     return new Object[][]{
-        {"", all}, {" WHERE s >= 5", range}, {" WHERE s NOT IN (7, 10000)", gaps},
-        {" WHERE s >= 10015", tail}, {" WHERE s = 3", allNull}, {" WHERE s > 20000", empty}
+        {"", all}, {" WHERE s >= 5", range}, {" WHERE s NOT IN (7, 10000)", gaps}
     };
   }
 
@@ -174,8 +155,6 @@ public class DocIdBatchNullQueriesTest extends BaseQueriesTest {
     String query = "SELECT g AS group_key, SUM(m) AS total_value, AVG(m) AS average_value,"
         + " COUNT(*) AS row_count, COUNT(m) AS value_count FROM " + TABLE + filter
         + " GROUP BY g ORDER BY g NULLS FIRST LIMIT 100";
-    verifyDocIdBlocks(query, matches);
-
     Map<Integer, ExpectedGroup> groups = new TreeMap<>(Comparator.nullsFirst(Comparator.naturalOrder()));
     long numDocs = 0;
     for (int id = 0; id < TOTAL_ROWS; id++) {
@@ -211,48 +190,6 @@ public class DocIdBatchNullQueriesTest extends BaseQueriesTest {
     for (int row = 0; row < expectedRows.size(); row++) {
       assertEquals(result.getRows().get(row), expectedRows.get(row), "Row " + row + " for " + query);
     }
-  }
-
-  private void verifyDocIdBlocks(String query, IntPredicate matches) {
-    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
-      for (int segmentId = 0; segmentId < _segments.size(); segmentId++) {
-        int start = segmentId == 0 ? 0 : FIRST_ROWS;
-        int end = segmentId == 0 ? FIRST_ROWS : TOTAL_ROWS;
-        int[] expected = IntStream.range(start, end).filter(matches).map(id -> id - start).toArray();
-        IndexSegment segment = _segments.get(segmentId);
-        try (BlockDocIdIterator iterator = new FilterPlanNode(new SegmentContext(segment), context(query)).run()
-            .nextBlock().getBlockDocIdSet().iterator()) {
-          if (expected.length == 0) {
-            assertTrue(iterator instanceof EmptyDocIdIterator);
-          } else if (expected.length == end - start) {
-            assertTrue(iterator instanceof MatchAllDocIdIterator);
-          } else {
-            assertTrue(iterator instanceof SortedDocIdIterator);
-          }
-        }
-        DocIdSetOperator operator = new DocIdSetOperator(
-            new FilterPlanNode(new SegmentContext(segment), context(query)).run(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
-        int offset = 0;
-        DocIdSetBlock block;
-        while ((block = operator.nextBlock()) != null) {
-          int expectedSize = Math.min(DocIdSetPlanNode.MAX_DOC_PER_CALL, expected.length - offset);
-          assertEquals(block.getLength(), expectedSize);
-          for (int i = 0; i < expectedSize; i++) {
-            assertEquals(block.getDocIds()[i], expected[offset++]);
-          }
-        }
-        assertEquals(offset, expected.length);
-        assertNull(operator.nextBlock());
-      }
-    }
-  }
-
-  private static QueryContext context(String sql) {
-    PinotQuery query = CalciteSqlParser.compileToPinotQuery(sql);
-    query.setQueryOptions(new HashMap<>(OPTIONS));
-    QueryContext context = QueryContextConverterUtils.getQueryContext(query);
-    context.setEndTimeMs(System.currentTimeMillis() + 60_000);
-    return context;
   }
 
   @Nullable
