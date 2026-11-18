@@ -2883,19 +2883,24 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validatePauselessUpsertModes(partial, null);
     TableConfigUtils.validatePauselessUpsertModes(dropOutOfOrder, null);
 
-    // An update cannot turn either combination on, whether it enables pauseless or the upsert mode
-    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validatePauselessUpsertModes(pauselessPartial,
-        partial));
-    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validatePauselessUpsertModes(pauselessPartial,
-        pauselessFull));
-    expectThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, dropOutOfOrder));
-    expectThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, pauselessPartial));
+    // An update is left to the backward compatibility check, so force=true can apply it
+    TableConfigUtils.validatePauselessUpsertModes(pauselessPartial, partial);
+    TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, pauselessFull);
 
-    // An existing table that already has the combination can still be updated
-    TableConfigUtils.validatePauselessUpsertModes(pauselessPartial, pauselessPartial);
-    TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, pauselessDropOutOfOrder);
+    // An update that turns either combination on is a violation, whether it enables pauseless, changes the upsert
+    // mode or dropOutOfOrderRecord, or adds the upsert config
+    TableConfig pauselessNoUpsert = createTableConfigWithConsumptionPolicy(null, null, true);
+    assertPauselessUpsertViolation(pauselessPartial, partial, true);
+    assertPauselessUpsertViolation(pauselessDropOutOfOrder, dropOutOfOrder, true);
+    assertPauselessUpsertViolation(pauselessPartial, pauselessFull, true);
+    assertPauselessUpsertViolation(pauselessDropOutOfOrder, pauselessFull, true);
+    assertPauselessUpsertViolation(pauselessPartial, pauselessNoUpsert, true);
+
+    // An update of a table that already has a combination, or that does not turn one on, is not
+    assertPauselessUpsertViolation(pauselessPartial, pauselessPartial, false);
+    assertPauselessUpsertViolation(pauselessDropOutOfOrder, pauselessDropOutOfOrder, false);
+    assertPauselessUpsertViolation(pauselessFull, pauselessFull, false);
+    assertPauselessUpsertViolation(partial, pauselessPartial, false);
 
     // The check is part of the upsert validation
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -2906,6 +2911,14 @@ public class TableConfigUtilsTest {
         () -> TableConfigUtils.validateUpsertConfig(pauselessDropOutOfOrder, schema));
     assertTrue(e.getMessage().startsWith("dropOutOfOrderRecord cannot be used with pauseless consumption."),
         e.getMessage());
+  }
+
+  private static void assertPauselessUpsertViolation(TableConfig newConfig, TableConfig existingConfig,
+      boolean expected) {
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.stream()
+        .anyMatch(v -> v.startsWith("pauseless consumption with partial upsert or dropOutOfOrderRecord")), expected,
+        violations.toString());
   }
 
   @Test
