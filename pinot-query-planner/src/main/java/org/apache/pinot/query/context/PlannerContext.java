@@ -32,7 +32,6 @@ import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlExplainFormat;
-import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.pinot.calcite.rex.SearchSealer;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
@@ -53,7 +52,7 @@ import org.apache.pinot.query.validate.Validator;
 public class PlannerContext implements AutoCloseable, Context {
   private final PlannerImpl _planner;
 
-  private final SqlValidator _validator;
+  private final Validator _validator;
 
   private final RelOptPlanner _relOptPlanner;
   private final LogicalPlanner _relTraitPlanner;
@@ -84,7 +83,9 @@ public class PlannerContext implements AutoCloseable, Context {
     _planner = new PlannerImpl(config);
     _validator = new Validator(useMvAggregate
         ? PinotOperatorTable.withNullableArrayToMv(envConfig.isNullHandlingEnabled()) : config.getOperatorTable(),
-        catalogReader, typeFactory);
+        catalogReader, typeFactory,
+        QueryOptionsUtils.isPreferSelectAliasInGroupBy(options, envConfig.defaultPreferSelectAliasInGroupBy()),
+        envConfig.meterGroupByAliasShadowedByColumn());
     _useMvAggregate = useMvAggregate;
     _options = options;
     _envConfig = envConfig;
@@ -130,7 +131,7 @@ public class PlannerContext implements AutoCloseable, Context {
     return _planner;
   }
 
-  public SqlValidator getValidator() {
+  public Validator getValidator() {
     return _validator;
   }
 

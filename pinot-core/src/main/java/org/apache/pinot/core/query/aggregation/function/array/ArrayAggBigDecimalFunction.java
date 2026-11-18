@@ -24,12 +24,14 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 
 
 public class ArrayAggBigDecimalFunction extends BaseArrayAggBigDecimalFunction<ObjectArrayList<BigDecimal>> {
+  private static final int BIG_DECIMAL_ARRAY_LIST_TYPE = 52;
+
   public ArrayAggBigDecimalFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -73,9 +75,8 @@ public class ArrayAggBigDecimalFunction extends BaseArrayAggBigDecimalFunction<O
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ObjectArrayList<BigDecimal> list) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BigDecimalArrayList.getValue(),
-        ObjectSerDeUtils.BIG_DECIMAL_ARRAY_LIST_SER_DE.serialize(list));
+  public SerializedResult serializeIntermediateResult(ObjectArrayList<BigDecimal> list) {
+    return new SerializedValue<>(BIG_DECIMAL_ARRAY_LIST_TYPE, list, ObjectSerDeUtils.BIG_DECIMAL_ARRAY_LIST_SER_DE);
   }
 
   @Override

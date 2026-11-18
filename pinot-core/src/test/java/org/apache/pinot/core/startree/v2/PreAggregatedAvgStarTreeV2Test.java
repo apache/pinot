@@ -19,7 +19,6 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.AvgValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.customobject.AvgPair;
@@ -42,7 +41,7 @@ public class PreAggregatedAvgStarTreeV2Test extends BaseStarTreeV2Test<Object, A
 
   @Override
   Object getRandomRawValue(Random random) {
-    return ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(new AvgPair(random.nextInt(), random.nextInt(10) + 1));
+    return new AvgPair(random.nextInt(), random.nextInt(10) + 1).toBytes();
   }
 
   @Override

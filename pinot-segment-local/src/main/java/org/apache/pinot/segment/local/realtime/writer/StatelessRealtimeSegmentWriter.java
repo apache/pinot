@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.writer;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
@@ -38,6 +39,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
+import org.apache.pinot.segment.local.realtime.DecodeRetryTracker;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
@@ -78,6 +80,17 @@ import org.slf4j.LoggerFactory;
 
 
 /// Segment writer to ingest streaming data from a start offset to an end offset.
+///
+/// A batch that reports data loss (records between the requested offset and the batch were deleted from the stream
+/// before they could be replayed) fails the replay before anything from it is indexed: the replayed segment would
+/// otherwise silently miss part of its offset range. The segment then stays in ERROR until the operator restores the
+/// range from another source or deletes the segment to accept the loss.
+///
+/// A batch without unfiltered messages never moves the writer, whatever next offset it reports: the writer polls again
+/// from its own offset. A Kafka consumer reports its client position there, which can lie past transaction markers,
+/// but also past deleted records after an out-of-range reset it has not reported as loss yet. The loss check of the
+/// next batch with records then covers the whole gap. Reaching the end offset never needs that position, since the
+/// data manager only moves its own offset on fetched records.
 ///
 /// TODO:
 ///   1. Clean up this class and only keep the necessary parts.
@@ -254,6 +267,25 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     }
   }
 
+  /// Returns whether to fetch and decode the message at `offset` again after a retriable decode failure, reporting it
+  /// as the realtime consumer does, minus segment errors.
+  private boolean shouldRetryDecode(DecodeRetryTracker decodeRetryTracker, StreamPartitionMsgOffset offset,
+      Exception cause) {
+    long nowMs = now();
+    DecodeRetryTracker.Outcome outcome = decodeRetryTracker.onRetriableFailure(nowMs);
+    if (outcome == DecodeRetryTracker.Outcome.GIVE_UP_AND_REPORT) {
+      _logger.warn("Retriable decode errors have lasted {}ms, giving up retrying the message at offset: {}. Until "
+              + "none happens for {}ms, retriable decode errors are handled like any other decode error",
+          decodeRetryTracker.getOutageDurationMs(nowMs), offset, decodeRetryTracker.getMaxDurationMs());
+    } else if (outcome == DecodeRetryTracker.Outcome.RETRY_AND_REPORT) {
+      _logger.warn("Retriable decode error at offset: {}. Fetching and decoding it again", offset, cause);
+    } else if (outcome == DecodeRetryTracker.Outcome.RETRY_AND_REMIND) {
+      _logger.warn("Still retrying: retriable decode error at offset: {}, {}ms into the outage", offset,
+          decodeRetryTracker.getOutageDurationMs(nowMs), cause);
+    }
+    return outcome.isRetry();
+  }
+
   private class PartitionConsumer implements Runnable {
     @Override
     public void run() {
@@ -261,6 +293,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         _consumer.start(_startOffset);
         _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
+        DecodeRetryTracker decodeRetryTracker = new DecodeRetryTracker(_streamConfig);
         while (_currentOffset.compareTo(_endOffset) < 0) {
           if (_shouldStop) {
             _consumptionException = new IllegalStateException(
@@ -272,8 +305,19 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
+          Preconditions.checkState(!messageBatch.hasDataLoss(), "Stream data loss at offset %s while replaying to %s: "
+              + "the stream no longer holds this range (e.g. it aged out of retention), so the segment cannot be "
+              + "rebuilt from it. Restore the range from another source, or delete the segment to accept the loss",
+              _currentOffset, _endOffset);
+          if (messageBatch.getUnfilteredMessageCount() == 0) {
+            // Poll again from the same offset (see the class Javadoc)
+            continue;
+          }
 
           int messageCount = messageBatch.getMessageCount();
+          // Refetch from the previous message's next offset, as some streams fetch from after the given offset
+          StreamPartitionMsgOffset currentMessageFetchOffset = _currentOffset;
+          boolean decodeRetryNeeded = false;
 
           for (int i = 0; i < messageCount; i++) {
             StreamMessage streamMessage = messageBatch.getStreamMessage(i);
@@ -285,6 +329,13 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
             // Decode message
             StreamDataDecoderResult decodedResult = _decoder.decode(streamMessage);
+            if (decodedResult.isRetriable() && shouldRetryDecode(decodeRetryTracker, metadata.getOffset(),
+                decodedResult.getException())) {
+              // Refetch after a backoff rather than leave the message out; the re-ingestion timeout bounds retries
+              decodeRetryNeeded = true;
+              break;
+            }
+            decodeRetryTracker.onMessageDone();
             if (decodedResult.getException() == null) {
               // Index message
               GenericRow row = decodedResult.getResult();
@@ -296,8 +347,21 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
             } else {
               _logger.warn("Failed to decode message at offset {}: {}", _currentOffset, decodedResult.getException());
             }
+            currentMessageFetchOffset = metadata.getNextOffset();
           }
 
+          if (decodeRetryNeeded) {
+            _currentOffset = currentMessageFetchOffset;
+            if (!_shouldStop) {
+              try {
+                sleepBeforeDecodeRetry(decodeRetryTracker.nextBackoffMs());
+              } catch (InterruptedException e) {
+                // stopConsumption() interrupts the backoff, and the _shouldStop check above ends consumption
+                Thread.currentThread().interrupt();
+              }
+            }
+            continue;
+          }
           _currentOffset = messageBatch.getOffsetOfNextBatch();
         }
         _isSuccess = true;
@@ -314,6 +378,13 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         _isDoneConsuming.set(true);
       }
     }
+  }
+
+  /// Sleeps the decode retry backoff; [#stopConsumption()] interrupts it.
+  @VisibleForTesting
+  void sleepBeforeDecodeRetry(long backoffMs)
+      throws InterruptedException {
+    Thread.sleep(backoffMs);
   }
 
   public void stopConsumption() {

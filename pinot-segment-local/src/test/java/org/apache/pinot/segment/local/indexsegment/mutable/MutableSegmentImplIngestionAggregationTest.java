@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.utils.ObjectSerDeUtils;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -188,7 +188,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     GenericRow reuse = new GenericRow();
     for (int docId = 0; docId < numDocsIndexed; docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
-      HyperLogLog actualHLL = CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) row.getValue(m1));
+      HyperLogLog actualHLL = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) row.getValue(m1));
       HyperLogLog expectedHLL = expectedValues.get(buildKey(row));
       assertEquals(actualHLL.cardinality(), expectedHLL.cardinality());
     }

@@ -24,6 +24,7 @@ LABEL MAINTAINER=dev@pinot.apache.org
 
 ENV PINOT_HOME=/opt/pinot
 ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true"
+ENV JDK_JAVA_OPTIONS="--add-modules=jdk.incubator.vector"
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 

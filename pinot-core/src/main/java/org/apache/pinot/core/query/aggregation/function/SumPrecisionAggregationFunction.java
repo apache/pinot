@@ -29,7 +29,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -48,6 +47,8 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 /// - Precision (optional): precision to be set to the final result
 /// - Scale (optional): scale to be set to the final result
 public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
+  private static final int BIG_DECIMAL_TYPE = 22;
+
   private final Integer _precision;
   private final Integer _scale;
 
@@ -351,14 +352,13 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(BigDecimal bigDecimal) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BigDecimal.getValue(),
-        ObjectSerDeUtils.BIGDECIMAL_SER_DE.serialize(bigDecimal));
+  public SerializedResult serializeIntermediateResult(BigDecimal bigDecimal) {
+    return new SerializedBytes(BIG_DECIMAL_TYPE, BigDecimalUtils.serialize(bigDecimal));
   }
 
   @Override
   public BigDecimal deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.BIGDECIMAL_SER_DE.deserialize(customObject.getBuffer());
+    return BigDecimalUtils.deserialize(customObject.getBuffer());
   }
 
   @Override

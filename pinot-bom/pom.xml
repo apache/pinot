@@ -275,12 +275,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-3.0</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-3.0</artifactId>
+        <artifactId>pinot-kafka-4.0</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>

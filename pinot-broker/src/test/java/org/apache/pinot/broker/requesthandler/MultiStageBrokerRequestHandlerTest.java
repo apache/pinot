@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -56,6 +57,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.auth.TableRowColAccessResultImpl;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -73,6 +75,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
@@ -81,8 +84,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -470,6 +475,14 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
   private static MultiStageBrokerRequestHandler newHandler(PinotConfiguration config, RoutingManager routingManager,
       FailureDetector failureDetector, @Nullable MultiClusterRoutingContext multiClusterRoutingContext)
       throws Exception {
+    return newHandler(config, routingManager, failureDetector, multiClusterRoutingContext,
+        new AllowAllAccessControlFactory());
+  }
+
+  private static MultiStageBrokerRequestHandler newHandler(PinotConfiguration config, RoutingManager routingManager,
+      FailureDetector failureDetector, @Nullable MultiClusterRoutingContext multiClusterRoutingContext,
+      AccessControlFactory accessControlFactory)
+      throws Exception {
     config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
     config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
     BrokerQueryEventListenerFactory.init(config);
@@ -481,7 +494,7 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
 
     return new MultiStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
-        routingManager, new AllowAllAccessControlFactory(), queryQuotaManager,
+        routingManager, accessControlFactory, queryQuotaManager,
         mock(TableCache.class), mock(MultiStageQueryThrottler.class), failureDetector,
         ThreadAccountantUtils.getNoOpAccountant(), multiClusterRoutingContext, mock(WorkerManager.class),
         mock(WorkerManager.class)) {
@@ -494,6 +507,75 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
         super.shutDown();
       }
     };
+  }
+
+  @Test
+  public void testThrottlerAcquiresAndReleasesCappedEstimate()
+      throws Exception {
+    MultiStageQueryThrottler throttler = mock(MultiStageQueryThrottler.class);
+    when(throttler.getMaxPermits()).thenReturn(1);
+    when(throttler.tryAcquire(anyInt(), anyLong(), any())).thenReturn(true);
+    // The table has no segments, so the broker runs the query without dispatching it to the server
+    MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1);
+    factory.registerTable(TABLE_SCHEMAS.get("c_OFFLINE"), "c_OFFLINE");
+    factory.registerEmptyTable("c_OFFLINE");
+    RoutingManager routingManager = factory.buildRoutingManager(null);
+    WorkerManager workerManager =
+        new WorkerManager("Broker_localhost", "localhost", NetUtils.findOpenPort(), routingManager);
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
+    BrokerQueryEventListenerFactory.init(config);
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    MultiStageBrokerRequestHandler handler = new MultiStageBrokerRequestHandler(config, "testBrokerId",
+        new BrokerRequestIdGenerator(), routingManager, new AllowAllAccessControlFactory(), queryQuotaManager,
+        factory.buildTableCache(), throttler, mock(FailureDetector.class), ThreadAccountantUtils.getNoOpAccountant(),
+        null, workerManager, workerManager) {
+      @Override
+      protected int getEstimatedNumQueryThreads(DispatchableSubPlan dispatchableSubPlan) {
+        return 10;
+      }
+    };
+
+    BrokerResponse response = handler.handleRequest("SELECT COUNT(*) FROM c");
+    assertEquals(response.getExceptions().size(), 0, response.getExceptions().toString());
+    // The estimate of 10 threads is capped to the throttler limit of 1
+    verify(throttler).tryAcquire(eq(1), anyLong(), any());
+    verify(throttler).release(1);
+
+    // With limiting disabled, the estimate is not capped
+    when(throttler.getMaxPermits()).thenReturn(Integer.MAX_VALUE);
+    response = handler.handleRequest("SELECT COUNT(*) FROM c");
+    assertEquals(response.getExceptions().size(), 0, response.getExceptions().toString());
+    verify(throttler).tryAcquire(eq(10), anyLong(), any());
+    verify(throttler).release(10);
+  }
+
+  /// An access control can return an empty RLS filter list for a table without row filters. No predicate is attached
+  /// for it, so the response must not report that RLS filters were applied.
+  @Test
+  public void testApplyRlsFiltersIgnoresEmptyFilterList()
+      throws Exception {
+    AccessControl accessControl = mock(AccessControl.class);
+    when(accessControl.getRowColFilters(any(), eq("empty"))).thenReturn(new TableRowColAccessResultImpl(List.of()));
+    when(accessControl.getRowColFilters(any(), eq("absent"))).thenReturn(TableRowColAccessResultImpl.unrestricted());
+    when(accessControl.getRowColFilters(any(), eq("filtered"))).thenReturn(
+        new TableRowColAccessResultImpl(List.of("col1 = 'a'", "col2 = 'b'")));
+    AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
+    when(accessControlFactory.create()).thenReturn(accessControl);
+    MultiStageBrokerRequestHandler handler = newHandler(new PinotConfiguration(), mock(RoutingManager.class),
+        mock(FailureDetector.class), null, accessControlFactory);
+
+    Map<String, String> queryOptions = new HashMap<>();
+    Assert.assertFalse(handler.applyRlsFilters(null, Set.of("empty", "absent"), queryOptions));
+    assertEquals(queryOptions, Map.of());
+
+    Assert.assertTrue(handler.applyRlsFilters(null, Set.of("empty", "absent", "filtered"), queryOptions));
+    assertEquals(queryOptions,
+        Map.of(RlsUtils.buildRlsFilterKey("filtered"), "( col1 = 'a' ) AND ( col2 = 'b' )"));
   }
 
   /// The failure detector keeps an instance unhealthy while any retrier returns UNHEALTHY for it. A multi-stage worker

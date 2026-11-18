@@ -23,9 +23,13 @@ import org.apache.datasketches.tuple.TupleSketch;
 import org.apache.datasketches.tuple.TupleUnion;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerTupleSketch;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class IntegerTupleSketchValueAggregatorTest {
@@ -60,7 +64,7 @@ public class IntegerTupleSketchValueAggregatorTest {
         new IntegerTupleSketchValueAggregator(List.of(), IntegerSummary.Mode.Sum);
     TupleSketch<IntegerSummary> merged = toSketch(agg.applyAggregatedValue(s1, s2));
     assertEquals(merged.getEstimate(), 2.0);
-    assertEquals(agg.getMaxAggregatedValueByteSize(), 196632);
+    assertEquals(agg.getMaxAggregatedValueByteSize(), 213016);
   }
 
   @Test
@@ -73,7 +77,36 @@ public class IntegerTupleSketchValueAggregatorTest {
         new IntegerTupleSketchValueAggregator(List.of(), IntegerSummary.Mode.Sum);
     TupleSketch<IntegerSummary> merged = toSketch(agg.applyRawValue(s1, agg.serializeAggregatedValue(s2)));
     assertEquals(merged.getEstimate(), 2.0);
-    assertEquals(agg.getMaxAggregatedValueByteSize(), 196632);
+    assertEquals(agg.getMaxAggregatedValueByteSize(), 213016);
+  }
+
+  @DataProvider
+  public Object[][] nominalEntries() {
+    return new Object[][]{{null, 16384}, {1, 1}, {3, 4}, {1000, 1024}};
+  }
+
+  @Test(dataProvider = "nominalEntries")
+  public void testMaxSerializedSize(Integer nominalEntries, int retainedEntries) {
+    List<ExpressionContext> arguments = nominalEntries == null
+        ? List.of()
+        : List.of(ExpressionContext.forLiteral(Literal.intValue(nominalEntries)));
+    IntegerTupleSketchValueAggregator agg = new IntegerTupleSketchValueAggregator(arguments, IntegerSummary.Mode.Sum);
+    int maxSize = agg.getMaxAggregatedValueByteSize();
+    for (int inputSize : new int[]{0, 1, retainedEntries * 2}) {
+      IntegerTupleSketch input = new IntegerTupleSketch(16, IntegerSummary.Mode.Sum);
+      for (int i = 0; i < inputSize; i++) {
+        input.update(i, 1);
+      }
+      Object result = agg.getInitialAggregatedValue(input.compact().toByteArray());
+      byte[] bytes = agg.serializeAggregatedValue(result);
+      assertTrue(bytes.length <= maxSize, "Serialized sketch exceeds the size reserved by the index writer");
+      if (inputSize > retainedEntries) {
+        TupleSketch<IntegerSummary> sketch = toSketch(result);
+        assertTrue(sketch.isEstimationMode());
+        assertEquals(sketch.getRetainedEntries(), retainedEntries);
+        assertEquals(bytes.length, maxSize);
+      }
+    }
   }
 
   @SuppressWarnings("unchecked")

@@ -426,7 +426,7 @@ public class PinotHelixResourceManager {
   protected SegmentDeletionManager createSegmentDeletionManager(String dataDir, HelixAdmin helixAdmin,
       String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
     return new SegmentDeletionManager(dataDir, helixAdmin, helixClusterName, propertyStore,
-        deletedSegmentsRetentionInDays);
+        deletedSegmentsRetentionInDays, _controllerConf != null && _controllerConf.isDeletedSegmentsPreserveMetadata());
   }
 
   /// Get the Helix manager.
@@ -4519,7 +4519,7 @@ public class PinotHelixResourceManager {
   /// server instances. With BiMap, both mappings are easily available
   public BiMap<String, String> getDataInstanceAdminEndpoints(Set<String> instances)
       throws InvalidConfigException {
-    BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
+    BiMap<String, String> instanceToEndpoint = HashBiMap.create(instances.size());
     for (String instance : instances) {
       String instanceAdminEndpoint;
       try {
@@ -4531,9 +4531,9 @@ public class PinotHelixResourceManager {
         LOGGER.error(errorMessage, e);
         throw new InvalidConfigException(errorMessage);
       }
-      endpointToInstance.put(instance, instanceAdminEndpoint);
+      instanceToEndpoint.put(instance, instanceAdminEndpoint);
     }
-    return endpointToInstance;
+    return instanceToEndpoint;
   }
 
   /// Returns the service identity provider used for outbound Server admin API requests.
@@ -4617,18 +4617,10 @@ public class PinotHelixResourceManager {
     // Create a segment lineage entry id
     String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
 
-    // Check that all the segments from 'segmentsFrom' exist in the table
-    Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, true));
-    for (String segment : segmentsFrom) {
-      Preconditions.checkState(segmentsForTable.contains(segment),
-          "Segment: %s from 'segmentsFrom' does not exist in table: %s", segment, tableNameWithType);
-    }
-
-    // Check that all the segments from 'segmentTo' does not exist in the table
-    for (String segment : segmentsTo) {
-      Preconditions.checkState(!segmentsForTable.contains(segment), "Segment: %s from 'segmentsTo' exists in table: %s",
-          segment, tableNameWithType);
-    }
+    validateSegmentsForStartReplace(tableNameWithType, segmentsFrom, segmentsTo,
+        new HashSet<>(getSegmentsFor(tableNameWithType, true)));
+    Set<String> segmentsFromSet = new HashSet<>(segmentsFrom);
+    Set<String> segmentsToSet = new HashSet<>(segmentsTo);
     List<String> segmentsToCleanUp = new ArrayList<>();
     int attemptCount;
     synchronized (getLineageUpdaterLock(tableNameWithType)) {
@@ -4655,6 +4647,12 @@ public class PinotHelixResourceManager {
           Preconditions.checkState(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
               "Entry id: %s already exists in the segment lineage for table: %s", segmentLineageEntryId,
               tableNameWithType);
+
+          // The check before the lock can be stale because a concurrent 'endReplaceSegments' or revert may change which
+          // segments are served. Re-run it against the lineage read here, which the versioned write below guards.
+          Set<String> servedSegments = new HashSet<>(getSegmentsFor(tableNameWithType, false));
+          SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(servedSegments, segmentLineage);
+          validateSegmentsForStartReplace(tableNameWithType, segmentsFrom, segmentsTo, servedSegments);
 
           Iterator<Map.Entry<String, LineageEntry>> entryIterator =
               segmentLineage.getLineageEntries().entrySet().iterator();
@@ -4683,8 +4681,8 @@ public class PinotHelixResourceManager {
             //    at any time in case of REFRESH use case.
             if (forceCleanup) {
               if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && (
-                  !Collections.disjoint(segmentsFrom, lineageEntry.getSegmentsFrom()) || !Collections.disjoint(
-                      segmentsTo, lineageEntry.getSegmentsTo()))) {
+                  !Collections.disjoint(segmentsFromSet, lineageEntry.getSegmentsFrom()) || !Collections.disjoint(
+                      segmentsToSet, lineageEntry.getSegmentsTo()))) {
                 LOGGER.info(
                     "Detected the incomplete lineage entry with overlapped 'segmentsFrom' or 'segmentsTo'. Deleting or "
                         + "reverting the lineage entry to unblock the new segment protocol. tableNameWithType={}, "
@@ -4799,6 +4797,20 @@ public class PinotHelixResourceManager {
         System.currentTimeMillis() - startReplaceSegmentsTs, attemptCount + 1, tableNameWithType, segmentsFrom,
         segmentsTo, segmentLineageEntryId);
     return segmentLineageEntryId;
+  }
+
+  /// Checks that every segment in 'segmentsFrom' is served and no segment in 'segmentsTo' is. 'servedSegments' must
+  /// exclude the segments hidden by the segment lineage.
+  private static void validateSegmentsForStartReplace(String tableNameWithType, List<String> segmentsFrom,
+      List<String> segmentsTo, Set<String> servedSegments) {
+    for (String segment : segmentsFrom) {
+      Preconditions.checkState(servedSegments.contains(segment),
+          "Segment: %s from 'segmentsFrom' does not exist in table: %s", segment, tableNameWithType);
+    }
+    for (String segment : segmentsTo) {
+      Preconditions.checkState(!servedSegments.contains(segment), "Segment: %s from 'segmentsTo' exists in table: %s",
+          segment, tableNameWithType);
+    }
   }
 
   /// Computes the end segment replace phase

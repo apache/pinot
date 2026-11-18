@@ -347,6 +347,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         serverRoutingStatsManager);
   }
 
+  /// Override to supply a custom [TimeSeriesRequestHandler], e.g. one built with a
+  /// `TimeSeriesRoutingCustomizer` that adjusts how each time-series leaf is routed.
+  /// The default implementation routes every leaf exactly as the routing manager chooses.
+  protected TimeSeriesRequestHandler createTimeSeriesRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, BrokerRoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
+    return new TimeSeriesRequestHandler(config, brokerId, requestIdGenerator, routingManager, accessControlFactory,
+        queryQuotaManager, tableCache, threadAccountant, multiClusterRoutingContext);
+  }
+
   private void setupHelixSystemProperties() {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
@@ -568,6 +579,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _serverRoutingStatsManager, _failureDetector, _threadAccountant, multiClusterRoutingContext,
               materializedViewHandler);
     }
+    // A server that becomes enabled has most likely been restarted: let the handler drop the connections it cached to
+    // a previous process, so the next query reconnects instead of writing into a half-open socket.
+    _routingManager.addServerEnabledCallback(singleStageBrokerRequestHandler::onServerEnabled);
+    _routingManager.addServerRemovedCallback(singleStageBrokerRequestHandler::onServerRemoved);
 
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
@@ -593,7 +608,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
               _serverRoutingStatsManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
-      _routingManager.setServerEnabledCallback(
+      _routingManager.addServerEnabledCallback(
           serverInstance -> finalHandler.getQueryDispatcher().onServerEnabled(serverInstance));
       // Lets an operator turn the proto segment list encoding on and off through cluster config, without a restart.
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
@@ -602,7 +617,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
       timeSeriesRequestHandler =
-          new TimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+          createTimeSeriesRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _threadAccountant,
               multiClusterRoutingContext);
     }

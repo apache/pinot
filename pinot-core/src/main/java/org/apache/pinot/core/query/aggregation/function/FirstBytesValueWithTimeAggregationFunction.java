@@ -23,7 +23,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.BytesLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
@@ -40,13 +39,15 @@ import org.apache.pinot.spi.utils.ByteArray;
 /// - timeExpression: expression that contains the column to be used to decide which data is first, can be any
 ///   Numeric column
 public class FirstBytesValueWithTimeAggregationFunction extends FirstWithTimeAggregationFunction<ByteArray> {
+  private static final int BYTES_LONG_PAIR_TYPE = 56;
+
   private final ColumnDataType _resultType;
   private final ValueLongPair<ByteArray> _defaultValueTimePair;
 
   /// The result type is BYTES or UUID; both are stored as bytes.
   public FirstBytesValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
       boolean nullHandlingEnabled, ColumnDataType resultType) {
-    super(dataCol, timeCol, ObjectSerDeUtils.BYTES_LONG_PAIR_SER_DE, nullHandlingEnabled);
+    super(dataCol, timeCol, nullHandlingEnabled);
     Preconditions.checkArgument(resultType == ColumnDataType.BYTES || resultType == ColumnDataType.UUID,
         "Unsupported result type: %s", resultType);
     _resultType = resultType;
@@ -57,6 +58,11 @@ public class FirstBytesValueWithTimeAggregationFunction extends FirstWithTimeAgg
   @Override
   public ValueLongPair<ByteArray> constructValueLongPair(ByteArray value, long time) {
     return new BytesLongPair(value, time);
+  }
+
+  @Override
+  public ValueLongPair<ByteArray> deserializeValueLongPair(byte[] bytes) {
+    return BytesLongPair.fromBytes(bytes);
   }
 
   @Override
@@ -113,14 +119,13 @@ public class FirstBytesValueWithTimeAggregationFunction extends FirstWithTimeAgg
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<ByteArray> bytesLongPair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BytesLongPair.getValue(),
-        ObjectSerDeUtils.BYTES_LONG_PAIR_SER_DE.serialize((BytesLongPair) bytesLongPair));
+  public SerializedResult serializeIntermediateResult(ValueLongPair<ByteArray> bytesLongPair) {
+    return new SerializedBytes(BYTES_LONG_PAIR_TYPE, bytesLongPair.toBytes());
   }
 
   @Override
   public ValueLongPair<ByteArray> deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.BYTES_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return BytesLongPair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

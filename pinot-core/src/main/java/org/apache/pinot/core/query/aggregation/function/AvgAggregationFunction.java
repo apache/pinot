@@ -25,7 +25,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -36,6 +35,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<AvgPair, Double> {
+  private static final int AVG_PAIR_TYPE = 4;
+
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   public AvgAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
@@ -84,7 +85,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
     AvgPair avgPair = new AvgPair();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+        AvgPair value = AvgPair.fromBytes(bytesValues[i]);
         avgPair.apply(value);
       }
     });
@@ -154,7 +155,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
     byte[][] bytesValues = blockValSet.getBytesValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+        AvgPair avgPair = AvgPair.fromBytes(bytesValues[i]);
         updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
       }
     });
@@ -213,7 +214,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
     byte[][] bytesValues = blockValSet.getBytesValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+        AvgPair avgPair = AvgPair.fromBytes(bytesValues[i]);
         for (int groupKey : groupKeysArray[i]) {
           updateGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
         }
@@ -280,14 +281,13 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   }
 
   @Override
-  public SerializedIntermediateResult serializeIntermediateResult(AvgPair avgPair) {
-    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.AvgPair.getValue(),
-        ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair));
+  public SerializedResult serializeIntermediateResult(AvgPair avgPair) {
+    return new SerializedBytes(AVG_PAIR_TYPE, avgPair.toBytes());
   }
 
   @Override
   public AvgPair deserializeIntermediateResult(CustomObject customObject) {
-    return ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(customObject.getBuffer());
+    return AvgPair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override
