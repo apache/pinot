@@ -38,7 +38,6 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface RoutingManager {
-
   /// Get all enabled server instances in the cluster.
   ///
   /// @return all currently enabled server instances.
@@ -68,6 +67,13 @@ public interface RoutingManager {
   /// @return the route table.
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
+
+  /// Get the routing table and report required segments whose selected server has since disappeared as unavailable.
+  /// Implementations without this capability fall back to regular routing.
+  @Nullable
+  default RoutingTable getRoutingTableWithMissingServerSegments(BrokerRequest brokerRequest, long requestId) {
+    return getRoutingTable(brokerRequest, requestId);
+  }
 
   /// Get the [RoutingTable] for a specific broker request.
   /// @param brokerRequest the broker request constructed from a query.

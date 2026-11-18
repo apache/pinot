@@ -1330,6 +1330,18 @@ public abstract class BaseBrokerRoutingManager
   @Nullable
   @Override
   public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
+    return getRoutingTable(brokerRequest, tableNameWithType, requestId, false);
+  }
+
+  @Nullable
+  @Override
+  public RoutingTable getRoutingTableWithMissingServerSegments(BrokerRequest brokerRequest, long requestId) {
+    return getRoutingTable(brokerRequest, brokerRequest.getQuerySource().getTableName(), requestId, true);
+  }
+
+  @Nullable
+  private RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId,
+      boolean reportMissingServerSegments) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     if (routingEntry == null) {
       return null;
@@ -1337,35 +1349,35 @@ public abstract class BaseBrokerRoutingManager
     String samplerName = extractSamplerName(brokerRequest);
     InstanceSelector.SelectionResult selectionResult =
         routingEntry.calculateRouting(brokerRequest, requestId, samplerName);
-    return new RoutingTable(getServerInstanceToSegmentsMap(tableNameWithType, selectionResult),
-        selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
-  }
-
-  private Map<ServerInstance, SegmentsToQuery> getServerInstanceToSegmentsMap(String tableNameWithType,
-      InstanceSelector.SelectionResult selectionResult) {
+    List<String> unavailableSegments = selectionResult.getUnavailableSegments();
+    List<String> unavailableSegmentsWithMissingServers = null;
     Map<String, SegmentsToQuery> instanceToSegmentsMap = selectionResult.getInstanceToSegmentsMap();
     Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
         Maps.newHashMapWithExpectedSize(instanceToSegmentsMap.size());
     for (Map.Entry<String, SegmentsToQuery> entry : instanceToSegmentsMap.entrySet()) {
       SegmentsToQuery segmentsToQuery = entry.getValue();
       int numSegments = segmentsToQuery.getSegments().size();
-      // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
-      // to process, to be backward compatible.
-      // TODO: allow servers only with optional segments
+      // Query optional segments only on servers with required segments.
       if (numSegments == 0) {
         continue;
       }
-      // The server instance is looked up per query, because an instance config change replaces it
+      // The server instance is looked up per query because an instance config change replaces it.
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getKey());
       if (serverInstance != null) {
         serverInstanceToSegmentsMap.put(serverInstance, segmentsToQuery);
       } else {
-        // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, numSegments);
-        // TODO: Report missing server metrics for optional segments when we allow servers only with optional segments.
+        if (reportMissingServerSegments) {
+          if (unavailableSegmentsWithMissingServers == null) {
+            unavailableSegmentsWithMissingServers = new ArrayList<>(unavailableSegments);
+          }
+          unavailableSegmentsWithMissingServers.addAll(segmentsToQuery.getSegments());
+        }
       }
     }
-    return serverInstanceToSegmentsMap;
+    return new RoutingTable(serverInstanceToSegmentsMap,
+        unavailableSegmentsWithMissingServers != null ? unavailableSegmentsWithMissingServers : unavailableSegments,
+        selectionResult.getNumPrunedSegments());
   }
 
   @Nullable
