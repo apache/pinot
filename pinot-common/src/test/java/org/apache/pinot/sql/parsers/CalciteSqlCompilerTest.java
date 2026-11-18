@@ -23,6 +23,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.sql.SqlDelete;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -47,6 +48,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.expectThrows;
 
 
 /// Some tests for the SQL compiler.
@@ -970,6 +972,30 @@ public class CalciteSqlCompilerTest {
     } catch (SqlCompilationException sce) {
       // expected.
     }
+  }
+
+  @Test
+  public void testExtractQueryOptionsMatchesFullParser() {
+    for (String sql : List.of(
+        "SELECT * FROM foo",
+        "sEt \"TiMeOuTmS\" = '120000'; SELECT * FROM foo",
+        "SET timeoutMs=120000; SELECT * FROM foo; SET timeoutMs=240000;",
+        "SELECT * FROM foo OPTION(timeoutMs=300000, trace=true); -- trailing comment",
+        "SET timeoutMs=120000; SELECT * FROM foo OPTION(timeoutMs=300000, trace=true)",
+        "SET \"custom:key\"='a:b;''c'; SELECT \"col:;\"\"name\", 'it''s; SET timeoutMs=7;' FROM foo; "
+            + "/* SET timeoutMs=8; */ SET /* comment */ timeoutMs=120000; -- SET timeoutMs=9;",
+        "ALTER SESSION SET timeoutMs=120000; ALTER SYSTEM SET trace=true; SELECT * FROM foo")) {
+      assertEquals(CalciteSqlParser.extractQueryOptions(sql),
+          CalciteSqlParser.compileToSqlNodeAndOptions(sql).getOptions(), sql);
+    }
+  }
+
+  @Test
+  public void testExtractQueryOptionsWithoutParsingQueryBody() {
+    String sql = "SET timeoutMs=120000; SELECT FROM WHERE OPTION(timeoutMs=300000, trace=true)";
+
+    expectThrows(SqlCompilationException.class, () -> CalciteSqlParser.compileToSqlNodeAndOptions(sql));
+    assertEquals(CalciteSqlParser.extractQueryOptions(sql), Map.of("timeoutMs", "120000", "trace", "true"));
   }
 
   @Test

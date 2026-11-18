@@ -75,6 +75,7 @@ import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.GrowingCharStream;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
+import org.apache.pinot.sql.parsers.parser.SqlParserImplConstants;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropMaterializedView;
@@ -180,6 +181,85 @@ public class CalciteSqlParser {
     }
   }
 
+  /// Extracts SQL `SET` statements and the legacy `OPTION(...)` suffix without building the executable statement's AST.
+  /// Uses the same lexer and option parser as [#compileToSqlNodeAndOptions(String)], including quoted identifiers,
+  /// literals, comments, and scoped `ALTER SESSION/SYSTEM SET` statements. `SET` options take precedence over `OPTION`.
+  ///
+  /// This is not SQL validation: executable statements and broker query-option policies must still be validated by the
+  /// broker. In particular, successfully extracting options does not mean the SQL is executable.
+  public static Map<String, String> extractQueryOptions(String sql) {
+    sql = ParserUtils.sanitizeSql(sql);
+    List<String> legacyOptions = List.of();
+    Matcher matcher = OPTIONS_REGEX_PATTEN.matcher(sql);
+    if (matcher.find()) {
+      SqlOptionsMode legacyOptionSyntaxMode = QueryOptionsUtils.getLegacyOptionSyntaxMode();
+      if (legacyOptionSyntaxMode != SqlOptionsMode.IGNORE) {
+        legacyOptions = List.of(matcher.group(1));
+        if (legacyOptionSyntaxMode == SqlOptionsMode.REJECT) {
+          throw new SqlCompilationException("Legacy OPTION(...) query options are not allowed on this cluster, use "
+              + "'SET <key> = <value>;' statements instead: " + legacyOptions);
+        }
+      }
+      sql = sql.substring(0, matcher.start());
+    }
+    try {
+      Map<String, String> options = new HashMap<>();
+      SqlParserImpl sqlParser = newSqlParser(sql);
+      int firstSeparator = sql.indexOf(';');
+      int lastInternalSeparator = sql.lastIndexOf(';', sql.endsWith(";") ? sql.length() - 2 : sql.length() - 1);
+      boolean hasInternalSeparator = lastInternalSeparator >= 0;
+      int kind = sqlParser.getToken(1).kind;
+      while (kind != SqlParserImplConstants.EOF) {
+        if (kind == SqlParserImplConstants.SET || kind == SqlParserImplConstants.RESET
+            || (kind == SqlParserImplConstants.ALTER
+                && (sqlParser.getToken(2).kind == SqlParserImplConstants.SESSION
+                    || sqlParser.getToken(2).kind == SqlParserImplConstants.SYSTEM)
+                && (sqlParser.getToken(3).kind == SqlParserImplConstants.SET
+                    || sqlParser.getToken(3).kind == SqlParserImplConstants.RESET))) {
+          extractSetOption((SqlSetOption) sqlParser.SqlStmt(), options);
+          kind = sqlParser.getToken(1).kind;
+          if (kind != SqlParserImplConstants.EOF && kind != SqlParserImplConstants.SEMICOLON) {
+            throw new SqlCompilationException("Expected ';' after SET query option");
+          }
+        } else {
+          // A final semicolon cannot start a later SET statement. Other semicolons may occur in literals or comments,
+          // so use the lexer until consuming a real separator, then skip the remainder if no internal ones are left.
+          if (!hasInternalSeparator) {
+            break;
+          }
+          while (kind != SqlParserImplConstants.EOF && kind != SqlParserImplConstants.SEMICOLON) {
+            sqlParser.getNextToken();
+            kind = sqlParser.getToken(1).kind;
+          }
+        }
+        if (kind == SqlParserImplConstants.EOF) {
+          break;
+        }
+        sqlParser.getNextToken();
+        if (firstSeparator == lastInternalSeparator) {
+          hasInternalSeparator = false;
+        }
+        kind = sqlParser.getToken(1).kind;
+      }
+      Map<String, String> resolvedOptions = QueryOptionsUtils.resolveCaseInsensitiveOptions(options);
+      if (!legacyOptions.isEmpty()) {
+        QueryOptionsUtils.resolveCaseInsensitiveOptions(extractOptionsMap(legacyOptions))
+            .forEach(resolvedOptions::putIfAbsent);
+      }
+      return resolvedOptions;
+    } catch (Throwable e) {
+      throw new SqlCompilationException(
+          "Caught exception while extracting query options: " + sql + ": " + e.getMessage(), e);
+    }
+  }
+
+  private static void extractSetOption(SqlSetOption sqlNode, Map<String, String> options) {
+    List<SqlNode> operandList = sqlNode.getOperandList();
+    SqlIdentifier key = (SqlIdentifier) operandList.get(1);
+    SqlLiteral value = (SqlLiteral) operandList.get(2);
+    options.put(key.getSimple(), value.toValue());
+  }
+
   private static SqlNodeAndOptions extractSqlNodeAndOptions(SqlNodeList sqlNodeList) {
     PinotSqlType sqlType = null;
     SqlNode statementNode = null;
@@ -216,10 +296,7 @@ public class CalciteSqlParser {
         }
       } else if (sqlNode instanceof SqlSetOption) {
         // extract options, these are non-execution statements
-        List<SqlNode> operandList = ((SqlSetOption) sqlNode).getOperandList();
-        SqlIdentifier key = (SqlIdentifier) operandList.get(1);
-        SqlLiteral value = (SqlLiteral) operandList.get(2);
-        options.put(key.getSimple(), value.toValue());
+        extractSetOption((SqlSetOption) sqlNode, options);
       } else {
         // default extract query statement (execution statement)
         if (sqlType == null) {
