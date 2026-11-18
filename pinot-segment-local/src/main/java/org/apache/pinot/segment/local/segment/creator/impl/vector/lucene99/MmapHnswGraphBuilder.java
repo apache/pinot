@@ -29,6 +29,7 @@ import org.apache.lucene.codecs.hnsw.HnswGraphProvider;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.MergeState;
 import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.FixedBitSet;
 import org.apache.lucene.util.hnsw.CloseableRandomVectorScorerSupplier;
 import org.apache.lucene.util.hnsw.HnswGraph;
@@ -37,11 +38,14 @@ import org.apache.lucene.util.hnsw.IncrementalHnswGraphMerger;
 import org.apache.lucene.util.hnsw.NeighborArray;
 import org.apache.lucene.util.hnsw.NeighborQueue;
 import org.apache.lucene.util.hnsw.RandomVectorScorer;
+import org.apache.lucene.util.hnsw.RandomVectorScorerSupplier;
 
 
 /// Serial Lucene 9.12 HNSW merge algorithm using mapped neighbor rows. Reuses Lucene's selection
 /// of a compatible source graph and mapping of its vector ordinals into the merged segment.
 final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
+  private static final int MIN_CACHED_VECTOR_DIMENSION = 256;
+
   private final MmapHnswGraph _graph;
   private final SplittableRandom _random = new SplittableRandom(HnswGraphBuilder.randSeed);
   private final double _levelMultiplier;
@@ -70,7 +74,8 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
 
   private MmapHnswGraphBuilder(MmapHnswGraph graph, FieldInfo fieldInfo,
       CloseableRandomVectorScorerSupplier scorerSupplier, int maxConn, int beamWidth) {
-    super(fieldInfo, scorerSupplier, maxConn, beamWidth);
+    super(fieldInfo, fieldInfo.getVectorDimension() >= MIN_CACHED_VECTOR_DIMENSION
+        ? new ScoreCachingSupplier(scorerSupplier) : scorerSupplier, maxConn, beamWidth);
     _graph = graph;
     _levelMultiplier = maxConn == 1 ? 1 : 1 / Math.log(maxConn);
     _visited = new FixedBitSet(graph.maxNodeId() + 1);
@@ -339,5 +344,61 @@ final class MmapHnswGraphBuilder extends IncrementalHnswGraphMerger {
   }
 
   private record Component(int entry, int size) {
+  }
+
+  /// A bounded cache local to one merge. Searching multiple levels, linking neighbors, and pruning
+  /// backlinks can all compare the same pair of vectors. Lucene's similarity functions are symmetric.
+  private static final class ScoreCachingSupplier implements RandomVectorScorerSupplier {
+    private static final int CACHE_BITS = 13;
+
+    private final RandomVectorScorerSupplier _delegate;
+    private final long[] _pairs = new long[1 << CACHE_BITS];
+    private final float[] _scores = new float[_pairs.length];
+
+    ScoreCachingSupplier(RandomVectorScorerSupplier delegate) {
+      _delegate = delegate;
+    }
+
+    @Override
+    public RandomVectorScorer scorer(int ord)
+        throws IOException {
+      RandomVectorScorer scorer = _delegate.scorer(ord);
+      return new RandomVectorScorer() {
+        @Override
+        public float score(int node)
+            throws IOException {
+          long pair = (((long) Math.min(ord, node) << Integer.SIZE) | Math.max(ord, node)) + 1;
+          int slot = (int) ((pair * 0x9E3779B97F4A7C15L) >>> (Long.SIZE - CACHE_BITS));
+          if (_pairs[slot] == pair) {
+            return _scores[slot];
+          }
+          float score = scorer.score(node);
+          _pairs[slot] = pair;
+          _scores[slot] = score;
+          return score;
+        }
+
+        @Override
+        public int maxOrd() {
+          return scorer.maxOrd();
+        }
+
+        @Override
+        public int ordToDoc(int ord) {
+          return scorer.ordToDoc(ord);
+        }
+
+        @Override
+        public Bits getAcceptOrds(Bits acceptDocs) {
+          return scorer.getAcceptOrds(acceptDocs);
+        }
+      };
+    }
+
+    @Override
+    public RandomVectorScorerSupplier copy()
+        throws IOException {
+      return new ScoreCachingSupplier(_delegate.copy());
+    }
   }
 }
