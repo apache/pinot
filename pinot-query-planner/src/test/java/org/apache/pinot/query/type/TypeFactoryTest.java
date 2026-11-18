@@ -171,6 +171,68 @@ public class TypeFactoryTest {
         eventType);
   }
 
+  /// Child specs map by shape: a multi-value child is an array of its type, and a complex child (a nested OPEN_STRUCT,
+  /// MAP or LIST) has no Calcite counterpart as a key read, so it is VARCHAR, the JSON text the leaf returns.
+  /// With null handling on, every declared key is nullable since any row may lack it.
+  @Test(dataProvider = "nullHandlingModes")
+  public void testOpenStructChildTypesFollowTheirShape(boolean columnNullMode) {
+    TypeFactory typeFactory = new TypeFactory();
+    Map<String, FieldSpec> children = Map.of(
+        "tags", new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false),
+        "n", new DimensionFieldSpec("n", FieldSpec.DataType.LONG, true),
+        "inner", new ComplexFieldSpec("inner", FieldSpec.DataType.OPEN_STRUCT, true, Map.of()),
+        "m", new ComplexFieldSpec("m", FieldSpec.DataType.MAP, true, Map.of()),
+        "l", new ComplexFieldSpec("l", FieldSpec.DataType.LIST, true, Map.of()));
+    Schema schema = new Schema.SchemaBuilder().setEnableColumnBasedNullHandling(columnNullMode).build();
+    schema.addField(new ComplexFieldSpec("event", FieldSpec.DataType.OPEN_STRUCT, true, children));
+
+    OpenStructSqlType open = (OpenStructSqlType) typeFactory.createRelDataTypeFromSchema(schema)
+        .getField("event", true, false).getType();
+
+    Assert.assertEquals(open.getDeclaredKeyType("tags").getSqlTypeName(), SqlTypeName.ARRAY);
+    Assert.assertEquals(open.getDeclaredKeyType("tags").getComponentType().getSqlTypeName(), SqlTypeName.VARCHAR);
+    Assert.assertEquals(open.getDeclaredKeyType("n").getSqlTypeName(), SqlTypeName.BIGINT);
+    for (String complex : List.of("inner", "m", "l")) {
+      Assert.assertEquals(open.getDeclaredKeyType(complex).getSqlTypeName(), SqlTypeName.VARCHAR, complex);
+    }
+    for (String key : children.keySet()) {
+      Assert.assertEquals(open.getDeclaredKeyType(key).isNullable(), columnNullMode, key);
+    }
+  }
+
+  /// `createTypeWithNullability` returns the same instance when nothing changes, and the canonical instance of the new
+  /// nullability otherwise, so equal declarations stay one type and keep their declared keys.
+  @Test
+  public void testOpenStructNullabilityChangeIsCanonical() {
+    TypeFactory typeFactory = new TypeFactory();
+    RelDataType varchar = typeFactory.createSqlType(SqlTypeName.VARCHAR);
+    OpenStructSqlType open =
+        new OpenStructSqlType(varchar, varchar, false, Map.of("n", typeFactory.createSqlType(SqlTypeName.BIGINT)));
+    Assert.assertSame(typeFactory.createTypeWithNullability(open, false), open);
+    RelDataType nullable = typeFactory.createTypeWithNullability(open, true);
+    Assert.assertTrue(nullable instanceof OpenStructSqlType);
+    Assert.assertTrue(nullable.isNullable());
+    Assert.assertSame(typeFactory.createTypeWithNullability(nullable, true), nullable);
+    Assert.assertSame(typeFactory.createTypeWithNullability(nullable, true),
+        typeFactory.createTypeWithNullability(open, true));
+    Assert.assertEquals(typeFactory.createTypeWithNullability(nullable, false), open);
+  }
+
+  /// `leastRestrictive` only keeps the OPEN_STRUCT type when every input is one; any other mix, and a single input,
+  /// are Calcite's.
+  @Test
+  public void testLeastRestrictiveFallsBackToCalciteForOtherMixes() {
+    TypeFactory typeFactory = new TypeFactory();
+    RelDataType varchar = typeFactory.createSqlType(SqlTypeName.VARCHAR);
+    RelDataType bigint = typeFactory.createSqlType(SqlTypeName.BIGINT);
+    OpenStructSqlType open = new OpenStructSqlType(varchar, varchar, false, Map.of("n", bigint));
+
+    Assert.assertEquals(typeFactory.leastRestrictive(List.of(bigint, bigint)), bigint);
+    Assert.assertFalse(typeFactory.leastRestrictive(List.of(bigint, open)) instanceof OpenStructSqlType);
+    Assert.assertFalse(typeFactory.leastRestrictive(List.of(open, bigint)) instanceof OpenStructSqlType);
+    Assert.assertTrue(typeFactory.leastRestrictive(List.of(open)) instanceof OpenStructSqlType);
+  }
+
   /// A key two declarations agree on keeps its type even when only one side is nullable; a key they type
   /// differently, or that only one declares, is dropped (reads as VARCHAR).
   @Test

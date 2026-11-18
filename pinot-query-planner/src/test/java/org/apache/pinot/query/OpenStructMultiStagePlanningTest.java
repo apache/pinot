@@ -147,6 +147,39 @@ public class OpenStructMultiStagePlanningTest extends QueryEnvironmentTestBase {
     assertTrue(plan.contains("CAST(ITEM("), plan);
   }
 
+  /// The physical optimizer converts the table scan's row type through its own converter; the column is JSON there
+  /// too, and key reads are typed as with the default planner.
+  @Test
+  public void testPhysicalOptimizerPlansTheColumnAsJson() {
+    String options = "SET usePhysicalOptimizer=true; ";
+    DataSchema schema = _env.planQuery(options + "SELECT col1, v FROM d").getQueryStageMap().get(0).getPlanFragment()
+        .getFragmentRoot().getDataSchema();
+    assertEquals(schema.getColumnDataTypes()[1], ColumnDataType.JSON);
+    for (String sql : List.of("SELECT SUM(v['n']), COUNT(*) FROM d WHERE v['n'] > 50", "SELECT v['name'] FROM d",
+        "SELECT v['n'], COUNT(*) FROM d GROUP BY v['n']")) {
+      assertNotNull(_env.planQuery(options + sql), sql);
+    }
+  }
+
+  /// `ITEM` on an array (a multi-value column) keeps its standard typing and one-based indexing; only an OPEN_STRUCT
+  /// operand takes the declared-key typing.
+  @Test
+  public void testItemOnNonOpenStructOperandsIsUnchanged() {
+    RelDataType rowType = validatedRowType("SELECT mcol1[1], mcol2[1] FROM e");
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
+    assertEquals(rowType.getFieldList().get(1).getType().getSqlTypeName(), SqlTypeName.BIGINT);
+    assertNotNull(_env.planQuery("SELECT mcol1[1], mcol2[1] FROM e WHERE mcol2[1] > 5"));
+  }
+
+  /// A key is looked up in the operand's own declared keys, so the same key name on another OPEN_STRUCT column with a
+  /// different declaration is typed by that column's declaration.
+  @Test
+  public void testDeclaredKeyTypeFollowsTheColumnItIsReadFrom() {
+    RelDataType rowType = validatedRowType("SELECT x.v['price'], u.v['price'] FROM d AS x CROSS JOIN d2 AS u LIMIT 1");
+    assertEquals(rowType.getFieldList().get(0).getType().getSqlTypeName(), SqlTypeName.DOUBLE);
+    assertEquals(rowType.getFieldList().get(1).getType().getSqlTypeName(), SqlTypeName.VARCHAR);
+  }
+
   @Test
   public void testQueriesThatDoNotReadTheColumnPlan() {
     for (String sql : List.of("SELECT COUNT(*) FROM d", "SELECT SUM(col3) FROM d", "SELECT * FROM d LIMIT 1")) {
