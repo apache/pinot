@@ -52,6 +52,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -125,10 +126,10 @@ public class OpChainConverterDispatcherTest {
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(8000);
-    when(mailboxService.getSendingMailbox(anyString(), anyInt(), anyString(), anyLong(), any()))
+    when(mailboxService.getSendingMailbox(anyString(), anyInt(), anyLong(), anyString(), anyLong(), any()))
         .thenReturn(mock(SendingMailbox.class));
 
-    MailboxInfo receiverMailboxInfo = new MailboxInfo("localhost", 18080, List.of(0));
+    MailboxInfo receiverMailboxInfo = new MailboxInfo("localhost", 18080, List.of(0), 1234L);
     WorkerMetadata workerMetadata =
         new WorkerMetadata(0, Map.of(receiverStageId, new MailboxInfos(receiverMailboxInfo)));
     StageMetadata stageMetadata = new StageMetadata(stageId, List.of(workerMetadata), Map.of());
@@ -141,8 +142,8 @@ public class OpChainConverterDispatcherTest {
         "MURMUR3");
 
     try (OpChain opChain = PlanNodeToOpChain.convert(sendNode, context)) {
-      Assert.assertTrue(opChain.getRoot() instanceof MailboxSendOperator);
-      verify(mailboxService).getSendingMailbox(anyString(), anyInt(), anyString(), anyLong(), any());
+      assertTrue(opChain.getRoot() instanceof MailboxSendOperator);
+      verify(mailboxService).getSendingMailbox(eq("localhost"), eq(18080), eq(1234L), anyString(), anyLong(), any());
     }
   }
 

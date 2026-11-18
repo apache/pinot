@@ -36,13 +36,14 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.MailboxMergeReceiveNode;
+import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
@@ -55,6 +56,7 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
         RelDistribution.Type.SINGLETON, List.of(), List.of(new RelFieldCollation(0)), null);
     Plan.PlanNode proto = PlanNodeSerializer.process(node);
     assertEquals(proto.getNodeCase(), Plan.PlanNode.NodeCase.MAILBOXMERGERECEIVENODE);
+    assertEquals(proto.getNodeCase().getNumber(), 20);
     assertEquals(PlanNodeDeserializer.process(proto), node);
     // Emulate a legacy parser retaining tag 20 as unknown: there is no recognized executable node, so fail loudly.
     Plan.PlanNode unknown = proto.toBuilder().clearMailboxMergeReceiveNode().setUnknownFields(
