@@ -153,7 +153,14 @@
                     </condition>
                   </fail>
                   <copy file="${patched.jar}" tofile="${main.jar}" overwrite="true" />
-                  <unzip src="${patched.jar}" dest="${project.build.outputDirectory}" overwrite="true" />
+                  <!-- A directory on the classpath is never multi-release, so the JVM ignores
+                       META-INF/versions there. Leave it out: JaCoCo report-aggregate reads
+                       target/classes and fails on two classes with the same name. -->
+                  <unzip src="${patched.jar}" dest="${project.build.outputDirectory}" overwrite="true">
+                    <patternset>
+                      <exclude name="META-INF/versions/**" />
+                    </patternset>
+                  </unzip>
                 </target>
               </configuration>
             </execution>
