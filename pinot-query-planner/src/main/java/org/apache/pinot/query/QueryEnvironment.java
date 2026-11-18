@@ -328,6 +328,11 @@ public class QueryEnvironment {
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
       return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
     } catch (QueryException e) {
+      if (plannerContext != null && plannerContext.getValidator().isGroupByNameResolvedToShadowedColumn()) {
+        // Lets callers retry with preferSelectAliasInGroupBy. With the column, the query can fail in the validation
+        // or later, for example when HAVING compares the name with a literal of the type of the alias
+        throw new GroupByAliasShadowedByColumnException(e);
+      }
       throw e;
     } catch (Throwable t) {
       if (plannerContext != null) {
@@ -443,19 +448,6 @@ public class QueryEnvironment {
   /// may be slightly different. For example, a function call may have its arguments casted to the correct type (only
   /// in case it was legal to apply an automatic cast for these types!).
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
-    try {
-      return validateAndClassifyErrors(sqlNode, plannerContext);
-    } catch (QueryException e) {
-      if (e.getErrorCode() == QueryErrorCode.QUERY_VALIDATION
-          && plannerContext.getValidator().isGroupByNameResolvedToShadowedColumn()) {
-        // Lets callers retry with preferSelectAliasInGroupBy
-        throw new GroupByAliasShadowedByColumnException(e);
-      }
-      throw e;
-    }
-  }
-
-  private SqlNode validateAndClassifyErrors(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
       if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
