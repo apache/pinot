@@ -107,6 +107,15 @@ public class MvAggregateFallbackTest extends QueryEnvironmentTestBase {
   }
 
   @Test
+  public void testSecondPlanKeepsPreferSelectAliasInGroupBy() {
+    // With the option, GROUP BY col2 is the alias of the MV key, not the column col2. The second plan is validated
+    // again from a copy of the query, and must resolve the name in the same way.
+    String plan = explain("SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1) AS col2, "
+        + "COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY col2");
+    assertTrue(plan.contains(MV_AGGREGATE + "(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]]"), plan);
+  }
+
+  @Test
   public void testErrorOfTheSecondPlanKeepsTheErrorOfTheFirstPlan() {
     // The plan with the MV aggregate fails: the message says what is supported and why the second plan failed
     QueryException e = expectThrows(QueryException.class, () -> explain("EXPLAIN PLAN FOR SELECT "

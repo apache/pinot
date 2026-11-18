@@ -493,6 +493,11 @@
           "\n          PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
+      },
+      {
+        "description": "The same array key above a join, under GROUP BY ARRAY_TO_MV: the plan with the MV aggregate has the complete check, so the query fails as before the MV aggregate",
+        "sql": "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(m), COUNT(*) FROM (SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ e.mcol1 AS m, COUNT(*) AS c FROM e JOIN a ON e.col1 = a.col1 GROUP BY e.mcol1) GROUP BY ARRAY_TO_MV(m)",
+        "expectedException": ".*Multi-valued column found as a grouping key in AGGREGATE in the intermediate stage.*ARRAY_TO_MV is supported only.*"
       }
     ]
   }
