@@ -19,10 +19,12 @@
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.data.OpenStructKeyFlattener;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -59,7 +61,33 @@ public class OpenStructSparseBlobReader {
     // TODO: an N-key projection parses each doc N times. FastJsonPathExtractor fixes this in one pass,
     // but only across a batch of paths — this single-key signature has to change first.
     JsonNode blob = parseBlob(docId, context);
-    return blob == null ? null : blob.get(key);
+    return blob == null ? null : resolve(blob, key);
+  }
+
+  /// Resolves `key` against one document the way [OpenStructKeyFlattener] would have keyed
+  /// it at ingest, so `col['o.z']` reads `{"o": {"z": 2}}` whether or not the column was flattened:
+  /// - a key the object carries literally wins at every level (`.` is an ordinary key character);
+  /// - otherwise the key is walked through nested objects, taking the first match in document order when two
+  ///   synthesized paths collide, as the flattener's first emission does;
+  /// - arrays are never indexed into, and a missing, null or scalar intermediate, or an empty segment, is absent.
+  @Nullable
+  static JsonNode resolve(JsonNode node, String key) {
+    JsonNode literal = node.get(key);
+    if (literal != null || key.indexOf(OpenStructKeyFlattener.PATH_SEPARATOR) < 0 || !node.isObject()) {
+      return literal;
+    }
+    for (Map.Entry<String, JsonNode> field : node.properties()) {
+      String name = field.getKey();
+      JsonNode child = field.getValue();
+      if (child.isObject() && !name.isEmpty() && key.length() > name.length() + 1 && key.startsWith(name)
+          && key.charAt(name.length()) == OpenStructKeyFlattener.PATH_SEPARATOR) {
+        JsonNode found = resolve(child, key.substring(name.length() + 1));
+        if (found != null) {
+          return found;
+        }
+      }
+    }
+    return null;
   }
 
   @Nullable

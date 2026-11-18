@@ -75,6 +75,53 @@ public class OpenStructSparseBlobReaderTest {
     assertNull(blob.getValue(1, "region", null));
   }
 
+  private static OpenStructSparseBlobReader readerOf(String... blobs) {
+    return new OpenStructSparseBlobReader(new FakeStringForwardIndex(blobs), FakeStringForwardIndex.nullVector(blobs),
+        blobs.length);
+  }
+
+  @Test
+  public void testDottedKeyWalksNestedObjects() {
+    OpenStructSparseBlobReader blob = readerOf("{\"o\":{\"z\":2,\"w\":{\"x\":\"deep\"}},\"n\":5}");
+    assertEquals(blob.getValue(0, "o.z", null).asInt(), 2);
+    assertEquals(blob.getValue(0, "o.w.x", null).asText(), "deep");
+    // A path that ends on an object returns the object, like a top-level key does.
+    assertEquals(blob.getValue(0, "o.w", null).toString(), "{\"x\":\"deep\"}");
+    assertEquals(blob.getValue(0, "n", null).asInt(), 5);
+  }
+
+  @Test
+  public void testLiteralDottedKeyWinsOverPath() {
+    // Same rule as OpenStructKeyFlattener: a key the document carries is never shadowed by a path.
+    assertEquals(readerOf("{\"a.b\":100,\"a\":{\"b\":200}}").getValue(0, "a.b", null).asInt(), 100);
+    // The literal wins at an inner level too.
+    assertEquals(readerOf("{\"a\":{\"b.c\":1,\"b\":{\"c\":2}}}").getValue(0, "a.b.c", null).asInt(), 1);
+    // Two synthesized paths: the first in document order wins, as in the flattener.
+    assertEquals(readerOf("{\"a.b\":{\"c\":1},\"a\":{\"b.c\":2}}").getValue(0, "a.b.c", null).asInt(), 1);
+  }
+
+  @Test
+  public void testDottedKeyThatCannotBeWalkedIsAbsent() {
+    OpenStructSparseBlobReader blob = readerOf("{\"tags\":[\"x\",\"y\"],\"s\":\"text\",\"o\":{\"z\":2},\"nul\":null}");
+    assertNull(blob.getValue(0, "tags.0", null));    // arrays are not indexed into
+    assertNull(blob.getValue(0, "s.len", null));     // scalar intermediate
+    assertNull(blob.getValue(0, "o.missing", null)); // missing leaf
+    assertNull(blob.getValue(0, "nope.z", null));    // missing intermediate
+    assertNull(blob.getValue(0, "nul.z", null));     // null intermediate
+    assertNull(blob.getValue(0, "o..z", null));      // empty segment
+    assertNull(blob.getValue(0, "o.", null));        // trailing separator
+  }
+
+  @Test
+  public void testPresenceFollowsDottedPath() {
+    OpenStructSparseBlobReader blob = readerOf("{\"o\":{\"z\":1}}", "{\"o\":{}}", "{\"o\":{\"z\":null}}", "{}");
+    ImmutableRoaringBitmap present = blob.computePresence("o.z");
+    assertTrue(present.contains(0));
+    assertFalse(present.contains(1));
+    assertFalse(present.contains(2)); // explicit JSON null is absent, as for top-level keys
+    assertFalse(present.contains(3));
+  }
+
   @Test
   public void testExplicitJsonNullIsPresentButNullNode() {
     String[] blobs = {"{\"region\":null}"};
