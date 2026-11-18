@@ -48,6 +48,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
@@ -1102,7 +1103,8 @@ public final class TableConfigUtils {
   /// [#validateUpsertAndDedupCommonConfig]), the OFFLINE restrictions (no partial upsert, segment partition config,
   /// comparison or time column), no multi-tier / star-tree, comparison / delete-record / out-of-order columns are
   /// valid, deleted-keys compaction consistency, post-partial-upsert transforms, consistency-mode constraints, and
-  /// delegates to [#validateTTLForUpsertConfig] and [#validatePartialUpsertStrategies]; rejects MD5 when disabled.
+  /// delegates to [#validateTTLForUpsertConfig], [#validatePartialUpsertStrategies] and
+  /// [#validatePauselessUpsertModes]; rejects MD5 when disabled.
   @VisibleForTesting
   static void validateUpsertConfig(TableConfig tableConfig, Schema schema) {
     validateUpsertConfig(tableConfig, schema, null);
@@ -1272,6 +1274,7 @@ public final class TableConfigUtils {
     validateTTLForUpsertConfig(tableConfig, schema);
     validatePartialUpsertStrategies(tableConfig, schema);
     validateConsumptionDuringUpsertRevert(tableConfig);
+    validatePauselessUpsertModes(tableConfig, existingTableConfig);
     Preconditions.checkState(!(PinotMd5Mode.isPinotMd5Disabled() && upsertConfig.getHashFunction() == HashFunction.MD5),
         "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED);
   }
@@ -1319,6 +1322,32 @@ public final class TableConfigUtils {
             + "dropOutOfOrderRecord or outOfOrderRecordColumn revert upsert metadata in PROTECTED consistency mode. "
             + "Set parallelSegmentConsumptionPolicy to DISALLOW_ALWAYS",
         policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit");
+  }
+
+  /// Rejects partial upsert and `dropOutOfOrderRecord` on a pauseless table. A pauseless segment is committed before it
+  /// is built, so a failed build is repaired by consuming its offsets again, and for these modes that second pass can
+  /// produce different rows: a partial upsert merge and an out-of-order drop both depend on the upsert metadata at the
+  /// time each record arrives.
+  ///
+  /// Only a new table, or an update that turns one of these combinations on, is rejected. An existing table that
+  /// already has the combination can still be updated.
+  @VisibleForTesting
+  static void validatePauselessUpsertModes(TableConfig tableConfig, @Nullable TableConfig existingTableConfig) {
+    if (!PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      return;
+    }
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    boolean existingPauseless = PauselessConsumptionUtils.isPauselessEnabled(existingTableConfig);
+    UpsertConfig existingUpsertConfig = existingPauseless ? existingTableConfig.getUpsertConfig() : null;
+    if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
+      Preconditions.checkState(
+          existingUpsertConfig != null && existingUpsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
+          "Partial upsert is not supported for tables with pauseless consumption enabled");
+    }
+    if (upsertConfig.isDropOutOfOrderRecord()) {
+      Preconditions.checkState(existingUpsertConfig != null && existingUpsertConfig.isDropOutOfOrderRecord(),
+          "dropOutOfOrderRecord is not supported for tables with pauseless consumption enabled");
+    }
   }
 
   /// Checks if a data type is valid for time-based comparison operations (upsert/dedup).

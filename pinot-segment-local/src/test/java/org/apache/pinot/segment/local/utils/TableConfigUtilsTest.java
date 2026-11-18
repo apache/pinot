@@ -2859,6 +2859,53 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidatePauselessUpsertModes() {
+    UpsertConfig fullUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    UpsertConfig dropOutOfOrderConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    dropOutOfOrderConfig.setDropOutOfOrderRecord(true);
+    TableConfig pauselessFull = createTableConfigWithConsumptionPolicy(fullUpsertConfig, null, true);
+    TableConfig pauselessPartial = createTableConfigWithConsumptionPolicy(partialUpsertConfig, null, true);
+    TableConfig pauselessDropOutOfOrder = createTableConfigWithConsumptionPolicy(dropOutOfOrderConfig, null, true);
+    TableConfig partial = createTableConfigWithConsumptionPolicy(partialUpsertConfig, null, false);
+    TableConfig dropOutOfOrder = createTableConfigWithConsumptionPolicy(dropOutOfOrderConfig, null, false);
+
+    // A new pauseless table cannot use partial upsert or dropOutOfOrderRecord
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessPartial, null));
+    assertEquals(e.getMessage(), "Partial upsert is not supported for tables with pauseless consumption enabled");
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, null));
+    assertEquals(e.getMessage(), "dropOutOfOrderRecord is not supported for tables with pauseless consumption enabled");
+    TableConfigUtils.validatePauselessUpsertModes(pauselessFull, null);
+    TableConfigUtils.validatePauselessUpsertModes(partial, null);
+    TableConfigUtils.validatePauselessUpsertModes(dropOutOfOrder, null);
+
+    // An update cannot turn either combination on, whether it enables pauseless or the upsert mode
+    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validatePauselessUpsertModes(pauselessPartial,
+        partial));
+    expectThrows(IllegalStateException.class, () -> TableConfigUtils.validatePauselessUpsertModes(pauselessPartial,
+        pauselessFull));
+    expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, dropOutOfOrder));
+    expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, pauselessPartial));
+
+    // An existing table that already has the combination can still be updated
+    TableConfigUtils.validatePauselessUpsertModes(pauselessPartial, pauselessPartial);
+    TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, pauselessDropOutOfOrder);
+
+    // The check is part of the upsert validation
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", DataType.STRING)
+        .setPrimaryKeyColumns(List.of("myCol"))
+        .build();
+    e = expectThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateUpsertConfig(pauselessDropOutOfOrder, schema));
+    assertEquals(e.getMessage(), "dropOutOfOrderRecord is not supported for tables with pauseless consumption enabled");
+  }
+
+  @Test
   public void testConsumptionPolicyMatrix() {
     ConsumingSegmentConsistencyModeListener listener = ConsumingSegmentConsistencyModeListener.getInstance();
     try {
