@@ -85,7 +85,9 @@ public class PlannerContext implements AutoCloseable, Context {
         ? PinotOperatorTable.withNullableArrayToMv(envConfig.isNullHandlingEnabled()) : config.getOperatorTable(),
         catalogReader, typeFactory,
         QueryOptionsUtils.isPreferSelectAliasInGroupBy(options, envConfig.defaultPreferSelectAliasInGroupBy()),
-        envConfig.meterGroupByAliasShadowedByColumn());
+        // The plan with the MV aggregate is the second plan of a query. The validator of its first plan marked the
+        // meter.
+        envConfig.meterGroupByAliasShadowedByColumn() && !useMvAggregate);
     _useMvAggregate = useMvAggregate;
     _options = options;
     _envConfig = envConfig;
