@@ -25,11 +25,10 @@ import java.util.function.IntConsumer;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.automaton.Automaton;
 import org.apache.lucene.util.automaton.CharacterRunAutomaton;
-import org.apache.lucene.util.automaton.Operations;
-import org.apache.lucene.util.automaton.RegExp;
 import org.apache.lucene.util.automaton.Transition;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.Util;
+import org.apache.pinot.segment.local.utils.LuceneRegexpAutomaton;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
@@ -37,21 +36,16 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 /// queries. This class handles only case-insensitive matching using `FST<BytesRef>` type.
 ///
 /// The regexp query is converted to lowercase and then into an automaton for matching against the FST.
-/// This class is separate from RegexpMatcher because case-insensitive logic is fundamentally different
-/// from case-sensitive logic and doesn't share code.
 ///
 /// This class is not thread-safe. Create a new instance (or use the static helper) per query.
 public class RegexpMatcherCaseInsensitive {
   private final FST<BytesRef> _ifst;
   private final Automaton _automaton;
 
-  @SuppressWarnings("deprecation") // Preserve the complement syntax supported by existing FST queries.
   public RegexpMatcherCaseInsensitive(String regexQuery, FST<BytesRef> ifst) {
     _ifst = ifst;
     // For case-insensitive FSTs, convert regex to lowercase since we only store lowercase keys
-    _automaton = Operations.determinize(
-        new RegExp(regexQuery.toLowerCase(), RegExp.ALL | RegExp.DEPRECATED_COMPLEMENT).toAutomaton(),
-        Operations.DEFAULT_DETERMINIZE_WORK_LIMIT);
+    _automaton = LuceneRegexpAutomaton.compile(regexQuery.toLowerCase());
   }
 
   /// Runs case-insensitive matching of the given regexp query on the FST, emitting the values (dict ids) of each

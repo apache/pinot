@@ -24,11 +24,10 @@ import java.util.List;
 import java.util.function.IntConsumer;
 import org.apache.lucene.util.automaton.Automaton;
 import org.apache.lucene.util.automaton.CharacterRunAutomaton;
-import org.apache.lucene.util.automaton.Operations;
-import org.apache.lucene.util.automaton.RegExp;
 import org.apache.lucene.util.automaton.Transition;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.Util;
+import org.apache.pinot.segment.local.utils.LuceneRegexpAutomaton;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
@@ -44,11 +43,9 @@ public class RegexpMatcher {
   private final FST<Long> _fst;
   private final Automaton _automaton;
 
-  @SuppressWarnings("deprecation") // Preserve the complement syntax supported by existing FST queries.
   public RegexpMatcher(String regexQuery, FST<Long> fst) {
     _fst = fst;
-    _automaton = Operations.determinize(new RegExp(regexQuery, RegExp.ALL | RegExp.DEPRECATED_COMPLEMENT).toAutomaton(),
-        Operations.DEFAULT_DETERMINIZE_WORK_LIMIT);
+    _automaton = LuceneRegexpAutomaton.compile(regexQuery);
   }
 
   /// Runs matching of the given regexp query on the FST, emitting the value (dict id) of each matched entry to the

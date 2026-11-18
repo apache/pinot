@@ -77,6 +77,12 @@ public class IFSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   @Test
+  public void testOversizedRegexRepetitions() {
+    assertThrows(IllegalArgumentException.class, () -> new RegexpMatcherCaseInsensitive("(A{101}){101}", null));
+    assertTrue(new RegexpMatcherCaseInsensitive("(A{1,2}){2}", null).match("aAa"));
+  }
+
+  @Test
   public void testIFSTBuilder()
       throws IOException {
     SortedMap<String, Integer> x = new TreeMap<>();

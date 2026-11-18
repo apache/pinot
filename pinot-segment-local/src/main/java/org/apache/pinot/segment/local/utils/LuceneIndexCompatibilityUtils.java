@@ -71,10 +71,10 @@ public final class LuceneIndexCompatibilityUtils {
     }
     Version writerVersion;
     try (IndexInput input = directory.openInput(commit, IOContext.READONCE)) {
-      // Both Lucene 9.12 and 10.0 use this commit layout. Inspect its creation version before SegmentInfos,
+      // Lucene commit headers through 10.6 share this prefix. Inspect the creation version before SegmentInfos,
       // whose constructor rejects a future major with IllegalArgumentException rather than a format exception.
       try {
-        CodecUtil.checkHeader(input, "segments", SegmentInfos.VERSION_74, SegmentInfos.VERSION_86);
+        CodecUtil.checkHeader(input, "segments", SegmentInfos.VERSION_74, SegmentInfos.VERSION_10_6);
       } catch (IndexFormatTooNewException e) {
         CodecUtil.checksumEntireFile(input);
         return true;

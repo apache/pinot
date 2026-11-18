@@ -19,14 +19,21 @@
 package org.apache.pinot.segment.local.utils;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.List;
 import java.util.Map;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
+import org.apache.lucene.analysis.core.WhitespaceTokenizer;
+import org.apache.lucene.analysis.synonym.SynonymGraphFilter;
+import org.apache.lucene.analysis.synonym.SynonymMap;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
 import org.apache.lucene.queries.spans.SpanQuery;
 import org.apache.lucene.queries.spans.SpanTermQuery;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.PrefixQuery;
@@ -34,9 +41,16 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.WildcardQuery;
+import org.apache.lucene.util.CharsRef;
+import org.apache.lucene.util.CharsRefBuilder;
 import org.apache.pinot.segment.local.segment.index.text.lucene.parsers.PrefixPhraseQueryParser;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class LuceneTextIndexUtilsTest {
@@ -102,6 +116,55 @@ public class LuceneTextIndexUtilsTest {
     // Test 2: Regex query is not re-written.
     RegexpQuery regexpQuery = new RegexpQuery(new Term("field", "\\d+"));
     Assert.assertEquals(regexpQuery, LuceneTextIndexUtils.convertToMultiTermSpanQuery(regexpQuery));
+  }
+
+  @Test
+  public void testWildcardPhrasePreservesMultiwordAnalysis()
+      throws Exception {
+    SynonymMap.Builder synonyms = new SynonymMap.Builder(true);
+    synonyms.add(SynonymMap.Builder.join(new String[]{"new", "york"}, new CharsRefBuilder()),
+        new CharsRef("nyc"), false);
+    SynonymMap synonymMap = synonyms.build();
+    try (Analyzer analyzer = new Analyzer() {
+      @Override
+      protected TokenStreamComponents createComponents(String fieldName) {
+        Tokenizer tokenizer = new WhitespaceTokenizer();
+        return new TokenStreamComponents(tokenizer, new SynonymGraphFilter(tokenizer, synonymMap, false));
+      }
+    }) {
+      QueryParserBase parser = TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(
+          QueryParser.class.getName()).newInstance("field", analyzer);
+      parser.setAllowLeadingWildcard(true);
+      Query query = parser.parse("*ava realtime new york system*");
+      Query span = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
+      assertTrue(span instanceof SpanNearQuery);
+      assertEquals(((SpanNearQuery) span).getClauses()[2], new SpanTermQuery(new Term("field", "nyc")));
+
+      Query grouped = parser.parse("*ava (realtime new york) system*");
+      assertEquals(LuceneTextIndexUtils.convertToMultiTermSpanQuery(grouped), grouped);
+      Query escaped = parser.parse("*ava realtime\\ nyc system*");
+      assertEquals(LuceneTextIndexUtils.convertToMultiTermSpanQuery(escaped), escaped);
+    }
+  }
+
+  @Test
+  public void testRegexpConstructionBudget()
+      throws Exception {
+    try (Analyzer analyzer = new WhitespaceAnalyzer()) {
+      QueryParserBase defaultParser =
+          TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(QueryParser.class.getName())
+              .newInstance("field", analyzer);
+      assertThrows(IllegalArgumentException.class, () -> defaultParser.parse("/a{10001}/"));
+      for (String parser : List.of("CLASSIC", "COMPLEX", "STANDARD", "MATCH")) {
+        LuceneTextIndexUtils.LuceneTextIndexOptions options =
+            LuceneTextIndexUtils.createOptions("parser=" + parser);
+        assertThrows(RuntimeException.class,
+            () -> LuceneTextIndexUtils.createQueryParserWithOptions("/a{10001}/", options, "field", analyzer));
+        Query query = LuceneTextIndexUtils.createQueryParserWithOptions("/a{1,2}/", options, "field", analyzer);
+        assertTrue(query instanceof RegexpQuery, parser);
+        assertEquals(((RegexpQuery) query).getRegexp(), new Term("field", "a{1,2}"), parser);
+      }
+    }
   }
 
   @Test
