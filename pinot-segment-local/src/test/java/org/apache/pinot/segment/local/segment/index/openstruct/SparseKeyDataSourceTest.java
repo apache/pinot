@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -72,6 +73,107 @@ public class SparseKeyDataSourceTest {
     assertFalse(longs.getNullValueVector().isNull(0));
     assertTrue(longs.getNullValueVector().isNull(1));
     assertFalse(longs.getNullValueVector().isNull(2));
+  }
+
+  private static SparseKeyDataSource multiValue(DataType declaredType, String... blobs) {
+    OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(new FakeStringForwardIndex(blobs),
+        FakeStringForwardIndex.nullVector(blobs), blobs.length);
+    return new SparseKeyDataSource(new DimensionFieldSpec("k", declaredType, false), blob, 3);
+  }
+
+  /// Every multi-value getter converts each element to the key's stored type (numeric text and fractions as the dense
+  /// tier converts them), reads a document without the key as the single default the dense tier stores for it, reads a
+  /// scalar stored before the key became multi-value as a one-element value, and fills a caller's buffer.
+  @Test
+  public void testMultiValueNumericGettersConvertEachElement() {
+    String[] blobs = {"{\"k\":[1,\"2\",3.0]}", null, "{\"k\":4}"};
+
+    ForwardIndexReader<?> ints = multiValue(DataType.INT, blobs).getForwardIndex();
+    assertEquals(ints.getNumValuesMV(0, null), 3);
+    assertEquals(ints.getIntMV(0, null), new int[]{1, 2, 3});
+    int[] intBuffer = new int[3];
+    assertEquals(ints.getIntMV(0, intBuffer, null), 3);
+    assertEquals(intBuffer, new int[]{1, 2, 3});
+    assertEquals(ints.getIntMV(1, null), new int[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT});
+    assertEquals(ints.getNumValuesMV(1, null), 1);
+    assertEquals(ints.getIntMV(2, null), new int[]{4});
+
+    ForwardIndexReader<?> longs = multiValue(DataType.LONG, blobs).getForwardIndex();
+    long[] longBuffer = new long[3];
+    assertEquals(longs.getLongMV(0, longBuffer, null), 3);
+    assertEquals(longBuffer, new long[]{1, 2, 3});
+
+    ForwardIndexReader<?> floats = multiValue(DataType.FLOAT, blobs).getForwardIndex();
+    assertEquals(floats.getFloatMV(0, null), new float[]{1f, 2f, 3f});
+    float[] floatBuffer = new float[3];
+    assertEquals(floats.getFloatMV(0, floatBuffer, null), 3);
+    assertEquals(floatBuffer, new float[]{1f, 2f, 3f});
+    assertEquals(floats.getFloatMV(1, null), new float[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT});
+    assertEquals(floats.getFloatMV(2, null), new float[]{4f});
+
+    ForwardIndexReader<?> doubles = multiValue(DataType.DOUBLE, blobs).getForwardIndex();
+    assertEquals(doubles.getDoubleMV(0, null), new double[]{1.0, 2.0, 3.0});
+    double[] doubleBuffer = new double[3];
+    assertEquals(doubles.getDoubleMV(0, doubleBuffer, null), 3);
+    assertEquals(doubleBuffer, new double[]{1.0, 2.0, 3.0});
+    assertEquals(doubles.getDoubleMV(1, null), new double[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE});
+    assertEquals(doubles.getDoubleMV(2, null), new double[]{4.0});
+  }
+
+  @Test
+  public void testMultiValueBigDecimalGettersConvertEachElement() {
+    String[] blobs = {"{\"k\":[1,\"2.5\",3.25]}", null, "{\"k\":4}"};
+    ForwardIndexReader<?> decimals = multiValue(DataType.BIG_DECIMAL, blobs).getForwardIndex();
+
+    BigDecimal[] values = decimals.getBigDecimalMV(0, null);
+    assertEquals(values.length, 3);
+    assertEquals(values[0].compareTo(new BigDecimal("1")), 0);
+    assertEquals(values[1].compareTo(new BigDecimal("2.5")), 0);
+    assertEquals(values[2].compareTo(new BigDecimal("3.25")), 0);
+    BigDecimal[] buffer = new BigDecimal[3];
+    assertEquals(decimals.getBigDecimalMV(0, buffer, null), 3);
+    assertEquals(buffer[1].compareTo(new BigDecimal("2.5")), 0);
+    assertEquals(decimals.getBigDecimalMV(1, null),
+        new BigDecimal[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL});
+    assertEquals(decimals.getBigDecimalMV(2, null)[0].compareTo(new BigDecimal("4")), 0);
+  }
+
+  /// A STRING multi-value key takes every element as text (a nested element as JSON, not the empty string), and a
+  /// BYTES one decodes each base64 element, reading a malformed or non-binary element as the default.
+  @Test
+  public void testMultiValueStringAndBytesGetters() {
+    String[] stringBlobs = {"{\"k\":[\"a\",{\"x\":1},5,true]}", null, "{\"k\":\"s\"}"};
+    ForwardIndexReader<?> strings = multiValue(DataType.STRING, stringBlobs).getForwardIndex();
+    String[] expected = {"a", "{\"x\":1}", "5", "true"};
+    assertEquals(strings.getNumValuesMV(0, null), 4);
+    assertEquals(strings.getStringMV(0, null), expected);
+    String[] stringBuffer = new String[4];
+    assertEquals(strings.getStringMV(0, stringBuffer, null), 4);
+    assertEquals(stringBuffer, expected);
+    assertEquals(strings.getStringMV(1, null), new String[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING});
+    assertEquals(strings.getStringMV(2, null), new String[]{"s"});
+
+    String[] bytesBlobs = {"{\"k\":[\"aGVsbG8=\",\"!!not base64\",5]}", null};
+    ForwardIndexReader<?> bytes = multiValue(DataType.BYTES, bytesBlobs).getForwardIndex();
+    byte[] hello = "hello".getBytes(StandardCharsets.UTF_8);
+    byte[] absent = FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+    assertEquals(bytes.getBytesMV(0, null), new byte[][]{hello, absent, absent});
+    byte[][] bytesBuffer = new byte[3][];
+    assertEquals(bytes.getBytesMV(0, bytesBuffer, null), 3);
+    assertEquals(bytesBuffer, new byte[][]{hello, absent, absent});
+    assertEquals(bytes.getBytesMV(1, null), new byte[][]{absent});
+  }
+
+  /// A null element takes the whole multi-value out, as the dense tier drops it (length is part of the value), and the
+  /// null vector agrees.
+  @Test
+  public void testMultiValueKeyWithANullElementIsAbsent() {
+    SparseKeyDataSource longs = multiValue(DataType.LONG, "{\"k\":[1,null]}", "{\"k\":[1,2]}");
+    assertTrue(longs.getNullValueVector().isNull(0));
+    assertFalse(longs.getNullValueVector().isNull(1));
+    assertEquals(longs.getForwardIndex().getLongMV(0, null),
+        new long[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG});
+    assertEquals(longs.getForwardIndex().getLongMV(1, null), new long[]{1, 2});
   }
 
   @Test
@@ -233,7 +335,7 @@ public class SparseKeyDataSourceTest {
     // "aGVsbG8=" is base64 for "hello"
     SparseKeyDataSource src = source("b", DataType.BYTES);
     ForwardIndexReader<?> fwd = src.getForwardIndex();
-    assertEquals(fwd.getBytes(0, null), "hello".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    assertEquals(fwd.getBytes(0, null), "hello".getBytes(StandardCharsets.UTF_8));
     assertEquals(fwd.getBytes(1, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
     assertEquals(fwd.getBytes(2, null), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES);
   }
