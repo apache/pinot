@@ -44,9 +44,11 @@ public class MailboxIdUtils {
     for (MailboxInfo mailboxInfo : receiverMailboxInfos) {
       String hostname = mailboxInfo.getHostname();
       int port = mailboxInfo.getPort();
+      long receiverInstanceIdHash = mailboxInfo.getInstanceIdHash();
       for (int receiverWorkerId : mailboxInfo.getWorkerIds()) {
         routingInfos.add(new RoutingInfo(hostname, port,
-            toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId)));
+            toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId),
+            receiverInstanceIdHash));
       }
     }
     return routingInfos;
