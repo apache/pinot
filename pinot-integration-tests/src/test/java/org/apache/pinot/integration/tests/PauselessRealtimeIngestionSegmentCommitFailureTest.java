@@ -234,7 +234,8 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
   }
 
-  private void verifyRecovery(FailureScenario failureScenario) {
+  private void verifyRecovery(FailureScenario failureScenario)
+      throws Exception {
     String pauselessTableName = TableNameBuilder.REALTIME.tableNameWithType(getPauselessTableName(failureScenario));
 
     List<String> erroredSegments = getSegmentsInEV(pauselessTableName, SegmentStateModel.ERROR);
@@ -266,6 +267,13 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     compareZKMetadataForSegments(_helixResourceManager.getSegmentsZKMetadata(pauselessTableName),
         _helixResourceManager.getSegmentsZKMetadata(
             TableNameBuilder.REALTIME.tableNameWithType(getNonPauselessTableName())));
+    verifyRecoveredRows(pauselessTableName);
+  }
+
+  /// Checks the rows the repaired pauseless table serves. A subclass whose fixture rows are small enough to list
+  /// overrides it; by default only the segment metadata is compared with the reference table.
+  protected void verifyRecoveredRows(String pauselessTableNameWithType)
+      throws Exception {
   }
 
   private void runSegmentLevelValidation() {

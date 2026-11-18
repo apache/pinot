@@ -45,6 +45,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.DEDUP_PAUSELESS_SURVIVORS;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.dedupRowsQuery;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -180,8 +182,11 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     }, 1000L, 600_000L, "ERROR replicas were not repaired without the disaster recovery override");
 
     // With all its replicas repaired, the lagging server passes the dedup consume gate and catches up, so queries
-    // return the deduplicated count from either replica group.
+    // return the deduplicated rows from either replica group.
     waitForAllDocsLoaded(600_000L);
+    for (int i = 0; i < 10; i++) {
+      assertRows(dedupRowsQuery(getTableName()), DEDUP_PAUSELESS_SURVIVORS);
+    }
   }
 
   private int getNumErrorReplicasInEV(String realtimeTableName) {

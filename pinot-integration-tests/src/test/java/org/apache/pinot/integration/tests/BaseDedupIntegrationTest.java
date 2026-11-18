@@ -47,12 +47,12 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.DEDUP_SURVIVORS;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.dedupRowsQuery;
 
 
 public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -217,51 +217,43 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
   //Tests the query results for table with RF=1
   @Test
-  public void testValues() {
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
-
-    // Validate the older value persist
-    for (int i = 0; i < getCountStarResult(); i++) {
-      Assert.assertEquals(getPinotConnection()
-          .execute("SELECT name FROM " + getTableName() + " WHERE id = " + i)
-          .getResultSet(0)
-          .getString(0),
-          "" + i);
-    }
+  public void testValues()
+      throws Exception {
+    assertRows(dedupRowsQuery(getTableName()), DEDUP_SURVIVORS);
   }
 
   @Test
   public void testSegmentReload()
       throws Exception {
-    getOrCreateAdminClient().getSegmentClient().reloadTable(getTableName(), null, false);
+    String reloadJobId = reloadTableAndValidateResponse(getTableName(), TableType.REALTIME, false);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return isReloadJobCompleted(reloadJobId);
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000L, 60_000L, "Reload job " + reloadJobId + " did not finish");
 
-    // wait for reload to finish
-    Thread.sleep(1000);
-
-    // Push data again
+    // Push data again. Dedup drops every re-pushed row, so wait until both tables have consumed them before checking.
     pushAvroIntoKafka(_avroFiles);
+    waitForAllStreamRecordsConsumed(getTableName(), 60_000L);
+    waitForAllStreamRecordsConsumed(DEDUP_TABLE_WITH_REPLICAS, 60_000L);
 
     // Validate no change
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
-    for (int i = 0; i < getCountStarResult(); i++) {
-      Assert.assertEquals(getPinotConnection()
-              .execute("SELECT name FROM " + getTableName() + " WHERE id = " + i)
-              .getResultSet(0)
-              .getString(0),
-          "" + i);
+    assertRows(dedupRowsQuery(getTableName()), DEDUP_SURVIVORS);
+    for (int i = 0; i < 10; i++) {
+      assertRows(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
     }
   }
 
   //tests the query results when metadataTTL is set with RF>1.
   @Test
-  public void testValuesWithReplicas() {
-    assertEquals(getCurrentCountStarResult(DEDUP_TABLE_WITH_REPLICAS), getCountStarResult());
-
-    // Validate the older value persist
-    for (int i = 0; i < getCountStarResult(); i++) {
-      Assert.assertEquals(
-          getPinotConnection().execute("SELECT name FROM " + DEDUP_TABLE_WITH_REPLICAS + " WHERE id = " + i)
-              .getResultSet(0).getString(0), "" + i);
+  public void testValuesWithReplicas()
+      throws Exception {
+    // Query 10 times so that both replica groups answer: the broker picks the replica group by request id in a
+    // round-robin fashion, as the setup checks with getServingServerPort()
+    for (int i = 0; i < 10; i++) {
+      assertRows(dedupRowsQuery(DEDUP_TABLE_WITH_REPLICAS), DEDUP_SURVIVORS);
     }
   }
 }

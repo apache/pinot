@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -66,6 +67,9 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.ConsumingSegmentInfo;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.plugin.stream.kafka40.server.EmbeddedKafkaCluster;
@@ -980,6 +984,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return 0;
   }
 
+  /// Get current result for "SELECT COUNT(\*) ... OPTION(skipUpsert=true)": every ingested row of an upsert or dedup
+  /// table, including the ones upsert replaced or deleted.
+  protected long getCurrentCountStarResultWithoutUpsert(String tableName) {
+    ResultSetGroup resultSetGroup =
+        getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)");
+    if (resultSetGroup.getResultSetCount() > 0) {
+      try {
+        return Long.parseLong(resultSetGroup.getResultSet(0).getString(0));
+      } catch (NumberFormatException e) {
+        return 0;
+      }
+    }
+    return 0;
+  }
+
   protected void waitForMinionTaskCompletion(String taskId, long timeout) {
     // The task state (workflow context) and the subtask states (job context) live in different Helix znodes and are
     // not updated atomically, so a subtask can still read as a non-terminal state (null/INIT before start, RUNNING,
@@ -1041,6 +1060,148 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       }
     }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents on all servers",
         Duration.ofMillis(timeoutMs / 10));
+  }
+
+  /// Runs a query and returns its rows in the order the broker returned them, each rendered as a JSON array such as
+  /// `[100,"Zook",2050.0,false]`. Throws [IllegalStateException] when the broker reports an exception or returns
+  /// no result table.
+  private List<String> queryRows(@Language("sql") String query)
+      throws Exception {
+    JsonNode response = postQuery(query);
+    JsonNode exceptions = response.get("exceptions");
+    if (exceptions != null && !exceptions.isEmpty()) {
+      throw new IllegalStateException("Query: " + query + " failed with: " + exceptions);
+    }
+    JsonNode resultTable = response.get("resultTable");
+    if (resultTable == null) {
+      throw new IllegalStateException("Query: " + query + " returned no result table: " + response);
+    }
+    List<String> rows = new ArrayList<>();
+    for (JsonNode row : resultTable.get("rows")) {
+      rows.add(row.toString());
+    }
+    return rows;
+  }
+
+  /// Renders expected rows as JSON arrays, the same way [#queryRows] renders the rows a query returns.
+  private static List<String> toJsonRows(List<List<Object>> rows) {
+    List<String> rendered = new ArrayList<>(rows.size());
+    for (List<Object> row : rows) {
+      rendered.add(JsonUtils.objectToJsonNode(row).toString());
+    }
+    return rendered;
+  }
+
+  /// Asserts that the query returns exactly the expected rows, in order. The query should have an `ORDER BY` and a
+  /// `LIMIT` that covers every row. On failure the message shows the rows that are missing and the rows that are
+  /// not expected.
+  protected void assertRows(@Language("sql") String query, List<List<Object>> expectedRows)
+      throws Exception {
+    List<String> expected = toJsonRows(expectedRows);
+    List<String> actual = queryRows(query);
+    if (!actual.equals(expected)) {
+      throw new AssertionError(describeRowDiff(query, expected, actual));
+    }
+  }
+
+  /// Waits until the query returns exactly the expected rows, in order. A failing query (e.g. while servers restart)
+  /// counts as a miss and is retried after the poll interval. On timeout the message shows the row diff of the last
+  /// successful query, and the last query error if any.
+  protected void waitForRows(@Language("sql") String query, List<List<Object>> expectedRows, long timeoutMs) {
+    List<String> expected = toJsonRows(expectedRows);
+    AtomicReference<List<String>> lastRows = new AtomicReference<>();
+    AtomicReference<Exception> lastError = new AtomicReference<>();
+    try {
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          List<String> rows = queryRows(query);
+          lastRows.set(rows);
+          return rows.equals(expected);
+        } catch (Exception e) {
+          lastError.set(e);
+          return false;
+        }
+      }, 100L, timeoutMs, null);
+    } catch (AssertionError e) {
+      List<String> last = lastRows.get();
+      String message = last != null ? describeRowDiff(query, expected, last) : "No query succeeded: " + query;
+      AssertionError error = new AssertionError("Rows did not match in " + timeoutMs + "ms. " + message, e);
+      if (lastError.get() != null) {
+        error.addSuppressed(lastError.get());
+      }
+      throw error;
+    }
+  }
+
+  /// Asserts that an upsert table fed with the given Avro files serves, for each primary key, the record with the
+  /// largest comparison value, with the given columns. See [ClusterIntegrationTestUtils#latestRowPerKey].
+  protected void assertLatestRowPerKey(String tableName, List<File> avroFiles, String primaryKeyColumn,
+      String comparisonColumn, List<String> columns)
+      throws Exception {
+    assertRows("SELECT " + String.join(", ", columns) + " FROM " + tableName + " ORDER BY " + primaryKeyColumn
+            + " LIMIT 10000",
+        ClusterIntegrationTestUtils.latestRowPerKey(avroFiles, primaryKeyColumn, comparisonColumn, columns));
+  }
+
+  /// Describes how the actual rows differ from the expected rows: which expected rows are missing, which served rows
+  /// are not expected, and both full lists.
+  private static String describeRowDiff(String query, List<String> expected, List<String> actual) {
+    List<String> missing = new ArrayList<>(expected);
+    List<String> unexpected = new ArrayList<>();
+    for (String row : actual) {
+      if (!missing.remove(row)) {
+        unexpected.add(row);
+      }
+    }
+    StringBuilder message = new StringBuilder("Query: ").append(query);
+    if (missing.isEmpty() && unexpected.isEmpty()) {
+      message.append("\nSame rows in a different order");
+    } else {
+      message.append("\nMissing (expected, not served): ").append(missing);
+      message.append("\nUnexpected (served, not expected): ").append(unexpected);
+    }
+    message.append("\nExpected (").append(expected.size()).append("): ").append(expected);
+    message.append("\nActual (").append(actual.size()).append("): ").append(actual);
+    return message.toString();
+  }
+
+  /// Waits until every replica of every stream partition of the table has consumed up to the latest upstream offset,
+  /// i.e. reports no records lag. Use it after pushing rows that the table is expected to drop (for example
+  /// duplicates on a dedup table), where no row or count change shows that they were consumed.
+  ///
+  /// @param tableName raw table name; the number of partitions is [#getNumKafkaPartitions()]
+  protected void waitForAllStreamRecordsConsumed(String tableName, long timeoutMs) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    int numPartitions = getNumKafkaPartitions();
+    AtomicReference<Map<String, List<String>>> lastLags = new AtomicReference<>();
+    try {
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          ConsumingSegmentsInfoMap info = getOrCreateAdminClient().getTableClient()
+              .getConsumingSegmentsInfo(realtimeTableName, ConsumingSegmentsInfoMap.class);
+          // Partition to the records lag reported by each replica
+          Map<String, List<String>> partitionToLags = new HashMap<>();
+          for (List<ConsumingSegmentInfo> segmentInfos : info._segmentToConsumingInfoMap.values()) {
+            for (ConsumingSegmentInfo segmentInfo : segmentInfos) {
+              ConsumingSegmentInfoReader.PartitionOffsetInfo offsetInfo = segmentInfo._partitionOffsetInfo;
+              if (offsetInfo != null && offsetInfo._recordsLagMap != null) {
+                offsetInfo._recordsLagMap.forEach(
+                    (partition, lag) -> partitionToLags.computeIfAbsent(partition, k -> new ArrayList<>()).add(lag));
+              }
+            }
+          }
+          lastLags.set(partitionToLags);
+          return info._serversFailingToRespond == 0 && partitionToLags.size() == numPartitions
+              && partitionToLags.values().stream().flatMap(List::stream).allMatch("0"::equals);
+        } catch (Exception e) {
+          return false;
+        }
+      }, 100L, timeoutMs, null);
+    } catch (AssertionError e) {
+      throw new AssertionError("Table " + realtimeTableName + " did not consume all " + numPartitions
+          + " stream partitions in " + timeoutMs + "ms; last records lag per partition and replica: "
+          + lastLags.get(), e);
+    }
   }
 
   protected void waitForAnyDocLoaded(String tableName, long timeoutMs) {

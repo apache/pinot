@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -29,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -48,6 +46,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.common.MinionConstants.UpsertCompactMergeTask.MERGED_SEGMENT_NAME_PREFIX;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.GAME_SCORES_WINNERS;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.gameScoresRowsQuery;
 import static org.testng.Assert.*;
 
 
@@ -63,7 +63,6 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz";
   private static final String INPUT_DATA_SMALL_TAR_FILE = "gameScores_csv.tar.gz";
 
-  protected static final long DEFAULT_COUNT_STAR_RESULT = 12L; // Total records in gameScores_csv
   private static final String REALTIME_TABLE_NAME = "mytable_REALTIME";
   private static final String SCHEMA_NAME = "mytable";
   private static final String PRIMARY_KEY_COL = "playerId";
@@ -83,8 +82,6 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
   protected PinotHelixResourceManager _pinotHelixResourceManager;
 
   private List<File> _dataFiles;
-  private long _countStarResult;
-  private Map<Integer, Double> _initialPlayerScores;
 
   @BeforeClass
   public void setUp()
@@ -108,9 +105,9 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     setUpTable(getTableName(), kafkaTopicName, null);
 
     // Wait for all documents loaded
-    TestUtils.waitForCondition(() -> getCurrentCountStarResultSkipUpsert() == 10, 100L, 600_000L,
+    TestUtils.waitForCondition(() -> getCurrentCountStarResultWithoutUpsert(getTableName()) == 10, 100L, 600_000L,
         "Failed to load 10 documents", Duration.ofMillis(600_000L / 10));
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    assertRows(gameScoresRowsQuery(getTableName()), GAME_SCORES_WINNERS);
 
     // Create partial upsert table schema
     Schema partialUpsertSchema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
@@ -139,9 +136,6 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
       throws Exception {
     // Verify initial state
     verifyInitialSegmentState();
-
-    // Capture initial data state before merge to verify data integrity afterwards
-    captureInitialDataState();
 
     // Schedule the UpsertCompactMergeTask
     assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
@@ -338,20 +332,13 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
       assertNotNull(segment.getStatus(), "Segment status should not be null");
     }
 
-    // Use query-based verification instead of metadata since it's more reliable for verifying data presence
+    // All 10 fixture rows are ingested, and the table serves the latest row per player
     try {
-      long actualCount = getPinotConnection()
-          .execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
-          .getResultSet(0).getLong(0);
-      assertTrue(actualCount > 0, "Should have documents in segments. Count: " + actualCount);
-
-      // Also verify using normal query that should account for upsert
-      long upsertCount = getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName())
-          .getResultSet(0).getLong(0);
-      assertTrue(upsertCount > 0, "Should have upserted documents. Count: " + upsertCount);
-      assertTrue(upsertCount <= actualCount, "Upsert count should be <= total count due to deduplication");
+      assertEquals(getCurrentCountStarResultWithoutUpsert(getTableName()), 10,
+          "Should have all fixture rows in segments");
+      assertRows(gameScoresRowsQuery(getTableName()), GAME_SCORES_WINNERS);
     } catch (Exception e) {
-      fail("Failed to verify initial segment state via queries: " + e.getMessage());
+      fail("Failed to verify initial segment state via queries: " + e.getMessage(), e);
     }
   }
 
@@ -394,105 +381,10 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     }
   }
 
+  /// Verifies that the merge kept exactly the latest row per player, with every column.
   private void verifyDataIntegrityAfterMerge()
       throws Exception {
-    // Verify count remains the same as before merge (captured in _countStarResult)
-    String countQuery = "SELECT COUNT(*) FROM " + SCHEMA_NAME;
-    JsonNode countResponse = postQuery(countQuery);
-    long actualCount = countResponse.get("resultTable").get("rows").get(0).get(0).asLong();
-    assertEquals(actualCount, _countStarResult, "Count should remain the same after merge task execution");
-
-    // Also verify it matches expected count after upsert (unique primary keys only)
-    long expectedCountAfterUpsert = getCountStarResult(); // This returns 3 for gameScores data (unique primary keys)
-    assertEquals(actualCount, expectedCountAfterUpsert, "Count should equal expected unique primary keys after merge");
-
-    // Verify each unique primary key has exactly one record
-    String distinctQuery = "SELECT COUNT(DISTINCT " + PRIMARY_KEY_COL + ") FROM " + SCHEMA_NAME;
-    JsonNode distinctResponse = postQuery(distinctQuery);
-    long distinctCount = distinctResponse.get("resultTable").get("rows").get(0).get(0).asLong();
-    assertEquals(distinctCount, actualCount, "Primary key uniqueness should be maintained");
-    assertEquals(distinctCount, expectedCountAfterUpsert, "Distinct primary key count should match expected");
-
-    // Verify that each primary key appears exactly once
-    String primaryKeyCountQuery = "SELECT " + PRIMARY_KEY_COL + ", COUNT(*) as cnt FROM " + SCHEMA_NAME
-        + " GROUP BY " + PRIMARY_KEY_COL + " HAVING COUNT(*) > 1";
-    JsonNode primaryKeyCountResponse = postQuery(primaryKeyCountQuery);
-    assertEquals(primaryKeyCountResponse.get("resultTable").get("rows").size(), 0,
-        "No primary key should appear more than once after upsert merge");
-
-    // Verify specific data integrity - check that we have the expected primary keys
-    String expectedPrimaryKeysQuery =
-        "SELECT " + PRIMARY_KEY_COL + " FROM " + SCHEMA_NAME + " ORDER BY " + PRIMARY_KEY_COL;
-    JsonNode expectedPrimaryKeysResponse = postQuery(expectedPrimaryKeysQuery);
-    List<Integer> actualPrimaryKeys = new ArrayList<>();
-    for (JsonNode row : expectedPrimaryKeysResponse.get("resultTable").get("rows")) {
-      actualPrimaryKeys.add(row.get(0).asInt());
-    }
-
-    // Verify that for each primary key, we have the latest record (highest timestamp)
-    verifyLatestRecordsRetained();
-  }
-
-  /// Verifies that for each primary key, the record with the highest timestamp is retained after merge.
-  /// This is crucial for upsert behavior - the latest record should win.
-  private void verifyLatestRecordsRetained()
-      throws Exception {
-    // Based on the gameScores_csv.tar.gz data, expected latest records are:
-    // playerId 100: latest timestamp 1681256400000, score 2050 (from player "Zook")
-    // playerId 101: latest timestamp 1681258290000, score 12500.20 (from player "Suess")
-    // playerId 102: latest timestamp 1681036400000, score 102 (from player "Clifford")
-
-    String latestRecordsQuery = "SELECT " + PRIMARY_KEY_COL + ", name, score, " + TIME_COL_NAME
-        + " FROM " + SCHEMA_NAME + " ORDER BY " + PRIMARY_KEY_COL;
-    JsonNode latestRecordsResponse = postQuery(latestRecordsQuery);
-
-    JsonNode rows = latestRecordsResponse.get("resultTable").get("rows");
-    assertEquals(rows.size(), 3, "Should have exactly 3 records after upsert merge");
-
-    // Verify player 100 (Zook) - latest record
-    JsonNode player100 = rows.get(0);
-    assertEquals(player100.get(0).asInt(), 100, "First record should be playerId 100");
-    assertEquals(player100.get(1).asText(), "Zook", "Player 100 should be Zook");
-    assertEquals(player100.get(2).asDouble(), 2050.0, 0.01, "Player 100 should have latest score 2050");
-    assertEquals(player100.get(3).asLong(), 1681256400000L, "Player 100 should have latest timestamp");
-
-    // Verify player 101 (Suess) - latest record
-    JsonNode player101 = rows.get(1);
-    assertEquals(player101.get(0).asInt(), 101, "Second record should be playerId 101");
-    assertEquals(player101.get(1).asText(), "Suess", "Player 101 should be Suess");
-    assertEquals(player101.get(2).asDouble(), 12500.20, 0.01, "Player 101 should have latest score 12500.20");
-    assertEquals(player101.get(3).asLong(), 1681258290000L, "Player 101 should have latest timestamp");
-
-    // Verify player 102 (Clifford) - latest record
-    JsonNode player102 = rows.get(2);
-    assertEquals(player102.get(0).asInt(), 102, "Third record should be playerId 102");
-    assertEquals(player102.get(1).asText(), "Clifford", "Player 102 should be Clifford");
-    assertEquals(player102.get(2).asDouble(), 102.0, 0.01, "Player 102 should have latest score 102");
-    assertEquals(player102.get(3).asLong(), 1681036400000L, "Player 102 should have latest timestamp");
-
-    System.out.println("✓ Verified that latest records are retained for each primary key after upsert merge");
-  }
-
-  /// Captures the initial data state before running the merge task.
-  /// This allows us to verify that the data remains consistent after the merge.
-  private void captureInitialDataState()
-      throws Exception {
-    // Capture initial count
-    _countStarResult = getCurrentCountStarResult();
-
-    // Capture initial player scores (should be the latest scores after upsert)
-    _initialPlayerScores = new HashMap<>();
-    String scoresQuery = "SELECT " + PRIMARY_KEY_COL + ", score FROM " + SCHEMA_NAME + " ORDER BY " + PRIMARY_KEY_COL;
-    JsonNode scoresResponse = postQuery(scoresQuery);
-
-    for (JsonNode row : scoresResponse.get("resultTable").get("rows")) {
-      int playerId = row.get(0).asInt();
-      double score = row.get(1).asDouble();
-      _initialPlayerScores.put(playerId, score);
-    }
-
-    System.out.println(
-        "✓ Captured initial data state: " + _countStarResult + " records, player scores: " + _initialPlayerScores);
+    assertRows(gameScoresRowsQuery(SCHEMA_NAME), GAME_SCORES_WINNERS);
   }
 
   private void verifyPartitionHandling() {
@@ -691,14 +583,5 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
       }
     }
     return null;
-  }
-
-  private long getCurrentCountStarResultSkipUpsert() {
-    ResultSetGroup resultSetGroup =
-        getPinotConnection().execute("SET skipUpsert = true; SELECT COUNT(*) FROM " + getTableName());
-    if (resultSetGroup.getResultSetCount() > 0) {
-      return resultSetGroup.getResultSet(0).getLong(0);
-    }
-    return 0;
   }
 }

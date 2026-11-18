@@ -179,12 +179,29 @@ public class VectorUpsertTableTest extends CustomDataQueryClusterIntegrationTest
   }
 
   @Override
-  protected void waitForAllDocsLoaded(long timeoutMs) {
+  protected void waitForAllDocsLoaded(long timeoutMs)
+      throws Exception {
     disableMultiStageQueryEngine();
     long effectiveTimeoutMs = Math.max(timeoutMs, STATE_TIMEOUT_MS);
     waitForTableState(CONSUMING_TABLE_NAME, NUM_PHYSICAL_RECORDS, NUM_CURRENT_RECORDS, 1, 1,
         effectiveTimeoutMs);
     waitForTableState(SEALED_TABLE_NAME, NUM_PHYSICAL_RECORDS, NUM_CURRENT_RECORDS, 2, 1, effectiveTimeoutMs);
+    for (String tableName : List.of(CONSUMING_TABLE_NAME, SEALED_TABLE_NAME)) {
+      // The current corpus is the new A versions and the B records; every version stays physically present
+      assertRows(String.format("SELECT %s, %s, %s FROM %s ORDER BY %s LIMIT 100", ENTITY_ID_COLUMN,
+          TIMESTAMP_COLUMN, VECTOR_COLUMN, tableName, ENTITY_ID_COLUMN), toRows(List.of(A1_V2, A2_V2, B1, B2)));
+      assertRows(String.format("SELECT %s, %s, %s FROM %s ORDER BY %s, %s LIMIT 100 OPTION(skipUpsert=true)",
+              ENTITY_ID_COLUMN, TIMESTAMP_COLUMN, VECTOR_COLUMN, tableName, ENTITY_ID_COLUMN, TIMESTAMP_COLUMN),
+          toRows(List.of(A1_V1, A1_V2, A2_V1, A2_V2, B1, B2)));
+    }
+  }
+
+  private static List<List<Object>> toRows(List<TestRecord> records) {
+    List<List<Object>> rows = new ArrayList<>();
+    for (TestRecord record : records) {
+      rows.add(List.of(record._entityId, record._timestamp, List.of(record._vectorX, record._vectorY)));
+    }
+    return rows;
   }
 
   @AfterClass

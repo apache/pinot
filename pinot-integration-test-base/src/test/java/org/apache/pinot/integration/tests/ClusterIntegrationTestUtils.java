@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
@@ -44,6 +45,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -98,6 +100,54 @@ public class ClusterIntegrationTestUtils {
   public static final int MAX_NUM_ROWS_TO_COMPARE = 10000;
 
   private static final Random RANDOM = new Random();
+
+  /// Computes the rows a full-upsert table keyed on `primaryKeyColumn` serves after ingesting the given Avro files:
+  /// for each key, the record with the largest `comparisonColumn` value. Returns the selected `columns` of each
+  /// winner, ordered by key, ready for [BaseClusterIntegrationTest#assertRows].
+  ///
+  /// This is a test oracle and deliberately does not use the upsert code under test. It covers plain full upsert
+  /// only: no delete column, no partial-upsert merge. Two records of a key with the same comparison value fail it,
+  /// since which one wins depends on the order of stream partitions and uploaded segments.
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static List<List<Object>> latestRowPerKey(List<File> avroFiles, String primaryKeyColumn,
+      String comparisonColumn, List<String> columns)
+      throws IOException {
+    Map<Comparable, GenericRecord> winners = new TreeMap<>();
+    for (File avroFile : avroFiles) {
+      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
+        for (GenericRecord record : reader) {
+          Comparable key = (Comparable) toJavaValue(record.get(primaryKeyColumn));
+          Comparable comparisonValue = (Comparable) toJavaValue(record.get(comparisonColumn));
+          Preconditions.checkState(key != null && comparisonValue != null,
+              "Null primary key or comparison value in record: %s", record);
+          GenericRecord current = winners.get(key);
+          if (current != null) {
+            int comparison = comparisonValue.compareTo(toJavaValue(current.get(comparisonColumn)));
+            Preconditions.checkState(comparison != 0, "Records %s and %s tie on %s", current, record,
+                comparisonColumn);
+            if (comparison < 0) {
+              continue;
+            }
+          }
+          winners.put(key, record);
+        }
+      }
+    }
+    List<List<Object>> rows = new ArrayList<>(winners.size());
+    for (GenericRecord winner : winners.values()) {
+      List<Object> row = new ArrayList<>(columns.size());
+      for (String column : columns) {
+        row.add(toJavaValue(winner.get(column)));
+      }
+      rows.add(row);
+    }
+    return rows;
+  }
+
+  @Nullable
+  private static Object toJavaValue(@Nullable Object avroValue) {
+    return avroValue instanceof Utf8 ? avroValue.toString() : avroValue;
+  }
 
   /// Set up an H2 table with records from the given Avro files inserted.
   ///

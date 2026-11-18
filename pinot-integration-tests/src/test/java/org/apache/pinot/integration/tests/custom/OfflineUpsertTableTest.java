@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -50,8 +49,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-
 
 /// Integration test for offline table upsert support.
 ///
@@ -74,6 +71,16 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
   private static final int NUM_PARTITIONS = 1;
   private static final int TOTAL_RAW_RECORDS = 6;
   private static final int UNIQUE_PRIMARY_KEYS = 3;
+  private static final String COLUMNS = "playerId, name, game, score, timestampInEpoch";
+  private static final String ROWS_QUERY = "SELECT " + COLUMNS + " FROM " + TABLE_NAME + " ORDER BY playerId LIMIT 100";
+  private static final String RAW_ROWS_QUERY = "SELECT " + COLUMNS + " FROM " + TABLE_NAME
+      + " ORDER BY playerId, timestampInEpoch LIMIT 100 OPTION(skipUpsert=true)";
+  private static final List<Object> ROW_100_OLD = List.of(100, "Alice", "chess", 2000.0, 1671036400000L);
+  private static final List<Object> ROW_100 = List.of(100, "Alice", "chess", 2500.0, 1681036400000L);
+  private static final List<Object> ROW_101_OLD = List.of(101, "Bob", "chess", 3000.0, 1671036400000L);
+  private static final List<Object> ROW_101 = List.of(101, "Bob", "chess", 3500.0, 1681036400000L);
+  private static final List<Object> ROW_102_OLD = List.of(102, "Charlie", "chess", 4000.0, 1671036400000L);
+  private static final List<Object> ROW_102 = List.of(102, "Charlie", "chess", 4500.0, 1681036400000L);
 
   @Override
   public String getTableName() {
@@ -146,32 +153,16 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
     waitForAllDocsLoaded(TOTAL_RAW_RECORDS, timeoutMs);
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    assertRows(ROWS_QUERY, List.of(ROW_100, ROW_101, ROW_102));
   }
 
   @Test
   public void testUpsertQueryResults()
       throws Exception {
-    long upsertCount = getCurrentCountStarResult();
-    assertEquals(upsertCount, UNIQUE_PRIMARY_KEYS,
-        "Expected " + UNIQUE_PRIMARY_KEYS + " unique records after upsert dedup");
-
-    long rawCount = queryCountStarWithoutUpsert();
-    assertEquals(rawCount, TOTAL_RAW_RECORDS,
-        "Expected " + TOTAL_RAW_RECORDS + " raw records with skipUpsert=true");
-
-    ResultSet rs = getPinotConnection().execute(
-        "SELECT playerId, score FROM " + TABLE_NAME + " ORDER BY playerId").getResultSet(0);
-    assertEquals(rs.getRowCount(), UNIQUE_PRIMARY_KEYS);
-
-    assertEquals(rs.getInt(0, 0), 100);
-    assertEquals(rs.getFloat(0, 1), 2500.0f, 0.01f);
-
-    assertEquals(rs.getInt(1, 0), 101);
-    assertEquals(rs.getFloat(1, 1), 3500.0f, 0.01f);
-
-    assertEquals(rs.getInt(2, 0), 102);
-    assertEquals(rs.getFloat(2, 1), 4500.0f, 0.01f);
+    // The latest row per player
+    assertRows(ROWS_QUERY, List.of(ROW_100, ROW_101, ROW_102));
+    // Every uploaded row
+    assertRows(RAW_ROWS_QUERY, List.of(ROW_100_OLD, ROW_100, ROW_101_OLD, ROW_101, ROW_102_OLD, ROW_102));
   }
 
   @Test(dependsOnMethods = "testUpsertQueryResults")
@@ -197,12 +188,8 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
 
     waitForAllDocsLoaded(TOTAL_RAW_RECORDS + 1, 600_000L);
 
-    assertEquals(getCurrentCountStarResult(), UNIQUE_PRIMARY_KEYS);
-
-    ResultSet rs = getPinotConnection().execute(
-        "SELECT score FROM " + TABLE_NAME + " WHERE playerId = 100").getResultSet(0);
-    assertEquals(rs.getRowCount(), 1);
-    assertEquals(rs.getFloat(0, 0), 9999.0f, 0.01f);
+    // The uploaded row replaces player 100; the other players keep their rows
+    assertRows(ROWS_QUERY, List.of(List.of(100, "UpdatedPlayer", "chess", 9999.0, 1691036400000L), ROW_101, ROW_102));
   }
 
   private void waitForAllDocsLoaded(int expectedRawRecords, long timeoutMs) {
@@ -210,7 +197,7 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
     AtomicInteger consecutiveSuccesses = new AtomicInteger();
     TestUtils.waitForCondition(() -> {
       try {
-        if (queryCountStarWithoutUpsert() != expectedRawRecords) {
+        if (getCurrentCountStarResultWithoutUpsert(TABLE_NAME) != expectedRawRecords) {
           consecutiveSuccesses.set(0);
           return false;
         }
@@ -269,10 +256,5 @@ public class OfflineUpsertTableTest extends CustomDataQueryClusterIntegrationTes
     File indexDir = new File(segmentDir, segmentName);
     File segmentTarFile = new File(tarDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
-  }
-
-  private long queryCountStarWithoutUpsert() {
-    return getPinotConnection().execute(
-        "SELECT COUNT(*) FROM " + TABLE_NAME + " OPTION(skipUpsert=true)").getResultSet(0).getLong(0);
   }
 }

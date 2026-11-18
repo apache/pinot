@@ -31,6 +31,8 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.DISASTER_RECOVERY_MODE_CONFIG_KEY;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.DEDUP_PAUSELESS_SURVIVORS;
+import static org.apache.pinot.integration.tests.UpsertDedupTestFixtures.dedupRowsQuery;
 import static org.testng.Assert.assertNotNull;
 
 
@@ -60,6 +62,18 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
   protected long getCountStarResult() {
     // Two distinct records are expected with pk values of 0, 1.
     return 2;
+  }
+
+  /// The fixture has ids 0 and 1 with names "0" and "1", then the same ids again with names "5" and "6". Dedup keeps
+  /// the first row per id, on the repaired table from every replica and on the reference table.
+  @Override
+  protected void verifyRecoveredRows(String pauselessTableNameWithType)
+      throws Exception {
+    waitForAllDocsLoaded(pauselessTableNameWithType, 120_000L);
+    for (int i = 0; i < 10; i++) {
+      assertRows(dedupRowsQuery(pauselessTableNameWithType), DEDUP_PAUSELESS_SURVIVORS);
+    }
+    assertRows(dedupRowsQuery(getNonPauselessTableName()), DEDUP_PAUSELESS_SURVIVORS);
   }
 
   @Override
