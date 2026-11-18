@@ -291,6 +291,25 @@ public class IngestionUtilsTest {
     Assert.assertTrue(fields.containsAll(Sets.newHashSet("a_b", "f_d", "ab")));
   }
 
+  @DataProvider
+  public Object[][] consumptionModes() {
+    return new Object[][]{{"kafka", false}, {"kafka", true}, {"test", false}, {"test", true}};
+  }
+
+  @Test(dataProvider = "consumptionModes")
+  public void testConsumptionConfigPreservesSourceSettings(String streamType, boolean replicateMode) {
+    Map<String, String> source = streamMap(streamType);
+    source.put("auto.offset.reset", "latest");
+    Map<String, String> original = Map.copyOf(source);
+
+    StreamConfig result = IngestionUtils.createConsumptionStreamConfig("table_REALTIME", source, replicateMode);
+
+    assertEquals(result.getStreamConfigsMap().get("auto.offset.reset"),
+        replicateMode && "kafka".equals(streamType) ? "none" : "latest");
+    assertEquals(source, original);
+    assertEquals(result.getTopicName(), "topic");
+  }
+
   @Test
   public void testPartitionFunctionUsesFullCountAndRetainsOriginalId() {
     StreamMetadataProvider provider = mock(StreamMetadataProvider.class);

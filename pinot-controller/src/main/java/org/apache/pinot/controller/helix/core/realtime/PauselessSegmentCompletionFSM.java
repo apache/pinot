@@ -82,6 +82,10 @@ public class PauselessSegmentCompletionFSM extends BlockingSegmentCompletionFSM 
     final long now = _segmentCompletionManager.getCurrentTimeMs();
     synchronized (this) {
       _logger.info("Processing extendBuildTime({}, {}, {})", instanceId, offset, extTimeSec);
+      if (_replicateMode && (!instanceId.equals(_winner) || _winningOffset == null
+          || offset.compareTo(_winningOffset) != 0)) {
+        return SegmentCompletionProtocol.RESP_FAILED;
+      }
       switch (_state) {
         case PARTIAL_CONSUMING:
         case HOLDING:

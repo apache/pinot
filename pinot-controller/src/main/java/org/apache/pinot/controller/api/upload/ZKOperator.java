@@ -26,10 +26,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -200,10 +203,39 @@ public class ZKOperator {
               + segmentZKMetadata.getStatus(), Response.Status.CONFLICT);
     }
 
+    if (segmentZKMetadata.isReplicateMode()) {
+      Preconditions.checkState(StringUtils.isBlank(segmentZKMetadata.getDownloadUrl()),
+          "Segment already has an artifact: %s", segmentName);
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(realtimeTableName);
+      Preconditions.checkState(tableConfig != null && !tableConfig.isUpsertEnabled() && !tableConfig.isDedupEnabled(),
+          "Replicate-mode recovery only supports append-only tables");
+      validateReingestedRange(segmentZKMetadata, segmentMetadata);
+      // Never replace the canonical object: a stale native committer or a second replay can still be uploading.
+      // The metadata CAS chooses the winning immutable artifact. Unreferenced attempts can be collected separately.
+      String attemptSuffix = ".recovery." + UUID.randomUUID();
+      finalSegmentLocationURI = new URI(finalSegmentLocationURI + attemptSuffix);
+      segmentDownloadURIStr += attemptSuffix;
+    }
+
     // Copy the segment to the final location
     copyFromSegmentURIToDeepStore(new URI(sourceDownloadURIStr), finalSegmentLocationURI);
     LOGGER.info("Copied reingested segment: {} of table: {} to final location: {}", segmentName, realtimeTableName,
         finalSegmentLocationURI);
+
+    if (segmentZKMetadata.isReplicateMode()) {
+      ZNRecord latestRecord = _pinotHelixResourceManager.getSegmentMetadataZnRecord(realtimeTableName, segmentName);
+      if (latestRecord == null || latestRecord.getVersion() != expectedVersion) {
+        throw new ControllerApplicationException(LOGGER, "Segment changed during replay publication: " + segmentName,
+            Response.Status.CONFLICT);
+      }
+      SegmentZKMetadata latestMetadata = new SegmentZKMetadata(latestRecord);
+      if (latestMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.COMMITTING
+          || StringUtils.isNotBlank(latestMetadata.getDownloadUrl()) || !latestMetadata.isReplicateMode()) {
+        throw new ControllerApplicationException(LOGGER, "Segment no longer needs replay: " + segmentName,
+            Response.Status.CONFLICT);
+      }
+      validateReingestedRange(latestMetadata, segmentMetadata);
+    }
 
     // Update the ZK metadata
     segmentZKMetadata.setCustomMap(segmentMetadata.getCustomMap());
@@ -218,6 +250,16 @@ public class ZKOperator {
 
     // Send a message to servers hosting the table to reset the segment
     _pinotHelixResourceManager.resetSegment(realtimeTableName, segmentName, null);
+  }
+
+  private static void validateReingestedRange(SegmentZKMetadata metadata, SegmentMetadata replayedSegment) {
+    if (metadata.getStartOffset() == null || metadata.getEndOffset() == null
+        || !Objects.equals(metadata.getStartOffset(), replayedSegment.getStartOffset())
+        || !Objects.equals(metadata.getEndOffset(), replayedSegment.getEndOffset())) {
+      throw new ControllerApplicationException(LOGGER,
+          "Reingested segment offsets do not match the saved replay range: " + metadata.getSegmentName(),
+          Response.Status.CONFLICT);
+    }
   }
 
   /// Returns `true` when the segment should be processed as new segment.

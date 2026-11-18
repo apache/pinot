@@ -37,6 +37,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.server.api.resources.ReingestionResource.MAX_PARALLEL_REINGESTIONS;
+import static org.apache.pinot.server.api.resources.ReingestionResource.MAX_REPLICATE_MODE_REINGESTIONS;
 import static org.apache.pinot.server.api.resources.ReingestionResource.waitForCondition;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -58,6 +59,59 @@ public class ReingestionResourceApiTest extends BaseResourceTest {
   /// Table availability when a queued re-ingestion starts.
   private enum TableState {
     AVAILABLE, REMOVED, SHUT_DOWN
+  }
+
+  @Test
+  public void testReplicateModeAdmissionBoundsQueuedAndRunningJobs()
+      throws Exception {
+    waitForCondition(() -> getJobs().equals("[]"), "previous re-ingestions to finish", 10, 10_000);
+    CountDownLatch releaseJobs = new CountDownLatch(1);
+    addTableDataManager(invocation -> {
+      releaseJobs.await();
+      throw new IllegalStateException("Release admitted recovery without building");
+    });
+    RealtimeTableDataManager manager =
+        (RealtimeTableDataManager) _tableDataManagerMap.get(REINGESTION_REALTIME_TABLE_NAME);
+    when(manager.fetchZKMetadata(anyString())).thenAnswer(invocation -> {
+      SegmentZKMetadata metadata = segmentMetadata(invocation.getArgument(0));
+      metadata.setReplicateMode(true);
+      return metadata;
+    });
+    try {
+      String first = null;
+      for (int i = 0; i < MAX_REPLICATE_MODE_REINGESTIONS; i++) {
+        String segment = segmentName(i);
+        if (first == null) {
+          first = segment;
+        }
+        assertThat(postReingestion(segment)).isEqualTo(Response.Status.OK.getStatusCode());
+      }
+      assertThat(postReingestion(first)).isEqualTo(Response.Status.CONFLICT.getStatusCode());
+      assertThat(postReingestion(segmentName(0))).isEqualTo(Response.Status.SERVICE_UNAVAILABLE.getStatusCode());
+      releaseJobs.countDown();
+      waitForCondition(() -> getJobs().equals("[]"), "admitted repairs to release their slots", 10, 10_000);
+      assertThat(postReingestion(segmentName(0))).isEqualTo(Response.Status.OK.getStatusCode());
+      waitForCondition(() -> getJobs().equals("[]"), "last repair to finish", 10, 10_000);
+    } finally {
+      releaseJobs.countDown();
+      _tableDataManagerMap.remove(REINGESTION_REALTIME_TABLE_NAME);
+    }
+  }
+
+  @Test
+  public void testUnboundedInProgressSegmentCannotBeReingested() {
+    RealtimeTableDataManager manager = mock(RealtimeTableDataManager.class);
+    String segment = segmentName(0);
+    SegmentZKMetadata metadata = segmentMetadata(segment);
+    metadata.setStatus(Status.IN_PROGRESS);
+    when(manager.fetchZKMetadata(segment)).thenReturn(metadata);
+    _tableDataManagerMap.put(REINGESTION_REALTIME_TABLE_NAME, manager);
+    try {
+      assertThat(postReingestion(segment)).isEqualTo(Response.Status.CONFLICT.getStatusCode());
+      verify(manager, never()).getSegmentBuildSemaphore();
+    } finally {
+      _tableDataManagerMap.remove(REINGESTION_REALTIME_TABLE_NAME);
+    }
   }
 
   @Test

@@ -63,6 +63,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // later pass is counted again. Repairs skipped by policy, and repairs that fail asynchronously after they were sent,
   // are not counted.
   LLC_ERROR_SEGMENT_REPAIR_FAILURES("failures", false),
+  REPLICATE_MODE_HANDOFFS("handoffs", false),
+  REPLICATE_MODE_RECOVERY_REQUESTS("requests", false),
+  REPLICATE_MODE_RECOVERY_FAILURES("failures", false),
   DELETED_TMP_SEGMENT_COUNT("DeletedTmpSegmentCount", false),
   REALTIME_METADATA_TAR_MOVE_FAILURE("RealtimeMetadataTarMoveFailure", false),
   REALTIME_METADATA_TAR_INVALIDATE_FAILURE("RealtimeMetadataTarInvalidateFailure", false),

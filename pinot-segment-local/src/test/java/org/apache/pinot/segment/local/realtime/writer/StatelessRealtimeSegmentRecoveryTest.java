@@ -78,15 +78,17 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
-/// Tests native re-ingestion semantics and multi-stream partition translation using isolated mocked streams.
+/// Tests native re-ingestion semantics and replicate-mode recovery using isolated mocked streams.
 public class StatelessRealtimeSegmentRecoveryTest {
   @DataProvider
   public Object[][] nullHandlingModes() {
@@ -304,14 +306,20 @@ public class StatelessRealtimeSegmentRecoveryTest {
     }
   }
 
-  @Test
-  public void testMultiStreamReplayUsesSelectedTopicAndRawPartition()
+  @DataProvider
+  public Object[][] replayModes() {
+    return new Object[][]{{false}, {true}};
+  }
+
+  @Test(dataProvider = "replayModes")
+  public void testMultiStreamReplayUsesSelectedTopicAndRawPartition(boolean replicateMode)
       throws Exception {
-    ReplayFixture fixture = new ReplayFixture(10007, List.of(stream("first"), stream("second")));
+    ReplayFixture fixture = new ReplayFixture(10007, List.of(stream("first"), stream("second")), replicateMode);
     try (MockedStatic<StreamConsumerFactoryProvider> ignored = fixture.mockFactory();
         StatelessRealtimeSegmentWriter writer = fixture.writer()) {
       assertEquals(fixture._config.get().getTopicName(), "second");
-      assertEquals(fixture._config.get().getStreamConfigsMap().get("auto.offset.reset"), "latest");
+      assertEquals(fixture._config.get().getStreamConfigsMap().get("auto.offset.reset"),
+          replicateMode ? "none" : "latest");
       assertEquals(fixture._status.get().getPartitionGroupId(), 10007);
       assertEquals(fixture._status.get().getStreamPartitionGroupId(), 7);
       assertEquals(fixture._status.get().getSequenceNumber(), 2);
@@ -321,10 +329,10 @@ public class StatelessRealtimeSegmentRecoveryTest {
     }
   }
 
-  @Test
-  public void testReplayBuildContainsOnlySavedHalfOpenRange()
+  @Test(dataProvider = "replayModes")
+  public void testReplayBuildContainsOnlySavedHalfOpenRange(boolean replicateMode)
       throws Exception {
-    ReplayFixture fixture = new ReplayFixture(0, List.of(stream("first")));
+    ReplayFixture fixture = new ReplayFixture(0, List.of(stream("first")), replicateMode);
     MessageBatch<byte[]> messages = batch(false, 13, 10, 11, 12);
     when(fixture._consumer.fetchMessages(any(), anyInt())).thenReturn(messages);
     File extracted = Files.createTempDirectory("replayed-segment").toFile();
@@ -339,6 +347,73 @@ public class StatelessRealtimeSegmentRecoveryTest {
       assertEquals(rebuilt.getEndOffset(), "12");
     } finally {
       FileUtils.deleteDirectory(extracted);
+    }
+  }
+
+  @Test
+  public void testExpiredReplayStartDoesNotPublishTruncatedArtifact()
+      throws Exception {
+    ReplayFixture fixture = new ReplayFixture(0, List.of(stream("first")), true);
+    when(fixture._provider.fetchStreamPartitionOffset(any(), anyLong())).thenReturn(new LongMsgOffset(11));
+    try (MockedStatic<StreamConsumerFactoryProvider> ignored = fixture.mockFactory();
+        StatelessRealtimeSegmentWriter writer = fixture.writer()) {
+      consume(writer);
+      assertFalse(writer.isSuccess());
+      assertTrue(writer.getConsumptionException().getMessage().contains("no longer retained"));
+      expectThrows(IllegalStateException.class, writer::buildSegment);
+      verify(fixture._consumer, never()).fetchMessages(any(), anyInt());
+    }
+  }
+
+  @Test
+  public void testDataLossAfterInitialRetentionCheckBlocksReplay()
+      throws Exception {
+    ReplayFixture fixture = new ReplayFixture(0, List.of(stream("first")), true);
+    MessageBatch<byte[]> messages = batch(true, 20);
+    when(fixture._consumer.fetchMessages(any(), anyInt())).thenReturn(messages);
+    try (MockedStatic<StreamConsumerFactoryProvider> ignored = fixture.mockFactory();
+        StatelessRealtimeSegmentWriter writer = fixture.writer()) {
+      consume(writer);
+      assertFalse(writer.isSuccess());
+      assertTrue(writer.getConsumptionException().getMessage().contains("Stream data loss"));
+      expectThrows(IllegalStateException.class, writer::buildSegment);
+    }
+  }
+
+  @Test
+  public void testEmptyEndOfStreamCannotCompleteFixedRangeReplay()
+      throws Exception {
+    ReplayFixture fixture = new ReplayFixture(0, List.of(stream("first")), true);
+    MessageBatch<byte[]> messages = batch(false, 11);
+    when(messages.isEndOfPartitionGroup()).thenReturn(true);
+    when(fixture._consumer.fetchMessages(any(), anyInt())).thenReturn(messages);
+    try (MockedStatic<StreamConsumerFactoryProvider> ignored = fixture.mockFactory();
+        StatelessRealtimeSegmentWriter writer = fixture.writer()) {
+      consume(writer);
+      assertFalse(writer.isSuccess());
+      assertTrue(writer.getConsumptionException().getMessage().contains("Stream ended before replay reached"));
+      expectThrows(IllegalStateException.class, writer::buildSegment);
+    }
+  }
+
+  @Test
+  public void testReplicateReplayRejectsBuildAfterFatalDecodeError()
+      throws Exception {
+    Map<String, String> stream = new HashMap<>(stream("first"));
+    stream.put("stream.kafka.decoder.class.name", FailingDecoder.class.getName());
+    stream.put("stopOnDecodeError", "true");
+    ReplayFixture fixture = new ReplayFixture(0, List.of(stream), true);
+    fixture._metadata.setEndOffset("13");
+    MessageBatch<byte[]> messages = batch(false, 13, 10, 11, 12);
+    when(fixture._consumer.fetchMessages(any(), anyInt())).thenReturn(messages);
+    try (MockedStatic<StreamConsumerFactoryProvider> ignored = fixture.mockFactory();
+        StatelessRealtimeSegmentWriter writer = fixture.writer()) {
+      consume(writer);
+      assertFalse(writer.isSuccess());
+      assertTrue(writer.getConsumptionException().getMessage().contains("decode error at offset: 11"));
+      assertEquals(writer.getIngestionStats(),
+          new StatelessRealtimeSegmentWriter.IngestionStats(1, 1, 0, 0, 0, 0, 0));
+      expectThrows(IllegalStateException.class, writer::buildSegment);
     }
   }
 
@@ -472,11 +547,21 @@ public class StatelessRealtimeSegmentRecoveryTest {
 
     ReplayFixture(int partitionId, List<Map<String, String>> streams)
         throws Exception {
+      this(partitionId, streams, false);
+    }
+
+    ReplayFixture(int partitionId, List<Map<String, String>> streams, boolean replicateMode)
+        throws Exception {
       this(partitionId, streams, new Schema.SchemaBuilder().setSchemaName("replay")
-          .addSingleValueDimension("col", DataType.STRING).build());
+          .addSingleValueDimension("col", DataType.STRING).build(), replicateMode);
     }
 
     ReplayFixture(int partitionId, List<Map<String, String>> streams, Schema schema)
+        throws Exception {
+      this(partitionId, streams, schema, false);
+    }
+
+    ReplayFixture(int partitionId, List<Map<String, String>> streams, Schema schema, boolean replicateMode)
         throws Exception {
       _schema = schema;
       IngestionConfig ingestion = new IngestionConfig();
@@ -484,6 +569,7 @@ public class StatelessRealtimeSegmentRecoveryTest {
       _tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("replay")
           .setIngestionConfig(ingestion).build();
       _metadata = new SegmentZKMetadata(new LLCSegmentName("replay", partitionId, 2, 0L).getSegmentName());
+      _metadata.setReplicateMode(replicateMode);
       _metadata.setStatus(Status.COMMITTING);
       _metadata.setStartOffset("10");
       _metadata.setEndOffset("12");

@@ -35,6 +35,25 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 /// segment's completion.
 public interface SegmentCompletionFSM {
 
+  /// Read-only status of an existing completion attempt. This is an observation, not recovery authorization.
+  enum RecoveryStatus {
+    UNKNOWN, NO_ACTIVE_COMMIT, COMMIT_IN_PROGRESS, COMMIT_EXPIRED
+  }
+
+  /// Observes completion activity without creating, aborting, extending, or otherwise advancing the FSM.
+  /// Implementations must not block on commit work. Custom implementations return UNKNOWN until they provide an
+  /// observation; callers must not treat UNKNOWN or an expired observation as permission to mutate segment state.
+  default RecoveryStatus getRecoveryStatus() {
+    return RecoveryStatus.UNKNOWN;
+  }
+
+  /// Identifies an already accepted upload without creating or advancing an attempt. This exception permits the
+  /// exact old committer to finish after consuming placement changes; it must never authorize a new attempt.
+  /// Implementations must not wait for Controller-side commit I/O. Custom FSMs fail closed by default.
+  default boolean isAcceptedCommitter(String instanceId, String offset) {
+    return false;
+  }
+
   /// Initializes the FSM to its initial state based on the message type.
   /// @param msgType The message type that triggered the FSM initialization.
   ///                This is sent by the server when triggering the commit.

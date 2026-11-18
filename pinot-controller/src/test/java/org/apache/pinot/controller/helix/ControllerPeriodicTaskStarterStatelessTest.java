@@ -27,6 +27,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.helix.core.realtime.ReplicateModeFailoverManager.TASK_NAME;
+import static org.testng.Assert.assertTrue;
+
 
 @Test(groups = "stateless")
 public class ControllerPeriodicTaskStarterStatelessTest extends ControllerTest {
@@ -55,7 +58,7 @@ public class ControllerPeriodicTaskStarterStatelessTest extends ControllerTest {
   }
 
   private class MockControllerStarter extends ControllerStarter {
-    private static final int NUM_PERIODIC_TASKS = 13;
+    private static final int NUM_PERIODIC_TASKS = 14;
 
     public MockControllerStarter() {
       super();
@@ -73,6 +76,7 @@ public class ControllerPeriodicTaskStarterStatelessTest extends ControllerTest {
       List<PeriodicTask> controllerPeriodicTasks = super.setupControllerPeriodicTasks();
       Assert.assertNotNull(controllerPeriodicTasks);
       Assert.assertEquals(controllerPeriodicTasks.size(), NUM_PERIODIC_TASKS);
+      assertTrue(controllerPeriodicTasks.stream().anyMatch(task -> TASK_NAME.equals(task.getTaskName())));
       return controllerPeriodicTasks;
     }
   }

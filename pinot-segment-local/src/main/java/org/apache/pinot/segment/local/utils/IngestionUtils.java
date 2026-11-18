@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +69,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataDecoder;
 import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
@@ -350,6 +352,17 @@ public final class IngestionUtils {
       result.add(StringUtils.splitByWholeSeparator(field, delimiter)[0]);
     }
     return result;
+  }
+
+  /// A replicate-mode Kafka consumer must fail on missing offsets instead of silently skipping its saved range.
+  public static StreamConfig createConsumptionStreamConfig(String tableName, Map<String, String> streamConfigMap,
+      boolean replicateMode) {
+    if (!replicateMode || !"kafka".equals(streamConfigMap.get(StreamConfigProperties.STREAM_TYPE))) {
+      return new StreamConfig(tableName, streamConfigMap);
+    }
+    Map<String, String> consumptionConfig = new HashMap<>(streamConfigMap);
+    consumptionConfig.put("auto.offset.reset", "none");
+    return new StreamConfig(tableName, consumptionConfig);
   }
 
   /// Configures the column partition function using the full stream partition count, even when consumption selects a

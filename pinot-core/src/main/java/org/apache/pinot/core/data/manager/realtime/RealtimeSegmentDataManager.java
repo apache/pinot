@@ -113,6 +113,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
@@ -176,6 +177,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     public boolean isFinal() {
       return this.equals(ERROR) || this.equals(COMMITTED) || this.equals(RETAINED) || this.equals(DISCARDED);
     }
+  }
+
+  /// The operation whose configured parallel-consumption permission controls a fixed-range early release.
+  private enum PermitReleasePhase {
+    BUILD,
+    DOWNLOAD
   }
 
   @VisibleForTesting
@@ -276,6 +283,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private ServerIngestionOomProtectionManager _serverIngestionOomProtectionManager;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
+  /// An authoritative pauseless end offset after which this mutable copy must never resume indexing. Published before
+  /// releasing the partition permit, so query references to this copy can coexist with the disjoint successor range.
+  @Nullable
+  private volatile StreamPartitionMsgOffset _replicateFrozenEndOffset;
   // Furthest next offset reported by a batch without messages, e.g. one past a Kafka transaction marker. Only feeds
   // consumption lag and the highest-offset gauge (see getStreamPosition()). Written by the consumer thread only.
   @Nullable
@@ -553,6 +564,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected boolean consumeLoop()
       throws Exception {
+    checkMutableNotFrozen("resume consumption");
     try {
       return doConsumeLoop();
     } finally {
@@ -748,6 +760,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// @return how processing of the batch ended
   private BatchOutcome processStreamEvents(MessageBatch<?> messageBatch, long idlePipeSleepTimeMillis,
       boolean decodeRetryFetch) {
+    checkMutableNotFrozen("index stream messages");
     int messageCount = messageBatch.getMessageCount();
     if (!decodeRetryFetch) {
       throttle(messageBatch);
@@ -1056,6 +1069,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public class PartitionConsumer implements Runnable {
     public void run() {
+      checkMutableNotFrozen("start a partition consumer");
       long initialConsumptionEnd = 0L;
       long lastCatchUpStart = 0L;
       long catchUpTimeMillis = 0L;
@@ -1168,6 +1182,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                     _currentOffset);
                 hold();
               } else {
+                checkMutableNotFrozen("catch up to " + rspOffset);
                 _state = State.CATCHING_UP;
                 _finalOffset = rspOffset;
                 lastCatchUpStart = now();
@@ -1226,7 +1241,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             }
             case COMMIT: {
               _state = State.COMMITTING;
-              _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+              if (_replicateFrozenEndOffset == null) {
+                _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+              } else {
+                Preconditions.checkState(_currentOffset.compareTo(_replicateFrozenEndOffset) == 0,
+                    "Frozen segment: %s moved from end offset: %s to: %s", _segmentNameStr,
+                    _replicateFrozenEndOffset, _currentOffset);
+              }
               // Lock the segment to avoid multiple threads touching the same segment.
               Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
               // NOTE: We need to lock interruptibly because the lock might already be held by the Helix thread for the
@@ -1338,8 +1359,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   private boolean startSegmentCommit() {
+    StreamPartitionMsgOffset committingOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset.toString());
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
+    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(committingOffset.toString())
         .withNumRows(_numRowsIndexed).withInstanceId(_instanceId).withReasonCode(_stopReasonCode);
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
@@ -1359,6 +1381,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
       return false;
     }
+    // A successful pauseless commit start has durably fixed this exact range before creating the successor.
+    freezeAndReleaseReplicatePermit(committingOffset, PermitReleasePhase.BUILD);
     return true;
   }
 
@@ -1371,6 +1395,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // built the segment successfully.
   protected void buildSegmentForCommit(long buildTimeLeaseMs)
       throws SegmentBuildFailureException {
+    // Also cover a retried commit that already has a built tar and returns before buildSegmentInternal().
+    tryReleaseReplicatePermitForFixedRange(null);
     try {
       if (_segmentBuildDescriptor != null && _segmentBuildDescriptor.getOffset().compareTo(_currentOffset) == 0) {
         // Double-check that we have the file, just in case.
@@ -1424,9 +1450,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   /// Checks and reports if the consumer is going through data loss.
   ///
-  /// The [ServerGauge#STREAM_DATA_LOSS] gauge is set for every batch that reports loss. The ERROR log line and the
-  /// segment error entry are emitted at most once per [#DATA_LOSS_REPORT_INTERVAL_MS] per segment, carrying the
-  /// number of affected batches since the previous report and where the earliest and the most recent of them were
+  /// The [ServerGauge#STREAM_DATA_LOSS] gauge is set for every batch that reports loss. For ordinary consumption,
+  /// the ERROR log line and segment error entry are emitted at most once per [#DATA_LOSS_REPORT_INTERVAL_MS],
+  /// carrying the number of affected batches since the previous report and where the earliest and most recent were
   /// detected, so a stream that keeps reporting loss on every poll does not flood the log or churn the segment error
   /// cache, and the report still shows where the loss started. A batch with loss whose report was suppressed is
   /// reported by the first batch processed after the interval has elapsed, even when that batch and every one before
@@ -1434,6 +1460,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// segment error cache. This method runs for every fetched batch, including empty ones, so the deferred report
   /// follows the end of the interval within one fetch. When the consume loop exits before that,
   /// [#flushDataLossReport] reports it instead.
+  /// Replicate-mode replay reports its failing batch immediately and stops rather than accepting a truncated range.
   ///
   /// @param messageBatch Message batch to validate
   @VisibleForTesting
@@ -1455,9 +1482,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _latestUnreportedDataLossLocation = location;
     long now = now();
-    if (_lastDataLossReportTimeMs < 0 || now - _lastDataLossReportTimeMs >= DATA_LOSS_REPORT_INTERVAL_MS) {
+    boolean replicateMode = _segmentZKMetadata.isReplicateMode();
+    if (replicateMode || _lastDataLossReportTimeMs < 0
+        || now - _lastDataLossReportTimeMs >= DATA_LOSS_REPORT_INTERVAL_MS) {
       logDataLoss(now);
     }
+    Preconditions.checkState(!replicateMode,
+        "Cannot continue replicate-mode replay after stream data loss: %s", location);
   }
 
   /// Reports the batches with loss whose report the rate limit suppressed, if any. Runs whenever the consume loop
@@ -1733,6 +1764,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// @return `true` if the consuming segment was replaced with the local copy; `false` if the caller should download
   protected boolean buildSegmentAndReplace(@Nullable SegmentZKMetadata committedSegmentZKMetadata)
       throws Exception {
+    // KEEP needs a fresh lookup; ONLINE transitions already carry the fixed range, after stopping/catching up.
+    tryReleaseReplicatePermitForFixedRange(committedSegmentZKMetadata);
     SegmentBuildDescriptor descriptor;
     try {
       descriptor = buildSegmentInternal(false);
@@ -1800,6 +1833,70 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// Whether this stopped consumer has allowed its successor to consume while its segment is still being sealed.
   boolean hasReleasedConsumerSemaphore() {
     return _hasReleasedConsumerSemaphore;
+  }
+
+  /// Tries to release a replicate-mode permit only after a fixed pauseless range is confirmed and indexing is stopped.
+  /// Called by the consumer outside consumeLoop(), or by the ONLINE transition after joining the consumer, under the
+  /// segment lock. A missing/stale range leaves the permit held through authoritative replacement and destruction.
+  @VisibleForTesting
+  boolean tryReleaseReplicatePermitForFixedRange(@Nullable SegmentZKMetadata metadata) {
+    return tryReleaseReplicatePermitForFixedRange(metadata, PermitReleasePhase.BUILD);
+  }
+
+  private boolean tryReleaseReplicatePermitForFixedRange(@Nullable SegmentZKMetadata metadata,
+      PermitReleasePhase phase) {
+    if (!canReleaseReplicatePermit(phase) || !_consumerSemaphoreAcquired.get()) {
+      return false;
+    }
+    if (_replicateFrozenEndOffset != null) {
+      return false;
+    }
+    try {
+      SegmentZKMetadata authoritative = metadata != null ? metadata
+          : _realtimeTableDataManager.fetchZKMetadataNullable(_segmentNameStr);
+      if (authoritative == null || !authoritative.isReplicateMode()
+          || !authoritative.getSegmentName().equals(_segmentNameStr)
+          || authoritative.getCreationTime() != _segmentZKMetadata.getCreationTime()
+          || !_startOffset.toString().equals(authoritative.getStartOffset())
+          || authoritative.getStatus() != Status.COMMITTING && authoritative.getStatus() != Status.DONE
+          || StringUtils.isBlank(authoritative.getEndOffset())) {
+        return false;
+      }
+      return freezeAndReleaseReplicatePermit(
+          _streamPartitionMsgOffsetFactory.create(authoritative.getEndOffset()), phase);
+    } catch (RuntimeException e) {
+      _segmentLogger.warn("Cannot confirm a fixed range for segment: {}; retaining its consumer permit",
+          _segmentNameStr, e);
+      return false;
+    }
+  }
+
+  private boolean canReleaseReplicatePermit(PermitReleasePhase phase) {
+    if (!_segmentZKMetadata.isReplicateMode() || !PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)
+        || _partitionUpsertMetadataManager != null || _partitionDedupMetadataManager != null
+        || isTableDataManagerShutDown() || hasDifferentSegmentDataManagerRegistered()) {
+      return false;
+    }
+    ParallelSegmentConsumptionPolicy policy =
+        _tableConfig.getIngestionConfig().getStreamIngestionConfig().getParallelSegmentConsumptionPolicy();
+    return policy == null || (phase == PermitReleasePhase.BUILD
+        ? policy.isAllowedDuringBuild()
+        : policy.isAllowedDuringDownload());
+  }
+
+  private boolean freezeAndReleaseReplicatePermit(StreamPartitionMsgOffset endOffset, PermitReleasePhase phase) {
+    if (!canReleaseReplicatePermit(phase) || !_consumerSemaphoreAcquired.get()
+        || _replicateFrozenEndOffset != null || _currentOffset.compareTo(endOffset) != 0) {
+      return false;
+    }
+    _replicateFrozenEndOffset = _streamPartitionMsgOffsetFactory.create(endOffset.toString());
+    closeStreamConsumerAndReleaseSemaphore();
+    return true;
+  }
+
+  private void checkMutableNotFrozen(String operation) {
+    Preconditions.checkState(_replicateFrozenEndOffset == null,
+        "Cannot %s for segment: %s frozen at end offset: %s", operation, _segmentNameStr, _replicateFrozenEndOffset);
   }
 
   private void closePartitionGroupConsumer() {
@@ -2095,6 +2192,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
+    tryReleaseReplicatePermitForFixedRange(segmentZKMetadata, PermitReleasePhase.DOWNLOAD);
     boolean holdsPermit = holdsConsumerSemaphoreForMetadata();
     if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload() && !holdsPermit) {
       closeStreamConsumerAndReleaseSemaphore();
@@ -2185,11 +2283,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // replaying while primary keys still point to this mutable segment, and merge against the un-reverted state.
     // When the parallel consumption policy allowed the next segment to start during build or download, the semaphore
     // was already released there and the release below is a no-op.
-    // The semaphore is released in a finally block so that a failure in metadata removal cannot stall the partition.
+    // Replicate-mode copies retain the permit until destruction, when old mutable query references have drained.
+    // Other tables release in finally so a failure in metadata removal cannot stall the partition.
     try {
       _realtimeSegment.offload();
     } finally {
-      releaseConsumerSemaphore();
+      if (!_segmentZKMetadata.isReplicateMode()) {
+        releaseConsumerSemaphore();
+      }
       _consumerCoordinator.clearUnsealedRelease(_segmentNameStr);
       cleanupMetrics();
     }
@@ -2197,10 +2298,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @Override
   protected void doDestroy() {
-    _realtimeSegment.destroy();
+    try {
+      _realtimeSegment.destroy();
+    } finally {
+      if (_segmentZKMetadata.isReplicateMode()) {
+        // Replacement removes this mutable copy from the serving map before offload, but existing queries may
+        // still hold it. Starting the next range before their references drain can double-count a replayed tail.
+        releaseConsumerSemaphore();
+      }
+    }
   }
 
   public void startConsumption() {
+    checkMutableNotFrozen("start consumption");
     Runnable consumer =
         SegmentOperationsTaskContext.wrap(new PartitionConsumer(), SegmentOperationsTaskType.CONSUMER,
             _tableNameWithType);
@@ -2275,8 +2385,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _partitionGroupId = llcSegmentName.getPartitionGroupId();
     _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, _partitionGroupId);
-    _streamConfig =
-        new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig, _partitionGroupId));
+    _streamConfig = createConsumptionStreamConfig(_tableNameWithType,
+        IngestionConfigUtils.getStreamConfigMap(_tableConfig, _partitionGroupId), segmentZKMetadata.isReplicateMode());
     _decodeRetryTracker = new DecodeRetryTracker(_streamConfig);
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
@@ -2379,8 +2489,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Initialize stopOnDecodeError configuration with proper validation
       boolean stopOnDecodeError = parseStopOnDecodeErrorConfig(_streamConfig);
 
+      if (segmentZKMetadata.isReplicateMode()) {
+        Preconditions.checkState(!tableConfig.isUpsertEnabled() && !tableConfig.isDedupEnabled(),
+            "Replicate-mode recovery only supports append-only tables");
+        createPartitionMetadataProvider("Validating replicate-mode replay range");
+        StreamPartitionMsgOffset earliestOffset = fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA,
+            _streamConfig.getFetchTimeoutMillis());
+        Preconditions.checkState(earliestOffset != null && earliestOffset.compareTo(_startOffset) <= 0,
+            "Replicate-mode replay start offset: %s is not retained; earliest available: %s for segment: %s",
+            _startOffset, earliestOffset, _segmentNameStr);
+      }
       makeStreamConsumer("Starting");
-      createPartitionMetadataProvider("Starting");
+      if (!segmentZKMetadata.isReplicateMode()) {
+        createPartitionMetadataProvider("Starting");
+      }
       setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
       _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
       _recordProcessor = new RealtimeIngestionRecordProcessor(_transformPipeline, _realtimeSegment, stopOnDecodeError,
@@ -2415,7 +2537,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  /// A replicate-mode consumer must rebuild its complete saved interval rather than resetting past missing offsets.
+  @VisibleForTesting
+  static StreamConfig createConsumptionStreamConfig(String tableName, Map<String, String> streamConfigMap,
+      boolean replicateMode) {
+    return IngestionUtils.createConsumptionStreamConfig(tableName, streamConfigMap, replicateMode);
+  }
+
   private ParallelSegmentConsumptionPolicy getParallelConsumptionPolicy() {
+    if (_segmentZKMetadata.isReplicateMode()) {
+      // The static policy cannot prove that a replacement consumer has not passed a late committer's end offset.
+      // Only the fixed-range runtime gate may release early; unknown and overshot ranges wait for destruction.
+      return ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS;
+    }
     IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
     ParallelSegmentConsumptionPolicy parallelSegmentConsumptionPolicy = null;
     boolean pauseless = false;
@@ -2525,6 +2659,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   /// Creates a new stream consumer
   private void makeStreamConsumer(String reason) {
+    checkMutableNotFrozen("create a stream consumer");
     if (_partitionGroupConsumer != null) {
       closePartitionGroupConsumer();
     }
@@ -2544,6 +2679,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /// Checkpoints existing consumer before creating a new consumer instance
   /// Assumes there is a valid instance of [PartitionGroupConsumer]
   private void recreateStreamConsumer(String reason) {
+    checkMutableNotFrozen("recreate a stream consumer");
     _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
     _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
     closePartitionGroupConsumer();

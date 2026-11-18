@@ -53,6 +53,7 @@ import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.PartitionAssignmentUtils;
+import org.apache.pinot.common.assignment.ReplicateModeAssignmentUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -285,6 +286,36 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     try {
       assertFalse(_helixResourceManager.instanceDropSafetyCheck(instanceName).isSafe());
       assertFalse(_helixResourceManager.dropInstance(instanceName).isSuccessful());
+    } finally {
+      _helixAdmin.dropResource(getHelixClusterName(), tableNameWithType);
+    }
+
+    // A follower is still in use before its first segment assignment, including when the resource is disabled.
+    String candidateTenant = "replicateModeCandidateTenant";
+    _helixResourceManager.updateInstanceTags(instanceName, TagNameUtils.getRealtimeTagForTenant(candidateTenant),
+        false);
+    tableNameWithType = "replicateModeTable_REALTIME";
+    String leader = serverInstances.iterator().next();
+    idealState = new IdealState(tableNameWithType);
+    idealState.setStateModelDefRef(
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL);
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    idealState.setReplicas("1");
+    idealState.setNumPartitions(1);
+    idealState.setPartitionState("segment0", leader, Helix.StateModel.SegmentStateModel.CONSUMING);
+    idealState.enable(false);
+    ReplicateModeAssignmentUtils.setAssignment(idealState, 0, leader, List.of(leader, instanceName));
+    _helixAdmin.addResource(getHelixClusterName(), tableNameWithType, idealState);
+    try {
+      assertFalse(_helixResourceManager.instanceDropSafetyCheck(instanceName).isSafe());
+      assertFalse(_helixResourceManager.dropInstance(instanceName).isSuccessful());
+      assertNotNull(_helixResourceManager.getHelixInstanceConfig(instanceName));
+      assertFalse(_helixResourceManager.isServerTenantDeletable(candidateTenant));
+
+      ReplicateModeAssignmentUtils.setAssignment(idealState, 0, leader, List.of(leader));
+      _helixAdmin.setResourceIdealState(getHelixClusterName(), tableNameWithType, idealState);
+      assertTrue(_helixResourceManager.instanceDropSafetyCheck(instanceName).isSafe());
+      assertTrue(_helixResourceManager.isServerTenantDeletable(candidateTenant));
     } finally {
       _helixAdmin.dropResource(getHelixClusterName(), tableNameWithType);
     }

@@ -428,13 +428,14 @@ public abstract class BaseBrokerRoutingManager
     }
   }
 
-  /// Returns true if the IS / EV version has changed (irrespective of whether the routing entry was updated), otherwise
-  /// return false
+  /// Returns true when an IS/EV version change or unresolved segment metadata requires a routing refresh,
+  /// irrespective of whether that refresh succeeds.
   private boolean processAssignmentChangeForTable(int idealStateVersion, int externalViewVersion,
       RoutingEntry routingEntry) {
     // Table lock must be held prior to calling this helper method
     if (idealStateVersion != routingEntry.getLastUpdateIdealStateVersion()
-        || externalViewVersion != routingEntry.getLastUpdateExternalViewVersion()) {
+        || externalViewVersion != routingEntry.getLastUpdateExternalViewVersion()
+        || routingEntry.hasPendingSegmentMetadata()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       long startTimeNs = System.nanoTime();
       try {
@@ -1630,6 +1631,18 @@ public abstract class BaseBrokerRoutingManager
 
     int getLastUpdateExternalViewVersion() {
       return _lastUpdateExternalViewVersion;
+    }
+
+    boolean hasPendingSegmentMetadata() {
+      if (_instanceSelector.hasPendingSegmentMetadata()) {
+        return true;
+      }
+      for (SamplerInfo samplerInfo : _samplerInfos.values()) {
+        if (samplerInfo._instanceSelector.hasPendingSegmentMetadata()) {
+          return true;
+        }
+      }
+      return false;
     }
 
     void setTimeBoundaryManager(@Nullable TimeBoundaryManager timeBoundaryManager) {

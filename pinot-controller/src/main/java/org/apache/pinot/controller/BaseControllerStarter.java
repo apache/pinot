@@ -111,6 +111,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.helix.core.realtime.ReplicateModeFailoverManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker;
@@ -1115,6 +1116,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics, _storageQuotaChecker,
             _resourceUtilizationManager);
     periodicTasks.add(_realtimeSegmentValidationManager);
+    periodicTasks.add(new ReplicateModeFailoverManager(_config, _helixResourceManager, _leadControllerManager,
+        _controllerMetrics, _pinotLLCRealtimeSegmentManager, _segmentCompletionManager));
     _brokerResourceValidationManager =
         new BrokerResourceValidationManager(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics);
     periodicTasks.add(_brokerResourceValidationManager);

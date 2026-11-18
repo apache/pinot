@@ -54,6 +54,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -106,6 +107,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   private final String _tableNameWithType;
   private final int _partitionGroupId;
   private final int _streamPartitionId;
+  private final boolean _strictRecovery;
   private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final Schema _schema;
@@ -144,6 +146,9 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     _tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(llcSegmentName.getTableName());
     _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = indexLoadingConfig.getTableConfig();
+    _strictRecovery = segmentZKMetadata.isReplicateMode();
+    Preconditions.checkState(!_strictRecovery || (!_tableConfig.isUpsertEnabled() && !_tableConfig.isDedupEnabled()),
+        "Replicate-mode recovery only supports append-only tables");
     _schema = SchemaUtils.prepareRealtimeSegmentSchema(_tableConfig, indexLoadingConfig.getSchema(), segmentZKMetadata);
     String tableDataDir = indexLoadingConfig.getTableDataDir() == null ? FileUtils.getTempDirectory().getAbsolutePath()
         : indexLoadingConfig.getTableDataDir();
@@ -161,8 +166,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentWriter.class.getName() + "_" + _segmentName);
 
     _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, _partitionGroupId);
-    _streamConfig = new StreamConfig(_tableNameWithType,
-        IngestionConfigUtils.getStreamConfigMap(_tableConfig, _partitionGroupId));
+    _streamConfig = IngestionUtils.createConsumptionStreamConfig(_tableNameWithType,
+        IngestionConfigUtils.getStreamConfigMap(_tableConfig, _partitionGroupId), _strictRecovery);
 
     StreamPartitionMsgOffsetFactory offsetFactory =
         StreamConsumerFactoryProvider.create(_streamConfig).createStreamMsgOffsetFactory();
@@ -319,6 +324,15 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     @Override
     public void run() {
       try {
+        if (_strictRecovery) {
+          Preconditions.checkState(_partitionMetadataProvider != null,
+              "Cannot validate retained replay interval for segment: %s", _segmentName);
+          StreamPartitionMsgOffset smallestOffset = _partitionMetadataProvider.fetchStreamPartitionOffset(
+              OffsetCriteria.SMALLEST_OFFSET_CRITERIA, _fetchTimeoutMs);
+          Preconditions.checkState(smallestOffset.compareTo(_startOffset) <= 0,
+              "Replay start offset: %s is no longer retained; earliest available: %s for segment: %s",
+              _startOffset, smallestOffset, _segmentName);
+        }
         _consumer.start(_startOffset);
         _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
@@ -339,6 +353,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
               + "rebuilt from it. Restore the range from another source, or delete the segment to accept the loss",
               _currentOffset, _endOffset);
           if (messageBatch.getUnfilteredMessageCount() == 0) {
+            Preconditions.checkState(!_strictRecovery || !messageBatch.isEndOfPartitionGroup(),
+                "Stream ended before replay reached end offset: %s for segment: %s", _endOffset, _segmentName);
             // Poll again from the same offset (see the class Javadoc)
             continue;
           }
@@ -382,6 +398,9 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
             continue;
           }
           _currentOffset = messageBatch.getOffsetOfNextBatch();
+          Preconditions.checkState(!_strictRecovery || !messageBatch.isEndOfPartitionGroup()
+                  || _currentOffset.compareTo(_endOffset) >= 0,
+              "Stream ended before replay reached end offset: %s for segment: %s", _endOffset, _segmentName);
         }
         _isSuccess = true;
       } catch (Exception e) {
@@ -430,6 +449,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
   }
 
   public File buildSegment() {
+    Preconditions.checkState(!_strictRecovery || _isSuccess, "Cannot build an incomplete replay of segment: %s",
+        _segmentName);
     _logger.info("Building segment from {} to {}", _startOffset, _endOffset);
     long startTimeMs = now();
     try {
