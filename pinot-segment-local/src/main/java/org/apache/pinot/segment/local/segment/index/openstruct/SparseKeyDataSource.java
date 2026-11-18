@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -36,7 +37,7 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -50,9 +51,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /// `maxNumValuesPerMVEntry` is the longest value the key holds, the number callers size their multi-value
 /// buffers from; 0 for a single-value key.
 ///
-/// Single-value reads accept only values that fit the key's type ([#accepts]); anything else reads as absent and
-/// the null vector agrees. Multi-value elements keep Jackson's lenient conversion, since one element cannot be marked
-/// null; their presence is not type-aware.
+/// A numeric, BOOLEAN or TIMESTAMP value is converted exactly as the dense tier converts it at build
+/// (`OpenStructColumnSplitter`: [PinotDataType] of the stored type), so a key reads the same whichever tier holds it.
+/// A value that conversion rejects -- text that is not a number, an object in a numeric key -- is dropped by the dense
+/// tier, so here it reads as absent (null, or the default with null handling off) and the null vector agrees. A
+/// multi-value key is absent when any element is rejected, as the dense tier drops the whole value. STRING, JSON and
+/// BYTES keys take any value.
 public class SparseKeyDataSource extends BaseDataSource {
   private final FieldSpec _fieldSpec;
 
@@ -81,7 +85,9 @@ public class SparseKeyDataSource extends BaseDataSource {
     /// predicate names it -- so the two must agree, or a NOT_IN over a declared default can take the fast path and
     /// miss the documents that lack the key.
     private final Object _declaredDefault;
-    private final DataType _dataType;
+    /// The dense tier's conversion for this key; null for a STRING, JSON or BYTES key, which reads any value.
+    @Nullable
+    private final PinotDataType _converter;
 
     SparseKeyForwardIndexReader(FieldSpec fieldSpec, OpenStructSparseBlobReader blob) {
       this(fieldSpec.getName(), fieldSpec.getDataType(), fieldSpec.isSingleValueField(), blob,
@@ -96,7 +102,7 @@ public class SparseKeyDataSource extends BaseDataSource {
         OpenStructSparseBlobReader blob, @Nullable Object declaredDefault) {
       _declaredDefault = declaredDefault;
       _key = key;
-      _dataType = dataType;
+      _converter = converterFor(dataType);
       _storedType = dataType.getStoredType();
       _singleValue = singleValue;
       _blob = blob;
@@ -125,7 +131,15 @@ public class SparseKeyDataSource extends BaseDataSource {
     @Nullable
     private JsonNode valueNode(int docId, ForwardIndexReaderContext context) {
       JsonNode node = _blob.getValue(docId, _key, context);
-      return node == null || node.isNull() || (_singleValue && !accepts(_dataType, node)) ? null : node;
+      return node == null || node.isNull() ? null : node;
+    }
+
+    /// The single value converted to the key's stored type, or null when the document lacks the key or the dense
+    /// tier's conversion rejects the value.
+    @Nullable
+    private Object converted(int docId, ForwardIndexReaderContext context) {
+      JsonNode node = valueNode(docId, context);
+      return node == null ? null : convert(_converter, node);
     }
 
     private <T> T orDefault(int docId, ForwardIndexReaderContext context, Function<JsonNode, T> map, T defaultValue) {
@@ -142,51 +156,37 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public int getInt(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context,
-          _dataType == DataType.BOOLEAN ? SparseKeyForwardIndexReader::booleanAsInt : JsonNode::asInt,
-          declaredOr(Integer.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT));
-    }
-
-    /// TIMESTAMP is stored as LONG epoch millis; text is parsed the way the materialized tier parses it.
-    private static long timestampMillis(JsonNode node) {
-      return node.isTextual() ? TimestampUtils.toMillisSinceEpoch(node.textValue().trim()) : node.asLong();
-    }
-
-    /// BOOLEAN is stored as INT; Jackson's `asInt()` reads the text `"true"` as 0, so map booleans explicitly.
-    private static int booleanAsInt(JsonNode node) {
-      if (node.isBoolean()) {
-        return node.booleanValue() ? 1 : 0;
-      }
-      if (node.isNumber()) {
-        return node.asLong() != 0 ? 1 : 0;
-      }
-      String text = node.asText().trim();
-      return "true".equalsIgnoreCase(text) || "1".equals(text) ? 1 : 0;
+      Object value = converted(docId, context);
+      return value != null ? ((Number) value).intValue()
+          : declaredOr(Integer.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
     }
 
     @Override
     public long getLong(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context,
-          _dataType == DataType.TIMESTAMP ? SparseKeyForwardIndexReader::timestampMillis : JsonNode::asLong,
-          declaredOr(Long.class, (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG));
+      Object value = converted(docId, context);
+      return value != null ? ((Number) value).longValue()
+          : declaredOr(Long.class, (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
     }
 
     @Override
     public float getFloat(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, node -> (float) node.asDouble(),
-          declaredOr(Float.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT));
+      Object value = converted(docId, context);
+      return value != null ? ((Number) value).floatValue()
+          : declaredOr(Float.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
     }
 
     @Override
     public double getDouble(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, JsonNode::asDouble,
-          declaredOr(Double.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE));
+      Object value = converted(docId, context);
+      return value != null ? ((Number) value).doubleValue()
+          : declaredOr(Double.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
     }
 
     @Override
     public BigDecimal getBigDecimal(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, node -> new BigDecimal(node.asText().trim()),
-          declaredOr(BigDecimal.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL));
+      Object value = converted(docId, context);
+      return value != null ? (BigDecimal) value
+          : declaredOr(BigDecimal.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL);
     }
 
     @Override
@@ -221,38 +221,50 @@ public class SparseKeyDataSource extends BaseDataSource {
     @Nullable
     private JsonNode[] valueNodes(int docId, ForwardIndexReaderContext context) {
       JsonNode node = valueNode(docId, context);
-      if (node == null) {
+      return node == null ? null : elementsOf(node);
+    }
+
+    /// Elements of a multi-value key converted to its stored type, or null when the document lacks the key or the
+    /// dense tier's conversion rejects any element (it drops the whole value, since length is part of it).
+    @Nullable
+    private Object[] convertedValues(int docId, ForwardIndexReaderContext context) {
+      JsonNode[] nodes = valueNodes(docId, context);
+      if (nodes == null) {
         return null;
       }
-      if (!node.isArray()) {
-        return new JsonNode[]{node};
-      }
-      JsonNode[] nodes = new JsonNode[node.size()];
+      Object[] values = new Object[nodes.length];
       for (int i = 0; i < nodes.length; i++) {
-        nodes[i] = node.get(i);
+        values[i] = convert(_converter, nodes[i]);
+        if (values[i] == null) {
+          return null;
+        }
       }
-      return nodes;
+      return values;
     }
 
     @Override
     public int getNumValuesMV(int docId, ForwardIndexReaderContext context) {
-      JsonNode[] nodes = valueNodes(docId, context);
       // A document without the key reads as one element holding the default, which is what a materialized
       // multi-value column stores for an absent document -- it has no empty state.
+      if (_converter != null) {
+        Object[] values = convertedValues(docId, context);
+        return values == null ? 1 : values.length;
+      }
+      JsonNode[] nodes = valueNodes(docId, context);
       return nodes == null ? 1 : nodes.length;
     }
 
     @Override
     public int[] getIntMV(int docId, ForwardIndexReaderContext context) {
-      JsonNode[] nodes = valueNodes(docId, context);
-      if (nodes == null) {
+      Object[] values = convertedValues(docId, context);
+      if (values == null) {
         return new int[]{declaredOr(Integer.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT)};
       }
-      int[] values = new int[nodes.length];
-      for (int i = 0; i < nodes.length; i++) {
-        values[i] = nodes[i].asInt();
+      int[] result = new int[values.length];
+      for (int i = 0; i < values.length; i++) {
+        result[i] = ((Number) values[i]).intValue();
       }
-      return values;
+      return result;
     }
 
     @Override
@@ -264,15 +276,15 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public long[] getLongMV(int docId, ForwardIndexReaderContext context) {
-      JsonNode[] nodes = valueNodes(docId, context);
-      if (nodes == null) {
+      Object[] values = convertedValues(docId, context);
+      if (values == null) {
         return new long[]{declaredOr(Long.class, (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG)};
       }
-      long[] values = new long[nodes.length];
-      for (int i = 0; i < nodes.length; i++) {
-        values[i] = nodes[i].asLong();
+      long[] result = new long[values.length];
+      for (int i = 0; i < values.length; i++) {
+        result[i] = ((Number) values[i]).longValue();
       }
-      return values;
+      return result;
     }
 
     @Override
@@ -284,15 +296,15 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public float[] getFloatMV(int docId, ForwardIndexReaderContext context) {
-      JsonNode[] nodes = valueNodes(docId, context);
-      if (nodes == null) {
+      Object[] values = convertedValues(docId, context);
+      if (values == null) {
         return new float[]{declaredOr(Float.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT)};
       }
-      float[] values = new float[nodes.length];
-      for (int i = 0; i < nodes.length; i++) {
-        values[i] = (float) nodes[i].asDouble();
+      float[] result = new float[values.length];
+      for (int i = 0; i < values.length; i++) {
+        result[i] = ((Number) values[i]).floatValue();
       }
-      return values;
+      return result;
     }
 
     @Override
@@ -304,15 +316,15 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public double[] getDoubleMV(int docId, ForwardIndexReaderContext context) {
-      JsonNode[] nodes = valueNodes(docId, context);
-      if (nodes == null) {
+      Object[] values = convertedValues(docId, context);
+      if (values == null) {
         return new double[]{declaredOr(Double.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE)};
       }
-      double[] values = new double[nodes.length];
-      for (int i = 0; i < nodes.length; i++) {
-        values[i] = nodes[i].asDouble();
+      double[] result = new double[values.length];
+      for (int i = 0; i < values.length; i++) {
+        result[i] = ((Number) values[i]).doubleValue();
       }
-      return values;
+      return result;
     }
 
     @Override
@@ -324,15 +336,15 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public BigDecimal[] getBigDecimalMV(int docId, ForwardIndexReaderContext context) {
-      JsonNode[] nodes = valueNodes(docId, context);
-      if (nodes == null) {
+      Object[] values = convertedValues(docId, context);
+      if (values == null) {
         return new BigDecimal[]{declaredOr(BigDecimal.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL)};
       }
-      BigDecimal[] values = new BigDecimal[nodes.length];
-      for (int i = 0; i < nodes.length; i++) {
-        values[i] = new BigDecimal(nodes[i].asText());
+      BigDecimal[] result = new BigDecimal[values.length];
+      for (int i = 0; i < values.length; i++) {
+        result[i] = (BigDecimal) values[i];
       }
-      return values;
+      return result;
     }
 
     @Override
@@ -400,69 +412,78 @@ public class SparseKeyDataSource extends BaseDataSource {
     }
   }
 
-  /// Whether a single value fits `dataType` without losing its meaning. A value that does not -- text in a numeric
-  /// key, a fraction in an integral key, an object or array in a scalar key -- reads as absent (null, or the
-  /// default with null handling off) rather than as the `0` or `1` a lenient JSON conversion would invent, and the
-  /// null vector agrees. STRING, JSON and BYTES keys take any value.
-  static boolean accepts(DataType dataType, JsonNode node) {
-    switch (dataType) {
+  /// The dense tier's conversion for a key of `dataType`: [PinotDataType] of its stored type, as
+  /// `OpenStructColumnSplitter` applies at build. Null for STRING, JSON and BYTES, which read any value as is.
+  @Nullable
+  static PinotDataType converterFor(DataType dataType) {
+    switch (dataType.getStoredType()) {
       case INT:
-        return node.isIntegralNumber() ? node.canConvertToInt() : isWhole(node) ? fitsInt(node.doubleValue())
-            : node.isTextual() && parses(node.textValue(), Integer::parseInt);
       case LONG:
-        return node.isIntegralNumber() ? node.canConvertToLong() : isWhole(node) ? node.canConvertToLong()
-            : node.isTextual() && parses(node.textValue(), Long::parseLong);
-      case TIMESTAMP:
-        // Epoch millis, or timestamp text in any form the materialized tier parses.
-        return node.isIntegralNumber() ? node.canConvertToLong() : isWhole(node) ? node.canConvertToLong()
-            : node.isTextual() && parses(node.textValue(), TimestampUtils::toMillisSinceEpoch);
       case FLOAT:
       case DOUBLE:
-        return node.isNumber() || (node.isTextual() && parses(node.textValue(), Double::parseDouble));
       case BIG_DECIMAL:
-        return node.isNumber() || (node.isTextual() && parses(node.textValue(), BigDecimal::new));
-      case BOOLEAN:
-        // As the materialized tier (BooleanUtils.toInt): booleans, 0/1, and their text forms.
-        return node.isBoolean() || (node.isIntegralNumber() && (node.asLong() == 0 || node.asLong() == 1))
-            || (node.isTextual() && BOOLEAN_TEXT.contains(node.textValue().trim().toLowerCase()));
+        return ColumnDataType.fromDataTypeSV(dataType.getStoredType()).toPinotDataType();
       default:
-        return true;
+        return null;
     }
   }
 
-  private static final Set<String> BOOLEAN_TEXT = Set.of("true", "false", "1", "0");
-
-  private static boolean isWhole(JsonNode node) {
-    if (!node.isFloatingPointNumber()) {
-      return false;
+  /// `node` converted by `converter`, or null when the conversion rejects it. With no converter the node itself is
+  /// returned. A container is offered as JSON text, as the dense tier sees a nested value.
+  @Nullable
+  static Object convert(@Nullable PinotDataType converter, JsonNode node) {
+    if (converter == null) {
+      return node;
     }
-    double value = node.doubleValue();
-    return !Double.isInfinite(value) && value == Math.rint(value);
-  }
-
-  private static boolean fitsInt(double value) {
-    return value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE;
-  }
-
-  private static boolean parses(String text, Function<String, ?> parser) {
+    Object raw = node.isNumber() ? node.numberValue() : node.isBoolean() ? (Object) node.booleanValue()
+        : node.isTextual() ? node.textValue() : node.toString();
     try {
-      parser.apply(text.trim());
-      return true;
+      return converter.convert(raw, PinotDataType.getSingleValueType(raw));
     } catch (RuntimeException e) {
-      return false;
+      return null;
     }
+  }
+
+  /// The elements of a multi-value key's value: an array's elements, or the value itself, so a scalar stored on the
+  /// key before it became multi-value reads back as the one-element value the dense side stores for it.
+  static JsonNode[] elementsOf(JsonNode node) {
+    if (!node.isArray()) {
+      return new JsonNode[]{node};
+    }
+    JsonNode[] nodes = new JsonNode[node.size()];
+    for (int i = 0; i < nodes.length; i++) {
+      nodes[i] = node.get(i);
+    }
+    return nodes;
+  }
+
+  /// Whether the dense tier would keep this value for a key read through `converter`.
+  static boolean keeps(@Nullable PinotDataType converter, boolean singleValue, JsonNode node) {
+    if (converter == null) {
+      return true;
+    }
+    if (singleValue) {
+      return convert(converter, node) != null;
+    }
+    for (JsonNode element : elementsOf(node)) {
+      if (element.isNull() || convert(converter, element) == null) {
+        return false;
+      }
+    }
+    return true;
   }
 
   static class LazyPresenceNullVector implements NullValueVectorReader {
     private final String _key;
-    private final DataType _dataType;
+    @Nullable
+    private final PinotDataType _converter;
     private final boolean _singleValue;
     private final OpenStructSparseBlobReader _blob;
     private volatile ImmutableRoaringBitmap _nullBitmap;
 
     LazyPresenceNullVector(FieldSpec fieldSpec, OpenStructSparseBlobReader blob) {
       _key = fieldSpec.getName();
-      _dataType = fieldSpec.getDataType();
+      _converter = converterFor(fieldSpec.getDataType());
       _singleValue = fieldSpec.isSingleValueField();
       _blob = blob;
     }
@@ -471,9 +492,8 @@ public class SparseKeyDataSource extends BaseDataSource {
     public ImmutableRoaringBitmap getNullBitmap() {
       ImmutableRoaringBitmap bm = _nullBitmap;
       if (bm == null) {
-        ImmutableRoaringBitmap presence = _singleValue
-            ? _blob.computePresence(_key, node -> accepts(_dataType, node))
-            : _blob.computePresence(_key);
+        ImmutableRoaringBitmap presence = _converter == null ? _blob.computePresence(_key)
+            : _blob.computePresence(_key, node -> keeps(_converter, _singleValue, node));
         MutableRoaringBitmap nulls = new MutableRoaringBitmap();
         nulls.add(0L, _blob.getNumDocs());
         nulls.andNot(presence);

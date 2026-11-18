@@ -66,14 +66,16 @@ public class OpenStructSparseBlobReader {
   }
 
   /// Resolves `key` against one document the way [OpenStructKeyFlattener] would have keyed
-  /// it at ingest, so `col['o.z']` reads `{"o": {"z": 2}}` whether or not the column was flattened:
+  /// it at ingest, so `col['o.z']` reads `{"o": {"z": 2}}` from a blob that holds the nested object:
   /// - a key the object carries literally wins at every level (`.` is an ordinary key character);
   /// - otherwise the key is walked through nested objects, taking the first match in document order when two
   ///   synthesized paths collide, as the flattener's first emission does;
   /// - arrays are never indexed into, and a missing, null or scalar intermediate is absent;
   /// - empty key segments are allowed, as the flattener emits them (`{"o": {"": 1}}` keys `o.` to `1`);
   /// - unlike a flattened column, the walk has no depth limit. Native segments store a nested object that was not
-  ///   flattened as JSON text, which this does not parse, so the walk serves sparse blobs that hold real objects.
+  ///   flattened as JSON text, which this does not parse, and a segment with a sparse-key manifest only serves the
+  ///   keys it lists, so the walk serves blobs written without flattening: a segment with no manifest, such as one
+  ///   produced outside the standard build. A miss costs a scan of each level's field names per document.
   @Nullable
   static JsonNode resolve(JsonNode node, String key) {
     JsonNode literal = node.get(key);
@@ -116,7 +118,7 @@ public class OpenStructSparseBlobReader {
   }
 
   /// Full scan for docs where `key` holds a non-null value that `accept` takes. Callers memoize.
-  public ImmutableRoaringBitmap computePresence(String key, Predicate<JsonNode> accept) {
+  ImmutableRoaringBitmap computePresence(String key, Predicate<JsonNode> accept) {
     // TODO: the opt-in sparse JSON index already encodes this; deriving presence from it needs a
     // handle on the index, which only ImmutableOpenStructDataSource has.
     MutableRoaringBitmap present = new MutableRoaringBitmap();

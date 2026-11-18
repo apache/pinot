@@ -26,7 +26,6 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -57,31 +56,22 @@ public class SparseKeyDataSourceTest {
     return new SparseKeyDataSource(new DimensionFieldSpec("k", declaredType, true), blob, 0);
   }
 
+  /// A multi-value key converts each element as the dense tier does; when any element is rejected the dense tier drops
+  /// the whole value (its length is part of it), so the document reads as absent.
   @Test
-  public void testBooleanAcceptsTheFormsTheMaterializedTierAccepts() {
-    SparseKeyDataSource booleans = of(DataType.BOOLEAN, "{\"k\":true}", "{\"k\":1}", "{\"k\":0}", "{\"k\":\"1\"}",
-        "{\"k\":\" FALSE \"}", "{\"k\":2}", "{\"k\":\"yes\"}");
-    int[] expected = {1, 1, 0, 1, 0};
-    for (int doc = 0; doc < expected.length; doc++) {
-      assertFalse(booleans.getNullValueVector().isNull(doc), "doc " + doc);
-      assertEquals(booleans.getForwardIndex().getInt(doc, null), expected[doc], "doc " + doc);
-    }
-    assertTrue(booleans.getNullValueVector().isNull(5)); // 2 is not a boolean
-    assertTrue(booleans.getNullValueVector().isNull(6));
-  }
-
-  @Test
-  public void testTimestampAndBigDecimalTextForms() {
-    SparseKeyDataSource timestamps = of(DataType.TIMESTAMP, "{\"k\":1767225600000}",
-        "{\"k\":\"2026-01-01 00:00:00\"}", "{\"k\":\"not a time\"}");
-    long millis = TimestampUtils.toMillisSinceEpoch("2026-01-01 00:00:00");
-    assertEquals(timestamps.getForwardIndex().getLong(0, null), 1767225600000L);
-    assertEquals(timestamps.getForwardIndex().getLong(1, null), millis);
-    assertTrue(timestamps.getNullValueVector().isNull(2));
-
-    SparseKeyDataSource decimals = of(DataType.BIG_DECIMAL, "{\"k\":\" 1.5 \"}", "{\"k\":2.25}");
-    assertEquals(decimals.getForwardIndex().getBigDecimal(0, null), new BigDecimal("1.5"));
-    assertEquals(decimals.getForwardIndex().getBigDecimal(1, null), new BigDecimal("2.25"));
+  public void testMultiValueKeyIsAbsentWhenAnyElementIsRejected() {
+    String[] blobs = {"{\"k\":[1,\"2\"]}", "{\"k\":[1,\"abc\"]}", "{\"k\":7}"};
+    OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(new FakeStringForwardIndex(blobs),
+        FakeStringForwardIndex.nullVector(blobs), blobs.length);
+    SparseKeyDataSource longs = new SparseKeyDataSource(new DimensionFieldSpec("k", DataType.LONG, false), blob, 2);
+    ForwardIndexReader<?> fwd = longs.getForwardIndex();
+    assertEquals(fwd.getLongMV(0, null), new long[]{1, 2});
+    assertEquals(fwd.getNumValuesMV(1, null), 1);
+    assertEquals(fwd.getLongMV(1, null), new long[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG});
+    assertEquals(fwd.getLongMV(2, null), new long[]{7});
+    assertFalse(longs.getNullValueVector().isNull(0));
+    assertTrue(longs.getNullValueVector().isNull(1));
+    assertFalse(longs.getNullValueVector().isNull(2));
   }
 
   @Test
@@ -99,14 +89,21 @@ public class SparseKeyDataSourceTest {
 
   @Test
   public void testDeclaredNumericKeyReadsOnlyValuesThatFit() {
+    // Text that is not a number, an object and an array read as absent rather than as an invented 0, and the null
+    // vector agrees; a fraction converts as the dense tier converts it. OpenStructSparseDenseParityTest checks
+    // every type against the dense tier itself.
     SparseKeyDataSource longs = mixed(DataType.LONG);
     ForwardIndexReader<?> fwd = longs.getForwardIndex();
     long absent = (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG;
-    long[] expected = {5, absent, absent, 2, 7, absent, absent, absent, Long.MAX_VALUE};
-    for (int doc = 0; doc < MIXED.length; doc++) {
-      assertEquals(fwd.getLong(doc, null), expected[doc], MIXED[doc]);
-      assertEquals(longs.getNullValueVector().isNull(doc), expected[doc] == absent, MIXED[doc]);
+    for (int doc : new int[]{1, 5, 7}) {
+      assertEquals(fwd.getLong(doc, null), absent, MIXED[doc]);
+      assertTrue(longs.getNullValueVector().isNull(doc), MIXED[doc]);
     }
+    assertEquals(fwd.getLong(0, null), 5L);
+    assertEquals(fwd.getLong(2, null), 1L);
+    assertEquals(fwd.getLong(4, null), 7L);
+    assertEquals(fwd.getLong(8, null), Long.MAX_VALUE);
+    assertFalse(longs.getNullValueVector().isNull(2));
 
     SparseKeyDataSource doubles = mixed(DataType.DOUBLE);
     assertEquals(doubles.getForwardIndex().getDouble(2, null), 1.5);
@@ -114,11 +111,6 @@ public class SparseKeyDataSourceTest {
     assertTrue(doubles.getNullValueVector().isNull(1));
     assertTrue(doubles.getNullValueVector().isNull(5));
     assertFalse(doubles.getNullValueVector().isNull(2));
-
-    SparseKeyDataSource booleans = mixed(DataType.BOOLEAN);
-    assertEquals(booleans.getForwardIndex().getInt(6, null), 1);
-    assertTrue(booleans.getNullValueVector().isNull(0));
-    assertFalse(booleans.getNullValueVector().isNull(6));
 
     // STRING still takes every value.
     SparseKeyDataSource strings = mixed(DataType.STRING);

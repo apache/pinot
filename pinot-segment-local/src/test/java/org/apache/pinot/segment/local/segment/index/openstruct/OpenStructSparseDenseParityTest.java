@@ -94,8 +94,16 @@ public class OpenStructSparseDenseParityTest {
     children.put("tags", new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, true));
     // Declared INT, only populated by testTypeMismatchedValueDroppedFromBothTiers.
     children.put("count", new DimensionFieldSpec("count", FieldSpec.DataType.INT, true));
+    // Only populated by testExternalSparseBlobReadsLikeTheDenseTier.
+    for (Map.Entry<String, FieldSpec.DataType> typed : TYPED_KEYS.entrySet()) {
+      children.put(typed.getKey(), new DimensionFieldSpec(typed.getKey(), typed.getValue(), true));
+    }
     return new ComplexFieldSpec(METRICS, FieldSpec.DataType.OPEN_STRUCT, true, children);
   }
+
+  private static final Map<String, FieldSpec.DataType> TYPED_KEYS = Map.of("iv", FieldSpec.DataType.INT,
+      "lv", FieldSpec.DataType.LONG, "fv", FieldSpec.DataType.FLOAT, "dv", FieldSpec.DataType.DOUBLE,
+      "bdv", FieldSpec.DataType.BIG_DECIMAL, "bv", FieldSpec.DataType.BOOLEAN, "tv", FieldSpec.DataType.TIMESTAMP);
 
   private static Map<String, Object> metricsForDoc(int docId) {
     Map<String, Object> m = new HashMap<>();
@@ -231,6 +239,8 @@ public class OpenStructSparseDenseParityTest {
         return fwd.getFloat(docId, ctx);
       case DOUBLE:
         return fwd.getDouble(docId, ctx);
+      case BIG_DECIMAL:
+        return fwd.getBigDecimal(docId, ctx);
       case STRING:
         return fwd.getString(docId, ctx);
       default:
@@ -495,6 +505,61 @@ public class OpenStructSparseDenseParityTest {
   /// back out of the key's presence bitmap and stores nothing — so `writeDenseKeyColumn` and
   /// `writeSparseJsonColumn` both see that doc as ABSENT. The drop must therefore be invisible to
   /// the tier: null in both null vectors, and the INT default from both forward readers.
+  /// A sparse blob written outside the build (e.g. by an external source) holds values as they arrived, not as the
+  /// build would have converted them. Reading it must give what the dense tier gives for the same raw value: the
+  /// value the build's conversion produces, or absent where the build drops it. Oracle: the same raw values built
+  /// into dense columns, for every declared scalar type and a spread of fitting, lossy and unconvertible values.
+  @Test
+  public void testExternalSparseBlobReadsLikeTheDenseTier()
+      throws Exception {
+    Object[] raw = {5, 7L, 1.5, 2.0, -0.0, "7", " 8 ", "1.9", "1e3", "abc", "", true, false, "true", 2,
+        Long.MAX_VALUE, "2026-01-01 00:00:00", List.of(1, 2)};
+    List<GenericRow> rows = new ArrayList<>(raw.length);
+    String[] blobs = new String[raw.length];
+    for (int docId = 0; docId < raw.length; docId++) {
+      Map<String, Object> m = new HashMap<>();
+      for (String key : TYPED_KEYS.keySet()) {
+        m.put(key, raw[docId]);
+      }
+      GenericRow row = new GenericRow();
+      row.putValue(METRICS, m);
+      rows.add(row);
+      blobs[docId] = JsonUtils.objectToString(m);
+    }
+    ImmutableSegment dense =
+        buildSegment(new OpenStructIndexConfig(false, null, -1, null, 0.0, null, null), "dense-typed", rows);
+    try {
+      OpenStructDataSource denseDs = (OpenStructDataSource) dense.getDataSource(METRICS);
+      OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(new FakeStringForwardIndex(blobs),
+          FakeStringForwardIndex.nullVector(blobs), blobs.length);
+      for (Map.Entry<String, FieldSpec.DataType> typed : TYPED_KEYS.entrySet()) {
+        String key = typed.getKey();
+        assertTrue(denseDs.isMaterialized(key), key);
+        DataSource denseKey = denseDs.getDataSource(key);
+        SparseKeyDataSource sparseKey =
+            new SparseKeyDataSource(new DimensionFieldSpec(key, typed.getValue(), true), blob, 0);
+        FieldSpec.DataType storedType = typed.getValue().getStoredType();
+        @SuppressWarnings("rawtypes")
+        ForwardIndexReader denseFwd = denseKey.getForwardIndex();
+        ForwardIndexReaderContext denseCtx = denseFwd.createContext();
+        @SuppressWarnings("rawtypes")
+        ForwardIndexReader sparseFwd = sparseKey.getForwardIndex();
+        ForwardIndexReaderContext sparseCtx = sparseFwd.createContext();
+        for (int docId = 0; docId < raw.length; docId++) {
+          String where = key + " (" + typed.getValue() + ") <- " + raw[docId];
+          boolean denseNull = denseKey.getNullValueVector().isNull(docId);
+          assertEquals(sparseKey.getNullValueVector().isNull(docId), denseNull, where);
+          if (!denseNull) {
+            assertEquals(readValue(sparseKey, sparseFwd, docId, storedType, sparseCtx),
+                readValue(denseKey, denseFwd, docId, storedType, denseCtx), where);
+          }
+        }
+      }
+    } finally {
+      dense.destroy();
+    }
+  }
+
   @Test
   public void testTypeMismatchedValueDroppedFromBothTiers()
       throws Exception {
