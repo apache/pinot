@@ -105,8 +105,15 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     return GROOVY_EXPRESSION_PREFIX;
   }
 
-  /// Controls new ingestion evaluator and validation-script compilation in this JVM. Existing evaluators and query
-  /// evaluators are unaffected. Ingestion Groovy remains enabled until a service configures its policy.
+  /// Controls new ingestion evaluator and validation-script compilation in this JVM. Ingestion Groovy remains
+  /// enabled until a service configures its policy.
+  ///
+  /// When disabled, already compiled ingestion evaluators can continue running. Operations that need to compile
+  /// an ingestion Groovy expression will fail, including starting a new consuming segment, reloading a segment
+  /// that needs to rebuild a derived column, running a minion task that uses a Groovy transform, and validating
+  /// a schema or table config that uses ingestion Groovy.
+  ///
+  /// Query Groovy continues to follow the query admission and static-analysis controls.
   public static void setIngestionGroovyDisabled(boolean disabled) {
     _ingestionGroovyDisabled = disabled;
   }
