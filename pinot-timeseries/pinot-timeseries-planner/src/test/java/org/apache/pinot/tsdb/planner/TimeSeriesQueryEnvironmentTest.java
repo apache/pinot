@@ -87,7 +87,7 @@ public class TimeSeriesQueryEnvironmentTest {
     when(routingManager.routingExists(TABLE)).thenReturn(true);
     Map<ServerInstance, SegmentsToQuery> routed = new HashMap<>();
     routed.put(server, new SegmentsToQuery(List.of("seg1", "seg2"), List.of()));
-    when(routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
+    when(routingManager.getRoutingTableWithMissingServerSegments(any(BrokerRequest.class), anyLong()))
         .thenReturn(new RoutingTable(routed, List.of(), 0));
     TableCache tableCache = mock(TableCache.class);
     when(tableCache.getTableConfig(TABLE))
@@ -195,27 +195,23 @@ public class TimeSeriesQueryEnvironmentTest {
   }
 
   @Test
-  public void testServerWithOnlyOptionalSegmentsReadsTheLeaf() {
+  public void testCustomizerCannotAddAnOptionalOnlyRpc() {
     ServerInstance serverOne = mockServer("Server_1");
     ServerInstance serverTwo = mockServer("Server_2");
-    RoutingManager routingManager = mock(RoutingManager.class);
-    when(routingManager.routingExists(TABLE)).thenReturn(true);
-    Map<ServerInstance, SegmentsToQuery> routed = new HashMap<>();
-    routed.put(serverOne, new SegmentsToQuery(List.of("seg1"), List.of()));
-    routed.put(serverTwo, new SegmentsToQuery(List.of(), List.of("seg2")));
-    when(routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
-        .thenReturn(new RoutingTable(routed, List.of(), 0));
-    TimeSeriesQueryEnvironment environment =
-        newEnvironment(routingManager, tableCache(), TimeSeriesRoutingCustomizer.NO_OP);
+    RoutingManager routingManager = routingManagerWith(Map.of(serverOne, List.of("seg1"), serverTwo, List.of("seg2")));
+    TimeSeriesQueryEnvironment environment = newEnvironment(routingManager, tableCache(),
+        (leaf, routingTable, context) -> new RoutingTable(Map.of(
+            serverOne, new SegmentsToQuery(List.of("seg1"), List.of("optional1")),
+            serverTwo, new SegmentsToQuery(List.of(), List.of("optional2"))), List.of(), 1));
 
     TimeSeriesDispatchablePlan plan = environment.buildPhysicalPlan(request(), requestContext(),
         new TimeSeriesLogicalPlanResult(leaf("leaf", "myTable"), TIME_BUCKETS), tableNames -> { });
 
-    // Server_2 reads the leaf through its optional segments, so it runs the leaf and the exchange waits for it.
-    assertEquals(plan.getNumInputServersForExchangePlanNode(), Map.of("leaf", 2));
+    assertEquals(plan.getNumInputServersForExchangePlanNode(), Map.of("leaf", 1));
+    assertEquals(plan.getQueryServerInstances().size(), 1);
+    assertEquals(plan.getQueryServerInstances().get(0).getInstanceId(), "Server_1");
     assertEquals(plan.getLeafIdToOptionalSegmentsByInstanceId(),
-        Map.of("Server_2", Map.of("leaf", List.of("seg2"))));
-    assertEquals(fragmentIds(plan.getSerializedServerFragments("Server_2")), List.of("leaf"));
+        Map.of("Server_1", Map.of("leaf", List.of("optional1"))));
   }
 
   @Test
@@ -247,7 +243,7 @@ public class TimeSeriesQueryEnvironmentTest {
     // No server can serve the leaf's segments: an outage, which must not read as a range without data.
     RoutingManager routingManager = mock(RoutingManager.class);
     when(routingManager.routingExists(TABLE)).thenReturn(true);
-    when(routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
+    when(routingManager.getRoutingTableWithMissingServerSegments(any(BrokerRequest.class), anyLong()))
         .thenReturn(new RoutingTable(Map.of(), List.of("seg1", "seg2"), 0));
     TimeSeriesQueryEnvironment environment =
         newEnvironment(routingManager, tableCache(), TimeSeriesRoutingCustomizer.NO_OP);
@@ -292,7 +288,7 @@ public class TimeSeriesQueryEnvironmentTest {
     when(routingManager.routingExists(TABLE)).thenReturn(true);
     Map<ServerInstance, SegmentsToQuery> routed = new HashMap<>();
     segmentsByServer.forEach((server, segments) -> routed.put(server, new SegmentsToQuery(segments, List.of())));
-    when(routingManager.getRoutingTableIncludingOptionalOnlyServers(any(BrokerRequest.class), anyLong()))
+    when(routingManager.getRoutingTableWithMissingServerSegments(any(BrokerRequest.class), anyLong()))
         .thenReturn(new RoutingTable(routed, List.of(), 0));
     return routingManager;
   }

@@ -42,9 +42,8 @@ public class TimeSeriesDispatchablePlan {
 
   /// @param wholePlanOnOneServer whether the query's one server runs the whole plan, which needs it to hold segments
   ///     for every leaf; the server fragments are then the whole plan rather than one fragment per leaf
-  /// @param leafIdToSegmentsByInstanceId per server, the required segments of each leaf it reads; a server reads a
-  ///     leaf when it has required or optional segments for it, so a list may be empty
-  /// @param leafIdToOptionalSegmentsByInstanceId per server, the non-empty optional segments of each leaf
+  /// @param leafIdToSegmentsByInstanceId per server, the non-empty required segments of each leaf it reads
+  /// @param leafIdToOptionalSegmentsByInstanceId per server, the optional segments of leaves with required segments
   public TimeSeriesDispatchablePlan(String language, List<TimeSeriesQueryServerInstance> queryServerInstances,
       BaseTimeSeriesPlanNode brokerFragment, List<BaseTimeSeriesPlanNode> serverFragments,
       boolean wholePlanOnOneServer, TimeBuckets initialTimeBuckets,

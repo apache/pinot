@@ -30,18 +30,17 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 
 
 /// The segment lists a server receives with a time-series query.
 public class TimeSeriesQueryDispatcherMetadataTest {
   @Test
   public void testSegmentListsInServerMetadata() {
-    // Server_1 reads leafA from required segments and leafB only from optional (not yet ONLINE) segments.
+    // Server_1 reads leafA from required and optional (not yet ONLINE) segments.
     TimeSeriesDispatchablePlan plan = new TimeSeriesDispatchablePlan("m3ql", List.of(), null, List.of(), false,
         TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 6),
-        Map.of("Server_1", Map.of("leafA", List.of("seg1", "seg2"), "leafB", List.of())),
-        Map.of("Server_1", Map.of("leafB", List.of("seg3"))), Map.of(), List.of());
+        Map.of("Server_1", Map.of("leafA", List.of("seg1", "seg2"))),
+        Map.of("Server_1", Map.of("leafA", List.of("seg3"))), Map.of(), List.of());
     RequestContext requestContext = mock(RequestContext.class);
     when(requestContext.getRequestId()).thenReturn(7L);
     when(requestContext.getBrokerId()).thenReturn("broker");
@@ -50,8 +49,6 @@ public class TimeSeriesQueryDispatcherMetadataTest {
         TimeSeriesQueryDispatcher.initializeTimeSeriesMetadataMap(plan, 1000L, requestContext, "Server_1");
 
     assertEquals(metadata.get(MetadataKeys.TimeSeries.encodeSegmentListKey("leafA")), "seg1,seg2");
-    // An empty required list is left out, so the server does not read it as one segment named "".
-    assertFalse(metadata.containsKey(MetadataKeys.TimeSeries.encodeSegmentListKey("leafB")));
-    assertEquals(metadata.get(MetadataKeys.TimeSeries.encodeOptionalSegmentListKey("leafB")), "seg3");
+    assertEquals(metadata.get(MetadataKeys.TimeSeries.encodeOptionalSegmentListKey("leafA")), "seg3");
   }
 }

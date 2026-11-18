@@ -35,9 +35,11 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.TableRouteProvider;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -67,30 +69,27 @@ public class TableScanVisitor {
       LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) planNode;
       Expression filterExpression = CalciteSqlParser.compileToExpression(sfpNode.getEffectiveFilter(timeBuckets));
       context.addTableName(sfpNode.getTableName());
-      RoutingTable routingTable = _routingManager.getRoutingTableIncludingOptionalOnlyServers(
-          compileBrokerRequest(sfpNode.getTableName(), filterExpression),
-          context._requestId);
+      RoutingTable routingTable = _routingManager.getRoutingTableWithMissingServerSegments(
+          compileBrokerRequest(sfpNode.getTableName(), filterExpression), context._requestId);
       Preconditions.checkNotNull(routingTable, "Failed to get routing table for table: " + sfpNode.getTableName());
-      routingTable = context._routingCustomizer.customize(sfpNode, routingTable, context._routingContext);
-      Preconditions.checkNotNull(routingTable, "Routing customizer returned no routing for table: "
-          + sfpNode.getTableName());
+      routingTable = customizeRouting(sfpNode, routingTable, context);
+      // A later callback can still hold references to this leaf's routing lists.
+      boolean copyAssignments = context._routingCustomizer != TimeSeriesRoutingCustomizer.NO_OP;
       boolean hasRequiredSegments = false;
       for (var entry : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
         ServerInstance serverInstance = entry.getKey();
-        List<String> segments = entry.getValue().getSegments() == null ? List.of() : entry.getValue().getSegments();
-        List<String> optionalSegments = entry.getValue().getOptionalSegments() == null ? List.of()
-            : entry.getValue().getOptionalSegments();
-        // A server reads the leaf only if it has segments for it: it then sends exactly one block for the leaf, which
-        // is what the leaf's exchange counts on.
-        if (segments.isEmpty() && optionalSegments.isEmpty()) {
+        List<String> segments = entry.getValue().getSegments();
+        // The exchange waits for each dispatched server. Optional segments alone cannot require an RPC.
+        if (segments == null || segments.isEmpty()) {
           continue;
         }
-        hasRequiredSegments |= !segments.isEmpty();
+        hasRequiredSegments = true;
+        List<String> optionalSegments = entry.getValue().getOptionalSegments();
         context.getLeafIdToSegmentsByServer().computeIfAbsent(serverInstance, (x) -> new HashMap<>())
-            .put(sfpNode.getId(), segments);
-        if (!optionalSegments.isEmpty()) {
+            .put(sfpNode.getId(), copyAssignments ? List.copyOf(segments) : segments);
+        if (optionalSegments != null && !optionalSegments.isEmpty()) {
           context._leafIdToOptionalSegmentsByServer.computeIfAbsent(serverInstance, (x) -> new HashMap<>())
-              .put(sfpNode.getId(), optionalSegments);
+              .put(sfpNode.getId(), copyAssignments ? List.copyOf(optionalSegments) : optionalSegments);
         }
       }
       List<String> unavailableSegments = routingTable.getUnavailableSegments();
@@ -106,9 +105,50 @@ public class TableScanVisitor {
     }
   }
 
+  private RoutingTable customizeRouting(LeafTimeSeriesPlanNode leaf, RoutingTable routingTable, Context context) {
+    TimeSeriesRoutingCustomizer customizer = context._routingCustomizer;
+    if (customizer == TimeSeriesRoutingCustomizer.NO_OP) {
+      return routingTable;
+    }
+    String tableName = leaf.getTableName();
+    TableConfig tableConfig = _tableCache.getTableConfig(tableName);
+    if (tableConfig == null) {
+      throw QueryErrorCode.BROKER_RESOURCE_MISSING.asException("Table config not found for " + tableName);
+    }
+    // Upsert execution adds recently loaded segments on the server. Snapshot the assignments before the hook
+    // so that it cannot accidentally narrow an upsert scan, including by modifying the routing table in place.
+    RoutingAssignments original = tableConfig.isUpsertEnabled() ? RoutingAssignments.snapshot(routingTable) : null;
+    RoutingTable customized = Preconditions.checkNotNull(customizer.customize(leaf, routingTable,
+        context._routingContext), "Routing customizer returned no routing for table: " + tableName);
+    if (original != null && !original.equals(RoutingAssignments.snapshot(customized))) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(
+          "Time-series routing cannot change segment assignments for upsert table " + tableName);
+    }
+    return customized;
+  }
+
+  private record SegmentAssignment(List<String> required, List<String> optional) {
+  }
+
+  private record RoutingAssignments(Map<ServerInstance, SegmentAssignment> byServer, List<String> unavailable) {
+    private static RoutingAssignments snapshot(RoutingTable routingTable) {
+      Map<ServerInstance, SegmentAssignment> byServer = new HashMap<>();
+      for (var entry : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
+        SegmentsToQuery segments = entry.getValue();
+        byServer.put(entry.getKey(),
+            new SegmentAssignment(copySegments(segments.getSegments()), copySegments(segments.getOptionalSegments())));
+      }
+      return new RoutingAssignments(byServer, copySegments(routingTable.getUnavailableSegments()));
+    }
+
+    private static List<String> copySegments(@Nullable List<String> segments) {
+      return segments == null ? List.of() : List.copyOf(segments);
+    }
+  }
+
   /// Adds the query options the [TimeSeriesRoutingCustomizer] collected during [#assignSegmentsToPlan] to every leaf,
   /// so the servers receive them. Returns the plan unchanged when there are none. A collected option replaces a leaf's
-  /// own option with the same key, so the servers read exactly what the leaf was routed for.
+  /// own option with the same key.
   ///
   /// @param planNode The [BaseTimeSeriesPlanNode] to process.
   /// @param queryOptions The options collected for the query, from [Context#getRoutingQueryOptions()].

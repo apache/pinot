@@ -68,10 +68,10 @@ public interface RoutingManager {
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
 
-  /// Get the routing table including servers selected only for optional segments, for engines that can execute
-  /// optional-only requests. Implementations without this capability fall back to regular routing.
+  /// Get the routing table and report required segments whose selected server has since disappeared as unavailable.
+  /// Implementations without this capability fall back to regular routing.
   @Nullable
-  default RoutingTable getRoutingTableIncludingOptionalOnlyServers(BrokerRequest brokerRequest, long requestId) {
+  default RoutingTable getRoutingTableWithMissingServerSegments(BrokerRequest brokerRequest, long requestId) {
     return getRoutingTable(brokerRequest, requestId);
   }
 

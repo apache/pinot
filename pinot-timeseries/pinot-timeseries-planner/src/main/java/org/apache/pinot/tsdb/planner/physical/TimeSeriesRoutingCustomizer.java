@@ -37,8 +37,11 @@ public interface TimeSeriesRoutingCustomizer {
   /// Routes every leaf exactly as the routing manager chose and adds no query options.
   TimeSeriesRoutingCustomizer NO_OP = (leaf, routingTable, context) -> routingTable;
 
-  /// A leaf with no segments assigned to any server yields no data. If the returned routing reports unavailable
-  /// segments and no required segments are assigned, the query fails even if optional segments are assigned.
+  /// A leaf dispatches to servers assigned required segments. Optional segments travel only to those servers.
+  /// A leaf with no required assignments yields no data unless the routing reports unavailable segments.
+  ///
+  /// For upsert tables the customizer can add query options but must preserve the required, optional, and
+  /// unavailable segment assignments. Upsert execution can include recently loaded segments on the server.
   ///
   /// @param leaf the leaf being routed; its table name carries the table type
   /// @param routingTable the routing the routing manager chose for the leaf
