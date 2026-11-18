@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.optimizer;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -64,6 +65,13 @@ public final class QueryOptimizerRegistry {
   /// Call after all plugins have been loaded via [PluginManager]; plugins
   /// loaded after this method returns will not be included.
   public static QueryOptimizerRegistry loadFromServiceLoader() {
+    return new QueryOptimizerRegistry(discoverProviders(PluginManager.get().getPluginClassLoaders()));
+  }
+
+  /// Discovers providers over the context classloader and the given plugin classloaders,
+  /// deduplicated by class name.
+  @VisibleForTesting
+  static List<QueryOptimizerProvider> discoverProviders(Iterable<ClassLoader> pluginClassLoaders) {
     List<QueryOptimizerProvider> providers = new ArrayList<>();
     // Dedup by class name: the context classloader and a plugin classloader may both see the same
     // META-INF/services file if their classpaths overlap (e.g. fat-jar + plugin realm).
@@ -73,14 +81,14 @@ public final class QueryOptimizerRegistry {
         providers.add(provider);
       }
     }
-    for (ClassLoader pluginClassLoader : PluginManager.get().getPluginClassLoaders()) {
+    for (ClassLoader pluginClassLoader : pluginClassLoaders) {
       for (QueryOptimizerProvider provider : ServiceLoader.load(QueryOptimizerProvider.class, pluginClassLoader)) {
         if (seen.add(provider.getClass().getName())) {
           providers.add(provider);
         }
       }
     }
-    return new QueryOptimizerRegistry(providers);
+    return providers;
   }
 
   /// Lazily-initialized process-wide singleton built from the

@@ -54,6 +54,18 @@ public final class NoopOptimizerProvider implements QueryOptimizerProvider {
 
   static final AtomicInteger FIND_BEST_EXP_CALLS = new AtomicInteger();
 
+  private final List<RelMetadataProvider> _metadataProviders;
+
+  /// Used by [java.util.ServiceLoader]; supplies no metadata providers.
+  public NoopOptimizerProvider() {
+    this(List.of());
+  }
+
+  /// Supplies the given metadata providers, to exercise the broker's metadata installation.
+  NoopOptimizerProvider(List<RelMetadataProvider> metadataProviders) {
+    _metadataProviders = metadataProviders;
+  }
+
   @Override
   public String getName() {
     return NAME;
@@ -61,7 +73,7 @@ public final class NoopOptimizerProvider implements QueryOptimizerProvider {
 
   @Override
   public List<RelMetadataProvider> getMetadataProviders() {
-    return List.of();
+    return _metadataProviders;
   }
 
   @Override
