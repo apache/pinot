@@ -27,6 +27,12 @@ import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.analysis.core.WhitespaceTokenizer;
 import org.apache.lucene.analysis.synonym.SynonymGraphFilter;
 import org.apache.lucene.analysis.synonym.SynonymMap;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
@@ -36,11 +42,15 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.RegexpQuery;
+import org.apache.lucene.search.SynonymQuery;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.WildcardQuery;
+import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.util.CharsRef;
 import org.apache.lucene.util.CharsRefBuilder;
 import org.apache.pinot.segment.local.segment.index.text.lucene.parsers.PrefixPhraseQueryParser;
@@ -124,14 +134,7 @@ public class LuceneTextIndexUtilsTest {
     SynonymMap.Builder synonyms = new SynonymMap.Builder(true);
     synonyms.add(SynonymMap.Builder.join(new String[]{"new", "york"}, new CharsRefBuilder()),
         new CharsRef("nyc"), false);
-    SynonymMap synonymMap = synonyms.build();
-    try (Analyzer analyzer = new Analyzer() {
-      @Override
-      protected TokenStreamComponents createComponents(String fieldName) {
-        Tokenizer tokenizer = new WhitespaceTokenizer();
-        return new TokenStreamComponents(tokenizer, new SynonymGraphFilter(tokenizer, synonymMap, false));
-      }
-    }) {
+    try (Analyzer analyzer = newSynonymAnalyzer(synonyms.build())) {
       QueryParserBase parser = TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(
           QueryParser.class.getName()).newInstance("field", analyzer);
       parser.setAllowLeadingWildcard(true);
@@ -145,6 +148,52 @@ public class LuceneTextIndexUtilsTest {
       Query escaped = parser.parse("*ava realtime\\ nyc system*");
       assertEquals(LuceneTextIndexUtils.convertToMultiTermSpanQuery(escaped), escaped);
     }
+  }
+
+  @Test
+  public void testSamePositionSynonymsPreserveClauseSemantics()
+      throws Exception {
+    SynonymMap.Builder synonyms = new SynonymMap.Builder(true);
+    synonyms.add(new CharsRef("foo"), new CharsRef("qux"), true);
+    try (Analyzer analyzer = newSynonymAnalyzer(synonyms.build());
+        Analyzer indexAnalyzer = new WhitespaceAnalyzer();
+        ByteBuffersDirectory directory = new ByteBuffersDirectory()) {
+      try (IndexWriter writer = new IndexWriter(directory, new IndexWriterConfig(indexAnalyzer))) {
+        for (String text : List.of("foo bar", "qux bar bazaar", "qux bazaar bar", "bar")) {
+          Document document = new Document();
+          document.add(new TextField("field", text, Field.Store.NO));
+          writer.addDocument(document);
+        }
+      }
+      try (DirectoryReader reader = DirectoryReader.open(directory)) {
+        IndexSearcher searcher = new IndexSearcher(reader);
+        LuceneTextIndexUtils.LuceneTextIndexOptions options =
+            LuceneTextIndexUtils.createOptions("parser=MATCH,minimumShouldMatch=2");
+        BooleanQuery match = (BooleanQuery) LuceneTextIndexUtils.createQueryParserWithOptions(
+            "foo bar baz*", options, "field", analyzer);
+        assertEquals(match.clauses().size(), 3);
+        assertTrue(match.clauses().get(0).query() instanceof SynonymQuery);
+        assertEquals(match.getMinimumNumberShouldMatch(), 2);
+        assertEquals(searcher.count(match), 3);
+
+        options = LuceneTextIndexUtils.createOptions("parser=COMPLEX");
+        Query phrase = LuceneTextIndexUtils.createQueryParserWithOptions(
+            "\"foo bar baz*\"", options, "field", analyzer);
+        TopDocs hits = searcher.search(phrase, 4);
+        assertEquals(hits.scoreDocs.length, 1);
+        assertEquals(hits.scoreDocs[0].doc, 1);
+      }
+    }
+  }
+
+  private static Analyzer newSynonymAnalyzer(SynonymMap synonymMap) {
+    return new Analyzer() {
+      @Override
+      protected TokenStreamComponents createComponents(String fieldName) {
+        Tokenizer tokenizer = new WhitespaceTokenizer();
+        return new TokenStreamComponents(tokenizer, new SynonymGraphFilter(tokenizer, synonymMap, false));
+      }
+    };
   }
 
   @Test

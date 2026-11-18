@@ -93,6 +93,12 @@ public class FSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   @Test
+  public void testRepeatedComplementBudget() {
+    assertThrows(IllegalArgumentException.class, () -> new RegexpMatcher("(~(~(ab|cd))){1500}", null));
+    assertTrue(new RegexpMatcher("(~(~(ab|cd))){2}", null).match("abcd"));
+  }
+
+  @Test
   public void testFSTBuilder()
       throws IOException {
     SortedMap<String, Integer> x = new TreeMap<>();

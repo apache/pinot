@@ -26,6 +26,7 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.Token;
 import org.apache.lucene.queryparser.complexPhrase.ComplexPhraseQueryParser;
 import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
@@ -57,7 +58,7 @@ public final class BoundedRegexpQueryParser extends QueryParser {
 
   @Override
   protected void addClause(List<BooleanClause> clauses, int conjunction, int modifier, Query query) {
-    if (!_multiTermClauses.add(clauses, conjunction, modifier, query)) {
+    if (!_multiTermClauses.add(clauses, conjunction, modifier, query, getDefaultOperator())) {
       super.addClause(clauses, conjunction, modifier, query);
     }
   }
@@ -96,7 +97,7 @@ public final class BoundedRegexpQueryParser extends QueryParser {
 
     @Override
     protected void addClause(List<BooleanClause> clauses, int conjunction, int modifier, Query query) {
-      if (!_multiTermClauses.add(clauses, conjunction, modifier, query)) {
+      if (!_multiTermClauses.add(clauses, conjunction, modifier, query, getDefaultOperator())) {
         super.addClause(clauses, conjunction, modifier, query);
       }
     }
@@ -108,7 +109,7 @@ public final class BoundedRegexpQueryParser extends QueryParser {
     }
   }
 
-  /// Restores Lucene 9's flattening of adjacent plain terms without splitting analyzer input.
+  /// Restores Lucene 9's outer-clause flattening without splitting analyzer input.
   private static final class MultiTermClauses {
     private static final int NO_CONJUNCTION = 0;
     private static final int NO_MODIFIER = 0;
@@ -123,13 +124,12 @@ public final class BoundedRegexpQueryParser extends QueryParser {
       // MultiTerm analyzes a string longer than the last token it consumed. Compare decoded lengths so
       // escaped whitespace inside an individual term does not turn into separate clauses.
       Token token = parser.getToken(0);
-      if (token.kind == TERM && text.length() > decodedLength(token.image)
-          && group.clauses().stream().allMatch(clause -> clause.query() instanceof TermQuery)) {
+      if (token.kind == TERM && text.length() > decodedLength(token.image)) {
         _group = group;
       }
     }
 
-    private boolean add(List<BooleanClause> clauses, int conjunction, int modifier, Query query) {
+    private boolean add(List<BooleanClause> clauses, int conjunction, int modifier, Query query, Operator operator) {
       BooleanQuery group = _group;
       _group = null;
       // MultiTerm immediately adds the same query returned by analysis. An explicit parenthesized group
@@ -137,7 +137,15 @@ public final class BoundedRegexpQueryParser extends QueryParser {
       if (group == null || query != group || conjunction != NO_CONJUNCTION || modifier != NO_MODIFIER) {
         return false;
       }
-      clauses.addAll(group.clauses());
+      if (group.clauses().stream().allMatch(clause -> clause.query() instanceof TermQuery)) {
+        clauses.addAll(group.clauses());
+      } else {
+        // Lucene 9 uses the default operator at this level and leaves alternatives at each position intact.
+        Occur occur = operator == Operator.OR ? Occur.SHOULD : Occur.MUST;
+        for (BooleanClause clause : group) {
+          clauses.add(new BooleanClause(clause.query(), occur));
+        }
+      }
       return true;
     }
 

@@ -62,10 +62,11 @@ public final class LuceneRegexpAutomaton {
         yield new ConstructionCost(work, acceptsEmpty);
       }
       case REGEXP_OPTIONAL, REGEXP_REPEAT -> new ConstructionCost(estimate(regex.exp1).work() + 1, true);
-      case REGEXP_COMPLEMENT, REGEXP_DEPRECATED_COMPLEMENT -> {
+      case REGEXP_COMPLEMENT -> {
         ConstructionCost child = estimate(regex.exp1);
         yield new ConstructionCost(child.work() + 1, !child.acceptsEmpty());
       }
+      case REGEXP_DEPRECATED_COMPLEMENT -> estimateComplement(regex);
       case REGEXP_STRING -> new ConstructionCost(Math.max(1, regex.s.length()), regex.s.isEmpty());
       case REGEXP_ANYSTRING -> new ConstructionCost(1, true);
       case REGEXP_CHAR_CLASS -> new ConstructionCost(Math.max(1, regex.from.length), false);
@@ -73,6 +74,27 @@ public final class LuceneRegexpAutomaton {
           new ConstructionCost(Math.max(regex.digits, Integer.toString(regex.max).length()), false);
       default -> new ConstructionCost(1, false);
     };
+  }
+
+  private static ConstructionCost estimateComplement(RegExp regex) {
+    int complements = 0;
+    RegExp child = regex;
+    do {
+      complements++;
+      child = child.exp1;
+    } while (child.kind == regex.kind);
+
+    ConstructionCost cost = estimate(child);
+    Automaton automaton = child.toAutomaton();
+    for (int i = 0; i < complements; i++) {
+      // Complement can determinize a small child into a much larger automaton. Measure it before any outer
+      // repetition can copy it. As in Lucene, determinization itself is subject to the default work limit.
+      automaton = Operations.complement(automaton, Operations.DEFAULT_DETERMINIZE_WORK_LIMIT);
+      long footprint = (long) automaton.getNumStates() + automaton.getNumTransitions();
+      boolean acceptsEmpty = automaton.getNumStates() > 0 && automaton.isAccept(0);
+      cost = new ConstructionCost(Math.max(cost.work() + 1, footprint), acceptsEmpty);
+    }
+    return cost;
   }
 
   private static ConstructionCost estimateRepetition(RegExp regex) {
