@@ -183,6 +183,69 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
     assertEquals(response.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_DOCS);
   }
 
+  /// The multi-stage engine returns what the single-stage engine returns for key reads on the OPEN_STRUCT column:
+  /// declared dense (`views`, `cpu`, `host`) and sparse (`region`, `latencyMs`) keys in filters, aggregations,
+  /// group-by and order-by. Numbers are compared by value, since the engines differ in aggregation result types
+  /// (e.g. SUM is DOUBLE in the single-stage engine).
+  @Test
+  public void testMultiStageMatchesSingleStage()
+      throws Exception {
+    String t = getTableName();
+    String m = METRICS;
+    List<String> queries = List.of(
+        "SELECT COUNT(*), SUM(" + m + "['views']) FROM " + t + " WHERE " + m + "['views'] > 500",
+        "SELECT COUNT(*) FROM " + t + " WHERE " + m + "['latencyMs'] >= 50",
+        "SELECT COUNT(*) FROM " + t + " WHERE " + m + "['region'] = 'region-0' AND " + m + "['views'] < 100",
+        "SELECT " + m + "['region'], COUNT(*), SUM(" + m + "['latencyMs']) FROM " + t + " GROUP BY " + m
+            + "['region'] ORDER BY " + m + "['region']",
+        "SELECT " + m + "['host'], MAX(" + m + "['cpu']) FROM " + t + " GROUP BY " + m + "['host'] ORDER BY " + m
+            + "['host']",
+        "SELECT " + m + "['views'], " + m + "['region'], " + m + "['cpu'] FROM " + t + " ORDER BY " + m
+            + "['views'] DESC LIMIT 5");
+    boolean multiStage = useMultiStageQueryEngine();
+    try {
+      for (String query : queries) {
+        setUseMultiStageQueryEngine(false);
+        JsonNode singleStage = postQuery(query);
+        setUseMultiStageQueryEngine(true);
+        JsonNode multiStageResponse = postQuery(query);
+        assertEquals(singleStage.get("exceptions").size(), 0, query + " -> " + singleStage);
+        assertEquals(multiStageResponse.get("exceptions").size(), 0, query + " -> " + multiStageResponse);
+        assertSameRows(multiStageResponse.get("resultTable").get("rows"), singleStage.get("resultTable").get("rows"),
+            query);
+      }
+      // Only the multi-stage engine joins: every row matches itself on the unique `views` key.
+      JsonNode join = postQuery("SELECT COUNT(*) FROM " + t + " a JOIN " + t + " b ON a." + m + "['views'] = b." + m
+          + "['views']");
+      assertEquals(join.get("exceptions").size(), 0, join.toString());
+      assertEquals(join.get("resultTable").get("rows").get(0).get(0).asLong(), NUM_DOCS);
+      // The whole column is JSON text carrying the declared and sparse keys.
+      JsonNode whole = postQuery("SELECT " + m + " FROM " + t + " WHERE " + m + "['views'] = 7");
+      assertEquals(whole.get("exceptions").size(), 0, whole.toString());
+      JsonNode document = JsonUtils.stringToJsonNode(whole.get("resultTable").get("rows").get(0).get(0).asText());
+      assertEquals(document.get("views").asLong(), 7);
+      assertEquals(document.get("region").asText(), "region-3");
+    } finally {
+      setUseMultiStageQueryEngine(multiStage);
+    }
+  }
+
+  private static void assertSameRows(JsonNode actual, JsonNode expected, String query) {
+    assertEquals(actual.size(), expected.size(), query);
+    for (int i = 0; i < expected.size(); i++) {
+      assertEquals(actual.get(i).size(), expected.get(i).size(), query);
+      for (int j = 0; j < expected.get(i).size(); j++) {
+        JsonNode a = actual.get(i).get(j);
+        JsonNode e = expected.get(i).get(j);
+        if (a.isNumber() && e.isNumber()) {
+          assertEquals(a.asDouble(), e.asDouble(), 1e-9, query + " row " + i);
+        } else {
+          assertEquals(a, e, query + " row " + i);
+        }
+      }
+    }
+  }
+
   @Test
   public void testSparseKeyGroupBy()
       throws Exception {

@@ -19,6 +19,8 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.util.List;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -27,6 +29,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// Verifies identity conversion and numeric coercions at the single-stage to multi-stage boundary.
@@ -64,6 +68,46 @@ public class TypeUtilsTest {
     if (value instanceof Double) {
       assertSame(converted, value);
     }
+  }
+
+  /// BOOLEAN is stored as INT. A BOOLEAN leaf column the planner types as VARCHAR (e.g. an OPEN_STRUCT key) must read
+  /// as `true`/`false`, as `CAST(b AS VARCHAR)` and the single-stage engine give, not as the stored `1`/`0`.
+  @Test
+  public void testBooleanToStringUsesLogicalType() {
+    assertEquals(TypeUtils.convert(1, ColumnDataType.BOOLEAN, ColumnDataType.STRING), "true");
+    assertEquals(TypeUtils.convert(0, ColumnDataType.BOOLEAN, ColumnDataType.STRING), "false");
+    // Other logical types and stored-type conversions are unchanged.
+    assertEquals(TypeUtils.convert(1, ColumnDataType.INT, ColumnDataType.STRING), "1");
+    assertEquals(TypeUtils.convert(1, ColumnDataType.BOOLEAN, ColumnDataType.LONG), 1L);
+  }
+
+  @Test
+  public void testTimestampAndArrayToStringMatchTheSingleStageEngine() {
+    assertEquals(TypeUtils.convert(0L, ColumnDataType.TIMESTAMP, ColumnDataType.STRING),
+        new Timestamp(0L).toString());
+    assertEquals(TypeUtils.convert(new long[]{1, 2}, ColumnDataType.LONG_ARRAY, ColumnDataType.STRING), "[1,2]");
+    assertEquals(TypeUtils.convert(new String[]{"a", "b"}, ColumnDataType.STRING_ARRAY, ColumnDataType.STRING),
+        "[\"a\",\"b\"]");
+    assertEquals(TypeUtils.convert(new int[]{1, 0}, ColumnDataType.BOOLEAN_ARRAY, ColumnDataType.STRING),
+        "[true,false]");
+  }
+
+  /// A segment can serve a key as STRING while the plan types it numeric from the table's declaration: text converts
+  /// as ingestion converts it, and text that does not convert fails with both types named, never truncated, wrapped
+  /// or read as null.
+  @Test
+  public void testNumericTextToNumberConvertsOrFails() {
+    assertEquals(TypeUtils.convert("42", ColumnDataType.STRING, ColumnDataType.LONG), 42L);
+    assertEquals(TypeUtils.convert("1.5", ColumnDataType.STRING, ColumnDataType.DOUBLE), 1.5);
+    assertEquals(TypeUtils.convert("7", ColumnDataType.STRING, ColumnDataType.INT), 7);
+    assertEquals(TypeUtils.convert("NaN", ColumnDataType.STRING, ColumnDataType.DOUBLE), Double.NaN);
+    for (String text : List.of("abc", "1.9", "2.0", "99999999999999999999")) {
+      IllegalStateException e = expectThrows(IllegalStateException.class,
+          () -> TypeUtils.convert(text, ColumnDataType.STRING, ColumnDataType.LONG));
+      assertTrue(e.getMessage().contains("STRING value '" + text + "' to LONG"), e.getMessage());
+    }
+    expectThrows(IllegalStateException.class,
+        () -> TypeUtils.convert("2147483648", ColumnDataType.STRING, ColumnDataType.INT));
   }
 
   @Test

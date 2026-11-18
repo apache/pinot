@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
@@ -31,6 +32,8 @@ import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
@@ -130,6 +133,70 @@ public class TypeFactoryTest {
       cases.add(new Object[]{dataType, basicType, false});
     }
     return cases.iterator();
+  }
+
+  /// A table with an OPEN_STRUCT column must stay plannable: the multi-stage engine converts every column into the
+  /// row type, so an unmapped type used to fail every query on the table, even `COUNT(*)`. The column maps to an
+  /// [OpenStructSqlType] (a `MAP<VARCHAR, VARCHAR>`) carrying the declared child types.
+  @Test(dataProvider = "nullHandlingModes")
+  public void testOpenStructColumnMapsToOpenStructSqlType(boolean columnNullMode) {
+    TypeFactory typeFactory = new TypeFactory();
+    Schema testSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("id", FieldSpec.DataType.LONG)
+        .setEnableColumnBasedNullHandling(columnNullMode)
+        .build();
+    ComplexFieldSpec openStruct = new ComplexFieldSpec("event", FieldSpec.DataType.OPEN_STRUCT, true,
+        Map.of("n", new DimensionFieldSpec("n", FieldSpec.DataType.LONG, true)));
+    testSchema.addField(openStruct);
+
+    RelDataType rowType = typeFactory.createRelDataTypeFromSchema(testSchema);
+
+    Assert.assertEquals(rowType.getField("id", true, false).getType().getSqlTypeName(), SqlTypeName.BIGINT);
+    RelDataType eventType = rowType.getField("event", true, false).getType();
+    Assert.assertTrue(eventType instanceof OpenStructSqlType, eventType.getFullTypeString());
+    OpenStructSqlType open = (OpenStructSqlType) eventType;
+    Assert.assertEquals(open.getSqlTypeName(), SqlTypeName.MAP);
+    Assert.assertEquals(open.getKeyType().getSqlTypeName(), SqlTypeName.VARCHAR);
+    Assert.assertEquals(open.getValueType().getSqlTypeName(), SqlTypeName.VARCHAR);
+    Assert.assertEquals(open.isNullable(), columnNullMode && openStruct.isNullable());
+    Assert.assertEquals(open.getDeclaredKeyType("n").getSqlTypeName(), SqlTypeName.BIGINT);
+    Assert.assertNull(open.getDeclaredKeyType("other"));
+    // A nullability change keeps the declared types, and different declarations stay distinct types.
+    RelDataType flipped = typeFactory.createTypeWithNullability(open, !open.isNullable());
+    Assert.assertTrue(flipped instanceof OpenStructSqlType);
+    Assert.assertEquals(((OpenStructSqlType) flipped).getDeclaredKeyType("n").getSqlTypeName(), SqlTypeName.BIGINT);
+    Schema undeclared = new Schema.SchemaBuilder().setEnableColumnBasedNullHandling(columnNullMode).build();
+    undeclared.addField(new ComplexFieldSpec("event", FieldSpec.DataType.OPEN_STRUCT, true, Map.of()));
+    Assert.assertNotEquals(typeFactory.createRelDataTypeFromSchema(undeclared).getField("event", true, false).getType(),
+        eventType);
+  }
+
+  /// A key two declarations agree on keeps its type even when only one side is nullable; a key they type
+  /// differently, or that only one declares, is dropped (reads as VARCHAR).
+  @Test
+  public void testLeastRestrictiveOfOpenStructTypesKeepsAgreedKeys() {
+    TypeFactory typeFactory = new TypeFactory();
+    RelDataType varchar = typeFactory.createSqlType(SqlTypeName.VARCHAR);
+    RelDataType bigint = typeFactory.createSqlType(SqlTypeName.BIGINT);
+    OpenStructSqlType left = new OpenStructSqlType(varchar, varchar, false,
+        Map.of("n", bigint, "p", typeFactory.createSqlType(SqlTypeName.DOUBLE), "only", bigint));
+    OpenStructSqlType right = new OpenStructSqlType(varchar, varchar, true,
+        Map.of("n", typeFactory.createTypeWithNullability(bigint, true), "p", varchar));
+
+    RelDataType merged = typeFactory.leastRestrictive(List.of(left, right));
+
+    Assert.assertTrue(merged instanceof OpenStructSqlType, String.valueOf(merged));
+    OpenStructSqlType open = (OpenStructSqlType) merged;
+    Assert.assertTrue(open.isNullable());
+    Assert.assertEquals(open.getDeclaredKeyType("n").getSqlTypeName(), SqlTypeName.BIGINT);
+    Assert.assertTrue(open.getDeclaredKeyType("n").isNullable());
+    Assert.assertNull(open.getDeclaredKeyType("p"));
+    Assert.assertNull(open.getDeclaredKeyType("only"));
+  }
+
+  @DataProvider(name = "nullHandlingModes")
+  public Object[][] nullHandlingModes() {
+    return new Object[][]{{true}, {false}};
   }
 
   @Test(dataProvider = "relDataTypeConversion")

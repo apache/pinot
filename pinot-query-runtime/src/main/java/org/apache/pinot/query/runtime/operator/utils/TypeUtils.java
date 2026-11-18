@@ -18,14 +18,49 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 public class TypeUtils {
   private TypeUtils() {
+  }
+
+  /// Converts a value whose logical type is `inputType` to `outputStoredType`. Same as [#convert(Object,
+  /// ColumnDataType)], except where the stored value alone does not say how to convert it:
+  /// - To STRING, a BOOLEAN reads as `true`/`false` and a TIMESTAMP as its timestamp text, as `CAST(x AS VARCHAR)`
+  ///   does, rather than as the stored `1`/`0` or epoch millis; an array reads as JSON text.
+  /// - Text to a numeric type is converted the way ingestion converts it ([PinotDataType]). A segment can serve a key
+  ///   as STRING while the plan types it from the table's declaration, for example an OPEN_STRUCT key declared after
+  ///   older segments were built. Text that does not convert (`"abc"`, `"1.9"` or an out-of-range value for INT/LONG)
+  ///   fails with an [IllegalStateException] naming both types, rather than reading as a value it does not hold.
+  public static Object convert(Object value, ColumnDataType inputType, ColumnDataType outputStoredType) {
+    if (outputStoredType == ColumnDataType.STRING && !(value instanceof String)) {
+      if (inputType == ColumnDataType.BOOLEAN || inputType == ColumnDataType.TIMESTAMP) {
+        return inputType.convertAndFormat(value).toString();
+      }
+      if (inputType.isArray()) {
+        try {
+          return JsonUtils.objectToString(inputType.convertAndFormat(value));
+        } catch (JsonProcessingException e) {
+          throw new IllegalStateException("Cannot convert " + inputType + " to STRING", e);
+        }
+      }
+    }
+    if (value instanceof String && outputStoredType.isNumber()) {
+      try {
+        return outputStoredType.toPinotDataType().convert(value, PinotDataType.STRING);
+      } catch (RuntimeException e) {
+        throw new IllegalStateException(
+            "Cannot convert " + inputType + " value '" + value + "' to " + outputStoredType, e);
+      }
+    }
+    return convert(value, outputStoredType);
   }
 
   /// Converts value to the desired stored [ColumnDataType]. This is used to convert rows generated from
