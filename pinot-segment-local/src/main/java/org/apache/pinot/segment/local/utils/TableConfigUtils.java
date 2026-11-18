@@ -1342,11 +1342,15 @@ public final class TableConfigUtils {
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
       Preconditions.checkState(
           existingUpsertConfig != null && existingUpsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
-          "Partial upsert is not supported for tables with pauseless consumption enabled");
+          "Partial upsert cannot be used with pauseless consumption. If a segment is recovered after a failure, "
+              + "merged values can change. Set upsertConfig.mode to FULL or "
+              + "ingestionConfig.streamIngestionConfig.pauselessConsumptionEnabled to false");
     }
     if (upsertConfig.isDropOutOfOrderRecord()) {
       Preconditions.checkState(existingUpsertConfig != null && existingUpsertConfig.isDropOutOfOrderRecord(),
-          "dropOutOfOrderRecord is not supported for tables with pauseless consumption enabled");
+          "dropOutOfOrderRecord cannot be used with pauseless consumption. If a segment is recovered after a "
+              + "failure, different records can be dropped. Set upsertConfig.dropOutOfOrderRecord or "
+              + "ingestionConfig.streamIngestionConfig.pauselessConsumptionEnabled to false");
     }
   }
 

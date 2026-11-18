@@ -2873,10 +2873,12 @@ public class TableConfigUtilsTest {
     // A new pauseless table cannot use partial upsert or dropOutOfOrderRecord
     IllegalStateException e = expectThrows(IllegalStateException.class,
         () -> TableConfigUtils.validatePauselessUpsertModes(pauselessPartial, null));
-    assertEquals(e.getMessage(), "Partial upsert is not supported for tables with pauseless consumption enabled");
+    assertTrue(e.getMessage().startsWith("Partial upsert cannot be used with pauseless consumption."),
+        e.getMessage());
     e = expectThrows(IllegalStateException.class,
         () -> TableConfigUtils.validatePauselessUpsertModes(pauselessDropOutOfOrder, null));
-    assertEquals(e.getMessage(), "dropOutOfOrderRecord is not supported for tables with pauseless consumption enabled");
+    assertTrue(e.getMessage().startsWith("dropOutOfOrderRecord cannot be used with pauseless consumption."),
+        e.getMessage());
     TableConfigUtils.validatePauselessUpsertModes(pauselessFull, null);
     TableConfigUtils.validatePauselessUpsertModes(partial, null);
     TableConfigUtils.validatePauselessUpsertModes(dropOutOfOrder, null);
@@ -2902,7 +2904,8 @@ public class TableConfigUtilsTest {
         .build();
     e = expectThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateUpsertConfig(pauselessDropOutOfOrder, schema));
-    assertEquals(e.getMessage(), "dropOutOfOrderRecord is not supported for tables with pauseless consumption enabled");
+    assertTrue(e.getMessage().startsWith("dropOutOfOrderRecord cannot be used with pauseless consumption."),
+        e.getMessage());
   }
 
   @Test
