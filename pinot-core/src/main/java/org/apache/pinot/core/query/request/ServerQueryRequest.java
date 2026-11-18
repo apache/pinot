@@ -162,6 +162,13 @@ public class ServerQueryRequest {
   /// To be used by Time Series Query Engine.
   public ServerQueryRequest(QueryContext queryContext, List<String> segmentsToQuery, Map<String, String> metadata,
       ServerMetrics serverMetrics) {
+    this(queryContext, segmentsToQuery, null, metadata, serverMetrics);
+  }
+
+  /// To be used by Time Series Query Engine. `optionalSegments` are queried when the server has them and skipped
+  /// otherwise, as in the single-stage engine.
+  public ServerQueryRequest(QueryContext queryContext, List<String> segmentsToQuery,
+      @Nullable List<String> optionalSegments, Map<String, String> metadata, ServerMetrics serverMetrics) {
     long queryArrivalTimeMs = System.currentTimeMillis();
     _queryContext = queryContext;
     _tableType = TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName());
@@ -176,7 +183,7 @@ public class ServerQueryRequest {
     _queryHash = QueryOptionsUtils.getQueryHash(_queryContext.getQueryOptions());
 
     _segmentsToQuery = segmentsToQuery;
-    _optionalSegments = null;
+    _optionalSegments = optionalSegments;
 
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
     _tableSegmentsContexts = null;

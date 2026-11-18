@@ -255,6 +255,44 @@ public class BrokerRoutingManagerTest {
   }
 
   @Test
+  public void testRoutingTableReportsRequiredSegmentsOnMissingServers()
+      throws Exception {
+    String optionalOnlyInstanceId = "Server_optional_8000";
+    ServerInstance requiredServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(SERVER_INSTANCE_ID)));
+    ServerInstance optionalOnlyServer =
+        new ServerInstance(new InstanceConfig(createEnabledServerZNRecord(optionalOnlyInstanceId)));
+    _routingManager.getEnabledServerInstanceMap().put(SERVER_INSTANCE_ID, requiredServer);
+    _routingManager.getEnabledServerInstanceMap().put(optionalOnlyInstanceId, optionalOnlyServer);
+    Map<String, SegmentsToQuery> instanceToSegmentsMap = Map.of(
+        SERVER_INSTANCE_ID, segmentsToQuery(List.of("required"), List.of("optional")),
+        optionalOnlyInstanceId, segmentsToQuery(List.of(), List.of("optionalOnly")));
+    InstanceSelector instanceSelector = mock(InstanceSelector.class);
+    InstanceSelector.SelectionResult selectionResult =
+        new InstanceSelector.SelectionResult(instanceToSegmentsMap, List.of("alreadyUnavailable"), 0);
+    when(instanceSelector.select(any(), any(), anyLong())).thenReturn(selectionResult);
+    putRoutingEntry(TEST_TABLE, createRoutingEntry(TEST_TABLE,
+        selectorOf("required", "optional", "optionalOnly", "alreadyUnavailable"), List.of(), instanceSelector));
+    clearInvocations(_brokerMetrics);
+
+    BrokerRequest request = brokerRequest(TEST_TABLE);
+    RoutingTable routingTable = _routingManager.getRoutingTableWithMissingServerSegments(request, 0);
+    Map<ServerInstance, SegmentsToQuery> serverSegments = routingTable.getServerInstanceToSegmentsMap();
+    assertEquals(serverSegments.keySet(), Set.of(requiredServer));
+    assertEquals(serverSegments.get(requiredServer).getSegments(), List.of("required"));
+    assertEquals(serverSegments.get(requiredServer).getOptionalSegments(), List.of("optional"));
+    assertEquals(routingTable.getUnavailableSegments(), List.of("alreadyUnavailable"));
+
+    // Model a query that selected a server just before it became disabled.
+    _routingManager.getEnabledServerInstanceMap().remove(SERVER_INSTANCE_ID);
+    routingTable = _routingManager.getRoutingTableWithMissingServerSegments(request, 0);
+    assertTrue(routingTable.getServerInstanceToSegmentsMap().isEmpty());
+    assertEquals(routingTable.getUnavailableSegments(), List.of("alreadyUnavailable", "required"));
+    assertEquals(selectionResult.getUnavailableSegments(), List.of("alreadyUnavailable"));
+    verify(_brokerMetrics).addMeteredTableValue(TEST_TABLE, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
+  }
+
+  @Test
   public void testNoErrorWhenCallbackNotSet() {
     // Don't set callback
 

@@ -198,7 +198,7 @@
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.34.1</swagger-ui.version>
+    <swagger-ui.version>5.35.0</swagger-ui.version>
     <hadoop.version>3.4.3</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.1</jsonsmart.version>
@@ -326,7 +326,7 @@
     <maven.version>3.10.1</maven.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <plexus-utils.version>4.1.0</plexus-utils.version>
-    <plexus-xml.version>3.1.0</plexus-xml.version>
+    <plexus-xml.version>3.1.1</plexus-xml.version>
 
     <!-- For maven-antrun-plugin -->
     <fmpp.version>0.9.16</fmpp.version>

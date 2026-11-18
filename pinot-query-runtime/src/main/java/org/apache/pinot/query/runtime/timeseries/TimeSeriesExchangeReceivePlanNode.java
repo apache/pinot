@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.AggInfo;
+import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
@@ -35,6 +36,8 @@ public class TimeSeriesExchangeReceivePlanNode extends BaseTimeSeriesPlanNode {
   private final TimeSeriesBuilderFactory _factory;
   private BlockingQueue<Object> _receiver;
   private int _numServersQueried;
+  @Nullable
+  private TimeBuckets _timeBuckets;
 
   public TimeSeriesExchangeReceivePlanNode(String id, long deadlineMs, @Nullable AggInfo aggInfo,
       TimeSeriesBuilderFactory factory) {
@@ -44,9 +47,11 @@ public class TimeSeriesExchangeReceivePlanNode extends BaseTimeSeriesPlanNode {
     _factory = factory;
   }
 
-  public void init(BlockingQueue<Object> receiver, int numExpectedBlocks) {
+  /// @param timeBuckets the query's time buckets, for the empty block returned when `numExpectedBlocks` is 0
+  public void init(BlockingQueue<Object> receiver, int numExpectedBlocks, @Nullable TimeBuckets timeBuckets) {
     _receiver = receiver;
     _numServersQueried = numExpectedBlocks;
+    _timeBuckets = timeBuckets;
   }
 
   @Override
@@ -66,6 +71,7 @@ public class TimeSeriesExchangeReceivePlanNode extends BaseTimeSeriesPlanNode {
 
   @Override
   public BaseTimeSeriesOperator run() {
-    return new TimeSeriesExchangeReceiveOperator(_receiver, _deadlineMs, _numServersQueried, _aggInfo, _factory);
+    return new TimeSeriesExchangeReceiveOperator(_receiver, _deadlineMs, _numServersQueried, _aggInfo, _factory,
+        _timeBuckets);
   }
 }

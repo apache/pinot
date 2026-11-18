@@ -82,16 +82,19 @@ public class PhysicalTimeSeriesServerPlanVisitor {
 
   private TimeSeriesPhysicalTableScan convertLeafToPhysicalTableScan(LeafTimeSeriesPlanNode leafNode,
       TimeSeriesExecutionContext context) {
-    List<String> segments = context.getPlanIdToSegmentsMap().getOrDefault(leafNode.getId(), List.of());
-    ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
+    ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, context);
     return new TimeSeriesPhysicalTableScan(context, leafNode.getId(), serverQueryRequest, _queryExecutor,
         _executorService);
   }
 
-  public ServerQueryRequest compileLeafServerQueryRequest(LeafTimeSeriesPlanNode leafNode, List<String> segments,
+  /// The leaf's request with the required and optional segments the broker assigned this server.
+  @VisibleForTesting
+  ServerQueryRequest compileLeafServerQueryRequest(LeafTimeSeriesPlanNode leafNode,
       TimeSeriesExecutionContext context) {
-    return new ServerQueryRequest(compileQueryContext(leafNode, context),
-        segments, getServerQueryRequestMetadataMap(context), _serverMetrics);
+    List<String> segments = context.getPlanIdToSegmentsMap().getOrDefault(leafNode.getId(), List.of());
+    List<String> optionalSegments = context.getPlanIdToOptionalSegmentsMap().get(leafNode.getId());
+    return new ServerQueryRequest(compileQueryContext(leafNode, context), segments, optionalSegments,
+        getServerQueryRequestMetadataMap(context), _serverMetrics);
   }
 
   /// Create a transform expression, and link it with an aggregation function.
