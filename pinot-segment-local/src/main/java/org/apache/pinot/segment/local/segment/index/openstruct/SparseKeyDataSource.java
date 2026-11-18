@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -48,6 +49,10 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /// a declared child spec, or -- for an undeclared key -- the shape the segment recorded for it.
 /// `maxNumValuesPerMVEntry` is the longest value the key holds, the number callers size their multi-value
 /// buffers from; 0 for a single-value key.
+///
+/// Single-value reads accept only values that fit the key's type ([#accepts]); anything else reads as absent and
+/// the null vector agrees. Multi-value elements keep Jackson's lenient conversion, since one element cannot be marked
+/// null; their presence is not type-aware.
 public class SparseKeyDataSource extends BaseDataSource {
   private final FieldSpec _fieldSpec;
 
@@ -83,8 +88,8 @@ public class SparseKeyDataSource extends BaseDataSource {
           fieldSpec.getDefaultNullValue());
     }
 
-    SparseKeyForwardIndexReader(String key, DataType storedType, OpenStructSparseBlobReader blob) {
-      this(key, storedType, true, blob, null);
+    SparseKeyForwardIndexReader(String key, DataType dataType, OpenStructSparseBlobReader blob) {
+      this(key, dataType, true, blob, null);
     }
 
     private SparseKeyForwardIndexReader(String key, DataType dataType, boolean singleValue,
@@ -142,14 +147,27 @@ public class SparseKeyDataSource extends BaseDataSource {
           declaredOr(Integer.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT));
     }
 
+    /// TIMESTAMP is stored as LONG epoch millis; text is parsed the way the materialized tier parses it.
+    private static long timestampMillis(JsonNode node) {
+      return node.isTextual() ? TimestampUtils.toMillisSinceEpoch(node.textValue().trim()) : node.asLong();
+    }
+
     /// BOOLEAN is stored as INT; Jackson's `asInt()` reads the text `"true"` as 0, so map booleans explicitly.
     private static int booleanAsInt(JsonNode node) {
-      return (node.isBoolean() ? node.booleanValue() : "true".equalsIgnoreCase(node.asText().trim())) ? 1 : 0;
+      if (node.isBoolean()) {
+        return node.booleanValue() ? 1 : 0;
+      }
+      if (node.isNumber()) {
+        return node.asLong() != 0 ? 1 : 0;
+      }
+      String text = node.asText().trim();
+      return "true".equalsIgnoreCase(text) || "1".equals(text) ? 1 : 0;
     }
 
     @Override
     public long getLong(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, JsonNode::asLong,
+      return orDefault(docId, context,
+          _dataType == DataType.TIMESTAMP ? SparseKeyForwardIndexReader::timestampMillis : JsonNode::asLong,
           declaredOr(Long.class, (long) FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG));
     }
 
@@ -167,7 +185,7 @@ public class SparseKeyDataSource extends BaseDataSource {
 
     @Override
     public BigDecimal getBigDecimal(int docId, ForwardIndexReaderContext context) {
-      return orDefault(docId, context, node -> new BigDecimal(node.asText()),
+      return orDefault(docId, context, node -> new BigDecimal(node.asText().trim()),
           declaredOr(BigDecimal.class, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL));
     }
 
@@ -392,21 +410,27 @@ public class SparseKeyDataSource extends BaseDataSource {
         return node.isIntegralNumber() ? node.canConvertToInt() : isWhole(node) ? fitsInt(node.doubleValue())
             : node.isTextual() && parses(node.textValue(), Integer::parseInt);
       case LONG:
-      case TIMESTAMP:
         return node.isIntegralNumber() ? node.canConvertToLong() : isWhole(node) ? node.canConvertToLong()
             : node.isTextual() && parses(node.textValue(), Long::parseLong);
+      case TIMESTAMP:
+        // Epoch millis, or timestamp text in any form the materialized tier parses.
+        return node.isIntegralNumber() ? node.canConvertToLong() : isWhole(node) ? node.canConvertToLong()
+            : node.isTextual() && parses(node.textValue(), TimestampUtils::toMillisSinceEpoch);
       case FLOAT:
       case DOUBLE:
         return node.isNumber() || (node.isTextual() && parses(node.textValue(), Double::parseDouble));
       case BIG_DECIMAL:
         return node.isNumber() || (node.isTextual() && parses(node.textValue(), BigDecimal::new));
       case BOOLEAN:
-        return node.isBoolean() || (node.isTextual()
-            && ("true".equalsIgnoreCase(node.textValue()) || "false".equalsIgnoreCase(node.textValue())));
+        // As the materialized tier (BooleanUtils.toInt): booleans, 0/1, and their text forms.
+        return node.isBoolean() || (node.isIntegralNumber() && (node.asLong() == 0 || node.asLong() == 1))
+            || (node.isTextual() && BOOLEAN_TEXT.contains(node.textValue().trim().toLowerCase()));
       default:
         return true;
     }
   }
+
+  private static final Set<String> BOOLEAN_TEXT = Set.of("true", "false", "1", "0");
 
   private static boolean isWhole(JsonNode node) {
     if (!node.isFloatingPointNumber()) {

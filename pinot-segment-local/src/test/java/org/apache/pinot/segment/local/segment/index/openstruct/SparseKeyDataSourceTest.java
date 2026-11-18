@@ -26,6 +26,7 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -49,6 +50,46 @@ public class SparseKeyDataSourceTest {
       "{\"k\":5}", "{\"k\":\"abc\"}", "{\"k\":1.5}", "{\"k\":2.0}", "{\"k\":\"7\"}", "{\"k\":{\"x\":1}}",
       "{\"k\":true}", "{\"k\":[1,2]}", "{\"k\":9223372036854775807}",
   };
+
+  private static SparseKeyDataSource of(DataType declaredType, String... blobs) {
+    OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
+        new FakeStringForwardIndex(blobs), FakeStringForwardIndex.nullVector(blobs), blobs.length);
+    return new SparseKeyDataSource(new DimensionFieldSpec("k", declaredType, true), blob, 0);
+  }
+
+  @Test
+  public void testBooleanAcceptsTheFormsTheMaterializedTierAccepts() {
+    SparseKeyDataSource booleans = of(DataType.BOOLEAN, "{\"k\":true}", "{\"k\":1}", "{\"k\":0}", "{\"k\":\"1\"}",
+        "{\"k\":\" FALSE \"}", "{\"k\":2}", "{\"k\":\"yes\"}");
+    int[] expected = {1, 1, 0, 1, 0};
+    for (int doc = 0; doc < expected.length; doc++) {
+      assertFalse(booleans.getNullValueVector().isNull(doc), "doc " + doc);
+      assertEquals(booleans.getForwardIndex().getInt(doc, null), expected[doc], "doc " + doc);
+    }
+    assertTrue(booleans.getNullValueVector().isNull(5)); // 2 is not a boolean
+    assertTrue(booleans.getNullValueVector().isNull(6));
+  }
+
+  @Test
+  public void testTimestampAndBigDecimalTextForms() {
+    SparseKeyDataSource timestamps = of(DataType.TIMESTAMP, "{\"k\":1767225600000}",
+        "{\"k\":\"2026-01-01 00:00:00\"}", "{\"k\":\"not a time\"}");
+    long millis = TimestampUtils.toMillisSinceEpoch("2026-01-01 00:00:00");
+    assertEquals(timestamps.getForwardIndex().getLong(0, null), 1767225600000L);
+    assertEquals(timestamps.getForwardIndex().getLong(1, null), millis);
+    assertTrue(timestamps.getNullValueVector().isNull(2));
+
+    SparseKeyDataSource decimals = of(DataType.BIG_DECIMAL, "{\"k\":\" 1.5 \"}", "{\"k\":2.25}");
+    assertEquals(decimals.getForwardIndex().getBigDecimal(0, null), new BigDecimal("1.5"));
+    assertEquals(decimals.getForwardIndex().getBigDecimal(1, null), new BigDecimal("2.25"));
+  }
+
+  @Test
+  public void testIntOverflowFromTextIsAbsent() {
+    SparseKeyDataSource ints = of(DataType.INT, "{\"k\":\"2147483648\"}", "{\"k\":\"42\"}");
+    assertTrue(ints.getNullValueVector().isNull(0));
+    assertEquals(ints.getForwardIndex().getInt(1, null), 42);
+  }
 
   private static SparseKeyDataSource mixed(DataType declaredType) {
     OpenStructSparseBlobReader blob = new OpenStructSparseBlobReader(
