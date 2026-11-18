@@ -69,7 +69,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// Exercises server-load rollback from real Lucene 10 HNSW files to the running Lucene writer.
+/// Exercises server loading and rollback across Lucene HNSW index versions.
 public class HnswIndexRollbackTest implements PinotBuffersAfterClassCheckRule {
   private static final String COLUMN = "embedding";
   private static final int DIMENSIONS = 2048;
@@ -85,6 +85,32 @@ public class HnswIndexRollbackTest implements PinotBuffersAfterClassCheckRule {
         {SegmentVersion.v3, "consolidated", true},
         {SegmentVersion.v3, "consolidated", false}
     };
+  }
+
+  @DataProvider
+  public Object[][] legacyLayouts() {
+    return new Object[][]{{"directory", false}, {"consolidated", true}};
+  }
+
+  @Test(dataProvider = "legacyLayouts")
+  public void testLoadingRetainsLucene912HnswIndex(String layout, boolean storeInSegmentFile)
+      throws Exception {
+    File tempDir = Files.createTempDirectory("hnsw-upgrade").toFile();
+    try {
+      SegmentVersion version = SegmentVersion.v3;
+      TableConfig tableConfig = tableConfig(storeInSegmentFile, false);
+      File segmentDir = buildSegment(tempDir, tableConfig, version);
+      File fixtures = LuceneIndexTestUtils.extractLucene912Fixtures(new File(tempDir, "lucene912"));
+      installIndex(segmentDir, version, layout, new File(fixtures, "hnsw"));
+      IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
+      try (SegmentDirectory directory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
+          SegmentPreProcessor processor = new SegmentPreProcessor(directory, loadingConfig)) {
+        assertFalse(processor.needProcess(), "the Lucene 9.12 HNSW index must be retained");
+      }
+      assertLoadsAndQueries(segmentDir, loadingConfig);
+    } finally {
+      FileUtils.deleteDirectory(tempDir);
+    }
   }
 
   @Test(dataProvider = "layouts")
@@ -273,6 +299,11 @@ public class HnswIndexRollbackTest implements PinotBuffersAfterClassCheckRule {
     File fixtures = LuceneIndexTestUtils.extractLucene10Fixtures(new File(tempDir, "lucene10-hnsw"));
     File fixture = new File(fixtures, "hnsw");
     assertTrue(LuceneIndexCompatibilityUtils.isIncompatible(fixture));
+    installIndex(segmentDir, version, layout, fixture);
+  }
+
+  private static void installIndex(File segmentDir, SegmentVersion version, String layout, File fixture)
+      throws Exception {
     File storageDir = SegmentDirectoryPaths.segmentDirectoryFor(segmentDir, version);
     try (SegmentDirectory directory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
         SegmentDirectory.Writer writer = directory.createWriter()) {

@@ -29,7 +29,7 @@ import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.codecs.lucene100.Lucene100Codec;
+import org.apache.lucene.codecs.lucene104.Lucene104Codec;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.index.ConcurrentMergeScheduler;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -356,8 +356,8 @@ public class VectorIndexUtils {
 
     HnswVectorsFormat knnVectorsFormat = new HnswVectorsFormat(maxCon, beamWidth, maxDimensions, mmapMergeDirectory);
 
-    Lucene100Codec.Mode mode = Lucene100Codec.Mode.valueOf(vectorIndexConfig.getProperties()
-        .getOrDefault("mode", Lucene100Codec.Mode.BEST_SPEED.name()));
+    Lucene104Codec.Mode mode = Lucene104Codec.Mode.valueOf(vectorIndexConfig.getProperties()
+        .getOrDefault("mode", Lucene104Codec.Mode.BEST_SPEED.name()));
     indexWriterConfig.setCodec(new HnswCodec(mode, knnVectorsFormat));
     return indexWriterConfig;
   }

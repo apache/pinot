@@ -44,13 +44,16 @@ import org.apache.lucene.index.MultiDocValues;
 import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.index.StoredFieldVisitor;
 import org.apache.lucene.index.StoredFields;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
+import org.apache.lucene.queryparser.complexPhrase.ComplexPhraseQueryParser;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexBufferReader;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
+import org.apache.pinot.segment.local.segment.index.text.lucene.parsers.BoundedRegexpQueryParser;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -494,7 +497,12 @@ public class TextIndexUtils {
       String queryParserClassName)
       throws ReflectiveOperationException {
     // Fail-fast if the query parser is specified class is not QueryParseBase class
-    final Class<?> queryParserClass = Class.forName(queryParserClassName);
+    Class<?> queryParserClass = Class.forName(queryParserClassName);
+    if (queryParserClass == QueryParser.class) {
+      queryParserClass = BoundedRegexpQueryParser.class;
+    } else if (queryParserClass == ComplexPhraseQueryParser.class) {
+      queryParserClass = BoundedRegexpQueryParser.ComplexPhrase.class;
+    }
     if (!QueryParserBase.class.isAssignableFrom(queryParserClass)) {
       throw new ReflectiveOperationException(
           "The specified lucene query parser class " + queryParserClassName + " is not assignable from "

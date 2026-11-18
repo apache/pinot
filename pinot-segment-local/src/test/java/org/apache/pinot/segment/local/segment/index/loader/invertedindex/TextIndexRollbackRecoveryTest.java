@@ -79,7 +79,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/// Exercises server loading with real Lucene 10 indexes and retained Pinot source values on Lucene 9.12.
+/// Exercises cross-version text index loading and recovery from retained Pinot source values.
 public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassCheckRule {
   private File _tempDir;
   private File _fixtures;
@@ -184,6 +184,33 @@ public class TextIndexRollbackRecoveryTest implements PinotBuffersAfterClassChec
   @DataProvider
   public Object[][] multiColumnVersions() {
     return new Object[][]{{SegmentVersion.v1}, {SegmentVersion.v3}};
+  }
+
+  @Test(dataProvider = "multiColumnVersions")
+  public void testLoadingRetainsLucene912MultiColumnIndex(SegmentVersion version)
+      throws Exception {
+    Schema schema = schema(false);
+    TableConfig tableConfig = tableConfig(true, false, false);
+    File segmentDir = buildSegment(tableConfig, schema, version, false);
+    File fixtures = LuceneIndexTestUtils.extractLucene912Fixtures(new File(_tempDir, "lucene912"));
+    File luceneDir = SegmentDirectoryPaths.findTextIndexIndexFile(segmentDir,
+        MultiColumnTextIndexConstants.INDEX_DIR_NAME);
+    FileUtils.deleteDirectory(luceneDir);
+    FileUtils.copyDirectory(new File(fixtures, "multi"), luceneDir);
+
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    try (SegmentDirectory directory = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap)) {
+      assertFalse(ImmutableSegmentLoader.needPreprocess(directory, loadingConfig));
+    }
+    ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDir, loadingConfig, true);
+    try {
+      MultiColumnLuceneTextIndexReader reader = (MultiColumnLuceneTextIndexReader) segment.getMultiColumnTextIndex();
+      // The fixture's terms are absent from the forward index, so rebuilding would change these results.
+      assertEquals(reader.getDocIds("text", "\"legacy world\"", (String) null).toArray(), new int[]{1});
+      assertEquals(reader.getDocIds("other", "delta", (String) null).toArray(), new int[]{0});
+    } finally {
+      segment.destroy();
+    }
   }
 
   @Test(dataProvider = "multiColumnVersions")

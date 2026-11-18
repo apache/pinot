@@ -93,7 +93,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       return DirectoryReader.open(directory);
     } catch (IndexFormatTooOldException e) {
       // This lower-level reader accepts the Lucene 8 commit rejected by the default version check.
-      return StandardDirectoryReader.open(directory, SegmentInfos.readLatestCommit(directory, 8), null, null);
+      return StandardDirectoryReader.open(directory, SegmentInfos.readLatestCommit(directory, 8), null, null, null);
     }
   }
 

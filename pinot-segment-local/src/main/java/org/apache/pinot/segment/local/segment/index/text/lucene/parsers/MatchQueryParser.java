@@ -181,7 +181,7 @@ public class MatchQueryParser extends QueryParserBase {
     }
 
     // Parse the query using Lucene's QueryParser
-    QueryParser parser = new QueryParser(_field, _analyzer);
+    QueryParser parser = new BoundedRegexpQueryParser(_field, _analyzer);
     Query parsedQuery = parser.parse(query);
 
     // If it's a Boolean query, apply minimum_should_match behavior
