@@ -20,8 +20,6 @@ package org.apache.pinot.core.common;
 
 import org.apache.pinot.segment.spi.Constants;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 
 /// The interface `BlockDocIdIterator` represents the iterator for `BlockDocIdSet`. The document
 /// ids returned from the iterator should be in ascending order.
@@ -45,8 +43,6 @@ public interface BlockDocIdIterator extends AutoCloseable {
   ///
   /// The default implementation preserves scalar iteration for existing implementations.
   default int nextBatch(int[] output, int maxDocs) {
-    checkArgument(maxDocs > 0 && maxDocs <= output.length,
-        "maxDocs (%s) must be between 1 and the output length (%s)", maxDocs, output.length);
     int size = 0;
     while (size < maxDocs) {
       int docId = next();

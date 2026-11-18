@@ -21,8 +21,6 @@ package org.apache.pinot.core.operator.dociditerators;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 
 /// The `MatchAllDocIdIterator` is the iterator for MatchAllDocIdSet where all documents are matching.
 public final class MatchAllDocIdIterator implements BlockDocIdIterator {
@@ -45,8 +43,6 @@ public final class MatchAllDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int nextBatch(int[] output, int maxDocs) {
-    checkArgument(maxDocs > 0 && maxDocs <= output.length,
-        "maxDocs (%s) must be between 1 and the output length (%s)", maxDocs, output.length);
     int nextDocId = _nextDocId;
     if (nextDocId >= _numDocs) {
       return 0;

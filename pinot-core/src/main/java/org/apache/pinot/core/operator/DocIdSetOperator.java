@@ -74,10 +74,10 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
     QueryThreadContext.sampleUsage();
 
     int[] docIds = THREAD_LOCAL_DOC_IDS.get();
-    int pos = _blockDocIdIterator.nextBatch(docIds, _maxSizeOfDocIdSet);
-    // A short batch has already consumed EOF in the scalar fallback. Do not call the iterator again.
-    _exhausted = pos < _maxSizeOfDocIdSet;
-    if (pos > 0) {
+    int numDocIds = _blockDocIdIterator.nextBatch(docIds, _maxSizeOfDocIdSet);
+    // A short batch means the iterator is exhausted; do not call it again.
+    _exhausted = numDocIds < _maxSizeOfDocIdSet;
+    if (numDocIds > 0) {
       // Push scan cost delta for proactive query killing
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
@@ -88,7 +88,7 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
           _lastReportedEntriesScanned = currentTotal;
         }
       }
-      return new DocIdSetBlock(docIds, pos);
+      return new DocIdSetBlock(docIds, numDocIds);
     } else {
       return null;
     }

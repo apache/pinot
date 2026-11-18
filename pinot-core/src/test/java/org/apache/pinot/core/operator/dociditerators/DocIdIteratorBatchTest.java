@@ -31,7 +31,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.expectThrows;
 
 
 /// Exercises the shared cursor, caller-owned output and terminal-batch contract of document-id iterators.
@@ -41,22 +40,22 @@ public class DocIdIteratorBatchTest {
 
   @DataProvider
   public Object[][] batchBoundaries() {
-    int maxDocs = DocIdSetPlanNode.MAX_DOC_PER_CALL;
+    int maxDocPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
     return new Object[][]{
         {1, 0}, {1, 1}, {1, 2}, {2, 1}, {2, 2}, {2, 3},
-        {maxDocs, maxDocs - 1}, {maxDocs, maxDocs}, {maxDocs, maxDocs + 1}
+        {maxDocPerCall, maxDocPerCall - 1}, {maxDocPerCall, maxDocPerCall}, {maxDocPerCall, maxDocPerCall + 1}
     };
   }
 
   @Test(dataProvider = "batchBoundaries")
-  public void testBatchBoundaries(int capacity, int numDocs) {
+  public void testBatchBoundaries(int maxDocs, int numDocs) {
     int[] expected = IntStream.range(0, numDocs).toArray();
-    assertBatches(new MatchAllDocIdIterator(numDocs), capacity, expected);
-    assertBatches(new ScalarIterator(expected), capacity, expected);
+    assertBatches(new MatchAllDocIdIterator(numDocs), maxDocs, expected);
+    assertBatches(new ScalarIterator(expected), maxDocs, expected);
     if (numDocs > 0) {
-      assertBatches(new SortedDocIdIterator(List.of(new IntPair(0, numDocs - 1))), capacity, expected);
+      assertBatches(new SortedDocIdIterator(List.of(new IntPair(0, numDocs - 1))), maxDocs, expected);
     } else {
-      assertBatches(EmptyDocIdIterator.getInstance(), capacity, expected);
+      assertBatches(EmptyDocIdIterator.getInstance(), maxDocs, expected);
     }
   }
 
@@ -76,8 +75,8 @@ public class DocIdIteratorBatchTest {
 
   @Test(dataProvider = "sortedRanges")
   public void testSortedRangeTransitions(List<IntPair> ranges, int[] expected) {
-    for (int capacity : new int[]{1, 2, 3, 4, 256}) {
-      assertBatches(new SortedDocIdIterator(ranges), capacity, expected);
+    for (int maxDocs : new int[]{1, 2, 3, 4, 256}) {
+      assertBatches(new SortedDocIdIterator(ranges), maxDocs, expected);
     }
   }
 
@@ -128,20 +127,6 @@ public class DocIdIteratorBatchTest {
     assertEquals(iterator._numNextCalls, 6);
   }
 
-  @Test
-  public void testInvalidCapacityDoesNotConsumeOrWrite() {
-    for (BlockDocIdIterator iterator : List.of(new MatchAllDocIdIterator(3),
-        new SortedDocIdIterator(List.of(new IntPair(0, 2))), new ScalarIterator(new int[]{0, 1, 2}))) {
-      int[] output = {UNWRITTEN, UNWRITTEN};
-      expectThrows(IllegalArgumentException.class, () -> iterator.nextBatch(output, 0));
-      expectThrows(IllegalArgumentException.class, () -> iterator.nextBatch(output, -1));
-      expectThrows(IllegalArgumentException.class, () -> iterator.nextBatch(output, 3));
-      expectThrows(IllegalArgumentException.class, () -> iterator.nextBatch(new int[0], 1));
-      assertEquals(output, new int[]{UNWRITTEN, UNWRITTEN});
-      assertEquals(iterator.next(), 0);
-    }
-  }
-
   @DataProvider
   public Object[][] fallbackIterators() {
     Supplier<BlockDocIdIterator> bitmap = () -> bitmap(1, 2, 3, 8, 9, 10, 11, 18, 19, 20);
@@ -165,8 +150,8 @@ public class DocIdIteratorBatchTest {
 
   @Test(dataProvider = "fallbackIterators")
   public void testDefaultFallbacks(Supplier<BlockDocIdIterator> factory, int[] expected) {
-    for (int capacity : new int[]{1, 2, 3, 256}) {
-      assertBatches(factory.get(), capacity, expected);
+    for (int maxDocs : new int[]{1, 2, 3, 256}) {
+      assertBatches(factory.get(), maxDocs, expected);
     }
     BlockDocIdIterator scalar = factory.get();
     for (int docId : expected) {
@@ -193,23 +178,22 @@ public class DocIdIteratorBatchTest {
     return new BitmapDocIdIterator(bitmap, 32);
   }
 
-  private static void assertBatches(BlockDocIdIterator iterator, int capacity, int[] expected) {
+  private static void assertBatches(BlockDocIdIterator iterator, int maxDocs, int[] expected) {
     int offset = 0;
     while (true) {
-      int size = Math.min(capacity, expected.length - offset);
-      assertBatch(iterator, capacity, Arrays.copyOfRange(expected, offset, offset + size));
+      int size = Math.min(maxDocs, expected.length - offset);
+      assertBatch(iterator, maxDocs, Arrays.copyOfRange(expected, offset, offset + size));
       offset += size;
-      if (size < capacity) {
+      if (size < maxDocs) {
         break;
       }
     }
-    assertEquals(offset, expected.length);
   }
 
-  private static void assertBatch(BlockDocIdIterator iterator, int capacity, int... expected) {
-    int[] output = new int[capacity + 2];
+  private static void assertBatch(BlockDocIdIterator iterator, int maxDocs, int... expected) {
+    int[] output = new int[maxDocs + 2];
     Arrays.fill(output, UNWRITTEN);
-    assertEquals(iterator.nextBatch(output, capacity), expected.length);
+    assertEquals(iterator.nextBatch(output, maxDocs), expected.length);
     assertEquals(Arrays.copyOf(output, expected.length), expected);
     for (int i = expected.length; i < output.length; i++) {
       assertEquals(output[i], UNWRITTEN);
