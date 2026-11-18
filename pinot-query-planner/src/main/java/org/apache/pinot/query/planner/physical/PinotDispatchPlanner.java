@@ -157,7 +157,7 @@ public class PinotDispatchPlanner {
     PlanNode rootPlanNode = planFragment.getFragmentRoot();
     boolean scansTables =
         !context.getDispatchablePlanMetadataMap().get(rootPlanNode.getStageId()).getScannedTables().isEmpty();
-    ArrayToMvValidationVisitor.validate(rootPlanNode, scansTables);
+    ArrayToMvValidationVisitor.validate(rootPlanNode, scansTables, _plannerContext.isUseMvAggregate());
     for (PlanFragment child : planFragment.getChildren()) {
       runValidations(child, context);
     }

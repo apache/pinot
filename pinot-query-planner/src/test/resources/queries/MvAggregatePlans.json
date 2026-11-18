@@ -382,5 +382,118 @@
         "expectedException": ".*GROUP BY ARRAY_TO_MV\\(\\) is not supported with WITHIN GROUP ordered aggregates.*"
       }
     ]
+  },
+  "array_group_keys_that_plan_before_mv_aggregate_tests": {
+    "comment": "The check of array-typed group keys from before the MV aggregate misses these keys. The queries group by the array reference and run today, so they must keep their plan. See ArrayToMvValidationVisitor.",
+    "queries": [
+      {
+        "description": "Array key above an UNNEST in the leaf fragment, with the hint is_partitioned_by_group_by_keys",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ e.col1, e.mcol1, COUNT(*) FROM e CROSS JOIN UNNEST(e.mcol2) AS u(x) GROUP BY e.col1, e.mcol1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT()], aggType=[DIRECT])",
+          "\n  LogicalCorrelate(correlation=[$cor0], joinType=[inner], requiredColumns=[{2}])",
+          "\n    LogicalProject(col1=[$0], mcol1=[$7], mcol2=[$8])",
+          "\n      PinotLogicalTableScan(table=[[default, e]])",
+          "\n    Uncollect",
+          "\n      LogicalProject(mcol2=[$cor0.mcol2])",
+          "\n        LogicalValues(tuples=[[{ 0 }]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Array key above a join, with the hint is_partitioned_by_group_by_keys",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ e.mcol1, COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY e.mcol1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{1}], agg#0=[COUNT()], aggType=[DIRECT])",
+          "\n  LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], mcol1=[$7])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Array key above a join, with the hint is_partitioned_by_group_by_keys (physical optimizer)",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ e.mcol1, COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY e.mcol1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalAggregate(group=[{1}], agg#0=[COUNT()], aggType=[DIRECT])",
+          "\n    PhysicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n      PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n        PhysicalProject(col1=[$0], mcol1=[$7])",
+          "\n          PhysicalTableScan(table=[[default, e]])",
+          "\n      PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n        PhysicalProject(col1=[$0])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Array key above a join, with the hint is_partitioned_by_group_by_keys (lite mode)",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ e.mcol1, COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY e.mcol1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{1}], agg#0=[COUNT()], aggType=[DIRECT])",
+          "\n  PhysicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalSort(fetch=[100000])",
+          "\n        PhysicalProject(col1=[$0], mcol1=[$7])",
+          "\n          PhysicalTableScan(table=[[default, e]])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalSort(fetch=[100000])",
+          "\n        PhysicalProject(col1=[$0])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Array key and SV key, with the hint is_skip_leaf_stage_group_by (physical optimizer)",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col1, mcol1, COUNT(*) FROM e GROUP BY col1, mcol1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalAggregate(group=[{0, 7}], agg#0=[COUNT()], aggType=[DIRECT])",
+          "\n    PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0, 7]])",
+          "\n      PhysicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Array key and SV key, with the hint is_skip_leaf_stage_group_by (lite mode)",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col1, mcol1, COUNT(*) FROM e GROUP BY col1, mcol1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{0, 7}], agg#0=[COUNT()], aggType=[DIRECT])",
+          "\n  PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n    PhysicalSort(fetch=[100000])",
+          "\n      PhysicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "DISTINCT on an array above a join (lite mode)",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR SELECT DISTINCT e.mcol1 FROM e JOIN a ON e.col1 = a.col1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{1}], aggType=[DIRECT])",
+          "\n  PhysicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalSort(fetch=[100000])",
+          "\n        PhysicalProject(col1=[$0], mcol1=[$7])",
+          "\n          PhysicalTableScan(table=[[default, e]])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalSort(fetch=[100000])",
+          "\n        PhysicalProject(col1=[$0])",
+          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
   }
 }

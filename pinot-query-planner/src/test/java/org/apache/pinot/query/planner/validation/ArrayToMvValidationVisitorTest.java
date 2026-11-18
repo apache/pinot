@@ -27,6 +27,8 @@ import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.MvAggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.testng.annotations.Test;
@@ -70,8 +72,20 @@ public class ArrayToMvValidationVisitorTest {
         AggregateNode.AggType.LEAF, false, null, 0, mvKeyIndexes);
   }
 
+  /// Validates `node` as the root of a fragment of a plan with the MV aggregate. The fragment scans a table when
+  /// `isIntermediateStage` is not set.
   private static void validate(PlanNode node, boolean isIntermediateStage) {
-    node.visit(ArrayToMvValidationVisitor.INSTANCE, isIntermediateStage);
+    ArrayToMvValidationVisitor.validate(node, !isIntermediateStage, true);
+  }
+
+  /// As [#validate], for a plan without the MV aggregate.
+  private static void validateWithoutMvAggregate(PlanNode node, boolean isIntermediateStage) {
+    ArrayToMvValidationVisitor.validate(node, !isIntermediateStage, false);
+  }
+
+  private static AggregateNode aggregate(PlanNode input, DataSchema output, List<Integer> groupKeys) {
+    return new AggregateNode(1, output, PlanNode.NodeHint.EMPTY, List.of(input), COUNT, List.of(-1), groupKeys,
+        AggregateNode.AggType.DIRECT, false, null, 0);
   }
 
   @Test
@@ -128,9 +142,56 @@ public class ArrayToMvValidationVisitorTest {
         List.of(input(ColumnDataType.STRING_ARRAY)), COUNT, List.of(-1), List.of(0), AggregateNode.AggType.LEAF,
         false, null, 0);
     validate(node, false);
-    QueryException e = expectThrows(QueryException.class, () -> validate(node, true));
-    assertTrue(e.getMessage().contains("in the intermediate stage"), e.getMessage());
-    assertTrue(e.getMessage().contains("Use ARRAY_TO_MV() to group by multi-value column"), e.getMessage());
+    validateWithoutMvAggregate(node, false);
+    for (boolean useMvAggregate : new boolean[]{true, false}) {
+      QueryException e = expectThrows(QueryException.class,
+          () -> ArrayToMvValidationVisitor.validate(node, false, useMvAggregate));
+      assertTrue(e.getMessage().contains("in the intermediate stage"), e.getMessage());
+      assertTrue(e.getMessage().contains("Use ARRAY_TO_MV() to group by multi-value column"), e.getMessage());
+      assertTrue(e.getMessage().endsWith(ArrayToMvValidationVisitor.SUPPORTED_USES), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testPlanWithoutMvAggregateKeepsTheArrayGroupKeyCheckFromBeforeMvAggregate() {
+    // GROUP BY c1, an array, above a node with the columns (c0, c1). The check from before the MV aggregate reads the
+    // output schema at the input position of the key, 1, which is the COUNT column. So it misses the key, and the
+    // query runs today.
+    AggregateNode aboveTwoColumns = aggregate(input(ColumnDataType.INT, ColumnDataType.STRING_ARRAY),
+        output(ColumnDataType.STRING_ARRAY), List.of(1));
+    validateWithoutMvAggregate(aboveTwoColumns, true);
+    // The input position of the key is past the end of the output schema.
+    AggregateNode aboveThreeColumns =
+        aggregate(input(ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.STRING_ARRAY),
+            output(ColumnDataType.STRING_ARRAY), List.of(2));
+    validateWithoutMvAggregate(aboveThreeColumns, true);
+    // GROUP BY c0, c1: the output column at position 1 is the array key, so the check finds it.
+    AggregateNode twoKeys = aggregate(input(ColumnDataType.INT, ColumnDataType.STRING_ARRAY),
+        output(ColumnDataType.INT, ColumnDataType.STRING_ARRAY), List.of(0, 1));
+    expectThrows(QueryException.class, () -> validateWithoutMvAggregate(twoKeys, true));
+
+    // No query that runs today has a plan with the MV aggregate, so that plan has the complete check.
+    for (AggregateNode node : List.of(aboveTwoColumns, aboveThreeColumns, twoKeys)) {
+      QueryException e = expectThrows(QueryException.class, () -> validate(node, true));
+      assertTrue(e.getMessage().contains("Multi-valued column found as a grouping key in AGGREGATE"), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testArrayGroupKeyAboveAnUnnestInALeafFragment() {
+    // GROUP BY c0, an array, above an UNNEST in a fragment that scans a table. The aggregate runs above the leaf
+    // boundary. The check from before the MV aggregate does not run in a fragment that scans a table.
+    DataSchema scanSchema = new DataSchema(new String[]{"c0", "c1"},
+        new ColumnDataType[]{ColumnDataType.STRING_ARRAY, ColumnDataType.INT_ARRAY});
+    PlanNode scan = new TableScanNode(1, scanSchema, PlanNode.NodeHint.EMPTY, List.of(), "t", List.of("c0", "c1"));
+    DataSchema unnestSchema = new DataSchema(new String[]{"c0", "c1", "e"},
+        new ColumnDataType[]{ColumnDataType.STRING_ARRAY, ColumnDataType.INT_ARRAY, ColumnDataType.INT});
+    PlanNode unnest = new UnnestNode(1, unnestSchema, PlanNode.NodeHint.EMPTY, List.of(scan),
+        List.of(new RexExpression.InputRef(1)), List.of("e"), false, null);
+    AggregateNode node = aggregate(unnest, output(ColumnDataType.STRING_ARRAY), List.of(0));
+    ArrayToMvValidationVisitor.validate(node, true, false);
+    QueryException e = expectThrows(QueryException.class, () -> ArrayToMvValidationVisitor.validate(node, true, true));
+    assertTrue(e.getMessage().contains("Multi-valued column found as a grouping key in AGGREGATE"), e.getMessage());
   }
 
   @Test

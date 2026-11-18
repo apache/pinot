@@ -692,7 +692,7 @@ public class QueryEnvironment {
       return null;
     }
     try {
-      ArrayToMvValidationVisitor.validateFragments(plan.getSubPlanRoot());
+      ArrayToMvValidationVisitor.validateFragments(plan.getSubPlanRoot(), plannerContext.isUseMvAggregate());
       return null;
     } catch (ArrayToMvValidationVisitor.ArrayToMvValidationException e) {
       return e;

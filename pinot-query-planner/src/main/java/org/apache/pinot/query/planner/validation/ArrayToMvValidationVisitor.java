@@ -59,7 +59,7 @@ import org.apache.pinot.spi.exception.QueryException;
 /// | Project not under an aggregate (SELECT list) | error | error |
 /// | Filter | allowed | error |
 /// | Aggregate call argument | allowed | error |
-/// | Array-typed group key (`GROUP BY mvCol`) | not checked (the FINAL aggregate fails) | error |
+/// | Array-typed group key (`GROUP BY mvCol`) | not checked (the FINAL aggregate fails) | see below |
 /// | Join non-equi condition | error | error |
 /// | Window | not checked (a window never runs in the leaf stage) | error |
 ///
@@ -70,28 +70,45 @@ import org.apache.pinot.spi.exception.QueryException;
 /// as multi-stage operators and are validated as intermediate-stage nodes. In a fragment with an `UNNEST`, the
 /// boundary is the input of the `UNNEST` in the same way.
 ///
-/// The visitor is stateless and thread-safe. The context is `true` when the visited node runs in an intermediate
-/// stage and `false` when it runs in the leaf stage. Use [#validate(PlanNode, boolean)] to validate a fragment.
+/// ## Array-typed group keys
+///
+/// A plan with the MV aggregate fails when a group key of an aggregate above the leaf boundary is an array, except
+/// for the MV keys of an MV aggregate. A plan without the MV aggregate keeps the check from before the MV aggregate,
+/// see [#checkArrayGroupKeysAsBeforeMvAggregate]: that check misses some array keys, and the queries that it misses
+/// run today.
+///
+/// The visitor is immutable and thread-safe. It validates one fragment. The context is `true` when the visited node
+/// runs in an intermediate stage and `false` when it runs in the leaf stage. Use
+/// [#validate(PlanNode, boolean, boolean)] to validate a fragment.
 public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean> {
-  public static final ArrayToMvValidationVisitor INSTANCE = new ArrayToMvValidationVisitor();
+  private final boolean _scansTables;
+  private final boolean _useMvAggregate;
+
+  private ArrayToMvValidationVisitor(boolean scansTables, boolean useMvAggregate) {
+    _scansTables = scansTables;
+    _useMvAggregate = useMvAggregate;
+  }
 
   /// Validates the plan fragment rooted at `fragmentRoot`.
   ///
   /// @param scansTables whether the fragment scans a table (a leaf fragment)
-  public static void validate(PlanNode fragmentRoot, boolean scansTables) {
+  /// @param useMvAggregate whether the plan was made with the MV aggregate, see `PlannerContext.isUseMvAggregate()`
+  public static void validate(PlanNode fragmentRoot, boolean scansTables, boolean useMvAggregate) {
     // In a leaf fragment with a lookup join or an UNNEST, the nodes from the root down to that node run above the leaf
     // boundary.
     boolean isIntermediateStage = !scansTables || containsLookupJoin(fragmentRoot) || containsUnnest(fragmentRoot);
-    fragmentRoot.visit(INSTANCE, isIntermediateStage);
+    fragmentRoot.visit(new ArrayToMvValidationVisitor(scansTables, useMvAggregate), isIntermediateStage);
   }
 
   /// Validates every fragment of the plan rooted at `fragment`. It needs no worker assignment: a fragment is a leaf
   /// fragment when it scans a table.
-  public static void validateFragments(PlanFragment fragment) {
+  ///
+  /// @param useMvAggregate whether the plan was made with the MV aggregate, see `PlannerContext.isUseMvAggregate()`
+  public static void validateFragments(PlanFragment fragment, boolean useMvAggregate) {
     PlanNode fragmentRoot = fragment.getFragmentRoot();
-    validate(fragmentRoot, scansTable(fragmentRoot));
+    validate(fragmentRoot, scansTable(fragmentRoot), useMvAggregate);
     for (PlanFragment child : fragment.getChildren()) {
-      validateFragments(child);
+      validateFragments(child, useMvAggregate);
     }
   }
 
@@ -201,8 +218,12 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
       // gives one DIRECT aggregate in the leaf stage, as before the MV aggregate.
       return null;
     }
-    // The group keys are the first columns of the output.
-    checkNoArrayGroupKey(node.getDataSchema(), node.getGroupKeys().size(), List.of(), "AGGREGATE", true);
+    if (_useMvAggregate) {
+      // The group keys are the first columns of the output.
+      checkNoArrayGroupKey(node.getDataSchema(), node.getGroupKeys().size(), List.of(), "AGGREGATE", true);
+    } else {
+      checkArrayGroupKeysAsBeforeMvAggregate(node);
+    }
     if (containsArrayToMv(node.getAggCalls())) {
       throw error("ARRAY_TO_MV found in an aggregate call argument in AGGREGATE in the " + stageName(true) + " stage");
     }
@@ -309,10 +330,36 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
     ColumnDataType[] columnDataTypes = schema.getColumnDataTypes();
     for (int i = 0; i < numGroupKeys && i < columnDataTypes.length; i++) {
       if (columnDataTypes[i] != null && columnDataTypes[i].isArray() && !mvKeyIndexes.contains(i)) {
-        throw error("Multi-valued column found as a grouping key in " + nodeName + " in the "
-            + stageName(isIntermediateStage) + " stage. Use ARRAY_TO_MV() to group by multi-value column");
+        throw arrayGroupKeyError(nodeName, isIntermediateStage);
       }
     }
+  }
+
+  /// The check of the array-typed group keys of a plain aggregate from before the MV aggregate, with no change, for
+  /// a plan without the MV aggregate. It misses some array keys:
+  ///
+  /// - It runs only in a fragment that scans no table. It does not run for an aggregate above a lookup join or an
+  ///   `UNNEST` in a leaf fragment.
+  /// - It reads the output schema at the input position of each group key, not at the output position.
+  ///
+  /// The queries that it misses run today. They group by the array reference, and some of them return correct
+  /// rows, for example when all the rows of a group share one array object. A complete check makes these queries
+  /// fail, so it must be a separate change.
+  private void checkArrayGroupKeysAsBeforeMvAggregate(AggregateNode node) {
+    if (_scansTables) {
+      return;
+    }
+    ColumnDataType[] columnDataTypes = node.getDataSchema().getColumnDataTypes();
+    for (int key : node.getGroupKeys()) {
+      if (key >= 0 && key < columnDataTypes.length && columnDataTypes[key] != null && columnDataTypes[key].isArray()) {
+        throw arrayGroupKeyError("AGGREGATE", true);
+      }
+    }
+  }
+
+  private static QueryException arrayGroupKeyError(String nodeName, boolean isIntermediateStage) {
+    return error("Multi-valued column found as a grouping key in " + nodeName + " in the "
+        + stageName(isIntermediateStage) + " stage. Use ARRAY_TO_MV() to group by multi-value column");
   }
 
   private static String stageName(boolean isIntermediateStage) {
