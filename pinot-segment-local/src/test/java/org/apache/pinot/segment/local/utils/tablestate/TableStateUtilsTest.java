@@ -44,12 +44,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -68,8 +63,6 @@ public class TableStateUtilsTest {
     Assignment fixture = new Assignment();
     when(fixture._accessor.getProperty(fixture._keys.idealStates(TABLE))).thenReturn(null);
     assertFalse(fixture.isReady());
-    // Preserve the legacy table-wide check's behavior when no IdealState is available.
-    assertTrue(TableStateUtils.isAllSegmentsLoaded(fixture._manager, TABLE));
 
     when(fixture._accessor.getProperty(fixture._keys.idealStates(TABLE))).thenReturn(fixture._idealState);
     fixture._idealState.getRecord().getMapFields().remove(fixture._consumer.getSegmentName());
@@ -106,7 +99,6 @@ public class TableStateUtilsTest {
     assertFalse(fixture.isReady());
     fixture._currentState.setState(n1, ONLINE);
     assertTrue(fixture.isReady());
-    assertTrue(TableStateUtils.isAllSegmentsLoaded(fixture._manager, TABLE));
   }
 
   @Test
@@ -121,8 +113,6 @@ public class TableStateUtilsTest {
     fixture.assign(segment(1, 2), CONSUMING);
     fixture._idealState.setInstanceStateMap(segment(1, 0), Map.of(OTHER_SERVER, ONLINE));
     assertTrue(fixture.isReady());
-    assertFalse(TableStateUtils.isAllSegmentsLoaded(fixture._manager, TABLE),
-        "The legacy table-wide check still includes other partitions and successors");
   }
 
   @DataProvider

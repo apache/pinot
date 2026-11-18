@@ -19,10 +19,11 @@
 package org.apache.pinot.segment.local.utils.tablestate;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixDataAccessor;
@@ -41,11 +42,10 @@ import org.slf4j.LoggerFactory;
 
 
 public class TableStateUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableStateUtils.class);
-  private static final int MAX_NUM_SEGMENTS_TO_LOG = 10;
-
   private TableStateUtils() {
   }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableStateUtils.class);
 
   /// Returns all segments in a given state for a given table.
   ///
@@ -81,18 +81,6 @@ public class TableStateUtils {
     return segmentsInGivenState;
   }
 
-  /// Checks if all segments for the given @param tableNameWithType were successfully loaded
-  /// This function will get all segments in IDEALSTATE and CURRENTSTATE for the given table,
-  /// and then check if all ONLINE segments in IDEALSTATE match with CURRENTSTATE.
-  /// @param helixManager helix manager for the server instance
-  /// @param tableNameWithType table name for which segment state is to be checked
-  /// @return true if all segments for the given table are successfully loaded. False otherwise
-  public static boolean isAllSegmentsLoaded(HelixManager helixManager, String tableNameWithType) {
-    List<String> onlineSegments =
-        getSegmentsInGivenStateForThisInstance(helixManager, tableNameWithType, SegmentStateModel.ONLINE);
-    return areSegmentsLoaded(helixManager, tableNameWithType, onlineSegments);
-  }
-
   /// Checks the current assignment before a consumer starts. Earlier ONLINE segments of the same partition must be
   /// loaded, as must uploaded segments from that partition. Resolve partitions from names or segment metadata,
   /// matching upsert and dedup loading; unresolved segments are conservatively included. The consumer and its
@@ -107,8 +95,9 @@ public class TableStateUtils {
   }
 
   /// Reads the table assignment and this live instance's current state once for evaluation by multiple consumers.
-  /// Partition metadata is read only for custom-named ONLINE segments that are neither ONLINE in current state nor
-  /// locally ready. Loaded segments cannot block consumption, so their partition is irrelevant to this check.
+  /// Only what evaluation reads is kept: this instance's CONSUMING segments, and its ONLINE segments that are not
+  /// ONLINE in current state. Partition metadata is read only for custom-named segments among the latter that are not
+  /// locally ready. Loaded segments cannot block consumption, so neither they nor their partitions are retained.
   /// A cached snapshot must only reject readiness; callers must perform a fresh check before authorizing consumption
   /// from a cached result.
   ///
@@ -120,46 +109,53 @@ public class TableStateUtils {
     IdealState idealState = dataAccessor.getProperty(dataAccessor.keyBuilder().idealStates(tableNameWithType));
     if (idealState == null) {
       LOGGER.warn("Failed to find ideal state for table: {}", tableNameWithType);
-      return new ReadinessSnapshot(Map.of(), Map.of(), Map.of());
+      return new ReadinessSnapshot(Set.of(), Map.of(), Map.of());
     }
     String instanceName = helixManager.getInstanceName();
-    Map<String, String> idealStates = new HashMap<>();
-    Map<String, String> currentStates = getCurrentStates(helixManager, tableNameWithType);
+    CurrentState currentState = getCurrentState(helixManager, tableNameWithType);
+    Set<String> consumingSegments = new HashSet<>();
+    Map<String, String> unloadedSegments = new HashMap<>();
     Map<String, Integer> metadataPartitionIds = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
       String segmentName = entry.getKey();
       String state = entry.getValue().get(instanceName);
-      if (state != null) {
-        idealStates.put(segmentName, state);
-        if (SegmentStateModel.ONLINE.equals(state) && !SegmentStateModel.ONLINE.equals(currentStates.get(segmentName))
-            && SegmentUtils.getPartitionIdFromSegmentName(segmentName) == null && !isLocallyReady.test(segmentName)) {
-          Integer partitionId = getPartitionIdFromMetadata(helixManager, tableNameWithType, segmentName);
-          if (partitionId != null) {
-            metadataPartitionIds.put(segmentName, partitionId);
+      if (SegmentStateModel.CONSUMING.equals(state)) {
+        consumingSegments.add(segmentName);
+      } else if (SegmentStateModel.ONLINE.equals(state)) {
+        String actualState = currentState != null ? currentState.getState(segmentName) : null;
+        if (!SegmentStateModel.ONLINE.equals(actualState)) {
+          unloadedSegments.put(segmentName, actualState);
+          if (SegmentUtils.getPartitionIdFromSegmentName(segmentName) == null && !isLocallyReady.test(segmentName)) {
+            Integer partitionId = getPartitionIdFromMetadata(helixManager, tableNameWithType, segmentName);
+            if (partitionId != null) {
+              metadataPartitionIds.put(segmentName, partitionId);
+            }
           }
         }
       }
     }
-    return new ReadinessSnapshot(idealStates, currentStates, metadataPartitionIds);
+    return new ReadinessSnapshot(consumingSegments, unloadedSegments, metadataPartitionIds);
   }
 
-  /// An immutable view of this instance's assignment, current state, and metadata-derived partition ids, safe to share
-  /// between consumer threads.
-  /// Evaluation performs no ZooKeeper reads. It rechecks local readiness for assigned ONLINE segments that were not
-  /// ONLINE in the captured current state, then determines whether any unavailable segment is required history.
-  /// The predicate must itself be safe for its caller's threads. Its results are never retained here; an omitted or
-  /// unresolved partition id is treated conservatively if the segment is no longer locally ready.
+  /// An immutable view of the segments readiness evaluation reads, safe to share between consumer threads: this
+  /// instance's CONSUMING segments, its ONLINE segments that were not ONLINE in the captured current state, and the
+  /// metadata-derived partition ids of the latter. The collections are built for this snapshot and never modified.
+  /// Evaluation performs no ZooKeeper reads. It rechecks local readiness for the unloaded segments, then determines
+  /// whether any of them is required history. The predicate must itself be safe for its caller's threads. Its results
+  /// are never retained here; an omitted or unresolved partition id is treated conservatively if the segment is no
+  /// longer locally ready.
   public static final class ReadinessSnapshot {
-    private final Map<String, String> _idealStates;
-    private final Map<String, String> _currentStates;
+    private final Set<String> _consumingSegments;
+    // ONLINE in the ideal state but not in the captured current state, mapped to that state (null when not reported).
+    private final Map<String, String> _unloadedSegments;
     // Only known ids for custom-named segments that could block when captured. Absence means unknown, not ready.
     private final Map<String, Integer> _metadataPartitionIds;
 
-    private ReadinessSnapshot(Map<String, String> idealStates, Map<String, String> currentStates,
+    private ReadinessSnapshot(Set<String> consumingSegments, Map<String, String> unloadedSegments,
         Map<String, Integer> metadataPartitionIds) {
-      _idealStates = Collections.unmodifiableMap(new HashMap<>(idealStates));
-      _currentStates = Collections.unmodifiableMap(new HashMap<>(currentStates));
-      _metadataPartitionIds = Map.copyOf(metadataPartitionIds);
+      _consumingSegments = consumingSegments;
+      _unloadedSegments = unloadedSegments;
+      _metadataPartitionIds = metadataPartitionIds;
     }
 
     public boolean isReadyToConsume(LLCSegmentName consumer, Predicate<String> isLocallyReady) {
@@ -170,22 +166,22 @@ public class TableStateUtils {
     /// repeated rejection checks against a cached snapshot quiet.
     public boolean isReadyToConsume(LLCSegmentName consumer, Predicate<String> isLocallyReady,
         boolean logUnavailableSegments) {
-      String consumerState = _idealStates.get(consumer.getSegmentName());
-      if (!SegmentStateModel.CONSUMING.equals(consumerState) && !SegmentStateModel.ONLINE.equals(consumerState)) {
+      // The consumer must still be assigned to this instance, as CONSUMING or as ONLINE with its transition pending.
+      String consumerName = consumer.getSegmentName();
+      if (!_consumingSegments.contains(consumerName) && !_unloadedSegments.containsKey(consumerName)) {
         return false;
       }
-      for (Map.Entry<String, String> entry : _idealStates.entrySet()) {
+      for (Map.Entry<String, String> entry : _unloadedSegments.entrySet()) {
         String segmentName = entry.getKey();
-        String actualState = _currentStates.get(segmentName);
-        if (SegmentStateModel.ONLINE.equals(entry.getValue()) && !SegmentStateModel.ONLINE.equals(actualState)
-            && !isLocallyReady.test(segmentName) && isRequiredHistory(segmentName, consumer)) {
+        if (!isLocallyReady.test(segmentName) && isRequiredHistory(segmentName, consumer)) {
           if (logUnavailableSegments) {
+            String actualState = entry.getValue();
             if (SegmentStateModel.ERROR.equals(actualState)) {
               LOGGER.error("Consumer: {} is waiting for history segment: {} in ERROR state, expected: {}",
-                  consumer.getSegmentName(), segmentName, SegmentStateModel.ONLINE);
+                  consumerName, segmentName, SegmentStateModel.ONLINE);
             } else {
-              LOGGER.info("Consumer: {} is waiting for history segment: {} in state: {}, expected: {}",
-                  consumer.getSegmentName(), segmentName, actualState, SegmentStateModel.ONLINE);
+              LOGGER.info("Consumer: {} is waiting for history segment: {} in state: {}, expected: {}", consumerName,
+                  segmentName, actualState, SegmentStateModel.ONLINE);
             }
           }
           return false;
@@ -218,51 +214,17 @@ public class TableStateUtils {
     return metadata != null ? SegmentUtils.getSegmentPartitionId(metadata, null) : null;
   }
 
-  private static boolean areSegmentsLoaded(HelixManager helixManager, String tableNameWithType,
-      List<String> onlineSegments) {
-    if (onlineSegments.isEmpty()) {
-      LOGGER.info("No required ONLINE segment found for table: {}", tableNameWithType);
-      return true;
-    }
-
-    Map<String, String> currentStateMap = getCurrentStates(helixManager, tableNameWithType);
-    List<String> unloadedSegments = new ArrayList<>();
-    for (String segmentName : onlineSegments) {
-      String actualState = currentStateMap.get(segmentName);
-      if (!SegmentStateModel.ONLINE.equals(actualState)) {
-        if (SegmentStateModel.ERROR.equals(actualState)) {
-          LOGGER.error("Found segment: {}, table: {} in ERROR state, expected: {}", segmentName, tableNameWithType,
-              SegmentStateModel.ONLINE);
-          return false;
-        } else {
-          unloadedSegments.add(segmentName);
-        }
-      }
-    }
-    if (unloadedSegments.isEmpty()) {
-      LOGGER.info("All required segments loaded for table: {}", tableNameWithType);
-      return true;
-    } else {
-      int numUnloadedSegments = unloadedSegments.size();
-      if (numUnloadedSegments <= MAX_NUM_SEGMENTS_TO_LOG) {
-        LOGGER.info("Found {} unloaded segments: {} for table: {}", numUnloadedSegments, unloadedSegments,
-            tableNameWithType);
-      } else {
-        LOGGER.info("Found {} unloaded segments: {}... for table: {}", numUnloadedSegments,
-            unloadedSegments.subList(0, MAX_NUM_SEGMENTS_TO_LOG), tableNameWithType);
-      }
-      return false;
-    }
-  }
-
-  private static Map<String, String> getCurrentStates(HelixManager helixManager, String tableNameWithType) {
+  /// Returns this live instance's current state for the table, or null if it is not available, in which case no
+  /// segment counts as loaded.
+  @Nullable
+  private static CurrentState getCurrentState(HelixManager helixManager, String tableNameWithType) {
     HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = dataAccessor.keyBuilder();
     String instanceName = helixManager.getInstanceName();
     LiveInstance liveInstance = dataAccessor.getProperty(keyBuilder.liveInstance(instanceName));
     if (liveInstance == null) {
       LOGGER.warn("Failed to find live instance for instance: {}", instanceName);
-      return Map.of();
+      return null;
     }
     String sessionId = liveInstance.getEphemeralOwner();
     CurrentState currentState =
@@ -270,8 +232,7 @@ public class TableStateUtils {
     if (currentState == null) {
       LOGGER.warn("Failed to find current state for instance: {}, sessionId: {}, table: {}", instanceName, sessionId,
           tableNameWithType);
-      return Map.of();
     }
-    return currentState.getPartitionStateMap();
+    return currentState;
   }
 }

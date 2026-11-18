@@ -49,12 +49,7 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -478,7 +473,8 @@ public class ConsumerCoordinatorTest {
   }
 
   @Test(dataProvider = "historyOrderingModes", timeOut = 10_000)
-  public void testHistoryReadinessReplacesPreviousRegistration(boolean enforceConsumptionInOrder) throws Exception {
+  public void testHistoryReadinessReplacesPreviousRegistration(boolean enforceConsumptionInOrder)
+      throws Exception {
     try (ReadinessFixture fixture = new ReadinessFixture(enforceConsumptionInOrder, true)) {
       AtomicBoolean historyReady = new AtomicBoolean();
       ReadinessWaiter waiter = fixture.start(historyReady::get, () -> false);
@@ -495,7 +491,8 @@ public class ConsumerCoordinatorTest {
   }
 
   @Test(timeOut = 20_000)
-  public void testReadinessSkipsRepeatedChecksWhilePermitHeld() throws Exception {
+  public void testReadinessDeferredWhilePermitHeld()
+      throws Exception {
     try (ReadinessFixture fixture = new ReadinessFixture(false, true)) {
       assertTrue(fixture._coordinator.acquire(getLLCSegment(100), () -> true, () -> false));
       AtomicBoolean historyReady = new AtomicBoolean();
@@ -512,16 +509,16 @@ public class ConsumerCoordinatorTest {
         }
         return false;
       });
-      fixture.assertGauge(1);
-      assertEquals(checks.poll(2, TimeUnit.SECONDS), Integer.valueOf(1));
       awaitReadinessWait(waiter);
       observeNextPoll.set(true);
       assertTrue(nextPoll.await(7, TimeUnit.SECONDS), "The periodic readiness wait did not expire");
       awaitReadinessWait(waiter);
-      assertEquals(readinessChecks.get(), 1, "A held permit makes repeated history reads unnecessary");
+      assertEquals(readinessChecks.get(), 0, "Readiness cannot be acted on while another consumer holds the permit");
+      assertTrue(fixture._gaugeUpdates.isEmpty(), "Waiting for the permit holder is not a readiness wait");
 
       fixture._coordinator.release();
-      assertEquals(checks.poll(2, TimeUnit.SECONDS), Integer.valueOf(2));
+      assertEquals(checks.poll(2, TimeUnit.SECONDS), Integer.valueOf(1));
+      fixture.assertGauge(1);
       awaitReadinessWait(waiter);
       assertFalse(waiter.result().isDone(), "Permit release must still check the complete history");
       assertEquals(fixture._coordinator.getSemaphore().availablePermits(), 1);
@@ -533,13 +530,49 @@ public class ConsumerCoordinatorTest {
     }
   }
 
+  @Test(timeOut = 10_000)
+  public void testPermitWaitChecksSegmentStatus()
+      throws Exception {
+    try (ReadinessFixture fixture = new ReadinessFixture(false, true, 100)) {
+      assertTrue(fixture._coordinator.acquire(getLLCSegment(100), () -> true, () -> false));
+      clearInvocations(fixture._metrics);
+      SegmentZKMetadata consuming = new SegmentZKMetadata(getSegmentName(101));
+      consuming.setStatus(Status.IN_PROGRESS);
+      SegmentZKMetadata committed = new SegmentZKMetadata(getSegmentName(101));
+      committed.setStatus(Status.DONE);
+      AtomicBoolean completed = new AtomicBoolean();
+      when(fixture._table.fetchZKMetadataNullable(getSegmentName(101)))
+          .thenAnswer(invocation -> completed.get() ? committed : consuming);
+      AtomicInteger readinessChecks = new AtomicInteger();
+      ReadinessWaiter waiter = fixture.start(() -> {
+        readinessChecks.incrementAndGet();
+        return true;
+      }, () -> false);
+
+      verify(fixture._metrics, timeout(2000).atLeastOnce()).setValueOfPartitionGauge(eq("tableTest_REALTIME"), eq(1),
+          eq(ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS), longThat(waitTimeMs -> waitTimeMs >= 100));
+      assertFalse(waiter.result().isDone(), "A consumable segment keeps waiting for the permit holder");
+
+      completed.set(true);
+      ExecutionException exception =
+          expectThrows(ExecutionException.class, () -> waiter.result().get(2, TimeUnit.SECONDS));
+      assertEquals(exception.getCause().getClass(), ConsumerCoordinator.ShouldNotConsumeException.class);
+      assertEquals(readinessChecks.get(), 0);
+      assertTrue(fixture._gaugeUpdates.isEmpty(), "Waiting for the permit holder is not a readiness wait");
+      verify(fixture._metrics).setValueOfPartitionGauge("tableTest_REALTIME", 1, ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS,
+          0L);
+      assertEquals(fixture._coordinator.getSemaphore().availablePermits(), 0, "The permit holder keeps its permit");
+    }
+  }
+
   private static void awaitReadinessWait(ReadinessWaiter waiter) {
     TestUtils.waitForCondition(ignored -> waiter.thread().getState() == Thread.State.TIMED_WAITING, 10, 2000,
         "Consumer did not enter its readiness wait");
   }
 
   @Test(timeOut = 10_000)
-  public void testReadinessGaugeCountsOverlappingWaiters() throws Exception {
+  public void testReadinessGaugeCountsOverlappingWaiters()
+      throws Exception {
     try (ReadinessFixture fixture = new ReadinessFixture()) {
       AtomicBoolean firstReady = new AtomicBoolean();
       AtomicBoolean secondReady = new AtomicBoolean();
@@ -577,7 +610,8 @@ public class ConsumerCoordinatorTest {
   }
 
   @Test(dataProvider = "readinessExits", timeOut = 10_000)
-  public void testReadinessGaugeClearedOnUnsuccessfulExit(String exit) throws Exception {
+  public void testReadinessGaugeClearedOnUnsuccessfulExit(String exit)
+      throws Exception {
     try (ReadinessFixture fixture = new ReadinessFixture()) {
       AtomicBoolean stopped = new AtomicBoolean();
       AtomicBoolean failed = new AtomicBoolean();
@@ -611,7 +645,8 @@ public class ConsumerCoordinatorTest {
   }
 
   @Test
-  public void testReadinessGaugeDoesNotCountConsumersThatNeverWait() throws Exception {
+  public void testReadinessGaugeDoesNotCountConsumersThatNeverWait()
+      throws Exception {
     try (ReadinessFixture fixture = new ReadinessFixture()) {
       assertTrue(fixture._coordinator.acquire(getLLCSegment(101), () -> true, () -> false));
       fixture._coordinator.release();
@@ -641,32 +676,42 @@ public class ConsumerCoordinatorTest {
   private static class ReadinessFixture implements AutoCloseable {
     private final BlockingQueue<Long> _gaugeUpdates = new LinkedBlockingQueue<>();
     private final List<Thread> _threads = new ArrayList<>();
+    private final ServerMetrics _metrics = mock(ServerMetrics.class);
+    private final RealtimeTableDataManager _table = mock(RealtimeTableDataManager.class);
     private final ConsumerCoordinator _coordinator;
 
     ReadinessFixture() {
       this(false, false);
     }
 
+    /// Uses a permit wait interval long enough that no permit wait is reported during a test.
     ReadinessFixture(boolean enforceConsumptionInOrder, boolean requiresHistory) {
-      ServerMetrics metrics = mock(ServerMetrics.class);
+      this(enforceConsumptionInOrder, requiresHistory, TimeUnit.HOURS.toMillis(1));
+    }
+
+    ReadinessFixture(boolean enforceConsumptionInOrder, boolean requiresHistory, long permitWaitIntervalMs) {
       doAnswer(invocation -> {
         Supplier<Long> value = invocation.getArgument(3);
         long waiters = value.get();
         assertTrue(waiters > 0, "An idle readiness gauge must be removed instead of publishing zero");
         _gaugeUpdates.add(waiters);
         return null;
-      }).when(metrics).setOrUpdatePartitionGauge(eq("tableTest_REALTIME"), eq(1),
+      }).when(_metrics).setOrUpdatePartitionGauge(eq("tableTest_REALTIME"), eq(1),
           eq(ServerGauge.CONSUMERS_WAITING_FOR_READINESS), any());
       doAnswer(invocation -> {
         _gaugeUpdates.add(0L);
         return null;
-      }).when(metrics).removePartitionGauge("tableTest_REALTIME", 1, ServerGauge.CONSUMERS_WAITING_FOR_READINESS);
-      RealtimeTableDataManager table = mock(RealtimeTableDataManager.class);
-      when(table.getTableName()).thenReturn("tableTest_REALTIME");
-      when(table.requiresHistoryForConsumption()).thenReturn(requiresHistory);
+      }).when(_metrics).removePartitionGauge("tableTest_REALTIME", 1, ServerGauge.CONSUMERS_WAITING_FOR_READINESS);
+      when(_table.getTableName()).thenReturn("tableTest_REALTIME");
+      when(_table.requiresHistoryForConsumption()).thenReturn(requiresHistory);
       try (MockedStatic<ServerMetrics> factory = mockStatic(ServerMetrics.class)) {
-        factory.when(ServerMetrics::get).thenReturn(metrics);
-        _coordinator = new ConsumerCoordinator(enforceConsumptionInOrder, table);
+        factory.when(ServerMetrics::get).thenReturn(_metrics);
+        _coordinator = new ConsumerCoordinator(enforceConsumptionInOrder, _table) {
+          @Override
+          long getPermitWaitIntervalMs() {
+            return permitWaitIntervalMs;
+          }
+        };
       }
     }
 
@@ -679,11 +724,13 @@ public class ConsumerCoordinatorTest {
       return new ReadinessWaiter(result, thread);
     }
 
-    void assertGauge(long count) throws InterruptedException {
+    void assertGauge(long count)
+        throws InterruptedException {
       assertEquals(_gaugeUpdates.poll(2, TimeUnit.SECONDS), Long.valueOf(count));
     }
 
-    void assertAcquiredAndRelease(ReadinessWaiter waiter) throws Exception {
+    void assertAcquiredAndRelease(ReadinessWaiter waiter)
+        throws Exception {
       assertTrue(waiter.result().get(2, TimeUnit.SECONDS));
       assertEquals(_coordinator.getSemaphore().availablePermits(), 0);
       _coordinator.release();
@@ -695,7 +742,8 @@ public class ConsumerCoordinatorTest {
     }
 
     @Override
-    public void close() throws InterruptedException {
+    public void close()
+        throws InterruptedException {
       for (Thread thread : _threads) {
         thread.interrupt();
         thread.join(2000);

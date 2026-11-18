@@ -80,14 +80,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockConstruction;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -112,7 +105,8 @@ public class RealtimeTableReadinessTest {
       .setPrimaryKeyColumns(List.of(KEY)).build();
 
   @Test
-  public void testRebalanceWaitsForMissingBaseBeforePartialUpsert() throws Exception {
+  public void testRebalanceWaitsForMissingBaseBeforePartialUpsert()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       // The server already consumed another partition before this rebalance assigned partition 1.
       LLCSegmentName existing = name(0, 0);
@@ -142,7 +136,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testEachConsumerRechecksAlreadyLoadedPartition() throws Exception {
+  public void testEachConsumerRechecksAlreadyLoadedPartition()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName n1 = name(0, 1);
       LLCSegmentName n2 = name(0, 2);
@@ -162,7 +157,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testReleasedPredecessorDoesNotHideOlderMissingSegment() throws Exception {
+  public void testReleasedPredecessorDoesNotHideOlderMissingSegment()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName n1 = name(0, 1);
       LLCSegmentName n2 = name(0, 2);
@@ -184,7 +180,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testServerReadinessDoesNotCacheSegmentReadiness() throws Exception {
+  public void testServerReadinessDoesNotCacheSegmentReadiness()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName consumer = name(0, 2);
       table.assign(consumer, CONSUMING);
@@ -203,7 +200,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testWaitingConsumersShareSnapshotReads() throws Exception {
+  public void testWaitingConsumersShareSnapshotReads()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       List<BooleanSupplier> consumers = new ArrayList<>();
       for (int partition = 0; partition < 64; partition++) {
@@ -225,7 +223,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testCachedSuccessRechecksNewHistory() throws Exception {
+  public void testCachedSuccessRechecksNewHistory()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName consumer = name(0, 2);
       table.assign(consumer, CONSUMING);
@@ -241,7 +240,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testCachedSuccessRechecksCustomSegmentPartitionMetadata() throws Exception {
+  public void testCachedSuccessRechecksCustomSegmentPartitionMetadata()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL);
         MockedStatic<ZKMetadataProvider> metadata = mockStatic(ZKMetadataProvider.class)) {
       LLCSegmentName base = name(0, 1);
@@ -276,7 +276,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testReadyCustomHistoryDoesNotReadPartitionMetadata() throws Exception {
+  public void testReadyCustomHistoryDoesNotReadPartitionMetadata()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL);
         MockedStatic<ZKMetadataProvider> metadata = mockStatic(ZKMetadataProvider.class)) {
       LLCSegmentName consumer = name(0, 1);
@@ -307,7 +308,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testNewConsumerRefreshesOlderSnapshot() throws Exception {
+  public void testNewConsumerRefreshesOlderSnapshot()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName first = name(0, 0);
       table.assign(first, CONSUMING);
@@ -324,7 +326,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testLocalMetadataCompletionClearsCachedRejection() throws Exception {
+  public void testLocalMetadataCompletionClearsCachedRejection()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName base = name(0, 1);
       LLCSegmentName consumer = name(0, 2);
@@ -347,7 +350,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testReadyImmutablePredecessorDoesNotHideOlderHistory() throws Exception {
+  public void testReadyImmutablePredecessorDoesNotHideOlderHistory()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName base = name(0, 0);
       LLCSegmentName predecessor = name(0, 1);
@@ -373,7 +377,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test(dataProvider = "readinessReads")
-  public void testReadinessRetriesTransientZooKeeperFailure(PropertyKey key) throws Exception {
+  public void testReadinessRetriesTransientZooKeeperFailure(PropertyKey key)
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL)) {
       LLCSegmentName base = name(0, 1);
       LLCSegmentName consumer = name(0, 2);
@@ -392,7 +397,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testReadinessRetriesTransientSegmentMetadataFailure() throws Exception {
+  public void testReadinessRetriesTransientSegmentMetadataFailure()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.PARTIAL);
         MockedStatic<ZKMetadataProvider> metadata = mockStatic(ZKMetadataProvider.class)) {
       LLCSegmentName consumer = name(0, 1);
@@ -414,7 +420,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test
-  public void testDedupWaitsForHistoricalSegments() throws Exception {
+  public void testDedupWaitsForHistoricalSegments()
+      throws Exception {
     try (Fixture table = new Fixture(UpsertConfig.Mode.NONE, true)) {
       LLCSegmentName base = name(0, 1);
       LLCSegmentName consumer = name(0, 2);
@@ -441,7 +448,8 @@ public class RealtimeTableReadinessTest {
 
   @Test(dataProvider = "fullUpsertHistoryModes")
   public void testFullUpsertHistoryRequirement(boolean dropOutOfOrder, ConsistencyMode consistencyMode,
-      boolean enforceConsumptionInOrder) throws Exception {
+      boolean enforceConsumptionInOrder)
+      throws Exception {
     UpsertConfig upsert = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsert.setConsistencyMode(consistencyMode);
     if (dropOutOfOrder) {
@@ -474,7 +482,8 @@ public class RealtimeTableReadinessTest {
   }
 
   @Test(dataProvider = "independentModes")
-  public void testOtherModesDoNotWaitForHistoricalSegments(UpsertConfig.Mode mode) throws Exception {
+  public void testOtherModesDoNotWaitForHistoricalSegments(UpsertConfig.Mode mode)
+      throws Exception {
     try (Fixture table = new Fixture(mode)) {
       table.assign(name(0, 1), ONLINE);
       LLCSegmentName consumer = name(0, 2);
@@ -520,23 +529,28 @@ public class RealtimeTableReadinessTest {
     private final List<IndexSegment> _segments = new ArrayList<>();
     private long _nowNs = TimeUnit.SECONDS.toNanos(1);
 
-    Fixture(UpsertConfig.Mode mode) throws Exception {
+    Fixture(UpsertConfig.Mode mode)
+        throws Exception {
       this(mode, false);
     }
 
-    Fixture(UpsertConfig.Mode mode, boolean dedup) throws Exception {
+    Fixture(UpsertConfig.Mode mode, boolean dedup)
+        throws Exception {
       this(mode, dedup, new AtomicBoolean(true));
     }
 
-    Fixture(UpsertConfig.Mode mode, boolean dedup, AtomicBoolean serverReady) throws Exception {
+    Fixture(UpsertConfig.Mode mode, boolean dedup, AtomicBoolean serverReady)
+        throws Exception {
       this(new UpsertConfig(mode), dedup, serverReady);
     }
 
-    Fixture(UpsertConfig upsert) throws Exception {
+    Fixture(UpsertConfig upsert)
+        throws Exception {
       this(upsert, false, new AtomicBoolean(true));
     }
 
-    Fixture(UpsertConfig upsert, boolean dedup, AtomicBoolean serverReady) throws Exception {
+    Fixture(UpsertConfig upsert, boolean dedup, AtomicBoolean serverReady)
+        throws Exception {
       super(null, serverReady::get, () -> true,
           ServerIngestionOomProtectionManager.createServerThrottleState(null, ServerMetrics.get()));
       _serverReady = serverReady;
@@ -615,7 +629,8 @@ public class RealtimeTableReadinessTest {
       _segmentDataManagerMap.remove(name.getSegmentName());
     }
 
-    void load(LLCSegmentName name, GenericRow row) throws Exception {
+    void load(LLCSegmentName name, GenericRow row)
+        throws Exception {
       File output = new File(_directory, "built");
       FileUtils.forceMkdir(output);
       SegmentGeneratorConfig config = new SegmentGeneratorConfig(_config, SCHEMA);
@@ -632,7 +647,8 @@ public class RealtimeTableReadinessTest {
       publishState(name.getSegmentName(), ONLINE);
     }
 
-    void consume(LLCSegmentName name, GenericRow row) throws Exception {
+    void consume(LLCSegmentName name, GenericRow row)
+        throws Exception {
       RealtimeSegmentStatsHistory stats = mock(RealtimeSegmentStatsHistory.class);
       when(stats.getEstimatedCardinality(anyString())).thenReturn(10);
       when(stats.getEstimatedAvgColSize(anyString())).thenReturn(16);
@@ -651,7 +667,8 @@ public class RealtimeTableReadinessTest {
       segment.index(row.copy(), null);
     }
 
-    Map<String, Long> queryRows() throws IOException {
+    Map<String, Long> queryRows()
+        throws IOException {
       Map<String, Long> rows = new TreeMap<>();
       for (IndexSegment segment : _segments) {
         try (PinotSegmentColumnReader keys = new PinotSegmentColumnReader(segment, KEY);
@@ -666,7 +683,8 @@ public class RealtimeTableReadinessTest {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
       try {
         if (_tableUpsertMetadataManager != null) {
           _tableUpsertMetadataManager.stop();

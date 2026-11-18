@@ -1259,17 +1259,20 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test(timeOut = 20_000)
-  public void testLocalReleaseBetweenReadinessCheckAndWaitStartsSuccessor() throws Exception {
+  public void testLocalReleaseBetweenReadinessCheckAndWaitStartsSuccessor()
+      throws Exception {
     assertStartupAfterLocalRelease(true, false);
   }
 
   @Test(timeOut = 20_000)
-  public void testLocalReleaseWakesWaitingSuccessor() throws Exception {
+  public void testLocalReleaseWakesWaitingSuccessor()
+      throws Exception {
     assertStartupAfterLocalRelease(false, false);
   }
 
   @Test(timeOut = 20_000)
-  public void testLocalReleaseDoesNotBypassMissingHistory() throws Exception {
+  public void testLocalReleaseDoesNotBypassMissingHistory()
+      throws Exception {
     assertStartupAfterLocalRelease(false, true);
   }
 
@@ -1279,7 +1282,8 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test(dataProvider = "ordinaryRolloverHistory", timeOut = 20_000)
-  public void testOrdinaryRolloverWakesSuccessorBeforeCurrentStatePublication(boolean missingHistory) throws Exception {
+  public void testOrdinaryRolloverWakesSuccessorBeforeCurrentStatePublication(boolean missingHistory)
+      throws Exception {
     Map<Integer, ConsumerCoordinator> coordinators = new HashMap<>();
     TableConfig config = createTableConfigWithStreamIngestion(false, ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
     LLCSegmentName predecessorName =
@@ -1290,11 +1294,11 @@ public class RealtimeSegmentDataManagerTest {
     when(immutable.getSegmentName()).thenReturn(predecessorName.getSegmentName());
     ImmutableSegmentDataManager replacement = new ImmutableSegmentDataManager(immutable);
     BooleanSupplier ready = table.createReadyToConsumeDataSupplier(SEGMENT_NAME);
-    CountDownLatch firstCheck = new CountDownLatch(1);
+    AtomicInteger readinessChecks = new AtomicInteger();
     CountDownLatch checkedReplacement = new CountDownLatch(1);
     BooleanSupplier observedReady = () -> {
       boolean result = ready.getAsBoolean();
-      firstCheck.countDown();
+      readinessChecks.incrementAndGet();
       if (replacement.isPartitionMetadataInitialized()) {
         checkedReplacement.countDown();
       }
@@ -1312,8 +1316,8 @@ public class RealtimeSegmentDataManagerTest {
       Thread consumerThread = new Thread(successor.createPartitionConsumer(), "ordinary-rollover-readiness");
       try {
         consumerThread.start();
-        assertTrue(firstCheck.await(10, TimeUnit.SECONDS), "Successor never checked readiness");
         awaitStartupWait(consumerThread);
+        assertEquals(readinessChecks.get(), 0, "Readiness must not be checked while the predecessor holds the permit");
 
         // Real Base replacement marks and publishes the immutable manager before real predecessor offload releases
         // the permit. Helix deliberately continues to report CONSUMING throughout the handoff.
@@ -1344,17 +1348,22 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  private void assertStartupAfterLocalRelease(boolean releaseBeforeWait, boolean missingHistory) throws Exception {
+  private void assertStartupAfterLocalRelease(boolean releaseBeforeWait, boolean missingHistory)
+      throws Exception {
     Map<Integer, ConsumerCoordinator> coordinators = new HashMap<>();
+    AtomicInteger readinessChecks = new AtomicInteger();
     CountDownLatch firstCheck = new CountDownLatch(1);
     CountDownLatch finishFirstCheck = new CountDownLatch(releaseBeforeWait ? 1 : 0);
     CountDownLatch recheckedAfterRelease = new CountDownLatch(1);
     try (FakeRealtimeSegmentDataManager predecessor =
         createStartupSegmentManager(SEQUENCE_ID - 1, coordinators, () -> true)) {
       ConsumerCoordinator coordinator = coordinators.get(PARTITION_GROUP_ID);
-      assertTrue(coordinator.getSemaphore().tryAcquire());
-      predecessor.getConsumerSemaphoreAcquired().set(true);
+      if (!releaseBeforeWait) {
+        assertTrue(coordinator.getSemaphore().tryAcquire());
+        predecessor.getConsumerSemaphoreAcquired().set(true);
+      }
       BooleanSupplier ready = () -> {
+        readinessChecks.incrementAndGet();
         boolean released = predecessor.hasReleasedConsumerSemaphore();
         if (released) {
           recheckedAfterRelease.countDown();
@@ -1374,11 +1383,17 @@ public class RealtimeSegmentDataManagerTest {
         Thread consumerThread = new Thread(successor.createPartitionConsumer(), "successor-readiness");
         try {
           consumerThread.start();
-          assertTrue(firstCheck.await(10, TimeUnit.SECONDS), "Successor never checked readiness");
-          if (!releaseBeforeWait) {
+          if (releaseBeforeWait) {
+            // The permit is free, so the successor checks readiness. Keep that false result until the predecessor has
+            // taken and released the permit, forcing the check-to-wait race.
+            assertTrue(firstCheck.await(10, TimeUnit.SECONDS), "Successor never checked readiness");
+            assertTrue(coordinator.getSemaphore().tryAcquire());
+            predecessor.getConsumerSemaphoreAcquired().set(true);
+          } else {
             awaitStartupWait(consumerThread);
+            assertEquals(readinessChecks.get(), 0,
+                "Readiness must not be checked while the predecessor holds the permit");
           }
-          // Keep the first false result until the release has completed, forcing the check-to-wait race.
           predecessor.closeStreamConsumerAndReleaseSemaphore();
           finishFirstCheck.countDown();
           if (missingHistory) {
@@ -1417,12 +1432,14 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   private FakeRealtimeSegmentDataManager createStartupSegmentManager(int sequence,
-      Map<Integer, ConsumerCoordinator> coordinators, BooleanSupplier ready) throws Exception {
+      Map<Integer, ConsumerCoordinator> coordinators, BooleanSupplier ready)
+      throws Exception {
     return createStartupSegmentManager(sequence, coordinators, ready, createTableConfig());
   }
 
   private FakeRealtimeSegmentDataManager createStartupSegmentManager(int sequence,
-      Map<Integer, ConsumerCoordinator> coordinators, BooleanSupplier ready, TableConfig tableConfig) throws Exception {
+      Map<Integer, ConsumerCoordinator> coordinators, BooleanSupplier ready, TableConfig tableConfig)
+      throws Exception {
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     coordinators.computeIfAbsent(PARTITION_GROUP_ID, ignored -> new ConsumerCoordinator(false, tableDataManager));
     LLCSegmentName name = new LLCSegmentName(RAW_TABLE_NAME, PARTITION_GROUP_ID, sequence, SEG_TIME_MS);
