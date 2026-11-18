@@ -3084,8 +3084,9 @@ public class CommonConstants {
     /// mailbox that nothing reads. When the wrong instance rejects the request, the sender resets the connection and
     /// the query fails with a clear error, in most cases at once rather than at its deadline.
     ///
-    /// Requests without the headers, as sent by older versions, are always accepted. The value is read when the
-    /// instance starts, on brokers and servers.
+    /// An instance checks requests against its Helix instance id, which is the id that plans address it by. Requests
+    /// without the headers, as sent by older versions, are always accepted. The value is read when the instance starts,
+    /// on brokers and servers.
     public static final String KEY_OF_REJECT_MISROUTED_REQUESTS = "pinot.query.runner.reject.misrouted.requests";
     public static final boolean DEFAULT_REJECT_MISROUTED_REQUESTS = true;
 

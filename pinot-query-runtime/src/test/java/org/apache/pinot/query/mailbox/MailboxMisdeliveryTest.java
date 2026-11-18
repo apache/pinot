@@ -175,6 +175,56 @@ public class MailboxMisdeliveryTest {
     assertReceivesBlockAndEos(swap._restartedServerA, nextMailboxId);
   }
 
+  /// While DNS still returns the address that B took over, the stream that tells A about the error reaches B too. B
+  /// rejects it as well, so A hears nothing and waits until the query deadline, as without the check, while the sender
+  /// still fails its stage. Once DNS returns A's new address, a later rejection refreshes the channel again (at most
+  /// once a second), and the streams after it reach A.
+  @Test
+  public void testErrorForReceiverIsRejectedWhileDnsIsStale()
+      throws Exception {
+    Swap swap = swapAddresses(true);
+    _dns.map(SERVER_A, _addressX.getPort());
+    long rejectedBefore = meterCount(ServerMeter.MULTI_STAGE_MISROUTED_REQUESTS_REJECTED);
+    long rejectedByPeerBefore = meterCount(ServerMeter.MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER);
+
+    String mailboxId = nextMailboxId();
+    ReceivingMailbox atA = readMailbox(swap._restartedServerA, mailboxId);
+    SendingMailbox sendingMailbox = getSendingMailbox(swap._sender, mailboxId, SERVER_A_ID_HASH);
+    try {
+      sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"row"}));
+    } catch (QueryException e) {
+      // The rejection can arrive before the first send returns
+      assertEquals(e.getErrorCode(), QueryErrorCode.SERVER_NOT_RESPONDING);
+    }
+
+    // B rejects the data stream and then the stream with the error for A, and the sender counts both rejections
+    TestUtils.waitForCondition(
+        aVoid -> meterCount(ServerMeter.MULTI_STAGE_MISROUTED_REQUESTS_REJECTED) == rejectedBefore + 2
+            && meterCount(ServerMeter.MULTI_STAGE_MISROUTED_REQUESTS_REJECTED_BY_PEER) == rejectedByPeerBefore + 2,
+        10_000L, "Server B did not reject the stream with the error for server A");
+    assertNull(atA.poll(), "Server A received a block although every stream reached server B");
+    assertNull(swap._serverB.getReceivingMailboxIfPresent(mailboxId));
+    QueryException e = expectThrows(QueryException.class,
+        () -> sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{"row"})));
+    assertEquals(e.getErrorCode(), QueryErrorCode.SERVER_NOT_RESPONDING);
+
+    _dns.map(SERVER_A, swap._restartedServerA.getPort());
+    List<String> sentMailboxIds = new ArrayList<>();
+    TestUtils.waitForCondition(aVoid -> {
+      String nextMailboxId = nextMailboxId();
+      sentMailboxIds.add(nextMailboxId);
+      try {
+        sendBlockAndEos(swap._sender, nextMailboxId, SERVER_A_ID_HASH);
+      } catch (Exception ignored) {
+        // Rejected by B, which refreshes the channel if the last refresh is more than a second ago
+      }
+      return sentMailboxIds.stream().anyMatch(id -> {
+        ReceivingMailbox atRestartedA = swap._restartedServerA.getReceivingMailboxIfPresent(id);
+        return atRestartedA != null && atRestartedA.getNumPendingBlocks() > 0;
+      });
+    }, 100L, 15_000L, "No stream reached server A after DNS returned its new address");
+  }
+
   /// With the check disabled on the receiver, it accepts any stream, as before.
   @Test
   public void testRejectionCanBeDisabled()

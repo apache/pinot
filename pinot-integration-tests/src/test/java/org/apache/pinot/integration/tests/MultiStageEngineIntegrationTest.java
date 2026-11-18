@@ -396,7 +396,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static void assertMisroutedTo(Throwable t, String receiverInstanceId) {
     String misroutedTo = ReceiverIdentity.getMisroutedTo(t);
     assertNotNull(misroutedTo, "Not a rejection of a request meant for another instance: " + t);
-    assertEquals(misroutedTo.split(" ")[0], receiverInstanceId);
+    assertTrue(misroutedTo.startsWith(receiverInstanceId + " "), misroutedTo);
   }
 
   /// The proto segment list encoding ships disabled, so a query uses the legacy JSON encoding until an operator turns

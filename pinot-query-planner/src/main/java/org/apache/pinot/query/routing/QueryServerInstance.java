@@ -80,6 +80,8 @@ public class QueryServerInstance {
     return _instanceIdHash;
   }
 
+  /// Two instances are equal if they have the same hostname and ports, whatever their instance ids (and hashes): plans
+  /// group workers by the address they run at. Do not use this class as a key that must tell instance ids apart.
   @Override
   public boolean equals(Object o) {
     if (this == o) {
