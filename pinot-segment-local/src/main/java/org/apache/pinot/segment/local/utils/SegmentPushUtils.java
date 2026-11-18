@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
@@ -699,8 +700,7 @@ public class SegmentPushUtils implements Serializable {
         }
       }
 
-      URI uri = outputDirURI != null && "file".equals(outputDirURI.getScheme()) && new File(file).isAbsolute()
-          ? new File(file).toURI() : URI.create(file);
+      URI uri = toFileURI(outputDirURI, file);
       if (uri.getPath().endsWith(Constants.METADATA_TAR_GZ_FILE_EXT)) {
         // Skip segment metadata tar gz files
         continue;
@@ -716,6 +716,13 @@ public class SegmentPushUtils implements Serializable {
           pushSpec.getPushFileNamePattern());
     }
     return segmentUriToTarPathMap;
+  }
+
+  /// Converts a path returned by [PinotFS#listFiles(URI, boolean)] to a URI. [LocalPinotFS] returns absolute local
+  /// paths, which can contain characters such as space or `#` that are not valid in a URI.
+  private static URI toFileURI(@Nullable URI outputDirURI, String file) {
+    return outputDirURI != null && "file".equals(outputDirURI.getScheme()) && new File(file).isAbsolute()
+        ? new File(file).toURI() : URI.create(file);
   }
 
   /// Segments stored in the deep store, e.g. committed REALTIME segments, have no archive extension. The compression
@@ -750,7 +757,7 @@ public class SegmentPushUtils implements Serializable {
     } catch (UnsupportedOperationException e) {
       List<String> files = new ArrayList<>();
       for (String file : outputDirFS.listFiles(outputDirURI, true)) {
-        if (!isSegmentFileWithoutExtension(file) || !outputDirFS.isDirectory(URI.create(file))) {
+        if (!isSegmentFileWithoutExtension(file) || !outputDirFS.isDirectory(toFileURI(outputDirURI, file))) {
           files.add(file);
         }
       }

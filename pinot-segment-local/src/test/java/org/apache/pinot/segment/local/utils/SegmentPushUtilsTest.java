@@ -699,20 +699,20 @@ public class SegmentPushUtilsTest {
   @Test
   public void testListFilesWithoutFileMetadata()
       throws IOException {
-    File segmentDir = new File(_tempDir, "myTable__0__0__20260601T1557Z");
-    assertTrue(segmentDir.mkdir());
+    // LocalPinotFS.listFiles() returns absolute local paths, which are not valid URIs with a space or '#'
+    File outputDir = new File(_tempDir, "my data #1");
+    File segmentDir = new File(outputDir, "myTable__0__0__20260601T1557Z");
+    assertTrue(segmentDir.mkdirs());
     File segment = new File(segmentDir, "myTable__0__1__20260602T1557Z");
     assertTrue(segment.createNewFile());
-    File segmentArchive = new File(_tempDir, "myTable_offline.tar.gz");
+    File segmentArchive = new File(outputDir, "myTable_offline.tar.gz");
     assertTrue(segmentArchive.createNewFile());
     PinotFS fileSystem = spy(new LocalPinotFS());
     Mockito.doThrow(new UnsupportedOperationException()).when(fileSystem)
         .listFilesWithMetadata(any(URI.class), Mockito.anyBoolean());
-    Mockito.doReturn(new String[]{
-        segmentDir.toURI().toString(), segment.toURI().toString(), segmentArchive.toURI().toString()
-    }).when(fileSystem).listFiles(any(URI.class), Mockito.anyBoolean());
-    assertEquals(SegmentPushUtils.listFiles(fileSystem, _tempDir.toURI()),
-        new String[]{segment.toURI().toString(), segmentArchive.toURI().toString()});
+    String[] files = SegmentPushUtils.listFiles(fileSystem, outputDir.toURI());
+    Arrays.sort(files);
+    assertEquals(files, new String[]{segment.getAbsolutePath(), segmentArchive.getAbsolutePath()});
   }
 
   @Test(dataProvider = "segmentTarExtensions")
