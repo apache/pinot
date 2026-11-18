@@ -1324,10 +1324,11 @@ public final class TableConfigUtils {
         policy != null ? "parallelSegmentConsumptionPolicy " + policy : "allowPartialUpsertConsumptionDuringCommit");
   }
 
-  /// Rejects partial upsert and `dropOutOfOrderRecord` on a new pauseless table. A pauseless segment is committed
-  /// before it is built, so a failed build is repaired by consuming its offsets again, and for these modes that second
-  /// pass can produce different rows: a partial upsert merge and an out-of-order drop both depend on the upsert
-  /// metadata at the time each record arrives.
+  /// Rejects partial upsert and out-of-order record handling (`dropOutOfOrderRecord` or `outOfOrderRecordColumn`) on a
+  /// new pauseless table. A pauseless segment is committed before it is built, so a failed build is repaired by
+  /// consuming its offsets again, and for these modes that second pass can produce different rows: a partial upsert
+  /// merge, and whether a record is dropped or marked out of order, depend on the upsert metadata at the time each
+  /// record arrives.
   ///
   /// An update is not checked here. One that turns the combination on is a backward compatibility violation (see
   /// [#validateBackwardCompatibility]), so `force=true` can apply it, and one that keeps it is allowed.
@@ -1341,18 +1342,20 @@ public final class TableConfigUtils {
         "Partial upsert cannot be used with pauseless consumption. If a segment is recovered after a failure, "
             + "merged values can change. Set upsertConfig.mode to FULL or "
             + "ingestionConfig.streamIngestionConfig.pauselessConsumptionEnabled to false");
-    Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord(),
-        "dropOutOfOrderRecord cannot be used with pauseless consumption. If a segment is recovered after a "
-            + "failure, different records can be dropped. Set upsertConfig.dropOutOfOrderRecord or "
+    Preconditions.checkState(!upsertConfig.isDropOutOfOrderRecord() && upsertConfig.getOutOfOrderRecordColumn() == null,
+        "dropOutOfOrderRecord and outOfOrderRecordColumn cannot be used with pauseless consumption. If a segment is "
+            + "recovered after a failure, different records can be dropped or marked out of order. Set "
+            + "upsertConfig.dropOutOfOrderRecord to false or remove upsertConfig.outOfOrderRecordColumn, or set "
             + "ingestionConfig.streamIngestionConfig.pauselessConsumptionEnabled to false");
   }
 
-  /// Returns whether the table is pauseless and uses partial upsert or `dropOutOfOrderRecord`, see
-  /// [#validatePauselessUpsertModes].
+  /// Returns whether the table is pauseless and uses partial upsert, `dropOutOfOrderRecord` or
+  /// `outOfOrderRecordColumn`, see [#validatePauselessUpsertModes].
   private static boolean hasPauselessUnsafeUpsertMode(TableConfig tableConfig) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     return upsertConfig != null && PauselessConsumptionUtils.isPauselessEnabled(tableConfig) && (
-        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL || upsertConfig.isDropOutOfOrderRecord());
+        upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL || upsertConfig.isDropOutOfOrderRecord()
+            || upsertConfig.getOutOfOrderRecordColumn() != null);
   }
 
   /// Checks if a data type is valid for time-based comparison operations (upsert/dedup).
@@ -1791,7 +1794,8 @@ public final class TableConfigUtils {
   /// Validates that critical upsert configuration fields are not changed during table config update.
   /// Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
   /// deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn, and that the update does not turn on partial
-  /// upsert or dropOutOfOrderRecord on a pauseless table, by any of those settings or by adding the upsert config.
+  /// upsert, dropOutOfOrderRecord or outOfOrderRecordColumn on a pauseless table, by any of those settings or by adding
+  /// the upsert config.
   ///
   /// Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
   /// not validated here — they may be added, removed, or changed on existing tables.
@@ -1801,10 +1805,11 @@ public final class TableConfigUtils {
   /// @param violations list to collect violation messages
   private static void validateUpsertConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
       List<String> violations) {
-    // When the mode or dropOutOfOrderRecord changes, this adds to that field's violation and says why it is unsafe
+    // When one of these upsert settings changes, this adds to that field's violation and says why it is unsafe
     if (hasPauselessUnsafeUpsertMode(newConfig) && !hasPauselessUnsafeUpsertMode(existingConfig)) {
-      violations.add("pauseless consumption with partial upsert or dropOutOfOrderRecord (merged values or dropped "
-          + "records can change when a segment is recovered after a failure)");
+      violations.add("pauseless consumption with partial upsert, dropOutOfOrderRecord or outOfOrderRecordColumn "
+          + "(merged values, or which records are dropped or marked out of order, can change when a segment is "
+          + "recovered after a failure)");
     }
     boolean existingUpsertEnabled = existingConfig.isUpsertEnabled();
     boolean newUpsertEnabled = newConfig.isUpsertEnabled();
