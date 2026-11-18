@@ -45,6 +45,7 @@ logCount=1
 cmdName=`basename $0`
 source "$(dirname "${BASH_SOURCE[0]}")/utils.inc"
 source "$(dirname "${BASH_SOURCE[0]}")/server-readiness.inc"
+source "$(dirname "${BASH_SOURCE[0]}")/server-startup.inc"
 # Resolve this before changing directory to a distribution's bin directory.
 COMPAT_SERVER_LOG4J_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/server-log4j2.xml"
 
@@ -195,6 +196,7 @@ function startServerWithLogs() {
     export LOG4J_CONFIGURATION_FILE="$COMPAT_SERVER_LOG4J_CONFIG"
     export LOG_ROOT="$serverLogDir"
     export PINOT_COMPONENT="$serviceName"
+    export CLASSPATH_PREFIX="${COMPAT_SERVER_STARTUP_CLASSES}${CLASSPATH_PREFIX:+:$CLASSPATH_PREFIX}"
     if [ -f "$configFile" ]; then
       exec "$launcher" StartServer -configFileName "$configFile"
     else
@@ -229,7 +231,10 @@ function startService() {
     ./pinot-admin.sh StartBroker ${configFileArg} 1>${LOG_DIR}/broker.${logCount}.log 2>&1 &
     echo $! >${PID_DIR}/broker.pid
   elif [ "$serviceName" = "server" ] || [ "$serviceName" = "server2" ]; then
-    startServerWithLogs "$serviceName" "$PWD/pinot-admin.sh" "$3"
+    local serverLauncher
+    serverLauncher=$(prepareCompatibilityServerLauncher "$PWD/pinot-admin.sh") \
+        || abortCompatibilityCheck "Cannot prepare compatibility launcher for $serviceName"
+    startServerWithLogs "$serviceName" "$serverLauncher" "$3"
   elif [ "$serviceName" = "kafka" ]; then
     startKafkaService
   fi
@@ -545,6 +550,7 @@ oldTargetDir="$workingDir"/oldTargetDir
 newTargetDir="$workingDir"/newTargetDir
 
 setupCompatTester
+setupCompatibilityServerStartup "$workingDir" || { echo "Cannot compile compatibility server bootstrap"; exit 1; }
 
 # check that the default ports are open
 if ! checkPortAvailable ${SERVER_ADMIN_PORT} || ! checkPortAvailable ${SERVER_NETTY_PORT} || ! checkPortAvailable ${SERVER_GRPC_PORT} ||

@@ -57,6 +57,7 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.lucene.index.IndexWriter;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
@@ -662,6 +663,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Starting Pinot server (Version: {})", PinotVersion.VERSION);
     LOGGER.info("Server configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
+
+    // Initialize Lucene on the startup thread before Helix can load existing indexes and create realtime indexes
+    // concurrently. Lucene 9.x has a class initialization cycle between IndexWriter, TestSecrets, and
+    // ConcurrentMergeScheduler: https://github.com/apache/lucene/issues/12419.
+    Class.forName(IndexWriter.class.getName());
 
     // Load the index plugins before joining the cluster, so that an invalid plugin set (for example more than
     // IndexService.MAX_INDEX_TYPES index types) fails server startup instead of every later segment load.
