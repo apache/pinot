@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -62,15 +63,14 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
   @Nullable
   private ImmutableRoaringBitmap _rowFilterDocIds;
 
-  /// @param rowFilterOperator the operator of the RLS filter. It must not be empty or match all documents.
+  /// @param rowFilterOperator the operator of the RLS filter. It must not be known empty.
   /// @param userFilterOperator the operator of the WHERE clause. It must not be empty.
   /// @param validDocIds the valid-document snapshot of the segment, or `null` when the segment has none
   /// @param numDocs the number of documents that the plan read
   public RowLevelSecurityFilterOperator(BaseFilterOperator rowFilterOperator, BaseFilterOperator userFilterOperator,
       @Nullable ImmutableRoaringBitmap validDocIds, QueryContext queryContext, int numDocs) {
     super(numDocs, false);
-    assert !rowFilterOperator.isResultEmpty() && !rowFilterOperator.isResultMatchingAll()
-        && !userFilterOperator.isResultEmpty();
+    assert !rowFilterOperator.isResultEmpty() && !userFilterOperator.isResultEmpty();
     _rowFilterOperator = rowFilterOperator;
     _userFilterOperator = userFilterOperator;
     _validDocIds = validDocIds;
@@ -119,10 +119,12 @@ public class RowLevelSecurityFilterOperator extends BaseFilterOperator {
           scanCost.addEntriesScannedInFilter(numEntriesScanned);
         }
       }
-      assert docIds != null : "The RLS filter operator must not match all documents";
       // A mutable index can hold documents added after the plan read the number of documents. The rest of the plan
       // does not see them, so neither does the RLS filter.
-      if (!docIds.isEmpty() && docIds.last() >= _numDocs) {
+      if (docIds == null) {
+        Preconditions.checkState(_rowFilterOperator.isResultMatchingAll(), "Missing row filter bitmap");
+        docIds = MutableRoaringBitmap.bitmapOfRange(0, _numDocs);
+      } else if (!docIds.isEmpty() && docIds.last() >= _numDocs) {
         MutableRoaringBitmap bounded = docIds.toMutableRoaringBitmap();
         bounded.remove(_numDocs, Integer.toUnsignedLong(docIds.last()) + 1);
         docIds = bounded;

@@ -1694,20 +1694,19 @@ public class CommonConstants {
     /// How an AND pushes the document ids it has matched so far into its other children.
     ///
     /// A query with a row-level security filter always pushes the restriction down: for it, `NEVER` behaves as
-    /// `AUTO`.
+    /// `AUTO`, and only a supported single WHERE predicate can stream.
     public enum AndRestrictionPushdownMode {
       /// Always push the restriction down eagerly: every step materializes its result. Fastest for a query that reads
       /// every matching document.
       ALWAYS,
       /// Never push the restriction down, keeping the behavior Pinot had before the push-down existed.
       NEVER,
-      /// Push the restriction down eagerly for aggregation and group-by queries, which read every matching document,
-      /// and as a stream for selection queries without ORDER BY, which stop at their LIMIT. Do not push it down for
-      /// the other queries.
+      /// Push the restriction down eagerly for aggregation and group-by queries with a positive LIMIT. Other queries
+      /// without row-level security run with push-down off.
       AUTO,
-      /// Always push the restriction down as a stream: the scans are evaluated lazily, one chunk of candidate documents
-      /// at a time, so a query that stops at its LIMIT only pays for the chunks it reads. A server that predates this
-      /// value rejects a query that sets it.
+      /// Push the restriction down as a stream for eligible unordered finite LIMIT selections whose operators close
+      /// their readers at LIMIT, and eagerly for other queries.
+      /// A server that predates this value rejects a query that sets it.
       STREAMING
     }
 

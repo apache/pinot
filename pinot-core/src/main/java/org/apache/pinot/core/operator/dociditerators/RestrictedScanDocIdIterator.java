@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
@@ -47,8 +48,7 @@ import org.roaringbitmap.PeekableIntIterator;
 /// drains reaches the batch size of the eager path. An [#advance] that skips candidates resets the chunk to
 /// [#MIN_CHUNK_SIZE]: after a skip, the consumer only needs the documents near the target.
 ///
-/// The iterator closes the scans when it reaches the end of the candidates, like the scans do on their own. Not
-/// thread-safe.
+/// The iterator closes the scans on exhaustion or failure. A consumer that stops early must close it. Not thread-safe.
 public final class RestrictedScanDocIdIterator implements BlockDocIdIterator {
   public static final int MIN_CHUNK_SIZE = BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE;
   public static final int MAX_CHUNK_SIZE = DocIdSetPlanNode.MAX_DOC_PER_CALL;
@@ -88,16 +88,27 @@ public final class RestrictedScanDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int next() {
-    while (_cursor == _limit) {
-      if (!fillNextChunk()) {
-        return Constants.EOF;
-      }
+    if (_closed) {
+      return Constants.EOF;
     }
-    return _buffer[_cursor++];
+    try {
+      while (_cursor == _limit) {
+        if (!fillNextChunk()) {
+          return Constants.EOF;
+        }
+      }
+      return _buffer[_cursor++];
+    } catch (RuntimeException | Error e) {
+      close(e);
+      throw e;
+    }
   }
 
   @Override
   public int advance(int targetDocId) {
+    if (_closed) {
+      return Constants.EOF;
+    }
     // Skip over the matches below the target that are already evaluated, before evaluating anything new
     while (_cursor < _limit) {
       int docId = _buffer[_cursor++];
@@ -147,26 +158,16 @@ public final class RestrictedScanDocIdIterator implements BlockDocIdIterator {
   /// Closes every scan, also when one of them fails to close. Idempotent.
   @Override
   public void close() {
+    close(null);
+  }
+
+  private void close(@Nullable Throwable failure) {
     if (_closed) {
       return;
     }
     _closed = true;
     _cursor = 0;
     _limit = 0;
-    RuntimeException exception = null;
-    for (ScanBasedDocIdIterator scanDocIdIterator : _scanDocIdIterators) {
-      try {
-        scanDocIdIterator.close();
-      } catch (RuntimeException e) {
-        if (exception == null) {
-          exception = e;
-        } else {
-          exception.addSuppressed(e);
-        }
-      }
-    }
-    if (exception != null) {
-      throw exception;
-    }
+    DocIdIteratorUtils.closeAll(_scanDocIdIterators, _scanDocIdIterators.length, failure);
   }
 }

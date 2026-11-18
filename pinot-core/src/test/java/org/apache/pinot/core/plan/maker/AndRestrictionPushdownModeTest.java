@@ -19,13 +19,19 @@
 package org.apache.pinot.core.plan.maker;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown;
 import org.apache.pinot.core.operator.docidsets.AndRestrictionPushdown.Strategy;
+import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -33,15 +39,15 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 
 /// Tests how [InstancePlanMakerImplV2] resolves [Server.AndRestrictionPushdownMode] into the per-query
 /// [AndRestrictionPushdown] read by the AND filter operators.
 ///
-/// Under `AUTO`, a query that reads every matching document gets the eager push-down, and a selection query without
-/// ORDER BY, which stops at its LIMIT, gets the streaming one. See
-/// [issue 19339](https://github.com/apache/pinot/issues/19339).
+/// Without RLS, `AUTO` enables eager push-down for aggregation, and `STREAMING` opts selections into streaming.
 public class AndRestrictionPushdownModeTest {
   private static final String SELECTION_ONLY = "SELECT col1 FROM testTable WHERE col2 = 1";
   private static final String SELECTION_ORDER_BY = "SELECT col1 FROM testTable WHERE col2 = 1 ORDER BY col1";
@@ -56,10 +62,8 @@ public class AndRestrictionPushdownModeTest {
   }
 
   @Test
-  public void testAutoStreamsQueriesThatStopAtTheirLimit() {
-    AndRestrictionPushdown pushdown = resolve("auto", SELECTION_ONLY + " LIMIT 20 OFFSET 5");
-    assertEquals(pushdown.getStrategy(), Strategy.STREAMING, "A selection-only query stops at its LIMIT");
-    assertEquals(pushdown.getMaxDocsToRead(), 25, "The query reads at most its limit plus its offset");
+  public void testAutoLeavesNonRlsSelectionsOff() {
+    assertEquals(resolve("auto", SELECTION_ONLY + " LIMIT 20 OFFSET 5").getStrategy(), Strategy.OFF);
   }
 
   @Test
@@ -85,9 +89,14 @@ public class AndRestrictionPushdownModeTest {
   }
 
   @Test
-  public void testStreamingStreamsEveryQuery() {
-    assertEquals(resolve("streaming", AGGREGATION).getStrategy(), Strategy.STREAMING);
-    assertEquals(resolve("streaming", SELECTION_ORDER_BY).getStrategy(), Strategy.STREAMING);
+  public void testExplicitStreamingRequiresUnorderedLimitSelection() {
+    assertEquals(resolve("streaming", SELECTION_ONLY + " LIMIT 10").getStrategy(), Strategy.STREAMING);
+    assertEquals(resolve("streaming", SELECTION_ONLY + " AND (col3 = 1 OR col4 = 1) LIMIT 10").getStrategy(),
+        Strategy.STREAMING);
+    for (String query : new String[]{AGGREGATION, GROUP_BY, DISTINCT, SELECTION_ORDER_BY,
+        SELECTION_ONLY + " LIMIT 0", SELECTION_ONLY + " LIMIT " + Integer.MAX_VALUE}) {
+      assertEquals(resolve("streaming", query).getStrategy(), Strategy.EAGER, query);
+    }
   }
 
   @Test
@@ -109,14 +118,30 @@ public class AndRestrictionPushdownModeTest {
           Strategy.EAGER, "Mode: " + mode);
     }
     assertEquals(resolveWithRowFilter("always", SELECTION_ONLY).getStrategy(), Strategy.EAGER);
-    assertEquals(resolveWithRowFilter("streaming", AGGREGATION).getStrategy(), Strategy.STREAMING);
+  }
+
+  @Test
+  public void testRowLevelSecurityStreamingRequiresSupportedSelection() {
+    String filterWithPolicy = "SELECT col1 FROM testTable WHERE col3 = 1 AND col2 = 1 LIMIT 10 OFFSET 5";
+    for (String mode : new String[]{null, "never", "auto", "streaming"}) {
+      assertEquals(resolveWithRowFilter(mode, SELECTION_ONLY + " LIMIT 10").getStrategy(), Strategy.STREAMING);
+      AndRestrictionPushdown pushdown = resolveWithRowFilter(mode, filterWithPolicy);
+      assertEquals(pushdown.getStrategy(), Strategy.STREAMING, "Mode: " + mode);
+      assertEquals(pushdown.getMaxDocsToRead(), 15, "Mode: " + mode);
+      assertEquals(resolveWithRowFilter(mode, SELECTION_ONLY + " OR col4 = 1 LIMIT 10").getStrategy(), Strategy.EAGER,
+          "Mode: " + mode);
+      assertEquals(resolveWithRowFilter(mode, SELECTION_ONLY + " AND col4 = 1 LIMIT 10").getStrategy(), Strategy.EAGER,
+          "Mode: " + mode);
+    }
+    assertEquals(resolveWithRowFilter("streaming", AGGREGATION).getStrategy(), Strategy.EAGER);
+    assertEquals(resolveWithRowFilter("streaming", SELECTION_ORDER_BY).getStrategy(), Strategy.EAGER);
   }
 
   @Test
   public void testModeIsCaseInsensitive() {
     assertEquals(resolve("AlWaYs", SELECTION_ONLY).getStrategy(), Strategy.EAGER);
     assertEquals(resolve("AuTo", AGGREGATION).getStrategy(), Strategy.EAGER);
-    assertEquals(resolve("StReAmInG", AGGREGATION).getStrategy(), Strategy.STREAMING);
+    assertEquals(resolve("StReAmInG", SELECTION_ONLY).getStrategy(), Strategy.STREAMING);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -134,7 +159,7 @@ public class AndRestrictionPushdownModeTest {
   public void testServerDefaultAppliesWithoutQueryOption() {
     InstancePlanMakerImplV2 planMaker = planMakerWithServerDefault("always");
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(SELECTION_ONLY);
-    planMaker.applyQueryOptions(queryContext);
+    planMaker.makeInstancePlan(List.of(), queryContext, mock(ExecutorService.class));
     assertEquals(queryContext.getAndRestrictionPushdown().getStrategy(), Strategy.EAGER,
         "The server default must apply");
   }
@@ -144,9 +169,36 @@ public class AndRestrictionPushdownModeTest {
     InstancePlanMakerImplV2 planMaker = planMakerWithServerDefault("always");
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(AGGREGATION);
     queryContext.getQueryOptions().put(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, "never");
-    planMaker.applyQueryOptions(queryContext);
+    planMaker.makeInstancePlan(List.of(), queryContext, mock(ExecutorService.class));
     assertEquals(queryContext.getAndRestrictionPushdown().getStrategy(), Strategy.OFF,
         "The query option must win over the server default");
+  }
+
+  @Test
+  public void testRlsEligibilityUsesRewrittenPredicate() {
+    PinotQuery pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SELECT col1 FROM testTable WHERE ABS(rawCol3) = 1 LIMIT 10");
+    pinotQuery.setQueryOptions(Map.of(RlsUtils.buildRlsFilterKey("testTable"), "col3 = 1"));
+    pinotQuery.setExpressionOverrideHints(Map.of(CalciteSqlParser.compileToExpression("ABS(rawCol3)"),
+        CalciteSqlParser.compileToExpression("col3")));
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
+    IndexSegment segment = mock(IndexSegment.class);
+    when(segment.getColumnNames()).thenReturn(Set.of("col1", "col3"));
+
+    new InstancePlanMakerImplV2().makeInstancePlan(List.of(new SegmentContext(segment)), queryContext,
+        mock(ExecutorService.class));
+
+    assertEquals(queryContext.getFilter(), queryContext.getRowFilter());
+    assertEquals(queryContext.getAndRestrictionPushdown().getStrategy(), Strategy.EAGER);
+  }
+
+  @Test
+  public void testStreamingTransportKeepsEagerFallback() {
+    InstancePlanMakerImplV2 planMaker = planMakerWithServerDefault("streaming");
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(SELECTION_ONLY);
+    planMaker.makeStreamingInstancePlan(List.of(), queryContext, mock(ExecutorService.class),
+        mock(ResultsBlockStreamer.class));
+    assertEquals(queryContext.getAndRestrictionPushdown().getStrategy(), Strategy.EAGER);
   }
 
   private static InstancePlanMakerImplV2 planMakerWithServerDefault(String mode) {
@@ -180,7 +232,7 @@ public class AndRestrictionPushdownModeTest {
     if (mode != null) {
       queryContext.getQueryOptions().put(QueryOptionKey.AND_RESTRICTION_PUSHDOWN_MODE, mode);
     }
-    new InstancePlanMakerImplV2().applyQueryOptions(queryContext);
+    new InstancePlanMakerImplV2().makeInstancePlan(List.of(), queryContext, mock(ExecutorService.class));
     return queryContext.getAndRestrictionPushdown();
   }
 }

@@ -30,6 +30,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
   public final BlockDocIdIterator[] _docIdIterators;
 
   private int _nextDocId = 0;
+  private boolean _closed;
 
   public AndDocIdIterator(BlockDocIdIterator[] docIdIterators) {
     _docIdIterators = docIdIterators;
@@ -37,6 +38,9 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int next() {
+    if (_closed) {
+      return Constants.EOF;
+    }
     int maxDocId = _nextDocId;
     int maxDocIdIndex = -1;
     int numDocIdIterators = _docIdIterators.length;
@@ -58,7 +62,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
           index = 0;
         }
       } else {
-        closeIterators();
+        close();
         return Constants.EOF;
       }
     }
@@ -75,12 +79,9 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
   /// Closes every child, for a consumer that stops before the end.
   @Override
   public void close() {
-    closeIterators();
-  }
-
-  private void closeIterators() {
-    for (BlockDocIdIterator it : _docIdIterators) {
-      it.close();
+    if (!_closed) {
+      _closed = true;
+      DocIdIteratorUtils.closeAll(_docIdIterators, _docIdIterators.length, null);
     }
   }
 }

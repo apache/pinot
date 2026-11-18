@@ -60,8 +60,8 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/// Measures single-stage selection queries with a LIMIT under row-level security (RLS), end to end on the server: plan,
-/// filter, projection and the combine of 4 segments.
+/// Measures single-stage queries under row-level security (RLS), including planning, filtering, projection, and
+/// combining results from two segments.
 ///
 /// Each segment has 1M rows of 10 tenants, interleaved. The RLS filter is `tenant = 'T0'`, on an inverted index, so it
 /// allows 10% of the rows. As the broker does, each query has the RLS predicate in its WHERE clause and in the
@@ -69,17 +69,17 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 ///
 /// `_mode` is the value of the `andRestrictionPushdownMode` query option:
 ///
-/// - `ALWAYS`: the eager push-down. This is what every query under RLS does without the streaming push-down.
-/// - `NEVER`: the default. Under RLS it resolves as `AUTO`, which streams a selection without ORDER BY.
+/// - `ALWAYS` uses eager push-down.
+/// - `NEVER` is the default. Under RLS it streams eligible unordered selections with a LIMIT and uses eager
+///   push-down for the other queries.
 ///
 /// The queries:
 ///
-/// - `SCAN`: one scan predicate on a column without an index.
-/// - `EXPRESSION`: one predicate on an expression, evaluated by `ExpressionScanDocIdIterator`.
-/// - `OR`: an OR of two scans that matches many rows.
-/// - `OR_FEW_MATCHES`: an OR of two scans that matches fewer rows than the LIMIT: `id = 3` is a row of another tenant,
-///   and only 5 rows of `T0` have the rare name. The query streams, then reads every candidate anyway: the worst case
-///   of the streaming push-down.
+/// - `SCAN`: one scan predicate on a column without an index. Eligible for streaming.
+/// - `EXPRESSION`: one predicate on an expression, evaluated by `ExpressionScanDocIdIterator`. Eligible for streaming.
+/// - `OR`: an OR of two scans that matches many rows. Both modes use eager push-down.
+/// - `OR_FEW_MATCHES`: an OR of two scans that matches fewer rows than the LIMIT. Only 5 rows of `T0` have the rare
+///   name, and `id = 3` belongs to another tenant. Both modes use eager push-down.
 /// - `COUNT`: an aggregation, as a control. Both modes resolve to the eager push-down.
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
@@ -143,7 +143,7 @@ public class BenchmarkRowLevelSecurityLimitQueries extends BaseQueriesTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       int tenant = i % NUM_TENANTS;
       String name = "n" + random.nextInt(NUM_NAMES);
-      // Spread the rare rows over the segment, so that the query reads every chunk to find them
+      // Spread the rare rows across the segment.
       if (tenant == 0 && numRareRows < NUM_RARE_ROWS && i >= (long) numRareRows * NUM_ROWS / NUM_RARE_ROWS) {
         name = RARE_NAME;
         numRareRows++;

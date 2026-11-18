@@ -29,27 +29,25 @@ public class NotDocIdIterator implements BlockDocIdIterator {
   private final int _numDocs;
   private int _nextDocId;
   private int _nextNonMatchingDocId;
+  private boolean _closed;
 
   public NotDocIdIterator(BlockDocIdIterator childDocIdIterator, int numDocs) {
     _childDocIdIterator = childDocIdIterator;
-    _nextDocId = 0;
-
-    int currentDocIdFromChildIterator = childDocIdIterator.next();
-    _nextNonMatchingDocId = currentDocIdFromChildIterator == Constants.EOF ? numDocs : currentDocIdFromChildIterator;
     _numDocs = numDocs;
+    _nextNonMatchingDocId = childDocIdIterator.next();
   }
 
   @Override
   public int next() {
-    if (_nextDocId >= _numDocs) {
+    if (_closed) {
       return Constants.EOF;
     }
-    while (_nextDocId == _nextNonMatchingDocId) {
+    while (_nextDocId < _numDocs && _nextDocId == _nextNonMatchingDocId) {
       _nextDocId++;
-      int nextNonMatchingDocId = _childDocIdIterator.next();
-      _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? _numDocs : nextNonMatchingDocId;
+      _nextNonMatchingDocId = _childDocIdIterator.next();
     }
     if (_nextDocId >= _numDocs) {
+      close();
       return Constants.EOF;
     }
     return _nextDocId++;
@@ -57,11 +55,24 @@ public class NotDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int advance(int targetDocId) {
+    if (_closed) {
+      return Constants.EOF;
+    }
     _nextDocId = targetDocId;
-    if (targetDocId > _nextNonMatchingDocId) {
-      int nextNonMatchingDocId = _childDocIdIterator.advance(targetDocId);
-      _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? _numDocs : nextNonMatchingDocId;
+    if (_nextNonMatchingDocId != Constants.EOF && targetDocId > _nextNonMatchingDocId) {
+      _nextNonMatchingDocId = _childDocIdIterator.advance(targetDocId);
     }
     return next();
+  }
+
+  @Override
+  public void close() {
+    if (!_closed) {
+      _closed = true;
+      // Scans close themselves when they reach EOF.
+      if (_nextNonMatchingDocId != Constants.EOF) {
+        _childDocIdIterator.close();
+      }
+    }
   }
 }

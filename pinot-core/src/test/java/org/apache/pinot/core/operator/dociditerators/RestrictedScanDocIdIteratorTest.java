@@ -35,12 +35,16 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /// The streaming restriction: the scans only see candidate documents, and the result is produced lazily, so a
@@ -193,6 +197,26 @@ public class RestrictedScanDocIdIteratorTest {
     assertThrows(IllegalStateException.class, iterator::close);
     assertEquals(failing.getNumCloses(), 1);
     assertEquals(other.getNumCloses(), 1);
+  }
+
+  @Test
+  public void testScanFailureStaysPrimaryWhenClosingReaders() {
+    ScanBasedDocIdIterator failing = mock(ScanBasedDocIdIterator.class);
+    ScanBasedDocIdIterator other = mock(ScanBasedDocIdIterator.class);
+    IllegalStateException scanFailure = new IllegalStateException("scan failed");
+    IllegalStateException closeFailure = new IllegalStateException("close failed");
+    when(failing.matchDocIds(any(int[].class), anyInt())).thenThrow(scanFailure);
+    doThrow(scanFailure).when(failing).close();
+    doThrow(closeFailure).when(other).close();
+    BlockDocIdIterator iterator =
+        new RestrictedScanDocIdIterator(range(0, 10).getIntIterator(), List.of(failing, other));
+
+    IllegalStateException failure = expectThrows(IllegalStateException.class, iterator::next);
+    assertSame(failure, scanFailure);
+    assertEquals(failure.getSuppressed(), new Throwable[]{closeFailure});
+    iterator.close();
+    verify(failing).close();
+    verify(other).close();
   }
 
   /// The value matchers of [SVScanDocIdIterator] read the values into buffers of its batch size, so a larger chunk
