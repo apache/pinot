@@ -20,7 +20,9 @@ package org.apache.pinot.sql.parsers.parser;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -32,6 +34,44 @@ import static org.testng.Assert.assertTrue;
 
 /// Tests for the TableNameExtractor class.
 public class TableNameExtractorTest {
+
+  @Test
+  public void testVisitReferencedTableIdentifiersPreservesNameComponents() {
+    assertEquals(referencedTableNames("SELECT * FROM \"Analytics\".events JOIN \"Analytics.events\" ON 1 = 1"),
+        Set.of(List.of("Analytics", "events"), List.of("Analytics.events")));
+    assertEquals(referencedTableNames("WITH events AS (SELECT * FROM unused) SELECT * FROM analytics.events"),
+        Set.of(List.of("analytics", "events")));
+    assertEquals(referencedTableNames("SELECT * FROM analytics.events EXTEND (extra BIGINT)"),
+        Set.of(List.of("analytics", "events")));
+  }
+
+  @Test
+  public void testVisitReferencedTableIdentifiersResolvesCteScopes() {
+    String sql = "WITH t AS (SELECT * FROM analytics.events), chained AS (SELECT * FROM t), "
+        + "unused AS (SELECT * FROM ignored) SELECT * FROM "
+        + "(WITH t AS (SELECT * FROM logs.events) SELECT * FROM t) inner_t JOIN chained outer_t ON 1 = 1";
+    assertEquals(referencedTableNames(sql), Set.of(List.of("analytics", "events"), List.of("logs", "events")));
+    assertEquals(Set.of(TableNameExtractor.resolveTableName(sql)), Set.of("events", "ignored"));
+
+    assertEquals(referencedTableNames("SELECT * FROM (WITH t AS (SELECT * FROM source) SELECT * FROM t) nested "
+        + "JOIN t outer_t ON 1 = 1"), Set.of(List.of("source"), List.of("t")));
+    assertEquals(referencedTableNames("WITH t AS (SELECT * FROM t) SELECT * FROM t"), Set.of(List.of("t")));
+  }
+
+  @Test
+  public void testVisitReferencedTableIdentifiersSkipsRecursiveAlias() {
+    String sql = "WITH RECURSIVE t AS (SELECT id FROM analytics.seed UNION ALL SELECT id FROM t) SELECT * FROM t";
+    assertEquals(referencedTableNames(sql), Set.of(List.of("analytics", "seed")));
+    String sameNameSeed = "WITH RECURSIVE t AS (SELECT id FROM t UNION ALL SELECT id FROM t) SELECT * FROM t";
+    assertEquals(referencedTableNames(sameNameSeed), Set.of(List.of("t")));
+  }
+
+  private static Set<List<String>> referencedTableNames(String sql) {
+    Set<List<String>> tableNames = new HashSet<>();
+    TableNameExtractor.visitReferencedTableIdentifiers(CalciteSqlParser.compileToSqlNodeAndOptions(sql).getSqlNode(),
+        identifier -> tableNames.add(identifier.names));
+    return tableNames;
+  }
 
   @Test
   public void testResolveTableNameWithSingleQuery() {
