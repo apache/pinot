@@ -226,8 +226,12 @@ public class ConsumerCoordinatorTest {
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
     assertTrue(acquired.isEmpty());
 
-    // 6. check the next threads acquiring semaphore is 106
+    // 6. check the next threads acquiring semaphore is 106. Until 106 is registered, no other waiter can pass its
+    //   registration wait, so 106 is the only candidate for the released permit.
     consumerCoordinator.release();
+    assertAcquired(acquired, 106);
+
+    // Registering 106 lets 107 pass its registration wait; it then waits for the permit 106 holds.
     consumerCoordinator.register(getLLCSegment(106));
 
     Thread.sleep(1000);
@@ -236,7 +240,7 @@ public class ConsumerCoordinatorTest {
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 106);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
-    assertAcquired(acquired, 106);
+    assertTrue(acquired.isEmpty());
   }
 
   @Test
