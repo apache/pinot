@@ -88,8 +88,9 @@ public class ConsumerCoordinator {
   }
 
   /// Waits for server/history readiness, then acquires the consumer permit. Readiness checks are deferred when the
-  /// permit is observed held. Required history readiness supersedes predecessor registration; other tables retain
-  /// registration ordering when configured.
+  /// permit is observed held, and repeated after the release when another consumer holds the permit at acquisition.
+  /// Required history readiness supersedes predecessor registration; other tables retain registration ordering when
+  /// configured.
   /// @return true if the caller owns the permit and must release it, or false if stopped before admission
   public boolean acquire(LLCSegmentName llcSegmentName, BooleanSupplier isReadyToConsume, BooleanSupplier shouldStop)
       throws InterruptedException, ShouldNotConsumeException {
@@ -103,35 +104,33 @@ public class ConsumerCoordinator {
         _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
             ServerTimer.PREV_SEGMENT_WAIT_TIME_MS, System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
       }
-
-      long startTimeMs = System.currentTimeMillis();
-      long permitWaitIntervalMs = getPermitWaitIntervalMs();
-      while (!shouldStop.getAsBoolean()) {
-        if (_semaphore.tryAcquire(permitWaitIntervalMs, TimeUnit.MILLISECONDS)) {
-          // Cancellation may race with release/acquisition. Do not transfer a permit to a stopped consumer.
-          boolean admitted = false;
-          try {
-            admitted = !shouldStop.getAsBoolean();
-            return admitted;
-          } finally {
-            if (!admitted) {
-              release();
-            }
-          }
+      while (!_semaphore.tryAcquire()) {
+        // Another consumer took the permit after the readiness check. Wait for its release, then check again.
+        if (!waitUntilReadyToConsume(llcSegmentName, isReadyToConsume, shouldStop)) {
+          return false;
         }
-        reportPermitWait(llcSegmentName, System.currentTimeMillis() - startTimeMs);
       }
-      return false;
+      // Cancellation may race with release/acquisition. Do not transfer a permit to a stopped consumer.
+      boolean admitted = false;
+      try {
+        admitted = !shouldStop.getAsBoolean();
+        return admitted;
+      } finally {
+        if (!admitted) {
+          release();
+        }
+      }
     } finally {
       _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
           llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, 0);
     }
   }
 
-  /// Waits until the consumer may compete for the permit. When the permit is observed held, the readiness
-  /// check is deferred: its result cannot be acted on before the release, which wakes this wait. Such a wait is a
-  /// permit wait, reported and bounded by segment status checks like the wait in [#acquire]. A consumer counts as
-  /// waiting for readiness only after a check fails following an observation that the permit was free.
+  /// Waits until the consumer may compete for the permit. When the permit is observed held, the readiness check
+  /// is deferred: its result cannot be acted on before the release, which wakes this wait. Such a permit wait is
+  /// reported through `CONSUMER_LOCK_WAIT_TIME_MS` every permit wait interval, and ends if the segment should no
+  /// longer be consumed. A consumer counts as waiting for readiness only after a check fails following an observation
+  /// that the permit was free.
   ///
   /// Helix assignment and state changes are picked up by the periodic check. Readiness can perform ZooKeeper reads,
   /// so it must run outside the monitor. The version prevents losing a release between observing the permit or

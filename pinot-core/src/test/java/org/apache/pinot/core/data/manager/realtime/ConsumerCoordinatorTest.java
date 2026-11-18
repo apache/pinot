@@ -181,10 +181,11 @@ public class ConsumerCoordinatorTest {
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(109), serverSegmentStatusMap);
 
     // 2. create multiple helix transitions in this order: 106, 109, 104, 107
-    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(106));
-    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(109));
-    Thread thread3 = getNewThread(consumerCoordinator, getLLCSegment(104));
-    Thread thread4 = getNewThread(consumerCoordinator, getLLCSegment(107));
+    BlockingQueue<Integer> acquired = new LinkedBlockingQueue<>();
+    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(106), acquired);
+    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(109), acquired);
+    Thread thread3 = getNewThread(consumerCoordinator, getLLCSegment(104), acquired);
+    Thread thread4 = getNewThread(consumerCoordinator, getLLCSegment(107), acquired);
 
     thread1.start();
 
@@ -213,7 +214,9 @@ public class ConsumerCoordinatorTest {
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 102);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
+    assertAcquired(acquired, 104);
 
+    // Registering 104 lets 106 pass its registration wait; it then waits for the permit 104 holds.
     consumerCoordinator.register(getLLCSegment(104));
     Thread.sleep(1000);
 
@@ -221,10 +224,10 @@ public class ConsumerCoordinatorTest {
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 104);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
-    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
+    assertTrue(acquired.isEmpty());
 
     // 6. check the next threads acquiring semaphore is 106
-    consumerCoordinator.getSemaphore().release();
+    consumerCoordinator.release();
     consumerCoordinator.register(getLLCSegment(106));
 
     Thread.sleep(1000);
@@ -233,7 +236,7 @@ public class ConsumerCoordinatorTest {
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 106);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
-    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
+    assertAcquired(acquired, 106);
   }
 
   @Test
@@ -248,7 +251,8 @@ public class ConsumerCoordinatorTest {
     ReentrantLock lock = (ReentrantLock) consumerCoordinator.getLock();
 
     // 2. check first transition blocked on ideal state
-    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(101));
+    BlockingQueue<Integer> acquired = new LinkedBlockingQueue<>();
+    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(101), acquired);
     thread1.start();
 
     Thread.sleep(2000);
@@ -274,11 +278,12 @@ public class ConsumerCoordinatorTest {
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 91);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
+    assertAcquired(acquired, 101);
 
     // 5. check that all the following transitions rely on seq num watermark and gets blocked.
-    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(102));
-    Thread thread3 = getNewThread(consumerCoordinator, getLLCSegment(103));
-    Thread thread4 = getNewThread(consumerCoordinator, getLLCSegment(104));
+    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(102), acquired);
+    Thread thread3 = getNewThread(consumerCoordinator, getLLCSegment(103), acquired);
+    Thread thread4 = getNewThread(consumerCoordinator, getLLCSegment(104), acquired);
     thread3.start();
     thread2.start();
     thread4.start();
@@ -291,7 +296,7 @@ public class ConsumerCoordinatorTest {
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
 
     // 6. check that all above threads are still blocked even if semaphore is released.
-    consumerCoordinator.getSemaphore().release();
+    consumerCoordinator.release();
 
     Thread.sleep(1000);
 
@@ -299,6 +304,7 @@ public class ConsumerCoordinatorTest {
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 91);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
+    assertTrue(acquired.isEmpty());
 
     // 6. mark 101 seg as complete. Check 102 acquired the semaphore.
     consumerCoordinator.register(getLLCSegment(101));
@@ -308,7 +314,7 @@ public class ConsumerCoordinatorTest {
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 101);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
-    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 0);
+    assertAcquired(acquired, 102);
 
     // 7. register 102 seg, check if seg 103 is waiting on semaphore.
     consumerCoordinator.register(getLLCSegment(102));
@@ -318,24 +324,24 @@ public class ConsumerCoordinatorTest {
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 102);
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
-    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
+    assertTrue(acquired.isEmpty());
 
     // 8. release the semaphore and check if semaphore is acquired by seg 103.
-    consumerCoordinator.getSemaphore().release();
+    consumerCoordinator.release();
     Thread.sleep(1000);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 102);
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
-    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 0);
+    assertAcquired(acquired, 103);
 
-    // 8. register 103 seg and check if seg 104 is now queued on semaphore
+    // 8. register 103 seg and check if seg 104 is now waiting on semaphore
     consumerCoordinator.register(getLLCSegment(103));
     Thread.sleep(1000);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 103);
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
-    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
+    assertTrue(acquired.isEmpty());
   }
 
   @Test
@@ -348,7 +354,8 @@ public class ConsumerCoordinatorTest {
     realtimeTableDataManager.setConsumerCoordinator(consumerCoordinator);
 
     // 1. test that acquire blocks when prev segment is not loaded.
-    Thread thread = getNewThread(consumerCoordinator, getLLCSegment(101));
+    BlockingQueue<Integer> acquired = new LinkedBlockingQueue<>();
+    Thread thread = getNewThread(consumerCoordinator, getLLCSegment(101), acquired);
     thread.start();
 
     ReentrantLock lock = (ReentrantLock) consumerCoordinator.getLock();
@@ -371,10 +378,10 @@ public class ConsumerCoordinatorTest {
         "Semaphore must be acquired after registering previous segment");
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertTrue(consumerCoordinator.getFirstTransitionProcessed().get());
+    assertAcquired(acquired, 101);
 
     consumerCoordinator.release();
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
-    Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 91);
     consumerCoordinator.register(getLLCSegment(101));
@@ -388,7 +395,7 @@ public class ConsumerCoordinatorTest {
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(103), serverSegmentStatusMap);
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(104), serverSegmentStatusMap);
 
-    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(103));
+    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(103), acquired);
     thread1.start();
 
     Thread.sleep(1000);
@@ -396,29 +403,29 @@ public class ConsumerCoordinatorTest {
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
 
     // 3. test that segment 102 will acquire semaphore.
-    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(102));
+    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(102), acquired);
     thread2.start();
 
     Thread.sleep(1000);
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
-    Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
+    assertAcquired(acquired, 102);
 
-    // 4. registering seg 102 should unblock seg 103
+    // 4. registering seg 102 should unblock seg 103, which then waits for the semaphore
     consumerCoordinator.register(getLLCSegment(102));
 
     Thread.sleep(1000);
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
-    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
+    assertTrue(acquired.isEmpty());
 
     // 5. releasing semaphore should let seg 103 acquire it
-    consumerCoordinator.getSemaphore().release();
+    consumerCoordinator.release();
 
     Thread.sleep(1000);
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
-    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 0);
+    assertAcquired(acquired, 103);
     Assert.assertFalse(lock.hasQueuedThreads() && lock.isLocked());
     Assert.assertEquals(consumerCoordinator.getMaxSequenceNumberRegistered(), 102);
   }
@@ -436,11 +443,9 @@ public class ConsumerCoordinatorTest {
     Assert.assertNotNull(llcSegmentName);
     assertTrue(consumerCoordinator.acquire(llcSegmentName, () -> true, () -> false));
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
-    Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
 
     consumerCoordinator.release();
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
-    Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
   }
 
   @Test
@@ -811,14 +816,23 @@ public class ConsumerCoordinatorTest {
     }
   }
 
-  private Thread getNewThread(FakeConsumerCoordinator consumerCoordinator, LLCSegmentName llcSegmentName) {
+  /// Returns an unstarted thread that acquires the permit for the segment and then records its sequence number.
+  private Thread getNewThread(FakeConsumerCoordinator consumerCoordinator, LLCSegmentName llcSegmentName,
+      BlockingQueue<Integer> acquired) {
     return new Thread(() -> {
       try {
         assertTrue(consumerCoordinator.acquire(llcSegmentName, () -> true, () -> false));
+        acquired.add(llcSegmentName.getSequenceNumber());
       } catch (Exception e) {
         Assert.fail();
       }
     }, String.valueOf(llcSegmentName.getSequenceNumber()));
+  }
+
+  private static void assertAcquired(BlockingQueue<Integer> acquired, int sequenceNumber)
+      throws InterruptedException {
+    assertEquals(acquired.poll(5, TimeUnit.SECONDS), Integer.valueOf(sequenceNumber));
+    assertTrue(acquired.isEmpty(), "Only one consumer can hold the permit");
   }
 
   private RealtimeSegmentDataManager getMockedRealtimeSegmentDataManager() {

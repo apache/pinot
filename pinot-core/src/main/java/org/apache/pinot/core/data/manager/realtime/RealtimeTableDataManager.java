@@ -130,6 +130,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS =
+      TimeUnit.MILLISECONDS.toNanos(READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
 
   public static final long DEFAULT_SEGMENT_DOWNLOAD_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10); // 10 minutes
   public static final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
@@ -272,17 +274,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   /// Dedup and order-sensitive upsert modes need their assigned history before admitting a consumer.
   boolean requiresHistoryForConsumption() {
-    return isDedupEnabled() || (_tableUpsertMetadataManager != null
-        && _tableUpsertMetadataManager.getContext().isTableTypeInconsistentDuringConsumption());
+    return isDedupEnabled()
+        || (_tableUpsertMetadataManager != null
+            && _tableUpsertMetadataManager.getContext().isTableTypeInconsistentDuringConsumption());
   }
 
   private boolean isReadyToConsume(LLCSegmentName consumer, long consumerCreationTimeNs) {
     ReadinessSnapshot snapshot;
     synchronized (_readinessSnapshotLock) {
       long nowNs = readinessCheckTimeNs();
-      if (_readinessSnapshot == null || _readinessSnapshotTimeNs - consumerCreationTimeNs < 0
-          || nowNs - _readinessSnapshotTimeNs >= TimeUnit.MILLISECONDS.toNanos(
-              READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS)) {
+      if (_readinessSnapshot == null
+          || _readinessSnapshotTimeNs - consumerCreationTimeNs < 0
+          || nowNs - _readinessSnapshotTimeNs >= READY_TO_CONSUME_DATA_CHECK_INTERVAL_NS) {
         // A new consumer must see its own assignment. Record the read's start time, not its completion time.
         snapshot = TableStateUtils.getReadinessSnapshot(_helixManager, _tableNameWithType,
             this::isPartitionMetadataInitialized);
@@ -304,10 +307,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Pauseless release publishes completed mutable metadata; ordinary rollover publishes a ready immutable manager
     // before releasing the permit. Mere immutable presence is insufficient because initial upsert loading registers
     // the manager before its metadata is populated. Always inspect the currently registered manager.
-    return manager instanceof RealtimeSegmentDataManager
-        && ((RealtimeSegmentDataManager) manager).hasReleasedConsumerSemaphore()
-        || manager instanceof ImmutableSegmentDataManager
-        && ((ImmutableSegmentDataManager) manager).isPartitionMetadataInitialized();
+    return manager instanceof RealtimeSegmentDataManager realtime && realtime.hasReleasedConsumerSemaphore()
+        || manager instanceof ImmutableSegmentDataManager immutable && immutable.isPartitionMetadataInitialized();
   }
 
   @VisibleForTesting
