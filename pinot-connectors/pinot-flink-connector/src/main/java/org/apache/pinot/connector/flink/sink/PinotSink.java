@@ -266,42 +266,20 @@ public class PinotSink<T> implements Sink<T> {
       while (iterator.hasNext()) {
         Future<?> pendingUpload = iterator.next();
         if (pendingUpload.isDone()) {
-          awaitUpload(pendingUpload);
           iterator.remove();
+          awaitUpload(pendingUpload);
         }
       }
     }
 
     private void waitForPendingUploads()
         throws IOException, InterruptedException {
-      for (Future<?> pendingUpload : _pendingUploads) {
-        awaitUpload(pendingUpload);
-      }
-      _pendingUploads.clear();
+      awaitPendingUploads(_pendingUploads);
     }
 
     private void awaitUpload(Future<?> pendingUpload)
         throws IOException, InterruptedException {
-      try {
-        pendingUpload.get();
-      } catch (ExecutionException e) {
-        Throwable cause = unwrapExecutionFailure(e.getCause());
-        if (cause instanceof IOException) {
-          throw (IOException) cause;
-        }
-        if (cause instanceof InterruptedException) {
-          Thread.currentThread().interrupt();
-          throw (InterruptedException) cause;
-        }
-        throw new IOException("Failed to upload Pinot segment", cause);
-      }
-    }
-
-    private Throwable unwrapExecutionFailure(Throwable throwable) {
-      if (throwable instanceof RuntimeException && throwable.getCause() != null) {
-        return throwable.getCause();
-      }
-      return throwable;
+      awaitUploadResult(pendingUpload);
     }
 
     private void shutdownExecutor()
@@ -331,5 +309,51 @@ public class PinotSink<T> implements Sink<T> {
         }
       }
     }
+  }
+
+  static void awaitPendingUploads(List<Future<?>> pendingUploads)
+      throws IOException, InterruptedException {
+    IOException failure = null;
+    Iterator<Future<?>> iterator = pendingUploads.iterator();
+    while (iterator.hasNext()) {
+      Future<?> pendingUpload = iterator.next();
+      try {
+        awaitUploadResult(pendingUpload);
+      } catch (IOException e) {
+        if (failure == null) {
+          failure = e;
+        } else if (failure != e) {
+          failure.addSuppressed(e);
+        }
+      }
+      iterator.remove();
+    }
+    if (failure != null) {
+      throw failure;
+    }
+  }
+
+  private static void awaitUploadResult(Future<?> pendingUpload)
+      throws IOException, InterruptedException {
+    try {
+      pendingUpload.get();
+    } catch (ExecutionException e) {
+      Throwable cause = unwrapExecutionFailure(e.getCause());
+      if (cause instanceof IOException) {
+        throw (IOException) cause;
+      }
+      if (cause instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+        throw (InterruptedException) cause;
+      }
+      throw new IOException("Failed to upload Pinot segment", cause);
+    }
+  }
+
+  private static Throwable unwrapExecutionFailure(Throwable throwable) {
+    if (throwable instanceof RuntimeException && throwable.getCause() != null) {
+      return throwable.getCause();
+    }
+    return throwable;
   }
 }
