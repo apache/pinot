@@ -135,7 +135,8 @@ public class SparseKeyDataSource extends BaseDataSource {
     }
 
     /// The single value converted to the key's stored type, or null when the document lacks the key or the dense
-    /// tier's conversion rejects the value.
+    /// tier's conversion rejects the value. Callers read it through the getter of the key's stored type, as for any
+    /// forward index, so the numeric getters only see a converted number.
     @Nullable
     private Object converted(int docId, ForwardIndexReaderContext context) {
       JsonNode node = valueNode(docId, context);
