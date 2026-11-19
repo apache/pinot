@@ -193,52 +193,51 @@ public class MultiClusterRoutingManagerTest {
   }
 
   @Test
-  public void testGetSegmentsHandlesNulls() {
+  public void testGetSegmentsToQueryCombinesClusters() {
     BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
-    List<String> remoteSegments = Arrays.asList("seg1");
+    when(_localClusterRoutingManager.getSegmentsToQuery(brokerRequest, null))
+        .thenReturn(new SegmentsToQuery(List.of("localSeg"), List.of("localNewSeg")));
+    when(_remoteClusterRoutingManager1.getSegmentsToQuery(brokerRequest, null))
+        .thenReturn(new SegmentsToQuery(List.of("remoteSeg"), List.of("remoteNewSeg")));
+    when(_remoteClusterRoutingManager2.getSegmentsToQuery(brokerRequest, null)).thenReturn(null);
 
-    when(_localClusterRoutingManager.getSegments(brokerRequest, null)).thenReturn(null);
-    when(_remoteClusterRoutingManager1.getSegments(brokerRequest, null)).thenReturn(remoteSegments);
-    when(_remoteClusterRoutingManager2.getSegments(brokerRequest, null)).thenReturn(null);
-
-    List<String> result = _multiClusterRoutingManager.getSegments(brokerRequest);
-
-    assertNotNull(result);
-    assertEquals(result.size(), 1);
-    assertTrue(result.contains("seg1"));
+    assertEquals(_multiClusterRoutingManager.getSegmentsToQuery(brokerRequest, null),
+        new SegmentsToQuery(List.of("localSeg", "remoteSeg"), List.of("localNewSeg", "remoteNewSeg")));
   }
 
   @Test
-  public void testGetSegmentsReturnsNullWhenAllNull() {
+  public void testGetSegmentsToQueryHandlesNulls() {
     BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
-    when(_localClusterRoutingManager.getSegments(brokerRequest, null)).thenReturn(null);
-    when(_remoteClusterRoutingManager1.getSegments(brokerRequest, null)).thenReturn(null);
-    when(_remoteClusterRoutingManager2.getSegments(brokerRequest, null)).thenReturn(null);
+    when(_localClusterRoutingManager.getSegmentsToQuery(brokerRequest, null)).thenReturn(null);
+    when(_remoteClusterRoutingManager1.getSegmentsToQuery(brokerRequest, null))
+        .thenReturn(new SegmentsToQuery(List.of("seg1")));
+    when(_remoteClusterRoutingManager2.getSegmentsToQuery(brokerRequest, null)).thenReturn(null);
 
-    List<String> result = _multiClusterRoutingManager.getSegments(brokerRequest);
-
-    assertNull(result);
+    assertEquals(_multiClusterRoutingManager.getSegmentsToQuery(brokerRequest, null),
+        new SegmentsToQuery(List.of("seg1")));
   }
 
   @Test
-  public void testGetSegmentsWithSamplerName() {
+  public void testGetSegmentsToQueryReturnsNullWhenAllNull() {
     BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
-    List<String> localSegments = Arrays.asList("localSeg");
-    List<String> remoteSegments = Arrays.asList("remoteSeg");
+    when(_localClusterRoutingManager.getSegmentsToQuery(brokerRequest, null)).thenReturn(null);
+    when(_remoteClusterRoutingManager1.getSegmentsToQuery(brokerRequest, null)).thenReturn(null);
+    when(_remoteClusterRoutingManager2.getSegmentsToQuery(brokerRequest, null)).thenReturn(null);
 
-    when(_localClusterRoutingManager.getSegments(brokerRequest, "firstOnly")).thenReturn(localSegments);
-    when(_remoteClusterRoutingManager1.getSegments(brokerRequest, "firstOnly")).thenReturn(remoteSegments);
-    when(_remoteClusterRoutingManager2.getSegments(brokerRequest, "firstOnly")).thenReturn(null);
+    assertNull(_multiClusterRoutingManager.getSegmentsToQuery(brokerRequest, null));
+  }
 
-    List<String> result = _multiClusterRoutingManager.getSegments(brokerRequest, "firstOnly");
+  @Test
+  public void testGetSegmentsToQueryWithSamplerName() {
+    BrokerRequest brokerRequest = createMockBrokerRequest(TEST_TABLE);
+    when(_localClusterRoutingManager.getSegmentsToQuery(brokerRequest, "firstOnly"))
+        .thenReturn(new SegmentsToQuery(List.of("localSeg")));
+    when(_remoteClusterRoutingManager1.getSegmentsToQuery(brokerRequest, "firstOnly"))
+        .thenReturn(new SegmentsToQuery(List.of("remoteSeg")));
+    when(_remoteClusterRoutingManager2.getSegmentsToQuery(brokerRequest, "firstOnly")).thenReturn(null);
 
-    assertNotNull(result);
-    assertEquals(result.size(), 2);
-    assertTrue(result.contains("localSeg"));
-    assertTrue(result.contains("remoteSeg"));
-    verify(_localClusterRoutingManager, never()).getSegments(brokerRequest);
-    verify(_remoteClusterRoutingManager1, never()).getSegments(brokerRequest);
-    verify(_remoteClusterRoutingManager2, never()).getSegments(brokerRequest);
+    assertEquals(_multiClusterRoutingManager.getSegmentsToQuery(brokerRequest, "firstOnly"),
+        new SegmentsToQuery(List.of("localSeg", "remoteSeg")));
   }
 
   @Test

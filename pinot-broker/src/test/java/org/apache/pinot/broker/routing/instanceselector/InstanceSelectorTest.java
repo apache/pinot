@@ -53,6 +53,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.TestClock;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -1346,6 +1347,11 @@ public class InstanceSelectorTest {
     InstanceSelector selector =
         createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
 
+    // Queried on every instance, newSeg is optional because it is not online on instance0, and so is a segment the
+    // selector does not track yet
+    assertEquals(selector.selectOnAllInstances(List.of(oldSeg, newSeg, "untrackedSegment")),
+        new SegmentsToQuery(List.of(oldSeg), List.of(newSeg, "untrackedSegment")));
+
     {
       int requestId = 0;
       // First selection, we select instance0 for oldSeg and instance1 for newSeg in balance selector
@@ -1390,6 +1396,7 @@ public class InstanceSelectorTest {
     // Upon re-initialization, newly old segments can only be served from online instances: instance1
     selector.init(_tableConfig, _propertyStore, _brokerMetrics, null, _mutableClock,
         INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+    assertEquals(selector.selectOnAllInstances(List.of(oldSeg, newSeg)), new SegmentsToQuery(List.of(oldSeg, newSeg)));
     {
       int requestId = 0;
       InstanceSelector.SelectionResult selectionResult =

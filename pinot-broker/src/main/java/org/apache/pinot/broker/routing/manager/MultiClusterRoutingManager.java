@@ -204,34 +204,35 @@ public class MultiClusterRoutingManager implements RoutingManager {
     return combined.isEmpty() ? null : combined;
   }
 
+  /// Combines the clusters by union, keeping the optional segments of each of them apart from its segments. Returns
+  /// `null` when no cluster has a segment to query for the table.
+  @Nullable
   @Override
-  public List<String> getSegments(BrokerRequest brokerRequest) {
-    return getSegments(brokerRequest, BaseBrokerRoutingManager.extractSamplerName(brokerRequest));
-  }
-
-  @Override
-  public List<String> getSegments(BrokerRequest brokerRequest, @Nullable String samplerName) {
-    List<String> combined = new ArrayList<>();
-    List<String> localSegments = _localClusterRoutingManager.getSegments(brokerRequest, samplerName);
+  public SegmentsToQuery getSegmentsToQuery(BrokerRequest brokerRequest, @Nullable String samplerName) {
+    List<String> segments = new ArrayList<>();
+    List<String> optionalSegments = new ArrayList<>();
+    SegmentsToQuery localSegments = _localClusterRoutingManager.getSegmentsToQuery(brokerRequest, samplerName);
     if (localSegments != null) {
-      combined.addAll(localSegments);
+      segments.addAll(localSegments.getSegments());
+      optionalSegments.addAll(localSegments.getOptionalSegments());
     }
     for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
       try {
-        List<String> remoteSegments = remoteCluster.getSegments(brokerRequest, samplerName);
+        SegmentsToQuery remoteSegments = remoteCluster.getSegmentsToQuery(brokerRequest, samplerName);
         if (remoteSegments != null) {
-          combined.addAll(remoteSegments);
+          segments.addAll(remoteSegments.getSegments());
+          optionalSegments.addAll(remoteSegments.getOptionalSegments());
         }
       } catch (Exception e) {
-        LOGGER.error("Error getting segments from remote cluster routing manager", e);
+        LOGGER.error("Error getting segments to query from remote cluster routing manager", e);
       }
     }
-    return combined.isEmpty() ? null : combined;
+    return segments.isEmpty() && optionalSegments.isEmpty() ? null : new SegmentsToQuery(segments, optionalSegments);
   }
 
   /// Combines by *intersection* over the clusters that have routing for the table, which is the opposite of how
-  /// [#getSegments] combines and deliberately so: that returns segments that survive, and a segment survives if any
-  /// cluster keeps it, while this returns segments that are provably eliminated, and a proof only holds if every
+  /// [#getSegmentsToQuery] combines and deliberately so: that returns segments that survive, and a segment survives if
+  /// any cluster keeps it, while this returns segments that are provably eliminated, and a proof only holds if every
   /// cluster that could route the segment eliminated it. Unioning instead would let one cluster's pruners speak for a
   /// segment another cluster would still have queried -- silently dropping matching data.
   ///
@@ -287,12 +288,12 @@ public class MultiClusterRoutingManager implements RoutingManager {
 
   /// Returns the partition info only when a single cluster has any, and `null` when more than one does.
   ///
-  /// Unlike [#getRoutingTable], [#getSegments] and [#getServingInstances], this cannot union the clusters: the info is
-  /// a per-partition array of the servers holding every segment of that partition, and no server holds the segments
-  /// that live in another cluster. One cluster's array would make a partition served only by another cluster look like
-  /// a partition holding no data, and a colocated join treats such a partition as empty and silently drops its rows. So
-  /// a table spread over several clusters reports nothing and its callers fail. Expressing it properly needs the array
-  /// to carry each partition's cluster, which the current shape cannot do.
+  /// Unlike [#getRoutingTable], [#getSegmentsToQuery] and [#getServingInstances], this cannot union the clusters: the
+  /// info is a per-partition array of the servers holding every segment of that partition, and no server holds the
+  /// segments that live in another cluster. One cluster's array would make a partition served only by another cluster
+  /// look like a partition holding no data, and a colocated join treats such a partition as empty and silently drops
+  /// its rows. So a table spread over several clusters reports nothing and its callers fail. Expressing it properly
+  /// needs the array to carry each partition's cluster, which the current shape cannot do.
   @Override
   public TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType) {
     TablePartitionReplicatedServersInfo partitionInfo =

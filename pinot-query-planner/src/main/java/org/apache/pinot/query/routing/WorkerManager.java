@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -284,8 +283,7 @@ public class WorkerManager {
     for (int partitionId = classId; partitionId < partitionInfoMap.length; partitionId += numWorkers) {
       PartitionInfo partitionInfo = partitionInfoMap[partitionId];
       if (partitionInfo != null) {
-        numSegments += CollectionUtils.size(partitionInfo._offlineSegments)
-            + CollectionUtils.size(partitionInfo._realtimeSegments);
+        numSegments += partitionInfo.getNumSegments();
       }
     }
     return numSegments;
@@ -494,8 +492,8 @@ public class WorkerManager {
     }
     // Fake a segments map so that the worker can be correctly identified as leaf stage. The OFFLINE key with no
     // segments is only a placeholder: the join reads the dimension table from memory, not from segments.
-    Map<String, List<String>> segmentsMap = Map.of(TableType.OFFLINE.name(), List.of());
-    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
+    Map<String, SegmentsToQuery> segmentsMap = Map.of(TableType.OFFLINE.name(), new SegmentsToQuery(List.of()));
+    Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap =
         Maps.newHashMapWithExpectedSize(workerIdToServerInstanceMap.size());
     for (Integer workerId : workerIdToServerInstanceMap.keySet()) {
       workerIdToSegmentsMap.put(workerId, segmentsMap);
@@ -688,13 +686,13 @@ public class WorkerManager {
     // Do not include workers resulted from parallelism to reduce repeated work
     for (PlanFragment child : children) {
       DispatchablePlanMetadata childMetadata = metadataMap.get(child.getFragmentId());
-      Map<String, List<String>> replicatedSegments = childMetadata.getReplicatedSegments();
+      Map<String, SegmentsToQuery> replicatedSegments = childMetadata.getReplicatedSegments();
       if (replicatedSegments != null) {
         // Fill worker ids for the replicated
         assert
             childMetadata.getWorkerIdToServerInstanceMap() == null && childMetadata.getWorkerIdToSegmentsMap() == null;
         Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap;
-        Map<Integer, Map<String, List<String>>> childWorkerIdToSegmentsMap;
+        Map<Integer, Map<String, SegmentsToQuery>> childWorkerIdToSegmentsMap;
         if (localExchangeChildMetadata != null) {
           childWorkerIdToServerInstanceMap = localExchangeChildMetadata.getWorkerIdToServerInstanceMap();
           childWorkerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(childWorkerIdToServerInstanceMap.size());
@@ -962,19 +960,12 @@ public class WorkerManager {
     }
 
     // extract all the instances associated to each table type
-    Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
+    Map<ServerInstance, Map<String, SegmentsToQuery>> serverInstanceToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
       String tableType = routingEntry.getKey();
       RoutingTable routingTable = routingEntry.getValue();
-      // for each server instance, attach all table types and their associated segment list.
-      Map<ServerInstance, SegmentsToQuery> segmentsMap = routingTable.getServerInstanceToSegmentsMap();
-      for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : segmentsMap.entrySet()) {
-        Map<String, List<String>> tableTypeToSegmentListMap =
-            serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
-        // TODO: support optional segments for multi-stage engine.
-        Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getSegments()) == null,
-            "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
-      }
+      // for each server instance, attach all table types and their associated segments.
+      addSegmentsToQuery(tableType, routingTable.getServerInstanceToSegmentsMap(), serverInstanceToSegmentsMap);
 
       // attach unavailable segments to metadata
       if (!routingTable.getUnavailableSegments().isEmpty()) {
@@ -984,30 +975,48 @@ public class WorkerManager {
         context.addNumSegmentsPrunedByBroker(routingTable.getNumPrunedSegments());
       }
     }
+    metadata.setWorkerIdToSegmentsMap(assignOneWorkerPerServer(serverInstanceToSegmentsMap, metadata));
+  }
+
+  /// Adds the segments routed to each server for one table to the segments of that server, under the given key: the
+  /// table type, or the physical table name for a logical table.
+  ///
+  /// The [SegmentsToQuery] of the routing table is passed on as is, so the optional segments stay apart from the
+  /// segments all the way to the server: it queries the optional segments it has loaded and skips the others, the same
+  /// as on the single-stage engine. They must not be merged into the segments, where one that is not loaded yet fails
+  /// the query as missing.
+  private static void addSegmentsToQuery(String key, Map<ServerInstance, SegmentsToQuery> routingTable,
+      Map<ServerInstance, Map<String, SegmentsToQuery>> serverInstanceToSegmentsMap) {
+    for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : routingTable.entrySet()) {
+      Map<String, SegmentsToQuery> segmentsMap =
+          serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
+      Preconditions.checkState(segmentsMap.put(key, serverEntry.getValue()) == null,
+          "Entry for server: %s and table: %s already exists", serverEntry.getKey(), key);
+    }
+  }
+
+  /// Assigns one worker to each server on the metadata, and returns the segments each worker scans, which are the
+  /// ones routed to its server. The caller sets them on the metadata, as it knows what they are keyed by.
+  private static Map<Integer, Map<String, SegmentsToQuery>> assignOneWorkerPerServer(
+      Map<ServerInstance, Map<String, SegmentsToQuery>> serverInstanceToSegmentsMap,
+      DispatchablePlanMetadata metadata) {
     // Sort server instances to ensure deterministic worker ID assignment.
     // This is critical for pre-partitioned exchanges where worker ID N on one stage
     // must map to the same physical server as worker ID N on another stage.
-    List<Map.Entry<ServerInstance, Map<String, List<String>>>> sortedServerInstanceToSegmentsMap =
+    List<Map.Entry<ServerInstance, Map<String, SegmentsToQuery>>> sortedServerEntries =
         new ArrayList<>(serverInstanceToSegmentsMap.entrySet());
-    sortedServerInstanceToSegmentsMap.sort(Comparator.comparing(entry -> entry.getKey().getInstanceId()));
+    sortedServerEntries.sort(Comparator.comparing(entry -> entry.getKey().getInstanceId()));
 
-    // Assign 1 worker per server
-    int numWorkers = sortedServerInstanceToSegmentsMap.size();
+    int numWorkers = sortedServerEntries.size();
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
-    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numWorkers);
-
+    Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numWorkers);
     for (int workerId = 0; workerId < numWorkers; workerId++) {
-      Map.Entry<ServerInstance, Map<String, List<String>>> serverEntry =
-          sortedServerInstanceToSegmentsMap.get(workerId);
-      QueryServerInstance server = new QueryServerInstance(serverEntry.getKey());
-      Map<String, List<String>> segmentsMap = serverEntry.getValue();
-
-      workerIdToServerInstanceMap.put(workerId, server);
-      workerIdToSegmentsMap.put(workerId, segmentsMap);
+      Map.Entry<ServerInstance, Map<String, SegmentsToQuery>> serverEntry = sortedServerEntries.get(workerId);
+      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverEntry.getKey()));
+      workerIdToSegmentsMap.put(workerId, serverEntry.getValue());
     }
-
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
-    metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+    return workerIdToSegmentsMap;
   }
 
   /// Acquire routing table for items listed in [org.apache.pinot.query.planner.plannode.TableScanNode].
@@ -1205,7 +1214,7 @@ public class WorkerManager {
   private void setSegmentsForReplicatedLeafFragment(DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
-    Map<String, List<String>> segmentsMap = getSegments(tableName, context.getPlannerContext().getOptions());
+    Map<String, SegmentsToQuery> segmentsMap = getSegments(tableName, context.getPlannerContext().getOptions());
     Preconditions.checkState(!segmentsMap.isEmpty(), "Unable to find segments for table: %s", tableName);
 
     // Acquire time boundary info if it is a hybrid table.
@@ -1220,54 +1229,70 @@ public class WorkerManager {
       }
     }
 
-    // TODO: Support unavailable segments and optional segments for replicated leaf stage
+    // TODO: Support unavailable segments for replicated leaf stage
     metadata.setReplicatedSegments(segmentsMap);
     filterReplicatedLeafStageSegments(context, metadata);
   }
 
   /// Extension point to filter the non-replicated leaf-stage per-worker segment assignment; no-op by default.
   ///
-  /// An override must treat the assignment it is handed as read-only and publish its result by replacing the per-worker
-  /// segment lists (or the whole map) on the metadata, rather than by editing them in place: part of what the
-  /// assignment is built from is the broker's published partition metadata, shared across queries and read concurrently
-  /// by other planning threads. What is handed over is nevertheless kept safe to edit in place.
+  /// An override must treat the assignment it is handed as read-only and publish its result by replacing the
+  /// [SegmentsToQuery] of a worker (or the whole map) on the metadata, rather than by editing the segment lists in
+  /// place: part of what the assignment is built from is the broker's published partition metadata, shared across
+  /// queries and read concurrently by other planning threads. What is handed over is nevertheless kept safe to edit in
+  /// place.
+  ///
+  /// A [SegmentsToQuery] holds the optional segments of the worker next to its segments, and the server queries the
+  /// optional segments it has loaded, so an override has to filter both lists.
   protected void filterLeafStageSegments(DispatchablePlanContext context, DispatchablePlanMetadata metadata) {
   }
 
-  /// Extension point to filter the replicated leaf-stage segments; no-op by default.
+  /// Extension point to filter the replicated leaf-stage segments; no-op by default. As in [#filterLeafStageSegments],
+  /// an override has to filter the optional segments too.
   protected void filterReplicatedLeafStageSegments(DispatchablePlanContext context, DispatchablePlanMetadata metadata) {
   }
 
-  /// Returns the segments for the given table, keyed by table type.
+  /// Returns the segments for the given table, which every worker of a replicated leaf stage scans, keyed by table
+  /// type. The optional segments are the new segments that are not online on all of their servers yet: a worker
+  /// queries the ones its server has loaded. A table type is left out only when it has no segment at all, so a table
+  /// whose segments are all optional is still scanned.
   /// TODO: It doesn't handle unavailable segments.
-  private Map<String, List<String>> getSegments(String tableName, Map<String, String> queryOptions) {
+  private Map<String, SegmentsToQuery> getSegments(String tableName, Map<String, String> queryOptions) {
     String samplerName = MapUtils.isNotEmpty(queryOptions) ? QueryOptionsUtils.getTableSampler(queryOptions) : null;
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
       // Raw table name
-      Map<String, List<String>> segmentsMap = new HashMap<>(4);
-      List<String> offlineSegments =
-          setSegmentsHelper(TableNameBuilder.OFFLINE.tableNameWithType(tableName), samplerName);
-      if (CollectionUtils.isNotEmpty(offlineSegments)) {
+      Map<String, SegmentsToQuery> segmentsMap = new HashMap<>(4);
+      SegmentsToQuery offlineSegments =
+          getSegmentsToQuery(TableNameBuilder.OFFLINE.tableNameWithType(tableName), samplerName);
+      if (offlineSegments != null) {
         segmentsMap.put(TableType.OFFLINE.name(), offlineSegments);
       }
-      List<String> realtimeSegments =
-          setSegmentsHelper(TableNameBuilder.REALTIME.tableNameWithType(tableName), samplerName);
-      if (CollectionUtils.isNotEmpty(realtimeSegments)) {
+      SegmentsToQuery realtimeSegments =
+          getSegmentsToQuery(TableNameBuilder.REALTIME.tableNameWithType(tableName), samplerName);
+      if (realtimeSegments != null) {
         segmentsMap.put(TableType.REALTIME.name(), realtimeSegments);
       }
       return segmentsMap;
     } else {
       // Table name with type
-      List<String> segments = setSegmentsHelper(tableName, samplerName);
-      return CollectionUtils.isNotEmpty(segments) ? Map.of(tableType.name(), segments) : Map.of();
+      SegmentsToQuery segments = getSegmentsToQuery(tableName, samplerName);
+      return segments != null ? Map.of(tableType.name(), segments) : Map.of();
     }
   }
 
+  /// Returns the segments to query on every server for the given table, optional segments included, or `null` when
+  /// there is none.
   @Nullable
-  private List<String> setSegmentsHelper(String tableNameWithType, @Nullable String samplerName) {
-    return _routingManager.getSegments(
+  private SegmentsToQuery getSegmentsToQuery(String tableNameWithType, @Nullable String samplerName) {
+    SegmentsToQuery segmentsToQuery = _routingManager.getSegmentsToQuery(
         CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableNameWithType + "\""), samplerName);
+    if (segmentsToQuery == null) {
+      return null;
+    }
+    return !segmentsToQuery.getSegments().isEmpty() || !segmentsToQuery.getOptionalSegments().isEmpty()
+        ? segmentsToQuery
+        : null;
   }
 
   private void assignWorkersToNonPartitionedLeafFragmentForLogicalTable(PlanFragment fragment,
@@ -1350,15 +1375,14 @@ public class WorkerManager {
 
   private static void assignTableSegmentsToWorkers(LogicalTableRouteInfo logicalTableRouteInfo,
       DispatchablePlanMetadata metadata) {
-    Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap =
-        new HashMap<>();
+    Map<ServerInstance, Map<String, SegmentsToQuery>> serverInstanceToLogicalSegmentsMap = new HashMap<>();
 
     if (logicalTableRouteInfo.getOfflineTables() != null) {
       for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getOfflineTables()) {
         // Routing table maybe null if no routing table is found OR there are no segments.
         if (physicalTableRoute.getOfflineRoutingTable() != null) {
-          transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getOfflineTableName(),
-              physicalTableRoute.getOfflineRoutingTable(), serverInstanceToLogicalSegmentsMap);
+          addSegmentsToQuery(physicalTableRoute.getOfflineTableName(), physicalTableRoute.getOfflineRoutingTable(),
+              serverInstanceToLogicalSegmentsMap);
         }
       }
     }
@@ -1367,50 +1391,13 @@ public class WorkerManager {
       for (TableRouteInfo physicalTableRoute : logicalTableRouteInfo.getRealtimeTables()) {
         // Routing table maybe null if no routing table is found OR there are no segments.
         if (physicalTableRoute.getRealtimeRoutingTable() != null) {
-          transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getRealtimeTableName(),
-              physicalTableRoute.getRealtimeRoutingTable(), serverInstanceToLogicalSegmentsMap);
+          addSegmentsToQuery(physicalTableRoute.getRealtimeTableName(), physicalTableRoute.getRealtimeRoutingTable(),
+              serverInstanceToLogicalSegmentsMap);
         }
       }
     }
 
-    // Sort server instances to ensure deterministic worker ID assignment.
-    // This is critical for pre-partitioned exchanges where worker ID N on one stage
-    // must map to the same physical server as worker ID N on another stage.
-    List<Map.Entry<ServerInstance, Map<String, List<String>>>> sortedServerInstanceToSegmentsMap =
-        new ArrayList<>(serverInstanceToLogicalSegmentsMap.entrySet());
-    sortedServerInstanceToSegmentsMap.sort(Comparator.comparing(entry -> entry.getKey().getInstanceId()));
-
-    // Assign 1 worker per server
-    int numWorkers = sortedServerInstanceToSegmentsMap.size();
-    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
-    Map<Integer, Map<String, List<String>>> workerIdToLogicalTableSegmentsMap =
-        Maps.newHashMapWithExpectedSize(numWorkers);
-
-    for (int workerId = 0; workerId < numWorkers; workerId++) {
-      Map.Entry<ServerInstance, Map<String, List<String>>> serverEntry =
-          sortedServerInstanceToSegmentsMap.get(workerId);
-      QueryServerInstance server = new QueryServerInstance(serverEntry.getKey());
-      Map<String, List<String>> segmentsMap = serverEntry.getValue();
-
-      workerIdToServerInstanceMap.put(workerId, server);
-      workerIdToLogicalTableSegmentsMap.put(workerId, segmentsMap);
-    }
-
-    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
-    metadata.setWorkerIdToTableSegmentsMap(workerIdToLogicalTableSegmentsMap);
-  }
-
-  private static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
-      Map<ServerInstance, SegmentsToQuery> segmentsMap,
-      Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap) {
-    for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : segmentsMap.entrySet()) {
-      Map<String, List<String>> tableNameToSegmentsMap =
-          serverInstanceToLogicalSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
-      // TODO: support optional segments for multi-stage engine.
-      Preconditions.checkState(
-          tableNameToSegmentsMap.put(physicalTableName, serverEntry.getValue().getSegments()) == null,
-          "Entry for server {} and physical table: {} already exist!", serverEntry.getKey(), physicalTableName);
-    }
+    metadata.setWorkerIdToTableSegmentsMap(assignOneWorkerPerServer(serverInstanceToLogicalSegmentsMap, metadata));
   }
 
   // --------------------------------------------------------------------------
@@ -1472,7 +1459,7 @@ public class WorkerManager {
     }
 
     Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
-    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
+    Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap = new HashMap<>();
     if (numPartitionsPerWorker == 1) {
       assignOnePartitionPerWorker(tableName, context.getRequestId(), partitionInfoMap, partitionClassIds,
           partitionsToKeep, paddingInfo, _routingManager.getEnabledServerInstanceMap(), workerIdToServerInstanceMap,
@@ -1545,20 +1532,20 @@ public class WorkerManager {
   /// no segment at all, which has no rows to contribute either way -- note that a partition holding data the broker
   /// cannot route yet has no entry in the map rather than an empty one, so it is not this case (see
   /// [#checkNoPartitionsWithOnlyDeferredSegments]).
+  ///
+  /// The optional segments count like the others: one that is not provably pruned keeps the partition, and with it
+  /// the worker that queries it.
   private static boolean allSegmentsPruned(PartitionInfo partitionInfo, Set<String> prunedSegments) {
     return allPruned(partitionInfo._offlineSegments, prunedSegments)
         && allPruned(partitionInfo._realtimeSegments, prunedSegments);
   }
 
-  private static boolean allPruned(@Nullable List<String> segments, Set<String> prunedSegments) {
-    if (segments != null) {
-      for (String segment : segments) {
-        if (!prunedSegments.contains(segment)) {
-          return false;
-        }
-      }
+  private static boolean allPruned(@Nullable SegmentsToQuery segmentsToQuery, Set<String> prunedSegments) {
+    if (segmentsToQuery == null) {
+      return true;
     }
-    return true;
+    return prunedSegments.containsAll(segmentsToQuery.getSegments())
+        && prunedSegments.containsAll(segmentsToQuery.getOptionalSegments());
   }
 
   /// Counts the segments in partitions dropped by broker pruning (those absent from `partitionsToKeep`). A partition
@@ -1568,8 +1555,7 @@ public class WorkerManager {
     for (int i = 0; i < partitionInfoMap.length; i++) {
       PartitionInfo partitionInfo = partitionInfoMap[i];
       if (partitionInfo != null && !partitionsToKeep.contains(i)) {
-        numPrunedSegments += CollectionUtils.size(partitionInfo._offlineSegments)
-            + CollectionUtils.size(partitionInfo._realtimeSegments);
+        numPrunedSegments += partitionInfo.getNumSegments();
       }
     }
     return numPrunedSegments;
@@ -1581,7 +1567,7 @@ public class WorkerManager {
       @Nullable int[] partitionClassIds, @Nullable Set<Integer> partitionsToKeep, @Nullable PaddingInfo paddingInfo,
       Map<String, ServerInstance> enabledServerInstanceMap,
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap,
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+      Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap) {
     int[] partitionIds = selectPartitionsToAssign(partitionInfoMap.length, partitionClassIds, partitionsToKeep);
     for (int workerId = 0; workerId < partitionIds.length; workerId++) {
       int partitionId = partitionIds[workerId];
@@ -1652,7 +1638,7 @@ public class WorkerManager {
       PartitionInfo[] partitionInfoMap, @Nullable int[] partitionClassIds, @Nullable Set<Integer> partitionsToKeep,
       @Nullable PaddingInfo paddingInfo, Map<String, ServerInstance> enabledServerInstanceMap,
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap,
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+      Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap) {
     int numPartitions = partitionInfoMap.length;
     int numPartitionsPerWorker = numPartitions / numWorkers;
     int numClasses = partitionClassIds != null ? partitionClassIds.length : numWorkers;
@@ -1660,8 +1646,8 @@ public class WorkerManager {
     for (int classIndex = 0; classIndex < numClasses; classIndex++) {
       int classId = partitionClassIds != null ? partitionClassIds[classIndex] : classIndex;
       Set<String> fullyReplicatedServers = null;
-      List<String> offlineSegments = null;
-      List<String> realtimeSegments = null;
+      SegmentsToQuery offlineSegments = null;
+      SegmentsToQuery realtimeSegments = null;
       for (int partitionId = classId; partitionId < numPartitions; partitionId += numWorkers) {
         if (partitionsToKeep != null && !partitionsToKeep.contains(partitionId)) {
           // Partition pruned by the broker filter.
@@ -1676,20 +1662,8 @@ public class WorkerManager {
         } else {
           fullyReplicatedServers.retainAll(partitionInfo._fullyReplicatedServers);
         }
-        if (partitionInfo._offlineSegments != null) {
-          if (offlineSegments == null) {
-            offlineSegments = new ArrayList<>(partitionInfo._offlineSegments);
-          } else {
-            offlineSegments.addAll(partitionInfo._offlineSegments);
-          }
-        }
-        if (partitionInfo._realtimeSegments != null) {
-          if (realtimeSegments == null) {
-            realtimeSegments = new ArrayList<>(partitionInfo._realtimeSegments);
-          } else {
-            realtimeSegments.addAll(partitionInfo._realtimeSegments);
-          }
-        }
+        offlineSegments = addSegments(offlineSegments, partitionInfo._offlineSegments);
+        realtimeSegments = addSegments(realtimeSegments, partitionInfo._realtimeSegments);
       }
       if (fullyReplicatedServers == null) {
         // Pad a class the colocated group keeps but this table has no data in, see assignPaddedWorker.
@@ -1737,7 +1711,7 @@ public class WorkerManager {
   private static void assignPaddedWorker(String tableName, long requestId, int classId, PaddingInfo paddingInfo,
       Map<String, ServerInstance> enabledServerInstanceMap, int workerId,
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap,
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+      Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap) {
     Set<String> peerServers = paddingInfo._classCandidates.get(classId);
     // The callers only pad a class the colocated group decided to pad, so there is always a candidate set for it.
     assert peerServers != null;
@@ -1753,7 +1727,7 @@ public class WorkerManager {
       tableType = hostingServers.get(serverInstance.getInstanceId());
     }
     workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
-    workerIdToSegmentsMap.put(workerId, Map.of(tableType, new ArrayList<>()));
+    workerIdToSegmentsMap.put(workerId, Map.of(tableType, new SegmentsToQuery(new ArrayList<>())));
   }
 
   /// Returns every server that provably hosts the given table -- the union of the fully replicated servers over its
@@ -1781,9 +1755,9 @@ public class WorkerManager {
   /// - the worker ids must be exactly `0..numWorkers-1`, because
   ///   [DispatchablePlanContext#constructDispatchablePlanFragmentMap] indexes a `WorkerMetadata[]` sized from the
   ///   server map by worker id, where a gap leaves a null entry;
-  /// - every worker must have a segments map keyed by 1 or 2 [TableType] names, with non-null lists, because the server
-  ///   splits the request on the number of entries and resolves one table data manager per key: an unexpected key
-  ///   becomes an opaque server-side failure;
+  /// - every worker must have a segments map keyed by 1 or 2 [TableType] names, with non-null segments, because the
+  ///   server splits the request on the number of entries and resolves one table data manager per key: an unexpected
+  ///   key becomes an opaque server-side failure;
   /// - a leaf of a colocated group must produce exactly one worker per class of the group's shared list, because a
   ///   worker id *is* an index into that list. Nothing downstream can catch a leaf that skipped one:
   ///   `MailboxAssignmentVisitor#checkPartitionClassAgreement` compares the shared array against itself, so a member
@@ -1792,7 +1766,7 @@ public class WorkerManager {
   @VisibleForTesting
   static void checkLeafWorkerAssignment(String tableName, @Nullable int[] partitionClassIds,
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap,
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+      Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap) {
     int numWorkers = workerIdToServerInstanceMap.size();
     Preconditions.checkState(partitionClassIds == null || partitionClassIds.length == numWorkers,
         "Got %s workers for partition classes: %s of table: %s", numWorkers,
@@ -1803,19 +1777,19 @@ public class WorkerManager {
     for (int workerId = 0; workerId < numWorkers; workerId++) {
       Preconditions.checkState(workerIdToServerInstanceMap.containsKey(workerId),
           "Missing server instance for worker: %s (num workers: %s) for table: %s", workerId, numWorkers, tableName);
-      Map<String, List<String>> segmentsMap = workerIdToSegmentsMap.get(workerId);
+      Map<String, SegmentsToQuery> segmentsMap = workerIdToSegmentsMap.get(workerId);
       Preconditions.checkState(segmentsMap != null, "Missing segments for worker: %s (num workers: %s) for table: %s",
           workerId, numWorkers, tableName);
       int numTableTypes = segmentsMap.size();
       Preconditions.checkState(numTableTypes == 1 || numTableTypes == 2,
           "Expected 1 or 2 table types for worker: %s, got: %s for table: %s", workerId, numTableTypes, tableName);
-      for (Map.Entry<String, List<String>> entry : segmentsMap.entrySet()) {
+      for (Map.Entry<String, SegmentsToQuery> entry : segmentsMap.entrySet()) {
         String tableType = entry.getKey();
         Preconditions.checkState(
             TableType.OFFLINE.name().equals(tableType) || TableType.REALTIME.name().equals(tableType),
             "Unexpected table type: %s for worker: %s for table: %s", tableType, workerId, tableName);
         Preconditions.checkState(entry.getValue() != null,
-            "Null segment list for table type: %s, worker: %s for table: %s", tableType, workerId, tableName);
+            "Null segments for table type: %s, worker: %s for table: %s", tableType, workerId, tableName);
       }
     }
   }
@@ -1882,21 +1856,21 @@ public class WorkerManager {
             continue;
           }
           if (offlinePartitionInfo == null) {
-            partitionInfoMap[i] =
-                new PartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null, realtimePartitionInfo._segments);
+            partitionInfoMap[i] = new PartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null,
+                toSegmentsToQuery(realtimePartitionInfo));
             continue;
           }
           if (realtimePartitionInfo == null) {
-            partitionInfoMap[i] =
-                new PartitionInfo(offlinePartitionInfo._fullyReplicatedServers, offlinePartitionInfo._segments, null);
+            partitionInfoMap[i] = new PartitionInfo(offlinePartitionInfo._fullyReplicatedServers,
+                toSegmentsToQuery(offlinePartitionInfo), null);
             continue;
           }
           Set<String> fullyReplicatedServers = new HashSet<>(offlinePartitionInfo._fullyReplicatedServers);
           fullyReplicatedServers.retainAll(realtimePartitionInfo._fullyReplicatedServers);
           Preconditions.checkState(!fullyReplicatedServers.isEmpty(),
               "Failed to find fully replicated server for partition: %s in hybrid table: %s", i, tableName);
-          partitionInfoMap[i] = new PartitionInfo(fullyReplicatedServers, offlinePartitionInfo._segments,
-              realtimePartitionInfo._segments);
+          partitionInfoMap[i] = new PartitionInfo(fullyReplicatedServers, toSegmentsToQuery(offlinePartitionInfo),
+              toSegmentsToQuery(realtimePartitionInfo));
         }
         // Union the two sides, then keep only the partitions the merged map has no entry for: a partition one side
         // deferred but the other still serves as a whole does get a worker, so reporting it would fail a query the
@@ -1957,11 +1931,18 @@ public class WorkerManager {
   /// [TablePartitionReplicatedServersInfo#getPartitionsWithOnlyDeferredSegments()], which is also where the other
   /// causes of a partition without an entry in the partition info map are listed).
   ///
-  /// The partitioned assignment needs one worker to scan a whole partition and the multi-stage engine has no
-  /// optional-segment mechanism to fall back on, so the only alternatives are failing here or silently omitting the
-  /// partition's rows. Only called where every partition needs a worker, i.e. where broker pruning is inactive.
+  /// The partitioned assignment needs one worker to scan a whole partition, and such a partition has no server to
+  /// place that worker on, so the only alternatives are failing here or silently omitting the partition's rows. Only
+  /// called where every partition needs a worker, i.e. where broker pruning is inactive.
+  ///
+  /// A partition that also holds segments with all replicas online is not this case: it has a worker, which queries
+  /// the deferred segments as optional segments (see [#toSegmentsToQuery]).
   private static void checkNoPartitionsWithOnlyDeferredSegments(PartitionTableInfo partitionTableInfo,
       String tableNameWithType) {
+    // TODO: Give such a partition a worker that has only optional segments, on a server its segments are assigned to,
+    //   instead of rejecting the table here or dropping its rows when broker pruning is active. A server answers such
+    //   a worker with an empty result even when it has not set up the table yet, but only since release 1.7.0
+    //   (apache/pinot#20262), so this has to wait until servers on 1.7.0 or later are deployed.
     Set<Integer> partitionsWithOnlyDeferredSegments = partitionTableInfo._partitionsWithOnlyDeferredSegments;
     Preconditions.checkState(partitionsWithOnlyDeferredSegments.isEmpty(),
         "Failed to find a fully replicated server for partitions: %s of table: %s, because all of their segments are "
@@ -2053,11 +2034,11 @@ public class WorkerManager {
           switch (tableType) {
             case OFFLINE:
               workerPartitionInfoMap[i] =
-                  new PartitionInfo(partitionInfo._fullyReplicatedServers, partitionInfo._segments, null);
+                  new PartitionInfo(partitionInfo._fullyReplicatedServers, toSegmentsToQuery(partitionInfo), null);
               break;
             case REALTIME:
               workerPartitionInfoMap[i] =
-                  new PartitionInfo(partitionInfo._fullyReplicatedServers, null, partitionInfo._segments);
+                  new PartitionInfo(partitionInfo._fullyReplicatedServers, null, toSegmentsToQuery(partitionInfo));
               break;
             default:
               throw new IllegalStateException("Unsupported table type: " + tableType);
@@ -2070,17 +2051,39 @@ public class WorkerManager {
     }
   }
 
+  /// The servers that can scan one partition as a whole, and its segments of each table type, which wrap the lists the
+  /// broker publishes and so must only be read.
   private static class PartitionInfo {
     final Set<String> _fullyReplicatedServers;
-    final List<String> _offlineSegments;
-    final List<String> _realtimeSegments;
+    @Nullable
+    final SegmentsToQuery _offlineSegments;
+    @Nullable
+    final SegmentsToQuery _realtimeSegments;
 
-    PartitionInfo(Set<String> fullyReplicatedServers, @Nullable List<String> offlineSegments,
-        @Nullable List<String> realtimeSegments) {
+    PartitionInfo(Set<String> fullyReplicatedServers, @Nullable SegmentsToQuery offlineSegments,
+        @Nullable SegmentsToQuery realtimeSegments) {
       _fullyReplicatedServers = fullyReplicatedServers;
       _offlineSegments = offlineSegments;
       _realtimeSegments = realtimeSegments;
     }
+
+    /// Returns the number of segments of the partition, optional segments included.
+    int getNumSegments() {
+      return getNumSegments(_offlineSegments) + getNumSegments(_realtimeSegments);
+    }
+
+    private static int getNumSegments(@Nullable SegmentsToQuery segmentsToQuery) {
+      return segmentsToQuery != null
+          ? segmentsToQuery.getSegments().size() + segmentsToQuery.getOptionalSegments().size()
+          : 0;
+    }
+  }
+
+  /// Returns the segments of a partition as the broker publishes them. Its deferred segments, i.e. the new segments
+  /// that do not have all replicas online yet, are the optional segments: the worker of the partition runs on a server
+  /// that has all the other segments, and queries the deferred ones only if that server has loaded them.
+  private static SegmentsToQuery toSegmentsToQuery(TablePartitionReplicatedServersInfo.PartitionInfo partitionInfo) {
+    return new SegmentsToQuery(partitionInfo._segments, partitionInfo._optionalSegments);
   }
 
   /// Picks an enabled server deterministically based on the given index to pick.
@@ -2107,14 +2110,33 @@ public class WorkerManager {
     return null;
   }
 
-  /// Copies a segment list published by the broker so that the planner never hands out (or mutates) the shared one.
+  /// Copies the segment lists published by the broker so that the planner never hands out (or mutates) the shared ones.
   @Nullable
-  private static List<String> copySegments(@Nullable List<String> segments) {
-    return segments != null ? new ArrayList<>(segments) : null;
+  private static SegmentsToQuery copySegments(@Nullable SegmentsToQuery segmentsToQuery) {
+    return segmentsToQuery != null
+        ? new SegmentsToQuery(new ArrayList<>(segmentsToQuery.getSegments()),
+            new ArrayList<>(segmentsToQuery.getOptionalSegments()))
+        : null;
   }
 
-  private static Map<String, List<String>> getSegmentsMap(@Nullable List<String> offlineSegments,
-      @Nullable List<String> realtimeSegments) {
+  /// Adds the segments of a partition to the ones collected for the worker that scans it, and returns the latter. The
+  /// first ones added are copied, so that the lists published by the broker are never mutated.
+  @Nullable
+  private static SegmentsToQuery addSegments(@Nullable SegmentsToQuery workerSegments,
+      @Nullable SegmentsToQuery partitionSegments) {
+    if (partitionSegments == null) {
+      return workerSegments;
+    }
+    if (workerSegments == null) {
+      return copySegments(partitionSegments);
+    }
+    workerSegments.getSegments().addAll(partitionSegments.getSegments());
+    workerSegments.getOptionalSegments().addAll(partitionSegments.getOptionalSegments());
+    return workerSegments;
+  }
+
+  private static Map<String, SegmentsToQuery> getSegmentsMap(@Nullable SegmentsToQuery offlineSegments,
+      @Nullable SegmentsToQuery realtimeSegments) {
     if (offlineSegments != null) {
       if (realtimeSegments != null) {
         return Map.of(TableType.OFFLINE.name(), offlineSegments, TableType.REALTIME.name(), realtimeSegments);

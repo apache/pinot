@@ -20,13 +20,13 @@ package org.apache.pinot.query.planner.physical;
 
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.ToIntFunction;
 import org.apache.calcite.runtime.PairList;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 
 
@@ -150,10 +150,14 @@ public class DispatchableSubPlan {
         estimatedNumQueryThreads += stage.getWorkerMetadataList().size();
       } else {
         // Leaf stage
-        for (Map<String, List<String>> segmentsMap : stage.getWorkerIdToSegmentsMap().values()) {
+        for (Map<String, SegmentsToQuery> segmentsMap : stage.getWorkerIdToSegmentsMap().values()) {
           int numSegments = 0;
-          for (List<String> segments : segmentsMap.values()) {
-            for (String segment : segments) {
+          for (SegmentsToQuery segmentsToQuery : segmentsMap.values()) {
+            for (String segment : segmentsToQuery.getSegments()) {
+              numSegments += segmentWorkUnits.applyAsInt(segment);
+            }
+            // The server scans the optional segments it has loaded, which is the common case
+            for (String segment : segmentsToQuery.getOptionalSegments()) {
               numSegments += segmentWorkUnits.applyAsInt(segment);
             }
           }

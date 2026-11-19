@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -44,7 +45,7 @@ public class DispatchablePlanFragment {
   // used for table scan stage - we use ServerInstance instead of VirtualServer
   // here because all virtual servers that share a server instance will have the
   // same segments on them
-  private final Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
+  private final Map<Integer, Map<String, SegmentsToQuery>> _workerIdToSegmentsMap;
 
   // used for passing custom properties to build StageMetadata on the server.
   private final Map<String, String> _customProperties;
@@ -110,11 +111,11 @@ public class DispatchablePlanFragment {
     _customProperties.put(TIME_BOUNDARY_VALUE_KEY, timeBoundaryInfo.getTimeValue());
   }
 
-  public Map<Integer, Map<String, List<String>>> getWorkerIdToSegmentsMap() {
+  public Map<Integer, Map<String, SegmentsToQuery>> getWorkerIdToSegmentsMap() {
     return _workerIdToSegmentsMap;
   }
 
-  public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+  public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, SegmentsToQuery>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap.clear();
     _workerIdToSegmentsMap.putAll(workerIdToSegmentsMap);
   }

@@ -67,8 +67,8 @@ public class LeafStageWorkerAssignmentRuleTest {
   private static final InstanceIdToSegments HYBRID_INSTANCE_ID_TO_SEGMENTS;
 
   static {
-    Map<String, List<String>> offlineSegmentsMap = createOfflineSegmentsMap();
-    Map<String, List<String>> realtimeSegmentsMap = createRealtimeSegmentsMap();
+    Map<String, SegmentsToQuery> offlineSegmentsMap = createOfflineSegmentsMap();
+    Map<String, SegmentsToQuery> realtimeSegmentsMap = createRealtimeSegmentsMap();
     OFFLINE_INSTANCE_ID_TO_SEGMENTS = new InstanceIdToSegments();
     OFFLINE_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap = offlineSegmentsMap;
     REALTIME_INSTANCE_ID_TO_SEGMENTS = new InstanceIdToSegments();
@@ -141,6 +141,38 @@ public class LeafStageWorkerAssignmentRuleTest {
     assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
     assertEquals(desc.getHashFunction().name(), PARTITION_FUNCTION.toUpperCase());
     validateTableScanAssignment(result, OFFLINE_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap, "OFFLINE");
+  }
+
+  @Test
+  public void testAssignTableScanPartitionedOfflineTableWithOptionalSegments() {
+    // The optional segment of partition 1 is routed to the server of the worker that scans partition 1, while the one
+    // of partition 2 is routed to the server of the worker that scans partition 0.
+    InstanceIdToSegments instanceIdToSegments = new InstanceIdToSegments();
+    instanceIdToSegments._offlineTableSegmentsMap = Map.of(
+        "instance-0", new SegmentsToQuery(List.of("segment-0"), List.of("newSegment-2")),
+        "instance-1", new SegmentsToQuery(List.of("segment-1"), List.of("newSegment-1")),
+        "instance-2", new SegmentsToQuery(List.of("segment-2")),
+        "instance-3", new SegmentsToQuery(List.of("segment-3"))
+    );
+    TablePartitionInfo tablePartitionInfo = new TablePartitionInfo(
+        TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(TABLE_NAME), PARTITION_COLUMN,
+        PARTITION_FUNCTION, OFFLINE_NUM_PARTITIONS, List.of(
+            List.of("segment-0"),
+            List.of("segment-1", "newSegment-1"),
+            List.of("segment-2", "newSegment-2"),
+            List.of("segment-3")
+        ), List.of());
+
+    TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
+        instanceIdToSegments, Map.of("OFFLINE", tablePartitionInfo), false, false);
+
+    assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.HASH_DISTRIBUTED);
+    validateTableScanAssignment(result, Map.of(
+        "instance-0", new SegmentsToQuery(List.of("segment-0")),
+        "instance-1", new SegmentsToQuery(List.of("segment-1"), List.of("newSegment-1")),
+        "instance-2", new SegmentsToQuery(List.of("segment-2")),
+        "instance-3", new SegmentsToQuery(List.of("segment-3"))
+    ), "OFFLINE");
   }
 
   @Test
@@ -226,8 +258,8 @@ public class LeafStageWorkerAssignmentRuleTest {
     final TablePartitionInfo inputTablePartitionInfo = new TablePartitionInfo(tableNameWithType, PARTITION_COLUMN,
         PARTITION_FUNCTION, numPartitions, List.of(), segments /* invalid partition segments */);
     // Setup other test inputs.
-    Map<String, List<String>> instanceIdToSegmentsMap = new HashMap<>();
-    instanceIdToSegmentsMap.put("instance-0", segments);
+    Map<String, SegmentsToQuery> instanceIdToSegmentsMap = new HashMap<>();
+    instanceIdToSegmentsMap.put("instance-0", new SegmentsToQuery(segments));
     TablePartitionInfo tpi = LeafStageWorkerAssignmentRule.buildTablePartitionInfoWithInferredPartitions(
         TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), instanceIdToSegmentsMap, inputTablePartitionInfo);
     assertNotNull(tpi);
@@ -247,8 +279,8 @@ public class LeafStageWorkerAssignmentRuleTest {
     final TablePartitionInfo inputTablePartitionInfo = new TablePartitionInfo(tableNameWithType, PARTITION_COLUMN,
         PARTITION_FUNCTION, numPartitions, List.of(), segments /* invalid partition segments */);
     // Setup other test inputs.
-    Map<String, List<String>> instanceIdToSegmentsMap = new HashMap<>();
-    instanceIdToSegmentsMap.put("instance-0", segments);
+    Map<String, SegmentsToQuery> instanceIdToSegmentsMap = new HashMap<>();
+    instanceIdToSegmentsMap.put("instance-0", new SegmentsToQuery(segments));
     assertNull(LeafStageWorkerAssignmentRule.buildTablePartitionInfoWithInferredPartitions(
         TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), instanceIdToSegmentsMap, inputTablePartitionInfo));
   }
@@ -345,8 +377,8 @@ public class LeafStageWorkerAssignmentRuleTest {
   }
 
   private static void validateTableScanAssignment(TableScanWorkerAssignmentResult assignmentResult,
-      Map<String, List<String>> instanceIdToSegmentsMap, String tableType) {
-    Map<String, List<String>> actualInstanceIdToSegments = new HashMap<>();
+      Map<String, SegmentsToQuery> instanceIdToSegmentsMap, String tableType) {
+    Map<String, SegmentsToQuery> actualInstanceIdToSegments = new HashMap<>();
     for (var entry : assignmentResult._workerIdToSegmentsMap.entrySet()) {
       int workerId = entry.getKey();
       String fullWorkerId = assignmentResult._pinotDataDistribution.getWorkers().get(workerId);
@@ -357,31 +389,31 @@ public class LeafStageWorkerAssignmentRuleTest {
     assertEquals(actualInstanceIdToSegments, instanceIdToSegmentsMap);
   }
 
-  private static Map<String, List<String>> createOfflineSegmentsMap() {
+  private static Map<String, SegmentsToQuery> createOfflineSegmentsMap() {
     // assume 4 servers and 4 partitions.
-    Map<String, List<String>> result = new HashMap<>();
-    result.put("instance-0", List.of("segment1-0", "segment2-0", "segment3-0"));
-    result.put("instance-1", List.of("segment1-1", "segment2-1"));
-    result.put("instance-2", List.of("segment1-2"));
-    result.put("instance-3", List.of("segment1-3", "segment2-3", "segment3-3"));
+    Map<String, SegmentsToQuery> result = new HashMap<>();
+    result.put("instance-0", new SegmentsToQuery(List.of("segment1-0", "segment2-0", "segment3-0")));
+    result.put("instance-1", new SegmentsToQuery(List.of("segment1-1", "segment2-1")));
+    result.put("instance-2", new SegmentsToQuery(List.of("segment1-2")));
+    result.put("instance-3", new SegmentsToQuery(List.of("segment1-3", "segment2-3", "segment3-3")));
     return result;
   }
 
-  private static Map<String, List<String>> createRealtimeSegmentsMap() {
+  private static Map<String, SegmentsToQuery> createRealtimeSegmentsMap() {
     // assume 4 servers and 8 partitions. assume partition-5 is missing.
-    Map<String, List<String>> result = new HashMap<>();
-    result.put("instance-0", List.of("segment1-0", "segment1-4", "segment2-4"));
-    result.put("instance-1", List.of("segment1-1", "segment2-1"));
-    result.put("instance-2", List.of("segment1-2", "segment1-6"));
-    result.put("instance-3", List.of("segment1-3", "segment2-3", "segment1-7", "segment2-7"));
+    Map<String, SegmentsToQuery> result = new HashMap<>();
+    result.put("instance-0", new SegmentsToQuery(List.of("segment1-0", "segment1-4", "segment2-4")));
+    result.put("instance-1", new SegmentsToQuery(List.of("segment1-1", "segment2-1")));
+    result.put("instance-2", new SegmentsToQuery(List.of("segment1-2", "segment1-6")));
+    result.put("instance-3", new SegmentsToQuery(List.of("segment1-3", "segment2-3", "segment1-7", "segment2-7")));
     return result;
   }
 
-  private static Map<String, List<String>> createRealtimeSegmentsMapWithInvalidPartitionSegments() {
-    Map<String, List<String>> result = createRealtimeSegmentsMap();
-    List<String> segments = new ArrayList<>(result.get("instance-1"));
+  private static Map<String, SegmentsToQuery> createRealtimeSegmentsMapWithInvalidPartitionSegments() {
+    Map<String, SegmentsToQuery> result = createRealtimeSegmentsMap();
+    List<String> segments = new ArrayList<>(result.get("instance-1").getSegments());
     segments.add(INVALID_SEGMENT_PARTITION);
-    result.put("instance-1", segments);
+    result.put("instance-1", new SegmentsToQuery(segments));
     return result;
   }
 
@@ -391,7 +423,7 @@ public class LeafStageWorkerAssignmentRuleTest {
       String selectedInstance = String.format("instance-%s", partitionNum % NUM_SERVERS);
       final String segmentSuffixForPartition = String.format("-%d", partitionNum);
       List<String> segments = Objects.requireNonNull(OFFLINE_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap)
-          .get(selectedInstance).stream().filter(segment -> segment.endsWith(segmentSuffixForPartition))
+          .get(selectedInstance).getSegments().stream().filter(segment -> segment.endsWith(segmentSuffixForPartition))
           .collect(Collectors.toList());
       segmentsByPartition.add(segments);
     }
@@ -409,7 +441,7 @@ public class LeafStageWorkerAssignmentRuleTest {
       String selectedInstance = String.format("instance-%s", partitionNum % NUM_SERVERS);
       final String segmentSuffixForPartition = String.format("-%d", partitionNum);
       List<String> segments = Objects.requireNonNull(REALTIME_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap)
-          .get(selectedInstance).stream().filter(segment -> segment.endsWith(segmentSuffixForPartition))
+          .get(selectedInstance).getSegments().stream().filter(segment -> segment.endsWith(segmentSuffixForPartition))
           .collect(Collectors.toList());
       segmentsByPartition.add(segments);
     }
@@ -468,9 +500,9 @@ public class LeafStageWorkerAssignmentRuleTest {
     assertNotNull(metadata.getWorkerIdToLogicalTableSegmentsMap());
 
     // Verify segment mapping
-    Map<Integer, Map<String, List<String>>> segmentsMap = metadata.getWorkerIdToLogicalTableSegmentsMap();
-    assertEquals(segmentsMap.get(0).get("orders_OFFLINE"), List.of("orders_seg1", "orders_seg2"));
-    assertEquals(segmentsMap.get(1).get("orders_OFFLINE"), List.of("orders_seg3"));
+    Map<Integer, Map<String, SegmentsToQuery>> segmentsMap = metadata.getWorkerIdToLogicalTableSegmentsMap();
+    assertEquals(segmentsMap.get(0).get("orders_OFFLINE").getSegments(), List.of("orders_seg1", "orders_seg2"));
+    assertEquals(segmentsMap.get(1).get("orders_OFFLINE").getSegments(), List.of("orders_seg3"));
   }
 
   @Test
@@ -495,8 +527,8 @@ public class LeafStageWorkerAssignmentRuleTest {
     Map<ServerInstance, SegmentsToQuery> realtimeRouting = new HashMap<>();
     SegmentsToQuery rtSeg1 = mock(SegmentsToQuery.class);
     doReturn(List.of("orders_rt_seg1")).when(rtSeg1).getSegments();
-    SegmentsToQuery rtSeg2 = mock(SegmentsToQuery.class);
-    doReturn(List.of("orders_rt_seg2", "orders_rt_seg3")).when(rtSeg2).getSegments();
+    SegmentsToQuery rtSeg2 =
+        new SegmentsToQuery(List.of("orders_rt_seg2", "orders_rt_seg3"), List.of("orders_rt_new_seg"));
     realtimeRouting.put(server1, rtSeg1);
     realtimeRouting.put(server2, rtSeg2);
 
@@ -524,14 +556,15 @@ public class LeafStageWorkerAssignmentRuleTest {
     assertEquals(metadata.getTableOptions().get("option1"), "value1");
 
     // Server1 should have both offline and realtime segments
-    Map<String, List<String>> server1Segments = metadata.getWorkerIdToLogicalTableSegmentsMap().get(0);
-    assertEquals(server1Segments.get("orders_OFFLINE"), List.of("orders_seg1"));
-    assertEquals(server1Segments.get("orders_REALTIME"), List.of("orders_rt_seg1"));
+    Map<String, SegmentsToQuery> server1Segments = metadata.getWorkerIdToLogicalTableSegmentsMap().get(0);
+    assertEquals(server1Segments.get("orders_OFFLINE").getSegments(), List.of("orders_seg1"));
+    assertEquals(server1Segments.get("orders_REALTIME").getSegments(), List.of("orders_rt_seg1"));
 
-    // Server2 should only have realtime segments
-    Map<String, List<String>> server2Segments = metadata.getWorkerIdToLogicalTableSegmentsMap().get(1);
+    // Server2 should only have realtime segments, along with the optional segment routed to it
+    Map<String, SegmentsToQuery> server2Segments = metadata.getWorkerIdToLogicalTableSegmentsMap().get(1);
     assertNull(server2Segments.get("orders_OFFLINE"));
-    assertEquals(server2Segments.get("orders_REALTIME"), List.of("orders_rt_seg2", "orders_rt_seg3"));
+    assertEquals(server2Segments.get("orders_REALTIME"),
+        new SegmentsToQuery(List.of("orders_rt_seg2", "orders_rt_seg3"), List.of("orders_rt_new_seg")));
   }
 
   @Test
@@ -690,13 +723,13 @@ public class LeafStageWorkerAssignmentRuleTest {
     routingTable.put(server1, seg1);
     routingTable.put(server2, seg2);
 
-    Map<ServerInstance, Map<String, List<String>>> result = new HashMap<>();
+    Map<ServerInstance, Map<String, SegmentsToQuery>> result = new HashMap<>();
     LeafStageWorkerAssignmentRule.transferToServerInstanceLogicalSegmentsMap(
         "orders_OFFLINE", routingTable, result);
 
     assertEquals(result.size(), 2);
-    assertEquals(result.get(server1).get("orders_OFFLINE"), List.of("seg1", "seg2"));
-    assertEquals(result.get(server2).get("orders_OFFLINE"), List.of("seg3"));
+    assertEquals(result.get(server1).get("orders_OFFLINE").getSegments(), List.of("seg1", "seg2"));
+    assertEquals(result.get(server2).get("orders_OFFLINE").getSegments(), List.of("seg3"));
   }
 
   @Test
@@ -704,7 +737,7 @@ public class LeafStageWorkerAssignmentRuleTest {
     ServerInstance server1 = mock(ServerInstance.class);
     doReturn("server-1").when(server1).getInstanceId();
 
-    Map<ServerInstance, Map<String, List<String>>> result = new HashMap<>();
+    Map<ServerInstance, Map<String, SegmentsToQuery>> result = new HashMap<>();
 
     // Add first table
     Map<ServerInstance, SegmentsToQuery> routing1 = new HashMap<>();
@@ -722,9 +755,9 @@ public class LeafStageWorkerAssignmentRuleTest {
 
     // Verify single server has both tables
     assertEquals(result.size(), 1);
-    Map<String, List<String>> serverSegments = result.get(server1);
+    Map<String, SegmentsToQuery> serverSegments = result.get(server1);
     assertEquals(serverSegments.size(), 2);
-    assertEquals(serverSegments.get("table_OFFLINE"), List.of("offline_seg1"));
-    assertEquals(serverSegments.get("table_REALTIME"), List.of("realtime_seg1"));
+    assertEquals(serverSegments.get("table_OFFLINE").getSegments(), List.of("offline_seg1"));
+    assertEquals(serverSegments.get("table_REALTIME").getSegments(), List.of("realtime_seg1"));
   }
 }

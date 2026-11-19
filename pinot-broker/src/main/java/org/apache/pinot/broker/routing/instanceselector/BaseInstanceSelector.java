@@ -39,6 +39,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -412,6 +413,22 @@ public abstract class BaseInstanceSelector implements InstanceSelector {
     int requestIdInt = (int) (requestId % MAX_REQUEST_ID);
     // Read the volatile reference once, so that the whole selection has a consistent view of the state
     return select(segments, requestIdInt, _segmentStates, queryOptions);
+  }
+
+  @Override
+  public SegmentsToQuery selectOnAllInstances(Collection<String> segments) {
+    // Read the volatile reference once, so that the whole selection has a consistent view of the state
+    SegmentStates segmentStates = _segmentStates;
+    List<String> requiredSegments = new ArrayList<>(segments.size());
+    List<String> optionalSegments = new ArrayList<>();
+    for (String segment : segments) {
+      if (segmentStates.isNewAndNotFullyOnline(segment)) {
+        optionalSegments.add(segment);
+      } else {
+        requiredSegments.add(segment);
+      }
+    }
+    return new SegmentsToQuery(requiredSegments, optionalSegments);
   }
 
   @Override

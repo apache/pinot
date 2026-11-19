@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeDeserializer;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -40,14 +41,18 @@ import org.apache.pinot.spi.utils.JsonUtils;
 ///
 /// The leaf-stage segment maps of a [WorkerMetadata] have two wire encodings, picked per request by the broker:
 ///
-/// - **proto**: the native `tableSegmentsMap` / `logicalTableSegmentsMap` fields of [Worker.WorkerMetadata].
+/// - **proto**: the native `tableSegmentsMap` / `logicalTableSegmentsMap` fields of [Worker.WorkerMetadata], whose
+///   segment lists hold the optional segments next to the segments.
 /// - **legacy JSON**: a JSON string under the [WorkerMetadata#TABLE_SEGMENTS_MAP_KEY] /
 ///   [WorkerMetadata#LOGICAL_TABLE_SEGMENTS_MAP_KEY] custom property, which is all that servers predating the proto
-///   fields understand.
+///   fields understand, and the optional segments of both under [WorkerMetadata#OPTIONAL_SEGMENTS_MAP_KEY].
 ///
 /// Decoding accepts both, so a server always understands every broker; the proto encoding is off until an operator
 /// turns it on, which they only do once every server understands it (see
 /// `CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_PROTO_SEGMENT_LIST`).
+///
+/// A server that predates optional segments ignores them under either encoding (an unknown proto field, or an unknown
+/// custom property), and so keeps skipping them.
 public class QueryPlanSerDeUtils {
   private QueryPlanSerDeUtils() {
   }
@@ -86,14 +91,19 @@ public class QueryPlanSerDeUtils {
     Map<String, String> customProperties = protoWorkerMetadata.getCustomPropertyMap();
     String tableSegmentsJson = customProperties.get(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
     String logicalTableSegmentsJson = customProperties.get(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
-    if (tableSegmentsJson != null || logicalTableSegmentsJson != null) {
+    String optionalSegmentsJson = customProperties.get(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY);
+    if (tableSegmentsJson != null || logicalTableSegmentsJson != null || optionalSegmentsJson != null) {
       Map<String, String> strippedProperties = new HashMap<>(customProperties);
       strippedProperties.remove(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY);
       strippedProperties.remove(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+      strippedProperties.remove(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY);
       customProperties = Collections.unmodifiableMap(strippedProperties);
     }
     WorkerMetadata workerMetadata =
         new WorkerMetadata(protoWorkerMetadata.getWorkedId(), mailboxInfosMap, customProperties);
+    if (optionalSegmentsJson != null) {
+      workerMetadata.setOptionalSegmentsMapJson(optionalSegmentsJson);
+    }
     if (protoWorkerMetadata.hasTableSegmentsMap()) {
       workerMetadata.setTableSegmentsMap(fromProtoSegmentsMap(protoWorkerMetadata.getTableSegmentsMap()));
     } else if (tableSegmentsJson != null) {
@@ -108,11 +118,15 @@ public class QueryPlanSerDeUtils {
     return workerMetadata;
   }
 
-  private static Map<String, List<String>> fromProtoSegmentsMap(Worker.SegmentsMap protoSegmentsMap) {
+  private static Map<String, SegmentsToQuery> fromProtoSegmentsMap(Worker.SegmentsMap protoSegmentsMap) {
     Map<String, Worker.SegmentList> protoSegments = protoSegmentsMap.getSegmentsMap();
-    Map<String, List<String>> segmentsMap = Maps.newHashMapWithExpectedSize(protoSegments.size());
+    Map<String, SegmentsToQuery> segmentsMap = Maps.newHashMapWithExpectedSize(protoSegments.size());
     for (Map.Entry<String, Worker.SegmentList> entry : protoSegments.entrySet()) {
-      segmentsMap.put(entry.getKey(), new ArrayList<>(entry.getValue().getSegmentList()));
+      Worker.SegmentList protoSegmentList = entry.getValue();
+      List<String> segments = new ArrayList<>(protoSegmentList.getSegmentList());
+      segmentsMap.put(entry.getKey(), protoSegmentList.getOptionalSegmentCount() > 0
+          ? new SegmentsToQuery(segments, new ArrayList<>(protoSegmentList.getOptionalSegmentList()))
+          : new SegmentsToQuery(segments));
     }
     return segmentsMap;
   }
@@ -155,36 +169,62 @@ public class QueryPlanSerDeUtils {
     for (Map.Entry<Integer, MailboxInfos> entry : workerMetadata.getMailboxInfosMap().entrySet()) {
       builder.putMailboxInfos(entry.getKey(), entry.getValue().toProtoBytes());
     }
-    Map<String, List<String>> tableSegmentsMap = workerMetadata.getTableSegmentsMap();
-    if (tableSegmentsMap != null) {
-      if (protoSegmentList) {
+    Map<String, SegmentsToQuery> tableSegmentsMap = workerMetadata.getTableSegmentsMap();
+    Map<String, SegmentsToQuery> logicalTableSegmentsMap = workerMetadata.getLogicalTableSegmentsMap();
+    if (protoSegmentList) {
+      if (tableSegmentsMap != null) {
         builder.setTableSegmentsMap(toProtoSegmentsMap(tableSegmentsMap));
-      } else {
-        builder.putCustomProperty(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY, encodeSegmentsMapJson(tableSegmentsMap));
       }
-    }
-    Map<String, List<String>> logicalTableSegmentsMap = workerMetadata.getLogicalTableSegmentsMap();
-    if (logicalTableSegmentsMap != null) {
-      if (protoSegmentList) {
+      if (logicalTableSegmentsMap != null) {
         builder.setLogicalTableSegmentsMap(toProtoSegmentsMap(logicalTableSegmentsMap));
-      } else {
+      }
+    } else if (tableSegmentsMap != null || logicalTableSegmentsMap != null) {
+      // The two segment maps never share a key (table types vs physical table names), so their optional segments fit
+      // in one map.
+      Map<String, List<String>> optionalSegmentsMap = new HashMap<>();
+      if (tableSegmentsMap != null) {
+        builder.putCustomProperty(WorkerMetadata.TABLE_SEGMENTS_MAP_KEY,
+            encodeSegmentsMapJson(tableSegmentsMap, optionalSegmentsMap));
+      }
+      if (logicalTableSegmentsMap != null) {
         builder.putCustomProperty(WorkerMetadata.LOGICAL_TABLE_SEGMENTS_MAP_KEY,
-            encodeSegmentsMapJson(logicalTableSegmentsMap));
+            encodeSegmentsMapJson(logicalTableSegmentsMap, optionalSegmentsMap));
+      }
+      if (!optionalSegmentsMap.isEmpty()) {
+        builder.putCustomProperty(WorkerMetadata.OPTIONAL_SEGMENTS_MAP_KEY, toJson(optionalSegmentsMap));
       }
     }
     return builder.build();
   }
 
-  private static Worker.SegmentsMap toProtoSegmentsMap(Map<String, List<String>> segmentsMap) {
+  private static Worker.SegmentsMap toProtoSegmentsMap(Map<String, SegmentsToQuery> segmentsMap) {
     Worker.SegmentsMap.Builder builder = Worker.SegmentsMap.newBuilder();
-    for (Map.Entry<String, List<String>> entry : segmentsMap.entrySet()) {
-      builder.putSegments(entry.getKey(), Worker.SegmentList.newBuilder().addAllSegment(entry.getValue()).build());
+    for (Map.Entry<String, SegmentsToQuery> entry : segmentsMap.entrySet()) {
+      SegmentsToQuery segmentsToQuery = entry.getValue();
+      builder.putSegments(entry.getKey(), Worker.SegmentList.newBuilder()
+          .addAllSegment(segmentsToQuery.getSegments())
+          .addAllOptionalSegment(segmentsToQuery.getOptionalSegments())
+          .build());
     }
     return builder.build();
   }
 
-  /// JSON-encodes a segments map as `{"OFFLINE":["seg1","seg2"]}` for the legacy encoding.
-  private static String encodeSegmentsMapJson(Map<String, List<String>> segmentsMap) {
+  /// JSON-encodes the segments of a segments map as `{"OFFLINE":["seg1","seg2"]}` for the legacy encoding, and collects
+  /// its optional segments into `optionalSegmentsMap`, which is encoded apart from them.
+  private static String encodeSegmentsMapJson(Map<String, SegmentsToQuery> segmentsToQueryMap,
+      Map<String, List<String>> optionalSegmentsMap) {
+    Map<String, List<String>> segmentsMap = Maps.newHashMapWithExpectedSize(segmentsToQueryMap.size());
+    for (Map.Entry<String, SegmentsToQuery> entry : segmentsToQueryMap.entrySet()) {
+      SegmentsToQuery segmentsToQuery = entry.getValue();
+      segmentsMap.put(entry.getKey(), segmentsToQuery.getSegments());
+      if (!segmentsToQuery.getOptionalSegments().isEmpty()) {
+        optionalSegmentsMap.put(entry.getKey(), segmentsToQuery.getOptionalSegments());
+      }
+    }
+    return toJson(segmentsMap);
+  }
+
+  private static String toJson(Map<String, List<String>> segmentsMap) {
     try {
       return JsonUtils.objectToString(segmentsMap);
     } catch (JsonProcessingException e) {

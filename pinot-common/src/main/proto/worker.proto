@@ -110,6 +110,10 @@ message SegmentsMap {
 
 message SegmentList {
   repeated string segment = 1;
+  // New segments the broker has not seen online yet: the server scans the ones it has loaded and skips the others
+  // without reporting them as missing. When the segments are sent as JSON custom properties instead, the optional
+  // segments of both segment maps are sent in the "optionalSegmentsMap" custom property, under the same keys.
+  repeated string optionalSegment = 2;
 }
 
 message MailboxInfos {
