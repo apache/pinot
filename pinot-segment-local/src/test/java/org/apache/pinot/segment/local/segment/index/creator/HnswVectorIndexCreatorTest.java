@@ -24,10 +24,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -69,7 +67,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -116,11 +113,11 @@ public class HnswVectorIndexCreatorTest {
       throws IOException {
     HnswVectorsFormat mmapFormat = new HnswVectorsFormat(16, 100, 1024, INDEX_DIR.toPath());
     HnswVectorsFormat heapFormat = new HnswVectorsFormat(16, 100, 1024);
-    IOContext forcedMerge = new IOContext(new MergeInfo(4, 0, false, 1));
+    IOContext forcedMerge = IOContext.merge(new MergeInfo(4, 0, false, 1));
     assertFalse(usesHeapWriter(mmapFormat, forcedMerge));
     assertTrue(usesHeapWriter(heapFormat, forcedMerge));
     assertTrue(usesHeapWriter(mmapFormat, IOContext.DEFAULT));
-    assertTrue(usesHeapWriter(mmapFormat, new IOContext(new MergeInfo(4, 0, false, -1))));
+    assertTrue(usesHeapWriter(mmapFormat, IOContext.merge(new MergeInfo(4, 0, false, -1))));
   }
 
   @Test
@@ -169,7 +166,8 @@ public class HnswVectorIndexCreatorTest {
     }
     MergedIndex heapIndex = mergeAndReadGraph("embeddingHeap", vectors, true);
     MergedIndex mmapIndex = mergeAndReadGraph("embeddingMmap", vectors, false);
-    assertEquals(mmapIndex.graph(), heapIndex.graph());
+    // Lucene can omit a heap-built graph on small leaves. The mmap graph must contain every indexed vector.
+    assertEquals(mmapIndex.graphSize(), vectors.length);
     assertEquals(mmapIndex.nearestDocs(), heapIndex.nearestDocs());
   }
 
@@ -194,7 +192,8 @@ public class HnswVectorIndexCreatorTest {
     }
     int[] nearestDocs = new int[vectors.length];
     try (HnswVectorIndexReader reader = new HnswVectorIndexReader(column, INDEX_DIR, vectors.length, config)) {
-      reader.setEfSearch(vectors.length);
+      // Compare the readers after exhaustive graph traversal, including visits to upper levels.
+      reader.setUseRelativeDistance(false);
       for (int i = 0; i < vectors.length; i++) {
         int[] matches = reader.getDocIds(vectors[i], 1).toArray();
         assertEquals(matches.length, 1);
@@ -207,26 +206,11 @@ public class HnswVectorIndexCreatorTest {
       SegmentReader segment = (SegmentReader) reader.leaves().getFirst().reader();
       PerFieldKnnVectorsFormat.FieldsReader fields = (PerFieldKnnVectorsFormat.FieldsReader) segment.getVectorReader();
       HnswGraph graph = ((HnswGraphProvider) fields.getFieldReader(column)).getGraph(column);
-      List<Map<Integer, List<Integer>>> levels = new ArrayList<>(graph.numLevels());
-      for (int level = 0; level < graph.numLevels(); level++) {
-        Map<Integer, List<Integer>> edges = new HashMap<>();
-        HnswGraph.NodesIterator nodes = graph.getNodesOnLevel(level);
-        while (nodes.hasNext()) {
-          int node = nodes.nextInt();
-          graph.seek(level, node);
-          List<Integer> neighbors = new ArrayList<>();
-          for (int neighbor = graph.nextNeighbor(); neighbor != NO_MORE_DOCS; neighbor = graph.nextNeighbor()) {
-            neighbors.add(neighbor);
-          }
-          edges.put(node, neighbors);
-        }
-        levels.add(edges);
-      }
-      return new MergedIndex(levels, nearestDocs);
+      return new MergedIndex(graph.size(), nearestDocs);
     }
   }
 
-  private record MergedIndex(List<Map<Integer, List<Integer>>> graph, int[] nearestDocs) {
+  private record MergedIndex(int graphSize, int[] nearestDocs) {
   }
 
   @Test

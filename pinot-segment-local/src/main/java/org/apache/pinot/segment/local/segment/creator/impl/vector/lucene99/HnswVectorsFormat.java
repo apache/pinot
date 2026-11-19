@@ -28,7 +28,7 @@ import org.apache.lucene.codecs.KnnVectorsWriter;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
-import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.MergeInfo;
 
 
 /// Extend Lucene 9.5 vector format to support HNSW graph
@@ -84,7 +84,8 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
   @Override
   public KnnVectorsWriter fieldsWriter(SegmentWriteState state)
       throws IOException {
-    if (state.context.context == IOContext.Context.MERGE && state.context.mergeInfo.mergeMaxNumSegments == 1) {
+    MergeInfo mergeInfo = state.context.mergeInfo();
+    if (mergeInfo != null && mergeInfo.mergeMaxNumSegments() == 1) {
       if (_mmapMergeDirectory != null) {
         return new MmapHnswVectorsWriter(state, _mmapMergeDirectory, _maxConn, _beamWidth);
       }
