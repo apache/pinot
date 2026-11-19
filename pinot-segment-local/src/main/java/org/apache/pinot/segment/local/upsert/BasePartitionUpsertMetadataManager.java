@@ -713,22 +713,40 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /// NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from
   /// tests.
   ///       The passed-in bitmaps should always be empty.
+  ///
+  /// A replacement that fails is reverted before the failure is rethrown (see [#revertFailedReplace]).
   @VisibleForTesting
   public void replaceSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, @Nullable Iterator<RecordInfo> recordInfoIterator,
       IndexSegment oldSegment) {
+    MutableRoaringBitmap validDocIdsForOldSegment = null;
+    MutableRoaringBitmap oldValidDocIdsBeforeReplace = null;
+    if (_upsertViewManager == null) {
+      // When not using consistency mode, we use a copy of the validDocIds bitmap of the old segment to keep the old
+      // segment intact during segment replacement and queries access the old segment during segment replacement.
+      validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
+    } else {
+      // When using consistency mode, the old segment's bitmap is updated in place, so keep a copy to find the docs
+      // moved off it if the replacement fails.
+      oldValidDocIdsBeforeReplace = getValidDocIdsForOldSegment(oldSegment);
+    }
+    try {
+      replaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment, validDocIdsForOldSegment);
+    } catch (RuntimeException e) {
+      revertFailedReplace(segment, oldSegment, validDocIdsForOldSegment, oldValidDocIdsBeforeReplace, e);
+      throw e;
+    }
+  }
+
+  private void replaceSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, @Nullable Iterator<RecordInfo> recordInfoIterator,
+      IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
     // Currently when TTL is enabled, we don't support skip loading out-of-TTL segment with snapshots, since we don't
     // know which docs are valid in the new segment.
     // TODO: when ttl is enabled, we can allow
     //       (1) skip loading segments without any invalid docs.
     //       (2) assign the invalid docs from the replaced segment to the new segment.
     String segmentName = segment.getSegmentName();
-    MutableRoaringBitmap validDocIdsForOldSegment = null;
-    if (_upsertViewManager == null) {
-      // When not using consistency mode, we use a copy of the validDocIds bitmap of the old segment to keep the old
-      // segment intact during segment replacement and queries access the old segment during segment replacement.
-      validDocIdsForOldSegment = getValidDocIdsForOldSegment(oldSegment);
-    }
     if (recordInfoIterator != null) {
       Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
           "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
@@ -759,6 +777,67 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       updateInconsistentRowsMetric(validDocIdsForOldSegment.getCardinality());
       removeSegment(oldSegment, validDocIdsForOldSegment);
     }
+  }
+
+  /// Reverts a segment replacement that failed partway, so that no primary key points at the new segment and the new
+  /// segment can be destroyed. The keys moved off the old segment point at it again ([#revertReplacedKeys]), and the
+  /// other keys still pointing at the new segment are removed. The old segment then serves as before the replacement,
+  /// and replacing it again converges to the same metadata as a replacement that never failed, except that:
+  /// - Keys the new segment took from other segments stay removed until the replacement is retried, because the rows
+  ///   they had in those segments are already invalidated.
+  /// - For tables with inconsistent state, the previous record locations dropped for the moved keys are not restored.
+  ///
+  /// A failure of the revert is attached to the replacement failure and reported, but not thrown.
+  ///
+  /// @param validDocIdsForOldSegment Copy of the old segment's valid doc ids that the replacement updated instead of
+  ///                                 the old segment's own bitmap, or `null` if it updated the bitmap in place
+  /// @param oldValidDocIdsBeforeReplace Old segment's valid doc ids before a replacement that updated them in place
+  protected void revertFailedReplace(ImmutableSegment segment, IndexSegment oldSegment,
+      @Nullable MutableRoaringBitmap validDocIdsForOldSegment,
+      @Nullable MutableRoaringBitmap oldValidDocIdsBeforeReplace, RuntimeException replaceFailure) {
+    String segmentName = segment.getSegmentName();
+    try {
+      MutableRoaringBitmap oldValidDocIds = getValidDocIdsForOldSegment(oldSegment);
+      if (oldValidDocIds != null) {
+        // The docs moved off the old segment are missing from the copy if the old segment's bitmap is kept intact, and
+        // missing from the old segment's bitmap otherwise.
+        boolean oldValidDocIdsIntact = validDocIdsForOldSegment != null;
+        MutableRoaringBitmap movedDocIds = oldValidDocIdsIntact
+            ? MutableRoaringBitmap.andNot(oldValidDocIds, validDocIdsForOldSegment)
+            : MutableRoaringBitmap.andNot(oldValidDocIdsBeforeReplace, oldValidDocIds);
+        if (!movedDocIds.isEmpty()) {
+          _logger.info("Pointing primary keys of up to {} docs back at the old segment: {} after failing to replace it",
+              movedDocIds.getCardinality(), segmentName);
+          revertReplacedKeys(segment, oldSegment, movedDocIds, oldValidDocIdsIntact);
+        }
+      }
+      MutableRoaringBitmap validDocIds = UpsertUtils.getValidDocIdsSnapshotFromSegment(segment, true);
+      if (!validDocIds.isEmpty()) {
+        _logger.warn("Removing up to {} primary keys added by the failed replacement of segment: {}",
+            validDocIds.getCardinality(), segmentName);
+        removeSegment(segment, validDocIds);
+      }
+      updatePrimaryKeyGauge();
+    } catch (RuntimeException revertFailure) {
+      replaceFailure.addSuppressed(revertFailure);
+      _logger.error("UPSERT_METADATA_REVERT_FAILED: table={}, partition={}, segment={}. Failed to revert the failed "
+              + "segment replacement, primary keys might still point at the new segment", _tableNameWithType,
+          _partitionId, segmentName, revertFailure);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_METADATA_REVERT_FAILURES, 1);
+    }
+  }
+
+  /// Points the primary keys a failed replacement moved off the old segment back at it, along with their valid (and
+  /// queryable) docs. A key is pointed back only while it still points at the new segment. When the replacement kept
+  /// the old segment's bitmap intact, the old doc of a key that has moved on since, e.g. to a consuming segment, must
+  /// be invalidated instead.
+  ///
+  /// The default implementation leaves the keys pointing at the new segment, so [#revertFailedReplace] removes them.
+  ///
+  /// @param movedDocIds Docs of the old segment whose primary keys might have moved to the new segment
+  /// @param oldValidDocIdsIntact Whether the replacement kept the old segment's bitmap intact
+  protected void revertReplacedKeys(IndexSegment segment, IndexSegment oldSegment, MutableRoaringBitmap movedDocIds,
+      boolean oldValidDocIdsIntact) {
   }
 
   /// Determines whether metadata should be reverted when inconsistencies are detected during segment replacement.

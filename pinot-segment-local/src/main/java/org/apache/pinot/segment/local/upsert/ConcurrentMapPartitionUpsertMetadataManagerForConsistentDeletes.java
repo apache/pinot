@@ -278,6 +278,42 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     }
   }
 
+  /// Keeps the distinct segment count of a key pointed back at the old segment. The failed replacement counted the new
+  /// segment for it, and might also have discounted the old segment while removing it, so the kept count is never too
+  /// low. A count too high only keeps the tombstone of a deleted key longer than needed.
+  @Override
+  protected void revertReplacedKeys(IndexSegment segment, IndexSegment oldSegment, MutableRoaringBitmap movedDocIds,
+      boolean oldValidDocIdsIntact) {
+    ThreadSafeMutableRoaringBitmap oldValidDocIds = oldSegment.getValidDocIds();
+    ThreadSafeMutableRoaringBitmap oldQueryableDocIds = oldSegment.getQueryableDocIds();
+    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(oldSegment,
+        _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn)) {
+      Iterator<RecordInfo> recordInfoIterator = UpsertUtils.getRecordInfoIterator(recordInfoReader, movedDocIds);
+      while (recordInfoIterator.hasNext()) {
+        RecordInfo recordInfo = recordInfoIterator.next();
+        int oldDocId = recordInfo.getDocId();
+        _primaryKeyToRecordLocationMap.computeIfPresent(
+            HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction), (primaryKey, recordLocation) -> {
+              if (recordLocation.getSegment() == segment) {
+                replaceDocId(oldSegment, oldValidDocIds, oldQueryableDocIds, segment, recordLocation.getDocId(),
+                    oldDocId, recordInfo);
+                return new RecordLocation(oldSegment, oldDocId, recordInfo.getComparisonValue(),
+                    recordLocation.getDistinctSegmentCount());
+              }
+              if (oldValidDocIdsIntact) {
+                UpsertUtils.doRemoveDocId(oldSegment, oldDocId);
+              }
+              return recordLocation;
+            });
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while reverting the replacement of segment: %s, table: %s, message: %s",
+              segment.getSegmentName(), _tableNameWithType, e.getMessage()), e);
+    }
+    trackUpdatedSegmentsSinceLastSnapshot(oldSegment);
+  }
+
   @Override
   public void replaceSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, @Nullable Iterator<RecordInfo> recordInfoIterator,
@@ -288,32 +324,38 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     try {
       MutableRoaringBitmap validDocIdsForOldSegment =
           oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
-      if (recordInfoIterator != null) {
-        Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
-            "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
-            _tableNameWithType);
-        if (validDocIds == null) {
-          validDocIds = new ThreadSafeMutableRoaringBitmap();
+      try {
+        if (recordInfoIterator != null) {
+          Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
+              "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
+              _tableNameWithType);
+          if (validDocIds == null) {
+            validDocIds = new ThreadSafeMutableRoaringBitmap();
+          }
+          if (queryableDocIds == null && _deleteRecordColumn != null) {
+            queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+          }
+          doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
+              oldSegment, validDocIdsForOldSegment);
         }
-        if (queryableDocIds == null && _deleteRecordColumn != null) {
-          queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+        if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
+          if (shouldRevertMetadataOnInconsistency(oldSegment)) {
+            revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
+            return;
+          }
+          _logger.warn("Found {} primary keys not replaced for segment: {}",
+              validDocIdsForOldSegment.getCardinality(), segmentName);
+          updateInconsistentRowsMetric(validDocIdsForOldSegment.getCardinality());
         }
-        doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
-            oldSegment, validDocIdsForOldSegment);
+        // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
+        // this is to account for the removal of primary-key in the to-be-removed segment and reduce
+        // distinctSegmentCount by 1
+        doRemoveSegment(oldSegment);
+      } catch (RuntimeException e) {
+        // The replacement updates a copy of the old segment's valid doc ids and keeps the old segment's bitmap intact
+        revertFailedReplace(segment, oldSegment, validDocIdsForOldSegment, null, e);
+        throw e;
       }
-      if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-        if (shouldRevertMetadataOnInconsistency(oldSegment)) {
-          revertSegmentUpsertMetadata(oldSegment, segmentName, validDocIdsForOldSegment);
-          return;
-        }
-        _logger.warn("Found {} primary keys not replaced for segment: {}",
-            validDocIdsForOldSegment.getCardinality(), segmentName);
-        updateInconsistentRowsMetric(validDocIdsForOldSegment.getCardinality());
-      }
-      // we want to always remove a segment in case of enableDeletedKeysCompactionConsistency = true
-      // this is to account for the removal of primary-key in the to-be-removed segment and reduce
-      // distinctSegmentCount by 1
-      doRemoveSegment(oldSegment);
     } finally {
       segmentLock.unlock();
     }
