@@ -45,6 +45,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -100,8 +101,12 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     for (int i = 0; i < numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = _groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
-      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(
-          _projectOperator.getResultColumnContext(groupByExpression).getDataType());
+      DataType dataType = _projectOperator.getResultColumnContext(groupByExpression).getDataType();
+      if (dataType == DataType.VARIANT) {
+        throw new IllegalArgumentException(
+            "Raw VARIANT values do not support GROUP BY; extract a typed path with variantGet first");
+      }
+      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(dataType);
     }
 
     /// Synthetic grouping-id discriminator column for GROUP BY GROUPING SETS / ROLLUP / CUBE

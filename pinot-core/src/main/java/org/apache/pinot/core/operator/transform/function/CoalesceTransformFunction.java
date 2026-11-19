@@ -271,6 +271,9 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < argSize; i++) {
       TransformFunction func = arguments.get(i);
       DataType dataType = func.getResultMetadata().getDataType();
+      // The compatible-type fallback is STRING, which would render the raw envelope as hex text.
+      Preconditions.checkArgument(dataType != DataType.VARIANT,
+          "Raw VARIANT values do not support COALESCE; extract a typed path with variantGet first");
       if (_dataType != null) {
         _dataType = getCompatibleType(_dataType, dataType);
       } else {
