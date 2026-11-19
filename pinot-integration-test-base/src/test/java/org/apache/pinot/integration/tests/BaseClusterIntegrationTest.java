@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
@@ -66,6 +67,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.ConsumingSegmentInfo;
@@ -1163,6 +1165,49 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     message.append("\nExpected (").append(expected.size()).append("): ").append(expected);
     message.append("\nActual (").append(actual.size()).append("): ").append(actual);
     return message.toString();
+  }
+
+  /// Waits until the cluster state has settled after a reload, rebalance or restart:
+  ///
+  /// - IdealState has `expectedSegments` entries.
+  /// - No segment in IdealState has any instance in OFFLINE state.
+  /// - ExternalView equals IdealState (queries route via ExternalView, so this is required
+  ///   before asserting on IdealState).
+  ///
+  /// All conditions must hold for `stableSamples` consecutive polls, because IdealState can
+  /// transiently look correct between two intermediate states during force-commit +
+  /// new-consuming-segment creation.
+  protected void waitForClusterStateSettled(String tableNameWithType, int expectedSegments, int stableSamples,
+      long timeoutMs) {
+    AtomicInteger streak = new AtomicInteger(0);
+    TestUtils.waitForCondition(aVoid -> {
+      IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
+      if (idealState == null) {
+        streak.set(0);
+        return false;
+      }
+      Map<String, Map<String, String>> isMap = idealState.getRecord().getMapFields();
+      if (isMap.size() != expectedSegments) {
+        streak.set(0);
+        return false;
+      }
+      boolean anyOffline = isMap.values().stream()
+          .flatMap(m -> m.values().stream())
+          .anyMatch(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE::equals);
+      if (anyOffline) {
+        streak.set(0);
+        return false;
+      }
+      ExternalView externalView =
+          HelixHelper.getExternalViewForResource(_helixAdmin, getHelixClusterName(), tableNameWithType);
+      if (externalView == null || !isMap.equals(externalView.getRecord().getMapFields())) {
+        streak.set(0);
+        return false;
+      }
+      return streak.incrementAndGet() >= stableSamples;
+    }, 200L, timeoutMs,
+        "Cluster state never settled to " + expectedSegments
+            + " segments with no OFFLINE and ExternalView == IdealState for table " + tableNameWithType);
   }
 
   /// Waits until every replica of every stream partition of the table has consumed up to the latest upstream offset,
