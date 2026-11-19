@@ -26,6 +26,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -106,8 +107,8 @@ public class ClusterIntegrationTestUtils {
   /// winner, ordered by key, ready for [BaseClusterIntegrationTest#assertRows].
   ///
   /// This is a test oracle and deliberately does not use the upsert code under test. It covers plain full upsert
-  /// only: no delete column, no partial-upsert merge. Two records of a key with the same comparison value fail it,
-  /// since which one wins depends on the order of stream partitions and uploaded segments.
+  /// only: no delete column, no partial-upsert merge, no null or bytes values. Two records of a key with the same
+  /// comparison value fail it, since which one wins depends on the order of stream partitions and uploaded segments.
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static List<List<Object>> latestRowPerKey(List<File> avroFiles, String primaryKeyColumn,
       String comparisonColumn, List<String> columns)
@@ -116,13 +117,12 @@ public class ClusterIntegrationTestUtils {
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {
-          Comparable key = (Comparable) toJavaValue(record.get(primaryKeyColumn));
-          Comparable comparisonValue = (Comparable) toJavaValue(record.get(comparisonColumn));
-          Preconditions.checkState(key != null && comparisonValue != null,
-              "Null primary key or comparison value in record: %s", record);
+          Comparable key = (Comparable) toJavaValue(primaryKeyColumn, record.get(primaryKeyColumn));
+          Comparable comparisonValue = (Comparable) toJavaValue(comparisonColumn, record.get(comparisonColumn));
           GenericRecord current = winners.get(key);
           if (current != null) {
-            int comparison = comparisonValue.compareTo(toJavaValue(current.get(comparisonColumn)));
+            int comparison =
+                comparisonValue.compareTo(toJavaValue(comparisonColumn, current.get(comparisonColumn)));
             Preconditions.checkState(comparison != 0, "Records %s and %s tie on %s", current, record,
                 comparisonColumn);
             if (comparison < 0) {
@@ -137,16 +137,29 @@ public class ClusterIntegrationTestUtils {
     for (GenericRecord winner : winners.values()) {
       List<Object> row = new ArrayList<>(columns.size());
       for (String column : columns) {
-        row.add(toJavaValue(winner.get(column)));
+        row.add(toJavaValue(column, winner.get(column)));
       }
       rows.add(row);
     }
     return rows;
   }
 
-  @Nullable
-  private static Object toJavaValue(@Nullable Object avroValue) {
-    return avroValue instanceof Utf8 ? avroValue.toString() : avroValue;
+  /// Converts an Avro value to the value the broker returns for it. Strings and multi-value columns are converted;
+  /// null and bytes values fail, since the broker renders them differently (default value, hex string).
+  private static Object toJavaValue(String column, @Nullable Object avroValue) {
+    Preconditions.checkState(avroValue != null, "Null value in column: %s", column);
+    Preconditions.checkState(!(avroValue instanceof ByteBuffer), "Bytes column is not supported: %s", column);
+    if (avroValue instanceof Utf8) {
+      return avroValue.toString();
+    }
+    if (avroValue instanceof Collection) {
+      List<Object> values = new ArrayList<>();
+      for (Object value : (Collection<?>) avroValue) {
+        values.add(toJavaValue(column, value));
+      }
+      return values;
+    }
+    return avroValue;
   }
 
   /// Set up an H2 table with records from the given Avro files inserted.

@@ -69,9 +69,9 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.ConsumingSegmentInfo;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader.PartitionOffsetInfo;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.plugin.stream.kafka40.server.EmbeddedKafkaCluster;
@@ -94,7 +94,7 @@ import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
@@ -988,18 +988,18 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   /// Get current result for "SELECT COUNT(\*) ... OPTION(skipUpsert=true)": every ingested row of an upsert or dedup
   /// table, including the ones upsert replaced or deleted.
+  ///
+  /// @throws IllegalStateException when the broker returns no result, with the broker exceptions
   protected long getCurrentCountStarResultWithoutUpsert(String tableName) {
     ResultSetGroup resultSetGroup =
         getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)");
-    if (resultSetGroup.getResultSetCount() > 0) {
-      try {
-        return Long.parseLong(resultSetGroup.getResultSet(0).getString(0));
-      } catch (NumberFormatException e) {
-        return 0;
-      }
+    if (resultSetGroup.getResultSetCount() == 0) {
+      throw new IllegalStateException(
+          "No COUNT(*) result for table " + tableName + ": " + resultSetGroup.getExceptions());
     }
-    return 0;
+    return Long.parseLong(resultSetGroup.getResultSet(0).getString(0));
   }
+
 
   protected void waitForMinionTaskCompletion(String taskId, long timeout) {
     // The task state (workflow context) and the subtask states (job context) live in different Helix znodes and are
@@ -1193,7 +1193,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       }
       boolean anyOffline = isMap.values().stream()
           .flatMap(m -> m.values().stream())
-          .anyMatch(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE::equals);
+          .anyMatch(SegmentStateModel.OFFLINE::equals);
       if (anyOffline) {
         streak.set(0);
         return false;
@@ -1214,38 +1214,64 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /// i.e. reports no records lag. Use it after pushing rows that the table is expected to drop (for example
   /// duplicates on a dedup table), where no row or count change shows that they were consumed.
   ///
+  /// Every instance the IdealState has in CONSUMING state must report, so a replica that has not reported yet holds
+  /// the wait instead of being skipped.
+  ///
   /// @param tableName raw table name; the number of partitions is [#getNumKafkaPartitions()]
   protected void waitForAllStreamRecordsConsumed(String tableName, long timeoutMs) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     int numPartitions = getNumKafkaPartitions();
-    AtomicReference<Map<String, List<String>>> lastLags = new AtomicReference<>();
+    // Consuming segment to the records lag reported by each server
+    AtomicReference<Map<String, Map<String, Map<String, String>>>> lastLags = new AtomicReference<>();
+    AtomicReference<Exception> lastError = new AtomicReference<>();
     try {
       TestUtils.waitForCondition(aVoid -> {
         try {
+          IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
           ConsumingSegmentsInfoMap info = getOrCreateAdminClient().getTableClient()
               .getConsumingSegmentsInfo(realtimeTableName, ConsumingSegmentsInfoMap.class);
-          // Partition to the records lag reported by each replica
-          Map<String, List<String>> partitionToLags = new HashMap<>();
-          for (List<ConsumingSegmentInfo> segmentInfos : info._segmentToConsumingInfoMap.values()) {
+          Map<String, Map<String, Map<String, String>>> segmentToServerLags = new HashMap<>();
+          info._segmentToConsumingInfoMap.forEach((segment, segmentInfos) -> {
             for (ConsumingSegmentInfo segmentInfo : segmentInfos) {
-              ConsumingSegmentInfoReader.PartitionOffsetInfo offsetInfo = segmentInfo._partitionOffsetInfo;
-              if (offsetInfo != null && offsetInfo._recordsLagMap != null) {
-                offsetInfo._recordsLagMap.forEach(
-                    (partition, lag) -> partitionToLags.computeIfAbsent(partition, k -> new ArrayList<>()).add(lag));
+              PartitionOffsetInfo offsetInfo = segmentInfo._partitionOffsetInfo;
+              segmentToServerLags.computeIfAbsent(segment, k -> new HashMap<>()).put(segmentInfo._serverName,
+                  offsetInfo != null && offsetInfo._recordsLagMap != null ? offsetInfo._recordsLagMap : Map.of());
+            }
+          });
+          lastLags.set(segmentToServerLags);
+          if (idealState == null || info._serversFailingToRespond != 0) {
+            return false;
+          }
+          int numConsumingSegments = 0;
+          for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+            for (Map.Entry<String, String> instanceState : entry.getValue().entrySet()) {
+              if (!SegmentStateModel.CONSUMING.equals(instanceState.getValue())) {
+                continue;
+              }
+              Map<String, String> lags =
+                  segmentToServerLags.getOrDefault(entry.getKey(), Map.of()).get(instanceState.getKey());
+              if (lags == null || lags.isEmpty() || !lags.values().stream().allMatch("0"::equals)) {
+                return false;
               }
             }
+            if (entry.getValue().containsValue(SegmentStateModel.CONSUMING)) {
+              numConsumingSegments++;
+            }
           }
-          lastLags.set(partitionToLags);
-          return info._serversFailingToRespond == 0 && partitionToLags.size() == numPartitions
-              && partitionToLags.values().stream().flatMap(List::stream).allMatch("0"::equals);
+          return numConsumingSegments == numPartitions;
         } catch (Exception e) {
+          lastError.set(e);
           return false;
         }
       }, 100L, timeoutMs, null);
     } catch (AssertionError e) {
-      throw new AssertionError("Table " + realtimeTableName + " did not consume all " + numPartitions
-          + " stream partitions in " + timeoutMs + "ms; last records lag per partition and replica: "
-          + lastLags.get(), e);
+      AssertionError error = new AssertionError("Table " + realtimeTableName + " did not consume all "
+          + numPartitions + " stream partitions on every replica in " + timeoutMs
+          + "ms; last records lag per consuming segment and server: " + lastLags.get(), e);
+      if (lastError.get() != null) {
+        error.addSuppressed(lastError.get());
+      }
+      throw error;
     }
   }
 
@@ -1281,7 +1307,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         continue;
       }
       Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
-      if (stateMap != null && stateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
+      if (stateMap != null && stateMap.containsValue(SegmentStateModel.CONSUMING)) {
         consumingPartitions.add(new LLCSegmentName(segmentName).getPartitionGroupId());
       }
     }

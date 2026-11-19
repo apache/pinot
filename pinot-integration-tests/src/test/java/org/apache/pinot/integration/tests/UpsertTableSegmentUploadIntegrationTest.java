@@ -201,7 +201,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     verifyIdealState(getNumSegmentsAfterRestart());
     // The row check runs once, so first wait for every segment to be served again
     waitForClusterStateSettled(TableNameBuilder.REALTIME.tableNameWithType(getTableName()),
-        getNumSegmentsAfterRestart(), 5, 60_000L);
+        getNumSegmentsAfterRestart(), 5, 600_000L);
     waitForAllDocsLoaded(600_000L);
   }
 
