@@ -270,6 +270,23 @@ public class LookupJoinOperatorTest {
   }
 
   @Test
+  public void testConstantBindsTheTableColumnBehindAnAlias() {
+    // SELECT currency AS rate, rate AS currency, rate_start_date FROM dim_tbl, joined
+    // ON dim.rate = 'gbp' AND dim.rate_start_date = fact.rate_start_date. The constant pass must also match the table
+    // column "currency" behind the output name "rate", or the condition leaves the currency key position open.
+    DataSchema aliasedSchema = new DataSchema(new String[]{"rate", "currency", "rate_start_date"},
+        new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.LONG});
+    JoinNode node = new JoinNode(0, aliasedSchema, PlanNode.NodeHint.EMPTY, List.of(), JoinRelType.INNER,
+        List.of(FACT_RATE_START_DATE), List.of(2), List.of(dimEqualsConstant(0, ColumnDataType.STRING, "gbp")),
+        JoinNode.JoinStrategy.LOOKUP);
+    LookupJoinOperator.KeyPlan keyPlan = LookupJoinOperator.compileKeyPlan(node, TABLE_NAME, PRIMARY_KEY_COLUMNS,
+        aliasedSchema, DIM_SCHEMA.getColumnNames(), LEFT_COLUMN_SIZE);
+    assertEquals(keyPlan._constants[KEY_CURRENCY], "gbp");
+    assertEquals(keyPlan._sources[KEY_RATE_START_DATE], FACT_RATE_START_DATE);
+    assertFalse(keyPlan._neverMatches);
+  }
+
+  @Test
   public void testDimensionColumnsMustMatchRightSchema() {
     JoinNode node = new JoinNode(0, DIM_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(), JoinRelType.INNER,
         List.of(FACT_CURRENCY), List.of(DIM_CURRENCY), List.of(), JoinNode.JoinStrategy.LOOKUP);
