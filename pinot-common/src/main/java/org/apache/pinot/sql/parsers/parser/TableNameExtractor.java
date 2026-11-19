@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.sql.parsers.parser;
 
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
@@ -58,6 +62,13 @@ public class TableNameExtractor {
     } catch (Exception e) {
       throw new RuntimeException("Cannot parse table name from query: " + query, e);
     }
+  }
+
+  /// Visits referenced table identifiers in an already parsed query, preserving their name components and spelling.
+  /// Only referenced CTE definitions are visited, using the scope in which each definition was declared.
+  /// The visitor may receive the same table more than once. This syntactic walk does not validate or plan the query.
+  public static void visitReferencedTableIdentifiers(SqlNode query, Consumer<SqlIdentifier> visitor) {
+    new ReferencedTableVisitor(visitor).visit(query, null, false);
   }
 
   /// Extracts table names from a multi-stage query using Calcite SQL AST traversal.
@@ -279,6 +290,101 @@ public class TableNameExtractor {
       }
     } catch (Exception e) {
       throw new SqlCompilationException("Exception encountered while visiting node operands: " + node, e);
+    }
+  }
+
+  /// A per-query visitor that keeps table identifiers intact and expands each referenced CTE once.
+  private static final class ReferencedTableVisitor {
+    private static final Set<SqlKind> RELATION_WRAPPERS = EnumSet.of(SqlKind.AS, SqlKind.EXTEND, SqlKind.TABLE_REF,
+        SqlKind.TABLESAMPLE, SqlKind.LATERAL, SqlKind.SNAPSHOT, SqlKind.PIVOT, SqlKind.UNPIVOT,
+        SqlKind.MATCH_RECOGNIZE);
+
+    private final Consumer<SqlIdentifier> _visitor;
+    private final Set<CteBinding> _expanded = new HashSet<>();
+
+    ReferencedTableVisitor(Consumer<SqlIdentifier> visitor) {
+      _visitor = visitor;
+    }
+
+    void visit(@Nullable SqlNode node, @Nullable CteBinding scope, boolean relation) {
+      if (node instanceof SqlIdentifier) {
+        if (relation) {
+          visitRelation((SqlIdentifier) node, scope);
+        }
+      } else if (node instanceof SqlWith) {
+        SqlWith with = (SqlWith) node;
+        for (SqlNode definition : with.withList) {
+          SqlWithItem item = (SqlWithItem) definition;
+          scope = new CteBinding(item.name.getSimple(), item, scope);
+        }
+        visit(with.body, scope, false);
+      } else if (node instanceof SqlSelect) {
+        SqlSelect select = (SqlSelect) node;
+        for (SqlNode operand : select.getOperandList()) {
+          visit(operand, scope, operand == select.getFrom());
+        }
+      } else if (node instanceof SqlJoin) {
+        SqlJoin join = (SqlJoin) node;
+        visit(join.getLeft(), scope, true);
+        visit(join.getRight(), scope, true);
+        visit(join.getCondition(), scope, false);
+      } else if (node instanceof SqlCall) {
+        visitCall((SqlCall) node, scope, relation);
+      } else if (node instanceof SqlNodeList) {
+        for (SqlNode item : (SqlNodeList) node) {
+          visit(item, scope, false);
+        }
+      }
+    }
+
+    private void visitRelation(SqlIdentifier identifier, @Nullable CteBinding scope) {
+      CteBinding binding = scope != null && identifier.isSimple() ? scope.lookup(identifier.getSimple()) : null;
+      if (binding == null) {
+        _visitor.accept(identifier);
+      } else if (_expanded.add(binding)) {
+        SqlWithItem item = binding._item;
+        if (item.recursive.booleanValue() && item.query.getKind() == SqlKind.UNION) {
+          // Only the recursive term can see its own CTE name. The seed can still refer to a physical table.
+          SqlCall union = (SqlCall) item.query;
+          visit(union.operand(0), binding._parent, false);
+          visit(union.operand(1), binding, false);
+        } else {
+          visit(item.query, binding._parent, false);
+        }
+      }
+    }
+
+    private void visitCall(SqlCall call, @Nullable CteBinding scope, boolean relation) {
+      SqlKind kind = call.getKind();
+      boolean wrapsRelation = kind == SqlKind.EXPLICIT_TABLE || relation && RELATION_WRAPPERS.contains(kind);
+      List<SqlNode> operands = call.getOperandList();
+      for (int i = 0; i < operands.size(); i++) {
+        visit(operands.get(i), scope, wrapsRelation && i == 0);
+      }
+    }
+  }
+
+  /// A CTE binding shares its preceding and outer scopes.
+  private static final class CteBinding {
+    private final String _name;
+    private final SqlWithItem _item;
+    @Nullable
+    private final CteBinding _parent;
+
+    CteBinding(String name, SqlWithItem item, @Nullable CteBinding parent) {
+      _name = name;
+      _item = item;
+      _parent = parent;
+    }
+
+    @Nullable
+    CteBinding lookup(String alias) {
+      for (CteBinding scope = this; scope != null; scope = scope._parent) {
+        if (scope._name.equals(alias)) {
+          return scope;
+        }
+      }
+      return null;
     }
   }
 }
