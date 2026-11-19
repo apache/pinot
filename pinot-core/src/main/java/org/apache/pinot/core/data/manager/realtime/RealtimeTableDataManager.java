@@ -348,6 +348,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     } catch (Exception e) {
       _logger.error("Caught exception while shutting down the ingestion delay tracker", e);
     }
+    // The tracker leaves the caller's interrupt set when its bounded wait is interrupted. Releasing the segments waits
+    // on an executor, and that wait gives up at once under an interrupt and drops the queued offloads, which would
+    // leave consuming segments running after the table is gone. So run the cleanup with the interrupt cleared and
+    // restore it afterwards.
+    boolean interrupted = Thread.interrupted();
+    try {
+      releaseSegmentsAndStopLeaseExtender();
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private void releaseSegmentsAndStopLeaseExtender() {
     if (_tableUpsertMetadataManager != null || _tableDedupMetadataManager != null) {
       // Stop the upsert metadata manager first to prevent removing metadata when destroying segments
       if (_tableUpsertMetadataManager != null) {

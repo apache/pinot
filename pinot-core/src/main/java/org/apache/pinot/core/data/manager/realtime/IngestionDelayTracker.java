@@ -29,7 +29,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -147,6 +149,7 @@ public class IngestionDelayTracker {
   private final Map<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _metricsRemovalScheduler;
   private final ScheduledExecutorService _ingestionDelayTrackingScheduler;
+  private final ScheduledFuture<?> _ingestionDelayTrackingFuture;
 
   private Clock _clock = Clock.systemUTC();
   // Set when the table is shutting down, so the fetch that shutdown interrupts is not reported as an error
@@ -189,7 +192,7 @@ public class IngestionDelayTracker {
     _ingestionDelayTrackingScheduler = Executors.newSingleThreadScheduledExecutor(
         getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
     // schedule periodically to update latest upstream offset or create metrics for newly added partitions.
-    _ingestionDelayTrackingScheduler.scheduleWithFixedDelay(this::trackIngestionDelay,
+    _ingestionDelayTrackingFuture = _ingestionDelayTrackingScheduler.scheduleWithFixedDelay(this::trackIngestionDelay,
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricsTrackingIntervalMs, TimeUnit.MILLISECONDS);
   }
 
@@ -668,35 +671,59 @@ public class IngestionDelayTracker {
 
   /// We use this method to clean up when a table is being removed. It does not throw, so the caller can go on to stop
   /// the table's consumers.
+  ///
+  /// The tracking task may be inside a fetch on a stream metadata provider, and a stream consumer such as Kafka's is
+  /// not safe for concurrent use, so a provider is closed only after that fetch returns. The cleanup that needs the
+  /// providers therefore runs on the tracking thread, behind the fetch: removing the partitions' metrics asks each
+  /// provider which gauges it registered, and then the providers are closed. This waits a bounded time for it; if the
+  /// wait runs out or the caller is interrupted, the cleanup still completes on that thread once the fetch returns.
+  /// The interrupt is left set on the calling thread.
   public void shutdown() {
     _shuttingDown = true;
     // Now that segments can't report metric, destroy metric for this table
     _metricsRemovalScheduler.shutdown(); // ScheduledExecutor is installed in constructor so must always be cancelled
-    if (_ingestionDelayTrackingScheduler != null) {
-      // Stop the tracking task before closing the stream metadata providers it fetches through: a stream consumer
-      // such as Kafka's is not safe for concurrent use, so closing it under an in-flight fetch throws.
-      _ingestionDelayTrackingScheduler.shutdownNow();
-      try {
-        if (!_ingestionDelayTrackingScheduler.awaitTermination(TRACKING_SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-          LOGGER.warn("Ingestion delay tracking task for table: {} did not stop within {}ms", _tableNameWithType,
-              TRACKING_SHUTDOWN_TIMEOUT_MS);
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-    for (Map.Entry<Integer, StreamMetadataProvider> entry : _streamConfigIndexToStreamMetadataProvider.entrySet()) {
-      if (_streamConfigIndexToStreamMetadataProvider.remove(entry.getKey(), entry.getValue())) {
-        closeStreamMetadataProvider(entry.getValue());
-      }
-    }
-    if (!_isServerReadyToServeQueries.getAsBoolean()) {
-      // Do not update the tracker state during server startup period
+    if (_ingestionDelayTrackingScheduler == null) {
+      cleanUpAfterTracking();
       return;
     }
-    // Remove partitions so their related metrics get uninstalled.
-    for (Integer partitionId : _ingestionInfoMap.keySet()) {
-      removePartitionId(partitionId);
+    // Interrupt a fetch in flight and stop scheduling new ones, but keep the executor open for the cleanup below
+    _ingestionDelayTrackingFuture.cancel(true);
+    try {
+      _ingestionDelayTrackingScheduler.execute(this::cleanUpAfterTracking);
+    } catch (RejectedExecutionException e) {
+      // An earlier call already shut the executor down; the cleanup is idempotent
+      cleanUpAfterTracking();
+    }
+    _ingestionDelayTrackingScheduler.shutdown();
+    try {
+      if (!_ingestionDelayTrackingScheduler.awaitTermination(TRACKING_SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        LOGGER.warn("Ingestion delay tracking task for table: {} did not stop within {}ms; its cleanup completes once "
+            + "it does", _tableNameWithType, TRACKING_SHUTDOWN_TIMEOUT_MS);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  /// Removes the metrics of all tracked partitions, then closes the stream metadata providers. Metrics go first
+  /// because removing them looks the partition's provider up; the providers are closed even when that fails.
+  private void cleanUpAfterTracking() {
+    try {
+      if (_isServerReadyToServeQueries.getAsBoolean()) {
+        // Remove partitions so their related metrics get uninstalled. Not during server startup, when the tracker
+        // state is not updated.
+        for (Integer partitionId : _ingestionInfoMap.keySet()) {
+          removePartitionId(partitionId);
+        }
+      }
+    } catch (RuntimeException e) {
+      LOGGER.error("Failed to remove the ingestion metrics of table: {}", _tableNameWithType, e);
+    } finally {
+      for (Map.Entry<Integer, StreamMetadataProvider> entry : _streamConfigIndexToStreamMetadataProvider.entrySet()) {
+        if (_streamConfigIndexToStreamMetadataProvider.remove(entry.getKey(), entry.getValue())) {
+          closeStreamMetadataProvider(entry.getValue());
+        }
+      }
     }
   }
 }
