@@ -33,7 +33,9 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.TableScan;
@@ -277,15 +279,17 @@ public class PinotAggregateExchangeNodeInsertRule {
                 + "engine. Run the query on the single-stage query engine instead.");
       }
     }
-    // When the plain plan runs the aggregate in the leaf stage, the single-stage engine groups by each element of the
-    // multi-value column. That plan stays, so a server that predates the MV aggregate can run it.
-    boolean plainPlanRunsInLeafStage = withinGroupCollation == null && !Boolean.parseBoolean(
-        hintOptions.get(PinotHintOptions.AggregateOptions.IS_SKIP_LEAF_STAGE_GROUP_BY)) && readsTableScan(aggRel);
-    if (!mvKeys.isEmpty() && !plainPlanRunsInLeafStage) {
-      RelNode mvAggregatePlan =
-          createMvAggregatePlan(aggRel, mvKeys, hintOptions, withinGroupCollation, collations, limit);
-      if (mvAggregatePlan != null) {
-        return mvAggregatePlan;
+    if (!mvKeys.isEmpty()) {
+      // When the plain plan runs the aggregate in the leaf stage, the single-stage engine groups by each element of
+      // the multi-value column. That plan stays, so a server that predates the MV aggregate can run it.
+      boolean plainPlanRunsInLeafStage = withinGroupCollation == null && !Boolean.parseBoolean(
+          hintOptions.get(PinotHintOptions.AggregateOptions.IS_SKIP_LEAF_STAGE_GROUP_BY)) && readsTableScan(aggRel);
+      if (!plainPlanRunsInLeafStage) {
+        RelNode mvAggregatePlan =
+            createMvAggregatePlan(aggRel, mvKeys, hintOptions, withinGroupCollation, collations, limit);
+        if (mvAggregatePlan != null) {
+          return mvAggregatePlan;
+        }
       }
     }
     if (withinGroupCollation != null || (hasGroupBy && Boolean.parseBoolean(
@@ -358,14 +362,27 @@ public class PinotAggregateExchangeNodeInsertRule {
     return convertAggFromIntermediateInput(aggRel, exchange, AggType.FINAL, leafReturnFinalResult, collations, limit);
   }
 
-  /// Returns whether `aggRel` reads a table scan through `Project` and `Filter` nodes only. The leaf stage runs such
-  /// an aggregate in the single-stage engine.
+  /// Returns whether `aggRel` reads a table scan through `Project` and `Filter` nodes, and through the left input of
+  /// semi-joins that [PinotJoinToDynamicBroadcastRule] moves into the leaf stage. The leaf stage runs such an
+  /// aggregate in the single-stage engine.
+  ///
+  /// [PinotJoinToDynamicBroadcastRule] runs after this rule. It removes the exchange on the left input of a join
+  /// that this method walks through.
   private static boolean readsTableScan(Aggregate aggRel) {
     RelNode node = PinotRuleUtils.unboxRel(aggRel.getInput());
-    while (node instanceof Project || node instanceof Filter) {
-      node = PinotRuleUtils.unboxRel(node.getInput(0));
+    while (true) {
+      if (node instanceof Project || node instanceof Filter) {
+        node = PinotRuleUtils.unboxRel(node.getInput(0));
+      } else if (node instanceof Join && PinotJoinToDynamicBroadcastRule.isDynamicBroadcastCandidate((Join) node)) {
+        RelNode left = PinotRuleUtils.unboxRel(((Join) node).getLeft());
+        if (!(left instanceof Exchange)) {
+          return false;
+        }
+        node = PinotRuleUtils.unboxRel(left.getInput(0));
+      } else {
+        return node instanceof TableScan;
+      }
     }
-    return node instanceof TableScan;
   }
 
   // TODO: Currently it only handles one WITHIN GROUP collation across all AggregateCalls.

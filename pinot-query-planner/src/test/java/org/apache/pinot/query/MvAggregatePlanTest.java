@@ -36,6 +36,9 @@ public class MvAggregatePlanTest extends QueryEnvironmentTestBase {
   // With the planner default, the IN subquery becomes a dynamic-broadcast semi-join in the leaf stage.
   private static final String SEMI_JOIN_QUERY = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e "
       + "WHERE col1 IN (SELECT col1 FROM a WHERE col2 = 'x') GROUP BY ARRAY_TO_MV(mcol1)";
+  // Two IN subqueries become two semi-joins in the leaf stage, one above the other.
+  private static final String TWO_SEMI_JOINS_QUERY = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e "
+      + "WHERE col1 IN (SELECT col1 FROM a) AND col2 IN (SELECT col2 FROM b) GROUP BY ARRAY_TO_MV(mcol1)";
   private static final String JOIN_QUERY = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e "
       + "JOIN a ON e.col1 = a.col1 GROUP BY ARRAY_TO_MV(e.mcol1)";
   private static final String LOOKUP_JOIN_QUERY = "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy='lookup') */ "
@@ -48,11 +51,21 @@ public class MvAggregatePlanTest extends QueryEnvironmentTestBase {
   // ignores the hint.
   private static final String SKIP_LEAF_QUERY = "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by="
       + "'true') */ ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1)";
-  // The queries whose aggregate reads a table scan. They keep the plain plan, which a server that predates the MV
-  // aggregate can run.
-  private static final List<String> TABLE_SCAN_QUERIES = List.of(QUERY, FILTER_QUERY);
-  private static final List<String> MV_AGGREGATE_QUERIES =
-      List.of(JOIN_QUERY, LOOKUP_JOIN_QUERY, SEMI_JOIN_QUERY, SORTED_SUBQUERY_QUERY, UNNEST_QUERY, SKIP_LEAF_QUERY);
+  // A semi-join with this hint does not run in the leaf stage.
+  private static final String HASH_SEMI_JOIN_QUERY =
+      SEMI_JOIN_QUERY.replace("SELECT ARRAY_TO_MV", "SELECT /*+ joinOptions(join_strategy='hash') */ ARRAY_TO_MV");
+  // The left input of these semi-joins is not a table scan, so the semi-joins do not run in the leaf stage.
+  private static final String SEMI_JOIN_ABOVE_JOIN_QUERY = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) "
+      + "FROM e JOIN b ON e.col1 = b.col1 WHERE e.col2 IN (SELECT col2 FROM a) GROUP BY ARRAY_TO_MV(e.mcol1)";
+  private static final String SEMI_JOIN_ABOVE_SORT_QUERY = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM "
+      + "(SELECT mcol1, col1 FROM e ORDER BY col2 LIMIT 10) WHERE col1 IN (SELECT col1 FROM a) "
+      + "GROUP BY ARRAY_TO_MV(mcol1)";
+  // The queries whose aggregate reads a table scan, also through a semi-join in the leaf stage. They keep the plain
+  // plan, which a server that predates the MV aggregate can run.
+  private static final List<String> TABLE_SCAN_QUERIES =
+      List.of(QUERY, FILTER_QUERY, SEMI_JOIN_QUERY, TWO_SEMI_JOINS_QUERY);
+  private static final List<String> MV_AGGREGATE_QUERIES = List.of(JOIN_QUERY, LOOKUP_JOIN_QUERY, HASH_SEMI_JOIN_QUERY,
+      SEMI_JOIN_ABOVE_JOIN_QUERY, SEMI_JOIN_ABOVE_SORT_QUERY, SORTED_SUBQUERY_QUERY, UNNEST_QUERY, SKIP_LEAF_QUERY);
   private static final String MV_AGGREGATE = "PinotLogicalMvAggregate";
   private static final String SUPPORTED_USES = "ARRAY_TO_MV is supported only";
 
@@ -158,11 +171,14 @@ public class MvAggregatePlanTest extends QueryEnvironmentTestBase {
   @Test
   public void testArrayToMvStaysAboveAJoin() {
     // The MV key must be in the Project under the aggregate. In the plan text, a node comes after its parent.
-    for (String query : List.of(JOIN_QUERY, SEMI_JOIN_QUERY)) {
+    for (String query : List.of(JOIN_QUERY, HASH_SEMI_JOIN_QUERY)) {
       String plan = explain(query);
       assertTrue(plan.indexOf(MV_AGGREGATE) < plan.indexOf("Join"), plan);
       assertFalse(plan.contains("ARRAY_TO_MV"), plan);
     }
+    // Above a semi-join in the leaf stage, the call stays above the join in the Project of the plain aggregate
+    String plan = explain(SEMI_JOIN_QUERY);
+    assertTrue(plan.indexOf("ARRAY_TO_MV") < plan.indexOf("Join"), plan);
   }
 
   @Test
@@ -175,7 +191,7 @@ public class MvAggregatePlanTest extends QueryEnvironmentTestBase {
       assertTrue(plan.contains(MV_AGGREGATE), plan);
       assertTrue(plan.lastIndexOf("'x'") < plan.indexOf(MV_AGGREGATE), plan);
     }
-    String plan = explain(SEMI_JOIN_QUERY + " HAVING ARRAY_TO_MV(mcol1) = 'b'");
+    String plan = explain(HASH_SEMI_JOIN_QUERY + " HAVING ARRAY_TO_MV(mcol1) = 'b'");
     assertTrue(plan.contains(MV_AGGREGATE), plan);
     assertTrue(plan.indexOf("'b'") < plan.indexOf(MV_AGGREGATE), plan);
   }
@@ -183,9 +199,11 @@ public class MvAggregatePlanTest extends QueryEnvironmentTestBase {
   @Test
   public void testFilterOnMvKeyStaysAboveThePlainAggregate() {
     // The same holds when the aggregate reads a table scan and keeps the plain plan
-    String plan = explain(QUERY + " HAVING ARRAY_TO_MV(mcol1) = 'x'");
-    assertFalse(plan.contains(MV_AGGREGATE), plan);
-    assertTrue(plan.indexOf("'x'") < plan.indexOf("Aggregate"), plan);
+    for (String query : List.of(QUERY, SEMI_JOIN_QUERY)) {
+      String plan = explain(query + " HAVING ARRAY_TO_MV(mcol1) = 'b'");
+      assertFalse(plan.contains(MV_AGGREGATE), plan);
+      assertTrue(plan.indexOf("'b'") < plan.indexOf("Aggregate"), plan);
+    }
   }
 
   private static String getFullMessage(Throwable t) {

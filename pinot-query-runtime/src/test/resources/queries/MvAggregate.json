@@ -157,6 +157,12 @@
         "ignoreV2Optimizer": true
       },
       {
+        "description": "MV key and a single-value key above two semi-joins that run in the leaf stage, one on an expression",
+        "sql": "SELECT ARRAY_TO_MV(strMv), grp, COUNT(*) FROM {tbl} WHERE k IN (SELECT id FROM {dim}) AND sv + 1 IN (SELECT id FROM {dim}) GROUP BY ARRAY_TO_MV(strMv), grp",
+        "outputs": [["a", "g1", 1], ["b", "g1", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
         "description": "A filter on the MV key in HAVING keeps only the matching element above a semi-join",
         "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} WHERE k IN (SELECT id FROM {dim}) GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) = 'b'",
         "outputs": [["b", 2]],
