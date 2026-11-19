@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.config.provider.StaticTableCache;
@@ -28,7 +27,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -36,12 +34,11 @@ import org.testng.annotations.Test;
 /// Unit test for the static table cache functionality in PinotQueryResource.
 public class PinotQueryResourceStaticValidationTest {
 
-  private ObjectMapper _objectMapper;
+  private PinotQueryResource _pinotQueryResource;
 
   @BeforeClass
   public void setUp() {
-    MockitoAnnotations.openMocks(this);
-    _objectMapper = new ObjectMapper();
+    _pinotQueryResource = new PinotQueryResource();
   }
 
   @Test
@@ -69,5 +66,28 @@ public class PinotQueryResourceStaticValidationTest {
 
     Assert.assertTrue(provider.getTableNameMap().containsKey("testTable_OFFLINE"));
     Assert.assertTrue(provider.getTableNameMap().containsKey("testTable"));
+  }
+
+  @Test
+  public void testValidateMultiStageQueryWithStaticTable() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
+        .addSingleValueDimension("dimensionCol", FieldSpec.DataType.STRING)
+        .addMetric("metricCol", FieldSpec.DataType.LONG).build();
+    String sql = "SET useMultistageEngine=true; SELECT dimensionCol FROM testTable";
+
+    PinotQueryResource.MultiStageQueryValidationRequest request =
+        new PinotQueryResource.MultiStageQueryValidationRequest(sql, List.of(tableConfig), List.of(schema), null, null,
+            false);
+
+    List<PinotQueryResource.MultiStageQueryValidationResponse> responses =
+        _pinotQueryResource.validateMultiStageQuery(request, null);
+
+    Assert.assertEquals(responses.size(), 1);
+    PinotQueryResource.MultiStageQueryValidationResponse response = responses.get(0);
+    Assert.assertTrue(response.isCompiledSuccessfully());
+    Assert.assertNull(response.getErrorCode());
+    Assert.assertNull(response.getErrorMessage());
+    Assert.assertEquals(response.getSql(), sql);
   }
 }
