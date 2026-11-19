@@ -9,120 +9,107 @@
 #
 #   http://www.apache.org/licenses/LICENSE-2.0
 #
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
-name: "[Pinot Release] Pinot Release All Java Distro Docker Image Build and Publish"
+
+name: "[Pinot Release] Patch OpenJDK in Legacy Docker Images"
 
 on:
   workflow_dispatch:
-    inputs:
-      commit:
-        description: "The branch/tag/commit to build the Pinot image from."
-        default: "master"
-        required: true
-      tags:
-        description: "Tags to push, comma separated, e.g. tag1,tag2,tag3"
-        default: ""
+
+concurrency:
+  group: legacy-openjdk-image-patch
+  cancel-in-progress: false
 
 jobs:
-  generate-build-info:
-    name: Generate Build Info
+  plan:
     runs-on: ubuntu-24.04
     outputs:
-      commit-id: ${{ steps.generate-build-info.outputs.commit-id }}
-      tags: ${{ steps.generate-build-info.outputs.tags }}
+      builds: ${{ steps.inventory.outputs.builds }}
+      groups: ${{ steps.inventory.outputs.groups }}
     steps:
       - uses: actions/checkout@v7.0.1
-      - name: Generate Build Info
-        id: generate-build-info
-        env:
-          PINOT_GIT_REF: "${{ github.event.inputs.commit }}"
-          TAGS: "${{ github.event.inputs.tags }}"
+      - name: Read image inventory
+        id: inventory
         run: |
-          .github/workflows/scripts/docker/.pinot_build_info_gen.sh
-  compile-pinot:
-    # Pinot is compiled once per JDK version using the amazoncorretto build base.
-    # JVM bytecode is vendor-neutral, so the resulting build image is shared by all
-    # runtime distros (ms-openjdk, amazoncorretto) for the same JDK version.
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        java-version: ["25"]
-    name: Compile JDK-${{ matrix.java-version }} Pinot
-    needs: [generate-build-info]
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v7.0.1
-      - name: Compile Pinot and push build image
-        env:
-          DOCKER_FILE_BASE_DIR: "docker/images/pinot"
-          DOCKER_IMAGE_NAME: "apachepinot/pinot"
-          PINOT_GIT_REF: "${{ needs.generate-build-info.outputs.commit-id }}"
-          JDK_VERSION: ${{ matrix.java-version }}
-        run: .github/workflows/scripts/docker/.pinot_compile_and_push_build_image.sh
-        timeout-minutes: 240
-  package-pinot-docker-image:
+          set -euo pipefail
+          inventory=.github/workflows/scripts/docker/legacy-jdk-images.json
+          builds=$(jq -ce '.builds | select(type == "array" and length > 0) | {include: .}' "$inventory")
+          groups=$(jq -ce '.groups | select(type == "array" and length > 0) | {include: .}' "$inventory")
+          printf 'builds=%s\ngroups=%s\n' "$builds" "$groups" >> "$GITHUB_OUTPUT"
+
+  patch:
+    name: Patch ${{ matrix.release }} Java ${{ matrix.major }} ${{ matrix.vendor }} ${{ matrix.arch }}
+    needs: plan
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
-      matrix:
-        java-disto: ["ms-openjdk", "amazoncorretto"]
-        java-version: ["25"]
-        arch: ["amd64", "arm64"]
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-    name: Package ${{ matrix.java-disto }}-${{ matrix.java-version }} ${{ matrix.arch }}
-    needs: [generate-build-info, compile-pinot]
+      matrix: ${{ fromJSON(needs.plan.outputs.builds) }}
     steps:
+      - uses: actions/checkout@v7.0.1
       - name: Login to DockerHub
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v7.0.1
-      - name: Package and push the Docker image
+      - name: Patch, test and publish platform image
         env:
-          DOCKER_FILE_BASE_DIR: "docker/images/pinot"
-          DOCKER_IMAGE_NAME: "apachepinot/pinot"
-          JDK_VERSION: "${{ matrix.java-version }}"
-          RUNTIME_IMAGE_TAGS: "${{ matrix.java-version }}-${{ matrix.java-disto }}"
-          PINOT_GIT_REF: "${{ needs.generate-build-info.outputs.commit-id }}"
-          BUILD_ARCH: ${{ matrix.arch }}
-          TAGS: "${{ needs.generate-build-info.outputs.tags }}"
-        run: .github/workflows/scripts/docker/.pinot_package_single_platform.sh
-        timeout-minutes: 60
-  create-multi-arch-manifest:
+          RELEASE: ${{ matrix.release }}
+          VENDOR: ${{ matrix.vendor }}
+          MAJOR: ${{ matrix.major }}
+          ARCH: ${{ matrix.arch }}
+          OLD_DIGEST: ${{ matrix.old_digest }}
+          PRIMARY_TAG: ${{ matrix.primary_tag }}
+          PLATFORM_ALIASES: ${{ matrix.platform_aliases }}
+          MINIMUM_VERSION: ${{ matrix.minimum_version }}
+          CORRETTO_PACKAGE_VERSION: ${{ matrix.corretto_package_version }}
+          MS_DONOR: ${{ matrix.ms_donor }}
+          RESULTS_DIR: ${{ runner.temp }}/legacy-jdk-results
+        run: bash .github/workflows/scripts/docker/legacy-jdk-image-patch.sh patch
+      - name: Save the verified platform digest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: legacy-jdk-${{ matrix.primary_tag }}
+          path: ${{ runner.temp }}/legacy-jdk-results/${{ matrix.primary_tag }}.json
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    name: Publish ${{ matrix.release }} Java ${{ matrix.major }} ${{ matrix.vendor }} manifests
+    needs: [plan, patch]
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     strategy:
       fail-fast: false
-      matrix:
-        java-disto: ["ms-openjdk", "amazoncorretto"]
-        java-version: ["25"]
-    name: Create ${{ matrix.java-disto }}-${{ matrix.java-version }} Multi-Arch Manifest
-    needs: [generate-build-info, package-pinot-docker-image]
+      matrix: ${{ fromJSON(needs.plan.outputs.groups) }}
     steps:
+      - uses: actions/checkout@v7.0.1
       - name: Login to DockerHub
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v7.0.1
-      - name: Create Multi-Arch Manifest
+      - name: Read verified platform digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: legacy-jdk-${{ matrix.release }}-${{ matrix.major }}-${{ matrix.vendor }}-linux-*
+          path: ${{ runner.temp }}/legacy-jdk-results
+          merge-multiple: true
+      - name: Publish verified platform digests
         env:
-          TAGS: "${{ needs.generate-build-info.outputs.tags }}"
-          BUILD_PLATFORM: "linux/arm64,linux/amd64"
-          BASE_IMAGE_TAGS: "${{ matrix.java-version }}-${{ matrix.java-disto }}"
-        run: .github/workflows/scripts/docker/.pinot_multi_arch_docker_image_manifest_package.sh
+          RELEASE: ${{ matrix.release }}
+          VENDOR: ${{ matrix.vendor }}
+          MAJOR: ${{ matrix.major }}
+          AMD64_TAG: ${{ matrix.amd64_tag }}
+          ARM64_TAG: ${{ matrix.arm64_tag }}
+          AMD64_OLD_DIGEST: ${{ matrix.amd64_old_digest }}
+          ARM64_OLD_DIGEST: ${{ matrix.arm64_old_digest }}
+          OLD_INDEX_DIGEST: ${{ matrix.old_index_digest }}
+          INDEX_ALIASES: ${{ matrix.index_aliases }}
+          RESULTS_DIR: ${{ runner.temp }}/legacy-jdk-results
+        run: bash .github/workflows/scripts/docker/legacy-jdk-image-patch.sh publish
