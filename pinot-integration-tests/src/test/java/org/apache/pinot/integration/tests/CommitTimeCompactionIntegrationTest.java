@@ -552,8 +552,8 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   protected void validatePostCommitCompaction(String[] tableNames, long expectedBaselineRawDocs, String columns,
       List<List<Object>> expectedRows)
       throws Exception {
-    waitForRows(rawRowsQuery(columns, tableNames[ROW_MAJOR]), expectedRows, 30_000L);
-    waitForRows(rawRowsQuery(columns, tableNames[COLUMN_MAJOR]), expectedRows, 30_000L);
+    assertRows(rawRowsQuery(columns, tableNames[ROW_MAJOR]), expectedRows);
+    assertRows(rawRowsQuery(columns, tableNames[COLUMN_MAJOR]), expectedRows);
     assertEquals(getCurrentCountStarResultWithoutUpsert(tableNames[BASELINE]), expectedBaselineRawDocs,
         "Baseline table without commit-time compaction should keep every ingested row");
     assertRowsOnTables(columns, expectedRows, tableNames);
@@ -628,8 +628,8 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     List<List<Object>> expectedRawRows = List.of(expectedRows.get(0),
         List.of(101, "Alice-Updated1", "dota", 2000.0, 1681300001000L, true), expectedRows.get(1),
         List.of(103, "Charlie-New", "chess", 2500.0, 1681300004000L, true));
-    waitForRows(rawRowsQuery(GAME_SCORES_COLUMNS, tables[ROW_MAJOR]), expectedRawRows, 30_000L);
-    waitForRows(rawRowsQuery(GAME_SCORES_COLUMNS, tables[COLUMN_MAJOR]), expectedRawRows, 30_000L);
+    assertRows(rawRowsQuery(GAME_SCORES_COLUMNS, tables[ROW_MAJOR]), expectedRawRows);
+    assertRows(rawRowsQuery(GAME_SCORES_COLUMNS, tables[COLUMN_MAJOR]), expectedRawRows);
     assertEquals(getCurrentCountStarResultWithoutUpsert(tables[BASELINE]), 15L,
         "Baseline table without commit-time compaction should keep every ingested row");
 

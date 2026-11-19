@@ -106,6 +106,9 @@ public class ClusterIntegrationTestUtils {
   /// for each key, the record with the largest `comparisonColumn` value. Returns the selected `columns` of each
   /// winner, ordered by key, ready for [BaseClusterIntegrationTest#assertRows].
   ///
+  /// Values are compared as the Avro values render, so each Avro field type must match the Pinot stored type of the
+  /// column (e.g. an Avro float in a DOUBLE column fails with a confusing diff).
+  ///
   /// This is a test oracle and deliberately does not use the upsert code under test. It covers plain full upsert
   /// only: no delete column, no partial-upsert merge, no null or bytes values. Two records of a key with the same
   /// largest comparison value fail it, since which one wins depends on the order of stream partitions and uploaded

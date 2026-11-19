@@ -75,6 +75,8 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
     addTableConfig(tableConfig);
 
     waitForAllDocsLoaded(600_000L);
+    // Dedup keeps the first row per id, so the count is right before the duplicates are read: wait for them too
+    waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
   }
 
   @Override

@@ -88,6 +88,8 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
     TableConfig tableConfig = createDedupTableConfig(_avroFiles.get(0), "id", getNumKafkaPartitions());
     addTableConfig(tableConfig);
     waitForAllDocsLoaded(600_000L);
+    // Dedup keeps the first row per id, so the count is right before the duplicates are read: wait for them too
+    waitForAllStreamRecordsConsumed(getTableName(), 600_000L);
   }
 
   protected void createDedupTableWithReplicas()
@@ -117,6 +119,7 @@ public class BaseDedupIntegrationTest extends BaseClusterIntegrationTestSet {
       }
       return true;
     }, 600_000L, "Failed to load " + countStarResult + " documents to both servers");
+    waitForAllStreamRecordsConsumed(DEDUP_TABLE_WITH_REPLICAS, 600_000L);
   }
 
   @Nullable

@@ -74,6 +74,8 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
     // wait until every replica of both tables consumed the whole stream first
     waitForAllStreamRecordsConsumed(pauselessTableNameWithType, 120_000L);
     waitForAllStreamRecordsConsumed(getNonPauselessTableName(), 120_000L);
+    // A replica still in transition receives no queries, so settle first for every replica to answer
+    waitForClusterStateSettled(pauselessTableNameWithType, 120_000L);
     assertRowsFromEveryReplica(dedupRowsQuery(pauselessTableNameWithType), DEDUP_PAUSELESS_SURVIVORS);
     assertRows(dedupRowsQuery(getNonPauselessTableName()), DEDUP_PAUSELESS_SURVIVORS);
   }

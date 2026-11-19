@@ -266,7 +266,7 @@ public class UpsertSnapshotRestartIntegrationTest extends BaseClusterIntegration
     addTableConfig(tableConfig);
 
     pushCsvIntoKafka(rows(PHASE1_BASE_TS), topic, 0);
-    waitForRows(rowsQuery(table), expectedRows(PHASE1_BASE_TS), 60_000L);
+    waitForRows(rowsQuery(table), expectedRows(PHASE1_BASE_TS), WAIT_MS);
     waitForLlcSegments(rtTable, 2);
     String seg0Name = sortedLlcSegmentNames(rtTable).get(0);
     // The first snapshot pass runs when the second consuming segment starts

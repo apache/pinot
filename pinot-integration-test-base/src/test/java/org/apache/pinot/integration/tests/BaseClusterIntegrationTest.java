@@ -997,7 +997,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throw new IllegalStateException(
           "No COUNT(*) result for table " + tableName + ": " + resultSetGroup.getExceptions());
     }
-    return Long.parseLong(resultSetGroup.getResultSet(0).getString(0));
+    String count = resultSetGroup.getResultSet(0).getString(0);
+    try {
+      return Long.parseLong(count);
+    } catch (NumberFormatException e) {
+      throw new IllegalStateException("Invalid COUNT(*) result for table " + tableName + ": " + count, e);
+    }
   }
 
   protected void waitForMinionTaskCompletion(String taskId, long timeout) {
@@ -1126,6 +1131,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         try {
           List<String> rows = queryRows(query);
           lastRows.set(rows);
+          lastError.set(null);
           return rows.equals(expected);
         } catch (Exception e) {
           lastError.set(e);
@@ -1175,6 +1181,29 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return message.toString();
   }
 
+  /// Returns whether every instance of every segment in the IdealState of the table is in its prescribed state in the
+  /// ExternalView. Queries route by the ExternalView, so until then some segments may not be served where assigned.
+  protected boolean isExternalViewConverged(String tableNameWithType) {
+    IdealState idealState = getHelixResourceManager().getTableIdealState(tableNameWithType);
+    ExternalView externalView = getHelixResourceManager().getTableExternalView(tableNameWithType);
+    if (idealState == null || externalView == null) {
+      return false;
+    }
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      if (!entry.getValue().equals(externalView.getStateMap(entry.getKey()))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Waits until [#isExternalViewConverged(String)] holds once. [#waitForClusterStateSettled(String, long)] also
+  /// requires no OFFLINE segment and a few stable polls.
+  protected void waitForExternalViewToConverge(String tableNameWithType, long timeoutMs) {
+    TestUtils.waitForCondition(aVoid -> isExternalViewConverged(tableNameWithType), 1000L, timeoutMs,
+        "ExternalView failed to converge to the IdealState for table: " + tableNameWithType);
+  }
+
   /// Like [#waitForClusterStateSettled(String, Integer, int, long)] for any number of segments: waits until the
   /// ExternalView of the table (OFFLINE or REALTIME) equals its IdealState with no OFFLINE segment, so the next row
   /// check reads every segment from where it is assigned.
@@ -1186,15 +1215,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   ///
   /// - IdealState has `expectedSegments` entries (any number when null).
   /// - No segment in IdealState has any instance in OFFLINE state.
-  /// - ExternalView equals IdealState (queries route via ExternalView, so this is required
+  /// - [#isExternalViewConverged(String)] (queries route via ExternalView, so this is required
   ///   before asserting on IdealState).
   ///
   /// All conditions must hold for `stableSamples` consecutive polls, because IdealState can
   /// transiently look correct between two intermediate states during force-commit +
   /// new-consuming-segment creation.
   protected void waitForClusterStateSettled(String tableNameWithType, @Nullable Integer expectedSegments,
-      int stableSamples,
-      long timeoutMs) {
+      int stableSamples, long timeoutMs) {
     AtomicInteger streak = new AtomicInteger(0);
     TestUtils.waitForCondition(aVoid -> {
       IdealState idealState = getHelixResourceManager().getTableIdealState(tableNameWithType);
@@ -1214,8 +1242,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         streak.set(0);
         return false;
       }
-      ExternalView externalView = getHelixResourceManager().getTableExternalView(tableNameWithType);
-      if (externalView == null || !isMap.equals(externalView.getRecord().getMapFields())) {
+      if (!isExternalViewConverged(tableNameWithType)) {
         streak.set(0);
         return false;
       }
@@ -1254,6 +1281,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             }
           });
           lastLags.set(segmentToServerLags);
+          lastError.set(null);
           if (idealState == null || info._serversFailingToRespond != 0) {
             return false;
           }

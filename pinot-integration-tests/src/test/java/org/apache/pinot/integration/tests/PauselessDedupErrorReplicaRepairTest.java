@@ -28,7 +28,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider;
-import org.apache.pinot.integration.tests.realtime.utils.PauselessRealtimeTestUtils;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -170,7 +169,7 @@ public class PauselessDedupErrorReplicaRepairTest extends BaseClusterIntegration
     // The runs are spaced out so a pass does not re-trigger resets still in flight from the previous pass.
     long[] lastValidationRunMs = new long[1];
     TestUtils.waitForCondition(aVoid -> {
-      if (PauselessRealtimeTestUtils.isExternalViewConverged(_helixResourceManager, realtimeTableName)) {
+      if (isExternalViewConverged(realtimeTableName)) {
         return true;
       }
       long nowMs = System.currentTimeMillis();

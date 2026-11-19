@@ -318,15 +318,10 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     return getSharedControllerStarter().getHelixTaskResourceManager();
   }
 
-  /// Returns the Helix resource manager from the shared suite's controller.
-  protected PinotHelixResourceManager getSharedHelixResourceManager() {
-    return getSharedControllerStarter().getHelixResourceManager();
-  }
-
   /// Returns the Helix resource manager of the shared suite's controller, so helpers of the base class reach it.
   @Override
   public PinotHelixResourceManager getHelixResourceManager() {
-    return getSharedHelixResourceManager();
+    return getSharedControllerStarter().getHelixResourceManager();
   }
 
   /// Returns the Kafka broker list from the shared suite instance.

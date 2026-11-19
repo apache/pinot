@@ -240,7 +240,7 @@ public class MultiTopicRealtimeClusterIntegrationTest extends CustomDataQueryClu
   }
 
   private int getNumConsumingPartitions(String tableNameWithType) {
-    IdealState idealState = getSharedHelixResourceManager().getTableIdealState(tableNameWithType);
+    IdealState idealState = getHelixResourceManager().getTableIdealState(tableNameWithType);
     if (idealState == null) {
       return 0;
     }
@@ -373,7 +373,7 @@ public class MultiTopicRealtimeClusterIntegrationTest extends CustomDataQueryClu
   public void testSegmentsFromAllTopics() {
     int numTopics = getNumTopics();
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
-    IdealState idealState = getSharedHelixResourceManager().getTableIdealState(realtimeTableName);
+    IdealState idealState = getHelixResourceManager().getTableIdealState(realtimeTableName);
     assertNotNull(idealState);
 
     Set<Integer> topicIndicesSeen = new HashSet<>();
