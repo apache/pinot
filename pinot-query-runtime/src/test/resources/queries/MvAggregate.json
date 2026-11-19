@@ -145,6 +145,24 @@
         "ignoreV2Optimizer": true
       },
       {
+        "description": "A filter on the MV key in HAVING keeps only the matching element on a scan with the plain aggregate",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) = 'b'",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "MV key above a semi-join that runs in the leaf stage",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} WHERE k IN (SELECT id FROM {dim}) GROUP BY ARRAY_TO_MV(strMv)",
+        "outputs": [["a", 3], ["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
+        "description": "A filter on the MV key in HAVING keeps only the matching element above a semi-join",
+        "sql": "SELECT ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} WHERE k IN (SELECT id FROM {dim}) GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) = 'b'",
+        "outputs": [["b", 2]],
+        "ignoreV2Optimizer": true
+      },
+      {
         "description": "A filter on the MV key in HAVING keeps only the matching element on a scan with the MV aggregate",
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ARRAY_TO_MV(strMv), COUNT(*) FROM {tbl} GROUP BY ARRAY_TO_MV(strMv) HAVING ARRAY_TO_MV(strMv) = 'b'",
         "outputs": [["b", 2]],
@@ -194,7 +212,7 @@
         "ignoreV2Optimizer": true
       },
       {
-        "description": "In the plan with the MV aggregate, ARRAY_TO_MV is nullable, so IS NULL on the MV key of an outer join row is not folded and the null group becomes none",
+        "description": "ARRAY_TO_MV of a nullable array is nullable, so IS NULL on the MV key of an outer join row is not folded and the null group becomes none",
         "sql": "SELECT CASE WHEN ARRAY_TO_MV({tbl}.strMv) IS NULL THEN 'none' ELSE ARRAY_TO_MV({tbl}.strMv) END, COUNT(*) FROM {dim} LEFT JOIN {tbl} ON {dim}.id = {tbl}.k + 2 GROUP BY ARRAY_TO_MV({tbl}.strMv)",
         "outputs": [["a", 1], ["b", 1], ["none", 2]],
         "ignoreV2Optimizer": true
@@ -251,7 +269,7 @@
         "description": "A nested ARRAY_TO_MV key above a join fails",
         "sql": "SELECT COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k GROUP BY LOWER(ARRAY_TO_MV(t1.strMv))",
         "outputs": [],
-        "expectedException": ".*ARRAY_TO_MV found in PROJECT in the leaf stage.*ARRAY_TO_MV is supported only.*",
+        "expectedException": ".*ARRAY_TO_MV found in PROJECT in the intermediate stage.*ARRAY_TO_MV is supported only.*",
         "ignoreV2Optimizer": true
       }
     ]
@@ -295,15 +313,16 @@
         "ignoreV2Optimizer": true
       },
       {
-        "description": "Without the MV aggregate, ARRAY_TO_MV(col) IS NOT NULL keeps the null row, as before the MV aggregate: Calcite folds the check to TRUE because ARRAY_TO_MV has a NOT NULL type",
+        "description": "ARRAY_TO_MV of a nullable column is nullable, so Calcite does not fold ARRAY_TO_MV(col) IS NOT NULL, and the check removes the null row",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE ARRAY_TO_MV(strMv) IS NOT NULL",
-        "outputs": [[3]],
+        "outputs": [[2]],
         "ignoreV2Optimizer": true
       },
       {
-        "description": "Without the MV aggregate, COALESCE around an MV key on a scan is removed, as before the MV aggregate: the null row forms the null group, not none",
+        "description": "ARRAY_TO_MV of a nullable column is nullable, so COALESCE around an MV key on a scan stays. The leaf stage cannot run COALESCE on a multi-value column, so the query fails when it runs",
         "sql": "SET enableNullHandling=true; SELECT COALESCE(ARRAY_TO_MV(strMv), 'none'), COUNT(*) FROM {tbl} GROUP BY 1",
-        "outputs": [["a", 2], ["b", 1], [null, 1]],
+        "outputs": [],
+        "expectedException": ".*Caught exception while doing operator.*",
         "ignoreV2Optimizer": true
       },
       {
@@ -314,19 +333,21 @@
         "ignoreV2Optimizer": true
       },
       {
-        "description": "COALESCE around ARRAY_TO_MV in a filter on a scan: Calcite removes COALESCE, as before the MV aggregate, and the leaf stage runs the multi-value predicate",
+        "description": "COALESCE around ARRAY_TO_MV of a nullable column in a filter on a scan stays. The leaf stage cannot run it, so the query fails when it runs",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE COALESCE(ARRAY_TO_MV(strMv), 'x') = 'a'",
-        "outputs": [[2]],
+        "outputs": [],
+        "expectedException": ".*Caught exception while doing operator.*",
         "ignoreV2Optimizer": true
       },
       {
-        "description": "CAST around COALESCE around ARRAY_TO_MV in a filter on a scan: Calcite removes COALESCE, as before the MV aggregate, and the leaf stage casts each element",
+        "description": "CAST around COALESCE around ARRAY_TO_MV of a nullable column in a filter on a scan: COALESCE stays, and the query fails when it runs",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl} WHERE CAST(COALESCE(ARRAY_TO_MV(intMv), 0) AS VARCHAR) = '1'",
-        "outputs": [[1]],
+        "outputs": [],
+        "expectedException": ".*Caught exception while doing operator.*",
         "ignoreV2Optimizer": true
       },
       {
-        "description": "In the plan with the MV aggregate, ARRAY_TO_MV of a nullable column is nullable, so COALESCE around it in a leaf WHERE stays. The leaf stage cannot run it, so the query fails when it runs. It fails on master too, at planning time",
+        "description": "COALESCE around ARRAY_TO_MV of a nullable column in a leaf WHERE under an MV aggregate stays. The leaf stage cannot run it, so the query fails when it runs",
         "sql": "SET enableNullHandling=true; SELECT ARRAY_TO_MV(t1.strMv), COUNT(*) FROM {tbl} t1 JOIN {tbl} t2 ON t1.k = t2.k WHERE COALESCE(ARRAY_TO_MV(t1.strMv), 'x') = 'a' GROUP BY ARRAY_TO_MV(t1.strMv)",
         "outputs": [],
         "expectedException": ".*Caught exception while doing operator.*",

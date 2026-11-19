@@ -85,10 +85,6 @@ public class GroupByAliasShadowedByColumnMeterTest extends QueryEnvironmentTestB
         {"shadowed alias in rollup", "SELECT UPPER(col1) AS col1, COUNT(*) FROM a GROUP BY ROLLUP(col1)", 1},
         {"shadowed alias in a row of grouping sets",
             "SELECT UPPER(col1) AS col1, col2, COUNT(*) FROM a GROUP BY GROUPING SETS ((col1, col2), ())", 1},
-        // The MV aggregate fallback validates this query two times, once for each plan
-        {"shadowed alias in a query that falls back to the MV aggregate",
-            "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ARRAY_TO_MV(mcol1), UPPER(col2) AS col2, "
-                + "COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1), col2", 1},
         {"column aliased to its own name", "SELECT col1 AS col1, COUNT(*) FROM a GROUP BY col1", 0},
         {"qualified column aliased to its own name", "SELECT a.col1 AS col1, COUNT(*) FROM a GROUP BY col1", 0},
         {"alias that is not a column", "SELECT UPPER(col1) AS upper_col1, COUNT(*) FROM a GROUP BY upper_col1", 0},

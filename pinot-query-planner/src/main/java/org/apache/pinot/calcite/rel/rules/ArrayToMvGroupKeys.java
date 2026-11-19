@@ -29,7 +29,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
+import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 
 
 /// Detects and rewrites the `GROUP BY ARRAY_TO_MV(expr)` keys of an aggregate.
@@ -99,7 +99,7 @@ public final class ArrayToMvGroupKeys {
       return false;
     }
     RexCall call = (RexCall) expression;
-    if (call.getOperands().size() != 1 || !ArrayToMvFunctionName.matches(call.getOperator().getName())) {
+    if (call.getOperands().size() != 1 || call.getOperator() != PinotOperatorTable.ARRAY_TO_MV) {
       return false;
     }
     return call.getOperands().get(0).getType().getSqlTypeName() == SqlTypeName.ARRAY;

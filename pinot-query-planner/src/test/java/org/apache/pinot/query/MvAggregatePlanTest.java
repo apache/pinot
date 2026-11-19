@@ -22,15 +22,13 @@ import java.util.List;
 import org.apache.pinot.spi.exception.QueryException;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/// The MV aggregate fallback of `QueryEnvironment.CompiledQuery`: the planner plans a query without the MV aggregate
-/// first, and plans it again with the MV aggregate only when that plan fails the `ARRAY_TO_MV` validation.
-public class MvAggregateFallbackTest extends QueryEnvironmentTestBase {
+/// When the planner plans `GROUP BY ARRAY_TO_MV(expr)` as an MV aggregate, and what stays above and below it.
+public class MvAggregatePlanTest extends QueryEnvironmentTestBase {
   private static final String QUERY =
       "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1)";
   private static final String FILTER_QUERY = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), SUM(col3) FROM e "
@@ -46,21 +44,21 @@ public class MvAggregateFallbackTest extends QueryEnvironmentTestBase {
       + "(SELECT mcol1 FROM e ORDER BY col1 LIMIT 10) GROUP BY ARRAY_TO_MV(mcol1)";
   private static final String UNNEST_QUERY = "EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) FROM e "
       + "CROSS JOIN UNNEST(e.mcol2) AS u(elem) GROUP BY ARRAY_TO_MV(e.mcol1)";
-  // In the first plan, the hint keeps the aggregate out of the leaf stage. The second plan ignores the hint, so its MV
-  // aggregate reads directly from the table scan.
+  // The plain plan with this hint runs the aggregate above the leaf stage, so the planner uses the MV aggregate and
+  // ignores the hint.
   private static final String SKIP_LEAF_QUERY = "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by="
       + "'true') */ ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1)";
-  // The queries whose aggregate runs whole in the leaf stage. They keep the plain plan.
-  private static final List<String> LEAF_ONLY_QUERIES = List.of(QUERY, FILTER_QUERY, SEMI_JOIN_QUERY);
-  // The queries whose aggregate cannot run in the leaf stage. They fail without the MV aggregate.
-  private static final List<String> FALLBACK_QUERIES =
-      List.of(JOIN_QUERY, LOOKUP_JOIN_QUERY, SORTED_SUBQUERY_QUERY, UNNEST_QUERY, SKIP_LEAF_QUERY);
+  // The queries whose aggregate reads a table scan. They keep the plain plan, which a server that predates the MV
+  // aggregate can run.
+  private static final List<String> TABLE_SCAN_QUERIES = List.of(QUERY, FILTER_QUERY);
+  private static final List<String> MV_AGGREGATE_QUERIES =
+      List.of(JOIN_QUERY, LOOKUP_JOIN_QUERY, SEMI_JOIN_QUERY, SORTED_SUBQUERY_QUERY, UNNEST_QUERY, SKIP_LEAF_QUERY);
   private static final String MV_AGGREGATE = "PinotLogicalMvAggregate";
   private static final String SUPPORTED_USES = "ARRAY_TO_MV is supported only";
 
   @Test
-  public void testKeepsThePlainPlanOfQueriesThatPlanWithoutMvAggregate() {
-    for (String query : LEAF_ONLY_QUERIES) {
+  public void testKeepsThePlainPlanWhenTheAggregateReadsATableScan() {
+    for (String query : TABLE_SCAN_QUERIES) {
       String plan = explain(query);
       assertFalse(plan.contains(MV_AGGREGATE), plan);
       assertTrue(plan.contains("ARRAY_TO_MV"), plan);
@@ -69,20 +67,20 @@ public class MvAggregateFallbackTest extends QueryEnvironmentTestBase {
   }
 
   @Test
-  public void testFallsBackToMvAggregateWhenThePlanFailsWithoutIt() {
-    for (String query : FALLBACK_QUERIES) {
+  public void testPlansMvAggregateWhenTheAggregateDoesNotReadATableScan() {
+    for (String query : MV_AGGREGATE_QUERIES) {
       String plan = explain(query);
       assertTrue(plan.contains(MV_AGGREGATE), plan);
     }
   }
 
   @Test
-  public void testFallsBackToMvAggregateWithoutImplementation() {
+  public void testPlansMvAggregateWithoutImplementation() {
     String query = JOIN_QUERY.replace("EXPLAIN PLAN FOR", "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR");
     String plan = explain(query);
     assertTrue(plan.contains(MV_AGGREGATE), plan);
-    String leafOnlyQuery = QUERY.replace("EXPLAIN PLAN FOR", "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR");
-    plan = explain(leafOnlyQuery);
+    String tableScanQuery = QUERY.replace("EXPLAIN PLAN FOR", "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR");
+    plan = explain(tableScanQuery);
     assertFalse(plan.contains(MV_AGGREGATE), plan);
   }
 
@@ -94,89 +92,77 @@ public class MvAggregateFallbackTest extends QueryEnvironmentTestBase {
   }
 
   @Test
-  public void testFallsBackOnlyForArrayToMvGroupKeys() {
-    // A plain GROUP BY mvCol fails the validation, but the MV aggregate cannot help: no second plan.
+  public void testPlansMvAggregateOnlyForArrayToMvGroupKeys() {
+    // A plain GROUP BY mvCol fails the validation: the MV aggregate cannot help
     QueryException e = expectThrows(QueryException.class,
         () -> explain("EXPLAIN PLAN FOR SELECT mcol1, COUNT(*) FROM e GROUP BY mcol1"));
     assertTrue(getFullMessage(e).contains(SUPPORTED_USES), getFullMessage(e));
-    assertEquals(e.getSuppressed().length, 0);
-    // Grouping sets keep the plain aggregate in the second plan, so it fails too, with the error of the second plan.
+    // Grouping sets keep the plain aggregate, which fails the validation above a join
     e = expectThrows(QueryException.class, () -> explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV("
         + "e.mcol1), COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY GROUPING SETS ((ARRAY_TO_MV(e.mcol1)), ())"));
     assertTrue(getFullMessage(e).contains(SUPPORTED_USES), getFullMessage(e));
   }
 
   @Test
-  public void testSecondPlanKeepsPreferSelectAliasInGroupBy() {
-    // With the option, GROUP BY col2 is the alias of the MV key, not the column col2. The second plan is validated
-    // again from a copy of the query, and must resolve the name in the same way.
+  public void testMvKeyThroughASelectAlias() {
+    // With the option, GROUP BY col2 is the alias of the MV key, not the column col2
     String plan = explain("SET preferSelectAliasInGroupBy=true; EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(e.mcol1) AS col2, "
         + "COUNT(*) FROM e JOIN a ON e.col1 = a.col1 GROUP BY col2");
     assertTrue(plan.contains(MV_AGGREGATE + "(group=[{0}], agg#0=[COUNT()], mvKeys=[[0]]"), plan);
   }
 
   @Test
-  public void testErrorOfTheSecondPlanKeepsTheErrorOfTheFirstPlan() {
-    // The plan with the MV aggregate fails: the message says what is supported and why the second plan failed
-    QueryException e = expectThrows(QueryException.class, () -> explain("EXPLAIN PLAN FOR SELECT "
-        + "/*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ARRAY_TO_MV(mcol1), LISTAGG(col2, ',') "
-        + "WITHIN GROUP (ORDER BY col2) FROM e GROUP BY ARRAY_TO_MV(mcol1)"));
-    assertTrue(e.getMessage().contains(SUPPORTED_USES), e.getMessage());
-    assertTrue(e.getMessage().contains("is not supported with WITHIN GROUP"), e.getMessage());
+  public void testWithinGroupIsNotSupportedWithAnMvKey() {
+    Exception e = expectThrows(Exception.class, () -> explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), "
+        + "LISTAGG(col2, ',') WITHIN GROUP (ORDER BY col2) FROM e GROUP BY ARRAY_TO_MV(mcol1)"));
+    assertTrue(getFullMessage(e).contains("is not supported with WITHIN GROUP"), getFullMessage(e));
   }
 
   @Test
-  public void testCoalesceInALeafFilterStaysInThePlanWithMvAggregate() {
-    // In the plan with the MV aggregate, ARRAY_TO_MV of the nullable column of f is nullable, so COALESCE in the leaf
-    // WHERE stays. The leaf stage cannot run it, see MvAggregate.json. The query fails on master too.
-    String plan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(f.mcol1), COUNT(*) FROM f JOIN a ON f.col1 = a.col1 "
+  public void testArrayToMvIsNullableOnANullableColumn() {
+    // f has column-based null handling, so its MV column is nullable, and ARRAY_TO_MV of it is nullable too: a null
+    // array forms the null group. So Calcite does not remove COALESCE. The leaf stage cannot run COALESCE on a
+    // multi-value column, see MvAggregate.json.
+    String plan = explain("EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') = 'a'");
+    assertTrue(plan.contains("COALESCE"), plan);
+    plan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(f.mcol1), COUNT(*) FROM f JOIN a ON f.col1 = a.col1 "
         + "WHERE COALESCE(ARRAY_TO_MV(f.mcol1), 'x') = 'a' GROUP BY ARRAY_TO_MV(f.mcol1)");
     assertTrue(plan.contains(MV_AGGREGATE), plan);
     assertTrue(plan.contains("COALESCE"), plan);
+    // The MV column of e is not nullable, so COALESCE goes away as before
+    plan = explain("EXPLAIN PLAN FOR SELECT COUNT(*) FROM e WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') = 'a'");
+    assertFalse(plan.contains("COALESCE"), plan);
   }
 
   @Test
-  public void testTableNamesAreTheTablesOfThePlanThatRuns() {
-    // The broker reads the table names, for example to apply row-level security, so they must describe the second
-    // plan when the query falls back. With the NOT NULL type of the first plan, the HAVING condition folds to false
-    // and removes table e from the first branch. The second branch fails the first plan. The second plan keeps the
-    // null group, so e stays.
+  public void testArrayToMvIsNullableAboveAnOuterJoin() {
+    // Above a LEFT JOIN, the array of e is nullable, so ARRAY_TO_MV is nullable too and the null check on the key
+    // stays: a null array forms the null group.
+    String plan = explain("EXPLAIN PLAN FOR SELECT CASE WHEN ARRAY_TO_MV(e.mcol1) IS NULL THEN 'none' ELSE "
+        + "ARRAY_TO_MV(e.mcol1) END, COUNT(*) FROM a LEFT JOIN e ON a.col1 = e.col1 GROUP BY ARRAY_TO_MV(e.mcol1)");
+    assertTrue(plan.contains(MV_AGGREGATE), plan);
+    assertTrue(plan.contains("IS NULL"), plan);
+  }
+
+  @Test
+  public void testTableNamesKeepTheTableOfTheNullGroup() {
+    // The broker reads the table names, for example to apply row-level security. With a NOT NULL type of ARRAY_TO_MV,
+    // the HAVING condition folds to false and removes table e from the plan. The null group needs e.
     String query = "SELECT ARRAY_TO_MV(e.mcol1), COUNT(*) FROM a LEFT JOIN e ON a.col1 = e.col1 "
-        + "GROUP BY ARRAY_TO_MV(e.mcol1) HAVING ARRAY_TO_MV(e.mcol1) IS NULL "
-        + "UNION ALL SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ ARRAY_TO_MV(mcol1), COUNT(*) "
-        + "FROM f GROUP BY ARRAY_TO_MV(mcol1)";
+        + "GROUP BY ARRAY_TO_MV(e.mcol1) HAVING ARRAY_TO_MV(e.mcol1) IS NULL";
     try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(query)) {
       assertTrue(compiledQuery.getTableNames().contains("e"), compiledQuery.getTableNames().toString());
     }
   }
 
   @Test
-  public void testPushesArrayToMvBelowTheSemiJoinOfALeafOnlyQuery() {
-    // As before the MV aggregate, ARRAY_TO_MV is computed below the semi-join, in the leaf stage. In the plan text, a
-    // node comes after its parent.
-    String plan = explain(SEMI_JOIN_QUERY);
-    assertTrue(plan.indexOf("ARRAY_TO_MV") > plan.indexOf("Join"), plan);
-  }
-
-  @Test
-  public void testArrayToMvIsNotNullInThePlanWithoutMvAggregate() {
-    // f has column-based null handling, so its MV column is nullable. ARRAY_TO_MV keeps the NOT NULL type that it had
-    // before the MV aggregate, so Calcite removes COALESCE and folds IS NOT NULL as before. The leaf stage runs the
-    // remaining multi-value predicates.
-    String plan = explain("EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE COALESCE(ARRAY_TO_MV(mcol1), 'x') = 'a'");
-    assertFalse(plan.contains("CASE") || plan.contains("COALESCE") || plan.contains("IS NOT NULL"), plan);
-    plan = explain("EXPLAIN PLAN FOR SELECT COUNT(*) FROM f WHERE CAST(COALESCE(ARRAY_TO_MV(mcol1), '0') AS INT) = 1");
-    assertFalse(plan.contains("CASE") || plan.contains("COALESCE") || plan.contains("IS NOT NULL"), plan);
-  }
-
-  @Test
-  public void testArrayToMvIsNullableInThePlanWithMvAggregate() {
-    // Above a LEFT JOIN, the array of e is nullable. In the plan with the MV aggregate, ARRAY_TO_MV is nullable too,
-    // so the null check on the key stays: a null array forms the null group.
-    String plan = explain("EXPLAIN PLAN FOR SELECT CASE WHEN ARRAY_TO_MV(e.mcol1) IS NULL THEN 'none' ELSE "
-        + "ARRAY_TO_MV(e.mcol1) END, COUNT(*) FROM a LEFT JOIN e ON a.col1 = e.col1 GROUP BY ARRAY_TO_MV(e.mcol1)");
-    assertTrue(plan.contains(MV_AGGREGATE), plan);
-    assertTrue(plan.contains("IS NULL"), plan);
+  public void testArrayToMvStaysAboveAJoin() {
+    // The MV key must be in the Project under the aggregate. In the plan text, a node comes after its parent.
+    for (String query : List.of(JOIN_QUERY, SEMI_JOIN_QUERY)) {
+      String plan = explain(query);
+      assertTrue(plan.indexOf(MV_AGGREGATE) < plan.indexOf("Join"), plan);
+      assertFalse(plan.contains("ARRAY_TO_MV"), plan);
+    }
   }
 
   @Test
@@ -189,26 +175,17 @@ public class MvAggregateFallbackTest extends QueryEnvironmentTestBase {
       assertTrue(plan.contains(MV_AGGREGATE), plan);
       assertTrue(plan.lastIndexOf("'x'") < plan.indexOf(MV_AGGREGATE), plan);
     }
-  }
-
-  @Test
-  public void testFilterOnMvKeyAboveASemiJoinFallsBack() {
-    // In the first plan, ARRAY_TO_MV goes below the semi-join and the condition goes into the leaf stage, as before
-    // the MV aggregate, so the plan fails the validation. The second plan keeps the condition above the MV aggregate.
-    String plan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e "
-        + "WHERE col1 IN (SELECT col1 FROM a WHERE col2 = 'x') GROUP BY ARRAY_TO_MV(mcol1) "
-        + "HAVING ARRAY_TO_MV(mcol1) = 'b'");
+    String plan = explain(SEMI_JOIN_QUERY + " HAVING ARRAY_TO_MV(mcol1) = 'b'");
     assertTrue(plan.contains(MV_AGGREGATE), plan);
     assertTrue(plan.indexOf("'b'") < plan.indexOf(MV_AGGREGATE), plan);
   }
 
   @Test
-  public void testFilterOnMvKeyOfALeafOnlyQueryKeepsThePlainPlan() {
-    // The query plans without the MV aggregate, so it keeps the plan of today: the condition goes below the aggregate
-    String plan = explain("EXPLAIN PLAN FOR SELECT ARRAY_TO_MV(mcol1), COUNT(*) FROM e GROUP BY ARRAY_TO_MV(mcol1) "
-        + "HAVING ARRAY_TO_MV(mcol1) = 'x'");
+  public void testFilterOnMvKeyStaysAboveThePlainAggregate() {
+    // The same holds when the aggregate reads a table scan and keeps the plain plan
+    String plan = explain(QUERY + " HAVING ARRAY_TO_MV(mcol1) = 'x'");
     assertFalse(plan.contains(MV_AGGREGATE), plan);
-    assertTrue(plan.lastIndexOf("'x'") > plan.lastIndexOf("Aggregate"), plan);
+    assertTrue(plan.indexOf("'x'") < plan.indexOf("Aggregate"), plan);
   }
 
   private static String getFullMessage(Throwable t) {

@@ -106,9 +106,8 @@ public class PinotLogicalMvAggregateTest {
     for (int i = 0; i < arrayTypes.size(); i++) {
       RelDataType inputType = _typeFactory.builder().add("arr", arrayTypes.get(i)).build();
       RelNode values = LogicalValues.createEmpty(_cluster, inputType);
-      // The MV aggregate exists only in the plan where ARRAY_TO_MV is NULLABLE_ARRAY_TO_MV
       RelDataType arrayToMvType =
-          rexBuilder.makeCall(PinotOperatorTable.NULLABLE_ARRAY_TO_MV, rexBuilder.makeInputRef(values, 0)).getType();
+          rexBuilder.makeCall(PinotOperatorTable.ARRAY_TO_MV, rexBuilder.makeInputRef(values, 0)).getType();
       PinotLogicalMvAggregate mvAggregate =
           new PinotLogicalMvAggregate(_cluster, values.getTraitSet(), List.of(), values, ImmutableBitSet.of(0), null,
               List.of(), AggType.LEAF, false, null, 0, List.of(0));

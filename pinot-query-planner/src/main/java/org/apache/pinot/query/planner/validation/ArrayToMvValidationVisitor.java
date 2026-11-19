@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.validation;
 
 import java.util.List;
-import org.apache.pinot.calcite.sql.fun.ArrayToMvFunctionName;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.PlanFragment;
@@ -72,44 +71,62 @@ import org.apache.pinot.spi.exception.QueryException;
 ///
 /// ## Array-typed group keys
 ///
-/// A plan with the MV aggregate fails when a group key of an aggregate above the leaf boundary is an array, except
-/// for the MV keys of an MV aggregate. A plan without the MV aggregate keeps the check from before the MV aggregate,
-/// see [#checkArrayGroupKeysAsBeforeMvAggregate]: that check misses some array keys, and the queries that it misses
-/// run today.
+/// A plan with an MV aggregate fails when a group key of an aggregate above the leaf boundary is an array, except
+/// for the MV keys of an MV aggregate. Such a plan fails before the MV aggregate, so the complete check breaks no
+/// query that runs today. A plan without an MV aggregate keeps the check from before the MV aggregate, see
+/// [#checkArrayGroupKeysAsBeforeMvAggregate]: that check misses some array keys, and the queries that it misses run
+/// today.
 ///
 /// The visitor is immutable and thread-safe. It validates one fragment. The context is `true` when the visited node
 /// runs in an intermediate stage and `false` when it runs in the leaf stage. Use
 /// [#validate(PlanNode, boolean, boolean)] to validate a fragment.
 public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean> {
   private final boolean _scansTables;
-  private final boolean _useMvAggregate;
+  private final boolean _planHasMvAggregate;
 
-  private ArrayToMvValidationVisitor(boolean scansTables, boolean useMvAggregate) {
+  private ArrayToMvValidationVisitor(boolean scansTables, boolean planHasMvAggregate) {
     _scansTables = scansTables;
-    _useMvAggregate = useMvAggregate;
+    _planHasMvAggregate = planHasMvAggregate;
   }
 
   /// Validates the plan fragment rooted at `fragmentRoot`.
   ///
   /// @param scansTables whether the fragment scans a table (a leaf fragment)
-  /// @param useMvAggregate whether the plan was made with the MV aggregate, see `PlannerContext.isUseMvAggregate()`
-  public static void validate(PlanNode fragmentRoot, boolean scansTables, boolean useMvAggregate) {
+  /// @param planHasMvAggregate whether a fragment of the plan has an MV aggregate, see [#hasMvAggregate]
+  public static void validate(PlanNode fragmentRoot, boolean scansTables, boolean planHasMvAggregate) {
     // In a leaf fragment with a lookup join or an UNNEST, the nodes from the root down to that node run above the leaf
     // boundary.
     boolean isIntermediateStage = !scansTables || containsLookupJoin(fragmentRoot) || containsUnnest(fragmentRoot);
-    fragmentRoot.visit(new ArrayToMvValidationVisitor(scansTables, useMvAggregate), isIntermediateStage);
+    fragmentRoot.visit(new ArrayToMvValidationVisitor(scansTables, planHasMvAggregate), isIntermediateStage);
   }
 
-  /// Validates every fragment of the plan rooted at `fragment`. It needs no worker assignment: a fragment is a leaf
-  /// fragment when it scans a table.
-  ///
-  /// @param useMvAggregate whether the plan was made with the MV aggregate, see `PlannerContext.isUseMvAggregate()`
-  public static void validateFragments(PlanFragment fragment, boolean useMvAggregate) {
-    PlanNode fragmentRoot = fragment.getFragmentRoot();
-    validate(fragmentRoot, scansTable(fragmentRoot), useMvAggregate);
-    for (PlanFragment child : fragment.getChildren()) {
-      validateFragments(child, useMvAggregate);
+  /// Returns whether a fragment of the plan rooted at `fragment` has an MV aggregate.
+  public static boolean hasMvAggregate(PlanFragment fragment) {
+    if (containsMvAggregate(fragment.getFragmentRoot())) {
+      return true;
     }
+    for (PlanFragment child : fragment.getChildren()) {
+      if (hasMvAggregate(child)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean containsMvAggregate(PlanNode node) {
+    if (node instanceof MvAggregateNode) {
+      return true;
+    }
+    // The inputs of a MailboxReceiveNode belong to other fragments.
+    if (node instanceof MailboxReceiveNode) {
+      return false;
+    }
+    for (PlanNode input : node.getInputs()) {
+      if (containsMvAggregate(input)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static boolean containsLookupJoin(PlanNode node) {
@@ -218,7 +235,7 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
       // gives one DIRECT aggregate in the leaf stage, as before the MV aggregate.
       return null;
     }
-    if (_useMvAggregate) {
+    if (_planHasMvAggregate) {
       // The group keys are the first columns of the output.
       checkNoArrayGroupKey(node.getDataSchema(), node.getGroupKeys().size(), List.of(), "AGGREGATE", true);
     } else {
@@ -336,7 +353,7 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
   }
 
   /// The check of the array-typed group keys of a plain aggregate from before the MV aggregate, with no change, for
-  /// a plan without the MV aggregate. It misses some array keys:
+  /// a plan without an MV aggregate. It misses some array keys:
   ///
   /// - It runs only in a fragment that scans no table. It does not run for an aggregate above a lookup join or an
   ///   `UNNEST` in a leaf fragment.
@@ -382,7 +399,7 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
     if (expression instanceof RexExpression.FunctionCall) {
       RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) expression;
       String functionName = functionCall.getFunctionName();
-      if (ArrayToMvFunctionName.matches(functionName)) {
+      if (functionName.equalsIgnoreCase("ARRAY_TO_MV") || functionName.equalsIgnoreCase("ARRAYTOMV")) {
         return true;
       }
       // Process operands

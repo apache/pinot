@@ -1317,10 +1317,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }
 
-  /// A leaf-only `GROUP BY ARRAY_TO_MV(col)` keeps the plain aggregate. With the hint, the plan without the MV
-  /// aggregate fails, so the planner plans the MV aggregate.
+  /// A `GROUP BY ARRAY_TO_MV(col)` that reads a table scan keeps the plain aggregate. With the hint, the plain
+  /// aggregate does not run in the leaf stage, so the planner plans the MV aggregate.
   @Test
-  public void testMvAggregateOnlyWhenThePlainPlanFails()
+  public void testMvAggregateOnlyWhenThePlainAggregateIsNotInTheLeafStage()
       throws Exception {
     String query = "ARRAY_TO_MV(RandomAirports), COUNT(*) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports)";
     Assertions.assertThat(explainPlan("EXPLAIN PLAN FOR SELECT " + query))

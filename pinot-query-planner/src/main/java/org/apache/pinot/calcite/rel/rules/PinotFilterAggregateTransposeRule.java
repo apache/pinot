@@ -30,9 +30,6 @@ import org.apache.calcite.util.ImmutableBitSet;
 /// Same as [FilterAggregateTransposeRule], except that a filter that reads an MV key of an MV aggregate stays above
 /// the aggregate.
 ///
-/// The rule changes the plan only when the planner plans the MV aggregate (see [PinotRuleUtils#isMvAggregateEnabled]).
-/// Without it, the rule is [FilterAggregateTransposeRule].
-///
 /// An MV key is a group key `ARRAY_TO_MV(expr)` (see [ArrayToMvGroupKeys#detect]). A condition on it below the
 /// aggregate becomes a multi-value predicate in the leaf stage. That predicate keeps the whole row when any element
 /// matches, so the other elements of the row also get groups. For example, `GROUP BY ARRAY_TO_MV(tags) HAVING
@@ -52,7 +49,7 @@ public class PinotFilterAggregateTransposeRule extends FilterAggregateTransposeR
 
   @Override
   public void onMatch(RelOptRuleCall call) {
-    if (!PinotRuleUtils.isMvAggregateEnabled(call) || !readsMvKey(call.rel(0), call.rel(1))) {
+    if (!readsMvKey(call.rel(0), call.rel(1))) {
       super.onMatch(call);
     }
   }

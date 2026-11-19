@@ -33,8 +33,10 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.Sort;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -106,11 +108,11 @@ import org.slf4j.LoggerFactory;
 /// 3. [WithoutSort]:
 ///   Matches Aggregate node if there is no match of [SortProjectAggregate] or [SortAggregate].
 ///
-/// `GROUP BY ARRAY_TO_MV(col)`: when the MV aggregate is enabled (only in the second plan of a query that fails the
-/// `ARRAY_TO_MV` validation without it, see `QueryEnvironment.CompiledQuery`), the group keys whose expression is
-/// exactly `ARRAY_TO_MV(expr)` are MV keys (see [ArrayToMvGroupKeys]). The aggregate is then split into a LEAF
-/// [PinotLogicalMvAggregate] over the array expressions, an EXCHANGE and a plain FINAL aggregate over the scalar
-/// elements, in every position of the plan.
+/// `GROUP BY ARRAY_TO_MV(col)`: the group keys whose expression is exactly `ARRAY_TO_MV(expr)` are MV keys (see
+/// [ArrayToMvGroupKeys]). The aggregate is then split into a LEAF [PinotLogicalMvAggregate] over the array
+/// expressions, an EXCHANGE and a plain FINAL aggregate over the scalar elements.
+/// An aggregate that reads a table scan keeps the plain plan: the leaf stage runs it in the single-stage engine,
+/// which groups by each element, and a server that predates the MV aggregate can run that plan.
 /// An aggregate with grouping sets is never an MV aggregate.
 ///
 /// TODO:
@@ -238,15 +240,12 @@ public class PinotAggregateExchangeNodeInsertRule {
       Map<String, String> hintOptions, @Nullable List<RelFieldCollation> collations, int limit) {
     // WITHIN GROUP collation is not supported in leaf stage aggregation.
     RelCollation withinGroupCollation = extractWithinGroupCollation(aggRel);
-    // Grouping sets over MV keys are not supported by the MV aggregate yet. Such an aggregate keeps the plain plan, as
-    // if the MV aggregate were disabled: it runs when the aggregate is pushed whole to the leaf stage, and the
-    // ARRAY_TO_MV validation rejects it in an intermediate stage.
+    // Grouping sets over MV keys are not supported by the MV aggregate yet. Such an aggregate keeps the plain plan:
+    // it runs when the aggregate is pushed whole to the leaf stage, and the ARRAY_TO_MV validation rejects it in an
+    // intermediate stage.
     List<Integer> mvKeys = List.of();
     if (hasGroupBy && aggRel.getGroupType() == Aggregate.Group.SIMPLE) {
       mvKeys = ArrayToMvGroupKeys.detect(aggRel);
-      if (!mvKeys.isEmpty() && !PinotRuleUtils.isMvAggregateEnabled(call)) {
-        mvKeys = List.of();
-      }
     }
     if (aggRel.getGroupType() != Aggregate.Group.SIMPLE) {
       /// GROUP BY GROUPING SETS / ROLLUP / CUBE only supports the LEAF+EXCHANGE+FINAL split: the DIRECT paths
@@ -278,7 +277,11 @@ public class PinotAggregateExchangeNodeInsertRule {
                 + "engine. Run the query on the single-stage query engine instead.");
       }
     }
-    if (!mvKeys.isEmpty()) {
+    // When the plain plan runs the aggregate in the leaf stage, the single-stage engine groups by each element of the
+    // multi-value column. That plan stays, so a server that predates the MV aggregate can run it.
+    boolean plainPlanRunsInLeafStage = withinGroupCollation == null && !Boolean.parseBoolean(
+        hintOptions.get(PinotHintOptions.AggregateOptions.IS_SKIP_LEAF_STAGE_GROUP_BY)) && readsTableScan(aggRel);
+    if (!mvKeys.isEmpty() && !plainPlanRunsInLeafStage) {
       RelNode mvAggregatePlan =
           createMvAggregatePlan(aggRel, mvKeys, hintOptions, withinGroupCollation, collations, limit);
       if (mvAggregatePlan != null) {
@@ -353,6 +356,16 @@ public class PinotAggregateExchangeNodeInsertRule {
     PinotLogicalExchange exchange = PinotLogicalExchange.create(leafAggRel,
         RelDistributions.hash(ImmutableIntList.range(0, aggRel.getGroupCount())));
     return convertAggFromIntermediateInput(aggRel, exchange, AggType.FINAL, leafReturnFinalResult, collations, limit);
+  }
+
+  /// Returns whether `aggRel` reads a table scan through `Project` and `Filter` nodes only. The leaf stage runs such
+  /// an aggregate in the single-stage engine.
+  private static boolean readsTableScan(Aggregate aggRel) {
+    RelNode node = PinotRuleUtils.unboxRel(aggRel.getInput());
+    while (node instanceof Project || node instanceof Filter) {
+      node = PinotRuleUtils.unboxRel(node.getInput(0));
+    }
+    return node instanceof TableScan;
   }
 
   // TODO: Currently it only handles one WITHIN GROUP collation across all AggregateCalls.
